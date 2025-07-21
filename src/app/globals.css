@@ -122,3 +122,13 @@
 * {
   @apply transition-colors duration-200;
 }
+.progress-rtl {
+  direction: rtl; /* start edge becomes the right side */
+}
+
+.progress-rtl > div {
+  /* the inner “value” bar that shadcn injects */
+  transform: scaleX(
+    -1
+  ); /* mirror it so translateX now reveals from the right */
+}

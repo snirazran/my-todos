@@ -1,22 +1,17 @@
 // app/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import {
-  Calendar as CalendarIcon,
-  History as HistoryIcon,
-  Sparkles as SparklesIcon,
+  Calendar,
+  History,
+  CheckCircle2,
+  Circle,
+  Sparkles,
 } from 'lucide-react';
-
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 
 interface Task {
   id: string;
@@ -26,161 +21,166 @@ interface Task {
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
+  const [loading, setLoading] = useState(true);
   const today = new Date();
   const dateStr = format(today, 'yyyy-MM-dd');
 
-  /* ───────────────────────────────────────── Fetch ───────────────────────────────────────── */
   useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const res = await fetch(`/api/tasks?date=${dateStr}`);
-        const json = await res.json();
-        setTasks(json.tasks ?? []);
-      } catch (err) {
-        console.error('Failed to fetch tasks:', err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
     fetchTasks();
-  }, [dateStr]);
+  }, []);
 
-  const updateTask = async (taskId: string, completed: boolean) => {
+  const fetchTasks = async () => {
+    try {
+      const response = await fetch(`/api/tasks?date=${dateStr}`);
+      const data = await response.json();
+      setTasks(data.tasks || []);
+    } catch (error) {
+      console.error('Failed to fetch tasks:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleTask = async (taskId: string, completed: boolean) => {
     try {
       await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr, taskId, completed }),
       });
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, completed } : t))
+
+      setTasks(
+        tasks.map((task) =>
+          task.id === taskId ? { ...task, completed } : task
+        )
       );
-    } catch (err) {
-      console.error('Failed to update task:', err);
+    } catch (error) {
+      console.error('Failed to update task:', error);
     }
   };
 
-  /* ───────────────────────────────────────── Derived state ───────────────────────────────── */
-  const completed = tasks.filter((t) => t.completed).length;
-  const progress = tasks.length ? (completed / tasks.length) * 100 : 0;
+  const completedCount = tasks.filter((t) => t.completed).length;
+  const completionRate =
+    tasks.length > 0 ? (completedCount / tasks.length) * 100 : 0;
 
-  /* ───────────────────────────────────────── Loading skeleton ────────────────────────────── */
-  if (isLoading) {
+  if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center">
-        <Skeleton className="h-16 w-16 rounded-full" />
-      </main>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-4 border-purple-500 border-t-transparent"></div>
+      </div>
     );
   }
 
-  /* ───────────────────────────────────────── UI ──────────────────────────────────────────── */
   return (
-    <main
-      dir="rtl"
-      className="min-h-screen bg-muted/50 py-10 text-right dark:bg-background"
-    >
-      <div className="mx-auto w-full max-w-3xl space-y-10 px-4">
-        {/* ───────────────────────────── Header ───────────────────────────── */}
-        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
           <div>
-            <h1 className="text-4xl font-extrabold tracking-tight">
+            <h1 className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-white mb-2">
               {format(today, 'EEEE', { locale: he })}
             </h1>
-            <p className="mt-1 flex items-center gap-1 text-muted-foreground">
-              <CalendarIcon className="h-4 w-4" />
+            <p className="text-lg text-slate-600 dark:text-slate-400 flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
               {format(today, 'd בMMMM yyyy', { locale: he })}
             </p>
           </div>
+          <Link
+            href="/history"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-white dark:bg-slate-800 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 text-slate-700 dark:text-slate-200 font-medium"
+          >
+            <History className="w-5 h-5" />
+            היסטוריה
+          </Link>
+        </div>
 
-          <Button asChild variant="secondary" className="gap-2">
-            <Link href="/history">
-              <HistoryIcon className="h-4 w-4" />
-              היסטוריה
-            </Link>
-          </Button>
-        </header>
-
-        {/* ────────────────────────── Progress card ───────────────────────── */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <SparklesIcon className="h-5 w-5 text-primary" />
+        {/* Progress Card */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Sparkles className="w-6 h-6 text-purple-500" />
               ההתקדמות שלך היום
-            </CardTitle>
-            <span className="text-2xl font-bold text-primary">
-              {Math.round(progress)}%
+            </h2>
+            <span className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+              {Math.round(completionRate)}%
             </span>
-          </CardHeader>
-          <CardContent>
-            <Progress value={progress} />
-            <p className="mt-2 text-sm text-muted-foreground">
-              השלמת {completed} מתוך {tasks.length} משימות
-            </p>
-          </CardContent>
-        </Card>
+          </div>
+          <div className="w-full h-3 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all duration-500 ease-out"
+              style={{ width: `${completionRate}%` }}
+            />
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
+            השלמת {completedCount} מתוך {tasks.length} משימות
+          </p>
+        </div>
 
-        {/* ─────────────────────────── Tasks list ─────────────────────────── */}
-        <Card>
-          <CardHeader>
-            <CardTitle>המשימות שלי</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-3">
-              {tasks.map((task, idx) => (
-                <li
-                  key={task.id}
-                  className="flex items-center gap-3 rounded-lg bg-background/50 p-3 shadow-sm
-                           animate-in fade-in slide-in-from-bottom-2"
-                  style={{ animationDelay: `${idx * 40}ms` }}
-                >
-                  <Checkbox
-                    checked={task.completed}
-                    onCheckedChange={(checked) =>
-                      updateTask(task.id, Boolean(checked))
-                    }
-                    className="ml-1 shrink-0"
-                  />
+        {/* Tasks List */}
+        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-6">
+          <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-6">
+            המשימות שלי
+          </h2>
+          <div className="space-y-2">
+            {tasks.map((task, index) => (
+              <div
+                key={task.id}
+                className="group p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-200 cursor-pointer"
+                style={{
+                  animation: `fadeInUp 0.5s ease-out ${index * 0.05}s`,
+                  animationFillMode: 'both',
+                }}
+              >
+                <label className="flex items-center gap-4 cursor-pointer">
+                  <button
+                    onClick={() => toggleTask(task.id, !task.completed)}
+                    className="flex-shrink-0"
+                  >
+                    {task.completed ? (
+                      <CheckCircle2 className="w-6 h-6 text-green-500" />
+                    ) : (
+                      <Circle className="w-6 h-6 text-slate-400 group-hover:text-purple-500 transition-colors" />
+                    )}
+                  </button>
                   <span
-                    className={
-                      task.completed ? 'line-through text-muted-foreground' : ''
-                    }
+                    className={`text-lg transition-all duration-200 ${
+                      task.completed
+                        ? 'text-slate-400 dark:text-slate-500 line-through'
+                        : 'text-slate-700 dark:text-slate-200'
+                    }`}
                   >
                     {task.text}
                   </span>
                   {task.completed && (
-                    <Badge
-                      variant="outline"
-                      className="mr-auto animate-bounce text-lg leading-none"
-                    >
-                      ✨
-                    </Badge>
+                    <span className="mr-auto text-xl animate-bounce">✨</span>
                   )}
-                </li>
-              ))}
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
 
-              {tasks.length === 0 && (
-                <p className="text-center text-muted-foreground">
-                  אין לך משימות להיום ✨
-                </p>
-              )}
-            </ul>
-          </CardContent>
-        </Card>
-
-        {/* ─────────────────── Finished-all congratulation ─────────────────── */}
-        {progress === 100 && (
-          <Card className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white animate-pulse">
-            <CardHeader>
-              <CardTitle className="flex flex-col items-center gap-1">
-                <span className="text-3xl">🎉 כל הכבוד! 🎉</span>
-                <span className="text-lg">השלמת את כל המשימות להיום!</span>
-              </CardTitle>
-            </CardHeader>
-          </Card>
+        {/* Completion Message */}
+        {completionRate === 100 && (
+          <div className="mt-6 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-2xl shadow-lg p-6 text-center animate-pulse">
+            <h3 className="text-2xl font-bold mb-2">🎉 כל הכבוד! 🎉</h3>
+            <p className="text-lg">השלמת את כל המשימות להיום!</p>
+          </div>
         )}
       </div>
+
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </main>
   );
 }
