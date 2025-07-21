@@ -15,7 +15,7 @@ interface DayRecord {
   tasks: TaskItem[];
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const client = await clientPromise;
     const db = client.db('todoTracker');
@@ -23,16 +23,20 @@ export async function GET(request: NextRequest) {
 
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const cutoff = thirtyDaysAgo.toISOString().split('T')[0];
 
     const history = await collection
-      .find({
-        date: { $gte: thirtyDaysAgo.toISOString().split('T')[0] },
-      })
-      .sort({ date: -1 })
+      .aggregate([
+        { $match: { date: { $gte: cutoff } } },
+        { $sort: { date: -1, _id: -1 } }, // newest first
+        { $group: { _id: '$date', doc: { $first: '$$ROOT' } } },
+        { $replaceRoot: { newRoot: '$doc' } },
+        { $sort: { date: -1 } }, // final order by date
+      ])
       .toArray();
 
     return NextResponse.json(history);
-  } catch (error) {
+  } catch (err) {
     return NextResponse.json(
       { error: 'Failed to fetch history' },
       { status: 500 }

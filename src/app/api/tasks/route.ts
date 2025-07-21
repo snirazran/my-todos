@@ -18,35 +18,34 @@ interface DayRecord {
 
 export async function GET(request: NextRequest) {
   try {
+    /* 1 ▸ resolve the requested calendar-day string (local YYYY-MM-DD) */
     const { searchParams } = new URL(request.url);
     const date =
-      searchParams.get('date') || new Date().toISOString().split('T')[0];
+      searchParams.get('date') ?? new Date().toISOString().split('T')[0];
 
     const client = await clientPromise;
     const db = client.db('todoTracker');
     const collection = db.collection<DayRecord>('dailyTasks');
 
-    let dayRecord = await collection.findOne({ date });
+    /* 2 ▸ create-if-missing with an **UPSERT** (no duplicates possible) */
+    const dateObj = new Date(date);
+    const dayOfWeek = dateObj.getDay();
+    const defaultTasks = getTodaysTasks(dayOfWeek).map((t) => ({
+      ...t,
+      completed: false,
+    }));
 
-    if (!dayRecord) {
-      const dateObj = new Date(date);
-      const dayOfWeek = dateObj.getDay();
-      const tasks = getTodaysTasks(dayOfWeek);
+    await collection.updateOne(
+      { date }, // query
+      { $setOnInsert: { date, tasks: defaultTasks } },
+      { upsert: true }
+    );
 
-      const newDayRecord: DayRecord = {
-        date,
-        tasks: tasks.map((task) => ({
-          ...task,
-          completed: false,
-        })),
-      };
-
-      const result = await collection.insertOne(newDayRecord);
-      dayRecord = { ...newDayRecord, _id: result.insertedId };
-    }
+    /* 3 ▸ now read the single, authoritative row */
+    const dayRecord = await collection.findOne({ date });
 
     return NextResponse.json(dayRecord);
-  } catch (error) {
+  } catch (err) {
     return NextResponse.json(
       { error: 'Failed to fetch tasks' },
       { status: 500 }
