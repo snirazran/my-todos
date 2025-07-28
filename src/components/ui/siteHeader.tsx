@@ -36,12 +36,12 @@ export default function SiteHeader() {
             onClick={() => signOut()}
             className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium transition rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
           >
-            🚪 התנתקות
+            התנתק
           </button>
         ) : (
           <button
             onClick={() => signIn()}
-            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white transition bg-violet-600 rounded-lg hover:bg-purple-700"
+            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white transition rounded-lg bg-violet-600 hover:bg-purple-700"
           >
             🔑 התחברות
           </button>
