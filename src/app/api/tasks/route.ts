@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
 import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
@@ -9,13 +11,17 @@ interface TaskItem {
   order: number;
   completed: boolean;
 }
+
 interface DayRecord {
   _id?: ObjectId;
-  date: string;
+  userId: ObjectId;
+  date: string; // YYYY‑MM‑DD
   tasks: TaskItem[];
 }
+
 interface WeeklyDoc {
   _id?: ObjectId;
+  userId: ObjectId;
   dayOfWeek: number; // 0 = Sunday … 6 = Saturday
   tasks: { id: string; text: string; order: number }[];
 }
@@ -24,7 +30,15 @@ interface WeeklyDoc {
 /* GET – return (and lazily create) the list for the requested calendar‑day
 /* ===================================================================== */
 export async function GET(req: NextRequest) {
+  /* ---------- auth ---------- */
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  }
+  const userId = new ObjectId(session.user.id);
+
   try {
+    /* resolve the day */
     const date =
       new URL(req.url).searchParams.get('date') ??
       new Date().toISOString().split('T')[0];
@@ -34,25 +48,23 @@ export async function GET(req: NextRequest) {
     const daysCol = db.collection<DayRecord>('dailyTasks');
     const weeklyCol = db.collection<WeeklyDoc>('weeklyTasks');
 
-    /* build today’s template from weeklyTasks */
+    /* build today’s template from weeklyTasks (per‑user) */
     const dow = new Date(date).getDay();
-    const weekly = (await weeklyCol.findOne({ dayOfWeek: dow }))?.tasks ?? [];
+    const weekly =
+      (await weeklyCol.findOne({ userId, dayOfWeek: dow }))?.tasks ?? [];
     const template = weekly
       .sort((a, b) => a.order - b.order)
       .map((t) => ({ ...t, completed: false }));
 
-    /* ------------------------------------------------------- */
-    /* 1. create document if it doesn’t exist                  */
-    /* ------------------------------------------------------- */
+    /* 1 ▸ upsert today’s row */
     await daysCol.updateOne(
-      { date },
-      { $setOnInsert: { date, tasks: template } },
+      { userId, date },
+      { $setOnInsert: { userId, date, tasks: template } },
       { upsert: true }
     );
 
-    /* 2. if the document already existed *and* is still empty,
-          or you added new weekly tasks later, merge them in   */
-    let dayRecord = await daysCol.findOne({ date });
+    /* 2 ▸ merge newly‑added weekly tasks (so old days get new tasks) */
+    let dayRecord = await daysCol.findOne({ userId, date });
 
     if (dayRecord && template.length) {
       const missing = template.filter(
@@ -60,15 +72,16 @@ export async function GET(req: NextRequest) {
       );
       if (missing.length) {
         await daysCol.updateOne(
-          { date },
+          { userId, date },
           { $push: { tasks: { $each: missing } } }
         );
-        dayRecord = await daysCol.findOne({ date }); // refresh
+        dayRecord = await daysCol.findOne({ userId, date });
       }
     }
 
     return NextResponse.json(dayRecord);
-  } catch {
+  } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { error: 'Failed to fetch tasks' },
       { status: 500 }
@@ -77,9 +90,15 @@ export async function GET(req: NextRequest) {
 }
 
 /* ===================================================================== */
-/* PUT – toggle a single task’s ‘completed’ flag (unchanged)              */
+/* PUT – toggle a single task’s ‘completed’ flag                          */
 /* ===================================================================== */
 export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
+  }
+  const userId = new ObjectId(session.user.id);
+
   try {
     const { date, taskId, completed } = await request.json();
 
@@ -89,12 +108,13 @@ export async function PUT(request: NextRequest) {
       .collection<DayRecord>('dailyTasks');
 
     await collection.updateOne(
-      { date, 'tasks.id': taskId },
+      { userId, date, 'tasks.id': taskId },
       { $set: { 'tasks.$.completed': completed } }
     );
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error(err);
     return NextResponse.json(
       { error: 'Failed to update task' },
       { status: 500 }

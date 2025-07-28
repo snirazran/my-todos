@@ -36,9 +36,23 @@ export default function ManageTasks() {
 
   /* ─────────────── fetch once ────────────── */
   useEffect(() => {
-    fetch('/api/manage-tasks')
-      .then((r) => r.json())
-      .then(setWeek);
+    (async () => {
+      try {
+        const res = await fetch('/api/manage-tasks');
+        if (!res.ok) throw new Error(`status ${res.status}`);
+        const data = await res.json();
+
+        // we expect an array[7]; make sure before storing
+        if (Array.isArray(data)) {
+          setWeek(data);
+        } else {
+          console.error('Unexpected /api/manage‑tasks payload:', data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch weekly tasks:', err);
+        // leave week as the default empty 7‑slot array
+      }
+    })();
   }, []);
 
   /* ─────────────── dnd kit ───────────────── */
@@ -113,7 +127,7 @@ export default function ManageTasks() {
 
         {/* Week grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {week.map((dayTasks, idx) => (
+          {(Array.isArray(week) ? week : []).map((dayTasks, idx) => (
             <section
               key={idx}
               className="min-w-[230px] flex flex-col p-4 bg-white shadow dark:bg-slate-800 rounded-2xl"

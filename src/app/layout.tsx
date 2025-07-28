@@ -2,7 +2,8 @@
 import type { Metadata } from 'next';
 import { Rubik } from 'next/font/google';
 import './globals.css';
-
+import Providers from './providers';
+import SiteHeader from '@/components/ui/siteHeader';
 const rubik = Rubik({
   subsets: ['hebrew', 'latin'],
   display: 'swap',
@@ -20,7 +21,12 @@ export default function RootLayout({
 }) {
   return (
     <html lang="he" dir="rtl">
-      <body className={`${rubik.className} antialiased`}>{children}</body>
+      <body className={`${rubik.className} antialiased`}>
+        <Providers>
+          <SiteHeader />
+          {children}
+        </Providers>
+      </body>
     </html>
   );
 }
