@@ -2,7 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, GripVertical, Trash2, ArrowRight } from 'lucide-react';
+import {
+  Plus,
+  GripVertical,
+  Trash2,
+  ArrowRight,
+  ArrowLeft,
+} from 'lucide-react';
 import { arrayMoveImmutable } from 'array-move';
 import {
   DndContext,
@@ -74,30 +80,35 @@ export default function ManageTasks() {
     <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8">
       <div className="mx-auto max-w-7xl">
         {/* Header row (matches today/history pages) */}
-        <div className="flex flex-col items-start justify-between gap-4 mb-14 md:flex-row md:items-center">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg text-slate-700 dark:text-slate-200"
-          >
-            <ArrowRight className="w-5 h-5 rotate-180" />
-            חזרה להיום
-          </Link>
-          <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col gap-4 mb-8 md:mb-14 md:flex-row md:items-center md:justify-between">
+          {/* title + subtitle */}
+          <div className="text-right ">
             <h1 className="text-3xl font-bold md:text-4xl text-slate-900 dark:text-white">
               ניהול משימות שבועי
             </h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400">
+            <p className="text-base md:text-lg text-slate-600 dark:text-slate-400">
               צעדים קטנים, ניצחונות גדולים
             </p>
           </div>
 
-          <button
-            onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg text-slate-700 dark:text-slate-200"
-          >
-            <Plus className="w-5 h-5 text-purple-600" />
-            הוסף משימה
-          </button>
+          {/* buttons wrapper */}
+          <div className="flex self-start gap-2 md:self-auto">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg text-slate-700 dark:text-slate-200"
+            >
+              <ArrowLeft className="w-5 h-5 rotate-180" />
+              חזרה להיום
+            </Link>
+
+            <button
+              onClick={() => setShowModal(true)}
+              className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg text-slate-700 dark:text-slate-200"
+            >
+              <Plus className="w-5 h-5 text-purple-600" />
+              הוסף משימה
+            </button>
+          </div>
         </div>
 
         {/* Week grid */}
