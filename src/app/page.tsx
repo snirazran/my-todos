@@ -285,7 +285,7 @@ function TaskList({
     <>
       <div className="p-6 bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
         <h2 className="mb-6 text-2xl font-bold text-slate-900 dark:text-white">
-          המשימות שלי
+          המשימות שלך היום:
         </h2>
         <div className="space-y-2">
           {tasks.map((task, i) => (

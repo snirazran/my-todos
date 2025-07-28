@@ -1,19 +1,15 @@
+// src/app/manage-tasks/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-  Plus,
-  GripVertical,
-  Trash2,
-  ArrowRight,
-  ArrowLeft,
-} from 'lucide-react';
+import { Plus, GripVertical, Trash2, ArrowLeft } from 'lucide-react';
 import { arrayMoveImmutable } from 'array-move';
 import {
   DndContext,
   closestCenter,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
@@ -24,39 +20,41 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
+/* ---------- types ---------- */
 type Task = { id: string; text: string; order: number };
 const hebrewDays = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
 
+/* =================================================================== */
+/*  PAGE                                                               */
+/* =================================================================== */
 export default function ManageTasks() {
-  /* ───────────────── state ───────────────── */
+  /* ---------------- state ---------------- */
   const [week, setWeek] = useState<Task[][]>(
     Array.from({ length: 7 }, () => [])
   );
   const [showModal, setShowModal] = useState(false);
 
-  /* ─────────────── fetch once ────────────── */
+  /* ---------------- initial fetch ---------------- */
   useEffect(() => {
     (async () => {
       try {
         const res = await fetch('/api/manage-tasks');
         if (!res.ok) throw new Error(`status ${res.status}`);
         const data = await res.json();
-
-        // we expect an array[7]; make sure before storing
-        if (Array.isArray(data)) {
-          setWeek(data);
-        } else {
-          console.error('Unexpected /api/manage‑tasks payload:', data);
-        }
+        if (Array.isArray(data)) setWeek(data);
       } catch (err) {
         console.error('Failed to fetch weekly tasks:', err);
-        // leave week as the default empty 7‑slot array
       }
     })();
   }, []);
 
-  /* ─────────────── dnd kit ───────────────── */
-  const sensors = useSensors(useSensor(PointerSensor));
+  /* ---------------- dnd‑kit sensors ---------------- */
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 5 },
+    })
+  );
 
   const handleDragEnd = async (e: any, day: number) => {
     const { active, over } = e;
@@ -67,11 +65,13 @@ export default function ManageTasks() {
       const oldIdx = clone[day].findIndex((t) => t.id === active.id);
       const newIdx = clone[day].findIndex((t) => t.id === over.id);
       clone[day] = arrayMoveImmutable(clone[day], oldIdx, newIdx);
+
       fetch('/api/manage-tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ day, tasks: clone[day] }),
       });
+
       return clone;
     });
   };
@@ -89,14 +89,13 @@ export default function ManageTasks() {
     });
   };
 
-  /* ───────────────── UI ──────────────────── */
+  /* ---------------- UI ---------------- */
   return (
     <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8">
       <div className="mx-auto max-w-7xl">
-        {/* Header row (matches today/history pages) */}
+        {/* ---------- header ---------- */}
         <div className="flex flex-col gap-4 mb-8 md:mb-14 md:flex-row md:items-center md:justify-between">
-          {/* title + subtitle */}
-          <div className="text-right ">
+          <div className="text-right">
             <h1 className="text-3xl font-bold md:text-4xl text-slate-900 dark:text-white">
               ניהול משימות שבועי
             </h1>
@@ -105,7 +104,6 @@ export default function ManageTasks() {
             </p>
           </div>
 
-          {/* buttons wrapper */}
           <div className="flex self-start gap-2 md:self-auto">
             <Link
               href="/"
@@ -119,15 +117,15 @@ export default function ManageTasks() {
               onClick={() => setShowModal(true)}
               className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg text-slate-700 dark:text-slate-200"
             >
-              <Plus className="w-5 h-5 text-purple-600" />
+              <Plus className="w-5 h-5 text-violet-600" />
               הוסף משימה
             </button>
           </div>
         </div>
 
-        {/* Week grid */}
+        {/* ---------- week grid ---------- */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {(Array.isArray(week) ? week : []).map((dayTasks, idx) => (
+          {week.map((dayTasks, idx) => (
             <section
               key={idx}
               className="min-w-[230px] flex flex-col p-4 bg-white shadow dark:bg-slate-800 rounded-2xl"
@@ -159,7 +157,7 @@ export default function ManageTasks() {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* ---------- modal ---------- */}
       {showModal && (
         <AddTaskModal
           onClose={() => setShowModal(false)}
@@ -178,7 +176,9 @@ export default function ManageTasks() {
   );
 }
 
-/* ─────────────── Sortable row ────────────── */
+/* =================================================================== */
+/*  SORTABLE TASK ROW                                                  */
+/* =================================================================== */
 function SortableTask({
   task,
   onDelete,
@@ -192,14 +192,17 @@ function SortableTask({
   return (
     <div
       ref={setNodeRef}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
-      className="flex items-center gap-3 p-3 mb-2 transition rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
+      {...attributes}
+      {...listeners}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        touchAction: 'none',
+      }}
+      className="flex items-center gap-3 p-3 mb-2 select-none rounded-xl cursor-grab active:cursor-grabbing bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
     >
-      <GripVertical
-        className="cursor-grab text-slate-400 dark:text-slate-500"
-        {...attributes}
-        {...listeners}
-      />
+      {/* decorative grip icon */}
+      <GripVertical className="shrink-0 text-slate-400 dark:text-slate-500" />
       <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
         {task.text}
       </span>
@@ -210,7 +213,9 @@ function SortableTask({
   );
 }
 
-/* ─────────────── Add‑task modal ───────────── */
+/* =================================================================== */
+/*  ADD‑TASK MODAL                                                     */
+/* =================================================================== */
 function AddTaskModal({
   onClose,
   onSave,
@@ -237,7 +242,7 @@ function AddTaskModal({
           placeholder="שם משימה"
           value={text}
           onChange={(e) => setText(e.target.value)}
-          className="w-full px-3 py-2 mb-4 text-base border rounded-lg dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-purple-500"
+          className="w-full px-3 py-2 mb-4 text-base border rounded-lg dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-violet-500"
         />
         <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
           בחר ימים:
@@ -267,7 +272,7 @@ function AddTaskModal({
           <button
             disabled={!text || days.length === 0}
             onClick={() => onSave(text, days)}
-            className="px-4 py-2 text-base font-medium text-white bg-violet-600 rounded-lg disabled:opacity-50 hover:bg-purple-700"
+            className="px-4 py-2 text-base font-medium text-white rounded-lg bg-violet-600 disabled:opacity-50 hover:bg-violet-700"
           >
             שמירה
           </button>
