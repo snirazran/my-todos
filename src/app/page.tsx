@@ -112,18 +112,29 @@ export default function Home() {
           /* ───────── guest branch ───────── */
           <>
             {/* login prompt */}
-            <div className="p-8 mb-8 text-center bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
-              <h2 className="mb-4 text-2xl font-bold text-slate-900 dark:text-white">
-                ברוך הבא!
+            <div className="relative p-10 mb-8 overflow-hidden text-center bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
+              {/* headline + gradient logo */}
+              <h2 className="mb-6 text-2xl font-bold text-slate-900 dark:text-white">
+                ברוך הבא ל&nbsp;
+                <Link
+                  href="/"
+                  className="relative inline-flex items-center gap-1 text-transparent bg-gradient-to-r from-violet-400 via-fuchsia-500 to-purple-600 bg-clip-text hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+                >
+                  מה&nbsp;אומר?
+                  {/* sparkle */}
+                  <Sparkles className="w-4 h-4 text-fuchsia-500 animate-float" />
+                </Link>
               </h2>
-              <p className="mb-6 text-slate-600 dark:text-slate-400">
+
+              <p className="mb-8 text-slate-600 dark:text-slate-400">
                 התחבר כדי ליצור משימות שבועיות ולעקוב אחרי ההתקדמות היומית שלך.
               </p>
+
               <button
                 onClick={() => signIn()}
-                className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white bg-purple-600 shadow-md rounded-xl hover:bg-purple-700"
+                className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white shadow-md bg-violet-600 rounded-xl hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-400"
               >
-                🚀 התחברות / הרשמה בחינם!
+                🚀 התחברות / הרשמה בחינם!
               </button>
             </div>
 
@@ -150,7 +161,7 @@ export default function Home() {
                 </p>
                 <Link
                   href="/manage-tasks"
-                  className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white bg-purple-600 shadow-md rounded-xl hover:bg-purple-700"
+                  className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white shadow-md bg-violet-600 rounded-xl hover:bg-purple-700"
                 >
                   🛠️ יצירת משימות
                 </Link>

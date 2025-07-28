@@ -249,7 +249,7 @@ function AddTaskModal({
               onClick={() => toggleDay(i)}
               className={`px-2 py-1 rounded-lg font-medium ${
                 days.includes(i)
-                  ? 'bg-purple-600 text-white'
+                  ? 'bg-violet-600 text-white'
                   : 'bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200'
               }`}
             >
@@ -267,7 +267,7 @@ function AddTaskModal({
           <button
             disabled={!text || days.length === 0}
             onClick={() => onSave(text, days)}
-            className="px-4 py-2 text-base font-medium text-white bg-purple-600 rounded-lg disabled:opacity-50 hover:bg-purple-700"
+            className="px-4 py-2 text-base font-medium text-white bg-violet-600 rounded-lg disabled:opacity-50 hover:bg-purple-700"
           >
             שמירה
           </button>

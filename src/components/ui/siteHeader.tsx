@@ -28,9 +28,6 @@ export default function SiteHeader() {
           />
 
           {/* animated underline in matching hues */}
-          <span className="absolute -bottom-1 left-0 h-0.5 w-full overflow-hidden">
-            <span className="block h-full w-full translate-x-[-100%] bg-gradient-to-r from-violet-400 via-fuchsia-500 to-purple-600 animate-logo-line" />
-          </span>
         </Link>
 
         {/* ───────── Auth button (unchanged) ───────── */}
@@ -44,7 +41,7 @@ export default function SiteHeader() {
         ) : (
           <button
             onClick={() => signIn()}
-            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white transition bg-purple-600 rounded-lg hover:bg-purple-700"
+            className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white transition bg-violet-600 rounded-lg hover:bg-purple-700"
           >
             🔑 התחברות
           </button>

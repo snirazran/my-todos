@@ -13,6 +13,23 @@ module.exports = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      /* 🔹 animation support ↓↓↓ */
+      /* ─── animations used by the logo ─── */
+      keyframes: {
+        float: {
+          '0%,100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-4px)' },
+        },
+        'logo-line': {
+          '0%': { transform: 'translateX(-100%)' },
+          '60%': { transform: 'translateX(100%)' },
+          '100%': { transform: 'translateX(100%)' },
+        },
+      },
+      animation: {
+        float: 'float 3s ease-in-out infinite',
+        'logo-line': 'logo-line 3s ease-in-out infinite',
+      },
       colors: {
         // every key here becomes a colour-utility name
         background: 'hsl(var(--background))',

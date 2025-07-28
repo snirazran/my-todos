@@ -173,7 +173,7 @@ export default function History() {
               </p>
               <button
                 onClick={() => signIn()}
-                className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white bg-purple-600 shadow-md rounded-xl hover:bg-purple-700"
+                className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white bg-violet-600 shadow-md rounded-xl hover:bg-purple-700"
               >
                 🚀 התחברות / הרשמה בחינם!
               </button>
@@ -211,7 +211,7 @@ export default function History() {
                 </p>
                 <Link
                   href="/manage-tasks"
-                  className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white bg-purple-600 shadow-md rounded-xl hover:bg-purple-700"
+                  className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white bg-violet-600 shadow-md rounded-xl hover:bg-purple-700"
                 >
                   🛠️ יצירת משימות
                 </Link>

@@ -100,7 +100,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3 text-lg font-semibold text-white transition bg-purple-600 rounded-xl hover:bg-purple-700 disabled:opacity-50"
+            className="w-full py-3 text-lg font-semibold text-white transition bg-violet-600 rounded-xl hover:bg-purple-700 disabled:opacity-50"
           >
             {submitting ? 'טוען…' : 'התחבר'}
           </button>
