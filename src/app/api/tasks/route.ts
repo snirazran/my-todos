@@ -1,51 +1,74 @@
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
-import { getTodaysTasks } from '@/lib/tasks';
 import { ObjectId } from 'mongodb';
 
+/* ---------- types ---------- */
 interface TaskItem {
   id: string;
   text: string;
   order: number;
   completed: boolean;
 }
-
 interface DayRecord {
   _id?: ObjectId;
   date: string;
   tasks: TaskItem[];
 }
+interface WeeklyDoc {
+  _id?: ObjectId;
+  dayOfWeek: number; // 0 = Sunday … 6 = Saturday
+  tasks: { id: string; text: string; order: number }[];
+}
 
-export async function GET(request: NextRequest) {
+/* ===================================================================== */
+/* GET – return (and lazily create) the list for the requested calendar‑day
+/* ===================================================================== */
+export async function GET(req: NextRequest) {
   try {
-    /* 1 ▸ resolve the requested calendar-day string (local YYYY-MM-DD) */
-    const { searchParams } = new URL(request.url);
     const date =
-      searchParams.get('date') ?? new Date().toISOString().split('T')[0];
+      new URL(req.url).searchParams.get('date') ??
+      new Date().toISOString().split('T')[0];
 
     const client = await clientPromise;
     const db = client.db('todoTracker');
-    const collection = db.collection<DayRecord>('dailyTasks');
+    const daysCol = db.collection<DayRecord>('dailyTasks');
+    const weeklyCol = db.collection<WeeklyDoc>('weeklyTasks');
 
-    /* 2 ▸ create-if-missing with an **UPSERT** (no duplicates possible) */
-    const dateObj = new Date(date);
-    const dayOfWeek = dateObj.getDay();
-    const defaultTasks = getTodaysTasks(dayOfWeek).map((t) => ({
-      ...t,
-      completed: false,
-    }));
+    /* build today’s template from weeklyTasks */
+    const dow = new Date(date).getDay();
+    const weekly = (await weeklyCol.findOne({ dayOfWeek: dow }))?.tasks ?? [];
+    const template = weekly
+      .sort((a, b) => a.order - b.order)
+      .map((t) => ({ ...t, completed: false }));
 
-    await collection.updateOne(
-      { date }, // query
-      { $setOnInsert: { date, tasks: defaultTasks } },
+    /* ------------------------------------------------------- */
+    /* 1. create document if it doesn’t exist                  */
+    /* ------------------------------------------------------- */
+    await daysCol.updateOne(
+      { date },
+      { $setOnInsert: { date, tasks: template } },
       { upsert: true }
     );
 
-    /* 3 ▸ now read the single, authoritative row */
-    const dayRecord = await collection.findOne({ date });
+    /* 2. if the document already existed *and* is still empty,
+          or you added new weekly tasks later, merge them in   */
+    let dayRecord = await daysCol.findOne({ date });
+
+    if (dayRecord && template.length) {
+      const missing = template.filter(
+        (tpl) => !dayRecord!.tasks.some((d) => d.id === tpl.id)
+      );
+      if (missing.length) {
+        await daysCol.updateOne(
+          { date },
+          { $push: { tasks: { $each: missing } } }
+        );
+        dayRecord = await daysCol.findOne({ date }); // refresh
+      }
+    }
 
     return NextResponse.json(dayRecord);
-  } catch (err) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to fetch tasks' },
       { status: 500 }
@@ -53,14 +76,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/* ===================================================================== */
+/* PUT – toggle a single task’s ‘completed’ flag (unchanged)              */
+/* ===================================================================== */
 export async function PUT(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { date, taskId, completed } = body;
+    const { date, taskId, completed } = await request.json();
 
     const client = await clientPromise;
-    const db = client.db('todoTracker');
-    const collection = db.collection<DayRecord>('dailyTasks');
+    const collection = client
+      .db('todoTracker')
+      .collection<DayRecord>('dailyTasks');
 
     await collection.updateOne(
       { date, 'tasks.id': taskId },
@@ -68,7 +94,7 @@ export async function PUT(request: NextRequest) {
     );
 
     return NextResponse.json({ success: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: 'Failed to update task' },
       { status: 500 }
