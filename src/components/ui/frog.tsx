@@ -2,7 +2,8 @@
 'use client';
 
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
-import { motion, Variants } from 'framer-motion';
+// ✅ Import the new CSS file
+import './frog.css';
 
 export interface FrogHandle {
   getMouthPoint: () => { x: number; y: number };
@@ -10,49 +11,42 @@ export interface FrogHandle {
 
 interface FrogProps {
   className?: string;
-  /** show the open‑mouth SVG while the tongue is out */
   mouthOpen?: boolean;
 }
 
-/* subtle idle motion */
-const breathe: Variants = {
-  idle: {
-    y: [0, -2, 0, 1, 0],
-    transition: { duration: 4, ease: 'easeInOut', repeat: Infinity },
-  },
-};
+const Frog = React.memo(
+  forwardRef<FrogHandle, FrogProps>(
+    ({ className = '', mouthOpen = false }, ref) => {
+      const imgRef = useRef<HTMLImageElement>(null);
 
-const Frog = forwardRef<FrogHandle, FrogProps>(
-  ({ className = '', mouthOpen = false }, ref) => {
-    const imgRef = useRef<HTMLImageElement>(null);
+      useImperativeHandle(ref, () => ({
+        getMouthPoint: () => {
+          const r = imgRef.current!.getBoundingClientRect();
+          return { x: r.left + r.width / 1.95, y: r.top + r.height * 0.55 };
+        },
+      }));
 
-    /* expose mouth centre */
-    useImperativeHandle(ref, () => ({
-      getMouthPoint: () => {
-        const r = imgRef.current!.getBoundingClientRect();
-        return { x: r.left + r.width / 1.95, y: r.top + r.height * 0.55 };
-      },
-    }));
+      // Combine the passed className with our animation class
+      const combinedClassName = `frog-bob-animation ${className}`.trim();
 
-    return (
-      <motion.img
-        ref={imgRef}
-        src={mouthOpen ? '/frog-rtl-mouth.svg' : '/frog-rtl.svg'}
-        width={200}
-        height={140}
-        alt="frog"
-        initial="idle"
-        animate="idle"
-        variants={breathe}
-        style={{
-          display: 'block',
-          transform: 'scaleX(-1)',
-          transformOrigin: '50% 70%',
-        }}
-        className={className}
-      />
-    );
-  }
+      return (
+        <img
+          ref={imgRef}
+          src={mouthOpen ? '/frog-rtl-mouth.svg' : '/frog-rtl.svg'}
+          width={200}
+          height={140}
+          alt="frog"
+          // We still keep these styles for performance
+          style={{
+            display: 'block',
+            transformOrigin: '50% 70%',
+            willChange: 'transform',
+          }}
+          className={combinedClassName}
+        />
+      );
+    }
+  )
 );
 
 export default Frog;

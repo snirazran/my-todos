@@ -1,0 +1,20 @@
+/* components/ui/Frog.css */
+
+.frog-bob-animation {
+  /* Binds the animation keyframes to this class */
+  animation: gentle-bob 1.57s ease-in-out infinite;
+}
+
+/* Defines the animation steps */
+@keyframes gentle-bob {
+  0% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(1.75px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}

@@ -173,7 +173,7 @@ export default function History() {
               </p>
               <button
                 onClick={() => signIn()}
-                className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white bg-violet-600 shadow-md rounded-xl hover:bg-purple-700"
+                className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white shadow-md bg-violet-600 rounded-xl hover:bg-purple-700"
               >
                 🚀 התחברות / הרשמה בחינם!
               </button>
@@ -211,7 +211,7 @@ export default function History() {
                 </p>
                 <Link
                   href="/manage-tasks"
-                  className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white bg-violet-600 shadow-md rounded-xl hover:bg-purple-700"
+                  className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white shadow-md bg-violet-600 rounded-xl hover:bg-purple-700"
                 >
                   🛠️ יצירת משימות
                 </Link>
@@ -347,7 +347,7 @@ function HistoryCard({ day, index }: { day: DayRecord; index: number }) {
           </h2>
           <p className="text-sm text-slate-600 dark:text-slate-400">
             {hasTasks
-              ? `${completedCount} / ${totalCount} tasks completed`
+              ? `${completedCount} / ${totalCount} משימות הושלמו`
               : 'אין עדיין משימות ליום זה'}
           </p>
         </div>

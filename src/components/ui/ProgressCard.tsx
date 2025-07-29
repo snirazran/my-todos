@@ -11,7 +11,7 @@ interface ProgressCardProps {
 
 export default function ProgressCard({ rate, done, total }: ProgressCardProps) {
   return (
-    <div className="p-6 mb-6 bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
+    <div className="z-10 p-6 mb-6 bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
       <div className="flex items-center justify-between mb-4">
         <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-white">
           <Sparkles className="w-6 h-6 text-purple-500" />
