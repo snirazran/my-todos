@@ -1,99 +1,129 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
-import {
-  Calendar,
-  History,
-  CheckCircle2,
-  Circle,
-  Sparkles,
-} from 'lucide-react';
-import { signIn, signOut, useSession } from 'next-auth/react';
+import { Calendar, History, CheckCircle2 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { motion } from 'framer-motion';
 
-/* ---------- types ---------- */
+import Frog, { FrogHandle } from '@/components/ui/frog';
+import Fly from '@/components/ui/fly';
+import ProgressCard from '@/components/ui/ProgressCard';
+import TaskList from '@/components/ui/TaskList';
+const TONGUE_MS = 600;
+const FLY_PX = 24;
+const HIT_AT = 0.5;
 interface Task {
   id: string;
   text: string;
   completed: boolean;
 }
 
-/* ---------- guest demo tasks ---------- */
 const demoTasks: Task[] = [
-  { id: 'g1', text: 'מדיטציה', completed: true },
-  { id: 'g2', text: 'קריאת ספר', completed: true },
-  { id: 'g3', text: 'קניות לבית', completed: true },
-  { id: 'g4', text: 'שתיית 2 ליטר מים', completed: true },
-  { id: 'g5', text: 'הליכה 5,000 צעדים', completed: true },
-  { id: 'g6', text: 'תרגול יוגה', completed: true },
-  { id: 'g7', text: 'כתיבת יומן', completed: true },
-  { id: 'g8', text: 'לבדוק שאין מפלצת מתחת למיטה', completed: false },
+  /* …demo tasks… */
 ];
 
-/* ──────────── Top‑bar auth button ──────────── */
-
 export default function Home() {
+  /* ---------- auth & refs ---------- */
   const { data: session } = useSession();
   const router = useRouter();
+  const frogRef = useRef<FrogHandle>(null);
+  const flyRefs = useRef<Record<string, HTMLImageElement | null>>({});
 
-  /* ---------------- real tasks ---------------- */
+  /* ---------- state ---------- */
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
   const [loading, setLoading] = useState(true);
+  const [grab, setGrab] = useState<{
+    taskId: string;
+    completed: boolean;
+    origin: { x: number; y: number };
+    target: { x: number; y: number };
+  } | null>(null);
+
+  /* ---------- date helpers ---------- */
   const today = new Date();
   const dateStr = format(today, 'yyyy-MM-dd');
+  const data = session ? tasks : guestTasks;
+  const doneCount = data.filter((t) => t.completed).length;
+  const rate = data.length ? (doneCount / data.length) * 100 : 0;
 
+  /* ---------- fetch real tasks ---------- */
   useEffect(() => {
-    if (!session) return;
+    if (!session) {
+      setLoading(false);
+      return;
+    }
     (async () => {
       try {
         const res = await fetch(`/api/tasks?date=${dateStr}`);
-        const data = await res.json();
-        setTasks(data.tasks ?? []);
+        const json = await res.json();
+        setTasks(json.tasks ?? []);
       } finally {
         setLoading(false);
       }
     })();
   }, [session, dateStr]);
 
-  const toggleTask = async (taskId: string, completed?: boolean) => {
-    await fetch('/api/tasks', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        date: dateStr,
-        taskId,
-        completed:
-          completed !== undefined
-            ? completed
-            : !tasks.find((t) => t.id === taskId)?.completed,
-      }),
-    });
-
-    setTasks((t) =>
-      t.map((x) =>
-        x.id === taskId ? { ...x, completed: completed ?? !x.completed } : x
-      )
-    );
+  /* ---------- persistence helper ---------- */
+  const persistTask = async (taskId: string, completed: boolean) => {
+    if (session) {
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr, taskId, completed }),
+      });
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, completed } : t))
+      );
+    } else {
+      setGuestTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, completed } : t))
+      );
+    }
   };
 
-  /* ---------------- demo tasks ---------------- */
-  const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
-  const toggleGuestTask = (id: string, completed?: boolean) =>
-    setGuestTasks((prev) =>
-      prev.map((t) =>
-        t.id === id ? { ...t, completed: completed ?? !t.completed } : t
-      )
-    );
+  /* ---------- main “toggle” passed to TaskList ---------- */
+  const handleToggle = (taskId: string, explicit?: boolean) => {
+    const current = data.find((t) => t.id === taskId)?.completed ?? false;
+    const completed = explicit !== undefined ? explicit : !current;
+    const flyEl = flyRefs.current[taskId];
 
-  /* ---------------- helpers ---------------- */
-  const data = session ? tasks : guestTasks;
-  const doneCount = data.filter((t) => t.completed).length;
-  const rate = data.length ? (doneCount / data.length) * 100 : 0;
+    /* ► 1. if there’s no bullet (already completed) just persist */
+    if (!flyEl) {
+      persistTask(taskId, completed);
+      return;
+    }
 
-  if (loading && session) {
+    /* ► 2. schedule the bullet to disappear right *before* contact (≈ 50 %) */
+    setTimeout(() => {
+      flyEl.style.visibility = 'hidden';
+    }, TONGUE_MS * 0.45); // 270 ms with 600 ms total
+
+    /* ► 3. launch the grab */
+    const { x, y } = frogRef.current!.getMouthPoint(); // absolute coords
+    const origin = { x, y: y - 20 };
+    const rect = flyEl.getBoundingClientRect();
+    const target = {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
+    };
+
+    setGrab({ taskId, completed, origin, target });
+  };
+
+  /* ---------- after animation ---------- */
+  const onTongueDone = () => {
+    const { taskId, completed } = grab!;
+    persistTask(taskId, completed); // turns bullet ➜ ✅
+    setGrab(null);
+  };
+
+  /* ---------- loading skeleton ---------- */
+  if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="w-16 h-16 border-4 border-purple-500 rounded-full animate-spin border-t-transparent" />
@@ -101,109 +131,160 @@ export default function Home() {
     );
   }
 
+  /* ---------- render ---------- */
   return (
     <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8">
       <div className="max-w-4xl mx-auto">
-        {/* header */}
         <Header session={session} router={router} />
 
-        {/* ---------- guest OR logged‑in content ---------- */}
-        {!session ? (
-          /* ───────── guest branch ───────── */
-          <>
-            {/* login prompt */}
-            <div className="relative p-10 mb-8 overflow-hidden text-center bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
-              {/* headline + gradient logo */}
-              <h2 className="mb-6 text-2xl font-bold text-slate-900 dark:text-white">
-                ברוך הבא ל&nbsp;
-                <Link
-                  href="/"
-                  className="relative inline-flex items-center gap-1 text-transparent bg-gradient-to-r from-violet-400 via-fuchsia-500 to-purple-600 bg-clip-text hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
-                >
-                  מה&nbsp;אומר?
-                  {/* sparkle */}
-                  <Sparkles className="w-4 h-4 text-fuchsia-500 animate-float" />
-                </Link>
-              </h2>
+        {/* frog */}
+        <div className="flex justify-center">
+          <Frog ref={frogRef} mouthOpen={!!grab} />
+        </div>
 
-              <p className="mb-8 text-slate-600 dark:text-slate-400">
-                התחבר כדי ליצור משימות שבועיות ולעקוב אחרי ההתקדמות היומית שלך.
-              </p>
+        {/* progress */}
+        <ProgressCard rate={rate} done={doneCount} total={data.length} />
 
-              <button
-                onClick={() => signIn()}
-                className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white shadow-md bg-violet-600 rounded-xl hover:bg-violet-700 focus:outline-none focus:ring-2 focus:ring-violet-400"
-              >
-                🚀 התחברות / הרשמה בחינם!
-              </button>
-            </div>
-
-            {/* demo progress + tasks */}
-            <ProgressCard rate={rate} done={doneCount} total={data.length} />
-            <TaskList
-              tasks={guestTasks}
-              toggle={toggleGuestTask}
-              showConfetti={rate === 100}
-            />
-          </>
-        ) : (
-          /* ───────── logged‑in branch ───────── */
-          <>
-            {tasks.length === 0 ? (
-              /* no tasks yet – CTA */
-              <div className="p-8 text-center bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
-                <h2 className="mb-4 text-2xl font-bold text-slate-900 dark:text-white">
-                  עוד לא יצרת משימות 🔖
-                </h2>
-                <p className="mb-6 text-slate-600 dark:text-slate-400">
-                  לחץ על הכפתור כדי לבנות רשימת משימות שבועית ולהתחיל לעקוב אחרי
-                  ההתקדמות שלך.
-                </p>
-                <Link
-                  href="/manage-tasks"
-                  className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white shadow-md bg-violet-600 rounded-xl hover:bg-purple-700"
-                >
-                  🛠️ יצירת משימות
-                </Link>
-              </div>
+        {/* tasks */}
+        <TaskList
+          tasks={data}
+          toggle={handleToggle}
+          showConfetti={rate === 100}
+          renderBullet={(task) =>
+            task.completed ? (
+              <CheckCircle2 className="w-6 h-6 text-green-500" />
             ) : (
-              /* normal daily view */
-              <>
-                <ProgressCard
-                  rate={rate}
-                  done={doneCount}
-                  total={tasks.length}
-                />
-                <TaskList
-                  tasks={tasks}
-                  toggle={toggleTask}
-                  showConfetti={rate === 100}
-                />
-              </>
-            )}
-          </>
-        )}
+              <Fly
+                ref={(el) => {
+                  flyRefs.current[task.id] = el;
+                }}
+                onClick={() => handleToggle(task.id, true)}
+              />
+            )
+          }
+        />
       </div>
 
-      {/* animation keyframes */}
-      <style jsx>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
+      {/* overlay tongue */}
+
+      {grab &&
+        (() => {
+          const p0 = grab.origin;
+          const p2 = grab.target;
+          const p1 = { x: (p0.x + p2.x) / 2, y: p0.y - 120 };
+
+          const tonguePath = `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`;
+
+          // three key‑frames: start → hit → back
+          const times = [0, 0.5, 1]; // explicit key‑times
+
+          /* QUICK helper for tip positions */
+          const tmp = document.createElementNS(
+            'http://www.w3.org/2000/svg',
+            'path'
+          );
+          tmp.setAttribute('d', tonguePath);
+          const total = tmp.getTotalLength();
+          const pts = [0, 1, 0].map((f) => tmp.getPointAtLength(f * total));
+          /* ---------- helper just before the <svg> return ---------- */
+          const N = 20; // number of samples each way
+          const xs: number[] = [];
+          const ys: number[] = [];
+          const tArr: number[] = [];
+
+          /* forward 0‑→1 maps to timeline 0‑→0.5 */
+          for (let i = 0; i <= N; i++) {
+            const f = i / N;
+            const pt = tmp.getPointAtLength(f * total);
+            xs.push(pt.x);
+            ys.push(pt.y);
+            tArr.push(f * 0.5);
           }
-          to {
-            opacity: 1;
-            transform: translateY(0);
+          /* back 1‑→0 maps to 0.5‑→1 */
+          for (let i = N; i >= 0; i--) {
+            const f = i / N;
+            const pt = tmp.getPointAtLength(f * total);
+            xs.push(pt.x);
+            ys.push(pt.y);
+            tArr.push(0.5 + (1 - f) * 0.5);
           }
-        }
-      `}</style>
+
+          return (
+            <svg
+              className="fixed inset-0 pointer-events-none z-[9999] w-screen h-screen"
+              viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
+              preserveAspectRatio="none"
+            >
+              <defs>
+                <linearGradient id="tongue-grad" x1="0" y1="0" x2="0" y2="1">
+                  <stop stopColor="#ff6b6b" />
+                  <stop offset="1" stopColor="#f43f5e" />
+                </linearGradient>
+              </defs>
+              {/* shaft */}
+              <motion.path
+                d={tonguePath}
+                fill="none"
+                stroke="url(#tongue-grad)"
+                strokeWidth={8}
+                strokeLinecap="round"
+                vectorEffect="non-scaling-stroke"
+                initial={{ pathLength: 0 }}
+                animate={{ pathLength: [0, 1, 0] }}
+                transition={{
+                  duration: TONGUE_MS / 1000,
+                  times,
+                  ease: 'easeInOut',
+                }}
+                onAnimationComplete={onTongueDone}
+              />
+              {/* tip + captured fly */}
+              <motion.g
+                initial={{ x: xs[0], y: ys[0], scale: 0.8 }}
+                animate={{ x: xs, y: ys, scale: [0.8, 1.1, 1] }}
+                transition={{
+                  duration: TONGUE_MS / 1000,
+                  times: tArr,
+                  ease: 'easeInOut',
+                }}
+              >
+                {/* sticky blob */}
+                <motion.circle
+                  r={10}
+                  fill="transparent"
+                  initial={{ opacity: 1 }}
+                  animate={{ opacity: [1, 1, 0], r: [10, 10, 0] }}
+                  transition={{
+                    duration: TONGUE_MS / 2000,
+                    times,
+                    ease: 'easeInOut',
+                  }}
+                />
+
+                {/* captured fly – opacity jumps only at the “hit” key‑frame */}
+                <motion.image
+                  href="/fly.svg"
+                  x={-FLY_PX / 2}
+                  y={-FLY_PX / 2}
+                  width={FLY_PX}
+                  height={FLY_PX}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: [0, 1, 1] }} // jump to full opacity
+                  transition={{
+                    duration: TONGUE_MS / 1000,
+                    times: [HIT_AT - 0.01, HIT_AT, 1],
+                    ease: 'easeInOut',
+                  }}
+                />
+              </motion.g>
+            </svg>
+          );
+        })()}
     </main>
   );
 }
 
-/* ---------- tiny sub‑components ---------- */
-
+/* ---------- header (unchanged) ---------- */
 function Header({ session, router }: { session: any; router: any }) {
   return (
     <div className="flex flex-col gap-4 mb-8 md:flex-row md:items-center md:justify-between">
@@ -236,102 +317,5 @@ function Header({ session, router }: { session: any; router: any }) {
         </button>
       </div>
     </div>
-  );
-}
-
-function ProgressCard({
-  rate,
-  done,
-  total,
-}: {
-  rate: number;
-  done: number;
-  total: number;
-}) {
-  return (
-    <div className="p-6 mb-6 bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-white">
-          <Sparkles className="w-6 h-6 text-purple-500" />
-          ההתקדמות שלך היום
-        </h2>
-        <span className="text-3xl font-bold text-purple-600 dark:text-purple-400">
-          {Math.round(rate)}%
-        </span>
-      </div>
-      <div className="w-full h-3 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-        <div
-          className="h-full transition-all duration-500 ease-out bg-gradient-to-r from-purple-500 to-pink-500"
-          style={{ width: `${rate}%` }}
-        />
-      </div>
-      <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-        השלמת {done} מתוך {total} משימות
-      </p>
-    </div>
-  );
-}
-
-function TaskList({
-  tasks,
-  toggle,
-  showConfetti,
-}: {
-  tasks: Task[];
-  toggle: (id: string, completed?: boolean) => void;
-  showConfetti: boolean;
-}) {
-  return (
-    <>
-      <div className="p-6 bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
-        <h2 className="mb-6 text-2xl font-bold text-slate-900 dark:text-white">
-          המשימות שלך היום:
-        </h2>
-        <div className="space-y-2">
-          {tasks.map((task, i) => (
-            <div
-              key={task.id}
-              className="p-4 transition-all duration-200 cursor-pointer group rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700"
-              style={{
-                animation: `fadeInUp 0.5s ease-out ${i * 0.05}s`,
-                animationFillMode: 'both',
-              }}
-            >
-              <label className="flex items-center gap-4 cursor-pointer">
-                <button
-                  onClick={() => toggle(task.id, !task.completed)}
-                  className="flex-shrink-0"
-                >
-                  {task.completed ? (
-                    <CheckCircle2 className="w-6 h-6 text-green-500" />
-                  ) : (
-                    <Circle className="w-6 h-6 transition-colors text-slate-400 group-hover:text-purple-500" />
-                  )}
-                </button>
-                <span
-                  className={`text-lg transition-all duration-200 ${
-                    task.completed
-                      ? 'text-slate-400 dark:text-slate-500 line-through'
-                      : 'text-slate-700 dark:text-slate-200'
-                  }`}
-                >
-                  {task.text}
-                </span>
-                {task.completed && (
-                  <span className="mr-auto text-xl animate-bounce">✨</span>
-                )}
-              </label>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {showConfetti && (
-        <div className="p-6 mt-6 text-center text-white shadow-lg bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl animate-pulse">
-          <h3 className="mb-2 text-2xl font-bold">🎉 כל הכבוד! 🎉</h3>
-          <p className="text-lg">השלמת את כל המשימות להיום!</p>
-        </div>
-      )}
-    </>
   );
 }
