@@ -54,11 +54,12 @@ const Frog = React.memo(
       }, [mouthOpen, openMouth]);
 
       /* expose the mouth position so the fly animation knows where to start */
+      /* expose mouth position ----------------------------------------------- */
       useImperativeHandle(ref, () => ({
         getMouthPoint: () => {
           if (!rive) return { x: 0, y: 0 };
 
-          // -- reach into private fields (safe at runtime, hidden from TS types)
+          // -- private fields (runtime-only) ----------------------------------
           const r = rive as any;
           const canvas = r.canvas as HTMLCanvasElement;
           const artboard = r.artboard;
@@ -72,16 +73,22 @@ const Frog = React.memo(
               y: rect.top + rect.height / 2,
             };
           }
-          const local = artboard.worldToLocal(
-            new Vec2D(mouthNode.x, mouthNode.y)
-          );
+
+          /* ➊ world coordinates of the bone (tx, ty in the 3×2 matrix) */
+          const wt = mouthNode.worldTransform; // Float32Array(6)
+          const wx = wt[4]; // tx
+          const wy = wt[5]; // ty
+
+          /* ➋ convert to canvas pixels */
+          const local = artboard.worldToLocal(new Vec2D(wx, wy));
           const screen = map2D(local);
+
           return { x: rect.left + screen.x, y: rect.top + screen.y };
         },
       }));
 
       return (
-        <div className={className} style={{ width: 200, height: 140 }}>
+        <div className={className} style={{ width: 220, height: 160 }}>
           <RiveComponent ref={setCanvasRef} />
         </div>
       );

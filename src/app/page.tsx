@@ -109,10 +109,6 @@ export default function Home() {
       return;
     }
 
-    setTimeout(() => {
-      flyEl.style.visibility = 'hidden';
-    }, TONGUE_MS * HIT_AT);
-
     const { x, y } = frogRef.current!.getMouthPoint();
     const origin = { x, y: y - 20 };
     const rect = flyEl.getBoundingClientRect();
@@ -120,7 +116,17 @@ export default function Home() {
       x: rect.left + rect.width / 2,
       y: rect.top + rect.height / 2,
     };
-    setGrab({ taskId, completed, origin, target });
+    +(
+      // ➊ wait OFFSET_MS before tongue starts
+      setTimeout(() => {
+        /* hide the fly exactly when the tongue 'hits' */
+        setTimeout(() => {
+          flyEl.style.visibility = 'hidden';
+        }, TONGUE_MS * HIT_AT);
+
+        setGrab({ taskId, completed, origin, target }); // mouthOpen becomes true
+      }, OFFSET_MS)
+    );
   };
 
   const onTongueDone = () => {
