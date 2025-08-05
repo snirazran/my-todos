@@ -15,6 +15,7 @@ import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
 
 const TONGUE_MS = 600;
+const OFFSET_MS = 70;
 const FLY_PX = 24;
 const HIT_AT = 0.5;
 
@@ -161,10 +162,10 @@ export default function Home() {
         )}
 
         <div className="flex flex-col items-center w-full">
-          <div className="relative z-0">
+          <div className="relative z-10">
             <Frog ref={frogRef} mouthOpen={!!grab} />
           </div>
-          <div className="relative z-10 w-full -mt-3">
+          <div className="relative z-0 w-full -mt-6">
             <ProgressCard rate={rate} done={doneCount} total={data.length} />
           </div>
         </div>
