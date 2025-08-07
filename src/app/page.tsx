@@ -171,7 +171,7 @@ export default function Home() {
           <div className="relative z-10">
             <Frog ref={frogRef} mouthOpen={!!grab} />
           </div>
-          <div className="relative z-0 w-full -mt-6">
+          <div className="relative z-0 w-full -mt-2.5">
             <ProgressCard rate={rate} done={doneCount} total={data.length} />
           </div>
         </div>

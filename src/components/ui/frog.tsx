@@ -1,7 +1,12 @@
 'use client';
 
-import React, { forwardRef, useImperativeHandle, useEffect } from 'react';
-import riveCanvas, {
+import React, {
+  forwardRef,
+  useImperativeHandle,
+  useEffect,
+  useRef,
+} from 'react';
+import {
   Layout,
   Fit,
   Alignment,
@@ -9,16 +14,14 @@ import riveCanvas, {
   useStateMachineInput,
 } from '@rive-app/react-canvas';
 
-const Vec2D = (riveCanvas as any).Vec2D; // runtime helper
-
 /* === names exactly as they appear in the .riv file ======================== */
-const ARTBOARD = 'regular_green 2';
+const ARTBOARD = 'All';
 const STATE_MACHINE = 'State Machine 1';
 const MOUTH_TRIGGER = 'trigger_mouth_open';
-const MOUTH_NODE = 'mouth_target';
 /* ========================================================================= */
 
 export interface FrogHandle {
+  /** page-space coordinates of the mouth anchor */
   getMouthPoint: () => { x: number; y: number };
 }
 
@@ -28,72 +31,61 @@ interface FrogProps {
 }
 
 const Frog = React.memo(
-  forwardRef<FrogHandle, FrogProps>(
-    ({ className = '', mouthOpen = false }, ref) => {
-      const { RiveComponent, rive, setCanvasRef } = useRive({
-        src: '/frog_idle.riv', // put the .riv in /public
-        artboard: ARTBOARD,
-        stateMachines: STATE_MACHINE, // <-- for the trigger
-        autoplay: true,
-        layout: new Layout({
-          fit: Fit.Contain,
-          alignment: Alignment.Center, // center looks nicer than BottomCenter
-        }),
-      });
+  forwardRef<FrogHandle, FrogProps>(({ className = '', mouthOpen }, ref) => {
+    const { RiveComponent, rive, setCanvasRef } = useRive({
+      src: '/frog_idle.riv',
+      artboard: ARTBOARD,
+      stateMachines: STATE_MACHINE,
+      autoplay: true,
+      layout: new Layout({
+        fit: Fit.Contain,
+        alignment: Alignment.Center,
+      }),
+    });
 
-      // trigger for mouth-open
-      const openMouth = useStateMachineInput(
-        rive,
-        STATE_MACHINE,
-        MOUTH_TRIGGER
-      );
+    /* trigger that opens the mouth animation */
+    const openMouth = useStateMachineInput(rive, STATE_MACHINE, MOUTH_TRIGGER);
 
-      /* fire the trigger when <Frog mouthOpen /> flips to true */
-      useEffect(() => {
-        if (mouthOpen) openMouth?.fire();
-      }, [mouthOpen, openMouth]);
+    useEffect(() => {
+      if (mouthOpen) openMouth?.fire();
+    }, [mouthOpen, openMouth]);
 
-      /* expose the mouth position so the fly animation knows where to start */
-      /* expose mouth position ----------------------------------------------- */
-      useImperativeHandle(ref, () => ({
-        getMouthPoint: () => {
-          if (!rive) return { x: 0, y: 0 };
+    /* === mouth anchor ==================================================== */
+    const mouthAnchorRef = useRef<HTMLDivElement | null>(null);
 
-          // -- private fields (runtime-only) ----------------------------------
-          const r = rive as any;
-          const canvas = r.canvas as HTMLCanvasElement;
-          const artboard = r.artboard;
-          const map2D = r.mapToCanvas as (v: any) => { x: number; y: number };
+    useImperativeHandle(ref, () => ({
+      getMouthPoint() {
+        const el = mouthAnchorRef.current;
+        if (!el) return { x: 0, y: 0 };
+        const rect = el.getBoundingClientRect(); // CSS-pixel box
+        return { x: rect.left, y: rect.top };
+      },
+    }));
 
-          const rect = canvas.getBoundingClientRect();
-          const mouthNode = artboard.transformComponent(MOUTH_NODE);
-          if (!mouthNode) {
-            return {
-              x: rect.left + rect.width / 2,
-              y: rect.top + rect.height / 2,
-            };
-          }
+    /* === render ========================================================== */
+    return (
+      <div
+        className={className}
+        style={{ width: 240, height: 180, position: 'relative' }} // relative! ⬅
+      >
+        {/* Rive canvas */}
+        <RiveComponent ref={setCanvasRef} />
 
-          /* ➊ world coordinates of the bone (tx, ty in the 3×2 matrix) */
-          const wt = mouthNode.worldTransform; // Float32Array(6)
-          const wx = wt[4]; // tx
-          const wy = wt[5]; // ty
-
-          /* ➋ convert to canvas pixels */
-          const local = artboard.worldToLocal(new Vec2D(wx, wy));
-          const screen = map2D(local);
-
-          return { x: rect.left + screen.x, y: rect.top + screen.y };
-        },
-      }));
-
-      return (
-        <div className={className} style={{ width: 220, height: 160 }}>
-          <RiveComponent ref={setCanvasRef} />
-        </div>
-      );
-    }
-  )
+        {/* invisible mouth anchor — tweak the percentages once and forget */}
+        <div
+          ref={mouthAnchorRef}
+          style={{
+            position: 'absolute',
+            left: '50%', // 50 % of wrapper’s width  → centre horizontally
+            top: '66.6%', // adjust until tongue looks perfect
+            width: 0,
+            height: 0,
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
+    );
+  })
 );
 
 export default Frog;
