@@ -57,8 +57,9 @@ const Frog = React.memo(
       getMouthPoint() {
         const el = mouthAnchorRef.current;
         if (!el) return { x: 0, y: 0 };
-        const rect = el.getBoundingClientRect(); // CSS-pixel box
-        return { x: rect.left, y: rect.top };
+        const r = el.getBoundingClientRect();
+        /* convert viewport → page coordinates */
+        return { x: r.left + window.scrollX, y: r.top + window.scrollY };
       },
     }));
 
@@ -77,7 +78,7 @@ const Frog = React.memo(
           style={{
             position: 'absolute',
             left: '50%', // 50 % of wrapper’s width  → centre horizontally
-            top: '66.6%', // adjust until tongue looks perfect
+            top: '80%', // adjust until tongue looks perfect
             width: 0,
             height: 0,
             pointerEvents: 'none',

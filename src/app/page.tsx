@@ -109,24 +109,23 @@ export default function Home() {
       return;
     }
 
-    const { x, y } = frogRef.current!.getMouthPoint();
-    const origin = { x, y: y - 20 };
+    const pagePt = frogRef.current!.getMouthPoint(); // already includes scroll
+    const origin = { x: pagePt.x, y: pagePt.y - 20 }; // page-space
+
     const rect = flyEl.getBoundingClientRect();
     const target = {
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2,
+      x: rect.left + window.scrollX + rect.width / 2, // add scroll offset
+      y: rect.top + window.scrollY + rect.height / 2,
     };
-    +(
-      // ➊ wait OFFSET_MS before tongue starts
+    // ➊ wait OFFSET_MS before tongue starts
+    setTimeout(() => {
+      /* hide the fly exactly when the tongue 'hits' */
       setTimeout(() => {
-        /* hide the fly exactly when the tongue 'hits' */
-        setTimeout(() => {
-          flyEl.style.visibility = 'hidden';
-        }, TONGUE_MS * HIT_AT);
+        flyEl.style.visibility = 'hidden';
+      }, TONGUE_MS * HIT_AT);
 
-        setGrab({ taskId, completed, origin, target }); // mouthOpen becomes true
-      }, OFFSET_MS)
-    );
+      setGrab({ taskId, completed, origin, target }); // mouthOpen becomes true
+    }, OFFSET_MS);
   };
 
   const onTongueDone = () => {
@@ -243,8 +242,10 @@ export default function Home() {
 
           return (
             <svg
-              className="fixed inset-0 pointer-events-none z-[9999] w-screen h-screen"
-              viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
+              className="absolute pointer-events-none z-[9999] left-0 top-0"
+              style={{ width: '100%', height: '100%' }} // full page
+              viewBox={`0 0 ${document.documentElement.scrollWidth}
+                  ${document.documentElement.scrollHeight}`}
               preserveAspectRatio="none"
             >
               <defs>
