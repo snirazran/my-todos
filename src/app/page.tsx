@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { he, tr } from 'date-fns/locale';
-import { Calendar, History, CheckCircle2, Sparkles } from 'lucide-react';
+import { he } from 'date-fns/locale';
+import { Calendar, History, CheckCircle2 } from 'lucide-react';
 import { signIn, useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 
@@ -33,9 +33,31 @@ const demoTasks: Task[] = [
   { id: 'g5', text: 'לבדוק שאין מפלצת מתחת למיטה', completed: false },
 ];
 
+// ---------- helpers ----------
+const easeInOutCubic = (t: number) =>
+  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+function animateScrollTo(targetY: number, duration: number) {
+  return new Promise<void>((resolve) => {
+    const start = window.scrollY;
+    const dy = targetY - start;
+    const t0 = performance.now();
+
+    function frame(t: number) {
+      const p = Math.min(1, (t - t0) / duration);
+      const y = start + dy * easeInOutCubic(p);
+      window.scrollTo(0, y);
+      if (p < 1) requestAnimationFrame(frame);
+      else resolve();
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
 export default function Home() {
   const { data: session } = useSession();
   const router = useRouter();
+
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLImageElement | null>>({});
 
@@ -43,12 +65,30 @@ export default function Home() {
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
   const [loading, setLoading] = useState(true);
 
-  // ✅ 1. Restore `origin` to the grab state type
+  // viewport + scroll (for SVG viewBox + doc->viewport mapping)
+  const [vp, setVp] = useState({ w: 0, h: 0 });
+  const [scrollPos, setScrollPos] = useState({ x: 0, y: 0 });
+
+  // block manual scroll during sequence
+  const [cinematic, setCinematic] = useState(false);
+
+  // tongue sequence data in DOC coordinates
   const [grab, setGrab] = useState<{
     taskId: string;
     completed: boolean;
-    origin: { x: number; y: number };
-    target: { x: number; y: number };
+    originDoc: { x: number; y: number };
+    targetDoc: { x: number; y: number };
+    returnToY: number;
+  } | null>(null);
+
+  // live tip position in VIEWPORT coords (keeps fly glued)
+  const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
+
+  // precomputed DOC path numbers for RAF
+  const pathRef = useRef<{
+    total: number;
+    getPointAtLength: (s: number) => DOMPoint;
+    startTime: number;
   } | null>(null);
 
   const today = new Date();
@@ -57,6 +97,7 @@ export default function Home() {
   const doneCount = data.filter((t) => t.completed).length;
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
 
+  // ---- data load ----
   useEffect(() => {
     if (!session) {
       setLoading(false);
@@ -72,6 +113,36 @@ export default function Home() {
       }
     })();
   }, [session, dateStr]);
+
+  // ---- track viewport + scroll ----
+  useEffect(() => {
+    const onResize = () =>
+      setVp({ w: window.innerWidth, h: window.innerHeight });
+    const onScroll = () =>
+      setScrollPos({ x: window.scrollX, y: window.scrollY });
+    onResize();
+    onScroll();
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, []);
+
+  // block manual scroll during cinematic
+  useEffect(() => {
+    if (!cinematic) return;
+    const stop = (e: Event) => e.preventDefault();
+    window.addEventListener('wheel', stop, { passive: false });
+    window.addEventListener('touchmove', stop, { passive: false });
+    return () => {
+      window.removeEventListener('wheel', stop as any);
+      window.removeEventListener('touchmove', stop as any);
+    };
+  }, [cinematic]);
 
   const persistTask = async (taskId: string, completed: boolean) => {
     if (session) {
@@ -90,8 +161,38 @@ export default function Home() {
     }
   };
 
-  // ✅ 2. Restore original `handleToggle` logic
-  const handleToggle = (taskId: string, explicitCompleted?: boolean) => {
+  // DOC coordinates (stable)
+  const getMouthDoc = useCallback(() => {
+    const p = frogRef.current?.getMouthPoint();
+    if (!p) return { x: 0, y: 0 };
+    return { x: p.x + window.scrollX, y: p.y + window.scrollY - 20 };
+  }, []);
+  const getFlyDoc = useCallback((el: HTMLImageElement) => {
+    const r = el.getBoundingClientRect();
+    return {
+      x: r.left + r.width / 2 + window.scrollX,
+      y: r.top + r.height / 2 + window.scrollY,
+    };
+  }, []);
+
+  // visibility check (are both frog mouth & fly visible?)
+  const bothVisible = (
+    mouthV: { x: number; y: number } | null,
+    flyRect: DOMRect
+  ) => {
+    const inV = (x: number, y: number) =>
+      x >= 0 && x <= window.innerWidth && y >= 0 && y <= window.innerHeight;
+    const mouthOk = !!mouthV && inV(mouthV.x, mouthV.y);
+    const flyOk =
+      flyRect.left < window.innerWidth &&
+      flyRect.right > 0 &&
+      flyRect.top < window.innerHeight &&
+      flyRect.bottom > 0;
+    return mouthOk && flyOk;
+  };
+
+  // ---- the cinematic sequence + tongue ----
+  const handleToggle = async (taskId: string, explicitCompleted?: boolean) => {
     const task = data.find((t) => t.id === taskId);
     if (!task) return;
 
@@ -109,28 +210,109 @@ export default function Home() {
       return;
     }
 
-    const pagePt = frogRef.current!.getMouthPoint();
-    const rect = flyEl.getBoundingClientRect();
+    // measure mouth/fly
+    const mouthV = frogRef.current?.getMouthPoint() ?? { x: -1, y: -1 };
+    const flyR = flyEl.getBoundingClientRect();
 
-    // ✅ Use viewport coordinates directly
-    const origin = {
-      x: pagePt.x,
-      y: pagePt.y - 20, // The -20 offset is fine
-    };
-    const target = {
-      x: rect.left + rect.width / 2,
-      y: rect.top + rect.height / 2,
-    };
-    // ➊ wait OFFSET_MS before tongue starts
+    const originDoc = getMouthDoc();
+    const targetDoc = getFlyDoc(flyEl);
+    const startY = window.scrollY;
+
+    // need cinematic only if one/both are off-screen
+    const needCine = !bothVisible(mouthV, flyR);
+    setCinematic(true);
+
+    if (needCine) {
+      // pan to frog
+      const frogFocusY = Math.max(0, originDoc.y - window.innerHeight * 0.35);
+      await animateScrollTo(frogFocusY, 350);
+    }
+
+    // start after a tiny delay (feel free to tweak)
     setTimeout(() => {
-      /* hide the fly exactly when the tongue 'hits' */
+      // hide the fly at impact
       setTimeout(() => {
         flyEl.style.visibility = 'hidden';
       }, TONGUE_MS * HIT_AT);
 
-      setGrab({ taskId, completed, origin, target }); // mouthOpen becomes true
+      setGrab({
+        taskId,
+        completed,
+        originDoc,
+        targetDoc,
+        returnToY: startY,
+      });
     }, OFFSET_MS);
+
+    if (needCine) {
+      // move towards the fly
+      await animateScrollTo(
+        Math.max(0, targetDoc.y - window.innerHeight * 0.45),
+        TONGUE_MS * HIT_AT
+      );
+      // then back to frog
+      const frogFocusY = Math.max(0, originDoc.y - window.innerHeight * 0.35);
+      await animateScrollTo(frogFocusY, TONGUE_MS * (1 - HIT_AT));
+      // return user to where they were
+      await animateScrollTo(startY, 350);
+    } else {
+      // no camera moves—just keep scroll locked briefly
+      await new Promise((r) => setTimeout(r, TONGUE_MS + 120));
+    }
+
+    setCinematic(false);
   };
+
+  // RAF that keeps the fly glued to the tongue tip (doc path -> viewport coords)
+  useEffect(() => {
+    if (!grab) return;
+
+    // build the DOC path and length
+    const p0 = grab.originDoc;
+    const p2 = grab.targetDoc;
+    const p1 = { x: (p0.x + p2.x) / 2, y: p0.y - 120 };
+
+    const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    tmp.setAttribute(
+      'd',
+      `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`
+    );
+    const total = tmp.getTotalLength();
+
+    pathRef.current = {
+      total,
+      getPointAtLength: (s: number) => tmp.getPointAtLength(s),
+      startTime: performance.now(),
+    };
+
+    let raf = 0;
+    const tick = () => {
+      const ref = pathRef.current!;
+      const elapsed = performance.now() - ref.startTime;
+      const t = Math.min(1, elapsed / TONGUE_MS);
+      // progress along path: extend then retract
+      const forward =
+        t <= HIT_AT ? t / HIT_AT : 1 - (t - HIT_AT) / (1 - HIT_AT);
+
+      const pt = ref.getPointAtLength(ref.total * forward);
+      // map DOC -> VIEWPORT with current live scroll values
+      const sx = window.scrollX;
+      const sy = window.scrollY;
+      setTip({ x: pt.x - sx, y: pt.y - sy });
+
+      if (t < 1) {
+        raf = requestAnimationFrame(tick);
+      } else {
+        // end
+        setTip(null);
+        onTongueDone();
+      }
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [grab]);
 
   const onTongueDone = () => {
     if (!grab) return;
@@ -157,7 +339,8 @@ export default function Home() {
               יש פה צפרדע עם בטן מקרקרת!
             </h2>
             <p className="mb-8 text-slate-600 dark:text-slate-400">
-              והדרך היחידה להאכיל אותה היא על ידי השלמת המשימות שלך.<br></br>
+              והדרך היחידה להאכיל אותה היא על ידי השלמת המשימות שלך.
+              <br />
               בוא/י לעזור לה להרגיש שבעה ומאושרת!
             </p>
 
@@ -207,47 +390,37 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ✅ 3. Restored the original, correct SVG animation block */}
+      {/* Tongue SVG overlay: path built in DOC space; mapped to VIEWPORT each render */}
       {grab &&
         (() => {
-          const p0 = grab.origin;
-          const p2 = grab.target;
-          const p1 = { x: (p0.x + p2.x) / 2, y: p0.y - 120 };
+          const toV = (p: { x: number; y: number }) => ({
+            x: p.x - scrollPos.x,
+            y: p.y - scrollPos.y,
+          });
 
-          const tonguePath = `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`;
-          const times = [0, 0.5, 1];
+          const p0Doc = grab.originDoc;
+          const p2Doc = grab.targetDoc;
+          const p1Doc = { x: (p0Doc.x + p2Doc.x) / 2, y: p0Doc.y - 120 };
 
-          const tmp = document.createElementNS(
-            'http://www.w3.org/2000/svg',
-            'path'
-          );
-          tmp.setAttribute('d', tonguePath);
-          const total = tmp.getTotalLength();
+          const p0V = toV(p0Doc);
+          const p1V = toV(p1Doc);
+          const p2V = toV(p2Doc);
 
-          const N = 20;
-          const xs: number[] = [];
-          const ys: number[] = [];
-          const tArr: number[] = [];
-
-          for (let i = 0; i <= N; i++) {
-            const f = i / N;
-            const pt = tmp.getPointAtLength(f * total);
-            xs.push(pt.x);
-            ys.push(pt.y);
-            tArr.push(f * 0.5);
-          }
-          for (let i = N; i >= 0; i--) {
-            const f = i / N;
-            const pt = tmp.getPointAtLength(f * total);
-            xs.push(pt.x);
-            ys.push(pt.y);
-            tArr.push(0.5 + (1 - f) * 0.5);
-          }
+          const tonguePathViewport = `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`;
 
           return (
             <svg
-              className="fixed inset-0 pointer-events-none z-[9999] w-screen h-screen"
-              viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                width: '100vw',
+                height: '100vh',
+                pointerEvents: 'none',
+                zIndex: 9999,
+              }}
+              width={vp.w}
+              height={vp.h}
+              viewBox={`0 0 ${vp.w} ${vp.h}`}
               preserveAspectRatio="none"
             >
               <defs>
@@ -256,8 +429,9 @@ export default function Home() {
                   <stop offset="1" stopColor="#f43f5e" />
                 </linearGradient>
               </defs>
+
               <motion.path
-                d={tonguePath}
+                d={tonguePathViewport}
                 fill="none"
                 stroke="url(#tongue-grad)"
                 strokeWidth={8}
@@ -267,52 +441,31 @@ export default function Home() {
                 animate={{ pathLength: [0, 1, 0] }}
                 transition={{
                   duration: TONGUE_MS / 1000,
-                  times,
+                  times: [0, 0.5, 1],
                   ease: 'linear',
                 }}
-                onAnimationComplete={onTongueDone}
               />
-              <motion.g
-                initial={{ x: xs[0], y: ys[0], scale: 0.8 }}
-                animate={{ x: xs, y: ys, scale: [0.8, 1.1, 1] }}
-                transition={{
-                  duration: TONGUE_MS / 1000,
-                  times: tArr,
-                  ease: 'linear',
-                }}
-              >
-                <motion.circle
-                  r={10}
-                  fill="transparent"
-                  initial={{ opacity: 1 }}
-                  animate={{ opacity: [1, 1, 0], r: [10, 10, 0] }}
-                  transition={{
-                    duration: TONGUE_MS / 2000,
-                    times,
-                    ease: 'easeInOut',
-                  }}
-                />
-                <motion.image
-                  href="/fly.svg"
-                  x={-FLY_PX / 2}
-                  y={-FLY_PX / 2}
-                  width={FLY_PX}
-                  height={FLY_PX}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: [0, 1, 1] }}
-                  transition={{
-                    duration: TONGUE_MS / 1000,
-                    times: [HIT_AT - 0.01, HIT_AT, 1],
-                    ease: 'easeInOut',
-                  }}
-                />
-              </motion.g>
+
+              {/* Fly glued to the tip (RAF updates `tip`) */}
+              {tip && (
+                <g transform={`translate(${tip.x}, ${tip.y})`}>
+                  <circle r={10} fill="transparent" />
+                  <image
+                    href="/fly.svg"
+                    x={-FLY_PX / 2}
+                    y={-FLY_PX / 2}
+                    width={FLY_PX}
+                    height={FLY_PX}
+                  />
+                </g>
+              )}
             </svg>
           );
         })()}
     </main>
   );
 }
+
 /* ---------- header (unchanged) ---------- */
 function Header({ session, router }: { session: any; router: any }) {
   return (

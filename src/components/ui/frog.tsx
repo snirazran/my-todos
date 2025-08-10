@@ -13,14 +13,12 @@ import {
   useRive,
   useStateMachineInput,
 } from '@rive-app/react-canvas';
-// No more imports from @rive-app/canvas are needed!
 
-/* === Values from your Rive Editor ======================================== */
-// ⬇️ REPLACE THESE WITH YOUR REAL VALUES FROM STEP 1 ⬇️
+/* === Replace with your real Rive artboard + node values =================== */
 const ARTBOARD_WIDTH = 149;
 const ARTBOARD_HEIGHT = 120;
-const MOUTH_TARGET_X = 20; // The X position of your 'mouth_target'
-const MOUTH_TARGET_Y = 10; // The Y position of your 'mouth_target'
+const MOUTH_TARGET_X = 75; // mouth_target.x in artboard units
+const MOUTH_TARGET_Y = 80; // mouth_target.y in artboard units
 /* ========================================================================= */
 
 const ARTBOARD_NAME = 'All';
@@ -28,7 +26,7 @@ const STATE_MACHINE = 'State Machine 1';
 const MOUTH_TRIGGER = 'trigger_mouth_open';
 
 export interface FrogHandle {
-  /** page-space coordinates of the mouth anchor */
+  /** viewport coordinates of the mouth anchor */
   getMouthPoint: () => { x: number; y: number };
 }
 
@@ -39,17 +37,14 @@ interface FrogProps {
 
 const Frog = React.memo(
   forwardRef<FrogHandle, FrogProps>(({ className = '', mouthOpen }, ref) => {
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-    const { RiveComponent, rive } = useRive({
+    const { RiveComponent, rive, setCanvasRef } = useRive({
       src: '/frog_idle.riv',
       artboard: ARTBOARD_NAME,
       stateMachines: STATE_MACHINE,
       autoplay: true,
-      layout: new Layout({
-        fit: Fit.Contain,
-        alignment: Alignment.Center,
-      }),
+      layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
     });
 
     const openMouth = useStateMachineInput(rive, STATE_MACHINE, MOUTH_TRIGGER);
@@ -60,41 +55,38 @@ const Frog = React.memo(
 
     useImperativeHandle(ref, () => ({
       getMouthPoint() {
-        if (!canvasRef.current) {
-          return { x: 0, y: 0 };
-        }
+        const el = wrapperRef.current;
+        if (!el) return { x: 0, y: 0 };
 
-        // 1. Get the size of the HTML canvas element on the screen
-        const canvasRect = canvasRef.current.getBoundingClientRect();
+        const rect = el.getBoundingClientRect();
 
-        // 2. Calculate the scale factor based on "Fit.Contain"
+        // Same math Rive uses for Fit.Contain in this box:
         const scale = Math.min(
-          canvasRect.width / ARTBOARD_WIDTH,
-          canvasRect.height / ARTBOARD_HEIGHT
+          rect.width / ARTBOARD_WIDTH,
+          rect.height / ARTBOARD_HEIGHT
         );
+        const offsetX = (rect.width - ARTBOARD_WIDTH * scale) / 2;
+        const offsetY = (rect.height - ARTBOARD_HEIGHT * scale) / 2;
 
-        // 3. Calculate the letterboxing (empty space) based on "Alignment.Center"
-        const offsetX = (canvasRect.width - ARTBOARD_WIDTH * scale) / 2;
-        const offsetY = (canvasRect.height - ARTBOARD_HEIGHT * scale) / 2;
-
-        // 4. Calculate the target's position inside the canvas
         const canvasX = MOUTH_TARGET_X * scale + offsetX;
         const canvasY = MOUTH_TARGET_Y * scale + offsetY;
 
-        // 5. Convert to final screen coordinates by adding the canvas's top-left corner
-        return {
-          x: canvasRect.left + canvasX,
-          y: canvasRect.top + canvasY,
-        };
+        return { x: rect.left + canvasX, y: rect.top + canvasY };
       },
     }));
 
     return (
       <div
+        ref={wrapperRef}
         className={className}
         style={{ width: 240, height: 180, position: 'relative' }}
       >
-        <RiveComponent ref={canvasRef} />
+        {/* Let Rive render into our box; we still give it the actual canvas via setCanvasRef,
+            but we don't rely on reading that canvas back. */}
+        <RiveComponent
+          ref={(node) => setCanvasRef(node as HTMLCanvasElement | null)}
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
       </div>
     );
   })
