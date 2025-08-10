@@ -21,6 +21,7 @@ const PRE_PAN_MS = 600; // camera pre-pan up to frog
 const PRE_LINGER_MS = 180; // small pause on frog before firing
 const CAM_START_DELAY = 140; // start following down after tongue begins
 const RETURN_MS = 520; // (not used for return now, but kept for future)
+const ORIGIN_Y_ADJ = -4;
 const TONGUE_STROKE = 8;
 const FOLLOW_EASE = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // easeInOutCubic
@@ -77,7 +78,7 @@ export default function Home() {
   const [visuallyDone, setVisuallyDone] = useState<Set<string>>(new Set());
 
   const [vp, setVp] = useState({ w: 0, h: 0 });
-
+  const frogBoxRef = useRef<HTMLDivElement | null>(null);
   // lock manual scroll during sequence
   const [cinematic, setCinematic] = useState(false);
 
@@ -179,7 +180,7 @@ export default function Home() {
   const getMouthDoc = useCallback(() => {
     const p = frogRef.current?.getMouthPoint();
     if (!p) return { x: 0, y: 0 };
-    return { x: p.x + window.scrollX, y: p.y + window.scrollY - 20 };
+    return { x: p.x + window.scrollX, y: p.y + window.scrollY + ORIGIN_Y_ADJ };
   }, []);
   const getFlyDoc = useCallback((el: HTMLImageElement) => {
     const r = el.getBoundingClientRect();
@@ -188,19 +189,14 @@ export default function Home() {
       y: r.top + r.height / 2 + window.scrollY,
     };
   }, []);
-  const bothVisible = (
-    mouthV: { x: number; y: number } | null,
-    flyRect: DOMRect
-  ) => {
-    const inV = (x: number, y: number) =>
-      x >= 0 && x <= window.innerWidth && y >= 0 && y <= window.innerHeight;
-    const mouthOk = !!mouthV && inV(mouthV.x, mouthV.y);
-    const flyOk =
-      flyRect.left < window.innerWidth &&
-      flyRect.right > 0 &&
-      flyRect.top < window.innerHeight &&
-      flyRect.bottom > 0;
-    return mouthOk && flyOk;
+  const visibleRatio = (r: DOMRect) => {
+    const vw = window.innerWidth,
+      vh = window.innerHeight;
+    const xOverlap = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
+    const yOverlap = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+    const visArea = xOverlap * yOverlap;
+    const totalArea = Math.max(1, r.width * r.height);
+    return visArea / totalArea; // 0..1
   };
 
   /* -------- main toggle with cinematic timeline -------- */
@@ -223,19 +219,27 @@ export default function Home() {
     }
 
     // Initial measure
-    const mouthV = frogRef.current?.getMouthPoint() ?? { x: -1, y: -1 };
-    const flyR = flyEl.getBoundingClientRect();
+    const startY = window.scrollY; // you pass this into setGrab
 
-    const startY = window.scrollY;
-    const originDoc0 = getMouthDoc();
+    const originDoc0 = getMouthDoc(); // first measurement
     const targetDoc0 = getFlyDoc(flyEl);
-
-    // Decide if we need the camera move
-    const needCine = !bothVisible(mouthV, flyR);
-    setCinematic(true);
 
     let frogFocusY = Math.max(0, originDoc0.y - window.innerHeight * 0.35);
     let flyFocusY = Math.max(0, targetDoc0.y - window.innerHeight * 0.45);
+    const mouthV = frogRef.current?.getMouthPoint() ?? { x: -1, y: -1 };
+    const flyR = flyEl.getBoundingClientRect();
+    const frogR = frogBoxRef.current?.getBoundingClientRect();
+
+    const frogRatio = frogR ? visibleRatio(frogR) : 0;
+    const flyVisible =
+      flyR.top < window.innerHeight &&
+      flyR.bottom > 0 &&
+      flyR.left < window.innerWidth &&
+      flyR.right > 0;
+
+    // Now require 50% of frog to be visible
+    const needCine = frogRatio < 0.5 || !flyVisible;
+    setCinematic(true);
 
     if (needCine) {
       // Pre-pan to frog, then linger a bit
@@ -274,7 +278,7 @@ export default function Home() {
     if (!grab) return;
 
     // Build doc path
-    const p0 = grab.originDoc;
+    const p0 = getMouthDoc();
     const p2 = grab.targetDoc;
     const p1 = { x: (p0.x + p2.x) / 2, y: p0.y - 120 };
 
@@ -332,17 +336,13 @@ export default function Home() {
       // tip position (doc -> viewport)
       const s = total * forward;
       const pt = geomRef.current!.getPointAtLength(s);
-      const ahead = geomRef.current!.getPointAtLength(Math.min(total, s + 1)); // ~1px ahead
-      const dx = ahead.x - pt.x;
-      const dy = ahead.y - pt.y;
+      const ahead = geomRef.current!.getPointAtLength(Math.min(total, s + 1));
+      const dx = ahead.x - pt.x,
+        dy = ahead.y - pt.y;
       const len = Math.hypot(dx, dy) || 1;
       const ox = (dx / len) * (TONGUE_STROKE / 2);
       const oy = (dy / len) * (TONGUE_STROKE / 2);
-
-      setTip({
-        x: pt.x + ox - window.scrollX,
-        y: pt.y + oy - window.scrollY,
-      });
+      setTip({ x: pt.x + ox - window.scrollX, y: pt.y + oy - window.scrollY });
 
       // impact — hide the real fly and turn on tip fly immediately
       if (!geomRef.current!.hidImpact && t >= HIT_AT) {
@@ -438,8 +438,8 @@ export default function Home() {
         )}
 
         <div className="flex flex-col items-center w-full">
-          <div className="relative z-10">
-            <Frog ref={frogRef} mouthOpen={!!grab} />
+          <div ref={frogBoxRef} className="relative z-10">
+            <Frog ref={frogRef} mouthOpen={!!grab} mouthOffset={{ y: -4 }} />
           </div>
           <div className="relative z-0 w-full -mt-2.5">
             <ProgressCard rate={rate} done={doneCount} total={data.length} />
