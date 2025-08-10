@@ -73,6 +73,8 @@ export default function Home() {
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
   const [loading, setLoading] = useState(true);
 
+  const [visuallyDone, setVisuallyDone] = useState<Set<string>>(new Set());
+
   const [vp, setVp] = useState({ w: 0, h: 0 });
 
   // lock manual scroll during sequence
@@ -333,6 +335,11 @@ export default function Home() {
       // impact — hide the real fly and turn on tip fly immediately
       if (!geomRef.current!.hidImpact && t >= HIT_AT) {
         geomRef.current!.hidImpact = true;
+        setVisuallyDone((prev) => {
+          const s = new Set(prev);
+          s.add(grab.taskId);
+          return s;
+        });
         setTipVisible(true);
         const flyEl = flyRefs.current[grab.taskId];
         if (flyEl) {
@@ -361,6 +368,11 @@ export default function Home() {
         setTip(null);
         setTipVisible(false);
         persistTask(grab.taskId, grab.completed);
+        setVisuallyDone((prev) => {
+          const s = new Set(prev);
+          s.delete(grab.taskId);
+          return s;
+        });
 
         // tiny linger for feel; stay where we ended (no return)
         setTimeout(() => {
@@ -427,17 +439,9 @@ export default function Home() {
             tasks={data}
             toggle={handleToggle}
             showConfetti={rate === 100}
-            renderBullet={(task) =>
-              task.completed ? (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleToggle(task.id, false);
-                  }}
-                >
-                  <CheckCircle2 className="w-6 h-6 text-green-500" />
-                </button>
-              ) : (
+            visuallyCompleted={visuallyDone}
+            renderBullet={(task, isVisuallyDone) =>
+              task.completed || isVisuallyDone ? null : (
                 <Fly
                   ref={(el) => {
                     flyRefs.current[task.id] = el;
