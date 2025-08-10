@@ -201,6 +201,7 @@ export default function Home() {
 
   /* -------- main toggle with cinematic timeline -------- */
   const handleToggle = async (taskId: string, explicitCompleted?: boolean) => {
+    if (cinematic || grab) return;
     const task = data.find((t) => t.id === taskId);
     if (!task) return;
 
@@ -446,7 +447,10 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mt-6">
+        <div
+          className="mt-6"
+          style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
+        >
           <TaskList
             tasks={data}
             toggle={handleToggle}
