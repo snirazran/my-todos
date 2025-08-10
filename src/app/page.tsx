@@ -21,6 +21,7 @@ const PRE_PAN_MS = 600; // camera pre-pan up to frog
 const PRE_LINGER_MS = 180; // small pause on frog before firing
 const CAM_START_DELAY = 140; // start following down after tongue begins
 const RETURN_MS = 520; // (not used for return now, but kept for future)
+const TONGUE_STROKE = 8;
 const FOLLOW_EASE = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // easeInOutCubic
 const HIT_AT = 0.5; // impact at 50% of tongue
@@ -329,8 +330,19 @@ export default function Home() {
       }
 
       // tip position (doc -> viewport)
-      const pt = geomRef.current!.getPointAtLength(total * forward);
-      setTip({ x: pt.x - window.scrollX, y: pt.y - window.scrollY });
+      const s = total * forward;
+      const pt = geomRef.current!.getPointAtLength(s);
+      const ahead = geomRef.current!.getPointAtLength(Math.min(total, s + 1)); // ~1px ahead
+      const dx = ahead.x - pt.x;
+      const dy = ahead.y - pt.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const ox = (dx / len) * (TONGUE_STROKE / 2);
+      const oy = (dy / len) * (TONGUE_STROKE / 2);
+
+      setTip({
+        x: pt.x + ox - window.scrollX,
+        y: pt.y + oy - window.scrollY,
+      });
 
       // impact — hide the real fly and turn on tip fly immediately
       if (!geomRef.current!.hidImpact && t >= HIT_AT) {
@@ -457,14 +469,7 @@ export default function Home() {
       {/* SVG overlay; we update the path `d` every frame in RAF to stay locked to scroll */}
       {grab && (
         <svg
-          style={{
-            position: 'fixed',
-            inset: 0,
-            width: '100vw',
-            height: '100vh',
-            pointerEvents: 'none',
-            zIndex: 9999,
-          }}
+          className="fixed inset-0 z-40 w-screen h-screen pointer-events-none" // <-- was zIndex: 9999 inline
           width={vp.w}
           height={vp.h}
           viewBox={`0 0 ${vp.w} ${vp.h}`}
@@ -482,7 +487,7 @@ export default function Home() {
             d="M0 0 L0 0" // seeded on first RAF tick
             fill="none"
             stroke="url(#tongue-grad)"
-            strokeWidth={8}
+            strokeWidth={TONGUE_STROKE}
             strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
             initial={{ pathLength: 0 }}
