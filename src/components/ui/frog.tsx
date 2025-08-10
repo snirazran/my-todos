@@ -13,12 +13,19 @@ import {
   useRive,
   useStateMachineInput,
 } from '@rive-app/react-canvas';
+// No more imports from @rive-app/canvas are needed!
 
-/* === names exactly as they appear in the .riv file ======================== */
-const ARTBOARD = 'All';
+/* === Values from your Rive Editor ======================================== */
+// ⬇️ REPLACE THESE WITH YOUR REAL VALUES FROM STEP 1 ⬇️
+const ARTBOARD_WIDTH = 149;
+const ARTBOARD_HEIGHT = 120;
+const MOUTH_TARGET_X = 20; // The X position of your 'mouth_target'
+const MOUTH_TARGET_Y = 10; // The Y position of your 'mouth_target'
+/* ========================================================================= */
+
+const ARTBOARD_NAME = 'All';
 const STATE_MACHINE = 'State Machine 1';
 const MOUTH_TRIGGER = 'trigger_mouth_open';
-/* ========================================================================= */
 
 export interface FrogHandle {
   /** page-space coordinates of the mouth anchor */
@@ -32,9 +39,11 @@ interface FrogProps {
 
 const Frog = React.memo(
   forwardRef<FrogHandle, FrogProps>(({ className = '', mouthOpen }, ref) => {
-    const { RiveComponent, rive, setCanvasRef } = useRive({
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+    const { RiveComponent, rive } = useRive({
       src: '/frog_idle.riv',
-      artboard: ARTBOARD,
+      artboard: ARTBOARD_NAME,
       stateMachines: STATE_MACHINE,
       autoplay: true,
       layout: new Layout({
@@ -43,47 +52,49 @@ const Frog = React.memo(
       }),
     });
 
-    /* trigger that opens the mouth animation */
     const openMouth = useStateMachineInput(rive, STATE_MACHINE, MOUTH_TRIGGER);
 
     useEffect(() => {
       if (mouthOpen) openMouth?.fire();
     }, [mouthOpen, openMouth]);
 
-    /* === mouth anchor ==================================================== */
-    const mouthAnchorRef = useRef<HTMLDivElement | null>(null);
-
     useImperativeHandle(ref, () => ({
       getMouthPoint() {
-        const el = mouthAnchorRef.current;
-        if (!el) return { x: 0, y: 0 };
-        const r = el.getBoundingClientRect();
-        /* convert viewport → page coordinates */
-        return { x: r.left + window.scrollX, y: r.top + window.scrollY };
+        if (!canvasRef.current) {
+          return { x: 0, y: 0 };
+        }
+
+        // 1. Get the size of the HTML canvas element on the screen
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+
+        // 2. Calculate the scale factor based on "Fit.Contain"
+        const scale = Math.min(
+          canvasRect.width / ARTBOARD_WIDTH,
+          canvasRect.height / ARTBOARD_HEIGHT
+        );
+
+        // 3. Calculate the letterboxing (empty space) based on "Alignment.Center"
+        const offsetX = (canvasRect.width - ARTBOARD_WIDTH * scale) / 2;
+        const offsetY = (canvasRect.height - ARTBOARD_HEIGHT * scale) / 2;
+
+        // 4. Calculate the target's position inside the canvas
+        const canvasX = MOUTH_TARGET_X * scale + offsetX;
+        const canvasY = MOUTH_TARGET_Y * scale + offsetY;
+
+        // 5. Convert to final screen coordinates by adding the canvas's top-left corner
+        return {
+          x: canvasRect.left + canvasX,
+          y: canvasRect.top + canvasY,
+        };
       },
     }));
 
-    /* === render ========================================================== */
     return (
       <div
         className={className}
-        style={{ width: 240, height: 180, position: 'relative' }} // relative! ⬅
+        style={{ width: 240, height: 180, position: 'relative' }}
       >
-        {/* Rive canvas */}
-        <RiveComponent ref={setCanvasRef} />
-
-        {/* invisible mouth anchor — tweak the percentages once and forget */}
-        <div
-          ref={mouthAnchorRef}
-          style={{
-            position: 'absolute',
-            left: '50%', // 50 % of wrapper’s width  → centre horizontally
-            top: '80%', // adjust until tongue looks perfect
-            width: 0,
-            height: 0,
-            pointerEvents: 'none',
-          }}
-        />
+        <RiveComponent ref={canvasRef} />
       </div>
     );
   })

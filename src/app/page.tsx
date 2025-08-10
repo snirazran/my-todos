@@ -109,13 +109,17 @@ export default function Home() {
       return;
     }
 
-    const pagePt = frogRef.current!.getMouthPoint(); // already includes scroll
-    const origin = { x: pagePt.x, y: pagePt.y - 20 }; // page-space
-
+    const pagePt = frogRef.current!.getMouthPoint();
     const rect = flyEl.getBoundingClientRect();
+
+    // ✅ Use viewport coordinates directly
+    const origin = {
+      x: pagePt.x,
+      y: pagePt.y - 20, // The -20 offset is fine
+    };
     const target = {
-      x: rect.left + window.scrollX + rect.width / 2, // add scroll offset
-      y: rect.top + window.scrollY + rect.height / 2,
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height / 2,
     };
     // ➊ wait OFFSET_MS before tongue starts
     setTimeout(() => {
@@ -242,10 +246,8 @@ export default function Home() {
 
           return (
             <svg
-              className="absolute pointer-events-none z-[9999] left-0 top-0"
-              style={{ width: '100%', height: '100%' }} // full page
-              viewBox={`0 0 ${document.documentElement.scrollWidth}
-                  ${document.documentElement.scrollHeight}`}
+              className="fixed inset-0 pointer-events-none z-[9999] w-screen h-screen"
+              viewBox={`0 0 ${window.innerWidth} ${window.innerHeight}`}
               preserveAspectRatio="none"
             >
               <defs>
