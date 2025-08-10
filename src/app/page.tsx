@@ -13,8 +13,7 @@ import Frog, { FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
-import gsap from 'gsap';
-import { ScrollToPlugin } from 'gsap/ScrollToPlugin';
+
 /* === Tunables ============================================================ */
 const TONGUE_MS = 1111; // tongue extend+retract total
 const OFFSET_MS = 160; // anticipation delay before tongue starts
@@ -22,14 +21,14 @@ const PRE_PAN_MS = 600; // camera pre-pan up to frog
 const PRE_LINGER_MS = 180; // small pause on frog before firing
 const CAM_START_DELAY = 140; // start following down after tongue begins
 const RETURN_MS = 520; // (not used for return now, but kept for future)
-const ORIGIN_Y_ADJ = 0;
+const ORIGIN_Y_ADJ = -5;
 const TONGUE_STROKE = 8;
 const FOLLOW_EASE = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // easeInOutCubic
 const HIT_AT = 0.5; // impact at 50% of tongue
 const FLY_PX = 24;
 /* ======================================================================== */
-gsap.registerPlugin(ScrollToPlugin);
+
 interface Task {
   id: string;
   text: string;
