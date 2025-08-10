@@ -14,11 +14,11 @@ import {
   useStateMachineInput,
 } from '@rive-app/react-canvas';
 
-/* === Replace with your real Rive artboard + node values =================== */
+/* === Put your real artboard + node values here =========================== */
 const ARTBOARD_WIDTH = 149;
 const ARTBOARD_HEIGHT = 120;
-const MOUTH_TARGET_X = 75; // mouth_target.x in artboard units
-const MOUTH_TARGET_Y = 70; // mouth_target.y in artboard units
+const MOUTH_TARGET_X = 75; // artboard units
+const MOUTH_TARGET_Y = 70; // artboard units
 /* ========================================================================= */
 
 const ARTBOARD_NAME = 'All';
@@ -26,78 +26,92 @@ const STATE_MACHINE = 'State Machine 1';
 const MOUTH_TRIGGER = 'trigger_mouth_open';
 
 export interface FrogHandle {
-  /** viewport coordinates of the mouth anchor */
+  /** viewport coordinates of the mouth anchor (CSS px, rounded) */
   getMouthPoint: () => { x: number; y: number };
+  /** wrapper rect (for visibility checks) */
+  getBoxRect: () => DOMRect;
 }
 
 interface FrogProps {
   className?: string;
   mouthOpen?: boolean;
-  mouthOffset?: { x?: number; y?: number }; // NEW
+  /** fine-tune in CSS pixels after mapping */
+  mouthOffset?: { x?: number; y?: number };
+  /** wrapper size (optional) */
+  width?: number;
+  height?: number;
 }
 
 const Frog = React.memo(
-  forwardRef<FrogHandle, FrogProps>(
-    ({ className = '', mouthOpen, mouthOffset }, ref) => {
-      const wrapperRef = useRef<HTMLDivElement | null>(null);
+  forwardRef<FrogHandle, FrogProps>(function Frog(
+    { className = '', mouthOpen, mouthOffset, width = 240, height = 180 },
+    ref
+  ) {
+    const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-      const { RiveComponent, rive, setCanvasRef } = useRive({
-        src: '/frog_idle.riv',
-        artboard: ARTBOARD_NAME,
-        stateMachines: STATE_MACHINE,
-        autoplay: true,
-        layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
-      });
+    const { RiveComponent, rive, setCanvasRef } = useRive({
+      src: '/frog_idle.riv',
+      artboard: ARTBOARD_NAME,
+      stateMachines: STATE_MACHINE,
+      autoplay: true,
+      layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
+    });
 
-      const openMouth = useStateMachineInput(
-        rive,
-        STATE_MACHINE,
-        MOUTH_TRIGGER
-      );
+    const openMouth = useStateMachineInput(rive, STATE_MACHINE, MOUTH_TRIGGER);
 
-      useEffect(() => {
-        if (mouthOpen) openMouth?.fire();
-      }, [mouthOpen, openMouth]);
+    useEffect(() => {
+      if (mouthOpen) openMouth?.fire();
+    }, [mouthOpen, openMouth]);
 
-      useImperativeHandle(ref, () => ({
-        getMouthPoint() {
-          const el = wrapperRef.current;
-          if (!el) return { x: 0, y: 0 };
+    useImperativeHandle(ref, () => ({
+      getMouthPoint() {
+        const el = wrapperRef.current;
+        if (!el) return { x: 0, y: 0 };
 
-          const rect = el.getBoundingClientRect();
-          const scale = Math.min(
-            rect.width / ARTBOARD_WIDTH,
-            rect.height / ARTBOARD_HEIGHT
-          );
-          const offsetX = (rect.width - ARTBOARD_WIDTH * scale) / 2;
-          const offsetY = (rect.height - ARTBOARD_HEIGHT * scale) / 2;
+        // 1) wrapper rect in CSS pixels (already includes transforms)
+        const rect = el.getBoundingClientRect();
 
-          const canvasX = MOUTH_TARGET_X * scale + offsetX;
-          const canvasY = MOUTH_TARGET_Y * scale + offsetY;
+        // 2) Fit.Contain scale
+        const sx = rect.width / ARTBOARD_WIDTH;
+        const sy = rect.height / ARTBOARD_HEIGHT;
+        const scale = Math.min(sx, sy);
 
-          const ox = mouthOffset?.x ?? 0;
-          const oy = mouthOffset?.y ?? 0;
+        // 3) the actual drawn box (letterboxed & centered)
+        const drawW = ARTBOARD_WIDTH * scale;
+        const drawH = ARTBOARD_HEIGHT * scale;
+        const drawLeft = rect.left + (rect.width - drawW) / 2;
+        const drawTop = rect.top + (rect.height - drawH) / 2;
 
-          return { x: rect.left + canvasX + ox, y: rect.top + canvasY + oy };
-        },
-      }));
+        // 4) map artboard coords -> drawn box
+        const cx = drawLeft + MOUTH_TARGET_X * scale;
+        const cy = drawTop + MOUTH_TARGET_Y * scale;
 
-      return (
-        <div
-          ref={wrapperRef}
-          className={className}
-          style={{ width: 240, height: 180, position: 'relative' }}
-        >
-          {/* Let Rive render into our box; we still give it the actual canvas via setCanvasRef,
-            but we don't rely on reading that canvas back. */}
-          <RiveComponent
-            ref={(node) => setCanvasRef(node as HTMLCanvasElement | null)}
-            style={{ width: '100%', height: '100%', display: 'block' }}
-          />
-        </div>
-      );
-    }
-  )
+        // 5) apply optional fine offset (CSS px), snap to integer to avoid wobble
+        const ox = mouthOffset?.x ?? 0;
+        const oy = mouthOffset?.y ?? 0;
+
+        return { x: Math.round(cx + ox), y: Math.round(cy + oy) };
+      },
+      getBoxRect() {
+        return (
+          wrapperRef.current?.getBoundingClientRect() ?? new DOMRect(0, 0, 0, 0)
+        );
+      },
+    }));
+
+    return (
+      <div
+        ref={wrapperRef}
+        className={className}
+        style={{ width, height, position: 'relative' }}
+      >
+        <RiveComponent
+          ref={(node) => setCanvasRef(node as HTMLCanvasElement | null)}
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
+      </div>
+    );
+  })
 );
 
 export default Frog;
