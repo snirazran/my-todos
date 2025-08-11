@@ -18,7 +18,7 @@ import {
 const ARTBOARD_WIDTH = 149;
 const ARTBOARD_HEIGHT = 120;
 const MOUTH_TARGET_X = 75; // artboard units
-const MOUTH_TARGET_Y = 80; // artboard units
+const MOUTH_TARGET_Y = 70; // artboard units
 /* ========================================================================= */
 
 const ARTBOARD_NAME = 'All';
