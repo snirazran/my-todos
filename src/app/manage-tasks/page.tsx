@@ -8,11 +8,12 @@ import { arrayMoveImmutable } from 'array-move';
 import {
   DndContext,
   closestCenter,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -48,11 +49,11 @@ export default function ManageTasks() {
     })();
   }, []);
 
-  /* ---------------- dnd‑kit sensors ---------------- */
+  /* ---------------- dnd-kit sensors ---------------- */
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 150, tolerance: 5 },
+      activationConstraint: { delay: 220, tolerance: 6 },
     })
   );
 
@@ -123,37 +124,38 @@ export default function ManageTasks() {
           </div>
         </div>
 
-        {/* ---------- week grid ---------- */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {week.map((dayTasks, idx) => (
-            <section
-              key={idx}
-              className="min-w-[230px] flex flex-col p-4 bg-white shadow dark:bg-slate-800 rounded-2xl"
-            >
-              <h2 className="mb-4 font-semibold text-center text-slate-900 dark:text-white">
-                {hebrewDays[idx]}
-              </h2>
+        {/* ---------- Mobile: one day per screen (horizontal swipe) ---------- */}
+        <div className="px-4 -mx-4 md:hidden">
+          <div className="flex gap-4 pb-4 overflow-x-auto snap-x snap-mandatory overscroll-x-contain">
+            {week.map((dayTasks, idx) => (
+              <div key={idx} className="flex-none w-full snap-center">
+                <DayColumn
+                  idx={idx}
+                  dayTasks={dayTasks}
+                  sensors={sensors}
+                  onDelete={removeTask}
+                  onDragEnd={handleDragEnd}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
 
-              <DndContext
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={(e) => handleDragEnd(e, idx)}
-              >
-                <SortableContext
-                  items={dayTasks.map((t) => t.id)}
-                  strategy={verticalListSortingStrategy}
-                >
-                  {dayTasks.map((t) => (
-                    <SortableTask
-                      key={t.id}
-                      task={t}
-                      onDelete={() => removeTask(idx, t.id)}
-                    />
-                  ))}
-                </SortableContext>
-              </DndContext>
-            </section>
-          ))}
+        {/* ---------- Desktop: show ~4 columns, horizontal scroll for more ---------- */}
+        <div className="hidden md:block">
+          <div className="flex gap-6 pb-2 overflow-x-auto">
+            {week.map((dayTasks, idx) => (
+              <div key={idx} className="flex-none w-[320px]">
+                <DayColumn
+                  idx={idx}
+                  dayTasks={dayTasks}
+                  sensors={sensors}
+                  onDelete={removeTask}
+                  onDragEnd={handleDragEnd}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -192,20 +194,28 @@ function SortableTask({
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
-        touchAction: 'none',
+        // allow vertical scroll gestures to pass through on touch
+        touchAction: 'pan-y',
       }}
-      className="flex items-center gap-3 p-3 mb-2 select-none rounded-xl cursor-grab active:cursor-grabbing bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
+      className="flex items-center gap-3 p-3 mb-2 select-none rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
     >
-      {/* decorative grip icon */}
-      <GripVertical className="shrink-0 text-slate-400 dark:text-slate-500" />
+      {/* drag handle ONLY */}
+      <button
+        {...attributes}
+        {...listeners}
+        className="p-1 shrink-0 cursor-grab active:cursor-grabbing"
+        aria-label="Drag task"
+      >
+        <GripVertical className="text-slate-400 dark:text-slate-500" />
+      </button>
+
       <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
         {task.text}
       </span>
+
       <button onClick={onDelete} title="מחק">
         <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
       </button>
@@ -214,7 +224,7 @@ function SortableTask({
 }
 
 /* =================================================================== */
-/*  ADD‑TASK MODAL                                                     */
+/*  ADD-TASK MODAL                                                     */
 /* =================================================================== */
 function AddTaskModal({
   onClose,
@@ -279,5 +289,49 @@ function AddTaskModal({
         </div>
       </div>
     </div>
+  );
+}
+
+/* =================================================================== */
+/*  DAY COLUMN (mobile: full width page; desktop: fixed width card)    */
+/* =================================================================== */
+function DayColumn({
+  idx,
+  dayTasks,
+  sensors,
+  onDelete,
+  onDragEnd,
+}: {
+  idx: number;
+  dayTasks: Task[];
+  sensors: any;
+  onDelete: (day: number, id: string) => void;
+  onDragEnd: (e: any, day: number) => void;
+}) {
+  return (
+    <section className="flex-none min-w-full sm:min-w-[420px] lg:min-w-[320px] p-4 bg-white shadow dark:bg-slate-800 rounded-2xl">
+      <h2 className="mb-4 font-semibold text-center text-slate-900 dark:text-white">
+        {hebrewDays[idx]}
+      </h2>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[restrictToVerticalAxis]}
+        onDragEnd={(e) => onDragEnd(e, idx)}
+      >
+        <SortableContext
+          items={dayTasks.map((t) => t.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          {dayTasks.map((t) => (
+            <SortableTask
+              key={t.id}
+              task={t}
+              onDelete={() => onDelete(idx, t.id)}
+            />
+          ))}
+        </SortableContext>
+      </DndContext>
+    </section>
   );
 }
