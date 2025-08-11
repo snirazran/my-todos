@@ -48,7 +48,7 @@ export default function History() {
   /* ---- frog animation shared state ---- */
   const cooldownUntil = useRef(0);
   const frogRef = useRef<FrogHandle>(null);
-  const flyRefs = useRef<Record<string, HTMLImageElement | null>>({}); // key = `${date}::${taskId}`
+  const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [visuallyDone, setVisuallyDone] = useState<Set<string>>(new Set());
   const [vp, setVp] = useState({ w: 0, h: 0 });
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
@@ -151,7 +151,7 @@ export default function History() {
     return { x: p.x + offX, y: p.y + offY + ORIGIN_Y_ADJ };
   }, []);
 
-  const getFlyDoc = useCallback((el: HTMLImageElement) => {
+  const getFlyDoc = useCallback((el: HTMLElement) => {
     const r = el.getBoundingClientRect();
     const vv = window.visualViewport;
     const offX = window.scrollX + Math.max(0, vv?.offsetLeft ?? 0);
@@ -518,21 +518,17 @@ export default function History() {
                   toggle={handleToggle}
                   visuallyCompleted={visuallyDone}
                   renderBullet={(key: string, task: HistoryTask) => (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggle(day.date, task.id, true);
+                    <Fly
+                      ref={(el) => {
+                        flyRefs.current[key] = el;
                       }}
-                      className="inline-block"
-                    >
-                      <Fly
-                        ref={(el) => {
-                          flyRefs.current[key] = el;
-                        }}
-                        onClick={() => {}} // satisfy Fly’s required prop
-                      />
-                    </button>
+                      onClick={(e) => {
+                        e.stopPropagation(); // don't trigger row click
+                        handleToggle(day.date, task.id, true); // fire the tongue
+                      }}
+                      size={30}
+                      y={-6}
+                    />
                   )}
                 />
               </div>

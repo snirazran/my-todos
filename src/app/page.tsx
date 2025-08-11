@@ -70,7 +70,7 @@ export default function Home() {
   const cooldownUntil = useRef(0);
 
   const frogRef = useRef<FrogHandle>(null);
-  const flyRefs = useRef<Record<string, HTMLImageElement | null>>({});
+  const flyRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
@@ -198,7 +198,7 @@ export default function Home() {
     return { x: p.x + offX, y: p.y + offY + ORIGIN_Y_ADJ };
   }, []);
 
-  const getFlyDoc = useCallback((el: HTMLImageElement) => {
+  const getFlyDoc = useCallback((el: HTMLElement) => {
     const r = el.getBoundingClientRect();
     const vv = window.visualViewport;
     const offX = window.scrollX + Math.max(0, vv?.offsetLeft ?? 0);
@@ -512,6 +512,8 @@ export default function Home() {
                     flyRefs.current[task.id] = el;
                   }}
                   onClick={() => handleToggle(task.id, true)}
+                  size={30}
+                  y={-6}
                 />
               )
             }
