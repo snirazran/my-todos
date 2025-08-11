@@ -5,58 +5,82 @@ import React, {
   useEffect,
   useRef,
   useState,
-  ReactNode,
-  forwardRef,
   useMemo,
   useCallback,
 } from 'react';
 import Link from 'next/link';
+import { Plus, Trash2, ArrowLeft } from 'lucide-react';
+
 import {
-  Plus,
-  GripVertical,
-  Trash2,
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
-import {
-  DndContext,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragStartEvent,
-  DragMoveEvent,
-  DragOverEvent,
-  DragEndEvent,
-  useDroppable,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+  DragStart,
+} from '@hello-pangea/dnd';
+
+import useEmblaCarousel from 'embla-carousel-react';
 
 /* ---------- types ---------- */
 type Task = { id: string; text: string; order: number };
 const hebrewDays = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
+
+const DAYS = 7;
+const SEGMENTS = 3; // prev | current | next (virtual infinite)
+const MID_SEG = 1; // middle segment index
+
+/* ---------- helpers ---------- */
+const droppableId = (seg: number, day: number) => `seg-${seg}-day-${day}`;
+const parseDroppable = (id: string) => {
+  const m = id.match(/^seg-(\d+)-day-(\d+)$/);
+  if (!m) return { seg: 0, day: 0 };
+  return { seg: Number(m[1]) || 0, day: Number(m[2]) || 0 };
+};
+const draggableIdFor = (seg: number, day: number, taskId: string) =>
+  `${taskId}__s${seg}d${day}`;
 
 /* =================================================================== */
 /*  PAGE                                                               */
 /* =================================================================== */
 export default function ManageTasks() {
   const [week, setWeek] = useState<Task[][]>(
-    Array.from({ length: 7 }, () => [])
+    Array.from({ length: DAYS }, () => [])
   );
   const [showModal, setShowModal] = useState(false);
 
   // drag state
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const dragFromDayRef = useRef<number | null>(null);
+  const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [dragResetToken, setDragResetToken] = useState(0);
 
-  // horizontal row ref (for grab-to-pan + auto-scroll)
-  const rowRef = useRef<HTMLDivElement | null>(null);
+  // Embla (we simulate “infinite” with 3 segments)
+  const [emblaRef, emblaApi] = useEmblaCarousel({
+    loop: false,
+    align: 'start',
+    dragFree: false,
+    containScroll: 'trimSnaps',
+    skipSnaps: false,
+  });
+
+  // Keep the viewport element for edge detection
+  const viewportElRef = useRef<HTMLDivElement | null>(null);
+  const setViewportRef = useCallback(
+    (el: HTMLDivElement | null) => {
+      viewportElRef.current = el;
+      (emblaRef as (el: HTMLDivElement | null) => void)(el);
+    },
+    [emblaRef]
+  );
+
+  // Build virtual slides: 3x the 7 days
+  const slides = useMemo(
+    () =>
+      Array.from({ length: SEGMENTS * DAYS }, (_, i) => ({
+        seg: Math.floor(i / DAYS),
+        day: i % DAYS,
+        key: `seg-${Math.floor(i / DAYS)}-day-${i % DAYS}`,
+      })),
+    []
+  );
 
   /* ---------------- initial fetch ---------------- */
   useEffect(() => {
@@ -72,153 +96,46 @@ export default function ManageTasks() {
     })();
   }, []);
 
-  /* ---------------- dnd-kit sensors ----------------
-     Long-press to pick up (works for mouse & touch). */
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        delay: 300, // ~0.3s hold before drag begins
-        tolerance: 6, // slight finger wiggle allowed
-      },
-    })
-  );
+  /* ---------------- Embla: start centered on today ---------------- */
+  useEffect(() => {
+    if (!emblaApi) return;
+    const today = new Date().getDay(); // 0..6
+    emblaApi.scrollTo(MID_SEG * DAYS + today, true);
+  }, [emblaApi]);
 
-  /* ---------------- helpers ---------------- */
-  const findDayByItem = (id: string): number | null => {
-    for (let d = 0; d < week.length; d++) {
-      if (week[d].some((t) => t.id === id)) return d;
-    }
-    return null;
-  };
+  /* ---------------- Embla: virtual infinite re-centering ----------- */
+  useEffect(() => {
+    if (!emblaApi) return;
 
+    const maybeRecentre = () => {
+      const i = emblaApi.selectedScrollSnap();
+      const day = i % DAYS;
+      if (i < DAYS) {
+        emblaApi.scrollTo(MID_SEG * DAYS + day, true);
+      } else if (i >= (MID_SEG + 1) * DAYS) {
+        emblaApi.scrollTo(MID_SEG * DAYS + day, true);
+      }
+    };
+
+    emblaApi.on('select', maybeRecentre);
+    emblaApi.on('settle', maybeRecentre);
+    return () => {
+      emblaApi.off('select', maybeRecentre);
+      emblaApi.off('settle', maybeRecentre);
+    };
+  }, [emblaApi]);
+
+  /* ---------------- Save helpers ---------------- */
   const saveDay = async (day: number, tasks: Task[]) => {
     const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
-    await fetch('/api/manage-tasks', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ day, tasks: ordered }),
-    });
-  };
-
-  /* ---------------- autoscroll (slow + delayed) ---------------- */
-  const autoDirRef = useRef<'left' | 'right' | null>(null);
-  const autoTickRef = useRef<number | null>(null);
-  const autoDelayRef = useRef<number | null>(null);
-
-  const startAutoScroll = (dir: 'left' | 'right') => {
-    const el = rowRef.current;
-    if (!el) return;
-
-    if (autoDirRef.current !== dir) {
-      stopAutoScroll();
-      autoDirRef.current = dir;
-      autoDelayRef.current = window.setTimeout(() => {
-        autoTickRef.current = window.setInterval(() => {
-          el.scrollLeft += dir === 'left' ? -6 : 6; // slow + smooth
-        }, 16);
-      }, 250); // must linger at edge to move days
-    }
-  };
-  const stopAutoScroll = () => {
-    if (autoDelayRef.current) {
-      clearTimeout(autoDelayRef.current);
-      autoDelayRef.current = null;
-    }
-    if (autoTickRef.current) {
-      clearInterval(autoTickRef.current);
-      autoTickRef.current = null;
-    }
-    autoDirRef.current = null;
-  };
-
-  const handleDragStart = (e: DragStartEvent) => {
-    setActiveId(e.active.id as string);
-    dragFromDayRef.current = findDayByItem(e.active.id as string);
-  };
-
-  const handleDragMove = (e: DragMoveEvent) => {
-    const el = rowRef.current;
-    if (!el || !activeId) return;
-
-    const rect = el.getBoundingClientRect();
-    const tr = (e.active.rect.current.translated ||
-      e.active.rect.current) as any;
-
-    // If for some reason rects aren't present, bail gracefully.
-    if (!tr) return;
-
-    const left = tr.left ?? rect.left;
-    const right = tr.right ?? rect.right;
-
-    const threshold = 28;
-    if (right > rect.right - threshold) startAutoScroll('right');
-    else if (left < rect.left + threshold) startAutoScroll('left');
-    else stopAutoScroll();
-  };
-
-  // live cross-day rearrange while hovering other lists or empty days
-  const handleDragOver = (e: DragOverEvent) => {
-    const { active, over } = e;
-    if (!over) return;
-
-    const activeId = active.id as string;
-    const overId = over.id as string;
-
-    const fromDay = findDayByItem(activeId);
-
-    // Over a task in another day
-    let toDay = findDayByItem(overId);
-
-    // Or over an empty day container (id = day-<idx>)
-    if (toDay == null && overId.startsWith('day-')) {
-      const idx = Number(overId.split('-')[1]);
-      if (!Number.isNaN(idx)) toDay = idx;
-    }
-
-    if (fromDay == null || toDay == null || fromDay === toDay) return;
-
-    setWeek((prev) => {
-      const clone = prev.map((d) => [...d]);
-      const fromIdx = clone[fromDay].findIndex((t) => t.id === activeId);
-
-      // Determine insertion index:
-      // - If we hovered a task, insert at its index
-      // - If we hovered an empty area/day, append to end
-      let overIdx = clone[toDay].length;
-      if (!overId.startsWith('day-')) {
-        const oi = clone[toDay].findIndex((t) => t.id === overId);
-        if (oi >= 0) overIdx = oi;
-      }
-
-      const [moved] = clone[fromDay].splice(fromIdx, 1);
-      clone[toDay].splice(Math.max(0, overIdx), 0, moved);
-      return clone;
-    });
-  };
-
-  const handleDragEnd = async (e: DragEndEvent) => {
-    stopAutoScroll();
-    const { active, over } = e;
-    setActiveId(null);
-    if (!over) return;
-
-    const id = active.id as string;
-    const fromDay = dragFromDayRef.current;
-    const toDay =
-      findDayByItem(id) ??
-      (over.id.toString().startsWith('day-')
-        ? Number(over.id.toString().split('-')[1])
-        : null);
-
-    if (fromDay != null && toDay != null) {
-      if (fromDay === toDay) {
-        await saveDay(toDay, week[toDay]);
-      } else {
-        await Promise.all([
-          saveDay(fromDay, week[fromDay]),
-          saveDay(toDay, week[toDay]),
-        ]);
-      }
+    try {
+      await fetch('/api/manage-tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ day, tasks: ordered }),
+      });
+    } catch (e) {
+      console.warn('saveDay failed', e);
     }
   };
 
@@ -232,6 +149,106 @@ export default function ManageTasks() {
       const clone = [...w];
       clone[day] = clone[day].filter((t) => t.id !== id);
       return clone;
+    });
+  };
+
+  /* ---------------- Edge step (while dragging) --------------------- */
+  const pointerXRef = useRef<number>(0);
+  const draggingRef = useRef<boolean>(false);
+  const tickTimerRef = useRef<number | null>(null);
+  const lastStepRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+
+    const onMove = (ev: MouseEvent | TouchEvent | PointerEvent) => {
+      if ('touches' in ev && ev.touches && ev.touches[0]) {
+        pointerXRef.current = ev.touches[0].clientX;
+      } else if ('clientX' in ev) {
+        // @ts-ignore
+        pointerXRef.current = ev.clientX || pointerXRef.current;
+      }
+    };
+
+    if (draggingRef.current) {
+      window.addEventListener('pointermove', onMove, { passive: true });
+      window.addEventListener('mousemove', onMove as any, { passive: true });
+      window.addEventListener('touchmove', onMove as any, { passive: true });
+
+      const tick = () => {
+        const vp = viewportElRef.current;
+        if (!vp || !emblaApi) return;
+
+        const rect = vp.getBoundingClientRect();
+        const x = pointerXRef.current;
+        const threshold = 30; // px near edges
+        const now = Date.now();
+        const minLinger = 260; // ms between steps
+
+        if (x > rect.right - threshold) {
+          if (
+            emblaApi.canScrollNext() &&
+            now - lastStepRef.current > minLinger
+          ) {
+            emblaApi.scrollNext();
+            lastStepRef.current = now;
+          }
+        } else if (x < rect.left + threshold) {
+          if (
+            emblaApi.canScrollPrev() &&
+            now - lastStepRef.current > minLinger
+          ) {
+            emblaApi.scrollPrev();
+            lastStepRef.current = now;
+          }
+        }
+        tickTimerRef.current = window.setTimeout(tick, 60);
+      };
+      tick();
+    }
+
+    return () => {
+      if (tickTimerRef.current) {
+        clearTimeout(tickTimerRef.current);
+        tickTimerRef.current = null;
+      }
+      window.removeEventListener('pointermove', onMove as any);
+      window.removeEventListener('mousemove', onMove as any);
+      window.removeEventListener('touchmove', onMove as any);
+    };
+  }, [emblaApi, draggingTaskId]); // restart per drag
+
+  /* ---------------- DND: handlers --------------------------------- */
+  const onDragStart = (_s: DragStart) => {
+    draggingRef.current = true;
+  };
+
+  const onDragEnd = async (result: DropResult) => {
+    draggingRef.current = false;
+    setDraggingTaskId(null);
+    setDragResetToken((x) => x + 1);
+
+    const { source, destination } = result;
+    if (!destination) return;
+
+    const from = parseDroppable(source.droppableId);
+    const to = parseDroppable(destination.droppableId);
+
+    const fromDay = ((from.day % DAYS) + DAYS) % DAYS;
+    const toDay = ((to.day % DAYS) + DAYS) % DAYS;
+
+    if (fromDay === toDay && source.index === destination.index) return;
+
+    setWeek((prev) => {
+      const next = prev.map((d) => d.slice());
+      const [moved] = next[fromDay].splice(source.index, 1);
+      next[toDay].splice(destination.index, 0, moved);
+      Promise.all(
+        fromDay === toDay
+          ? [saveDay(toDay, next[toDay])]
+          : [saveDay(fromDay, next[fromDay]), saveDay(toDay, next[toDay])]
+      ).catch(() => {});
+      return next;
     });
   };
 
@@ -269,34 +286,33 @@ export default function ManageTasks() {
           </div>
         </div>
 
-        {/* ---------- One responsive row (mobile full width, desktop 320px) ---------- */}
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          // NOTE: no restrictToVerticalAxis → free to move sideways across days
-          onDragStart={handleDragStart}
-          onDragMove={handleDragMove}
-          onDragOver={handleDragOver}
-          onDragEnd={handleDragEnd}
-        >
-          <DragScroll ref={rowRef} hint dragging={!!activeId}>
-            <div className="flex gap-6 pb-2">
-              {week.map((dayTasks, idx) => (
-                <div
-                  key={idx}
-                  className="flex-none min-w-full sm:min-w-[420px] md:min-w-[320px] w-[320px]"
-                >
-                  <DayColumn
-                    idx={idx}
-                    dayTasks={dayTasks}
-                    onDelete={removeTask}
-                    activeId={activeId}
-                  />
-                </div>
-              ))}
+        {/* ---------- Embla viewport (virtual infinite) + DND ---------- */}
+        <DragDropContext onDragStart={onDragStart} onDragEnd={onDragEnd}>
+          <div className="relative">
+            <div ref={setViewportRef} dir="ltr" className="overflow-hidden">
+              <div className="flex gap-6 pb-2" dir="ltr">
+                {slides.map(({ seg, day, key }) => (
+                  <div
+                    key={key}
+                    // LTR layout for the carousel, RTL content inside the column
+                    dir="rtl"
+                    className="shrink-0 basis-full sm:basis-[420px] md:basis-[320px]"
+                  >
+                    <DayColumn
+                      seg={seg}
+                      dayIdx={day}
+                      tasks={week[day]}
+                      onDelete={(id) => removeTask(day, id)}
+                      draggingTaskId={draggingTaskId}
+                      setDraggingTaskId={setDraggingTaskId}
+                      dragResetToken={dragResetToken}
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
-          </DragScroll>
-        </DndContext>
+          </div>
+        </DragDropContext>
       </div>
 
       {/* ---------- modal ---------- */}
@@ -319,58 +335,179 @@ export default function ManageTasks() {
 }
 
 /* =================================================================== */
-/*  SORTABLE TASK ROW — long-press to pick; visual cue while active    */
+/*  DAY COLUMN (Droppable)                                             */
 /* =================================================================== */
-function SortableTask({
-  task,
+function DayColumn({
+  seg,
+  dayIdx,
+  tasks,
   onDelete,
-  isActive,
+  draggingTaskId,
+  setDraggingTaskId,
+  dragResetToken,
 }: {
-  task: Task;
-  onDelete: () => void;
-  isActive: boolean;
+  seg: number;
+  dayIdx: number;
+  tasks: Task[];
+  onDelete: (id: string) => void;
+  draggingTaskId: string | null;
+  setDraggingTaskId: (id: string | null) => void;
+  dragResetToken: number;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id });
-
-  // Small “picked” glow after activation; before activation we let the row scroll.
-  const style: React.CSSProperties = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    touchAction: isActive ? 'none' : 'pan-y', // while dragging, don't steal scroll
-  };
+  const id = droppableId(seg, dayIdx);
 
   return (
-    <div
-      ref={setNodeRef}
-      data-dnd-item
-      {...attributes}
-      {...listeners}
-      style={style}
-      className={[
-        'flex items-center gap-3 p-3 mb-2 select-none rounded-xl',
-        'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600',
-        'cursor-grab active:cursor-grabbing',
-        isActive
-          ? 'ring-2 ring-violet-500 shadow-lg scale-[1.02]'
-          : 'ring-0 shadow-sm',
-        isDragging ? 'opacity-90' : '',
-      ].join(' ')}
+    <section className="p-4 transition-colors bg-white shadow dark:bg-slate-800 rounded-2xl">
+      <h2 className="mb-4 font-semibold text-center text-slate-900 dark:text-white">
+        {hebrewDays[dayIdx]}
+      </h2>
+
+      <Droppable droppableId={id} direction="vertical">
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={[
+              'rounded-xl',
+              snapshot.isDraggingOver
+                ? 'bg-violet-50/70 dark:bg-violet-950/20'
+                : '',
+            ].join(' ')}
+          >
+            {tasks.length === 0 && !snapshot.isDraggingOver && (
+              <div className="py-6 mb-2 text-xs text-center border border-dashed rounded-lg border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400">
+                שחרר כאן כדי להוסיף ליום הזה
+              </div>
+            )}
+
+            {tasks.map((t, index) => {
+              const dragId = draggableIdFor(seg, dayIdx, t.id);
+              return (
+                <TaskCard
+                  key={dragId}
+                  dragId={dragId}
+                  task={t}
+                  index={index}
+                  onDelete={() => onDelete(t.id)}
+                  draggingTaskId={draggingTaskId}
+                  setDraggingTaskId={setDraggingTaskId}
+                  dragResetToken={dragResetToken}
+                />
+              );
+            })}
+            {provided.placeholder}
+          </div>
+        )}
+      </Droppable>
+    </section>
+  );
+}
+
+/* =================================================================== */
+/*  TASK CARD (Draggable with long-press gating)                       */
+/* =================================================================== */
+function TaskCard({
+  dragId,
+  task,
+  index,
+  onDelete,
+  draggingTaskId,
+  setDraggingTaskId,
+  dragResetToken,
+}: {
+  dragId: string;
+  task: Task;
+  index: number;
+  onDelete: () => void;
+  draggingTaskId: string | null;
+  setDraggingTaskId: (id: string | null) => void;
+  dragResetToken: number;
+}) {
+  const [canDrag, setCanDrag] = useState(false);
+  const pressTimerRef = useRef<number | null>(null);
+  const startPointRef = useRef<{ x: number; y: number } | null>(null);
+
+  const clearTimer = () => {
+    if (pressTimerRef.current) {
+      clearTimeout(pressTimerRef.current);
+      pressTimerRef.current = null;
+    }
+  };
+
+  const onPressStart = (clientX: number, clientY: number) => {
+    startPointRef.current = { x: clientX, y: clientY };
+    clearTimer();
+    pressTimerRef.current = window.setTimeout(() => {
+      setCanDrag(true);
+      setDraggingTaskId(task.id);
+    }, 320);
+  };
+
+  const onPressMove = (clientX: number, clientY: number) => {
+    const start = startPointRef.current;
+    if (!start || canDrag) return;
+    const dx = Math.abs(clientX - start.x);
+    const dy = Math.abs(clientY - start.y);
+    if (dx > 10 || dy > 10) {
+      clearTimer(); // user is swiping/scrolling, cancel drag intent
+    }
+  };
+
+  const onPressEnd = () => {
+    clearTimer();
+    if (!canDrag) setDraggingTaskId(null);
+  };
+
+  useEffect(() => {
+    setCanDrag(false);
+  }, [dragResetToken]);
+
+  return (
+    <Draggable
+      draggableId={dragId} // <<< UNIQUE across all slides
+      index={index}
+      isDragDisabled={!canDrag && draggingTaskId !== task.id}
     >
-      <GripVertical className="shrink-0 text-slate-400 dark:text-slate-500" />
-      <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
-        {task.text}
-      </span>
-      <button onClick={onDelete} title="מחק">
-        <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
-      </button>
-    </div>
+      {(provided, snapshot) => (
+        <div
+          ref={provided.innerRef}
+          {...provided.draggableProps}
+          {...provided.dragHandleProps}
+          onMouseDown={(e) => onPressStart(e.clientX, e.clientY)}
+          onMouseMove={(e) => onPressMove(e.clientX, e.clientY)}
+          onMouseUp={onPressEnd}
+          onMouseLeave={onPressEnd}
+          onTouchStart={(e) => {
+            const t = e.touches[0];
+            if (t) onPressStart(t.clientX, t.clientY);
+          }}
+          onTouchMove={(e) => {
+            const t = e.touches[0];
+            if (t) onPressMove(t.clientX, t.clientY);
+          }}
+          onTouchEnd={onPressEnd}
+          style={{
+            ...provided.draggableProps.style,
+            touchAction: snapshot.isDragging ? 'none' : 'pan-x pan-y',
+          }}
+          className={[
+            'flex items-center gap-3 p-3 mb-2 select-none rounded-xl',
+            'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600',
+            'cursor-grab active:cursor-grabbing',
+            snapshot.isDragging
+              ? 'ring-2 ring-violet-500 shadow-lg scale-[1.02]'
+              : 'ring-0 shadow-sm',
+          ].join(' ')}
+        >
+          <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
+            {task.text}
+          </span>
+          <button onClick={onDelete} title="מחק">
+            <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
+          </button>
+        </div>
+      )}
+    </Draggable>
   );
 }
 
@@ -442,163 +579,3 @@ function AddTaskModal({
     </div>
   );
 }
-
-/* =================================================================== */
-/*  DAY COLUMN (now also a droppable target for empty lists)           */
-/* =================================================================== */
-function DayColumn({
-  idx,
-  dayTasks,
-  onDelete,
-  activeId,
-}: {
-  idx: number;
-  dayTasks: Task[];
-  onDelete: (day: number, id: string) => void;
-  activeId: string | null;
-}) {
-  // Droppable container so you can drop into empty days
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: `day-${idx}`,
-  });
-
-  return (
-    <section
-      ref={setDropRef}
-      className={[
-        'p-4 bg-white shadow dark:bg-slate-800 rounded-2xl transition-colors',
-        isOver ? 'outline outline-2 outline-violet-500/60' : 'outline-none',
-      ].join(' ')}
-    >
-      <h2 className="mb-4 font-semibold text-center text-slate-900 dark:text-white">
-        {hebrewDays[idx]}
-      </h2>
-
-      <SortableContext
-        items={dayTasks.map((t) => t.id)}
-        strategy={verticalListSortingStrategy}
-      >
-        {dayTasks.length === 0 && (
-          <div className="py-6 mb-2 text-xs text-center border border-dashed rounded-lg border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400">
-            שחרר כאן כדי להוסיף ליום הזה
-          </div>
-        )}
-
-        {dayTasks.map((t) => (
-          <SortableTask
-            key={t.id}
-            task={t}
-            onDelete={() => onDelete(idx, t.id)}
-            isActive={activeId === t.id}
-          />
-        ))}
-      </SortableContext>
-    </section>
-  );
-}
-
-/* =================================================================== */
-/*  DragScroll — grab-to-pan on desktop; allow pan on tasks until drag */
-/* =================================================================== */
-type DragScrollProps = {
-  children: ReactNode;
-  className?: string;
-  hint?: boolean;
-  dragging?: boolean;
-};
-
-const DragScroll = forwardRef<HTMLDivElement, DragScrollProps>(
-  function DragScroll(
-    { children, className = '', hint = false, dragging = false },
-    ref
-  ) {
-    const localRef = useRef<HTMLDivElement | null>(null);
-    const setRef = (el: HTMLDivElement | null) => {
-      localRef.current = el;
-      if (typeof ref === 'function') ref(el);
-      else if (ref)
-        (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
-    };
-
-    const [showHint, setShowHint] = useState(hint);
-
-    useEffect(() => {
-      const el = localRef.current;
-      if (!el) return;
-
-      let isDown = false;
-      let startX = 0;
-      let startScroll = 0;
-
-      const onMouseDown = (e: MouseEvent) => {
-        if (dragging) return; // while dragging an item, don't pan the row
-        isDown = true;
-        startX = e.pageX - el.offsetLeft;
-        startScroll = el.scrollLeft;
-        el.classList.add('cursor-grabbing');
-        setShowHint(false);
-      };
-      const onMouseLeave = () => {
-        isDown = false;
-        el.classList.remove('cursor-grabbing');
-      };
-      const onMouseUp = () => {
-        isDown = false;
-        el.classList.remove('cursor-grabbing');
-      };
-      const onMouseMove = (e: MouseEvent) => {
-        if (!isDown) return;
-        e.preventDefault();
-        const x = e.pageX - el.offsetLeft;
-        const walk = x - startX;
-        el.scrollLeft = startScroll - walk;
-      };
-      const onAnyScroll = () => setShowHint(false);
-
-      el.addEventListener('mousedown', onMouseDown);
-      el.addEventListener('mouseleave', onMouseLeave);
-      el.addEventListener('mouseup', onMouseUp);
-      el.addEventListener('mousemove', onMouseMove);
-      el.addEventListener('wheel', onAnyScroll, { passive: true });
-      el.addEventListener('scroll', onAnyScroll, { passive: true });
-
-      return () => {
-        el.removeEventListener('mousedown', onMouseDown);
-        el.removeEventListener('mouseleave', onMouseLeave);
-        el.removeEventListener('mouseup', onMouseUp);
-        el.removeEventListener('mousemove', onMouseMove);
-        el.removeEventListener('wheel', onAnyScroll);
-        el.removeEventListener('scroll', onAnyScroll);
-      };
-    }, [dragging]);
-
-    return (
-      <div
-        ref={setRef}
-        className={[
-          'relative overflow-x-auto overscroll-x-contain cursor-grab',
-          // Keep horizontal panning smooth on touch
-          'scroll-smooth',
-          className,
-        ].join(' ')}
-      >
-        {/* arrows only, more visible; disappear after first scroll/drag */}
-        {showHint && (
-          <>
-            <div className="absolute inset-y-0 flex items-center pointer-events-none right-2">
-              <div className="p-1 rounded-full shadow bg-white/80 dark:bg-black/40">
-                <ChevronRight className="w-6 h-6 animate-pulse text-slate-500 dark:text-slate-300" />
-              </div>
-            </div>
-            <div className="absolute inset-y-0 flex items-center pointer-events-none left-2">
-              <div className="p-1 rounded-full shadow bg-white/80 dark:bg-black/40">
-                <ChevronLeft className="w-6 h-6 animate-pulse text-slate-500 dark:text-slate-300" />
-              </div>
-            </div>
-          </>
-        )}
-        {children}
-      </div>
-    );
-  }
-);
