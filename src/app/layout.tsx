@@ -23,7 +23,7 @@ export default function RootLayout({
     <html lang="he" dir="rtl">
       <body className={`${rubik.className} antialiased`}>
         <Providers>
-          {/* <SiteHeader /> */}
+          <SiteHeader />
           {children}
         </Providers>
       </body>
