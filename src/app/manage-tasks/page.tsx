@@ -7,6 +7,8 @@ import React, {
   useState,
   ReactNode,
   forwardRef,
+  useMemo,
+  useCallback,
 } from 'react';
 import Link from 'next/link';
 import {
@@ -17,20 +19,18 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { arrayMoveImmutable } from 'array-move';
 import {
   DndContext,
   closestCenter,
-  MouseSensor,
-  TouchSensor,
+  PointerSensor,
   useSensor,
   useSensors,
   DragStartEvent,
   DragMoveEvent,
   DragOverEvent,
   DragEndEvent,
+  useDroppable,
 } from '@dnd-kit/core';
-import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import {
   SortableContext,
   verticalListSortingStrategy,
@@ -72,11 +72,14 @@ export default function ManageTasks() {
     })();
   }, []);
 
-  /* ---------------- dnd-kit sensors ---------------- */
+  /* ---------------- dnd-kit sensors ----------------
+     Long-press to pick up (works for mouse & touch). */
   const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, {
-      activationConstraint: { delay: 220, tolerance: 6 },
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        delay: 300, // ~0.3s hold before drag begins
+        tolerance: 6, // slight finger wiggle allowed
+      },
     })
   );
 
@@ -113,7 +116,7 @@ export default function ManageTasks() {
         autoTickRef.current = window.setInterval(() => {
           el.scrollLeft += dir === 'left' ? -6 : 6; // slow + smooth
         }, 16);
-      }, 250); // must linger at edge
+      }, 250); // must linger at edge to move days
     }
   };
   const stopAutoScroll = () => {
@@ -140,8 +143,12 @@ export default function ManageTasks() {
     const rect = el.getBoundingClientRect();
     const tr = (e.active.rect.current.translated ||
       e.active.rect.current) as any;
-    const left = tr?.left ?? rect.left;
-    const right = tr?.right ?? rect.right;
+
+    // If for some reason rects aren't present, bail gracefully.
+    if (!tr) return;
+
+    const left = tr.left ?? rect.left;
+    const right = tr.right ?? rect.right;
 
     const threshold = 28;
     if (right > rect.right - threshold) startAutoScroll('right');
@@ -149,21 +156,40 @@ export default function ManageTasks() {
     else stopAutoScroll();
   };
 
-  // live cross-day rearrange while hovering other lists
+  // live cross-day rearrange while hovering other lists or empty days
   const handleDragOver = (e: DragOverEvent) => {
     const { active, over } = e;
     if (!over) return;
 
     const activeId = active.id as string;
     const overId = over.id as string;
+
     const fromDay = findDayByItem(activeId);
-    const toDay = findDayByItem(overId);
+
+    // Over a task in another day
+    let toDay = findDayByItem(overId);
+
+    // Or over an empty day container (id = day-<idx>)
+    if (toDay == null && overId.startsWith('day-')) {
+      const idx = Number(overId.split('-')[1]);
+      if (!Number.isNaN(idx)) toDay = idx;
+    }
+
     if (fromDay == null || toDay == null || fromDay === toDay) return;
 
     setWeek((prev) => {
       const clone = prev.map((d) => [...d]);
       const fromIdx = clone[fromDay].findIndex((t) => t.id === activeId);
-      const overIdx = clone[toDay].findIndex((t) => t.id === overId);
+
+      // Determine insertion index:
+      // - If we hovered a task, insert at its index
+      // - If we hovered an empty area/day, append to end
+      let overIdx = clone[toDay].length;
+      if (!overId.startsWith('day-')) {
+        const oi = clone[toDay].findIndex((t) => t.id === overId);
+        if (oi >= 0) overIdx = oi;
+      }
+
       const [moved] = clone[fromDay].splice(fromIdx, 1);
       clone[toDay].splice(Math.max(0, overIdx), 0, moved);
       return clone;
@@ -178,7 +204,11 @@ export default function ManageTasks() {
 
     const id = active.id as string;
     const fromDay = dragFromDayRef.current;
-    const toDay = findDayByItem(id);
+    const toDay =
+      findDayByItem(id) ??
+      (over.id.toString().startsWith('day-')
+        ? Number(over.id.toString().split('-')[1])
+        : null);
 
     if (fromDay != null && toDay != null) {
       if (fromDay === toDay) {
@@ -243,13 +273,13 @@ export default function ManageTasks() {
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
-          modifiers={[restrictToVerticalAxis]}
+          // NOTE: no restrictToVerticalAxis → free to move sideways across days
           onDragStart={handleDragStart}
           onDragMove={handleDragMove}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          <DragScroll ref={rowRef} hint>
+          <DragScroll ref={rowRef} hint dragging={!!activeId}>
             <div className="flex gap-6 pb-2">
               {week.map((dayTasks, idx) => (
                 <div
@@ -289,7 +319,7 @@ export default function ManageTasks() {
 }
 
 /* =================================================================== */
-/*  SORTABLE TASK ROW — drag from entire row; block row-swipe while active */
+/*  SORTABLE TASK ROW — long-press to pick; visual cue while active    */
 /* =================================================================== */
 function SortableTask({
   task,
@@ -300,22 +330,38 @@ function SortableTask({
   onDelete: () => void;
   isActive: boolean;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition } =
-    useSortable({ id: task.id });
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: task.id });
+
+  // Small “picked” glow after activation; before activation we let the row scroll.
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    touchAction: isActive ? 'none' : 'pan-y', // while dragging, don't steal scroll
+  };
 
   return (
     <div
       ref={setNodeRef}
-      data-dnd-item // ← lets DragScroll know this is a draggable
+      data-dnd-item
       {...attributes}
-      {...listeners} // ← drag from anywhere
-      style={{
-        transform: CSS.Transform.toString(transform),
-        transition,
-        // While dragging this item on touch, prevent the row from swiping.
-        touchAction: isActive ? 'none' : 'pan-y',
-      }}
-      className="flex items-center gap-3 p-3 mb-2 select-none rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-grab active:cursor-grabbing"
+      {...listeners}
+      style={style}
+      className={[
+        'flex items-center gap-3 p-3 mb-2 select-none rounded-xl',
+        'bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600',
+        'cursor-grab active:cursor-grabbing',
+        isActive
+          ? 'ring-2 ring-violet-500 shadow-lg scale-[1.02]'
+          : 'ring-0 shadow-sm',
+        isDragging ? 'opacity-90' : '',
+      ].join(' ')}
     >
       <GripVertical className="shrink-0 text-slate-400 dark:text-slate-500" />
       <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
@@ -398,7 +444,7 @@ function AddTaskModal({
 }
 
 /* =================================================================== */
-/*  DAY COLUMN                                                         */
+/*  DAY COLUMN (now also a droppable target for empty lists)           */
 /* =================================================================== */
 function DayColumn({
   idx,
@@ -411,15 +457,33 @@ function DayColumn({
   onDelete: (day: number, id: string) => void;
   activeId: string | null;
 }) {
+  // Droppable container so you can drop into empty days
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `day-${idx}`,
+  });
+
   return (
-    <section className="p-4 bg-white shadow dark:bg-slate-800 rounded-2xl">
+    <section
+      ref={setDropRef}
+      className={[
+        'p-4 bg-white shadow dark:bg-slate-800 rounded-2xl transition-colors',
+        isOver ? 'outline outline-2 outline-violet-500/60' : 'outline-none',
+      ].join(' ')}
+    >
       <h2 className="mb-4 font-semibold text-center text-slate-900 dark:text-white">
         {hebrewDays[idx]}
       </h2>
+
       <SortableContext
         items={dayTasks.map((t) => t.id)}
         strategy={verticalListSortingStrategy}
       >
+        {dayTasks.length === 0 && (
+          <div className="py-6 mb-2 text-xs text-center border border-dashed rounded-lg border-slate-300 dark:border-slate-600 text-slate-500 dark:text-slate-400">
+            שחרר כאן כדי להוסיף ליום הזה
+          </div>
+        )}
+
         {dayTasks.map((t) => (
           <SortableTask
             key={t.id}
@@ -434,16 +498,20 @@ function DayColumn({
 }
 
 /* =================================================================== */
-/*  DragScroll — grab-to-pan on desktop; ignores drags starting on items */
+/*  DragScroll — grab-to-pan on desktop; allow pan on tasks until drag */
 /* =================================================================== */
 type DragScrollProps = {
   children: ReactNode;
   className?: string;
   hint?: boolean;
+  dragging?: boolean;
 };
 
 const DragScroll = forwardRef<HTMLDivElement, DragScrollProps>(
-  function DragScroll({ children, className = '', hint = false }, ref) {
+  function DragScroll(
+    { children, className = '', hint = false, dragging = false },
+    ref
+  ) {
     const localRef = useRef<HTMLDivElement | null>(null);
     const setRef = (el: HTMLDivElement | null) => {
       localRef.current = el;
@@ -463,10 +531,7 @@ const DragScroll = forwardRef<HTMLDivElement, DragScrollProps>(
       let startScroll = 0;
 
       const onMouseDown = (e: MouseEvent) => {
-        // 🔒 if the mousedown is on a draggable task, DO NOT start grab-to-pan
-        const target = e.target as HTMLElement;
-        if (target.closest('[data-dnd-item]')) return;
-
+        if (dragging) return; // while dragging an item, don't pan the row
         isDown = true;
         startX = e.pageX - el.offsetLeft;
         startScroll = el.scrollLeft;
@@ -505,21 +570,30 @@ const DragScroll = forwardRef<HTMLDivElement, DragScrollProps>(
         el.removeEventListener('wheel', onAnyScroll);
         el.removeEventListener('scroll', onAnyScroll);
       };
-    }, []);
+    }, [dragging]);
 
     return (
       <div
         ref={setRef}
-        className={`relative overflow-x-auto overscroll-x-contain cursor-grab ${className}`}
+        className={[
+          'relative overflow-x-auto overscroll-x-contain cursor-grab',
+          // Keep horizontal panning smooth on touch
+          'scroll-smooth',
+          className,
+        ].join(' ')}
       >
-        {/* arrows only, no fades */}
+        {/* arrows only, more visible; disappear after first scroll/drag */}
         {showHint && (
           <>
-            <div className="absolute inset-y-0 flex items-center pointer-events-none right-3">
-              <ChevronRight className="animate-pulse text-slate-400" />
+            <div className="absolute inset-y-0 flex items-center pointer-events-none right-2">
+              <div className="p-1 rounded-full shadow bg-white/80 dark:bg-black/40">
+                <ChevronRight className="w-6 h-6 animate-pulse text-slate-500 dark:text-slate-300" />
+              </div>
             </div>
-            <div className="absolute inset-y-0 flex items-center pointer-events-none left-3">
-              <ChevronLeft className="animate-pulse text-slate-400" />
+            <div className="absolute inset-y-0 flex items-center pointer-events-none left-2">
+              <div className="p-1 rounded-full shadow bg-white/80 dark:bg-black/40">
+                <ChevronLeft className="w-6 h-6 animate-pulse text-slate-500 dark:text-slate-300" />
+              </div>
             </div>
           </>
         )}
