@@ -137,14 +137,26 @@ export default function Home() {
 
   /* -------- viewport tracking (for initial viewBox size) -------- */
   useEffect(() => {
-    const onResize = () =>
-      setVp({ w: window.innerWidth, h: window.innerHeight });
-    onResize();
-    window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', onResize);
+    const set = () => {
+      const vv = window.visualViewport;
+      if (vv) {
+        setVp({ w: Math.round(vv.width), h: Math.round(vv.height) });
+      } else {
+        setVp({ w: window.innerWidth, h: window.innerHeight });
+      }
+    };
+    set();
+    window.addEventListener('resize', set);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', set);
+      window.visualViewport.addEventListener('scroll', set);
+    }
     return () => {
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('orientationchange', onResize);
+      window.removeEventListener('resize', set);
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', set);
+        window.visualViewport.removeEventListener('scroll', set);
+      }
     };
   }, []);
 
@@ -179,23 +191,19 @@ export default function Home() {
 
   /* -------- doc-space helpers -------- */
   const getMouthDoc = useCallback(() => {
-    const p = frogRef.current?.getMouthPoint();
-    if (!p) return { x: 0, y: 0 };
+    const p = frogRef.current?.getMouthPoint() ?? { x: 0, y: 0 };
     const vv = window.visualViewport;
-    const offX = window.scrollX + (vv?.offsetLeft ?? 0);
-    const offY = window.scrollY + (vv?.offsetTop ?? 0);
+    const offX = window.scrollX + Math.max(0, vv?.offsetLeft ?? 0);
+    const offY = window.scrollY + Math.max(0, vv?.offsetTop ?? 0);
     return { x: p.x + offX, y: p.y + offY + ORIGIN_Y_ADJ };
   }, []);
 
   const getFlyDoc = useCallback((el: HTMLImageElement) => {
     const r = el.getBoundingClientRect();
     const vv = window.visualViewport;
-    const offX = window.scrollX + (vv?.offsetLeft ?? 0);
-    const offY = window.scrollY + (vv?.offsetTop ?? 0);
-    return {
-      x: r.left + r.width / 2 + offX,
-      y: r.top + r.height / 2 + offY,
-    };
+    const offX = window.scrollX + Math.max(0, vv?.offsetLeft ?? 0);
+    const offY = window.scrollY + Math.max(0, vv?.offsetTop ?? 0);
+    return { x: r.left + r.width / 2 + offX, y: r.top + r.height / 2 + offY };
   }, []);
   const visibleRatio = (r: DOMRect) => {
     const vw = window.innerWidth,
@@ -515,11 +523,12 @@ export default function Home() {
       {grab && (
         <svg
           key={grab.startAt}
-          className="fixed inset-0 z-40 w-screen h-screen pointer-events-none" // <-- was zIndex: 9999 inline
+          className="fixed inset-0 z-40 pointer-events-none"
           width={vp.w}
           height={vp.h}
           viewBox={`0 0 ${vp.w} ${vp.h}`}
           preserveAspectRatio="none"
+          style={{ width: vp.w, height: vp.h }}
         >
           <defs>
             <linearGradient id="tongue-grad" x1="0" y1="0" x2="0" y2="1">

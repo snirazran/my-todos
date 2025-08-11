@@ -8,7 +8,11 @@ const rubik = Rubik({
   subsets: ['hebrew', 'latin'],
   display: 'swap',
 });
-
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+};
 export const metadata: Metadata = {
   title: 'המשימות היומיות שלי',
   description: 'עקוב אחר המשימות היומיות שלך',
