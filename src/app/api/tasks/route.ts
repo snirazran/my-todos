@@ -97,27 +97,32 @@ export async function PUT(request: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
-  const userId = new ObjectId(session.user.id);
 
-  try {
-    const { date, taskId, completed } = await request.json();
-
-    const client = await clientPromise;
-    const collection = client
-      .db('todoTracker')
-      .collection<DayRecord>('dailyTasks');
-
-    await collection.updateOne(
-      { userId, date, 'tasks.id': taskId },
-      { $set: { 'tasks.$.completed': completed } }
-    );
-
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error(err);
+  const { date, taskId, completed } = await request.json();
+  if (!date || !taskId || typeof completed !== 'boolean') {
     return NextResponse.json(
-      { error: 'Failed to update task' },
-      { status: 500 }
+      { error: 'date, taskId and completed(boolean) are required' },
+      { status: 400 }
     );
   }
+
+  const userId = new ObjectId(session.user.id);
+  const client = await clientPromise;
+  const collection = client
+    .db('todoTracker')
+    .collection<DayRecord>('dailyTasks');
+
+  const r = await collection.updateOne(
+    { userId, date, 'tasks.id': taskId },
+    { $set: { 'tasks.$.completed': !!completed } }
+  );
+
+  if (r.matchedCount === 0) {
+    return NextResponse.json(
+      { error: 'Day or task not found' },
+      { status: 404 }
+    );
+  }
+
+  return NextResponse.json({ ok: true });
 }
