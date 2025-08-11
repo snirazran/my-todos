@@ -1,9 +1,22 @@
 // src/app/manage-tasks/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  ReactNode,
+  forwardRef,
+} from 'react';
 import Link from 'next/link';
-import { Plus, GripVertical, Trash2, ArrowLeft } from 'lucide-react';
+import {
+  Plus,
+  GripVertical,
+  Trash2,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { arrayMoveImmutable } from 'array-move';
 import {
   DndContext,
@@ -12,6 +25,10 @@ import {
   TouchSensor,
   useSensor,
   useSensors,
+  DragStartEvent,
+  DragMoveEvent,
+  DragOverEvent,
+  DragEndEvent,
 } from '@dnd-kit/core';
 import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import {
@@ -29,11 +46,17 @@ const hebrewDays = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמי�
 /*  PAGE                                                               */
 /* =================================================================== */
 export default function ManageTasks() {
-  /* ---------------- state ---------------- */
   const [week, setWeek] = useState<Task[][]>(
     Array.from({ length: 7 }, () => [])
   );
   const [showModal, setShowModal] = useState(false);
+
+  // drag state
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const dragFromDayRef = useRef<number | null>(null);
+
+  // horizontal row ref (for grab-to-pan + auto-scroll)
+  const rowRef = useRef<HTMLDivElement | null>(null);
 
   /* ---------------- initial fetch ---------------- */
   useEffect(() => {
@@ -57,24 +80,116 @@ export default function ManageTasks() {
     })
   );
 
-  const handleDragEnd = async (e: any, day: number) => {
+  /* ---------------- helpers ---------------- */
+  const findDayByItem = (id: string): number | null => {
+    for (let d = 0; d < week.length; d++) {
+      if (week[d].some((t) => t.id === id)) return d;
+    }
+    return null;
+  };
+
+  const saveDay = async (day: number, tasks: Task[]) => {
+    const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
+    await fetch('/api/manage-tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ day, tasks: ordered }),
+    });
+  };
+
+  /* ---------------- autoscroll (slow + delayed) ---------------- */
+  const autoDirRef = useRef<'left' | 'right' | null>(null);
+  const autoTickRef = useRef<number | null>(null);
+  const autoDelayRef = useRef<number | null>(null);
+
+  const startAutoScroll = (dir: 'left' | 'right') => {
+    const el = rowRef.current;
+    if (!el) return;
+
+    if (autoDirRef.current !== dir) {
+      stopAutoScroll();
+      autoDirRef.current = dir;
+      autoDelayRef.current = window.setTimeout(() => {
+        autoTickRef.current = window.setInterval(() => {
+          el.scrollLeft += dir === 'left' ? -6 : 6; // slow + smooth
+        }, 16);
+      }, 250); // must linger at edge
+    }
+  };
+  const stopAutoScroll = () => {
+    if (autoDelayRef.current) {
+      clearTimeout(autoDelayRef.current);
+      autoDelayRef.current = null;
+    }
+    if (autoTickRef.current) {
+      clearInterval(autoTickRef.current);
+      autoTickRef.current = null;
+    }
+    autoDirRef.current = null;
+  };
+
+  const handleDragStart = (e: DragStartEvent) => {
+    setActiveId(e.active.id as string);
+    dragFromDayRef.current = findDayByItem(e.active.id as string);
+  };
+
+  const handleDragMove = (e: DragMoveEvent) => {
+    const el = rowRef.current;
+    if (!el || !activeId) return;
+
+    const rect = el.getBoundingClientRect();
+    const tr = (e.active.rect.current.translated ||
+      e.active.rect.current) as any;
+    const left = tr?.left ?? rect.left;
+    const right = tr?.right ?? rect.right;
+
+    const threshold = 28;
+    if (right > rect.right - threshold) startAutoScroll('right');
+    else if (left < rect.left + threshold) startAutoScroll('left');
+    else stopAutoScroll();
+  };
+
+  // live cross-day rearrange while hovering other lists
+  const handleDragOver = (e: DragOverEvent) => {
     const { active, over } = e;
-    if (!over || active.id === over.id) return;
+    if (!over) return;
 
-    setWeek((w) => {
-      const clone = [...w];
-      const oldIdx = clone[day].findIndex((t) => t.id === active.id);
-      const newIdx = clone[day].findIndex((t) => t.id === over.id);
-      clone[day] = arrayMoveImmutable(clone[day], oldIdx, newIdx);
+    const activeId = active.id as string;
+    const overId = over.id as string;
+    const fromDay = findDayByItem(activeId);
+    const toDay = findDayByItem(overId);
+    if (fromDay == null || toDay == null || fromDay === toDay) return;
 
-      fetch('/api/manage-tasks', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day, tasks: clone[day] }),
-      });
-
+    setWeek((prev) => {
+      const clone = prev.map((d) => [...d]);
+      const fromIdx = clone[fromDay].findIndex((t) => t.id === activeId);
+      const overIdx = clone[toDay].findIndex((t) => t.id === overId);
+      const [moved] = clone[fromDay].splice(fromIdx, 1);
+      clone[toDay].splice(Math.max(0, overIdx), 0, moved);
       return clone;
     });
+  };
+
+  const handleDragEnd = async (e: DragEndEvent) => {
+    stopAutoScroll();
+    const { active, over } = e;
+    setActiveId(null);
+    if (!over) return;
+
+    const id = active.id as string;
+    const fromDay = dragFromDayRef.current;
+    const toDay = findDayByItem(id);
+
+    if (fromDay != null && toDay != null) {
+      if (fromDay === toDay) {
+        await saveDay(toDay, week[toDay]);
+      } else {
+        await Promise.all([
+          saveDay(fromDay, week[fromDay]),
+          saveDay(toDay, week[toDay]),
+        ]);
+      }
+    }
   };
 
   const removeTask = async (day: number, id: string) => {
@@ -124,39 +239,34 @@ export default function ManageTasks() {
           </div>
         </div>
 
-        {/* ---------- Mobile: one day per screen (horizontal swipe) ---------- */}
-        <div className="px-4 -mx-4 md:hidden">
-          <div className="flex gap-4 pb-4 overflow-x-auto snap-x snap-mandatory overscroll-x-contain">
-            {week.map((dayTasks, idx) => (
-              <div key={idx} className="flex-none w-full snap-center">
-                <DayColumn
-                  idx={idx}
-                  dayTasks={dayTasks}
-                  sensors={sensors}
-                  onDelete={removeTask}
-                  onDragEnd={handleDragEnd}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ---------- Desktop: show ~4 columns, horizontal scroll for more ---------- */}
-        <div className="hidden md:block">
-          <div className="flex gap-6 pb-2 overflow-x-auto">
-            {week.map((dayTasks, idx) => (
-              <div key={idx} className="flex-none w-[320px]">
-                <DayColumn
-                  idx={idx}
-                  dayTasks={dayTasks}
-                  sensors={sensors}
-                  onDelete={removeTask}
-                  onDragEnd={handleDragEnd}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* ---------- One responsive row (mobile full width, desktop 320px) ---------- */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          modifiers={[restrictToVerticalAxis]}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragOver={handleDragOver}
+          onDragEnd={handleDragEnd}
+        >
+          <DragScroll ref={rowRef} hint>
+            <div className="flex gap-6 pb-2">
+              {week.map((dayTasks, idx) => (
+                <div
+                  key={idx}
+                  className="flex-none min-w-full sm:min-w-[420px] md:min-w-[320px] w-[320px]"
+                >
+                  <DayColumn
+                    idx={idx}
+                    dayTasks={dayTasks}
+                    onDelete={removeTask}
+                    activeId={activeId}
+                  />
+                </div>
+              ))}
+            </div>
+          </DragScroll>
+        </DndContext>
       </div>
 
       {/* ---------- modal ---------- */}
@@ -179,14 +289,16 @@ export default function ManageTasks() {
 }
 
 /* =================================================================== */
-/*  SORTABLE TASK ROW                                                  */
+/*  SORTABLE TASK ROW — drag from entire row; block row-swipe while active */
 /* =================================================================== */
 function SortableTask({
   task,
   onDelete,
+  isActive,
 }: {
   task: Task;
   onDelete: () => void;
+  isActive: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: task.id });
@@ -194,28 +306,21 @@ function SortableTask({
   return (
     <div
       ref={setNodeRef}
+      data-dnd-item // ← lets DragScroll know this is a draggable
+      {...attributes}
+      {...listeners} // ← drag from anywhere
       style={{
         transform: CSS.Transform.toString(transform),
         transition,
-        // allow vertical scroll gestures to pass through on touch
-        touchAction: 'pan-y',
+        // While dragging this item on touch, prevent the row from swiping.
+        touchAction: isActive ? 'none' : 'pan-y',
       }}
-      className="flex items-center gap-3 p-3 mb-2 select-none rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600"
+      className="flex items-center gap-3 p-3 mb-2 select-none rounded-xl bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-grab active:cursor-grabbing"
     >
-      {/* drag handle ONLY */}
-      <button
-        {...attributes}
-        {...listeners}
-        className="p-1 shrink-0 cursor-grab active:cursor-grabbing"
-        aria-label="Drag task"
-      >
-        <GripVertical className="text-slate-400 dark:text-slate-500" />
-      </button>
-
+      <GripVertical className="shrink-0 text-slate-400 dark:text-slate-500" />
       <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
         {task.text}
       </span>
-
       <button onClick={onDelete} title="מחק">
         <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
       </button>
@@ -293,45 +398,133 @@ function AddTaskModal({
 }
 
 /* =================================================================== */
-/*  DAY COLUMN (mobile: full width page; desktop: fixed width card)    */
+/*  DAY COLUMN                                                         */
 /* =================================================================== */
 function DayColumn({
   idx,
   dayTasks,
-  sensors,
   onDelete,
-  onDragEnd,
+  activeId,
 }: {
   idx: number;
   dayTasks: Task[];
-  sensors: any;
   onDelete: (day: number, id: string) => void;
-  onDragEnd: (e: any, day: number) => void;
+  activeId: string | null;
 }) {
   return (
-    <section className="flex-none min-w-full sm:min-w-[420px] lg:min-w-[320px] p-4 bg-white shadow dark:bg-slate-800 rounded-2xl">
+    <section className="p-4 bg-white shadow dark:bg-slate-800 rounded-2xl">
       <h2 className="mb-4 font-semibold text-center text-slate-900 dark:text-white">
         {hebrewDays[idx]}
       </h2>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        modifiers={[restrictToVerticalAxis]}
-        onDragEnd={(e) => onDragEnd(e, idx)}
+      <SortableContext
+        items={dayTasks.map((t) => t.id)}
+        strategy={verticalListSortingStrategy}
       >
-        <SortableContext
-          items={dayTasks.map((t) => t.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {dayTasks.map((t) => (
-            <SortableTask
-              key={t.id}
-              task={t}
-              onDelete={() => onDelete(idx, t.id)}
-            />
-          ))}
-        </SortableContext>
-      </DndContext>
+        {dayTasks.map((t) => (
+          <SortableTask
+            key={t.id}
+            task={t}
+            onDelete={() => onDelete(idx, t.id)}
+            isActive={activeId === t.id}
+          />
+        ))}
+      </SortableContext>
     </section>
   );
 }
+
+/* =================================================================== */
+/*  DragScroll — grab-to-pan on desktop; ignores drags starting on items */
+/* =================================================================== */
+type DragScrollProps = {
+  children: ReactNode;
+  className?: string;
+  hint?: boolean;
+};
+
+const DragScroll = forwardRef<HTMLDivElement, DragScrollProps>(
+  function DragScroll({ children, className = '', hint = false }, ref) {
+    const localRef = useRef<HTMLDivElement | null>(null);
+    const setRef = (el: HTMLDivElement | null) => {
+      localRef.current = el;
+      if (typeof ref === 'function') ref(el);
+      else if (ref)
+        (ref as React.MutableRefObject<HTMLDivElement | null>).current = el;
+    };
+
+    const [showHint, setShowHint] = useState(hint);
+
+    useEffect(() => {
+      const el = localRef.current;
+      if (!el) return;
+
+      let isDown = false;
+      let startX = 0;
+      let startScroll = 0;
+
+      const onMouseDown = (e: MouseEvent) => {
+        // 🔒 if the mousedown is on a draggable task, DO NOT start grab-to-pan
+        const target = e.target as HTMLElement;
+        if (target.closest('[data-dnd-item]')) return;
+
+        isDown = true;
+        startX = e.pageX - el.offsetLeft;
+        startScroll = el.scrollLeft;
+        el.classList.add('cursor-grabbing');
+        setShowHint(false);
+      };
+      const onMouseLeave = () => {
+        isDown = false;
+        el.classList.remove('cursor-grabbing');
+      };
+      const onMouseUp = () => {
+        isDown = false;
+        el.classList.remove('cursor-grabbing');
+      };
+      const onMouseMove = (e: MouseEvent) => {
+        if (!isDown) return;
+        e.preventDefault();
+        const x = e.pageX - el.offsetLeft;
+        const walk = x - startX;
+        el.scrollLeft = startScroll - walk;
+      };
+      const onAnyScroll = () => setShowHint(false);
+
+      el.addEventListener('mousedown', onMouseDown);
+      el.addEventListener('mouseleave', onMouseLeave);
+      el.addEventListener('mouseup', onMouseUp);
+      el.addEventListener('mousemove', onMouseMove);
+      el.addEventListener('wheel', onAnyScroll, { passive: true });
+      el.addEventListener('scroll', onAnyScroll, { passive: true });
+
+      return () => {
+        el.removeEventListener('mousedown', onMouseDown);
+        el.removeEventListener('mouseleave', onMouseLeave);
+        el.removeEventListener('mouseup', onMouseUp);
+        el.removeEventListener('mousemove', onMouseMove);
+        el.removeEventListener('wheel', onAnyScroll);
+        el.removeEventListener('scroll', onAnyScroll);
+      };
+    }, []);
+
+    return (
+      <div
+        ref={setRef}
+        className={`relative overflow-x-auto overscroll-x-contain cursor-grab ${className}`}
+      >
+        {/* arrows only, no fades */}
+        {showHint && (
+          <>
+            <div className="absolute inset-y-0 flex items-center pointer-events-none right-3">
+              <ChevronRight className="animate-pulse text-slate-400" />
+            </div>
+            <div className="absolute inset-y-0 flex items-center pointer-events-none left-3">
+              <ChevronLeft className="animate-pulse text-slate-400" />
+            </div>
+          </>
+        )}
+        {children}
+      </div>
+    );
+  }
+);
