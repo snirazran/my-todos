@@ -528,6 +528,7 @@ export default function History() {
                       }}
                       size={30}
                       y={-6}
+                      x={-4}
                     />
                   )}
                 />

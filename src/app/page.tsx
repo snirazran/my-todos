@@ -514,6 +514,7 @@ export default function Home() {
                   onClick={() => handleToggle(task.id, true)}
                   size={30}
                   y={-6}
+                  x={-4}
                 />
               )
             }

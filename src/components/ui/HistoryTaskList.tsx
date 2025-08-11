@@ -53,8 +53,10 @@ export default function HistoryTaskList({
                     <motion.div
                       key="fly"
                       className="absolute inset-0"
-                      exit={{ opacity: 0, scale: 0.6 }}
-                      transition={{ duration: 0.12 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.18 }}
                     >
                       {renderBullet ? renderBullet(key, task, false) : null}
                     </motion.div>
@@ -64,6 +66,7 @@ export default function HistoryTaskList({
                       className="absolute inset-0"
                       initial={{ opacity: 0, scale: 0.6 }}
                       animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.6 }}
                       transition={{
                         type: 'spring',
                         stiffness: 420,

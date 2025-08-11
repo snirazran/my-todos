@@ -7,11 +7,12 @@ type FlyProps = {
   onClick?: (e: React.MouseEvent) => void;
   size?: number;
   className?: string;
-  y?: number; // px nudge (negative moves up)
+  y?: number;
+  x?: number;
 };
 
 const Fly = forwardRef<HTMLDivElement, FlyProps>(
-  ({ onClick, size = 30, className, y = 0 }, ref) => {
+  ({ onClick, size = 30, className, x = 0, y = 0 }, ref) => {
     // 1) Memoize options so Rive isn't re-created on parent re-renders
     const riveOptions = useMemo(
       () => ({
@@ -51,10 +52,10 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
           height: size,
           display: 'inline-block',
           verticalAlign: 'middle',
+          marginInlineStart: x,
           transform: y ? `translateY(${y}px)` : undefined, // <- fine-tune
           cursor: 'pointer',
           lineHeight: 0,
-          willChange: 'transform',
         }}
       >
         <RiveComponent style={{ width: '100%', height: '100%' }} />
