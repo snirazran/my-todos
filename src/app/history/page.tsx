@@ -12,6 +12,7 @@ import {
   History as HistoryIcon,
   TrendingUp,
   CheckCircle2,
+  Shirt,
 } from 'lucide-react';
 
 import Frog, { FrogHandle } from '@/components/ui/frog';
@@ -19,6 +20,8 @@ import Fly from '@/components/ui/fly';
 import StatCard from '@/components/ui/StatCard';
 import ProgressBadge from '@/components/ui/ProgressBadge';
 import HistoryTaskList, { HistoryTask } from '@/components/ui/HistoryTaskList';
+import { useSkins } from '@/lib/skinsStore';
+import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
 
 /* === import SAME tunables you used on Home === */
 const TONGUE_MS = 1111;
@@ -40,8 +43,8 @@ interface DayRecord {
 
 export default function History() {
   const { data: session } = useSession();
-  const router = useRouter();
-
+  const equippedIndex = useSkins((s) => s.equippedIndex);
+  const [openWardrobe, setOpenWardrobe] = useState(false);
   const [history, setHistory] = useState<DayRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -460,8 +463,21 @@ export default function History() {
         {/* Frog + KPIs */}
         <div className="flex flex-col items-center w-full">
           <div ref={frogBoxRef} className="relative z-10">
-            <Frog ref={frogRef} mouthOpen={!!grab} mouthOffset={{ y: -4 }} />
+            <Frog
+              skin={equippedIndex}
+              ref={frogRef}
+              mouthOpen={!!grab}
+              mouthOffset={{ y: -4 }}
+            />
+            <button
+              onClick={() => setOpenWardrobe(true)}
+              className="absolute p-2 rounded-full shadow -right-2 top-2 bg-white/80 dark:bg-slate-800 hover:shadow-md"
+              title="Wardrobe"
+            >
+              <Shirt className="w-5 h-5" />
+            </button>
           </div>
+          <WardrobePanel open={openWardrobe} onOpenChange={setOpenWardrobe} />
         </div>
 
         <div className="grid grid-cols-1 gap-4 mb-8 -mt-2.5 md:grid-cols-3">

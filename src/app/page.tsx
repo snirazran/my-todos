@@ -464,23 +464,11 @@ export default function Home() {
     );
   }
 
-  function DebugEquip() {
-    const { equippedIndex, setEquippedIndex } = useSkins();
-    return (
-      <div className="flex gap-2">
-        <button onClick={() => setEquippedIndex(0)}>Skin 0</button>
-        <button onClick={() => setEquippedIndex(1)}>Skin 1</button>
-        <button onClick={() => setEquippedIndex((equippedIndex + 1) % 9)}>
-          Next
-        </button>
-      </div>
-    );
-  }
   return (
     <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8">
       <div className="max-w-4xl mx-auto">
         <Header session={session} router={router} />
-        <DebugEquip />
+
         {!session && (
           <div className="relative p-10 mb-8 overflow-hidden text-center bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
             <h2 className="mb-4 text-2xl font-bold text-slate-900 dark:text-white">
