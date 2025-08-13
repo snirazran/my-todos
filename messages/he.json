@@ -1,0 +1,10 @@
+{
+  "inventory": {
+    "title": "ארון הבגדים — מלאי",
+    "loading": "טוען…",
+    "default": "ברירת מחדל",
+    "equip": "לבש",
+    "equipped": "נלבש",
+    "unequip": "הסר"
+  }
+}

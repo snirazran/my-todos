@@ -1,0 +1,10 @@
+{
+  "inventory": {
+    "title": "Wardrobe — Inventory",
+    "loading": "Loading…",
+    "default": "Default",
+    "equip": "Equip",
+    "equipped": "Equipped",
+    "unequip": "Unequip"
+  }
+}
