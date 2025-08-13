@@ -31,17 +31,9 @@ export const nextRarity = (r: Rarity): Rarity =>
 
 export const CATALOG: Readonly<SkinDef[]> = [
   {
-    id: 'green',
-    name: 'Green',
-    rarity: 'common',
-    riveIndex: 0,
-    icon: '/skins/common/skin0.png',
-    priceFlies: 0, // starter
-  },
-  {
     id: 'pink',
     name: 'Pink',
-    rarity: 'uncommon',
+    rarity: 'common',
     riveIndex: 1,
     icon: '/skins/uncommon/skin1.png',
     priceFlies: 150,
@@ -49,7 +41,7 @@ export const CATALOG: Readonly<SkinDef[]> = [
   {
     id: 'blue',
     name: 'Blue',
-    rarity: 'rare',
+    rarity: 'uncommon',
     riveIndex: 2,
     icon: '/skins/rare/skin2.png',
     priceFlies: 400,
@@ -57,7 +49,7 @@ export const CATALOG: Readonly<SkinDef[]> = [
   {
     id: 'red',
     name: 'Red',
-    rarity: 'epic',
+    rarity: 'rare',
     riveIndex: 3,
     icon: '/skins/epic/skin3.png',
     priceFlies: 900,
@@ -65,7 +57,7 @@ export const CATALOG: Readonly<SkinDef[]> = [
   {
     id: 'santa',
     name: 'Santa',
-    rarity: 'legendary',
+    rarity: 'epic',
     riveIndex: 4,
     icon: '/skins/legendary/skin4.png',
     priceFlies: 1800,
