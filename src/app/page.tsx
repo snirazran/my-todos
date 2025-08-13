@@ -1,18 +1,19 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
-import { Calendar, History, CheckCircle2 } from 'lucide-react';
+import { Calendar, History, CheckCircle2, Shirt } from 'lucide-react';
 import { signIn, useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
-
+import { useSkins } from '@/lib/skinsStore';
 import Frog, { FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
+import { InventoryPanel } from '@/components/ui/skins/InventoryPanel';
 
 /* === Tunables ============================================================ */
 const TONGUE_MS = 1111; // tongue extend+retract total
@@ -68,11 +69,12 @@ export default function Home() {
   const { data: session } = useSession();
   const router = useRouter();
   const cooldownUntil = useRef(0);
-
+  const equippedIndex = useSkins((s) => s.equippedIndex);
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [openWardrobe, setOpenWardrobe] = useState(false);
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
   const [loading, setLoading] = useState(true);
 
@@ -462,11 +464,23 @@ export default function Home() {
     );
   }
 
+  function DebugEquip() {
+    const { equippedIndex, setEquippedIndex } = useSkins();
+    return (
+      <div className="flex gap-2">
+        <button onClick={() => setEquippedIndex(0)}>Skin 0</button>
+        <button onClick={() => setEquippedIndex(1)}>Skin 1</button>
+        <button onClick={() => setEquippedIndex((equippedIndex + 1) % 9)}>
+          Next
+        </button>
+      </div>
+    );
+  }
   return (
     <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8">
       <div className="max-w-4xl mx-auto">
         <Header session={session} router={router} />
-
+        <DebugEquip />
         {!session && (
           <div className="relative p-10 mb-8 overflow-hidden text-center bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
             <h2 className="mb-4 text-2xl font-bold text-slate-900 dark:text-white">
@@ -489,8 +503,21 @@ export default function Home() {
 
         <div className="flex flex-col items-center w-full">
           <div ref={frogBoxRef} className="relative z-10">
-            <Frog ref={frogRef} mouthOpen={!!grab} mouthOffset={{ y: -4 }} />
+            <Frog
+              skin={equippedIndex}
+              ref={frogRef}
+              mouthOpen={!!grab}
+              mouthOffset={{ y: -4 }}
+            />
+            <button
+              onClick={() => setOpenWardrobe(true)}
+              className="absolute p-2 rounded-full shadow -right-2 top-2 bg-white/80 dark:bg-slate-800 hover:shadow-md"
+              title="Wardrobe"
+            >
+              <Shirt className="w-5 h-5" />
+            </button>
           </div>
+          <InventoryPanel open={openWardrobe} onOpenChange={setOpenWardrobe} />
           <div className="relative z-0 w-full -mt-2.5">
             <ProgressCard rate={rate} done={doneCount} total={data.length} />
           </div>
