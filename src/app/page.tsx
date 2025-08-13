@@ -13,7 +13,7 @@ import Frog, { FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
-import { InventoryPanel } from '@/components/ui/skins/InventoryPanel';
+import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
 
 /* === Tunables ============================================================ */
 const TONGUE_MS = 1111; // tongue extend+retract total
@@ -517,7 +517,7 @@ export default function Home() {
               <Shirt className="w-5 h-5" />
             </button>
           </div>
-          <InventoryPanel open={openWardrobe} onOpenChange={setOpenWardrobe} />
+          <WardrobePanel open={openWardrobe} onOpenChange={setOpenWardrobe} />
           <div className="relative z-0 w-full -mt-2.5">
             <ProgressCard rate={rate} done={doneCount} total={data.length} />
           </div>

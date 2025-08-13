@@ -18,6 +18,7 @@
     "@radix-ui/react-dialog": "^1.1.14",
     "@radix-ui/react-progress": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@radix-ui/react-tabs": "^1.1.12",
     "@rive-app/canvas": "^2.30.4",
     "@rive-app/react-canvas": "^4.22.1",
     "array-move": "^4.0.0",

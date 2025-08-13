@@ -1,8 +1,8 @@
 // lib/types/UserDoc.ts
 export type UserSkins = {
-  equippedId: string; // 'skin1_uncommon'
-  inventory: Record<string, number>; // { 'skin0_common': 2, 'skin1_uncommon': 1 }
-  flies: number; // future currency
+  equippedId: string | null; // null = no skin equipped
+  inventory: Record<string, number>; // only owned ids appear here
+  flies: number;
 };
 
 export type UserDoc = {

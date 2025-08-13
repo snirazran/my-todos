@@ -1,3 +1,4 @@
+// app/api/skins/inventory/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import clientPromise from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
@@ -8,7 +9,7 @@ import { CATALOG, byId } from '@/lib/skins/catalog';
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
 
-/** Ensure user.skins exists and contains all catalog ids (with 0 if missing). */
+/** Ensure user.skins exists. Default is *no skin equipped* and empty inventory. */
 async function ensureSkins(email: string) {
   const db = (await clientPromise).db('todoTracker');
   const users = db.collection<UserDoc>('users');
@@ -16,31 +17,27 @@ async function ensureSkins(email: string) {
   if (!user) return null;
 
   const current: UserSkins = user.skins ?? {
-    equippedId: 'skin0_common',
-    inventory: { skin0_common: 1 },
+    equippedId: null, // default: none
+    inventory: {}, // default: empty
     flies: 0,
   };
 
-  // Fill any missing catalog ids with 0
-  const inv = { ...current.inventory };
-  for (const s of CATALOG) {
-    if (inv[s.id] == null) inv[s.id] = 0;
-  }
-
-  // If equippedId points to a skin the user doesn't own at least 1 copy of,
-  // fallback to first owned or common.
+  // If equippedId points to a skin not owned anymore, reset to none
   let equippedId = current.equippedId;
-  if (!inv[equippedId] || inv[equippedId] <= 0) {
-    const firstOwned = Object.entries(inv).find(([, n]) => (n ?? 0) > 0)?.[0];
-    equippedId = firstOwned ?? 'skin0_common';
+  if (
+    equippedId &&
+    (!current.inventory[equippedId] || current.inventory[equippedId] <= 0)
+  ) {
+    equippedId = null;
   }
 
-  const next: UserSkins = { ...current, inventory: inv, equippedId };
+  const next: UserSkins = { ...current, equippedId };
 
+  // Only write if we have no skins yet or something changed
   if (
     !user.skins ||
     user.skins.equippedId !== next.equippedId ||
-    JSON.stringify(user.skins.inventory) !== JSON.stringify(inv)
+    JSON.stringify(user.skins.inventory) !== JSON.stringify(next.inventory)
   ) {
     await users.updateOne({ _id: user._id }, { $set: { skins: next } });
   }
@@ -55,7 +52,7 @@ export async function GET() {
   const skins = await ensureSkins(session.user.email);
   if (!skins) return json({ error: 'User not found' }, 404);
 
-  // Also return catalog so client can map riveIndex etc.
+  // keep returning catalog for client-side metadata (icon, rarity, etc.)
   return json({ skins, catalog: CATALOG });
 }
 
@@ -63,30 +60,38 @@ export async function PUT(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
 
-  let body: { skinId?: string };
+  let body: { skinId?: string | null };
   try {
     body = await req.json();
   } catch {
     return json({ error: 'Invalid JSON' }, 400);
   }
-  const skinId = body.skinId;
-  if (!skinId || !byId[skinId]) return json({ error: 'Unknown skinId' }, 400);
+
+  const skinId = body.skinId ?? null; // null => unequip
 
   const db = (await clientPromise).db('todoTracker');
   const users = db.collection<UserDoc>('users');
-
-  // Only allow equip if user owns ≥ 1
   const user = await users.findOne({ email: session.user.email });
   if (!user) return json({ error: 'User not found' }, 404);
-  const inv = user.skins?.inventory ?? {};
-  if (!inv[skinId] || inv[skinId] <= 0) {
-    return json({ error: 'You do not own this skin' }, 403);
+
+  // Unequip
+  if (skinId === null) {
+    await users.updateOne(
+      { _id: user._id },
+      { $set: { 'skins.equippedId': null } }
+    );
+    return json({ ok: true });
   }
+
+  // Equip (must be a real skin and owned)
+  if (!byId[skinId]) return json({ error: 'Unknown skinId' }, 400);
+  const inv = user.skins?.inventory ?? {};
+  if (!inv[skinId] || inv[skinId] <= 0)
+    return json({ error: 'You do not own this skin' }, 403);
 
   await users.updateOne(
     { _id: user._id },
     { $set: { 'skins.equippedId': skinId } }
   );
-
   return json({ ok: true });
 }
