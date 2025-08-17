@@ -8,7 +8,7 @@ import React, {
   useCallback,
 } from 'react';
 import Link from 'next/link';
-import AddTaskModal, { RepeatMode } from '@/components/ui/dialog/AddTaskModal';
+import AddTaskModal from '@/components/ui/dialog/AddTaskModal';
 import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import {
   DragDropContext,

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Calendar, History, CheckCircle2, Shirt } from 'lucide-react';
+import BacklogPanel from '@/components/ui/BacklogPanel';
 import { signIn, useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import { useSkins } from '@/lib/skinsStore';
@@ -81,6 +82,11 @@ export default function Home() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addDraft, setAddDraft] = useState('');
   const [insertAfter, setInsertAfter] = useState<number | null>(null);
+  const [preselectedDays, setPreselectedDays] = useState<number[]>([]);
+  const [defaultRepeat, setDefaultRepeat] = useState<'this-week' | 'weekly'>(
+    'this-week'
+  );
+  const [weeklyIds, setWeeklyIds] = useState<Set<string>>(new Set());
 
   const [weeklyBacklog, setWeeklyBacklog] = useState<
     { id: string; text: string }[]
@@ -143,9 +149,36 @@ export default function Home() {
   const doneCount = data.filter((t) => t.completed).length;
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
 
+  const refreshToday = useCallback(async () => {
+    if (!session) return;
+    const res = await fetch(`/api/tasks?date=${dateStr}`);
+    const json = await res.json();
+    setTasks(json.tasks ?? []);
+    await fetchWeeklyIds();
+  }, [session, dateStr]);
+
+  const loadWeeklyIds = useCallback(async () => {
+    if (!session) return;
+    const dow = new Date().getDay(); // 0..6 (Sun..Sat)
+    const arr = await fetch(`/api/manage-tasks?day=${dow}`).then((r) =>
+      r.json()
+    );
+    setWeeklyIds(new Set(arr.map((t: any) => t.id)));
+  }, [session]);
+
+  const fetchWeeklyIds = React.useCallback(async () => {
+    if (!session) return;
+    const dow = new Date().getDay();
+    const templ = await fetch(`/api/manage-tasks?day=${dow}`).then((r) =>
+      r.json()
+    );
+    setWeeklyIds(new Set(templ.map((t: any) => t.id)));
+  }, [session]);
+
   useEffect(() => {
     fetchBacklog();
-  }, [fetchBacklog]);
+    fetchWeeklyIds();
+  }, [fetchBacklog, fetchWeeklyIds]);
 
   /* -------- data load -------- */
   useEffect(() => {
@@ -553,142 +586,57 @@ export default function Home() {
                   ref={(el) => {
                     flyRefs.current[task.id] = el;
                   }}
-                  onClick={() => handleToggle(task.id, true)}
+                  onClick={() => /* your existing toggle */ null}
                   size={30}
                   y={-6}
                   x={-4}
                 />
               )
             }
-            onAddRequested={(prefill, afterIdx) => {
+            onAddRequested={(prefill, afterIdx, opts) => {
               setAddDraft(prefill);
               setInsertAfter(afterIdx);
+              const dow = new Date().getDay();
+              setPreselectedDays(opts?.preselectToday ? [dow] : []);
               setShowAddModal(true);
+            }}
+            weeklyIds={weeklyIds}
+            onDeleteToday={async (taskId) => {
+              await fetch('/api/tasks', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: dateStr, taskId }),
+              });
+              await refreshToday();
+            }}
+            onDeleteFromWeek={async (taskId) => {
+              const dow = new Date().getDay();
+              await fetch('/api/manage-tasks', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ day: dow, taskId }),
+              });
+              await fetch('/api/tasks', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: dateStr, taskId }),
+              });
+              await refreshToday();
             }}
           />
 
-          {session &&
-            (weeklyBacklog.length > 0 || weeklyTemplateBacklog.length > 0) && (
-              <div className="p-4 mt-6 border border-dashed rounded-2xl border-slate-300 dark:border-slate-600 bg-slate-50/60 dark:bg-slate-800/40">
-                <h3 className="mb-2 text-lg font-semibold">
-                  ללא יום – המשימות של השבוע
-                </h3>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  {/* This week only */}
-                  {weeklyBacklog.length > 0 && (
-                    <div>
-                      <p className="mb-2 text-sm text-slate-500">השבוע בלבד</p>
-                      <ul className="space-y-2">
-                        {weeklyBacklog.map((t) => (
-                          <li
-                            key={t.id}
-                            className="flex items-center justify-between px-3 py-2 bg-white rounded-lg dark:bg-slate-800"
-                          >
-                            <span>{t.text}</span>
-                            <div className="flex gap-2">
-                              <button
-                                className="px-2 py-1 text-sm text-white rounded-md bg-emerald-600"
-                                onClick={async () => {
-                                  // Assign to today via this-week path
-                                  const dow = new Date().getDay();
-                                  await fetch('/api/manage-tasks', {
-                                    method: 'POST',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({
-                                      text: t.text,
-                                      days: [dow],
-                                      repeat: 'this-week',
-                                    }),
-                                  });
-                                  await fetch('/api/weekly-backlog', {
-                                    method: 'DELETE',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({ taskId: t.id }),
-                                  });
-                                  // refresh
-                                  const res = await fetch(
-                                    `/api/tasks?date=${dateStr}`
-                                  );
-                                  const json = await res.json();
-                                  setTasks(json.tasks ?? []);
-                                  fetchBacklog();
-                                }}
-                              >
-                                עשו היום
-                              </button>
-                              <button
-                                className="px-2 py-1 text-sm rounded-md bg-slate-200 dark:bg-slate-600"
-                                onClick={async () => {
-                                  await fetch('/api/weekly-backlog', {
-                                    method: 'DELETE',
-                                    headers: {
-                                      'Content-Type': 'application/json',
-                                    },
-                                    body: JSON.stringify({ taskId: t.id }),
-                                  });
-                                  fetchBacklog();
-                                }}
-                              >
-                                הסר
-                              </button>
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-
-                  {/* Weekly template backlog */}
-                  {weeklyTemplateBacklog.length > 0 && (
-                    <div>
-                      <p className="mb-2 text-sm text-slate-500">
-                        חוזר כל שבוע
-                      </p>
-                      <ul className="space-y-2">
-                        {weeklyTemplateBacklog.map((t) => (
-                          <li
-                            key={t.id}
-                            className="flex items-center justify-between px-3 py-2 bg-white rounded-lg dark:bg-slate-800"
-                          >
-                            <span>{t.text}</span>
-                            <button
-                              className="px-2 py-1 text-sm text-white rounded-md bg-emerald-600"
-                              onClick={async () => {
-                                const dow = new Date().getDay();
-                                await fetch('/api/manage-tasks', {
-                                  method: 'POST',
-                                  headers: {
-                                    'Content-Type': 'application/json',
-                                  },
-                                  body: JSON.stringify({
-                                    text: t.text,
-                                    days: [dow],
-                                    repeat: 'this-week',
-                                  }),
-                                });
-                                // refresh today
-                                const res = await fetch(
-                                  `/api/tasks?date=${dateStr}`
-                                );
-                                const json = await res.json();
-                                setTasks(json.tasks ?? []);
-                              }}
-                            >
-                              עשו היום
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
+          {session && (
+            <BacklogPanel
+              weeklyBacklog={weeklyBacklog}
+              weeklyTemplateBacklog={weeklyTemplateBacklog}
+              dateStr={dateStr}
+              onRefreshToday={refreshToday}
+              onRefreshBacklog={() => {
+                fetchBacklog();
+                loadWeeklyIds();
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -748,6 +696,7 @@ export default function Home() {
       {showAddModal && (
         <AddTaskModal
           initialText={addDraft}
+          initialDays={preselectedDays}
           defaultRepeat="this-week"
           onClose={() => setShowAddModal(false)}
           onSave={async ({ text, days, repeat }) => {

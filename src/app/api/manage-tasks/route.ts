@@ -1,4 +1,3 @@
-// src/app/api/manage-tasks/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
@@ -15,7 +14,7 @@ interface WeeklyTask {
 interface WeeklyDoc {
   _id?: ObjectId;
   userId: ObjectId;
-  dayOfWeek: number; // 0..6, and -1 = unscheduled backlog
+  dayOfWeek: number; // 0..6, -1 = “unscheduled (every week template)”
   tasks: WeeklyTask[];
 }
 
@@ -28,29 +27,27 @@ interface TaskItem {
 interface DayRecord {
   _id?: ObjectId;
   userId: ObjectId;
-  date: string; // YYYY-MM-DD
+  date: string; // YYYY-MM-DD (LOCAL)
   tasks: TaskItem[];
 }
 
 interface WeeklyBacklogDoc {
   _id?: ObjectId;
   userId: ObjectId;
-  weekStart: string; // Sunday YYYY-MM-DD
+  weekStart: string; // LOCAL Sunday YYYY-MM-DD
   tasks: { id: string; text: string; order: number; completed: boolean }[];
 }
 
+/* ---------- helpers ---------- */
 const getWeeklyCol = async () =>
   (await clientPromise).db('todoTracker').collection<WeeklyDoc>('weeklyTasks');
-
 const getDailyCol = async () =>
   (await clientPromise).db('todoTracker').collection<DayRecord>('dailyTasks');
-
 const getWeeklyBacklogCol = async () =>
   (await clientPromise)
     .db('todoTracker')
     .collection<WeeklyBacklogDoc>('weeklyBacklog');
 
-/* ───────── helpers ───────── */
 async function currentUserId() {
   const session = await getServerSession(authOptions);
   return session?.user?.id ? new ObjectId(session.user.id) : null;
@@ -59,15 +56,24 @@ function unauth() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
-function sundayOf(date = new Date()) {
-  const d = new Date(date);
-  const day = d.getDay(); // 0 = Sunday
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - day);
-  return d;
+/** local midnight */
+function atLocalMidnight(d = new Date()) {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
-function ymd(d: Date) {
-  return d.toISOString().split('T')[0];
+/** Local week: return local Sunday */
+function sundayOf(date = new Date()) {
+  const base = atLocalMidnight(date);
+  const day = base.getDay(); // 0 = Sunday
+  const sun = new Date(base);
+  sun.setDate(base.getDate() - day);
+  return sun;
+}
+/** Format local date as YYYY-MM-DD */
+function ymdLocal(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
 /* ─────────────────── GET ─────────────────── */
@@ -75,17 +81,16 @@ export async function GET(req: NextRequest) {
   const uid = await currentUserId();
   if (!uid) return unauth();
 
-  const col = await getWeeklyCol();
   const dayParam = req.nextUrl.searchParams.get('day');
+  const col = await getWeeklyCol();
 
   if (dayParam !== null) {
-    // allow -1 for backlog
-    const dayNum = Number(dayParam);
+    const dayNum = Number(dayParam); // allow -1
     const doc = await col.findOne({ userId: uid, dayOfWeek: dayNum });
     return NextResponse.json(doc?.tasks ?? []);
   }
 
-  // Return 8 buckets: 0..6 + backlog(-1) mapped to index 7
+  // Return 8 buckets: 0..6 + backlog(-1) at index 7
   const docs = await col.find({ userId: uid }).toArray();
   const week: WeeklyTask[][] = Array.from({ length: 8 }, () => []);
   docs.forEach((d) => {
@@ -100,97 +105,102 @@ export async function POST(req: NextRequest) {
   const uid = await currentUserId();
   if (!uid) return unauth();
 
-  const body = await req.json();
-  const text: string = body.text;
-  // days can include 0..6 and/or 7 (UI) -> we map 7 => -1 for backlog
-  const uiDays: number[] = Array.isArray(body.days) ? body.days : [];
-  const repeat: 'weekly' | 'this-week' =
-    body.repeat === 'this-week' ? 'this-week' : 'weekly';
+  try {
+    const body = await req.json();
+    const text = String(body?.text ?? '').trim();
+    const uiDays: number[] = Array.isArray(body?.days) ? body.days : [];
+    const repeat: 'weekly' | 'this-week' =
+      body?.repeat === 'this-week' ? 'this-week' : 'weekly';
 
-  const days = uiDays.map((d) => (d === 7 ? -1 : d));
+    if (!text) {
+      return NextResponse.json({ error: 'text is required' }, { status: 400 });
+    }
 
-  const weeklyCol = await getWeeklyCol();
-  const dailyCol = await getDailyCol();
-  const backlogCol = await getWeeklyBacklogCol();
+    // UI days 0..6; 7 === “no day” in UI → store as -1
+    const days = uiDays
+      .map((d) => Number(d))
+      .filter((d) => Number.isInteger(d) && d >= 0 && d <= 7)
+      .map((d) => (d === 7 ? -1 : d));
 
-  if (repeat === 'weekly') {
-    // write into weeklyTasks (including -1 = backlog)
-    await Promise.all(
-      days.map(async (dayOfWeek) => {
-        const doc = await weeklyCol.findOne({ userId: uid, dayOfWeek });
+    const weeklyCol = await getWeeklyCol();
+    const dailyCol = await getDailyCol();
+    const backlogCol = await getWeeklyBacklogCol();
+
+    if (repeat === 'weekly') {
+      // Weekly template (including -1 = unscheduled template)
+      await Promise.all(
+        days.map(async (dayOfWeek) => {
+          const doc = await weeklyCol.findOne({ userId: uid, dayOfWeek });
+          const nextOrder =
+            (doc?.tasks?.reduce((m, t) => Math.max(m, t.order), 0) ?? 0) + 1;
+
+          await weeklyCol.updateOne(
+            { userId: uid, dayOfWeek },
+            { $push: { tasks: { id: uuid(), text, order: nextOrder } } },
+            { upsert: true }
+          );
+        })
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    // repeat === 'this-week'
+    const start = sundayOf(); // local Sunday
+    const weekStart = ymdLocal(start);
+    const weekDates = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(start);
+      d.setDate(start.getDate() + i);
+      return ymdLocal(d);
+    });
+
+    for (const d of days) {
+      if (d === -1) {
+        // “no day” but only for this week → weeklyBacklog
+        const doc = await backlogCol.findOne({ userId: uid, weekStart });
         const nextOrder =
           (doc?.tasks?.reduce((m, t) => Math.max(m, t.order), 0) ?? 0) + 1;
 
-        await weeklyCol.updateOne(
-          { userId: uid, dayOfWeek },
+        await backlogCol.updateOne(
+          { userId: uid, weekStart },
           {
+            // IMPORTANT: do NOT touch 'tasks' in $setOnInsert to avoid conflicts
+            $setOnInsert: { userId: uid, weekStart },
             $push: {
-              tasks: { id: uuid(), text, order: nextOrder },
+              tasks: { id: uuid(), text, order: nextOrder, completed: false },
             },
           },
           { upsert: true }
         );
-      })
-    );
-    return NextResponse.json({ ok: true });
-  }
+      } else {
+        const date = weekDates[d]; // concrete local date
+        await dailyCol.updateOne(
+          { userId: uid, date },
+          { $setOnInsert: { userId: uid, date, tasks: [] } },
+          { upsert: true }
+        );
+        const doc = await dailyCol.findOne({ userId: uid, date });
+        const nextOrder =
+          (doc?.tasks?.reduce((m, t) => Math.max(m, t.order), 0) ?? 0) + 1;
 
-  // repeat === 'this-week'
-  const start = sundayOf();
-  const weekDates = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return ymd(d);
-  });
-
-  for (const d of days) {
-    if (d === -1) {
-      // this-week backlog doc
-      const weekStart = ymd(start);
-      const doc = await backlogCol.findOne({ userId: uid, weekStart });
-      const nextOrder =
-        (doc?.tasks?.reduce((m, t) => Math.max(m, t.order), 0) ?? 0) + 1;
-
-      await backlogCol.updateOne(
-        { userId: uid, weekStart },
-        {
-          $setOnInsert: { userId: uid, weekStart, tasks: [] },
-          $push: {
-            tasks: { id: uuid(), text, order: nextOrder, completed: false },
-          },
-        },
-        { upsert: true }
-      );
-    } else {
-      // concrete day: add to that date's dailyTasks
-      const date = weekDates[d];
-      // ensure doc exists
-      await dailyCol.updateOne(
-        { userId: uid, date },
-        { $setOnInsert: { userId: uid, date, tasks: [] } },
-        { upsert: true }
-      );
-      const doc = await dailyCol.findOne({ userId: uid, date });
-      const nextOrder =
-        (doc?.tasks?.reduce((m, t) => Math.max(m, t.order), 0) ?? 0) + 1;
-
-      await dailyCol.updateOne(
-        { userId: uid, date },
-        {
-          $push: {
-            tasks: {
-              id: uuid(),
-              text,
-              order: nextOrder,
-              completed: false,
+        await dailyCol.updateOne(
+          { userId: uid, date },
+          {
+            $push: {
+              tasks: { id: uuid(), text, order: nextOrder, completed: false },
             },
-          },
-        }
-      );
+          }
+        );
+      }
     }
-  }
 
-  return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    console.error('POST /api/manage-tasks failed:', err);
+    return NextResponse.json(
+      { error: err?.message ?? 'Internal error' },
+      { status: 500 }
+    );
+  }
 }
 
 /* ─────────────────── PUT ─────────────────── */
@@ -199,7 +209,6 @@ export async function PUT(req: NextRequest) {
   if (!uid) return unauth();
 
   const { day, tasks } = await req.json();
-  // accept UI 7, map to -1 for storage
   const dayOfWeek = day === 7 ? -1 : day;
 
   await (
@@ -231,16 +240,16 @@ export async function DELETE(req: NextRequest) {
     .collection<WeeklyDoc>('weeklyTasks');
   const dailyCol = client.db('todoTracker').collection<DayRecord>('dailyTasks');
 
-  // 1) remove from weekly template (including unscheduled -1)
+  // remove from weekly template
   await weeklyCol.updateOne(
     { userId: uid, dayOfWeek },
     { $pull: { tasks: { id: taskId } } }
   );
 
-  // 2) remove from all future days where it exists
-  const today = ymd(new Date());
+  // remove from all future local days
+  const todayLocal = ymdLocal(new Date());
   await dailyCol.updateMany(
-    { userId: uid, date: { $gte: today }, 'tasks.id': taskId },
+    { userId: uid, date: { $gte: todayLocal }, 'tasks.id': taskId },
     { $pull: { tasks: { id: taskId } } } as any
   );
 
