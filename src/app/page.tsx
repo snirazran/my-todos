@@ -14,7 +14,7 @@ import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
 import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
-
+import AddTaskModal from '@/components/ui/dialog/AddTaskModal';
 /* === Tunables ============================================================ */
 const TONGUE_MS = 1111; // tongue extend+retract total
 const OFFSET_MS = 160; // anticipation delay before tongue starts
@@ -78,6 +78,17 @@ export default function Home() {
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
   const [loading, setLoading] = useState(true);
 
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addDraft, setAddDraft] = useState('');
+  const [insertAfter, setInsertAfter] = useState<number | null>(null);
+
+  const [weeklyBacklog, setWeeklyBacklog] = useState<
+    { id: string; text: string }[]
+  >([]);
+  const [weeklyTemplateBacklog, setWeeklyTemplateBacklog] = useState<
+    { id: string; text: string }[]
+  >([]);
+
   const [visuallyDone, setVisuallyDone] = useState<Set<string>>(new Set());
 
   const [vp, setVp] = useState({ w: 0, h: 0 });
@@ -114,11 +125,27 @@ export default function Home() {
     raf: number;
   } | null>(null);
 
+  const fetchBacklog = useCallback(async () => {
+    if (!session) return;
+    const [thisWeek, weeklyTemplate] = await Promise.all([
+      fetch('/api/weekly-backlog').then((r) => r.json()),
+      fetch('/api/manage-tasks?day=-1').then((r) => r.json()),
+    ]);
+    setWeeklyBacklog(thisWeek.map((t: any) => ({ id: t.id, text: t.text })));
+    setWeeklyTemplateBacklog(
+      weeklyTemplate.map((t: any) => ({ id: t.id, text: t.text }))
+    );
+  }, [session]);
+
   const today = new Date();
   const dateStr = format(today, 'yyyy-MM-dd');
   const data = session ? tasks : guestTasks;
   const doneCount = data.filter((t) => t.completed).length;
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
+
+  useEffect(() => {
+    fetchBacklog();
+  }, [fetchBacklog]);
 
   /* -------- data load -------- */
   useEffect(() => {
@@ -533,7 +560,135 @@ export default function Home() {
                 />
               )
             }
+            onAddRequested={(prefill, afterIdx) => {
+              setAddDraft(prefill);
+              setInsertAfter(afterIdx);
+              setShowAddModal(true);
+            }}
           />
+
+          {session &&
+            (weeklyBacklog.length > 0 || weeklyTemplateBacklog.length > 0) && (
+              <div className="p-4 mt-6 border border-dashed rounded-2xl border-slate-300 dark:border-slate-600 bg-slate-50/60 dark:bg-slate-800/40">
+                <h3 className="mb-2 text-lg font-semibold">
+                  ללא יום – המשימות של השבוע
+                </h3>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  {/* This week only */}
+                  {weeklyBacklog.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm text-slate-500">השבוע בלבד</p>
+                      <ul className="space-y-2">
+                        {weeklyBacklog.map((t) => (
+                          <li
+                            key={t.id}
+                            className="flex items-center justify-between px-3 py-2 bg-white rounded-lg dark:bg-slate-800"
+                          >
+                            <span>{t.text}</span>
+                            <div className="flex gap-2">
+                              <button
+                                className="px-2 py-1 text-sm text-white rounded-md bg-emerald-600"
+                                onClick={async () => {
+                                  // Assign to today via this-week path
+                                  const dow = new Date().getDay();
+                                  await fetch('/api/manage-tasks', {
+                                    method: 'POST',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({
+                                      text: t.text,
+                                      days: [dow],
+                                      repeat: 'this-week',
+                                    }),
+                                  });
+                                  await fetch('/api/weekly-backlog', {
+                                    method: 'DELETE',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ taskId: t.id }),
+                                  });
+                                  // refresh
+                                  const res = await fetch(
+                                    `/api/tasks?date=${dateStr}`
+                                  );
+                                  const json = await res.json();
+                                  setTasks(json.tasks ?? []);
+                                  fetchBacklog();
+                                }}
+                              >
+                                עשו היום
+                              </button>
+                              <button
+                                className="px-2 py-1 text-sm rounded-md bg-slate-200 dark:bg-slate-600"
+                                onClick={async () => {
+                                  await fetch('/api/weekly-backlog', {
+                                    method: 'DELETE',
+                                    headers: {
+                                      'Content-Type': 'application/json',
+                                    },
+                                    body: JSON.stringify({ taskId: t.id }),
+                                  });
+                                  fetchBacklog();
+                                }}
+                              >
+                                הסר
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Weekly template backlog */}
+                  {weeklyTemplateBacklog.length > 0 && (
+                    <div>
+                      <p className="mb-2 text-sm text-slate-500">
+                        חוזר כל שבוע
+                      </p>
+                      <ul className="space-y-2">
+                        {weeklyTemplateBacklog.map((t) => (
+                          <li
+                            key={t.id}
+                            className="flex items-center justify-between px-3 py-2 bg-white rounded-lg dark:bg-slate-800"
+                          >
+                            <span>{t.text}</span>
+                            <button
+                              className="px-2 py-1 text-sm text-white rounded-md bg-emerald-600"
+                              onClick={async () => {
+                                const dow = new Date().getDay();
+                                await fetch('/api/manage-tasks', {
+                                  method: 'POST',
+                                  headers: {
+                                    'Content-Type': 'application/json',
+                                  },
+                                  body: JSON.stringify({
+                                    text: t.text,
+                                    days: [dow],
+                                    repeat: 'this-week',
+                                  }),
+                                });
+                                // refresh today
+                                const res = await fetch(
+                                  `/api/tasks?date=${dateStr}`
+                                );
+                                const json = await res.json();
+                                setTasks(json.tasks ?? []);
+                              }}
+                            >
+                              עשו היום
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
         </div>
       </div>
 
@@ -588,6 +743,37 @@ export default function Home() {
             </g>
           )}
         </svg>
+      )}
+
+      {showAddModal && (
+        <AddTaskModal
+          initialText={addDraft}
+          defaultRepeat="this-week"
+          onClose={() => setShowAddModal(false)}
+          onSave={async ({ text, days, repeat }) => {
+            // use the unified API (handles weekly & this-week & backlog)
+            await fetch('/api/manage-tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text, days, repeat }),
+            });
+
+            // refresh today list
+            if (session) {
+              const res = await fetch(`/api/tasks?date=${dateStr}`);
+              const json = await res.json();
+              setTasks(json.tasks ?? []);
+            } else {
+              setGuestTasks((prev) => [
+                ...prev,
+                { id: crypto.randomUUID(), text, completed: false },
+              ]);
+            }
+
+            // Optionally refresh backlog panel (see 5.2)
+            fetchBacklog();
+          }}
+        />
       )}
     </main>
   );
