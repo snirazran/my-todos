@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { he } from 'date-fns/locale';
 import { Calendar, History, CheckCircle2, Shirt } from 'lucide-react';
+import BacklogPanel from '@/components/ui/BacklogPanel';
 import { signIn, useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import { useSkins } from '@/lib/skinsStore';
@@ -14,7 +15,7 @@ import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
 import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
-
+import AddTaskModal from '@/components/ui/dialog/AddTaskModal';
 /* === Tunables ============================================================ */
 const TONGUE_MS = 1111; // tongue extend+retract total
 const OFFSET_MS = 160; // anticipation delay before tongue starts
@@ -78,6 +79,22 @@ export default function Home() {
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
   const [loading, setLoading] = useState(true);
 
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addDraft, setAddDraft] = useState('');
+  const [insertAfter, setInsertAfter] = useState<number | null>(null);
+  const [preselectedDays, setPreselectedDays] = useState<number[]>([]);
+  const [defaultRepeat, setDefaultRepeat] = useState<'this-week' | 'weekly'>(
+    'this-week'
+  );
+  const [weeklyIds, setWeeklyIds] = useState<Set<string>>(new Set());
+
+  const [weeklyBacklog, setWeeklyBacklog] = useState<
+    { id: string; text: string }[]
+  >([]);
+  const [weeklyTemplateBacklog, setWeeklyTemplateBacklog] = useState<
+    { id: string; text: string }[]
+  >([]);
+
   const [visuallyDone, setVisuallyDone] = useState<Set<string>>(new Set());
 
   const [vp, setVp] = useState({ w: 0, h: 0 });
@@ -114,11 +131,54 @@ export default function Home() {
     raf: number;
   } | null>(null);
 
+  const fetchBacklog = useCallback(async () => {
+    if (!session) return;
+    const [thisWeek, weeklyTemplate] = await Promise.all([
+      fetch('/api/weekly-backlog').then((r) => r.json()),
+      fetch('/api/manage-tasks?day=-1').then((r) => r.json()),
+    ]);
+    setWeeklyBacklog(thisWeek.map((t: any) => ({ id: t.id, text: t.text })));
+    setWeeklyTemplateBacklog(
+      weeklyTemplate.map((t: any) => ({ id: t.id, text: t.text }))
+    );
+  }, [session]);
+
   const today = new Date();
   const dateStr = format(today, 'yyyy-MM-dd');
   const data = session ? tasks : guestTasks;
   const doneCount = data.filter((t) => t.completed).length;
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
+
+  const refreshToday = useCallback(async () => {
+    if (!session) return;
+    const res = await fetch(`/api/tasks?date=${dateStr}`);
+    const json = await res.json();
+    setTasks(json.tasks ?? []);
+    await fetchWeeklyIds();
+  }, [session, dateStr]);
+
+  const loadWeeklyIds = useCallback(async () => {
+    if (!session) return;
+    const dow = new Date().getDay(); // 0..6 (Sun..Sat)
+    const arr = await fetch(`/api/manage-tasks?day=${dow}`).then((r) =>
+      r.json()
+    );
+    setWeeklyIds(new Set(arr.map((t: any) => t.id)));
+  }, [session]);
+
+  const fetchWeeklyIds = React.useCallback(async () => {
+    if (!session) return;
+    const dow = new Date().getDay();
+    const templ = await fetch(`/api/manage-tasks?day=${dow}`).then((r) =>
+      r.json()
+    );
+    setWeeklyIds(new Set(templ.map((t: any) => t.id)));
+  }, [session]);
+
+  useEffect(() => {
+    fetchBacklog();
+    fetchWeeklyIds();
+  }, [fetchBacklog, fetchWeeklyIds]);
 
   /* -------- data load -------- */
   useEffect(() => {
@@ -526,14 +586,57 @@ export default function Home() {
                   ref={(el) => {
                     flyRefs.current[task.id] = el;
                   }}
-                  onClick={() => handleToggle(task.id, true)}
+                  onClick={() => /* your existing toggle */ null}
                   size={30}
                   y={-6}
                   x={-4}
                 />
               )
             }
+            onAddRequested={(prefill, afterIdx, opts) => {
+              setAddDraft(prefill);
+              setInsertAfter(afterIdx);
+              const dow = new Date().getDay();
+              setPreselectedDays(opts?.preselectToday ? [dow] : []);
+              setShowAddModal(true);
+            }}
+            weeklyIds={weeklyIds}
+            onDeleteToday={async (taskId) => {
+              await fetch('/api/tasks', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: dateStr, taskId }),
+              });
+              await refreshToday();
+            }}
+            onDeleteFromWeek={async (taskId) => {
+              const dow = new Date().getDay();
+              await fetch('/api/manage-tasks', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ day: dow, taskId }),
+              });
+              await fetch('/api/tasks', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: dateStr, taskId }),
+              });
+              await refreshToday();
+            }}
           />
+
+          {session && (
+            <BacklogPanel
+              weeklyBacklog={weeklyBacklog}
+              weeklyTemplateBacklog={weeklyTemplateBacklog}
+              dateStr={dateStr}
+              onRefreshToday={refreshToday}
+              onRefreshBacklog={() => {
+                fetchBacklog();
+                loadWeeklyIds();
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -588,6 +691,38 @@ export default function Home() {
             </g>
           )}
         </svg>
+      )}
+
+      {showAddModal && (
+        <AddTaskModal
+          initialText={addDraft}
+          initialDays={preselectedDays}
+          defaultRepeat="this-week"
+          onClose={() => setShowAddModal(false)}
+          onSave={async ({ text, days, repeat }) => {
+            // use the unified API (handles weekly & this-week & backlog)
+            await fetch('/api/manage-tasks', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text, days, repeat }),
+            });
+
+            // refresh today list
+            if (session) {
+              const res = await fetch(`/api/tasks?date=${dateStr}`);
+              const json = await res.json();
+              setTasks(json.tasks ?? []);
+            } else {
+              setGuestTasks((prev) => [
+                ...prev,
+                { id: crypto.randomUUID(), text, completed: false },
+              ]);
+            }
+
+            // Optionally refresh backlog panel (see 5.2)
+            fetchBacklog();
+          }}
+        />
       )}
     </main>
   );

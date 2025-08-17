@@ -8,6 +8,7 @@ import React, {
   useCallback,
 } from 'react';
 import Link from 'next/link';
+import AddTaskModal from '@/components/ui/dialog/AddTaskModal';
 import { Plus, Trash2, ArrowLeft } from 'lucide-react';
 import {
   DragDropContext,
@@ -20,7 +21,8 @@ import {
 /* ---------- types ---------- */
 type Task = { id: string; text: string; order: number };
 const hebrewDays = ['ראשון', 'שני', 'שלישי', 'רביעי', 'חמישי', 'שישי', 'שבת'];
-const DAYS = 7;
+const EXTRA = 'ללא יום (השבוע)';
+const DAYS = 8;
 
 /* ---------- helpers ---------- */
 const droppableId = (day: number) => `day-${day}`;
@@ -84,7 +86,7 @@ export default function ManageTasks() {
       await fetch('/api/manage-tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day, tasks: ordered }),
+        body: JSON.stringify({ day: day === 7 ? -1 : day, tasks: ordered }),
       });
     } catch (e) {
       console.warn('saveDay failed', e);
@@ -95,7 +97,7 @@ export default function ManageTasks() {
     await fetch('/api/manage-tasks', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ day, taskId: id }),
+      body: JSON.stringify({ day: day === 7 ? -1 : day, taskId: id }),
     });
     setWeek((w) => {
       const clone = [...w];
@@ -293,12 +295,13 @@ export default function ManageTasks() {
       {/* Modal */}
       {showModal && (
         <AddTaskModal
+          defaultRepeat="weekly" // Manage default = weekly
           onClose={() => setShowModal(false)}
-          onSave={async (text, days) => {
+          onSave={async ({ text, days, repeat }) => {
             await fetch('/api/manage-tasks', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text, days }),
+              body: JSON.stringify({ text, days, repeat }),
             });
             setWeek(await fetch('/api/manage-tasks').then((r) => r.json()));
             setShowModal(false);
@@ -326,7 +329,7 @@ function DayColumn({
   return (
     <section className="p-4 transition-colors bg-white shadow dark:bg-slate-800 rounded-2xl">
       <h2 className="mb-4 font-semibold text-center text-slate-900 dark:text-white">
-        {hebrewDays[dayIdx]}
+        {dayIdx === 7 ? EXTRA : hebrewDays[dayIdx]}
       </h2>
 
       <Droppable droppableId={id} direction="vertical">
@@ -411,74 +414,5 @@ function TaskCard({
         </div>
       )}
     </Draggable>
-  );
-}
-
-/* =================================================================== */
-/*  ADD-TASK MODAL                                                     */
-/* =================================================================== */
-function AddTaskModal({
-  onClose,
-  onSave,
-}: {
-  onClose: () => void;
-  onSave: (text: string, days: number[]) => void;
-}) {
-  const [text, setText] = useState('');
-  const [days, setDays] = useState<number[]>([]);
-
-  const toggleDay = (d: number) =>
-    setDays((prev) =>
-      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
-    );
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="p-6 bg-white shadow-lg w-96 dark:bg-slate-800 rounded-2xl">
-        <h3 className="mb-4 text-xl font-bold text-center text-slate-900 dark:text-white">
-          הוסף משימה
-        </h3>
-        <input
-          autoFocus
-          placeholder="שם משימה"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="w-full px-3 py-2 mb-4 text-base border rounded-lg dark:bg-slate-700 dark:text-white focus:ring-2 focus:ring-violet-500"
-        />
-        <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
-          בחר ימים:
-        </p>
-        <div className="grid grid-cols-4 gap-2 mb-6 text-sm">
-          {hebrewDays.map((d, i) => (
-            <button
-              key={i}
-              onClick={() => toggleDay(i)}
-              className={`px-2 py-1 rounded-lg font-medium ${
-                days.includes(i)
-                  ? 'bg-violet-600 text-white'
-                  : 'bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200'
-              }`}
-            >
-              {d}
-            </button>
-          ))}
-        </div>
-        <div className="flex justify-end gap-3">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-base rounded-lg bg-slate-200 dark:bg-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-500"
-          >
-            ביטול
-          </button>
-          <button
-            disabled={!text || days.length === 0}
-            onClick={() => onSave(text, days)}
-            className="px-4 py-2 text-base font-medium text-white rounded-lg bg-violet-600 disabled:opacity-50 hover:bg-violet-700"
-          >
-            שמירה
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
