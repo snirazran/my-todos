@@ -1,13 +1,14 @@
-// lib/skins/catalog.ts
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+export type WardrobeSlot = 'skin' | 'hat' | 'scarf' | 'hand_item';
 
-export type SkinDef = {
+export type ItemDef = {
   id: string; // stable id stored in DB
   name: string;
+  slot: WardrobeSlot; // which Rive input this drives
   rarity: Rarity;
-  riveIndex: number; // value for the Rive "skin" input
-  icon: string; // path under /public
-  priceFlies?: number; // (for the shop later)
+  riveIndex: number; // numeric value for that input
+  icon: string; // /public path
+  priceFlies?: number;
 };
 
 export const RARITY_ORDER = [
@@ -16,7 +17,7 @@ export const RARITY_ORDER = [
   'rare',
   'epic',
   'legendary',
-] as const satisfies Readonly<Rarity[]>;
+] as const;
 
 export const rarityRank: Record<Rarity, number> = {
   common: 0,
@@ -26,59 +27,104 @@ export const rarityRank: Record<Rarity, number> = {
   legendary: 4,
 };
 
-export const nextRarity = (r: Rarity): Rarity =>
-  RARITY_ORDER[Math.min(rarityRank[r] + 1, RARITY_ORDER.length - 1)];
-
-export const CATALOG: Readonly<SkinDef[]> = [
+export const CATALOG: Readonly<ItemDef[]> = [
+  // Skins
   {
-    id: 'pink',
+    id: 'skin_pink',
     name: 'Pink',
+    slot: 'skin',
     rarity: 'common',
     riveIndex: 1,
-    icon: '/skins/uncommon/skin1.png',
+    icon: '/skins/skin/skin1.png',
     priceFlies: 150,
   },
   {
-    id: 'blue',
+    id: 'skin_blue',
     name: 'Blue',
+    slot: 'skin',
     rarity: 'uncommon',
     riveIndex: 2,
-    icon: '/skins/rare/skin2.png',
+    icon: '/skins/skin/skin2.png',
     priceFlies: 400,
   },
   {
-    id: 'red',
+    id: 'skin_red',
     name: 'Red',
+    slot: 'skin',
     rarity: 'rare',
     riveIndex: 3,
-    icon: '/skins/epic/skin3.png',
+    icon: '/skins/skin/skin3.png',
     priceFlies: 900,
   },
   {
-    id: 'santa',
+    id: 'skin_santa',
     name: 'Santa',
+    slot: 'skin',
     rarity: 'epic',
     riveIndex: 4,
-    icon: '/skins/legendary/skin4.png',
+    icon: '/skins/skin/skin4.png',
     priceFlies: 1800,
   },
-  // If you later add "wizzard", add a unique riveIndex and a real icon path:
   {
-    id: 'wizzard',
+    id: 'skin_wizzard',
     name: 'Wizzard',
+    slot: 'skin',
     rarity: 'legendary',
     riveIndex: 5,
-    icon: '/skins/legendary/skin5.png',
+    icon: '/skins/skin/skin5.png',
+  },
+
+  // Hats
+  {
+    id: 'hat_cap',
+    name: 'Cap',
+    slot: 'hat',
+    rarity: 'common',
+    riveIndex: 1,
+    icon: '/skins/hat/hat1.png',
+    priceFlies: 120,
+  },
+  {
+    id: 'hat_crown',
+    name: 'Crown',
+    slot: 'hat',
+    rarity: 'epic',
+    riveIndex: 3,
+    icon: '/skins/hat/hat2.png',
+    priceFlies: 1500,
+  },
+
+  // Scarves
+  {
+    id: 'scarf_green',
+    name: 'Green Scarf',
+    slot: 'scarf',
+    rarity: 'uncommon',
+    riveIndex: 1,
+    icon: '/skins/scarf/scarf1.png',
+    priceFlies: 300,
+  },
+
+  // Hand items
+  {
+    id: 'hand_flower',
+    name: 'Flower',
+    slot: 'hand_item',
+    rarity: 'rare',
+    riveIndex: 2,
+    icon: '/skins/hand/hand1.png',
+    priceFlies: 700,
   },
 ];
 
-export const byId: Readonly<Record<string, SkinDef>> = Object.freeze(
+export const byId: Readonly<Record<string, ItemDef>> = Object.freeze(
   Object.fromEntries(CATALOG.map((s) => [s.id, s]))
 );
 
-// Helper for sorting an array of SkinDef (or user-owned ids) by rarity
-export const sortByRarity = <T extends SkinDef>(arr: T[]) =>
+export const sortByRarity = <T extends ItemDef>(arr: T[]) =>
   [...arr].sort(
     (a, b) =>
-      rarityRank[a.rarity] - rarityRank[b.rarity] || a.riveIndex - b.riveIndex
+      rarityRank[a.rarity] - rarityRank[b.rarity] ||
+      a.slot.localeCompare(b.slot) ||
+      a.riveIndex - b.riveIndex
   );

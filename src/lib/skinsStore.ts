@@ -1,31 +1,48 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { byId } from './skins/catalog';
+import { byId, type WardrobeSlot } from './skins/catalog';
 
-type SkinState = {
-  equippedId: string | null; // null => no skin
-  equippedIndex: number; // -1 => no skin
-  setEquippedById: (id: string | null) => void;
-  setEquippedIndex: (i: number) => void;
+type WardrobeState = {
+  // what’s equipped per slot (id or null)
+  equipped: Partial<Record<WardrobeSlot, string | null>>;
+  // rive indices for each slot (0 = default/none)
+  indices: Partial<Record<WardrobeSlot, number>>;
+
+  // actions
+  setEquippedById: (slot: WardrobeSlot, id: string | null) => void;
+  setEquippedIndex: (slot: WardrobeSlot, i: number) => void;
+  resetWardrobe: () => void;
 };
 
-export const useSkins = create<SkinState>()(
+export const useWardrobe = create<WardrobeState>()(
   persist(
-    (set) => ({
-      equippedId: null, // default: none
-      equippedIndex: -1, // default: none
-      setEquippedById: (id) => {
+    (set, get) => ({
+      equipped: {},
+      indices: {},
+
+      setEquippedById: (slot, id) => {
         if (id == null) {
-          // no skin selected
-          set({ equippedId: null, equippedIndex: -1 });
+          // unequip this slot
+          const nextEq = { ...get().equipped, [slot]: null };
+          const nextIdx = { ...get().indices, [slot]: 0 };
+          set({ equipped: nextEq, indices: nextIdx });
           return;
         }
-        // id is now narrowed to string
-        const idx = byId[id]?.riveIndex ?? -1;
-        set({ equippedId: id, equippedIndex: idx });
+        const idx = byId[id]?.riveIndex ?? 0;
+        set({
+          equipped: { ...get().equipped, [slot]: id },
+          indices: { ...get().indices, [slot]: idx },
+        });
       },
-      setEquippedIndex: (i) => set({ equippedIndex: i }),
+
+      setEquippedIndex: (slot, i) => {
+        set({
+          indices: { ...get().indices, [slot]: i },
+        });
+      },
+
+      resetWardrobe: () => set({ equipped: {}, indices: {} }),
     }),
-    { name: 'frog-skin' }
+    { name: 'frog-wardrobe' }
   )
 );

@@ -9,7 +9,8 @@ import { Calendar, History, CheckCircle2, Shirt } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 import { signIn, useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
-import { useSkins } from '@/lib/skinsStore';
+import useSWR from 'swr';
+import { byId } from '@/lib/skins/catalog';
 import Frog, { FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
@@ -70,7 +71,6 @@ export default function Home() {
   const { data: session } = useSession();
   const router = useRouter();
   const cooldownUntil = useRef(0);
-  const equippedIndex = useSkins((s) => s.equippedIndex);
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -250,6 +250,22 @@ export default function Home() {
       );
     }
   };
+
+  const { data: wardrobeData } = useSWR(
+    '/api/skins/inventory',
+    (u) => fetch(u).then((r) => r.json()),
+    { revalidateOnFocus: false }
+  );
+
+  const indices = (() => {
+    const eq = wardrobeData?.wardrobe?.equipped ?? {};
+    return {
+      skin: eq?.skin ? byId[eq.skin].riveIndex : 0,
+      hat: eq?.hat ? byId[eq.hat].riveIndex : 0,
+      scarf: eq?.scarf ? byId[eq.scarf].riveIndex : 0,
+      hand_item: eq?.hand_item ? byId[eq.hand_item].riveIndex : 0,
+    };
+  })();
 
   /* -------- doc-space helpers -------- */
   const getMouthDoc = useCallback(() => {
@@ -552,10 +568,10 @@ export default function Home() {
         <div className="flex flex-col items-center w-full">
           <div ref={frogBoxRef} className="relative z-10">
             <Frog
-              skin={equippedIndex}
               ref={frogRef}
               mouthOpen={!!grab}
               mouthOffset={{ y: -4 }}
+              indices={indices}
             />
             <button
               onClick={() => setOpenWardrobe(true)}
