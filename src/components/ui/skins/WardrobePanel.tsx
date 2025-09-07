@@ -1,4 +1,3 @@
-// components/ui/skins/WardrobePanel.tsx
 'use client';
 
 import useSWR from 'swr';
@@ -13,22 +12,21 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Check, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useSkins } from '@/lib/skinsStore';
-import type { SkinDef } from '@/lib/skins/catalog';
-import { CATALOG, RARITY_ORDER, sortByRarity } from '@/lib/skins/catalog';
+import type { ItemDef, RARITY_ORDER, WardrobeSlot } from '@/lib/skins/catalog';
+import { CATALOG, rarityRank, sortByRarity } from '@/lib/skins/catalog';
 
 type ApiData = {
-  skins: {
-    equippedId: string | null;
+  wardrobe: {
+    equipped: Partial<Record<WardrobeSlot, string | null>>;
     inventory: Record<string, number>;
     flies: number;
   };
-  catalog: SkinDef[];
+  catalog: ItemDef[];
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-const rarityBorder = (rarity: SkinDef['rarity']) =>
+const rarityBorder = (rarity: ItemDef['rarity']) =>
   ({
     common: 'border-zinc-300',
     uncommon: 'border-emerald-500',
@@ -36,6 +34,13 @@ const rarityBorder = (rarity: SkinDef['rarity']) =>
     epic: 'border-violet-500',
     legendary: 'border-amber-500',
   }[rarity]);
+
+const SLOT_LABEL: Record<WardrobeSlot, string> = {
+  skin: 'Skins',
+  hat: 'Hats',
+  scarf: 'Scarves',
+  hand_item: 'Hand Items',
+};
 
 /* ---------------- Inventory Tab ---------------- */
 
@@ -46,117 +51,133 @@ function InventoryTab({
   data?: ApiData | null;
   mutate: () => void;
 }) {
-  const setEquippedById = useSkins((s) => s.setEquippedById);
-  const equippedIdStore = useSkins((s) => s.equippedId);
   const [saving, setSaving] = useState<string | null>(null);
+  const inv = data?.wardrobe?.inventory ?? {};
+  const equipped = data?.wardrobe?.equipped ?? {};
 
-  // always run hooks; use safe fallbacks
-  const catalogById = useMemo(
-    () =>
-      Object.fromEntries((data?.catalog ?? []).map((s) => [s.id, s] as const)),
-    [data?.catalog]
-  );
+  // group owned items by slot
+  const ownedBySlot = useMemo(() => {
+    const bySlot: Record<WardrobeSlot, ItemDef[]> = {
+      skin: [],
+      hat: [],
+      scarf: [],
+      hand_item: [],
+    };
+    const byId: Record<string, ItemDef> = Object.fromEntries(
+      (data?.catalog ?? []).map((i) => [i.id, i] as const)
+    );
+    for (const [id, qty] of Object.entries(inv)) {
+      if (!qty || qty <= 0) continue;
+      const def = byId[id];
+      if (def) bySlot[def.slot].push(def);
+    }
+    for (const slot of Object.keys(bySlot) as WardrobeSlot[]) {
+      bySlot[slot] = sortByRarity(bySlot[slot]);
+    }
+    return bySlot;
+  }, [inv, data?.catalog]);
 
-  const inv = data?.skins?.inventory ?? {};
-
-  const ownedSkins: SkinDef[] = useMemo(() => {
-    const ids = Object.entries(inv)
-      .filter(([, n]) => (n ?? 0) > 0)
-      .map(([id]) => id);
-    const defs = ids.map((id) => catalogById[id]).filter(Boolean) as SkinDef[];
-    return sortByRarity(defs);
-  }, [inv, catalogById]);
-
-  const equippedId = data?.skins?.equippedId ?? null;
-  const loading = !data; // for UI only
-
-  const toggleEquip = async (skinId: string) => {
-    if (!data) return; // still guard side-effects
-    const currentlyEquipped =
-      equippedId === skinId || equippedIdStore === skinId;
-
-    setSaving(skinId);
+  const toggleEquip = async (slot: WardrobeSlot, itemId: string) => {
+    if (!data) return;
+    const isEquipped = equipped[slot] === itemId;
+    setSaving(itemId);
     const res = await fetch('/api/skins/inventory', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skinId: currentlyEquipped ? null : skinId }),
+      body: JSON.stringify({ slot, itemId: isEquipped ? null : itemId }),
     });
     setSaving(null);
-    if (res.ok) {
-      setEquippedById(currentlyEquipped ? null : skinId);
-      mutate();
-    }
+    if (res.ok) mutate();
   };
 
-  if (loading || ownedSkins.length === 0) {
+  if (!data) {
     return (
       <div className="py-10 text-sm text-center text-slate-600 dark:text-slate-400">
-        {loading ? (
-          'Loading…'
-        ) : (
-          <>
-            Your wardrobe is empty.
-            <br />
-            Earn skins by completing all your daily tasks — or{' '}
-            <span className="font-semibold">buy them in the Shop</span>.
-          </>
-        )}
+        Loading…
+      </div>
+    );
+  }
+
+  const empty =
+    ownedBySlot.skin.length +
+      ownedBySlot.hat.length +
+      ownedBySlot.scarf.length +
+      ownedBySlot.hand_item.length ===
+    0;
+
+  if (empty) {
+    return (
+      <div className="py-10 text-sm text-center text-slate-600 dark:text-slate-400">
+        Your wardrobe is empty.
+        <br />
+        Earn items by completing your daily tasks — or{' '}
+        <b>buy them in the Shop</b>.
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-        {ownedSkins.map((skin) => {
-          const equipped =
-            equippedId === skin.id || equippedIdStore === skin.id;
-          return (
-            <div
-              key={skin.id}
-              onClick={() => toggleEquip(skin.id)}
-              role="button"
-              tabIndex={0}
-              className={cn(
-                'rounded-2xl p-2 border-2 bg-white dark:bg-slate-900 shadow-sm cursor-pointer outline-none focus:ring-2 focus:ring-offset-1',
-                rarityBorder(skin.rarity)
-              )}
-            >
-              <div className="grid rounded-xl aspect-square place-items-center bg-slate-50 dark:bg-slate-800">
-                <img
-                  src={skin.icon}
-                  alt={skin.name}
-                  className="object-contain w-12 h-12"
-                />
-              </div>
-
-              <div className="mt-1 text-xs font-medium truncate">
-                {skin.name}
-              </div>
-
-              <div className="mt-2">
-                <Button
-                  size="sm"
-                  className="w-full h-8"
-                  disabled={saving === skin.id}
-                  variant={equipped ? 'default' : 'secondary'}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleEquip(skin.id);
-                  }}
-                >
-                  <Check className="w-3.5 h-3.5 mr-1" />
-                  {equipped ? 'Unequip' : 'Equip'}
-                </Button>
-              </div>
-
-              <div className="mt-1 text-[11px] text-right text-slate-500">
-                ×{inv[skin.id] ?? 0}
-              </div>
+    <div className="space-y-8">
+      {(Object.keys(SLOT_LABEL) as WardrobeSlot[]).map((slot) => {
+        const items = ownedBySlot[slot];
+        if (!items.length) return null;
+        return (
+          <div key={slot} className="space-y-3">
+            <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+              {SLOT_LABEL[slot]}
             </div>
-          );
-        })}
-      </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+              {items.map((item) => {
+                const isEquipped = equipped[slot] === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => toggleEquip(slot, item.id)}
+                    role="button"
+                    tabIndex={0}
+                    className={cn(
+                      'rounded-2xl p-2 border-2 bg-white dark:bg-slate-900 shadow-sm cursor-pointer outline-none focus:ring-2 focus:ring-offset-1',
+                      rarityBorder(item.rarity)
+                    )}
+                  >
+                    <div className="grid rounded-xl aspect-square place-items-center bg-slate-50 dark:bg-slate-800">
+                      <img
+                        src={item.icon}
+                        alt={item.name}
+                        className="object-contain w-12 h-12"
+                      />
+                    </div>
+
+                    <div className="mt-1 text-xs font-medium truncate">
+                      {item.name}
+                    </div>
+
+                    <div className="mt-2">
+                      <Button
+                        size="sm"
+                        className="w-full h-8"
+                        disabled={saving === item.id}
+                        variant={isEquipped ? 'default' : 'secondary'}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleEquip(slot, item.id);
+                        }}
+                      >
+                        <Check className="w-3.5 h-3.5 mr-1" />
+                        {isEquipped ? 'Unequip' : 'Equip'}
+                      </Button>
+                    </div>
+
+                    <div className="mt-1 text-[11px] text-right text-slate-500">
+                      ×{inv[item.id] ?? 0}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -170,32 +191,39 @@ function ShopTab({
   data?: ApiData | null;
   mutate: () => void;
 }) {
-  const [buying, setBuying] = useState<string | null>(null); // always created
-  const owned = data?.skins?.inventory ?? {};
-  const balance = data?.skins?.flies ?? 0;
-  const loading = !data;
+  const [buying, setBuying] = useState<string | null>(null);
+  const owned = data?.wardrobe?.inventory ?? {};
+  const balance = data?.wardrobe?.flies ?? 0;
 
-  const grouped = useMemo(() => {
-    const groups: Record<string, SkinDef[]> = {};
-    for (const r of RARITY_ORDER) groups[r] = [];
-    for (const s of CATALOG) groups[s.rarity].push(s);
-    for (const r of RARITY_ORDER) groups[r] = sortByRarity(groups[r]);
+  const bySlot = useMemo(() => {
+    const groups: Record<WardrobeSlot, ItemDef[]> = {
+      skin: [],
+      hat: [],
+      scarf: [],
+      hand_item: [],
+    };
+    for (const it of CATALOG) groups[it.slot].push(it);
+    for (const slot of Object.keys(groups) as WardrobeSlot[]) {
+      groups[slot] = groups[slot].sort(
+        (a, b) => rarityRank[a.rarity] - rarityRank[b.rarity]
+      );
+    }
     return groups;
   }, []);
 
-  const buy = async (skinId: string) => {
+  const buy = async (itemId: string) => {
     if (!data) return;
-    setBuying(skinId);
+    setBuying(itemId);
     const res = await fetch('/api/skins/shop', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ skinId }),
+      body: JSON.stringify({ itemId }),
     });
     setBuying(null);
     if (res.ok) mutate();
   };
 
-  if (loading)
+  if (!data)
     return (
       <div className="py-10 text-sm text-center text-slate-500">Loading…</div>
     );
@@ -206,44 +234,44 @@ function ShopTab({
         Balance: <span className="font-medium">{balance}</span> flies
       </div>
 
-      {RARITY_ORDER.map((r) => (
-        <div key={r} className="space-y-3">
-          <div className="text-sm font-semibold capitalize text-slate-700 dark:text-slate-200">
-            {r}
+      {(Object.keys(SLOT_LABEL) as WardrobeSlot[]).map((slot) => (
+        <div key={slot} className="space-y-3">
+          <div className="text-sm font-semibold text-slate-700 dark:text-slate-200">
+            {SLOT_LABEL[slot]}
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {grouped[r].map((skin) => {
-              const has = (owned[skin.id] ?? 0) > 0;
+            {bySlot[slot].map((item) => {
+              const has = (owned[item.id] ?? 0) > 0;
               return (
                 <div
-                  key={skin.id}
+                  key={item.id}
                   className={cn(
                     'rounded-2xl p-2 border-2 bg-white dark:bg-slate-900 shadow-sm',
-                    rarityBorder(skin.rarity),
+                    rarityBorder(item.rarity),
                     !has && 'opacity-70 grayscale'
                   )}
                 >
                   <div className="grid rounded-xl aspect-square place-items-center bg-slate-50 dark:bg-slate-800">
                     <img
-                      src={skin.icon}
-                      alt={skin.name}
+                      src={item.icon}
+                      alt={item.name}
                       className="object-contain w-12 h-12"
                     />
                   </div>
                   <div className="mt-1 text-xs font-medium truncate">
-                    {skin.name}
+                    {item.name}
                   </div>
 
                   <div className="mt-2">
                     <Button
                       size="sm"
                       className="w-full h-8"
-                      disabled={has || buying === skin.id}
-                      onClick={() => buy(skin.id)}
+                      disabled={has || buying === item.id}
+                      onClick={() => buy(item.id)}
                       variant={has ? 'secondary' : 'default'}
                     >
-                      {has ? 'Owned' : 'Buy (0)'}
+                      {has ? 'Owned' : `Buy (${item.priceFlies ?? 0})`}
                     </Button>
                   </div>
                 </div>
@@ -278,7 +306,7 @@ export function WardrobePanel({
   onOpenChange: (v: boolean) => void;
   defaultTab?: 'inventory' | 'shop' | 'trade';
 }) {
-  const { data, mutate, isLoading } = useSWR<ApiData>(
+  const { data, mutate } = useSWR<ApiData>(
     open ? '/api/skins/inventory' : null,
     fetcher
   );
@@ -286,17 +314,14 @@ export function WardrobePanel({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl p-0 flex flex-col max-h-[65vh]">
-        {/* header (no grow, no scroll) */}
         <DialogHeader className="px-6 pt-6 pb-3 shrink-0">
           <DialogTitle>Wardrobe</DialogTitle>
         </DialogHeader>
 
-        {/* tabs root stretches */}
         <Tabs
           defaultValue={defaultTab}
           className="flex flex-col flex-1 min-h-0"
         >
-          {/* tab buttons (no grow) */}
           <div className="px-6 shrink-0">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="inventory">Inventory</TabsTrigger>
@@ -305,7 +330,6 @@ export function WardrobePanel({
             </TabsList>
           </div>
 
-          {/* the ONLY scrollable area */}
           <div className="flex-1 min-h-0 px-6 pb-6 overflow-y-auto overscroll-contain">
             <TabsContent value="inventory" className="mt-4">
               <InventoryTab data={data} mutate={() => void mutate()} />
