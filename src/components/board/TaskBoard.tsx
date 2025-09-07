@@ -42,30 +42,30 @@ export default function TaskBoard({
   const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
   const listRefs = useRef<Array<HTMLDivElement | null>>([]);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-
+  const [panActive, setPanActive] = useState(false);
   const [pageIndex, setPageIndex] = useState(todayIndex());
 
-  // drag state (card dragging)
+  // card-drag state
   const [drag, setDrag] = useState<DragState | null>(null);
   const [targetDay, setTargetDay] = useState<number | null>(null);
   const [targetIndex, setTargetIndex] = useState<number | null>(null);
 
-  // suppress snap while programmatically smooth-scrolling
+  // smooth-scroll snapping suppression
   const [snapSuppressed, setSnapSuppressed] = useState(false);
 
-  // pointer refs (fresh every frame)
-  const pointerXRef = useRef(0);
-  const pointerYRef = useRef(0);
-
-  // velocity smoothing (edge scroll feel)
-  const pxPrevRef = useRef(0);
-  const pxVelRef = useRef(0);
-  const pxVelSmoothedRef = useRef(0);
-
-  // ---- Desktop drag-to-pan state ----
+  // desktop pan state
+  const [canPan, setCanPan] = useState(false);
+  const canPanRef = useRef(false);
   const panActiveRef = useRef(false);
   const panStartXRef = useRef(0);
   const panStartScrollLeftRef = useRef(0);
+
+  // pointer refs for edge auto-scroll
+  const pointerXRef = useRef(0);
+  const pointerYRef = useRef(0);
+  const pxPrevRef = useRef(0);
+  const pxVelRef = useRef(0);
+  const pxVelSmoothedRef = useRef(0);
 
   const slides = useMemo(
     () =>
@@ -90,7 +90,16 @@ export default function TaskBoard({
     else cardRefs.current.set(id, el);
   }, []);
 
-  // Snap to today
+  // recompute overflow => canPan
+  const recomputeCanPan = useCallback(() => {
+    const s = scrollerRef.current;
+    if (!s) return;
+    const overflow = s.scrollWidth - s.clientWidth > 2;
+    setCanPan(overflow);
+    canPanRef.current = overflow;
+  }, []);
+
+  // snap to today
   useEffect(() => {
     const s = scrollerRef.current;
     const t = todayIndex();
@@ -98,13 +107,26 @@ export default function TaskBoard({
     if (!s || !el) return;
     s.scrollTo({
       left: el.offsetLeft - (s.clientWidth - el.clientWidth) / 2,
-
       behavior: 'instant',
     });
     setPageIndex(t);
-  }, []);
+    recomputeCanPan();
+  }, [recomputeCanPan]);
 
-  // Pagination dots tracking
+  // observe size changes / window resize
+  useEffect(() => {
+    const onResize = () => recomputeCanPan();
+    window.addEventListener('resize', onResize);
+    const ro = new ResizeObserver(() => recomputeCanPan());
+    if (scrollerRef.current) ro.observe(scrollerRef.current);
+    requestAnimationFrame(recomputeCanPan);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      ro.disconnect();
+    };
+  }, [week, titles, recomputeCanPan]);
+
+  // pagination index
   useEffect(() => {
     const s = scrollerRef.current;
     if (!s) return;
@@ -121,7 +143,7 @@ export default function TaskBoard({
     return () => s.removeEventListener('scroll', handler);
   }, []);
 
-  // ----- Card drag lifecycle -----
+  // ----- CARD DRAG -----
   const onGrab = useCallback(
     (params: {
       day: number;
@@ -167,7 +189,6 @@ export default function TaskBoard({
     const col = slideRefs.current[day];
     if (!s || !col) return;
     const targetLeft = col.offsetLeft - (s.clientWidth - col.clientWidth) / 2;
-
     setSnapSuppressed(true);
     s.scrollTo({ left: targetLeft, behavior: 'smooth' });
     window.setTimeout(() => setSnapSuppressed(false), 550);
@@ -214,7 +235,7 @@ export default function TaskBoard({
     setTargetIndex(null);
   }, []);
 
-  // Global pointer move (card drag tracking)
+  // track card drag pointer & targets
   useEffect(() => {
     if (!drag) return;
 
@@ -307,23 +328,19 @@ export default function TaskBoard({
     };
   }, [drag, endDrag, cancelDrag]);
 
-  // Stable rAF loop: smooth edge scroll (board + list) with viewport assist
+  // edge auto-scroll loop (board + list + viewport assist)
   useEffect(() => {
     if (!drag) return;
     const s = scrollerRef.current;
     if (!s) return;
 
     let raf = 0;
-
-    // Edge sizes
-    const EDGE_X = 96; // board left/right
-    const EDGE_Y = 72; // list top/bottom
-    const VP_EDGE_Y = 80; // viewport top/bottom (mobile assist)
-    const HYST = 10;
-
-    // speed limits (px/frame)
-    const MIN_V = 2;
-    const MAX_V = 24;
+    const EDGE_X = 96,
+      EDGE_Y = 72,
+      VP_EDGE_Y = 80,
+      HYST = 10;
+    const MIN_V = 2,
+      MAX_V = 24;
 
     const clamp = (v: number, a: number, b: number) =>
       Math.max(a, Math.min(b, v));
@@ -334,12 +351,10 @@ export default function TaskBoard({
       const px = pointerXRef.current;
       const py = pointerYRef.current;
 
-      // ----- Horizontal (board) -----
+      // horizontal
       const rect = s.getBoundingClientRect();
-
-      let distFactor = 0;
-      let dir = 0; // -1 left, +1 right
-
+      let distFactor = 0,
+        dir = 0;
       if (px > rect.right - EDGE_X) {
         const d = px - (rect.right - EDGE_X);
         if (d > HYST) {
@@ -353,11 +368,9 @@ export default function TaskBoard({
           dir = -1;
         }
       }
-
       const inst = pxVelRef.current;
       const velSmoothed = lerp(pxVelSmoothedRef.current, inst, 0.18);
       pxVelSmoothedRef.current = velSmoothed;
-
       const speedFactor = clamp(Math.abs(velSmoothed) / 20, 0, 1);
       const combined = clamp(
         easeCubic(distFactor) * 0.85 + speedFactor * 0.35,
@@ -367,16 +380,13 @@ export default function TaskBoard({
       const vx = dir * (MIN_V + (MAX_V - MIN_V) * combined);
       if (dir !== 0) s.scrollLeft += vx;
 
-      // ----- Vertical (current column) -----
+      // vertical (current column)
       const dayForV = targetDay != null ? targetDay : drag.fromDay;
       const list = listRefs.current[dayForV];
       if (list) {
         const lr = list.getBoundingClientRect();
-
-        let distY = 0;
-        let dirY = 0;
-
-        // List edges
+        let distY = 0,
+          dirY = 0;
         if (py > lr.bottom - EDGE_Y) {
           const d = py - (lr.bottom - EDGE_Y);
           if (d > HYST) {
@@ -390,26 +400,24 @@ export default function TaskBoard({
             dirY = -1;
           }
         }
-
-        // Viewport assist (great on mobile)
         if (dirY === 0) {
-          const vpTop = 0;
-          const vpBottom = window.innerHeight;
-          if (py > vpBottom - VP_EDGE_Y) {
-            const d = py - (vpBottom - VP_EDGE_Y);
+          const vpBottom = window.innerHeight,
+            vpTop = 0,
+            VP = VP_EDGE_Y;
+          if (py > vpBottom - VP) {
+            const d = py - (vpBottom - VP);
             if (d > HYST) {
-              distY = clamp((d - HYST) / (VP_EDGE_Y - HYST), 0, 1);
+              distY = clamp((d - HYST) / (VP - HYST), 0, 1);
               dirY = +1;
             }
-          } else if (py < vpTop + VP_EDGE_Y) {
-            const d = vpTop + VP_EDGE_Y - py;
+          } else if (py < vpTop + VP) {
+            const d = vpTop + VP - py;
             if (d > HYST) {
-              distY = clamp((d - HYST) / (VP_EDGE_Y - HYST), 0, 1);
+              distY = clamp((d - HYST) / (VP - HYST), 0, 1);
               dirY = -1;
             }
           }
         }
-
         if (dirY !== 0) {
           const vy = dirY * (MIN_V + (MAX_V - MIN_V) * easeCubic(distY));
           list.scrollTop += vy;
@@ -423,51 +431,54 @@ export default function TaskBoard({
     return () => cancelAnimationFrame(raf);
   }, [drag, targetDay]);
 
-  // ---------- Desktop drag-to-pan handlers ----------
+  // ---------- DESKTOP DRAG-TO-PAN ----------
   const startPanIfEligible = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!canPanRef.current) return; // no overflow => no pan
     if (drag?.active) return; // don't pan while dragging a card
     if (e.pointerType !== 'mouse') return; // desktop only
     if (e.button !== 0) return; // left click only
 
     const target = e.target as HTMLElement;
-    // don't start pan if clicking on a task or inside a column (we only want empty board area)
+    // Do not start pan if clicking a CARD; allow panning on columns/background.
     if (target.closest('[data-card-id]')) return;
-    if (target.closest('[data-col="true"]')) return;
 
     const s = scrollerRef.current;
     if (!s) return;
 
+    // prevent the browser from starting text selection
+    e.preventDefault();
+
     panActiveRef.current = true;
+    setPanActive(true);
     panStartXRef.current = e.clientX;
     panStartScrollLeftRef.current = s.scrollLeft;
 
     s.setPointerCapture?.(e.pointerId);
-    document.body.style.cursor = 'grabbing';
     document.body.style.userSelect = 'none';
   };
 
   const onPanMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!panActiveRef.current) return;
+    e.preventDefault();
     const s = scrollerRef.current;
     if (!s) return;
-
-    const dx = e.clientX - panStartXRef.current;
-    s.scrollLeft = panStartScrollLeftRef.current - dx;
+    s.scrollLeft =
+      panStartScrollLeftRef.current - (e.clientX - panStartXRef.current);
   };
 
   const endPan = (e?: React.PointerEvent<HTMLDivElement>) => {
     if (!panActiveRef.current) return;
     panActiveRef.current = false;
+    setPanActive(false);
     const s = scrollerRef.current;
     if (s && e) s.releasePointerCapture?.(e.pointerId);
-    document.body.style.cursor = '';
     document.body.style.userSelect = '';
   };
 
-  // Clean up pan on pointerup outside the scroller
+  // End pan if pointer released outside element
   useEffect(() => {
     const up = () => endPan();
-    window.addEventListener('pointerup', up);
+    window.addEventListener('pointerup', up, { passive: true });
     return () => window.removeEventListener('pointerup', up);
   }, []);
 
@@ -541,23 +552,21 @@ export default function TaskBoard({
         ref={scrollerRef}
         dir="ltr"
         data-role="board-scroller"
-        // Desktop drag-to-pan only on empty board area
         onPointerDown={startPanIfEligible}
         onPointerMove={onPanMove}
         onPointerUp={endPan}
         className={[
           'no-scrollbar',
           'w-full overflow-x-auto overflow-y-visible overscroll-x-contain px-2 md:px-4',
-          // hand cursor on desktop for pan affordance
-          'cursor-grab',
-          // Disable snap while dragging a card OR while we smooth-scroll after drop
-          drag?.active || snapSuppressed
+          drag?.active || snapSuppressed || panActive
             ? 'snap-none'
             : 'snap-x snap-mandatory scroll-smooth',
         ].join(' ')}
         style={{
           WebkitOverflowScrolling: 'touch',
-          scrollBehavior: drag?.active ? 'auto' : undefined,
+          scrollBehavior: drag?.active || panActive ? 'auto' : undefined,
+          // On desktop, if there is no overflow, disable horizontal panning entirely.
+          // (Scrolling will be inert anyway.)
         }}
       >
         <div className="flex gap-3 pb-2 md:gap-5" dir="ltr">
@@ -588,7 +597,7 @@ export default function TaskBoard({
         ))}
       </div>
 
-      {/* Drag overlay (tilted + reduced opacity) */}
+      {/* Drag overlay */}
       {drag?.active && (
         <div
           className="fixed z-50 pointer-events-none"

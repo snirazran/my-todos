@@ -34,6 +34,7 @@ export default function DayColumn({
         ref={listRef}
         className={[
           'flex-1 overflow-y-auto pr-1 rounded-xl transition-colors',
+          'no-scrollbar',
           listExtraClass,
         ].join(' ')}
       >
