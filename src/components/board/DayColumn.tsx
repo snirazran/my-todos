@@ -1,26 +1,18 @@
 'use client';
 
 import React from 'react';
-import {
-  Droppable,
-  DroppableProvided,
-  DroppableStateSnapshot,
-} from '@hello-pangea/dnd';
-
-type DayColumnProps = {
-  title: string;
-  droppableId: string;
-  children: (
-    provided: DroppableProvided,
-    snapshot: DroppableStateSnapshot
-  ) => React.ReactNode;
-};
 
 export default function DayColumn({
   title,
-  droppableId,
+  listRef,
+  listExtraClass = '',
   children,
-}: DayColumnProps) {
+}: {
+  title: string;
+  listRef?: (el: HTMLDivElement | null) => void;
+  listExtraClass?: string;
+  children: React.ReactNode; // <-- plain nodes, not a render-prop
+}) {
   return (
     <section
       dir="rtl"
@@ -38,9 +30,15 @@ export default function DayColumn({
         {title}
       </h2>
 
-      <Droppable droppableId={droppableId} direction="vertical">
-        {(provided, snapshot) => <>{children(provided, snapshot)}</>}
-      </Droppable>
+      <div
+        ref={listRef}
+        className={[
+          'flex-1 overflow-y-auto pr-1 rounded-xl transition-colors',
+          listExtraClass,
+        ].join(' ')}
+      >
+        {children}
+      </div>
     </section>
   );
 }

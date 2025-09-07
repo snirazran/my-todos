@@ -84,9 +84,7 @@ export default function ManageTasksPage() {
 
   return (
     <main className="min-h-screen p-3 md:p-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      {/* Wider than before, closer to Trello (almost full width on large screens) */}
       <div className="w-full px-2 mx-auto md:px-6">
-        {/* Header */}
         <div className="flex flex-col gap-4 mb-6 md:mb-10 md:flex-row md:items-center md:justify-between">
           <div className="text-right">
             <h1 className="text-3xl font-bold md:text-4xl text-slate-900 dark:text-white">
