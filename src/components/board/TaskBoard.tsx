@@ -234,6 +234,29 @@ export default function TaskBoard({
                 title={titles[day]}
                 listRef={setListRef(day)}
                 maxHeightClass="max-h-[calc(100svh-210px)] md:max-h-[calc(100vh-170px)]"
+                footer={
+                  // show the button only when the bottom-composer for this day is NOT open
+                  !(
+                    composer &&
+                    composer.day === day &&
+                    composer.afterIndex === null
+                  ) && (
+                    <button
+                      onClick={() => openBottomComposer(day)}
+                      disabled={!!drag?.active}
+                      className={[
+                        'w-full px-3 py-2 text-right rounded-xl',
+                        'bg-violet-50/70 dark:bg-violet-950/20',
+                        'text-violet-700 dark:text-violet-300',
+                        !!drag?.active
+                          ? 'opacity-60 pointer-events-none'
+                          : 'hover:bg-violet-100 dark:hover:bg-violet-900/30',
+                      ].join(' ')}
+                    >
+                      + הוסף משימה
+                    </button>
+                  )
+                }
               >
                 <TaskList
                   day={day}

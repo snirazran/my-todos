@@ -63,6 +63,7 @@ export default function TaskList({
         key={`rail-top-${day}`}
         overlayHidden={topOpen}
         onAdd={() => openBetweenComposer(day, -1)}
+        disabled={!!drag?.active}
       />
     );
     if (topOpen) {
@@ -142,6 +143,7 @@ export default function TaskList({
           key={`rail-${day}-${i}`}
           overlayHidden={gapOpen}
           onAdd={() => openBetweenComposer(day, i)}
+          disabled={!!drag?.active}
         />
       );
 
@@ -187,17 +189,6 @@ export default function TaskList({
         />
       </div>
     );
-  } else {
-    rows.push(
-      <button
-        key={`add-bottom-${day}`}
-        onClick={() => openBottomComposer(day)}
-        className="w-full px-3 py-2 mt-2 text-right rounded-xl bg-violet-50/70 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-900/30 text-violet-700 dark:text-violet-300"
-      >
-        + הוסף משימה
-      </button>
-    );
   }
-
   return <>{rows}</>;
 }
