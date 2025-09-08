@@ -13,7 +13,7 @@ export default function TaskCard({
   innerRef,
   hiddenWhileDragging,
 }: {
-  dragId: string; // kept for key symmetry
+  dragId: string;
   index: number;
   task: Task;
   onDelete: () => void;
@@ -29,26 +29,39 @@ export default function TaskCard({
     <div
       ref={innerRef}
       data-card-id={dragId}
+      // ⬇️ stop native browser drag ghosting
+      draggable={false}
+      onDragStart={(e) => e.preventDefault()}
       className={[
-        // ⬇️ removed `mb-2`
         'flex items-center gap-3 p-3 select-none rounded-xl transition-[box-shadow,background-color]',
         'bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600',
         'border border-slate-200 dark:border-slate-600 shadow-sm',
+        'cursor-grab active:cursor-grabbing', // nicer feedback
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
       onPointerDown={(e) => {
-        if ((e as any).button && (e as any).button !== 0) return;
+        // ignore right/middle click
+        // @ts-ignore
+        if (e.button && e.button !== 0) return;
+        // don't start drag from interactive elements
+        const target = e.target as HTMLElement;
+        if (target.closest('button, a, input, textarea, [role="button"]'))
+          return;
+
         onGrab({
           clientX: e.clientX,
           clientY: e.clientY,
           pointerType: (e.pointerType as any) === 'touch' ? 'touch' : 'mouse',
         });
       }}
+      role="listitem"
+      aria-grabbed={false}
     >
       <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
         {task.text}
       </span>
-      <button onClick={onDelete} title="מחק" className="shrink-0">
+
+      <button onClick={onDelete} title="מחק" className="shrink-0" type="button">
         <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
       </button>
     </div>

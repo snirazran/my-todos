@@ -140,10 +140,23 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome/Safari/WebKit */
 }
+
 html.dragging,
-html.dragging * {
-  -webkit-user-select: none !important;
-  user-select: none !important;
-  -webkit-touch-callout: none !important;
-  touch-action: none !important;
+body.dragging {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  overscroll-behavior: none; /* prevent page from pulling in any direction */
+}
+[data-role='board-scroller'][data-drag='1'] {
+  cursor: grabbing;
+}
+[data-role='board-scroller'][data-drag='1'] * {
+  cursor: grabbing !important;
+}
+
+/* Generally reduce accidental highlights on the board */
+[data-role='board-scroller'],
+[data-role='board-scroller'] * {
+  -webkit-tap-highlight-color: transparent;
 }

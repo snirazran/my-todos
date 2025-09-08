@@ -215,6 +215,7 @@ export default function TaskBoard({
         className={[
           'no-scrollbar',
           'w-full overflow-x-auto overflow-y-visible overscroll-x-contain px-2 md:px-4',
+          'touch-pan-x',
           snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth',
         ].join(' ')}
         style={{

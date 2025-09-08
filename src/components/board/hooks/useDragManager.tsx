@@ -67,7 +67,7 @@ export function useDragManager() {
     ) => {
       document.body.style.userSelect = 'none';
       document.body.style.touchAction = 'none';
-
+      document.documentElement.classList.add('dragging');
       pointerXRef.current = clientX;
       pointerYRef.current = clientY;
       pxPrevRef.current = clientX;
@@ -171,6 +171,7 @@ export function useDragManager() {
   const endDrag = useCallback(() => {
     document.body.style.userSelect = '';
     document.body.style.touchAction = '';
+    document.documentElement.classList.remove('dragging');
     setDrag(null);
     setTargetDay(null);
     setTargetIndex(null);
@@ -179,6 +180,7 @@ export function useDragManager() {
   const cancelDrag = useCallback(() => {
     document.body.style.userSelect = '';
     document.body.style.touchAction = '';
+    document.documentElement.classList.remove('dragging');
     setDrag(null);
     setTargetDay(null);
     setTargetIndex(null);

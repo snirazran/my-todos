@@ -20,10 +20,9 @@ export default function GapRail({
     <div
       // make the WHOLE dashed rail clickable
       onClick={handleClick}
-      className={[
-        'relative h-2 select-none md:h-2 group/rail',
-        disabled ? 'pointer-events-none opacity-60' : 'cursor-pointer',
-      ].join(' ')}
+      className={`relative h-2 select-none md:h-2 group/rail ${
+        disabled ? 'pointer-events-none opacity-60' : 'hover:cursor-pointer'
+      }`}
       role="button"
       aria-disabled={disabled}
       tabIndex={-1}

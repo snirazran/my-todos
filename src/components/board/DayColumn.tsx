@@ -39,6 +39,7 @@ export default function DayColumn({
         className={[
           'flex-1 overflow-y-auto pr-1 rounded-xl transition-colors',
           'no-scrollbar',
+          'touch-pan-y overscroll-y-contain',
         ].join(' ')}
       >
         {children}
