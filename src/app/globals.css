@@ -140,3 +140,10 @@
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* Chrome/Safari/WebKit */
 }
+html.dragging,
+html.dragging * {
+  -webkit-user-select: none !important;
+  user-select: none !important;
+  -webkit-touch-callout: none !important;
+  touch-action: none !important;
+}

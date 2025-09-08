@@ -11,9 +11,13 @@ export default function ManageTasksPage() {
   const [week, setWeek] = useState<Task[][]>(
     Array.from({ length: DAYS }, () => [])
   );
+
   const [showModal, setShowModal] = useState(false);
   const [prefillText, setPrefillText] = useState<string>('');
   const [prefillDays, setPrefillDays] = useState<number[]>([]);
+
+  // NEW: where to insert (index in the column). null = append at end.
+  const [insertAt, setInsertAt] = useState<number | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -57,6 +61,7 @@ export default function ManageTasksPage() {
     }
   };
 
+  // Called by the modal when user clicks "save"
   const onAddTask = async ({
     text,
     days,
@@ -69,11 +74,22 @@ export default function ManageTasksPage() {
     await fetch('/api/manage-tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, days, repeat }),
+      body: JSON.stringify({
+        text,
+        days,
+        repeat, // 'weekly' | 'this-week'
+        insertAt, // << send the gap index (or null to append)
+      }),
     });
+
     const data = await fetch('/api/manage-tasks').then((r) => r.json());
     setWeek(data);
     setShowModal(false);
+
+    // clear for the next time
+    setInsertAt(null);
+    setPrefillText('');
+    setPrefillDays([]);
   };
 
   const titles = useMemo(
@@ -85,7 +101,6 @@ export default function ManageTasksPage() {
   return (
     <main className="min-h-screen px-3 pt-8 pb-6 md:px-6 md:pt-12 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="w-full px-2 mx-auto md:px-6">
-        {/* Header (no buttons) */}
         <div className="mb-4 text-right md:mb-8">
           <h1 className="text-3xl font-bold md:text-4xl text-slate-900 dark:text-white">
             ניהול משימות שבועי
@@ -101,9 +116,15 @@ export default function ManageTasksPage() {
           setWeek={setWeek}
           saveDay={saveDay}
           removeTask={removeTask}
-          onRequestAdd={(day, text) => {
+          onRequestAdd={(day, text, afterIndex = null) => {
             setPrefillText(text ?? '');
             setPrefillDays([day === 7 ? -1 : day]);
+
+            if (afterIndex === null) {
+              setInsertAt(null);
+            } else {
+              setInsertAt(Math.max(0, afterIndex + 1));
+            }
             setShowModal(true);
           }}
         />
@@ -114,7 +135,10 @@ export default function ManageTasksPage() {
           initialText={prefillText}
           initialDays={prefillDays}
           defaultRepeat="weekly"
-          onClose={() => setShowModal(false)}
+          onClose={() => {
+            setShowModal(false);
+            setInsertAt(null);
+          }}
           onSave={onAddTask}
         />
       )}

@@ -112,11 +112,18 @@ export async function POST(req: NextRequest) {
     const repeat: 'weekly' | 'this-week' =
       body?.repeat === 'this-week' ? 'this-week' : 'weekly';
 
+    // optional index where to insert (0..N). If null/undefined -> append.
+    const insertAtRaw = body?.insertAt;
+    const insertAt: number | null =
+      Number.isInteger(insertAtRaw) && insertAtRaw >= 0
+        ? Number(insertAtRaw)
+        : null;
+
     if (!text) {
       return NextResponse.json({ error: 'text is required' }, { status: 400 });
     }
 
-    // UI days 0..6; 7 === “no day” in UI → store as -1
+    // UI 0..6, 7 = “no day” → -1
     const days = uiDays
       .map((d) => Number(d))
       .filter((d) => Number.isInteger(d) && d >= 0 && d <= 7)
@@ -126,17 +133,23 @@ export async function POST(req: NextRequest) {
     const dailyCol = await getDailyCol();
     const backlogCol = await getWeeklyBacklogCol();
 
+    /* ---------------- weekly template ---------------- */
     if (repeat === 'weekly') {
-      // Weekly template (including -1 = unscheduled template)
       await Promise.all(
         days.map(async (dayOfWeek) => {
           const doc = await weeklyCol.findOne({ userId: uid, dayOfWeek });
-          const nextOrder =
-            (doc?.tasks?.reduce((m, t) => Math.max(m, t.order), 0) ?? 0) + 1;
+          const arr = (doc?.tasks ?? []).slice();
+
+          const at =
+            insertAt == null ? arr.length : Math.min(arr.length, insertAt);
+          const newTask = { id: uuid(), text, order: 0 };
+
+          arr.splice(at, 0, newTask);
+          const renumbered = arr.map((t, i) => ({ ...t, order: i + 1 }));
 
           await weeklyCol.updateOne(
             { userId: uid, dayOfWeek },
-            { $push: { tasks: { id: uuid(), text, order: nextOrder } } },
+            { $set: { tasks: renumbered } },
             { upsert: true }
           );
         })
@@ -144,8 +157,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // repeat === 'this-week'
-    const start = sundayOf(); // local Sunday
+    /* ---------------- this week (dated docs / backlog) ---------------- */
+    const start = sundayOf();
     const weekStart = ymdLocal(start);
     const weekDates = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(start);
@@ -155,40 +168,47 @@ export async function POST(req: NextRequest) {
 
     for (const d of days) {
       if (d === -1) {
-        // “no day” but only for this week → weeklyBacklog
+        // backlog for this specific week
         const doc = await backlogCol.findOne({ userId: uid, weekStart });
-        const nextOrder =
-          (doc?.tasks?.reduce((m, t) => Math.max(m, t.order), 0) ?? 0) + 1;
+        const arr = (doc?.tasks ?? []).slice() as {
+          id: string;
+          text: string;
+          order: number;
+          completed: boolean;
+        }[];
+
+        const at =
+          insertAt == null ? arr.length : Math.min(arr.length, insertAt);
+        arr.splice(at, 0, { id: uuid(), text, order: 0, completed: false });
+
+        const renumbered = arr.map((t, i) => ({ ...t, order: i + 1 }));
 
         await backlogCol.updateOne(
           { userId: uid, weekStart },
-          {
-            // IMPORTANT: do NOT touch 'tasks' in $setOnInsert to avoid conflicts
-            $setOnInsert: { userId: uid, weekStart },
-            $push: {
-              tasks: { id: uuid(), text, order: nextOrder, completed: false },
-            },
-          },
+          { $set: { userId: uid, weekStart, tasks: renumbered } },
           { upsert: true }
         );
       } else {
-        const date = weekDates[d]; // concrete local date
+        const date = weekDates[d];
+
         await dailyCol.updateOne(
           { userId: uid, date },
           { $setOnInsert: { userId: uid, date, tasks: [] } },
           { upsert: true }
         );
+
         const doc = await dailyCol.findOne({ userId: uid, date });
-        const nextOrder =
-          (doc?.tasks?.reduce((m, t) => Math.max(m, t.order), 0) ?? 0) + 1;
+        const arr = (doc?.tasks ?? []).slice();
+
+        const at =
+          insertAt == null ? arr.length : Math.min(arr.length, insertAt);
+        arr.splice(at, 0, { id: uuid(), text, order: 0, completed: false });
+
+        const renumbered = arr.map((t, i) => ({ ...t, order: i + 1 }));
 
         await dailyCol.updateOne(
           { userId: uid, date },
-          {
-            $push: {
-              tasks: { id: uuid(), text, order: nextOrder, completed: false },
-            },
-          }
+          { $set: { tasks: renumbered } }
         );
       }
     }
