@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DAYS, draggableIdFor } from '../helpers'; // ⬅️ need draggableIdFor
+import { DAYS } from '../helpers'; // adjust path if different
 
 export type DragState = {
   active: boolean;
@@ -26,12 +26,6 @@ export function useDragManager() {
   const [drag, setDrag] = useState<DragState | null>(null);
   const [targetDay, setTargetDay] = useState<number | null>(null);
   const [targetIndex, setTargetIndex] = useState<number | null>(null);
-
-  // keep a ref in sync to use for hysteresis
-  const targetIndexRef = useRef<number | null>(null);
-  useEffect(() => {
-    targetIndexRef.current = targetIndex;
-  }, [targetIndex]);
 
   // pointer tracking
   const pointerXRef = useRef(0);
@@ -132,7 +126,7 @@ export function useDragManager() {
       pressStartXY.current = { x: clientX, y: clientY };
       if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
       longPressTimer.current = window.setTimeout(() => {
-        const rect = rectGetter(); // fresh at the exact start moment
+        const rect = rectGetter(); // ⬅️ recompute at the exact start moment
         beginDragFromCard(
           day,
           index,
@@ -147,7 +141,7 @@ export function useDragManager() {
     [beginDragFromCard]
   );
 
-  // cancel long-press if finger moves
+  // cancel long-press if the finger moves too much before timeout
   useEffect(() => {
     const cancelLP = () => {
       if (longPressTimer.current) {
@@ -196,14 +190,12 @@ export function useDragManager() {
     setTargetIndex(null);
   }, []);
 
-  // Update drag position, compute target day/index (with hysteresis + exclude dragged card)
+  // Update drag position, compute target day/index
   useEffect(() => {
     if (!drag) return;
 
-    const MID_HYST = 8; // px: require a little extra crossing before flipping index
-
     const handleMove = (ev: PointerEvent | MouseEvent | TouchEvent) => {
-      // stop native scroll/selection while dragging (mobile)
+      // ⬅️ prevent native scroll/selection while dragging (mobile)
       if ((ev as any).cancelable) ev.preventDefault();
 
       // @ts-ignore
@@ -220,7 +212,7 @@ export function useDragManager() {
 
       setDrag((d) => (d ? { ...d, x, y } : d));
 
-      // find column by x
+      // find column
       let newDay: number | null = null;
       for (let day = 0; day < DAYS; day++) {
         const col = slideRefs.current[day];
@@ -247,69 +239,30 @@ export function useDragManager() {
         newDay = best;
       }
 
-      // compute index using only *other* cards (exclude the one being dragged in its source column)
+      // index using only cards
       let newIndex = 0;
       if (newDay != null) {
         const list = listRefs.current[newDay];
         if (list) {
-          let cardEls = Array.from(
+          const cardEls = Array.from(
             list.querySelectorAll<HTMLElement>('[data-card-id]')
           );
-
-          if (newDay === drag.fromDay) {
-            const draggedId = draggableIdFor(drag.fromDay, drag.taskId);
-            cardEls = cardEls.filter(
-              (el) => el.getAttribute('data-card-id') !== draggedId
-            );
-          }
-
-          if (cardEls.length === 0) {
-            newIndex = 0;
-          } else {
-            // default to end
-            let cand = cardEls.length;
-
+          if (cardEls.length === 0) newIndex = 0;
+          else {
+            let placed = false;
             for (let i = 0; i < cardEls.length; i++) {
               const cr = cardEls[i].getBoundingClientRect();
               const mid = cr.top + cr.height / 2;
-              // ⬅️ hysteresis: only insert before this card if we're clearly above its mid
-              if (y < mid - MID_HYST) {
-                cand = i;
+              if (y < mid) {
+                newIndex = i;
+                placed = true;
                 break;
               }
             }
-
-            // small stickiness near previous index to reduce flicker on slow moves
-            const prev = targetIndexRef.current;
-            if (prev != null && Math.abs(cand - prev) === 1) {
-              // compute the boundary mid between the two candidates and add a little dead-zone
-              const aIdx = Math.min(cand, prev);
-              const bIdx = Math.max(cand, prev);
-              const aRect =
-                aIdx < cardEls.length
-                  ? cardEls[aIdx].getBoundingClientRect()
-                  : null;
-              const bRect =
-                bIdx - 1 >= 0
-                  ? cardEls[bIdx - 1].getBoundingClientRect()
-                  : null;
-              const boundaryMid =
-                aRect && bRect
-                  ? (aRect.top +
-                      aRect.height / 2 +
-                      (bRect.top + bRect.height / 2)) /
-                    2
-                  : null;
-              if (boundaryMid && Math.abs(y - boundaryMid) < MID_HYST) {
-                cand = prev; // stick with previous until we clearly cross
-              }
-            }
-
-            newIndex = cand;
+            if (!placed) newIndex = cardEls.length;
           }
         }
       }
-
       setTargetDay(newDay);
       setTargetIndex(newIndex);
     };
@@ -318,7 +271,7 @@ export function useDragManager() {
       if (e.key === 'Escape') cancelDrag();
     };
 
-    // non-passive so preventDefault works on iOS/Android
+    // ⬅️ IMPORTANT: non-passive so preventDefault works on iOS/Android
     window.addEventListener('pointermove', handleMove as any, {
       passive: false,
     });
@@ -331,7 +284,7 @@ export function useDragManager() {
     };
   }, [drag, cancelDrag]);
 
-  // Edge auto-scroll (unchanged)
+  // Edge auto-scroll
   useEffect(() => {
     if (!drag) return;
     const s = scrollerRef.current;
