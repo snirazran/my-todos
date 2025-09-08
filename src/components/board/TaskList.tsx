@@ -45,7 +45,7 @@ export default function TaskList({
     clientX: number;
     clientY: number;
     pointerType: 'mouse' | 'touch';
-    rectGetter: () => DOMRect; // ⬅️ CHANGED: provide fresh rect
+    rectGetter: () => DOMRect; // ⬅️ changed: pass a getter
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
 }) {
@@ -114,7 +114,7 @@ export default function TaskList({
             clientX: payload.clientX,
             clientY: payload.clientY,
             pointerType: payload.pointerType,
-            // ⬅️ always compute a fresh rect at grab-time (mouse) or LP-fire-time (touch)
+            // fresh rect at grab-time (mouse) or when LP actually fires (touch)
             rectGetter: () => {
               const el =
                 document.querySelector<HTMLElement>(`[data-card-id="${id}"]`) ??
@@ -172,7 +172,7 @@ export default function TaskList({
     );
   }
 
-  // Empty column bottom placeholder
+  // Empty column: single placeholder at end
   if (items.length === 0 && placeholderAt === 0) {
     rows.push(
       <div
@@ -182,7 +182,7 @@ export default function TaskList({
     );
   }
 
-  // Bottom composer only (button now lives in DayColumn footer)
+  // Bottom composer only (footer button lives in DayColumn)
   if (composer && composer.day === day && composer.afterIndex === null) {
     rows.push(
       <div key={`composer-bottom-wrap-${day}`} className="mt-2">
