@@ -44,8 +44,8 @@ export default function TaskList({
     taskText: string;
     clientX: number;
     clientY: number;
-    rect: DOMRect;
     pointerType: 'mouse' | 'touch';
+    rectGetter: () => DOMRect; // ⬅️ CHANGED: provide fresh rect
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
 }) {
@@ -105,12 +105,7 @@ export default function TaskList({
         task={t}
         onDelete={() => removeTask(day, t.id)}
         onGrab={(payload) => {
-          const el = document.querySelector<HTMLElement>(
-            `[data-card-id="${draggableIdFor(day, t.id)}"]`
-          );
-          const rect =
-            el?.getBoundingClientRect() ??
-            new DOMRect(payload.clientX - 1, payload.clientY - 1, 1, 1);
+          const id = draggableIdFor(day, t.id);
           onGrab({
             day,
             index: i,
@@ -118,8 +113,17 @@ export default function TaskList({
             taskText: t.text,
             clientX: payload.clientX,
             clientY: payload.clientY,
-            rect,
             pointerType: payload.pointerType,
+            // ⬅️ always compute a fresh rect at grab-time (mouse) or LP-fire-time (touch)
+            rectGetter: () => {
+              const el =
+                document.querySelector<HTMLElement>(`[data-card-id="${id}"]`) ??
+                null;
+              return (
+                el?.getBoundingClientRect() ??
+                new DOMRect(payload.clientX - 1, payload.clientY - 1, 1, 1)
+              );
+            },
           });
         }}
         hiddenWhileDragging={!!isDragged}
@@ -168,6 +172,7 @@ export default function TaskList({
     );
   }
 
+  // Empty column bottom placeholder
   if (items.length === 0 && placeholderAt === 0) {
     rows.push(
       <div
@@ -177,6 +182,7 @@ export default function TaskList({
     );
   }
 
+  // Bottom composer only (button now lives in DayColumn footer)
   if (composer && composer.day === day && composer.afterIndex === null) {
     rows.push(
       <div key={`composer-bottom-wrap-${day}`} className="mt-2">
@@ -190,5 +196,6 @@ export default function TaskList({
       </div>
     );
   }
+
   return <>{rows}</>;
 }

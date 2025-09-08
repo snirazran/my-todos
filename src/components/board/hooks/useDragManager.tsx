@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { DAYS } from '../helpers'; // adjust path if different
 
 export type DragState = {
@@ -68,6 +68,7 @@ export function useDragManager() {
       document.body.style.userSelect = 'none';
       document.body.style.touchAction = 'none';
       document.documentElement.classList.add('dragging');
+
       pointerXRef.current = clientX;
       pointerYRef.current = clientY;
       pxPrevRef.current = clientX;
@@ -101,8 +102,8 @@ export function useDragManager() {
       taskText: string;
       clientX: number;
       clientY: number;
-      rect: DOMRect;
       pointerType: 'mouse' | 'touch';
+      rectGetter: () => DOMRect; // ⬅️ fresh rect provider
     }) => {
       const {
         day,
@@ -111,11 +112,12 @@ export function useDragManager() {
         taskText,
         clientX,
         clientY,
-        rect,
         pointerType,
+        rectGetter,
       } = params;
 
       if (pointerType === 'mouse') {
+        const rect = rectGetter();
         beginDragFromCard(day, index, taskId, taskText, clientX, clientY, rect);
         return;
       }
@@ -124,6 +126,7 @@ export function useDragManager() {
       pressStartXY.current = { x: clientX, y: clientY };
       if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
       longPressTimer.current = window.setTimeout(() => {
+        const rect = rectGetter(); // ⬅️ recompute at the exact start moment
         beginDragFromCard(
           day,
           index,
@@ -138,6 +141,7 @@ export function useDragManager() {
     [beginDragFromCard]
   );
 
+  // cancel long-press if the finger moves too much before timeout
   useEffect(() => {
     const cancelLP = () => {
       if (longPressTimer.current) {
@@ -191,6 +195,9 @@ export function useDragManager() {
     if (!drag) return;
 
     const handleMove = (ev: PointerEvent | MouseEvent | TouchEvent) => {
+      // ⬅️ prevent native scroll/selection while dragging (mobile)
+      if ((ev as any).cancelable) ev.preventDefault();
+
       // @ts-ignore
       const pt = 'touches' in ev ? ev.touches?.[0] : ev;
       const x = (pt?.clientX ?? 0) as number;
@@ -264,10 +271,11 @@ export function useDragManager() {
       if (e.key === 'Escape') cancelDrag();
     };
 
+    // ⬅️ IMPORTANT: non-passive so preventDefault works on iOS/Android
     window.addEventListener('pointermove', handleMove as any, {
-      passive: true,
+      passive: false,
     });
-    window.addEventListener('touchmove', handleMove as any, { passive: true });
+    window.addEventListener('touchmove', handleMove as any, { passive: false });
     window.addEventListener('keydown', handleKey);
     return () => {
       window.removeEventListener('pointermove', handleMove as any);
