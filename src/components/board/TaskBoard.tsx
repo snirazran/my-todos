@@ -11,6 +11,129 @@ import { Task, DAYS, draggableIdFor, todayIndex } from './helpers';
 import DayColumn from './DayColumn';
 import TaskCard from './TaskCard';
 
+/* ---------------- Inline Composer ---------------- */
+function InlineComposer({
+  value,
+  onChange,
+  onConfirm,
+  onCancel,
+  autoFocus,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+  autoFocus?: boolean;
+}) {
+  const taRef = React.useRef<HTMLTextAreaElement | null>(null);
+  const grow = () => {
+    const el = taRef.current;
+    if (!el) return;
+    el.style.height = '0px';
+    el.style.height = el.scrollHeight + 'px';
+  };
+  React.useEffect(grow, [value]);
+
+  return (
+    <div className="px-3 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl">
+      <textarea
+        ref={taRef}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="שם משימה…"
+        rows={1}
+        className="w-full resize-none overflow-hidden leading-6 min-h-[40px] px-3 py-2 bg-white border rounded-md dark:bg-slate-800 border-slate-200 dark:border-slate-600"
+        onInput={grow}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onConfirm();
+          if (e.key === 'Escape') onCancel();
+        }}
+        autoFocus={autoFocus}
+      />
+      <div className="flex gap-2 mt-2">
+        <button
+          onClick={onConfirm}
+          className="px-4 py-2 text-white rounded-md bg-violet-600 hover:bg-violet-700 disabled:opacity-60"
+          disabled={!value.trim()}
+        >
+          הוסף
+        </button>
+        <button
+          onClick={onCancel}
+          className="px-4 py-2 rounded-md bg-slate-200 dark:bg-slate-600"
+          title="ביטול"
+        >
+          ביטול
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function GapRail({
+  onAdd,
+  overlayHidden = false,
+}: {
+  onAdd: () => void;
+  overlayHidden?: boolean;
+}) {
+  return (
+    // This element provides the actual gap height
+    <div className="relative h-2 select-none md:h-2">
+      {/* Hover overlay (desktop only) */}
+      {!overlayHidden && (
+        <div className="absolute inset-0 z-10 items-center justify-center hidden transition-opacity opacity-0 pointer-events-none md:flex hover:opacity-100">
+          <div className="flex-1">
+            <div className="w-full h-px text-violet-400">
+              <div
+                className="w-full h-[2px]"
+                style={{
+                  // tune these two:
+                  ['--dash' as any]: '6px', // dash length  ⟵ make this bigger for wider dashes
+                  ['--gap' as any]: '6px', // gap length
+                  backgroundImage:
+                    'repeating-linear-gradient(to right, currentColor 0 var(--dash), transparent var(--dash) calc(var(--dash) + var(--gap)))',
+                }}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            title="הוסף משימה כאן"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd();
+            }}
+            className="pointer-events-auto mx-1 h-6 w-6 rounded bg-white dark:bg-slate-800
+                       text-violet-700 dark:text-violet-300 ring-1 ring-violet-200/70
+                       dark:ring-violet-900/40 shadow-sm grid place-items-center
+                       hover:scale-[1.04] transition-transform"
+          >
+            +
+          </button>
+
+          <div className="flex-1">
+            <div className="w-full h-px text-violet-400">
+              <div
+                className="w-full h-[2px]"
+                style={{
+                  // tune these two:
+                  ['--dash' as any]: '6px', // dash length  ⟵ make this bigger for wider dashes
+                  ['--gap' as any]: '6px', // gap length
+                  backgroundImage:
+                    'repeating-linear-gradient(to right, currentColor 0 var(--dash), transparent var(--dash) calc(var(--dash) + var(--gap)))',
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- Drag state ---------------- */
 type DragState = {
   active: boolean;
   fromDay: number;
@@ -31,36 +154,47 @@ export default function TaskBoard({
   setWeek,
   saveDay,
   removeTask,
+  onRequestAdd,
 }: {
   titles: string[];
   week: Task[][];
   setWeek: React.Dispatch<React.SetStateAction<Task[][]>>;
   saveDay: (day: number, tasks: Task[]) => Promise<void>;
   removeTask: (day: number, id: string) => Promise<void>;
+  onRequestAdd: (day: number, text?: string) => void;
 }) {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
   const listRefs = useRef<Array<HTMLDivElement | null>>([]);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
-  const [panActive, setPanActive] = useState(false);
+
   const [pageIndex, setPageIndex] = useState(todayIndex());
 
-  // card-drag state
   const [drag, setDrag] = useState<DragState | null>(null);
   const [targetDay, setTargetDay] = useState<number | null>(null);
   const [targetIndex, setTargetIndex] = useState<number | null>(null);
 
-  // smooth-scroll snapping suppression
   const [snapSuppressed, setSnapSuppressed] = useState(false);
-
-  // desktop pan state
-  const [canPan, setCanPan] = useState(false);
+  const [panActive, setPanActive] = useState(false);
   const canPanRef = useRef(false);
   const panActiveRef = useRef(false);
   const panStartXRef = useRef(0);
   const panStartScrollLeftRef = useRef(0);
 
-  // pointer refs for edge auto-scroll
+  // long-press on touch
+  const longPressTimer = useRef<number | null>(null);
+  const pressStartXY = useRef<{ x: number; y: number } | null>(null);
+  const LONG_MS = 230;
+  const MOVE_TOL = 8;
+
+  // inline composer
+  const [composer, setComposer] = useState<{
+    day: number;
+    afterIndex: number | null;
+  } | null>(null);
+  const [draft, setDraft] = useState('');
+
+  // for edge autoscroll
   const pointerXRef = useRef(0);
   const pointerYRef = useRef(0);
   const pxPrevRef = useRef(0);
@@ -73,33 +207,27 @@ export default function TaskBoard({
     []
   );
 
-  const setSlideRef = useCallback(
-    (day: number) => (el: HTMLDivElement | null) => {
+  const setSlideRef =
+    (day: number) =>
+    (el: HTMLDivElement | null): void => {
       slideRefs.current[day] = el;
-    },
-    []
-  );
-  const setListRef = useCallback(
-    (day: number) => (el: HTMLDivElement | null) => {
+    };
+  const setListRef =
+    (day: number) =>
+    (el: HTMLDivElement | null): void => {
       listRefs.current[day] = el;
-    },
-    []
-  );
+    };
   const setCardRef = useCallback((id: string, el: HTMLDivElement | null) => {
     if (!el) cardRefs.current.delete(id);
     else cardRefs.current.set(id, el);
   }, []);
 
-  // recompute overflow => canPan
   const recomputeCanPan = useCallback(() => {
     const s = scrollerRef.current;
     if (!s) return;
-    const overflow = s.scrollWidth - s.clientWidth > 2;
-    setCanPan(overflow);
-    canPanRef.current = overflow;
+    canPanRef.current = s.scrollWidth - s.clientWidth > 2;
   }, []);
 
-  // snap to today
   useEffect(() => {
     const s = scrollerRef.current;
     const t = todayIndex();
@@ -107,26 +235,25 @@ export default function TaskBoard({
     if (!s || !el) return;
     s.scrollTo({
       left: el.offsetLeft - (s.clientWidth - el.clientWidth) / 2,
+      // @ts-ignore
       behavior: 'instant',
     });
     setPageIndex(t);
     recomputeCanPan();
   }, [recomputeCanPan]);
 
-  // observe size changes / window resize
   useEffect(() => {
-    const onResize = () => recomputeCanPan();
-    window.addEventListener('resize', onResize);
     const ro = new ResizeObserver(() => recomputeCanPan());
     if (scrollerRef.current) ro.observe(scrollerRef.current);
+    const onResize = () => recomputeCanPan();
+    window.addEventListener('resize', onResize);
     requestAnimationFrame(recomputeCanPan);
     return () => {
-      window.removeEventListener('resize', onResize);
       ro.disconnect();
+      window.removeEventListener('resize', onResize);
     };
   }, [week, titles, recomputeCanPan]);
 
-  // pagination index
   useEffect(() => {
     const s = scrollerRef.current;
     if (!s) return;
@@ -143,19 +270,17 @@ export default function TaskBoard({
     return () => s.removeEventListener('scroll', handler);
   }, []);
 
-  // ----- CARD DRAG -----
-  const onGrab = useCallback(
-    (params: {
-      day: number;
-      index: number;
-      taskId: string;
-      taskText: string;
-      clientX: number;
-      clientY: number;
-      rect: DOMRect;
-    }) => {
-      const { day, index, taskId, taskText, clientX, clientY, rect } = params;
-
+  /* ---------------- drag helpers ---------------- */
+  const beginDragFromCard = useCallback(
+    (
+      day: number,
+      index: number,
+      taskId: string,
+      taskText: string,
+      clientX: number,
+      clientY: number,
+      rect: DOMRect
+    ) => {
       document.body.style.userSelect = 'none';
       document.body.style.touchAction = 'none';
 
@@ -180,9 +305,86 @@ export default function TaskBoard({
       });
       setTargetDay(day);
       setTargetIndex(index);
+      setComposer(null);
+      setDraft('');
     },
     []
   );
+
+  const onGrab = useCallback(
+    (params: {
+      day: number;
+      index: number;
+      taskId: string;
+      taskText: string;
+      clientX: number;
+      clientY: number;
+      rect: DOMRect;
+      pointerType: 'mouse' | 'touch';
+    }) => {
+      const {
+        day,
+        index,
+        taskId,
+        taskText,
+        clientX,
+        clientY,
+        rect,
+        pointerType,
+      } = params;
+
+      if (pointerType === 'mouse') {
+        beginDragFromCard(day, index, taskId, taskText, clientX, clientY, rect);
+        return;
+      }
+
+      // long-press on touch
+      pressStartXY.current = { x: clientX, y: clientY };
+      if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
+      longPressTimer.current = window.setTimeout(() => {
+        beginDragFromCard(
+          day,
+          index,
+          taskId,
+          taskText,
+          pointerXRef.current,
+          pointerYRef.current,
+          rect
+        );
+      }, LONG_MS);
+    },
+    [beginDragFromCard]
+  );
+
+  useEffect(() => {
+    const cancelLP = () => {
+      if (longPressTimer.current) {
+        clearTimeout(longPressTimer.current);
+        longPressTimer.current = null;
+      }
+    };
+    const move = (ev: TouchEvent | PointerEvent | MouseEvent) => {
+      // @ts-ignore
+      const pt = 'touches' in ev ? ev.touches?.[0] : ev;
+      const x = (pt?.clientX ?? 0) as number;
+      const y = (pt?.clientY ?? 0) as number;
+      pointerXRef.current = x;
+      pointerYRef.current = y;
+      const s = pressStartXY.current;
+      if (s && (Math.abs(x - s.x) > MOVE_TOL || Math.abs(y - s.y) > MOVE_TOL))
+        cancelLP();
+    };
+    window.addEventListener('pointermove', move as any, { passive: true });
+    window.addEventListener('touchmove', move as any, { passive: true });
+    window.addEventListener('pointerup', cancelLP, { passive: true });
+    window.addEventListener('touchend', cancelLP as any, { passive: true });
+    return () => {
+      window.removeEventListener('pointermove', move as any);
+      window.removeEventListener('touchmove', move as any);
+      window.removeEventListener('pointerup', cancelLP as any);
+      window.removeEventListener('touchend', cancelLP as any);
+    };
+  }, []);
 
   const centerColumnSmooth = (day: number) => {
     const s = scrollerRef.current;
@@ -196,7 +398,6 @@ export default function TaskBoard({
 
   const endDrag = useCallback(() => {
     if (!drag) return;
-
     document.body.style.userSelect = '';
     document.body.style.touchAction = '';
 
@@ -235,7 +436,6 @@ export default function TaskBoard({
     setTargetIndex(null);
   }, []);
 
-  // track card drag pointer & targets
   useEffect(() => {
     if (!drag) return;
 
@@ -254,7 +454,7 @@ export default function TaskBoard({
 
       setDrag((d) => (d ? { ...d, x, y } : d));
 
-      // which column?
+      // find column
       let newDay: number | null = null;
       for (let day = 0; day < DAYS; day++) {
         const col = slideRefs.current[day];
@@ -266,9 +466,8 @@ export default function TaskBoard({
         }
       }
       if (newDay == null) {
-        // clamp to nearest
-        let minDist = Infinity;
-        let best: number | null = null;
+        let minDist = Infinity,
+          best: number | null = null;
         for (let day = 0; day < DAYS; day++) {
           const col = slideRefs.current[day];
           if (!col) continue;
@@ -282,18 +481,19 @@ export default function TaskBoard({
         newDay = best;
       }
 
-      // index inside column
+      // index using ONLY cards (no separators)
       let newIndex = 0;
       if (newDay != null) {
         const list = listRefs.current[newDay];
         if (list) {
-          const children = Array.from(list.children) as HTMLElement[];
-          if (children.length === 0) {
-            newIndex = 0;
-          } else {
+          const cardEls = Array.from(
+            list.querySelectorAll<HTMLElement>('[data-card-id]')
+          );
+          if (cardEls.length === 0) newIndex = 0;
+          else {
             let placed = false;
-            for (let i = 0; i < children.length; i++) {
-              const cr = children[i].getBoundingClientRect();
+            for (let i = 0; i < cardEls.length; i++) {
+              const cr = cardEls[i].getBoundingClientRect();
               const mid = cr.top + cr.height / 2;
               if (y < mid) {
                 newIndex = i;
@@ -301,7 +501,7 @@ export default function TaskBoard({
                 break;
               }
             }
-            if (!placed) newIndex = children.length;
+            if (!placed) newIndex = cardEls.length;
           }
         }
       }
@@ -328,7 +528,7 @@ export default function TaskBoard({
     };
   }, [drag, endDrag, cancelDrag]);
 
-  // edge auto-scroll loop (board + list + viewport assist)
+  /* ---------------- edge auto-scroll (unchanged) ---------------- */
   useEffect(() => {
     if (!drag) return;
     const s = scrollerRef.current;
@@ -341,7 +541,6 @@ export default function TaskBoard({
       HYST = 10;
     const MIN_V = 2,
       MAX_V = 24;
-
     const clamp = (v: number, a: number, b: number) =>
       Math.max(a, Math.min(b, v));
     const easeCubic = (t: number) => t * t * t;
@@ -380,7 +579,7 @@ export default function TaskBoard({
       const vx = dir * (MIN_V + (MAX_V - MIN_V) * combined);
       if (dir !== 0) s.scrollLeft += vx;
 
-      // vertical (current column)
+      // vertical
       const dayForV = targetDay != null ? targetDay : drag.fromDay;
       const list = listRefs.current[dayForV];
       if (list) {
@@ -431,84 +630,136 @@ export default function TaskBoard({
     return () => cancelAnimationFrame(raf);
   }, [drag, targetDay]);
 
-  // ---------- DESKTOP DRAG-TO-PAN ----------
+  /* ---------------- desktop drag-to-pan ---------------- */
   const startPanIfEligible = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!canPanRef.current) return; // no overflow => no pan
-    if (drag?.active) return; // don't pan while dragging a card
-    if (e.pointerType !== 'mouse') return; // desktop only
-    if (e.button !== 0) return; // left click only
+    if (drag?.active) return;
+    if (e.pointerType !== 'mouse') return;
+    if (!canPanRef.current) return;
+    if (e.button !== 0) return;
 
     const target = e.target as HTMLElement;
-    // Do not start pan if clicking a CARD; allow panning on columns/background.
-    if (target.closest('[data-card-id]')) return;
+    if (
+      target.closest('[data-card-id]') ||
+      target.closest('button, a, input, textarea, [role="button"]')
+    )
+      return;
 
     const s = scrollerRef.current;
     if (!s) return;
-
-    // prevent the browser from starting text selection
     e.preventDefault();
 
     panActiveRef.current = true;
     setPanActive(true);
     panStartXRef.current = e.clientX;
     panStartScrollLeftRef.current = s.scrollLeft;
-
     s.setPointerCapture?.(e.pointerId);
     document.body.style.userSelect = 'none';
+    (s as any).style.scrollSnapType = 'none';
   };
-
   const onPanMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!panActiveRef.current) return;
-    e.preventDefault();
     const s = scrollerRef.current;
     if (!s) return;
+    e.preventDefault();
     s.scrollLeft =
       panStartScrollLeftRef.current - (e.clientX - panStartXRef.current);
   };
-
   const endPan = (e?: React.PointerEvent<HTMLDivElement>) => {
     if (!panActiveRef.current) return;
     panActiveRef.current = false;
     setPanActive(false);
     const s = scrollerRef.current;
     if (s && e) s.releasePointerCapture?.(e.pointerId);
+    (s as any).style.scrollSnapType = '';
     document.body.style.userSelect = '';
   };
-
-  // End pan if pointer released outside element
   useEffect(() => {
     const up = () => endPan();
     window.addEventListener('pointerup', up, { passive: true });
     return () => window.removeEventListener('pointerup', up);
   }, []);
 
-  const renderListWithPlaceholder = useCallback(
+  /* ---------------- composer helpers ---------------- */
+  const openBottomComposer = (day: number) => {
+    setComposer({ day, afterIndex: null });
+    setDraft('');
+  };
+  const openBetweenComposer = (day: number, afterIndex: number) => {
+    setComposer({ day, afterIndex });
+    setDraft('');
+  };
+  const cancelComposer = () => {
+    setComposer(null);
+    setDraft('');
+  };
+  const confirmComposer = (day: number) => {
+    const text = draft.trim();
+    if (!text) return;
+    const txt = text;
+    cancelComposer();
+    onRequestAdd(day, txt);
+  };
+
+  /* ---------------- render list (cards + separators) ---------------- */
+  const renderListWithUI = useCallback(
     (day: number) => {
       const items = week[day];
+
       const placeholderAt =
         drag && targetDay === day && targetIndex != null ? targetIndex : null;
 
-      const children: React.ReactNode[] = [];
-      for (let i = 0; i < items.length; i++) {
-        if (placeholderAt === i) {
-          children.push(
-            <div
-              key={`ph-${day}-${i}`}
-              className="h-12 mb-2 border-2 border-dashed rounded-xl border-violet-400/70"
+      const rows: React.ReactNode[] = [];
+
+      /* ── TOP rail (before first card) ───────────────────────────── */
+      if (items.length > 0) {
+        const topOpen =
+          !!composer && composer.day === day && composer.afterIndex === -1;
+
+        rows.push(
+          <GapRail
+            key={`rail-top-${day}`}
+            overlayHidden={topOpen}
+            onAdd={() => openBetweenComposer(day, -1)} // -1 = before first
+          />
+        );
+
+        // ⬇️ Missing piece: render the inline composer for the top gap
+        if (topOpen) {
+          rows.push(
+            <InlineComposer
+              key={`composer-top-${day}`}
+              value={draft}
+              onChange={setDraft}
+              onConfirm={() => confirmComposer(day)}
+              onCancel={cancelComposer}
+              autoFocus
             />
           );
         }
+      }
+
+      /* ── Placeholder at index 0 (drop before first) ─────────────── */
+      if (placeholderAt === 0) {
+        rows.push(
+          <div
+            key={`ph-top-${day}`}
+            className="h-12 my-2 border-2 border-dashed rounded-xl border-violet-400/70"
+          />
+        );
+      }
+
+      /* ── Cards + middle rails/composers ─────────────────────────── */
+      for (let i = 0; i < items.length; i++) {
         const t = items[i];
         const isDragged =
-          drag &&
-          drag.active &&
-          drag.fromDay === day &&
-          drag.fromIndex === i &&
-          draggableIdFor(day, t.id) === draggableIdFor(drag.fromDay, t.id);
+          drag && drag.active && drag.fromDay === day && drag.fromIndex === i;
 
+        const children: React.ReactNode[] = [];
+
+        // card (no margin—rails own the gap)
         children.push(
           <TaskCard
-            key={t.id}
+            key={`card-${t.id}`}
             innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
             dragId={draggableIdFor(day, t.id)}
             index={i}
@@ -527,23 +778,105 @@ export default function TaskBoard({
                 clientX: payload.clientX,
                 clientY: payload.clientY,
                 rect,
+                pointerType: payload.pointerType,
               });
             }}
             hiddenWhileDragging={!!isDragged}
           />
         );
+
+        // placeholder BEFORE next card
+        if (placeholderAt === i + 1) {
+          children.push(
+            <div
+              key={`ph-${day}-${i + 1}`}
+              className="h-12 my-2 border-2 border-dashed rounded-xl border-violet-400/70"
+            />
+          );
+        }
+
+        // between this and the next card
+        if (i < items.length - 1) {
+          const gapOpen =
+            !!composer && composer.day === day && composer.afterIndex === i;
+
+          children.push(
+            <GapRail
+              key={`rail-${day}-${i}`}
+              overlayHidden={gapOpen}
+              onAdd={() => openBetweenComposer(day, i)}
+            />
+          );
+
+          if (gapOpen) {
+            children.push(
+              <InlineComposer
+                key={`composer-gap-${day}-${i}`}
+                value={draft}
+                onChange={setDraft}
+                onConfirm={() => confirmComposer(day)}
+                onCancel={cancelComposer}
+                autoFocus
+              />
+            );
+          }
+        }
+
+        rows.push(
+          <div key={`wrap-${day}-${t.id}`} className="relative">
+            {children}
+          </div>
+        );
       }
+
+      /* ── Placeholder at end ─────────────────────────────────────── */
       if (placeholderAt != null && placeholderAt >= items.length) {
-        children.push(
+        rows.push(
           <div
             key={`ph-end-${day}`}
-            className="h-12 mb-2 border-2 border-dashed rounded-xl border-violet-400/70"
+            className="h-12 my-2 border-2 border-dashed rounded-xl border-violet-400/70"
           />
         );
       }
-      return children;
+
+      /* ── Bottom composer or “add” button ────────────────────────── */
+      if (composer && composer.day === day && composer.afterIndex === null) {
+        rows.push(
+          <div key={`composer-bottom-wrap-${day}`} className="mt-2">
+            <InlineComposer
+              value={draft}
+              onChange={setDraft}
+              onConfirm={() => confirmComposer(day)}
+              onCancel={cancelComposer}
+              autoFocus
+            />
+          </div>
+        );
+      } else {
+        rows.push(
+          <button
+            key={`add-bottom-${day}`}
+            onClick={() => openBottomComposer(day)}
+            className="w-full px-3 py-2 mt-2 text-right rounded-xl bg-violet-50/70 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-900/30 text-violet-700 dark:text-violet-300"
+          >
+            + הוסף משימה
+          </button>
+        );
+      }
+
+      return rows;
     },
-    [week, drag, targetDay, targetIndex, onGrab, removeTask, setCardRef]
+    [
+      week,
+      drag,
+      targetDay,
+      targetIndex,
+      composer,
+      draft,
+      onGrab,
+      removeTask,
+      setCardRef,
+    ]
   );
 
   return (
@@ -565,8 +898,6 @@ export default function TaskBoard({
         style={{
           WebkitOverflowScrolling: 'touch',
           scrollBehavior: drag?.active || panActive ? 'auto' : undefined,
-          // On desktop, if there is no overflow, disable horizontal panning entirely.
-          // (Scrolling will be inert anyway.)
         }}
       >
         <div className="flex gap-3 pb-2 md:gap-5" dir="ltr">
@@ -575,26 +906,35 @@ export default function TaskBoard({
               key={key}
               ref={setSlideRef(day)}
               data-col="true"
-              className="shrink-0 snap-center w-full sm:w-[460px] md:w-[400px]"
+              className="shrink-0 snap-center w-[88vw] sm:w-[460px] md:w-[400px]"
             >
-              <DayColumn title={titles[day]} listRef={setListRef(day)}>
-                {renderListWithPlaceholder(day)}
+              <DayColumn
+                title={titles[day]}
+                listRef={setListRef(day)}
+                maxHeightClass="max-h-[calc(100svh-210px)] md:max-h-[calc(100vh-170px)]"
+              >
+                {renderListWithUI(day)}
               </DayColumn>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Pagination dots (mobile only) */}
-      <div className="flex justify-center mt-3 mb-6 md:hidden">
-        {slides.map((_, i) => (
-          <div
-            key={i}
-            className={`h-2 w-2 rounded-full mx-1 ${
-              i === pageIndex ? 'bg-violet-600' : 'bg-gray-300'
-            }`}
-          />
-        ))}
+      {/* Mobile pagination dots */}
+      <div
+        className="fixed left-0 right-0 z-30 flex justify-center md:hidden"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 16px)' }}
+      >
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/70 backdrop-blur-sm shadow">
+          {slides.map((_, i) => (
+            <div
+              key={i}
+              className={`h-2 w-2 rounded-full ${
+                i === pageIndex ? 'bg-violet-600' : 'bg-gray-300'
+              }`}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Drag overlay */}
@@ -609,7 +949,7 @@ export default function TaskBoard({
         >
           <div
             className={[
-              'flex items-center gap-3 p-3 mb-2 select-none rounded-xl',
+              'flex items-center gap-3 p-3 select-none rounded-xl',
               'bg-white/90 dark:bg-slate-700/90',
               'border border-slate-200 dark:border-slate-600',
               'shadow-2xl',

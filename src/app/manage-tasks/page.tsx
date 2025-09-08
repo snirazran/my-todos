@@ -1,8 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
-import { ArrowLeft, Plus } from 'lucide-react';
 import AddTaskModal from '@/components/ui/dialog/AddTaskModal';
 import TaskBoard from '@/components/board/TaskBoard';
 import { Task, DAYS, hebrewDays } from '@/components/board/helpers';
@@ -14,6 +12,8 @@ export default function ManageTasksPage() {
     Array.from({ length: DAYS }, () => [])
   );
   const [showModal, setShowModal] = useState(false);
+  const [prefillText, setPrefillText] = useState<string>('');
+  const [prefillDays, setPrefillDays] = useState<number[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -83,37 +83,16 @@ export default function ManageTasksPage() {
   );
 
   return (
-    <main className="min-h-screen p-3 md:p-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      {/* Wider than before, closer to Trello (almost full width on large screens) */}
+    <main className="min-h-screen px-3 pt-8 pb-6 md:px-6 md:pt-12 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="w-full px-2 mx-auto md:px-6">
-        {/* Header */}
-        <div className="flex flex-col gap-4 mb-6 md:mb-10 md:flex-row md:items-center md:justify-between">
-          <div className="text-right">
-            <h1 className="text-3xl font-bold md:text-4xl text-slate-900 dark:text-white">
-              ניהול משימות שבועי
-            </h1>
-            <p className="text-base md:text-lg text-slate-600 dark:text-slate-400">
-              צעדים קטנים, ניצחונות גדולים
-            </p>
-          </div>
-
-          <div className="flex self-start gap-2 md:self-auto">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg text-slate-700 dark:text-slate-200"
-            >
-              <ArrowLeft className="w-5 h-5 rotate-180" />
-              חזרה להיום
-            </Link>
-
-            <button
-              onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg text-slate-700 dark:text-slate-200"
-            >
-              <Plus className="w-5 h-5 text-violet-600" />
-              הוסף משימה
-            </button>
-          </div>
+        {/* Header (no buttons) */}
+        <div className="mb-4 text-right md:mb-8">
+          <h1 className="text-3xl font-bold md:text-4xl text-slate-900 dark:text-white">
+            ניהול משימות שבועי
+          </h1>
+          <p className="text-slate-600 dark:text-slate-400">
+            צעדים קטנים, ניצחונות גדולים
+          </p>
         </div>
 
         <TaskBoard
@@ -122,11 +101,18 @@ export default function ManageTasksPage() {
           setWeek={setWeek}
           saveDay={saveDay}
           removeTask={removeTask}
+          onRequestAdd={(day, text) => {
+            setPrefillText(text ?? '');
+            setPrefillDays([day === 7 ? -1 : day]);
+            setShowModal(true);
+          }}
         />
       </div>
 
       {showModal && (
         <AddTaskModal
+          initialText={prefillText}
+          initialDays={prefillDays}
           defaultRepeat="weekly"
           onClose={() => setShowModal(false)}
           onSave={onAddTask}
