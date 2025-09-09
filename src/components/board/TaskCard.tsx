@@ -32,6 +32,8 @@ export default function TaskCard({
       // ⬇️ stop native browser drag ghosting
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
+      // ✅ THE FIX IS HERE 👇
+      style={{ touchAction: 'pan-y' }}
       className={[
         'flex items-center gap-3 p-3 select-none rounded-xl transition-[box-shadow,background-color]',
         'bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600',
