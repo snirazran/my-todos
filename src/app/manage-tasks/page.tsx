@@ -99,7 +99,12 @@ export default function ManageTasksPage() {
   );
 
   return (
-    <main className="min-h-screen px-3 pt-8 pb-6 md:px-6 md:pt-12 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+    <main
+      className="h-[100svh] md:min-h-screen overflow-hidden overscroll-y-contain
+             px-3 pt-8 pb-[max(env(safe-area-inset-bottom),1rem)]
+             md:px-6 md:pt-12
+             bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800"
+    >
       <div className="w-full px-2 mx-auto md:px-6">
         <div className="mb-4 text-right md:mb-8">
           <h1 className="text-3xl font-bold md:text-4xl text-slate-900 dark:text-white">
