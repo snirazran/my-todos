@@ -19,6 +19,7 @@ export type DragState = {
 
 export function useDragManager() {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
+  const needsFirstAlignRef = useRef(false);
   const slideRefs = useRef<Array<HTMLDivElement | null>>([]);
   const listRefs = useRef<Array<HTMLDivElement | null>>([]);
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -69,6 +70,10 @@ export function useDragManager() {
       document.body.style.touchAction = 'none';
       document.documentElement.classList.add('dragging');
 
+      // also blur any focused control (prevents focus-induced jumps)
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae && typeof ae.blur === 'function') ae.blur();
+
       pointerXRef.current = clientX;
       pointerYRef.current = clientY;
       pxPrevRef.current = clientX;
@@ -88,6 +93,10 @@ export function useDragManager() {
         width: rect.width,
         height: rect.height,
       });
+
+      // ⬅️ tell the mover to align once on the next frame
+      needsFirstAlignRef.current = true;
+
       setTargetDay(day);
       setTargetIndex(index);
     },
@@ -205,6 +214,19 @@ export function useDragManager() {
 
       pointerXRef.current = x;
       pointerYRef.current = y;
+
+      if (needsFirstAlignRef.current) {
+        const el =
+          cardRefs.current.get(drag.taskId) ||
+          // if you map by draggableId, adapt here:
+          // const el = cardRefs.current.get(draggableIdFor(drag.fromDay, drag.taskId))
+          null;
+        const r = el?.getBoundingClientRect();
+        if (r) {
+          setDrag((d) => (d ? { ...d, dx: x - r.left, dy: y - r.top } : d));
+        }
+        needsFirstAlignRef.current = false;
+      }
 
       const instV = x - pxPrevRef.current;
       pxPrevRef.current = x;

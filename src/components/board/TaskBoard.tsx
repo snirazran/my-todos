@@ -209,18 +209,24 @@ export default function TaskBoard({
         dir="ltr"
         data-role="board-scroller"
         data-drag={drag?.active ? '1' : '0'}
-        onPointerDown={startPanIfEligible}
+        onPointerDown={(e) => {
+          // blur any focused control so it doesn't capture the next gesture
+          const ae = document.activeElement as HTMLElement | null;
+          if (ae && typeof ae.blur === 'function') ae.blur();
+          startPanIfEligible(e);
+        }}
         onPointerMove={onPanMove}
         onPointerUp={endPan}
         className={[
           'no-scrollbar',
           'w-full overflow-x-auto overflow-y-visible overscroll-x-contain px-2 md:px-4',
-          'touch-pan-x',
+          'touch-pan-x', // keep
           snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth',
         ].join(' ')}
         style={{
           WebkitOverflowScrolling: 'touch',
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
+          touchAction: 'pan-x', // ⬅️ explicitly allow horizontal pan on the scroller
         }}
       >
         <div className="flex gap-3 pb-2 md:gap-5" dir="ltr">
