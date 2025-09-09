@@ -203,7 +203,7 @@ export default function TaskBoard({
   }, [drag, onDrop]);
 
   return (
-    <div className="relative h-full min-h-0">
+    <div className="relative">
       <div
         ref={scrollerRef}
         dir="ltr"
@@ -214,11 +214,7 @@ export default function TaskBoard({
         onPointerUp={endPan}
         className={[
           'no-scrollbar',
-          // occupy all available height; never create page scroll
-          'h-full w-full',
-          // only this container can scroll horizontally
-          'overflow-x-auto overflow-y-hidden overscroll-x-contain',
-          'px-2 md:px-4',
+          'w-full overflow-x-auto overflow-y-visible overscroll-x-contain px-2 md:px-4',
           'touch-pan-x',
           snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth',
         ].join(' ')}
@@ -227,20 +223,20 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex h-full gap-3 pb-2 md:gap-5" dir="ltr">
+        <div className="flex gap-3 pb-2 md:gap-5" dir="ltr">
           {slides.map(({ day, key }) => (
             <div
               key={key}
               ref={setSlideRef(day)}
               data-col="true"
-              className="shrink-0 snap-center w-[88vw] sm:w-[460px] md:w-[400px] h-full"
+              className="shrink-0 snap-center w-[88vw] sm:w-[460px] md:w-[400px]"
             >
               <DayColumn
                 title={titles[day]}
                 listRef={setListRef(day)}
-                // ⬇️ make each column fill the available height exactly
-                heightClass="h-full"
+                maxHeightClass="max-h-[calc(100svh-210px)] md:max-h-[calc(100vh-170px)]"
                 footer={
+                  // show the button only when the bottom-composer for this day is NOT open
                   !(
                     composer &&
                     composer.day === day &&
@@ -264,7 +260,6 @@ export default function TaskBoard({
                 }
               >
                 <TaskList
-                  /* props unchanged */
                   day={day}
                   items={week[day]}
                   drag={drag}
@@ -287,8 +282,10 @@ export default function TaskBoard({
         </div>
       </div>
 
+      {/* Mobile pagination dots */}
       <PaginationDots count={slides.length} activeIndex={pageIndex} />
 
+      {/* Drag overlay */}
       {drag?.active && (
         <DragOverlay
           x={drag.x}

@@ -1,4 +1,3 @@
-// DayColumn.tsx
 'use client';
 
 import React from 'react';
@@ -8,14 +7,13 @@ export default function DayColumn({
   listRef,
   children,
   footer,
-  heightClass = 'h-full',
+  maxHeightClass = 'max-h-[calc(100vh-170px)]',
 }: {
   title: string;
   listRef: (el: HTMLDivElement | null) => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
-  /** exact height for the column container (e.g., 'h-full') */
-  heightClass?: string;
+  maxHeightClass?: string;
 }) {
   return (
     <section
@@ -24,23 +22,22 @@ export default function DayColumn({
         'group flex flex-col',
         'bg-white/90 dark:bg-slate-800/90',
         'rounded-2xl shadow border border-slate-200/70 dark:border-slate-700/60',
-        // ⬇️ exact height + allow children to shrink
-        heightClass,
-        'min-h-0',
+        maxHeightClass,
         'p-3 md:p-4',
-        'md:min-h-[100px]',
+        'min-h-[100px] md:min-h-[100px]',
       ].join(' ')}
     >
-      <h2 className="mb-3 font-semibold text-center md:mb-4 text-slate-900 dark:text-white shrink-0">
+      <h2 className="mb-3 font-semibold text-center md:mb-4 text-slate-900 dark:text-white">
         {title}
       </h2>
 
-      {/* Scrollable list only */}
+      {/* Scrollable list area */}
       <div
         ref={listRef}
         className={[
-          'flex-1 min-h-0 overflow-y-auto pr-1 rounded-xl transition-colors',
+          'flex-1 overflow-y-auto pr-1 rounded-xl transition-colors',
           'no-scrollbar',
+          // ⬇️ Was: 'touch-pan-y'. Allow both axes so horizontal swipes work from tasks.
           'touch-auto',
           'overscroll-y-contain',
         ].join(' ')}
@@ -48,7 +45,7 @@ export default function DayColumn({
         {children}
       </div>
 
-      {footer ? <div className="mt-2 shrink-0">{footer}</div> : null}
+      {footer ? <div className="mt-2">{footer}</div> : null}
     </section>
   );
 }
