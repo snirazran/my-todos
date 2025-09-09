@@ -106,15 +106,6 @@ export default function ManageTasksPage() {
              bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800"
     >
       <div className="w-full px-2 mx-auto md:px-6">
-        <div className="mb-4 text-right md:mb-8">
-          <h1 className="text-3xl font-bold md:text-4xl text-slate-900 dark:text-white">
-            ניהול משימות שבועי
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            צעדים קטנים, ניצחונות גדולים
-          </p>
-        </div>
-
         <TaskBoard
           titles={titles}
           week={week}
