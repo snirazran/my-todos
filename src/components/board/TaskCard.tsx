@@ -32,15 +32,17 @@ export default function TaskCard({
   const MOVE_TOLERANCE = 8;
   const LONG_PRESS_DURATION = 230;
 
-  // This cleanup function will be stable thanks to useCallback
-  const cleanup = useCallback(() => {
+  const cleanupLP = useCallback(() => {
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
     }
-    window.removeEventListener('pointermove', handlePointerMove);
-    window.removeEventListener('pointerup', handlePointerUp);
-    window.removeEventListener('pointercancel', handlePointerUp);
+    const el = cardRef.current;
+    if (el) {
+      el.removeEventListener('pointermove', handlePointerMove as any);
+      el.removeEventListener('pointerup', handlePointerUp as any);
+      el.removeEventListener('pointercancel', handlePointerUp as any);
+    }
   }, []);
 
   const handlePointerMove = useCallback(
@@ -48,28 +50,27 @@ export default function TaskCard({
       if (!startPos.current) return;
       const dx = Math.abs(e.clientX - startPos.current.x);
       const dy = Math.abs(e.clientY - startPos.current.y);
-
+      // Any real movement cancels the pending long-press → let native scroll happen
       if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
-        cleanup();
+        cleanupLP();
       }
     },
-    [cleanup]
+    [cleanupLP]
   );
 
   const handlePointerUp = useCallback(() => {
-    cleanup();
-  }, [cleanup]);
+    cleanupLP();
+  }, [cleanupLP]);
 
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
       if (e.button !== 0 || !e.isPrimary) return;
 
       const target = e.target as HTMLElement;
-      if (target.closest('button, a, input, textarea, [role="button"]')) {
-        return;
-      }
+      if (target.closest('button, a, input, textarea, [role="button"]')) return;
 
       if (e.pointerType === 'mouse') {
+        // Desktop: start drag immediately
         onGrab({
           clientX: e.clientX,
           clientY: e.clientY,
@@ -78,46 +79,53 @@ export default function TaskCard({
         return;
       }
 
+      // Touch: arm a long-press without blocking scroll
       startPos.current = { x: e.clientX, y: e.clientY };
 
-      window.addEventListener('pointermove', handlePointerMove);
-      window.addEventListener('pointerup', handlePointerUp);
-      window.addEventListener('pointercancel', handlePointerUp);
+      const el = cardRef.current;
+      if (el) {
+        // ⬇️ passive: true so browser scroll is never blocked while we wait
+        el.addEventListener('pointermove', handlePointerMove as any, {
+          passive: true,
+        });
+        el.addEventListener('pointerup', handlePointerUp as any, {
+          passive: true,
+        });
+        el.addEventListener('pointercancel', handlePointerUp as any, {
+          passive: true,
+        });
+      }
 
       longPressTimer.current = window.setTimeout(() => {
+        // If we got here, user held still → begin drag
         onGrab({
           clientX: startPos.current!.x,
           clientY: startPos.current!.y,
           pointerType: 'touch',
         });
-        cleanup();
+        cleanupLP();
       }, LONG_PRESS_DURATION);
     },
-    [onGrab, handlePointerMove, handlePointerUp, cleanup]
+    [onGrab, handlePointerMove, handlePointerUp, cleanupLP]
   );
 
-  // ✅ THIS IS THE KEY CHANGE: We use useEffect to add a PASSIVE event listener.
   useEffect(() => {
-    const element = cardRef.current;
-    if (!element) return;
-
-    // A passive listener tells the browser it's safe to scroll immediately.
-    element.addEventListener('pointerdown', handlePointerDown, {
+    const el = cardRef.current;
+    if (!el) return;
+    // Passive pointerdown allows immediate scroll start
+    el.addEventListener('pointerdown', handlePointerDown as any, {
       passive: true,
     });
-
     return () => {
-      element.removeEventListener('pointerdown', handlePointerDown);
+      el.removeEventListener('pointerdown', handlePointerDown as any);
+      cleanupLP();
     };
-  }, [handlePointerDown]);
+  }, [handlePointerDown, cleanupLP]);
 
-  // Combine internal and external refs
   const setRefs = useCallback(
     (el: HTMLDivElement | null) => {
       cardRef.current = el;
-      if (innerRef) {
-        innerRef(el);
-      }
+      if (innerRef) innerRef(el);
     },
     [innerRef]
   );
@@ -128,13 +136,13 @@ export default function TaskCard({
       data-card-id={dragId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
-      style={{ touchAction: 'manipulation' }}
+      // ⬇️ Allow both axes; you can also use the Tailwind class 'touch-auto'
+      style={{ touchAction: 'auto' }}
       className={[
         'flex items-center gap-3 p-3 select-none rounded-xl transition-colors',
         'bg-white dark:bg-slate-700',
         'border border-slate-200 dark:border-slate-600 shadow-sm',
         'cursor-grab',
-        // Optional Tailwind alternative: 'touch-manipulation'
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
       role="listitem"

@@ -6,15 +6,13 @@ export default function DayColumn({
   title,
   listRef,
   children,
-  footer, // ⬅️ NEW
+  footer,
   maxHeightClass = 'max-h-[calc(100vh-170px)]',
 }: {
   title: string;
   listRef: (el: HTMLDivElement | null) => void;
   children: React.ReactNode;
-  /** content rendered **outside** the scrollable list, fixed at column bottom */
-  footer?: React.ReactNode; // ⬅️ NEW
-  /** allow board to set a device-height aware limit */
+  footer?: React.ReactNode;
   maxHeightClass?: string;
 }) {
   return (
@@ -39,13 +37,14 @@ export default function DayColumn({
         className={[
           'flex-1 overflow-y-auto pr-1 rounded-xl transition-colors',
           'no-scrollbar',
-          'touch-pan-y overscroll-y-contain',
+          // ⬇️ Was: 'touch-pan-y'. Allow both axes so horizontal swipes work from tasks.
+          'touch-auto',
+          'overscroll-y-contain',
         ].join(' ')}
       >
         {children}
       </div>
 
-      {/* Fixed footer (always visible) */}
       {footer ? <div className="mt-2">{footer}</div> : null}
     </section>
   );
