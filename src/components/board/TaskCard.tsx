@@ -128,15 +128,15 @@ export default function TaskCard({
       data-card-id={dragId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
-      style={{ touchAction: 'pan-y' }}
+      style={{ touchAction: 'manipulation' }}
       className={[
         'flex items-center gap-3 p-3 select-none rounded-xl transition-colors',
         'bg-white dark:bg-slate-700',
         'border border-slate-200 dark:border-slate-600 shadow-sm',
         'cursor-grab',
+        // Optional Tailwind alternative: 'touch-manipulation'
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
-      // ⛔️ The onPointerDown prop is removed from here and handled by the useEffect.
       role="listitem"
       aria-grabbed={false}
     >
