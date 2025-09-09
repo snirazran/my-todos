@@ -1,8 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useRef, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { Task } from './helpers';
+
+type OnGrabParams = {
+  clientX: number;
+  clientY: number;
+  pointerType: 'mouse' | 'touch';
+};
 
 export default function TaskCard({
   dragId,
@@ -18,44 +24,88 @@ export default function TaskCard({
   task: Task;
   onDelete: () => void;
   innerRef?: (el: HTMLDivElement | null) => void;
-  onGrab: (e: {
-    clientX: number;
-    clientY: number;
-    pointerType: 'mouse' | 'touch';
-  }) => void;
+  onGrab: (params: OnGrabParams) => void;
   hiddenWhileDragging?: boolean;
 }) {
+  const longPressTimer = useRef<number | null>(null);
+  const startPos = useRef<{ x: number; y: number } | null>(null);
+
+  const MOVE_TOLERANCE = 8;
+  const LONG_PRESS_DURATION = 230;
+
+  const cleanup = useCallback(() => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    window.removeEventListener('pointermove', handlePointerMove);
+    window.removeEventListener('pointerup', handlePointerUp);
+    window.removeEventListener('pointercancel', handlePointerUp);
+  }, []);
+
+  const handlePointerMove = useCallback(
+    (e: PointerEvent) => {
+      if (!startPos.current) return;
+      const dx = Math.abs(e.clientX - startPos.current.x);
+      const dy = Math.abs(e.clientY - startPos.current.y);
+
+      if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
+        cleanup();
+      }
+    },
+    [cleanup]
+  );
+
+  const handlePointerUp = useCallback(() => {
+    cleanup();
+  }, [cleanup]);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    if (e.button !== 0 || !e.isPrimary) return;
+
+    const target = e.target as HTMLElement;
+    if (target.closest('button, a, input, textarea, [role="button"]')) {
+      return;
+    }
+
+    if (e.pointerType === 'mouse') {
+      // ✅ CHANGED: Add pointerType to the payload
+      onGrab({ clientX: e.clientX, clientY: e.clientY, pointerType: 'mouse' });
+      return;
+    }
+
+    startPos.current = { x: e.clientX, y: e.clientY };
+
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+
+    longPressTimer.current = window.setTimeout(() => {
+      // ✅ CHANGED: Add pointerType to the payload
+      onGrab({
+        clientX: startPos.current!.x,
+        clientY: startPos.current!.y,
+        pointerType: 'touch',
+      });
+      cleanup();
+    }, LONG_PRESS_DURATION);
+  };
+
   return (
     <div
       ref={innerRef}
       data-card-id={dragId}
-      // ⬇️ stop native browser drag ghosting
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
-      // ✅ THE FIX IS HERE 👇
       style={{ touchAction: 'pan-y' }}
       className={[
         'flex items-center gap-3 p-3 select-none rounded-xl transition-[box-shadow,background-color]',
         'bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600',
         'border border-slate-200 dark:border-slate-600 shadow-sm',
-        'cursor-grab active:cursor-grabbing', // nicer feedback
+        'cursor-grab active:cursor-grabbing',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
-      onPointerDown={(e) => {
-        // ignore right/middle click
-        // @ts-ignore
-        if (e.button && e.button !== 0) return;
-        // don't start drag from interactive elements
-        const target = e.target as HTMLElement;
-        if (target.closest('button, a, input, textarea, [role="button"]'))
-          return;
-
-        onGrab({
-          clientX: e.clientX,
-          clientY: e.clientY,
-          pointerType: (e.pointerType as any) === 'touch' ? 'touch' : 'mouse',
-        });
-      }}
+      onPointerDown={handlePointerDown}
       role="listitem"
       aria-grabbed={false}
     >

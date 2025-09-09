@@ -34,12 +34,6 @@ export function useDragManager() {
   const pxVelRef = useRef(0);
   const pxVelSmoothedRef = useRef(0);
 
-  // long-press on touch
-  const longPressTimer = useRef<number | null>(null);
-  const pressStartXY = useRef<{ x: number; y: number } | null>(null);
-  const LONG_MS = 230;
-  const MOVE_TOL = 8;
-
   const setSlideRef =
     (day: number) =>
     (el: HTMLDivElement | null): void => {
@@ -102,75 +96,16 @@ export function useDragManager() {
       taskText: string;
       clientX: number;
       clientY: number;
-      pointerType: 'mouse' | 'touch';
       rectGetter: () => DOMRect; // ⬅️ fresh rect provider
     }) => {
-      const {
-        day,
-        index,
-        taskId,
-        taskText,
-        clientX,
-        clientY,
-        pointerType,
-        rectGetter,
-      } = params;
+      const { day, index, taskId, taskText, clientX, clientY, rectGetter } =
+        params;
 
-      if (pointerType === 'mouse') {
-        const rect = rectGetter();
-        beginDragFromCard(day, index, taskId, taskText, clientX, clientY, rect);
-        return;
-      }
-
-      // long-press on touch
-      pressStartXY.current = { x: clientX, y: clientY };
-      if (longPressTimer.current) window.clearTimeout(longPressTimer.current);
-      longPressTimer.current = window.setTimeout(() => {
-        const rect = rectGetter(); // ⬅️ recompute at the exact start moment
-        beginDragFromCard(
-          day,
-          index,
-          taskId,
-          taskText,
-          clientX, // ✅ CHANGED: Use the initial clientX from the onGrab call
-          clientY, // ✅ CHANGED: Use the initial clientY from the onGrab call
-          rect
-        );
-      }, LONG_MS);
+      const rect = rectGetter();
+      beginDragFromCard(day, index, taskId, taskText, clientX, clientY, rect);
     },
     [beginDragFromCard]
   );
-
-  // cancel long-press if the finger moves too much before timeout
-  useEffect(() => {
-    const cancelLP = () => {
-      if (longPressTimer.current) {
-        clearTimeout(longPressTimer.current);
-        longPressTimer.current = null;
-      }
-    };
-    const move = (ev: TouchEvent | PointerEvent | MouseEvent) => {
-      // @ts-ignore
-      const pt = 'touches' in ev ? ev.touches?.[0] : ev;
-      const x = (pt?.clientX ?? 0) as number;
-      const y = (pt?.clientY ?? 0) as number;
-      pointerXRef.current = x;
-      pointerYRef.current = y;
-      const s = pressStartXY.current;
-      if (s && (Math.abs(x - s.x) > MOVE_TOL || Math.abs(y - s.y) > MOVE_TOL))
-        cancelLP();
-    };
-    window.addEventListener('pointermove', move as any, { passive: true });
-    window.addEventListener('touchmove', move as any, { passive: true });
-    window.addEventListener('pointerup', cancelLP as any, { passive: true });
-    window.addEventListener('touchend', cancelLP as any, { passive: true });
-    return () => {
-      window.removeEventListener('pointermove', move as any);
-      window.removeEventListener('touchmove', move as any);
-      window.removeEventListener('pointerup', cancelLP as any);
-      window.removeEventListener('touchend', cancelLP as any);
-    };
-  }, []);
 
   const endDrag = useCallback(() => {
     document.body.style.userSelect = '';
