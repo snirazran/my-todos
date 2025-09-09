@@ -29,22 +29,16 @@ export default function TaskCard({
     <div
       ref={innerRef}
       data-card-id={dragId}
-      tabIndex={-1} // ⬅️ not focusable
+      // ⬇️ stop native browser drag ghosting
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
       className={[
         'flex items-center gap-3 p-3 select-none rounded-xl transition-[box-shadow,background-color]',
         'bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600',
         'border border-slate-200 dark:border-slate-600 shadow-sm',
-        'cursor-grab active:cursor-grabbing',
-        'outline-none focus:outline-none', // ⬅️ avoid focus ring
-        'touch-manipulation', // ⬅️ tailwind v3: add in globals (see note), or…
+        'cursor-grab active:cursor-grabbing', // nicer feedback
+        hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
-      style={{
-        WebkitTapHighlightColor: 'transparent', // ⬅️ iOS tap highlight off
-        WebkitTouchCallout: 'none', // ⬅️ disable callout menu
-        touchAction: 'manipulation', // ⬅️ allow pan/zoom, no dbl-tap zoom
-      }}
       onPointerDown={(e) => {
         // ignore right/middle click
         // @ts-ignore
