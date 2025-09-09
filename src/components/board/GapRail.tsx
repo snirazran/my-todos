@@ -1,63 +1,87 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-
 export default function GapRail({
-  overlayHidden,
   onAdd,
-  disabled,
+  overlayHidden = false,
+  disabled = false,
 }: {
-  overlayHidden?: boolean;
   onAdd: () => void;
+  overlayHidden?: boolean;
   disabled?: boolean;
 }) {
-  // Detect desktop-like pointers (fine + hover)
-  const isDesktopRef = useRef(false);
-  useEffect(() => {
-    isDesktopRef.current = window.matchMedia(
-      '(pointer: fine) and (hover: hover)'
-    ).matches;
-  }, []);
-
-  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    // JS guard: only allow on desktop mouse pointers
-    if (!isDesktopRef.current) return;
-    if (disabled) return;
-    if (e.pointerType !== 'mouse') return;
-
-    // avoid triggering from controls inside (future-proof)
-    const t = e.target as HTMLElement;
-    if (t.closest('button, [role="button"], a, input, textarea')) return;
-
-    e.preventDefault();
+  const handleClick: React.MouseEventHandler<HTMLDivElement> = (e) => {
+    if (disabled || overlayHidden) return;
+    e.stopPropagation();
     onAdd();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (!isDesktopRef.current || disabled) return;
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      onAdd();
-    }
   };
 
   return (
     <div
-      // CSS guard: no pointer events on mobile; enabled from md+
+      onClick={handleClick}
       className={[
-        'my-2 h-8 rounded-xl border-2 border-dashed border-violet-400/70 relative',
-        'pointer-events-none md:pointer-events-auto', // ← disables taps on mobile
-        disabled ? 'opacity-50' : 'cursor-pointer',
+        'relative h-2 select-none md:h-2 group/rail',
+        // NEW: disable all pointer events on mobile; re-enable on desktop if not disabled
+        'pointer-events-none',
+        disabled
+          ? 'opacity-60 md:pointer-events-none'
+          : 'hover:cursor-pointer md:pointer-events-auto',
       ].join(' ')}
-      onPointerDown={handlePointerDown}
-      onKeyDown={handleKeyDown}
       role="button"
-      tabIndex={isDesktopRef.current && !disabled ? 0 : -1}
-      aria-disabled={disabled ? 'true' : 'false'}
+      aria-disabled={disabled}
+      tabIndex={-1}
     >
       {!overlayHidden && (
-        <div className="absolute inset-0 grid text-xs pointer-events-none select-none place-items-center text-violet-600/80">
-          הוסף כאן
+        <div
+          className={[
+            'absolute inset-0 z-10 hidden md:flex items-center justify-center',
+            'transition-opacity opacity-0',
+            'group-hover/rail:opacity-100',
+            'pointer-events-none',
+          ].join(' ')}
+        >
+          <div className="flex-1">
+            <div className="w-full h-px text-violet-400">
+              <div
+                className="w-full h-[2px]"
+                style={{
+                  ['--dash' as any]: '6px',
+                  ['--gap' as any]: '6px',
+                  backgroundImage:
+                    'repeating-linear-gradient(to right, currentColor 0 var(--dash), transparent var(--dash) calc(var(--dash) + var(--gap)))',
+                }}
+              />
+            </div>
+          </div>
+
+          <button
+            type="button"
+            title="הוסף משימה כאן"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd();
+            }}
+            className="pointer-events-auto mx-1 h-6 w-6 rounded bg-white dark:bg-slate-800
+                       text-violet-700 dark:text-violet-300 ring-1 ring-violet-200/70
+                       dark:ring-violet-900/40 shadow-sm grid place-items-center
+                       hover:scale-[1.04] transition-transform"
+            disabled={disabled}
+          >
+            +
+          </button>
+
+          <div className="flex-1">
+            <div className="w-full h-px text-violet-400">
+              <div
+                className="w-full h-[2px]"
+                style={{
+                  ['--dash' as any]: '6px',
+                  ['--gap' as any]: '6px',
+                  backgroundImage:
+                    'repeating-linear-gradient(to right, currentColor 0 var(--dash), transparent var(--dash) calc(var(--dash) + var(--gap)))',
+                }}
+              />
+            </div>
+          </div>
         </div>
       )}
     </div>
