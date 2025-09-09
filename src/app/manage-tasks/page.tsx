@@ -1,3 +1,4 @@
+// page.tsx (ManageTasksPage)
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
@@ -15,8 +16,6 @@ export default function ManageTasksPage() {
   const [showModal, setShowModal] = useState(false);
   const [prefillText, setPrefillText] = useState<string>('');
   const [prefillDays, setPrefillDays] = useState<number[]>([]);
-
-  // NEW: where to insert (index in the column). null = append at end.
   const [insertAt, setInsertAt] = useState<number | null>(null);
 
   useEffect(() => {
@@ -61,7 +60,6 @@ export default function ManageTasksPage() {
     }
   };
 
-  // Called by the modal when user clicks "save"
   const onAddTask = async ({
     text,
     days,
@@ -74,19 +72,12 @@ export default function ManageTasksPage() {
     await fetch('/api/manage-tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        days,
-        repeat, // 'weekly' | 'this-week'
-        insertAt, // << send the gap index (or null to append)
-      }),
+      body: JSON.stringify({ text, days, repeat, insertAt }),
     });
 
     const data = await fetch('/api/manage-tasks').then((r) => r.json());
     setWeek(data);
     setShowModal(false);
-
-    // clear for the next time
     setInsertAt(null);
     setPrefillText('');
     setPrefillDays([]);
@@ -100,13 +91,19 @@ export default function ManageTasksPage() {
 
   return (
     <main
-      className="h-[100svh] md:min-h-screen overflow-hidden overscroll-y-contain
-             px-3 pt-8 pb-[max(env(safe-area-inset-bottom),1rem)]
-             md:px-6 md:pt-12
-             bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800"
+      className={[
+        // full viewport height & no page scroll
+        'h-[100svh] overflow-hidden',
+        // spacing & bg
+        'px-3 md:px-6 pt-6 md:pt-8 pb-[max(env(safe-area-inset-bottom),0px)]',
+        'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800',
+        // layout
+        'flex flex-col',
+      ].join(' ')}
     >
-      <div className="w-full px-2 mx-auto md:px-6">
-        <div className="mb-4 text-right md:mb-8">
+      {/* Header doesn't grow */}
+      <div className="w-full px-2 mx-auto md:px-0 shrink-0">
+        <div className="mb-3 text-right md:mb-4">
           <h1 className="text-3xl font-bold md:text-4xl text-slate-900 dark:text-white">
             ניהול משימות שבועי
           </h1>
@@ -114,7 +111,10 @@ export default function ManageTasksPage() {
             צעדים קטנים, ניצחונות גדולים
           </p>
         </div>
+      </div>
 
+      {/* Board gets the rest of the height */}
+      <div className="flex-1 min-h-0 px-2 md:px-0">
         <TaskBoard
           titles={titles}
           week={week}
@@ -124,12 +124,9 @@ export default function ManageTasksPage() {
           onRequestAdd={(day, text, afterIndex = null) => {
             setPrefillText(text ?? '');
             setPrefillDays([day === 7 ? -1 : day]);
-
-            if (afterIndex === null) {
-              setInsertAt(null);
-            } else {
-              setInsertAt(Math.max(0, afterIndex + 1));
-            }
+            setInsertAt(
+              afterIndex === null ? null : Math.max(0, afterIndex + 1)
+            );
             setShowModal(true);
           }}
         />
