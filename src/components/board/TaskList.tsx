@@ -45,7 +45,7 @@ export default function TaskList({
     clientX: number;
     clientY: number;
     pointerType: 'mouse' | 'touch';
-    rectGetter: () => DOMRect; // ⬅️ changed: pass a getter
+    rectGetter: () => DOMRect;
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
 }) {
@@ -101,7 +101,7 @@ export default function TaskList({
         key={`card-${t.id}`}
         innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
         dragId={draggableIdFor(day, t.id)}
-        index={i}
+        // ✅ REMOVED: The unnecessary 'index' prop was removed from here.
         task={t}
         onDelete={() => removeTask(day, t.id)}
         onGrab={(payload) => {
