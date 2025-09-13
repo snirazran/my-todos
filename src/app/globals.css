@@ -31,6 +31,7 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
     --bottom-safe: env(safe-area-inset-bottom, 0px);
   }
 
@@ -74,6 +75,23 @@
   }
 }
 
+@supports (padding: max(0px)) {
+  .pb-safe {
+    padding-bottom: max(var(--safe-bottom), 0px);
+  }
+}
+
+@supports (height: 100svh) {
+  .min-h-100svh {
+    min-height: 100svh;
+  }
+}
+@supports (height: 100dvh) {
+  .h-100dvh {
+    height: 100dvh;
+  }
+}
+
 /* Custom animations */
 @keyframes fadeInUp {
   from {
@@ -96,6 +114,12 @@
     transform: translateY(0);
     animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
   }
+}
+
+html,
+body {
+  /* Helps old iOS Safari stretch to the screen */
+  height: -webkit-fill-available;
 }
 
 .animate-bounce {

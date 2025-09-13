@@ -96,8 +96,13 @@ export default function ManageTasksPage() {
   return (
     // PAGE is non-scrollable: height = viewport - header (h-14 / md:h-16)
     <main
-      className="relative overflow-hidden  bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800"
-      style={{ height: 'calc(100dvh - var(--header-h))' }} // 👈 full visible height
+      className="relative overflow-hidden  bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 min-h-100svh pb-safe"
+      style={{
+        /* Prefer dynamic VH when available, subtract your header */
+        height: 'calc(100dvh - var(--header-h))',
+        /* Fallback for older Safari */
+        minHeight: 'calc(-webkit-fill-available - var(--header-h))',
+      }}
     >
       {/* Full-bleed content area that TaskBoard will completely occupy */}
       <div className="absolute inset-0">
