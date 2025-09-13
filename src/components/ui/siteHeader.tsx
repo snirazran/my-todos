@@ -8,7 +8,7 @@ import { Sparkles } from 'lucide-react';
 export default function SiteHeader() {
   const { data: session, status } = useSession();
 
-  // IMPORTANT: fixed height so pages can reserve space (mobile/desktop)
+  // Fixed height so pages can reserve space (mobile/desktop)
   // mobile: h-14 (=3.5rem), md: h-16 (=4rem)
   return (
     <header className="sticky top-0 z-50 w-full h-14 md:h-16 backdrop-blur-md">
@@ -19,7 +19,7 @@ export default function SiteHeader() {
           className="relative inline-flex items-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
         >
           <span className="text-2xl font-extrabold tracking-tight text-transparent bg-gradient-to-r from-violet-400 via-fuchsia-500 to-purple-600 bg-clip-text">
-            מה&nbsp;אומר?
+            FrogTask
           </span>
           <Sparkles
             className="h-5 w-5 text-fuchsia-500 animate-[float_3s_ease-in-out_infinite]"
@@ -33,14 +33,14 @@ export default function SiteHeader() {
             onClick={() => signOut()}
             className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium transition rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600"
           >
-            התנתק
+            Sign out
           </button>
         ) : (
           <button
             onClick={() => signIn()}
             className="inline-flex items-center gap-2 px-5 py-2 text-sm font-medium text-white transition rounded-lg bg-violet-600 hover:bg-purple-700"
           >
-            🔑 התחברות
+            🔑 Sign in
           </button>
         )}
       </div>

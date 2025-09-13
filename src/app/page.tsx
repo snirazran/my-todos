@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { he } from 'date-fns/locale';
 import { Calendar, History, CheckCircle2, Shirt } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 import { signIn, useSession } from 'next-auth/react';
@@ -17,6 +16,7 @@ import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
 import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
 import AddTaskModal from '@/components/ui/dialog/AddTaskModal';
+
 /* === Tunables ============================================================ */
 const TONGUE_MS = 1111; // tongue extend+retract total
 const OFFSET_MS = 160; // anticipation delay before tongue starts
@@ -39,11 +39,15 @@ interface Task {
 }
 
 const demoTasks: Task[] = [
-  { id: 'g1', text: 'מדיטציה', completed: true },
-  { id: 'g2', text: 'קריאת ספר', completed: true },
-  { id: 'g3', text: 'הליכה 5,000 צעדים', completed: true },
-  { id: 'g4', text: 'לשתות 2 ליטר מים', completed: true },
-  { id: 'g5', text: 'לבדוק שאין מפלצת מתחת למיטה', completed: false },
+  { id: 'g1', text: 'Meditation', completed: true },
+  { id: 'g2', text: 'Read a book', completed: true },
+  { id: 'g3', text: 'Walk 5,000 steps', completed: true },
+  { id: 'g4', text: 'Drink 2 liters of water', completed: true },
+  {
+    id: 'g5',
+    text: 'Check there is no monster under the bed',
+    completed: false,
+  },
 ];
 
 function easeOutQuad(t: number) {
@@ -546,21 +550,21 @@ export default function Home() {
         <Header session={session} router={router} />
 
         {!session && (
-          <div className="relative p-10 mb-8 overflow-hidden text-center bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
+          <div className="relative p-10 mb-8 overflow-hidden text-center bg-white shadow-lg rounded-2xl dark:bg-slate-800">
             <h2 className="mb-4 text-2xl font-bold text-slate-900 dark:text-white">
-              יש פה צפרדע עם בטן מקרקרת!
+              There’s a frog with a rumbling belly! 🐸
             </h2>
             <p className="mb-8 text-slate-600 dark:text-slate-400">
-              והדרך היחידה להאכיל אותה היא על ידי השלמת המשימות שלך.
+              The only way to feed it is by completing your tasks.
               <br />
-              בוא/י לעזור לה להרגיש שבעה ומאושרת!
+              Sign in and help the frog feel happy and full!
             </p>
 
             <button
               onClick={() => signIn('google')}
-              className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white shadow-md bg-violet-600 rounded-xl hover:bg-violet-700"
+              className="inline-flex items-center gap-2 px-8 py-3 text-lg font-medium text-white shadow-md rounded-xl bg-violet-600 hover:bg-violet-700"
             >
-              להתחברות / הרשמה בחינם! 🚀
+              Sign in / Create account — free! 🚀
             </button>
           </div>
         )}
@@ -575,14 +579,14 @@ export default function Home() {
             />
             <button
               onClick={() => setOpenWardrobe(true)}
-              className="absolute p-2 rounded-full shadow -right-2 top-2 bg-white/80 dark:bg-slate-800 hover:shadow-md"
+              className="absolute p-2 rounded-full shadow right-2 top-2 bg-white/80 hover:shadow-md dark:bg-slate-800"
               title="Wardrobe"
             >
               <Shirt className="w-5 h-5" />
             </button>
           </div>
           <WardrobePanel open={openWardrobe} onOpenChange={setOpenWardrobe} />
-          <div className="relative z-0 w-full -mt-2.5">
+          <div className="relative z-0 -mt-2.5 w-full">
             <ProgressCard rate={rate} done={doneCount} total={data.length} />
           </div>
         </div>
@@ -612,7 +616,7 @@ export default function Home() {
             onAddRequested={(prefill, afterIdx, opts) => {
               setAddDraft(prefill);
               setInsertAfter(afterIdx);
-              const dow = new Date().getDay();
+              const dow = new Date().getDay(); // API day (0..6, Sun..Sat)
               setPreselectedDays(opts?.preselectToday ? [dow] : []);
               setShowAddModal(true);
             }}
@@ -716,7 +720,7 @@ export default function Home() {
           defaultRepeat="this-week"
           onClose={() => setShowAddModal(false)}
           onSave={async ({ text, days, repeat }) => {
-            // use the unified API (handles weekly & this-week & backlog)
+            // unified API (handles weekly & this-week & backlog)
             await fetch('/api/manage-tasks', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -735,7 +739,6 @@ export default function Home() {
               ]);
             }
 
-            // Optionally refresh backlog panel (see 5.2)
             fetchBacklog();
           }}
         />
@@ -744,36 +747,36 @@ export default function Home() {
   );
 }
 
-/* ---------- header (unchanged) ---------- */
+/* ---------- header ---------- */
 function Header({ session, router }: { session: any; router: any }) {
   return (
     <div className="flex flex-col gap-4 mb-8 md:flex-row md:items-center md:justify-between">
       <div>
-        <h1 className="text-4xl font-bold md:text-5xl text-slate-900 dark:text-white">
-          {format(new Date(), 'EEEE', { locale: he })}
+        <h1 className="text-4xl font-bold text-slate-900 dark:text-white md:text-5xl">
+          {format(new Date(), 'EEEE')}
         </h1>
         <p className="flex items-center gap-2 text-lg text-slate-600 dark:text-slate-400">
           <Calendar className="w-5 h-5" />
-          {format(new Date(), 'd בMMMM yyyy', { locale: he })}
+          {format(new Date(), 'MMMM d, yyyy')}
         </p>
       </div>
 
       <div className="flex self-start gap-2 md:self-auto">
         <Link
           href="/history"
-          className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg text-slate-700 dark:text-slate-200"
+          className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"
         >
           <History className="w-5 h-5" />
-          היסטוריה
+          History
         </Link>
 
         <button
           onClick={() =>
             session ? router.push('/manage-tasks') : router.push('/login')
           }
-          className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg text-slate-700 dark:text-slate-200"
+          className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"
         >
-          🛠️ ניהול משימות
+          🛠️ Manage tasks
         </button>
       </div>
     </div>

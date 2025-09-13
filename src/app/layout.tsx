@@ -1,13 +1,15 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from 'next';
-import { Rubik } from 'next/font/google';
+import { Poppins } from 'next/font/google';
 import './globals.css';
 import Providers from './providers';
 import SiteHeader from '@/components/ui/siteHeader';
 
-const rubik = Rubik({
-  subsets: ['hebrew', 'latin'],
+const poppins = Poppins({
+  subsets: ['latin'],
+  weight: ['300', '400', '500', '600', '700'],
   display: 'swap',
+  variable: '--font-sans', // optional: lets Tailwind use it via font-sans
 });
 
 export const viewport: Viewport = {
@@ -17,9 +19,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'המשימות היומיות שלי',
-  description: 'עקוב אחר המשימות היומיות שלך',
-  // Tint the mobile browser bars to match the page background (iOS & Android).
+  title: 'My Daily Tasks',
+  description: 'Track your daily tasks',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#f8fafc' }, // slate-50
     { media: '(prefers-color-scheme: dark)', color: '#0f172a' }, // slate-900
@@ -32,10 +33,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="he" dir="rtl" className="h-full">
+    <html lang="en" dir="ltr" className={`h-full ${poppins.variable}`}>
       <body
         className={[
-          rubik.className,
+          // use Poppins globally (directly + via Tailwind var)
+          poppins.className,
           'antialiased h-full min-h-[100svh]',
           // respect device notches / home indicators
           '[padding-top:env(safe-area-inset-top)]',

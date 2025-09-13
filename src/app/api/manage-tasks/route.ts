@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(doc?.tasks ?? []);
   }
 
-  // Return 8 buckets: 0..6 + backlog(-1) at index 7
+  // Return 8 buckets: API order 0..6 + backlog(-1) at index 7
   const docs = await col.find({ userId: uid }).toArray();
   const week: WeeklyTask[][] = Array.from({ length: 8 }, () => []);
   docs.forEach((d) => {
@@ -101,6 +101,8 @@ export async function GET(req: NextRequest) {
 }
 
 /* ─────────────────── POST ─────────────────── */
+// ✅ Accept API day numbers directly: 0..6 for Sun..Sat, and -1 for “no day”.
+// (Backward-compat: if a client ever sends 7, we coerce it to -1.)
 export async function POST(req: NextRequest) {
   const uid = await currentUserId();
   if (!uid) return unauth();
@@ -108,7 +110,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const text = String(body?.text ?? '').trim();
-    const uiDays: number[] = Array.isArray(body?.days) ? body.days : [];
+    const rawDays: number[] = Array.isArray(body?.days) ? body.days : [];
     const repeat: 'weekly' | 'this-week' =
       body?.repeat === 'this-week' ? 'this-week' : 'weekly';
 
@@ -123,11 +125,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'text is required' }, { status: 400 });
     }
 
-    // UI 0..6, 7 = “no day” → -1
-    const days = uiDays
+    // 🔧 Normalize to API days: accept -1 or 0..6; coerce 7 -> -1 for safety.
+    const apiDays = rawDays
       .map((d) => Number(d))
-      .filter((d) => Number.isInteger(d) && d >= 0 && d <= 7)
-      .map((d) => (d === 7 ? -1 : d));
+      .filter((d) => Number.isInteger(d))
+      .map((d) => (d === 7 ? -1 : d))
+      .filter((d) => d === -1 || (d >= 0 && d <= 6));
+
+    if (apiDays.length === 0) {
+      return NextResponse.json(
+        { error: 'days must include at least one of -1 or 0..6' },
+        { status: 400 }
+      );
+    }
 
     const weeklyCol = await getWeeklyCol();
     const dailyCol = await getDailyCol();
@@ -136,7 +146,7 @@ export async function POST(req: NextRequest) {
     /* ---------------- weekly template ---------------- */
     if (repeat === 'weekly') {
       await Promise.all(
-        days.map(async (dayOfWeek) => {
+        apiDays.map(async (dayOfWeek) => {
           const doc = await weeklyCol.findOne({ userId: uid, dayOfWeek });
           const arr = (doc?.tasks ?? []).slice();
 
@@ -166,7 +176,7 @@ export async function POST(req: NextRequest) {
       return ymdLocal(d);
     });
 
-    for (const d of days) {
+    for (const d of apiDays) {
       if (d === -1) {
         // backlog for this specific week
         const doc = await backlogCol.findOne({ userId: uid, weekStart });
@@ -189,6 +199,7 @@ export async function POST(req: NextRequest) {
           { upsert: true }
         );
       } else {
+        // d = 0..6 (Sunday..Saturday)
         const date = weekDates[d];
 
         await dailyCol.updateOne(
@@ -229,6 +240,7 @@ export async function PUT(req: NextRequest) {
   if (!uid) return unauth();
 
   const { day, tasks } = await req.json();
+  // Expect API day here as well: -1 or 0..6. (Keep 7 => -1 for safety.)
   const dayOfWeek = day === 7 ? -1 : day;
 
   await (
@@ -252,6 +264,7 @@ export async function DELETE(req: NextRequest) {
   if (!uid) return unauth();
 
   const { day, taskId } = await req.json();
+  // Expect API day here as well: -1 or 0..6. (Keep 7 => -1 for safety.)
   const dayOfWeek = day === 7 ? -1 : day;
 
   const client = await clientPromise;

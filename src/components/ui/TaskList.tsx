@@ -93,8 +93,11 @@ export default function TaskList({
 
   return (
     <>
-      <div className="p-6 bg-white shadow-lg dark:bg-slate-800 rounded-2xl">
-        <h2 className="mb-6 text-2xl font-bold">המשימות שלך היום:</h2>
+      <div
+        dir="ltr"
+        className="p-6 bg-white shadow-lg rounded-2xl dark:bg-slate-800"
+      >
+        <h2 className="mb-6 text-2xl font-bold">Your tasks today:</h2>
 
         <div className="space-y-0">
           {tasks.map((task, i) => {
@@ -132,6 +135,8 @@ export default function TaskList({
                                   e.stopPropagation();
                                   toggle(task.id, true);
                                 }}
+                                aria-label="Mark task complete"
+                                title="Mark complete"
                               >
                                 <Circle className="w-6 h-6 text-slate-400" />
                               </button>
@@ -155,6 +160,8 @@ export default function TaskList({
                                 e.stopPropagation();
                                 toggle(task.id, false);
                               }}
+                              aria-label="Mark task incomplete"
+                              title="Mark incomplete"
                             >
                               <CheckCircle2 className="w-6 h-6 text-green-500" />
                             </button>
@@ -184,8 +191,9 @@ export default function TaskList({
 
                     {/* delete button (shows on hover on desktop, always visible on touch) */}
                     <button
-                      className="p-2 transition-opacity rounded-md opacity-0 group-hover:opacity-100 md:opacity-0 md:group-hover:opacity-100 hover:bg-slate-100 dark:hover:bg-slate-600"
-                      title="מחק משימה"
+                      className="p-2 transition-opacity rounded-md opacity-0 hover:bg-slate-100 dark:hover:bg-slate-600 md:opacity-0 md:group-hover:opacity-100"
+                      title="Delete task"
+                      aria-label="Delete task"
                       onClick={(e) => {
                         e.stopPropagation();
                         setToDelete(task);
@@ -235,18 +243,18 @@ export default function TaskList({
           {!inlineOpen ? (
             <button
               onClick={openInline}
-              className="flex items-center justify-center w-full gap-2 px-4 py-3 mt-2 text-violet-700 bg-violet-50/70 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-900/30 rounded-xl"
+              className="flex items-center justify-center w-full gap-2 px-4 py-3 mt-2 rounded-xl bg-violet-50/70 text-violet-700 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-900/30"
             >
-              <Plus className="w-5 h-5" /> הוסף משימה
+              <Plus className="w-5 h-5" /> Add task
             </button>
           ) : (
-            <div className="px-4 py-3 mt-2 bg-slate-50 dark:bg-slate-700 rounded-xl">
+            <div className="px-4 py-3 mt-2 rounded-xl bg-slate-50 dark:bg-slate-700">
               <div className="flex items-center gap-2">
                 <input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="משימה חדשה…"
-                  className="flex-1 px-3 py-2 bg-white border rounded-md dark:bg-slate-800 border-slate-200 dark:border-slate-600"
+                  placeholder="New task…"
+                  className="flex-1 px-3 py-2 bg-white border rounded-md border-slate-200 dark:border-slate-600 dark:bg-slate-800"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter') fireAddBottom();
                     if (e.key === 'Escape') closeInline();
@@ -257,12 +265,13 @@ export default function TaskList({
                   className="px-3 py-2 text-white rounded-md bg-violet-600 hover:bg-violet-700 disabled:opacity-60"
                   disabled={!draft.trim()}
                 >
-                  הוסף
+                  Add
                 </button>
                 <button
                   onClick={closeInline}
                   className="px-3 py-2 rounded-md bg-slate-200 dark:bg-slate-600"
-                  title="ביטול"
+                  title="Cancel"
+                  aria-label="Cancel"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -274,8 +283,8 @@ export default function TaskList({
 
       {showConfetti && (
         <div className="p-6 mt-6 text-center text-white shadow-lg rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 animate-pulse">
-          <h3 className="mb-2 text-2xl font-bold">🎉 כל הכבוד! 🎉</h3>
-          <p className="text-lg">השלמת את כל המשימות להיום!</p>
+          <h3 className="mb-2 text-2xl font-bold">🎉 Well done! 🎉</h3>
+          <p className="text-lg">You completed all tasks for today!</p>
         </div>
       )}
 
@@ -291,26 +300,27 @@ export default function TaskList({
             }}
           >
             <div
-              className="w-[440px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white dark:bg-slate-800 p-5 shadow-lg"
+              className="w-[440px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white p-5 shadow-lg dark:bg-slate-800"
               onMouseDown={(e) => e.stopPropagation()}
             >
               <div className="flex items-start gap-3">
                 <div className="flex-1">
                   <h4 className="mb-1 text-lg font-semibold">
                     {isWeekly(toDelete)
-                      ? 'מחיקת משימה שבועית'
-                      : 'מחיקת משימה להיום'}
+                      ? 'Delete weekly task'
+                      : 'Delete task for today'}
                   </h4>
                   <p className="mb-4 text-slate-600 dark:text-slate-300">
                     {isWeekly(toDelete)
-                      ? 'האם למחוק רק מהיום או להסיר מהשבוע כולו?'
-                      : 'האם למחוק את המשימה מהיום? הפעולה קבועה.'}
+                      ? 'Remove only from today, or delete from this week entirely?'
+                      : 'Delete this task from today? This action is permanent.'}
                   </p>
                 </div>
                 <button
                   className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
                   onClick={() => setToDelete(null)}
                   aria-label="Close"
+                  title="Close"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -322,7 +332,7 @@ export default function TaskList({
                   onClick={() => setToDelete(null)}
                   disabled={busy}
                 >
-                  בטל
+                  Cancel
                 </button>
 
                 {isWeekly(toDelete) ? (
@@ -333,7 +343,7 @@ export default function TaskList({
                       disabled={busy}
                       title="Remove only from today's list"
                     >
-                      מחיקה מהיום בלבד
+                      Remove today only
                     </button>
                     <button
                       className="px-4 py-2 text-white rounded-lg bg-rose-700 disabled:opacity-60"
@@ -341,7 +351,7 @@ export default function TaskList({
                       disabled={busy}
                       title="Remove from weekly template and upcoming days"
                     >
-                      מחיקה מהשבוע
+                      Remove from this week
                     </button>
                   </>
                 ) : (
@@ -350,7 +360,7 @@ export default function TaskList({
                     onClick={confirmDeleteToday}
                     disabled={busy}
                   >
-                    מחק
+                    Delete
                   </button>
                 )}
               </div>
@@ -391,7 +401,7 @@ function SeparatorHover({
 }) {
   return (
     <div
-      className="relative h-1.5 md:h-5 select-none"
+      className="relative h-1.5 select-none md:h-5"
       onMouseEnter={() => setHoverSep(index)}
       onMouseLeave={() => setHoverSep(null)}
     >
@@ -410,8 +420,9 @@ function SeparatorHover({
                 e.stopPropagation();
                 onOpen();
               }}
-              className="pointer-events-auto mx-3 px-2.5 py-1 rounded-full bg-white dark:bg-slate-800 shadow-sm ring-1 ring-violet-200/70 dark:ring-violet-900/40 flex items-center justify-center text-violet-700 dark:text-violet-300"
-              title="הוסף משימה כאן"
+              className="pointer-events-auto mx-3 flex items-center justify-center rounded-full bg-white px-2.5 py-1 text-violet-700 shadow-sm ring-1 ring-violet-200/70 dark:bg-slate-800 dark:text-violet-300 dark:ring-violet-900/40"
+              title="Add a task here"
+              aria-label="Add a task here"
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
@@ -430,7 +441,7 @@ function SeparatorHover({
 
 function Rail() {
   return (
-    <div className="flex-1 h-[2px] overflow-hidden">
+    <div className="h-[2px] flex-1 overflow-hidden">
       <motion.div
         className="h-full text-violet-400 dark:text-violet-300"
         initial={{ width: '60%', opacity: 0.7 }}
@@ -496,12 +507,12 @@ function GapComposer({
         transition={{ duration: 0.22, ease: 'easeInOut' }}
         layout
       >
-        <div className="flex items-center gap-2 px-3 py-2 shadow-sm bg-slate-50 dark:bg-slate-700 rounded-xl">
+        <div className="flex items-center gap-2 px-3 py-2 shadow-sm rounded-xl bg-slate-50 dark:bg-slate-700">
           <input
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="שם משימה…"
-            className="flex-1 px-3 py-2 bg-white border rounded-md dark:bg-slate-800 border-slate-200 dark:border-slate-600"
+            placeholder="New task…"
+            className="flex-1 px-3 py-2 bg-white border rounded-md border-slate-200 dark:border-slate-600 dark:bg-slate-800"
             onKeyDown={(e) => {
               if (e.key === 'Enter') onConfirm();
               if (e.key === 'Escape') onCancel();
@@ -512,12 +523,13 @@ function GapComposer({
             className="px-3 py-2 text-white rounded-md bg-violet-600 hover:bg-violet-700 disabled:opacity-60"
             disabled={!value.trim()}
           >
-            הוסף
+            Add
           </button>
           <button
             onClick={onCancel}
             className="px-3 py-2 rounded-md bg-slate-200 dark:bg-slate-600"
-            title="ביטול"
+            title="Cancel"
+            aria-label="Cancel"
           >
             <X className="w-5 h-5" />
           </button>

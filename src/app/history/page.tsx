@@ -2,10 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { he } from 'date-fns/locale';
-import { signIn, useSession } from 'next-auth/react';
+import { useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
 import {
   Calendar,
@@ -24,7 +22,7 @@ import { byId } from '@/lib/skins/catalog';
 import useSWR from 'swr';
 import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
 
-/* === import SAME tunables you used on Home === */
+/* === same tunables as Home === */
 const TONGUE_MS = 1111;
 const OFFSET_MS = 160;
 const PRE_PAN_MS = 600;
@@ -160,6 +158,7 @@ export default function History() {
       hand_item: eq?.hand_item ? byId[eq.hand_item].riveIndex : 0,
     };
   }, [wardrobeData]);
+
   /* ---- helpers (same as Home) ---- */
   const getMouthDoc = useCallback(() => {
     const p = frogRef.current?.getMouthPoint() ?? { x: 0, y: 0 };
@@ -232,7 +231,7 @@ export default function History() {
     }
   };
 
-  /* ---- main toggle (copies Home logic; adds date + composite key) ---- */
+  /* ---- main toggle ---- */
   const handleToggle = async (
     date: string,
     taskId: string,
@@ -308,7 +307,7 @@ export default function History() {
     });
   };
 
-  /* ---- RAF: identical to Home, except: use grab.date in keys and persistTask(grab.date, ...) ---- */
+  /* ---- RAF loop ---- */
   useEffect(() => {
     if (!grab) return;
 
@@ -454,24 +453,27 @@ export default function History() {
   }
 
   return (
-    <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8">
+    <main
+      dir="ltr"
+      className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8"
+    >
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="flex flex-col items-start justify-between gap-4 mb-8 md:flex-row md:items-center">
           <div>
-            <h1 className="mb-2 text-4xl font-bold md:text-5xl text-slate-900 dark:text-white">
-              היסטוריית משימות
+            <h1 className="mb-2 text-4xl font-bold text-slate-900 dark:text-white md:text-5xl">
+              Task History
             </h1>
             <p className="text-lg text-slate-600 dark:text-slate-400">
-              30 הימים האחרונים
+              Last 30 days
             </p>
           </div>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 font-medium transition-all duration-200 bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg text-slate-700 dark:text-slate-200"
+            className="inline-flex items-center gap-2 px-6 py-3 font-medium transition-all duration-200 bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"
           >
             <HistoryIcon className="w-5 h-5" />
-            חזרה להיום
+            Back to Today
           </Link>
         </div>
 
@@ -486,7 +488,7 @@ export default function History() {
             />
             <button
               onClick={() => setOpenWardrobe(true)}
-              className="absolute p-2 rounded-full shadow -right-2 top-2 bg-white/80 dark:bg-slate-800 hover:shadow-md"
+              className="absolute p-2 rounded-full shadow -right-2 top-2 bg-white/80 hover:shadow-md dark:bg-slate-800"
               title="Wardrobe"
             >
               <Shirt className="w-5 h-5" />
@@ -495,21 +497,21 @@ export default function History() {
           <WardrobePanel open={openWardrobe} onOpenChange={setOpenWardrobe} />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 mb-8 -mt-2.5 md:grid-cols-3">
+        <div className="-mt-2.5 mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
           <StatCard
             icon={<Calendar className="w-8 h-8 text-blue-500" />}
             value={totalDays}
-            label="ימים נרשמו"
+            label="Days recorded"
           />
           <StatCard
             icon={<CheckCircle2 className="w-8 h-8 text-green-500" />}
             value={completedTasks}
-            label="משימות הושלמו"
+            label="Tasks completed"
           />
           <StatCard
             icon={<TrendingUp className="w-8 h-8 text-purple-500" />}
             value={`${Math.round(overallCompletionRate)}%`}
-            label="אחוז השלמה כולל"
+            label="Overall completion"
           />
         </div>
 
@@ -523,7 +525,7 @@ export default function History() {
             return (
               <div
                 key={day.date}
-                className="p-6 transition-shadow duration-200 bg-white shadow-md dark:bg-slate-800 rounded-xl hover:shadow-lg"
+                className="p-6 transition-shadow duration-200 bg-white shadow-md rounded-xl hover:shadow-lg dark:bg-slate-800"
                 style={{
                   animation: `fadeInUp 0.5s ease-out ${i * 0.05}s`,
                   animationFillMode: 'both',
@@ -532,12 +534,10 @@ export default function History() {
                 <div className="flex flex-col items-start justify-between gap-4 mb-4 md:flex-row md:items-center">
                   <div>
                     <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-                      {format(new Date(day.date), 'EEEE, d בMMMM', {
-                        locale: he,
-                      })}
+                      {format(new Date(day.date), 'EEEE, MMMM d')}
                     </h2>
                     <p className="text-sm text-slate-600 dark:text-slate-400">
-                      {completedCount} / {day.tasks.length} משימות הושלמו
+                      {completedCount} / {day.tasks.length} tasks completed
                     </p>
                   </div>
                   {day.tasks.length > 0 && <ProgressBadge pct={pct} />}
@@ -554,8 +554,8 @@ export default function History() {
                         flyRefs.current[key] = el;
                       }}
                       onClick={(e) => {
-                        e.stopPropagation(); // don't trigger row click
-                        handleToggle(day.date, task.id, true); // fire the tongue
+                        e.stopPropagation();
+                        handleToggle(day.date, task.id, true);
                       }}
                       size={30}
                       y={-6}
@@ -569,7 +569,7 @@ export default function History() {
         </div>
       </div>
 
-      {/* SVG overlay – identical to Home; we only changed state/keys */}
+      {/* SVG overlay – same as Home */}
       {grab && (
         <svg
           key={grab.startAt}
