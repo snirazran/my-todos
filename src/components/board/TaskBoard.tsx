@@ -7,6 +7,7 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { usePathname } from 'next/navigation';
 import { Task, DAYS, todayIndex } from './helpers';
 import DayColumn from './DayColumn';
 import TaskList from './TaskList';
@@ -34,6 +35,8 @@ export default function TaskBoard({
     afterIndex?: number | null
   ) => void;
 }) {
+  const pathname = usePathname();
+
   const {
     scrollerRef,
     setSlideRef,
@@ -49,6 +52,11 @@ export default function TaskBoard({
     endDrag,
     cancelDrag,
   } = useDragManager();
+
+  // Cancel any active drag when the route changes (header navigation etc.)
+  useEffect(() => {
+    cancelDrag();
+  }, [pathname, cancelDrag]);
 
   const [pageIndex, setPageIndex] = useState(todayIndex());
   const recomputeCanPanRef = useRef<() => void>();
@@ -211,7 +219,7 @@ export default function TaskBoard({
         onPointerUp={endPan}
         className={[
           'no-scrollbar',
-          'absolute inset-0', // take entire area (except header, which the page already subtracted)
+          'absolute inset-0',
           'w-full h-full',
           'overflow-x-auto overflow-y-hidden overscroll-x-contain',
           'touch-pan-x',
@@ -223,10 +231,7 @@ export default function TaskBoard({
         }}
       >
         <div
-          className="flex gap-3 md:gap-3
-           px-3 md:px-6
-           pt-3 md:pt-6 lg:pt-8   /* top padding you can drag on */
-           pb-3"
+          className="flex gap-3 px-3 pt-3 pb-3 md:gap-3 md:px-6 md:pt-6 lg:pt-8"
           dir="ltr"
         >
           {slides.map(({ day, key }) => (
@@ -235,10 +240,10 @@ export default function TaskBoard({
               ref={setSlideRef(day)}
               data-col="true"
               className="shrink-0 snap-center
-            w-[88vw]        /* mobile */
-            sm:w-[380px]    /* small screens */
-            md:w-[340px]    /* laptops */
-            lg:w-[320px]    /* desktops */
+            w-[88vw]
+            sm:w-[380px]
+            md:w-[340px]
+            lg:w-[320px]
             xl:w-[300px] h-full"
             >
               <DayColumn
@@ -291,7 +296,7 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* Mobile pagination dots (positioned over content; doesn't affect layout height) */}
+      {/* Mobile pagination dots */}
       <PaginationDots count={DAYS} activeIndex={pageIndex} />
 
       {drag?.active && (

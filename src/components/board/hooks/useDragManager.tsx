@@ -49,6 +49,12 @@ export function useDragManager() {
     else cardRefs.current.set(id, el);
   }, []);
 
+  const restoreGlobalInteraction = useCallback(() => {
+    document.body.style.userSelect = '';
+    document.body.style.touchAction = ''; // re-enable page scroll on mobile
+    document.documentElement.classList.remove('dragging');
+  }, []);
+
   const beginDragFromCard = useCallback(
     (
       day: number,
@@ -96,7 +102,7 @@ export function useDragManager() {
       taskText: string;
       clientX: number;
       clientY: number;
-      rectGetter: () => DOMRect; // ⬅️ fresh rect provider
+      rectGetter: () => DOMRect; // fresh rect provider
     }) => {
       const { day, index, taskId, taskText, clientX, clientY, rectGetter } =
         params;
@@ -108,29 +114,25 @@ export function useDragManager() {
   );
 
   const endDrag = useCallback(() => {
-    document.body.style.userSelect = '';
-    document.body.style.touchAction = '';
-    document.documentElement.classList.remove('dragging');
+    restoreGlobalInteraction();
     setDrag(null);
     setTargetDay(null);
     setTargetIndex(null);
-  }, []);
+  }, [restoreGlobalInteraction]);
 
   const cancelDrag = useCallback(() => {
-    document.body.style.userSelect = '';
-    document.body.style.touchAction = '';
-    document.documentElement.classList.remove('dragging');
+    restoreGlobalInteraction();
     setDrag(null);
     setTargetDay(null);
     setTargetIndex(null);
-  }, []);
+  }, [restoreGlobalInteraction]);
 
   // Update drag position, compute target day/index
   useEffect(() => {
     if (!drag) return;
 
     const handleMove = (ev: PointerEvent | MouseEvent | TouchEvent) => {
-      // ⬅️ prevent native scroll/selection while dragging (mobile)
+      // prevent native scroll/selection while dragging (mobile)
       if ((ev as any).cancelable) ev.preventDefault();
 
       // @ts-ignore
@@ -206,7 +208,7 @@ export function useDragManager() {
       if (e.key === 'Escape') cancelDrag();
     };
 
-    // ⬅️ IMPORTANT: non-passive so preventDefault works on iOS/Android
+    // IMPORTANT: non-passive so preventDefault works on iOS/Android
     window.addEventListener('pointermove', handleMove as any, {
       passive: false,
     });
@@ -320,6 +322,34 @@ export function useDragManager() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [drag, targetDay]);
+
+  // SAFETY NETS: always restore interaction on unmount / lifecycle edges
+  useEffect(() => {
+    return () => {
+      restoreGlobalInteraction();
+    };
+  }, [restoreGlobalInteraction]);
+
+  useEffect(() => {
+    if (!drag?.active) return;
+
+    const abort = () => cancelDrag();
+    const onVis = () => {
+      if (document.hidden) cancelDrag();
+    };
+
+    window.addEventListener('pointercancel', abort, { passive: true });
+    window.addEventListener('blur', abort, { passive: true });
+    window.addEventListener('pagehide', abort, { passive: true });
+    document.addEventListener('visibilitychange', onVis);
+
+    return () => {
+      window.removeEventListener('pointercancel', abort as any);
+      window.removeEventListener('blur', abort as any);
+      window.removeEventListener('pagehide', abort as any);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, [drag?.active, cancelDrag]);
 
   return {
     // refs
