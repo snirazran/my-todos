@@ -96,11 +96,8 @@ export default function ManageTasksPage() {
   return (
     // PAGE is non-scrollable: height = viewport - header (h-14 / md:h-16)
     <main
-      className="
-        relative
-        h-[calc(100svh-3.5rem)] md:h-[calc(100svh-4rem)]
-        overflow-hidden
-      "
+      className="relative overflow-hidden  bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800"
+      style={{ height: 'calc(100dvh - var(--header-h))' }} // 👈 full visible height
     >
       {/* Full-bleed content area that TaskBoard will completely occupy */}
       <div className="absolute inset-0">

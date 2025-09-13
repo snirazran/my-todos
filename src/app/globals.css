@@ -8,6 +8,7 @@
     --background: 0 0% 100%;
     --foreground: 0 0% 3.9%;
     --card: 0 0% 100%;
+    --header-h: 3.5rem; /* h-14 mobile */
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
@@ -30,6 +31,7 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
     --radius: 0.5rem;
+    --bottom-safe: env(safe-area-inset-bottom, 0px);
   }
 
   .dark {
@@ -160,70 +162,8 @@ body.dragging {
 [data-role='board-scroller'] * {
   -webkit-tap-highlight-color: transparent;
 }
-
-/* ──────────────────────────────────────────────────────────────
-   Global full-viewport background (fills under mobile URL bars)
-   Works on iOS Safari, Android Chrome, and desktop
-   ────────────────────────────────────────────────────────────── */
-
-:root {
-  /* light */
-  --page-bg-from: #f8fafc; /* slate-50 */
-  --page-bg-to: #f1f5f9; /* slate-100 */
-}
-@media (prefers-color-scheme: dark) {
+@media (min-width: 768px) {
   :root {
-    /* dark */
-    --page-bg-from: #0f172a; /* slate-900 */
-    --page-bg-to: #1e293b; /* slate-800 */
-  }
-}
-
-/* Let the global layer show through */
-html,
-body {
-  height: 100%;
-  min-height: 100%;
-  background: transparent !important; /* allow gradient below to be visible */
-}
-
-/* Prefer stable viewport units on modern mobile browsers */
-@supports (height: 100svh) {
-  body {
-    min-height: 100svh;
-  }
-}
-
-/* iOS Safari “fill available” fallback for older engines */
-@supports (-webkit-touch-callout: none) {
-  html,
-  body {
-    min-height: -webkit-fill-available;
-  }
-}
-
-/* Paint something while ::before is initializing (prevents flash) */
-html {
-  background-color: var(--page-bg-from);
-}
-
-/* Fixed gradient that sits behind everything, incl. under browser chrome */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background: linear-gradient(135deg, var(--page-bg-from), var(--page-bg-to));
-  background-attachment: fixed;
-  -webkit-transform: translateZ(0);
-  transform: translateZ(0);
-  will-change: transform;
-}
-
-/* Respect notches / home indicator */
-@supports (padding: env(safe-area-inset-bottom)) {
-  body {
-    padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
+    --header-h: 4rem;
   }
 }
