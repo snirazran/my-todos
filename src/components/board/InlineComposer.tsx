@@ -32,7 +32,7 @@ export default function InlineComposer({
         ref={taRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="שם משימה…"
+        placeholder="Task name…"
         rows={1}
         className="w-full resize-none overflow-hidden leading-6 min-h-[40px] px-3 py-2 bg-white border rounded-md dark:bg-slate-800 border-slate-200 dark:border-slate-600"
         onInput={grow}
@@ -48,14 +48,14 @@ export default function InlineComposer({
           className="px-4 py-2 text-white rounded-md bg-violet-600 hover:bg-violet-700 disabled:opacity-60"
           disabled={!value.trim()}
         >
-          הוסף
+          Add
         </button>
         <button
           onClick={onCancel}
           className="px-4 py-2 rounded-md bg-slate-200 dark:bg-slate-600"
-          title="ביטול"
+          title="Cancel"
         >
-          ביטול
+          Cancel
         </button>
       </div>
     </div>

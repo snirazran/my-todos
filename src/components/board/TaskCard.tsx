@@ -50,7 +50,6 @@ export default function TaskCard({
       if (!startPos.current) return;
       const dx = Math.abs(e.clientX - startPos.current.x);
       const dy = Math.abs(e.clientY - startPos.current.y);
-      // Any real movement cancels the pending long-press → let native scroll happen
       if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
         cleanupLP();
       }
@@ -70,7 +69,6 @@ export default function TaskCard({
       if (target.closest('button, a, input, textarea, [role="button"]')) return;
 
       if (e.pointerType === 'mouse') {
-        // Desktop: start drag immediately
         onGrab({
           clientX: e.clientX,
           clientY: e.clientY,
@@ -79,12 +77,10 @@ export default function TaskCard({
         return;
       }
 
-      // Touch: arm a long-press without blocking scroll
       startPos.current = { x: e.clientX, y: e.clientY };
 
       const el = cardRef.current;
       if (el) {
-        // ⬇️ passive: true so browser scroll is never blocked while we wait
         el.addEventListener('pointermove', handlePointerMove as any, {
           passive: true,
         });
@@ -97,7 +93,6 @@ export default function TaskCard({
       }
 
       longPressTimer.current = window.setTimeout(() => {
-        // If we got here, user held still → begin drag
         onGrab({
           clientX: startPos.current!.x,
           clientY: startPos.current!.y,
@@ -112,7 +107,6 @@ export default function TaskCard({
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
-    // Passive pointerdown allows immediate scroll start
     el.addEventListener('pointerdown', handlePointerDown as any, {
       passive: true,
     });
@@ -136,7 +130,6 @@ export default function TaskCard({
       data-card-id={dragId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
-      // ⬇️ Allow both axes; you can also use the Tailwind class 'touch-auto'
       style={{ touchAction: 'auto' }}
       className={[
         'flex items-center gap-3 p-3 select-none rounded-xl transition-colors',
@@ -152,7 +145,12 @@ export default function TaskCard({
         {task.text}
       </span>
 
-      <button onClick={onDelete} title="מחק" className="shrink-0" type="button">
+      <button
+        onClick={onDelete}
+        title="Delete"
+        className="shrink-0"
+        type="button"
+      >
         <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
       </button>
     </div>

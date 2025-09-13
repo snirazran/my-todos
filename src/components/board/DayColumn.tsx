@@ -17,16 +17,13 @@ export default function DayColumn({
 }) {
   return (
     <section
-      dir="rtl"
       className={[
         'group flex flex-col',
         'bg-white/90 dark:bg-slate-800/90',
         'rounded-2xl shadow border border-slate-200/70 dark:border-slate-700/60',
         maxHeightClass,
         'p-1.5',
-        // keep a small min so empty days still look clickable
         'min-h-[100px] md:min-h-[100px]',
-        // prevent the column itself from overflowing; list will scroll
         'overflow-hidden',
       ].join(' ')}
     >
@@ -40,7 +37,6 @@ export default function DayColumn({
         className={[
           'flex-1 overflow-y-auto pr-1 rounded-xl transition-colors',
           'no-scrollbar',
-          // ⬇️ Was: 'touch-pan-y'. Allow both axes so horizontal swipes work from tasks.
           'touch-auto',
           'overscroll-y-contain',
         ].join(' ')}

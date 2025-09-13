@@ -20,7 +20,6 @@ export default function GapRail({
       onClick={handleClick}
       className={[
         'relative h-2 select-none md:h-2 group/rail',
-        // NEW: disable all pointer events on mobile; re-enable on desktop if not disabled
         'pointer-events-none',
         disabled
           ? 'opacity-60 md:pointer-events-none'
@@ -55,7 +54,7 @@ export default function GapRail({
 
           <button
             type="button"
-            title="הוסף משימה כאן"
+            title="Add task here"
             onClick={(e) => {
               e.stopPropagation();
               onAdd();

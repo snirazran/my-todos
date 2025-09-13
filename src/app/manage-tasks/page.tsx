@@ -3,9 +3,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AddTaskModal from '@/components/ui/dialog/AddTaskModal';
 import TaskBoard from '@/components/board/TaskBoard';
-import { Task, DAYS, hebrewDays } from '@/components/board/helpers';
+import {
+  Task,
+  DAYS,
+  labelForDisplayDay,
+  apiDayFromDisplay,
+} from '@/components/board/helpers';
 
-const EXTRA = 'ללא יום (השבוע)';
+const EXTRA = 'No day (this week)';
 
 export default function ManageTasksPage() {
   const [week, setWeek] = useState<Task[][]>(
@@ -30,30 +35,36 @@ export default function ManageTasksPage() {
     })();
   }, []);
 
-  const saveDay = async (day: number, tasks: Task[]) => {
+  const saveDay = async (displayDay: number, tasks: Task[]) => {
     const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
     try {
       await fetch('/api/manage-tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day: day === 7 ? -1 : day, tasks: ordered }),
+        body: JSON.stringify({
+          day: apiDayFromDisplay(displayDay), // ✅ map to API (-1 for extra)
+          tasks: ordered,
+        }),
       });
     } catch (e) {
       console.warn('saveDay failed', e);
     }
   };
 
-  const removeTask = async (day: number, id: string) => {
+  const removeTask = async (displayDay: number, id: string) => {
     try {
       await fetch('/api/manage-tasks', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day: day === 7 ? -1 : day, taskId: id }),
+        body: JSON.stringify({
+          day: apiDayFromDisplay(displayDay), // ✅ map to API
+          taskId: id,
+        }),
       });
     } finally {
       setWeek((w) => {
         const clone = [...w];
-        clone[day] = clone[day].filter((t) => t.id !== id);
+        clone[displayDay] = clone[displayDay].filter((t) => t.id !== id);
         return clone;
       });
     }
@@ -65,7 +76,7 @@ export default function ManageTasksPage() {
     repeat,
   }: {
     text: string;
-    days: number[];
+    days: number[]; // these will be API day numbers coming from the modal
     repeat: string;
   }) => {
     await fetch('/api/manage-tasks', {
@@ -89,22 +100,20 @@ export default function ManageTasksPage() {
 
   const titles = useMemo(
     () =>
-      Array.from({ length: DAYS }, (_, i) => (i === 7 ? EXTRA : hebrewDays[i])),
+      Array.from({ length: DAYS }, (_, i) =>
+        i === 7 ? EXTRA : labelForDisplayDay(i)
+      ),
     []
   );
 
   return (
-    // PAGE is non-scrollable: height = viewport - header (h-14 / md:h-16)
     <main
-      className="relative overflow-hidden  bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 min-h-100svh pb-safe"
+      className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 min-h-100svh pb-safe"
       style={{
-        /* Prefer dynamic VH when available, subtract your header */
         height: 'calc(100dvh - var(--header-h))',
-        /* Fallback for older Safari */
         minHeight: 'calc(-webkit-fill-available - var(--header-h))',
       }}
     >
-      {/* Full-bleed content area that TaskBoard will completely occupy */}
       <div className="absolute inset-0">
         <TaskBoard
           titles={titles}
@@ -112,9 +121,10 @@ export default function ManageTasksPage() {
           setWeek={setWeek}
           saveDay={saveDay}
           removeTask={removeTask}
-          onRequestAdd={(day, text, afterIndex = null) => {
+          onRequestAdd={(displayDay, text, afterIndex = null) => {
             setPrefillText(text ?? '');
-            setPrefillDays([day === 7 ? -1 : day]);
+            // Prefill modal with the API day (0..6) or -1 for extra:
+            setPrefillDays([apiDayFromDisplay(displayDay)]);
             setInsertAt(
               afterIndex === null ? null : Math.max(0, afterIndex + 1)
             );
@@ -126,7 +136,7 @@ export default function ManageTasksPage() {
       {showModal && (
         <AddTaskModal
           initialText={prefillText}
-          initialDays={prefillDays}
+          initialDays={prefillDays} // expects API days (0..6) or -1
           defaultRepeat="weekly"
           onClose={() => {
             setShowModal(false);

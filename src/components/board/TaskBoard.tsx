@@ -8,7 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { usePathname } from 'next/navigation';
-import { Task, DAYS, todayIndex } from './helpers';
+import { Task, DAYS, todayDisplayIndex } from './helpers';
 import DayColumn from './DayColumn';
 import TaskList from './TaskList';
 import PaginationDots from './PaginationDots';
@@ -53,12 +53,12 @@ export default function TaskBoard({
     cancelDrag,
   } = useDragManager();
 
-  // Cancel any active drag when the route changes (header navigation etc.)
+  // Cancel drag on route change
   useEffect(() => {
     cancelDrag();
   }, [pathname, cancelDrag]);
 
-  const [pageIndex, setPageIndex] = useState(todayIndex());
+  const [pageIndex, setPageIndex] = useState(todayDisplayIndex());
   const recomputeCanPanRef = useRef<() => void>();
 
   const centerColumnSmooth = (day: number) => {
@@ -74,7 +74,7 @@ export default function TaskBoard({
 
   useEffect(() => {
     const s = scrollerRef.current;
-    const t = todayIndex();
+    const t = todayDisplayIndex();
     const col = (document.querySelectorAll('[data-col="true"]')[t] ??
       null) as HTMLElement | null;
     if (!s || !col) return;
@@ -85,7 +85,6 @@ export default function TaskBoard({
     });
     setPageIndex(t);
     recomputeCanPanRef.current?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -206,9 +205,7 @@ export default function TaskBoard({
   }, [drag, onDrop]);
 
   return (
-    // Fill the parent (which is absolute inset-0 from the page)
     <div className="relative w-full h-full">
-      {/* Full-bleed horizontal scroller that owns the whole content area */}
       <div
         ref={scrollerRef}
         dir="ltr"
@@ -260,7 +257,7 @@ export default function TaskBoard({
                       onClick={() => openBottomComposer(day)}
                       disabled={!!drag?.active}
                       className={[
-                        'w-full px-3 py-2 text-right rounded-xl',
+                        'w-full px-3 py-2 text-left rounded-xl',
                         'bg-violet-50/70 dark:bg-violet-950/20',
                         'text-violet-700 dark:text-violet-300',
                         !!drag?.active
@@ -268,7 +265,7 @@ export default function TaskBoard({
                           : 'hover:bg-violet-100 dark:hover:bg-violet-900/30',
                       ].join(' ')}
                     >
-                      + הוסף משימה
+                      + Add task
                     </button>
                   )
                 }
@@ -296,7 +293,6 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* Mobile pagination dots */}
       <PaginationDots count={DAYS} activeIndex={pageIndex} />
 
       {drag?.active && (
