@@ -100,7 +100,6 @@ export default function ManageTasksPage() {
         relative
         h-[calc(100svh-3.5rem)] md:h-[calc(100svh-4rem)]
         overflow-hidden
-        bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800
       "
     >
       {/* Full-bleed content area that TaskBoard will completely occupy */}

@@ -235,7 +235,7 @@ export default function TaskBoard({
               ref={setSlideRef(day)}
               data-col="true"
               className="shrink-0 snap-center
-            w-[84vw]        /* mobile */
+            w-[90vw]        /* mobile */
             sm:w-[380px]    /* small screens */
             md:w-[340px]    /* laptops */
             lg:w-[320px]    /* desktops */
