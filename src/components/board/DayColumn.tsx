@@ -23,7 +23,7 @@ export default function DayColumn({
         'bg-white/90 dark:bg-slate-800/90',
         'rounded-2xl shadow border border-slate-200/70 dark:border-slate-700/60',
         maxHeightClass,
-        'p-3 md:p-4',
+        'p-1.5',
         'min-h-[100px] md:min-h-[100px]',
       ].join(' ')}
     >

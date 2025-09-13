@@ -15,8 +15,6 @@ export default function ManageTasksPage() {
   const [showModal, setShowModal] = useState(false);
   const [prefillText, setPrefillText] = useState<string>('');
   const [prefillDays, setPrefillDays] = useState<number[]>([]);
-
-  // NEW: where to insert (index in the column). null = append at end.
   const [insertAt, setInsertAt] = useState<number | null>(null);
 
   useEffect(() => {
@@ -61,7 +59,6 @@ export default function ManageTasksPage() {
     }
   };
 
-  // Called by the modal when user clicks "save"
   const onAddTask = async ({
     text,
     days,
@@ -77,16 +74,14 @@ export default function ManageTasksPage() {
       body: JSON.stringify({
         text,
         days,
-        repeat, // 'weekly' | 'this-week'
-        insertAt, // << send the gap index (or null to append)
+        repeat,
+        insertAt,
       }),
     });
 
     const data = await fetch('/api/manage-tasks').then((r) => r.json());
     setWeek(data);
     setShowModal(false);
-
-    // clear for the next time
     setInsertAt(null);
     setPrefillText('');
     setPrefillDays([]);
@@ -99,13 +94,17 @@ export default function ManageTasksPage() {
   );
 
   return (
+    // PAGE is non-scrollable: height = viewport - header (h-14 / md:h-16)
     <main
-      className="h-[100svh] md:min-h-screen overflow-hidden overscroll-y-contain
-             px-3 pt-8 pb-[max(env(safe-area-inset-bottom),1rem)]
-             md:px-6 md:pt-12
-             bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800"
+      className="
+        relative
+        h-[calc(100svh-3.5rem)] md:h-[calc(100svh-4rem)]
+        overflow-hidden
+        bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800
+      "
     >
-      <div className="w-full px-2 mx-auto md:px-6">
+      {/* Full-bleed content area that TaskBoard will completely occupy */}
+      <div className="absolute inset-0">
         <TaskBoard
           titles={titles}
           week={week}
@@ -115,12 +114,9 @@ export default function ManageTasksPage() {
           onRequestAdd={(day, text, afterIndex = null) => {
             setPrefillText(text ?? '');
             setPrefillDays([day === 7 ? -1 : day]);
-
-            if (afterIndex === null) {
-              setInsertAt(null);
-            } else {
-              setInsertAt(Math.max(0, afterIndex + 1));
-            }
+            setInsertAt(
+              afterIndex === null ? null : Math.max(0, afterIndex + 1)
+            );
             setShowModal(true);
           }}
         />

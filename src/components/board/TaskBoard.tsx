@@ -34,7 +34,6 @@ export default function TaskBoard({
     afterIndex?: number | null
   ) => void;
 }) {
-  // --- drag manager (refs + drag state + handlers)
   const {
     scrollerRef,
     setSlideRef,
@@ -51,7 +50,6 @@ export default function TaskBoard({
     cancelDrag,
   } = useDragManager();
 
-  // --- page index (center on today, track scroll)
   const [pageIndex, setPageIndex] = useState(todayIndex());
   const recomputeCanPanRef = useRef<() => void>();
 
@@ -100,15 +98,12 @@ export default function TaskBoard({
     return () => s.removeEventListener('scroll', handler);
   }, []);
 
-  // --- desktop drag-to-pan
   const { panActive, startPanIfEligible, onPanMove, endPan, recomputeCanPan } =
     usePan(scrollerRef);
   recomputeCanPanRef.current = recomputeCanPan;
 
-  // --- snap suppression: snap only when not dragging/panning
   const snapSuppressed = !!drag?.active || panActive;
 
-  // --- inline composer state
   const [composer, setComposer] = useState<{
     day: number;
     afterIndex: number | null;
@@ -135,25 +130,27 @@ export default function TaskBoard({
     onRequestAdd(day, text, after);
   };
 
-  // --- slides meta
   const slides = useMemo(
     () =>
       Array.from({ length: DAYS }, (_, day) => ({ day, key: `day-${day}` })),
     []
   );
 
-  // --- commit reordering on drop
   const commitDragReorder = useCallback(
     (toDay: number, toIndex: number) => {
       if (!drag) return;
-
       const sameSpot = drag.fromDay === toDay && drag.fromIndex === toIndex;
       if (sameSpot) return;
 
       setWeek((prev) => {
         const next = prev.map((d) => d.slice());
         const [moved] = next[drag.fromDay].splice(drag.fromIndex, 1);
-        next[toDay].splice(Math.min(toIndex, next[toDay].length), 0, moved);
+        let insertIndex = toIndex;
+        if (drag.fromDay === toDay && drag.fromIndex < toIndex) {
+          insertIndex = Math.max(0, toIndex - 1);
+        }
+
+        next[toDay].splice(Math.min(insertIndex, next[toDay].length), 0, moved);
         Promise.all(
           drag.fromDay === toDay
             ? [saveDay(toDay, next[toDay])]
@@ -168,7 +165,6 @@ export default function TaskBoard({
     [drag, saveDay, setWeek]
   );
 
-  // end drag + center column + save
   const onDrop = useCallback(() => {
     if (!drag) return;
     const toDay = targetDay ?? drag.fromDay;
@@ -190,7 +186,6 @@ export default function TaskBoard({
     commitDragReorder,
   ]);
 
-  // wire pointerup -> drop
   useEffect(() => {
     if (!drag?.active) return;
     const handleUp = () => onDrop();
@@ -203,7 +198,9 @@ export default function TaskBoard({
   }, [drag, onDrop]);
 
   return (
-    <div className="relative">
+    // Fill the parent (which is absolute inset-0 from the page)
+    <div className="relative w-full h-full">
+      {/* Full-bleed horizontal scroller that owns the whole content area */}
       <div
         ref={scrollerRef}
         dir="ltr"
@@ -214,7 +211,9 @@ export default function TaskBoard({
         onPointerUp={endPan}
         className={[
           'no-scrollbar',
-          'w-full overflow-x-auto overflow-y-visible overscroll-x-contain px-2 md:px-4',
+          'absolute inset-0', // take entire area (except header, which the page already subtracted)
+          'w-full h-full',
+          'overflow-x-auto overflow-y-hidden overscroll-x-contain',
           'touch-pan-x',
           snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth',
         ].join(' ')}
@@ -223,20 +222,32 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex gap-3 pb-2 md:gap-5" dir="ltr">
+        <div
+          className="flex gap-3 md:gap-3
+           px-3 md:px-6
+           pt-3 md:pt-6 lg:pt-8   /* top padding you can drag on */
+           pb-3"
+          dir="ltr"
+        >
           {slides.map(({ day, key }) => (
             <div
               key={key}
               ref={setSlideRef(day)}
               data-col="true"
-              className="shrink-0 snap-center w-[88vw] sm:w-[460px] md:w-[400px]"
+              className="shrink-0 snap-center
+            w-[84vw]        /* mobile */
+            sm:w-[380px]    /* small screens */
+            md:w-[340px]    /* laptops */
+            lg:w-[320px]    /* desktops */
+            xl:w-[300px]" /* big desktops */
             >
               <DayColumn
                 title={titles[day]}
                 listRef={setListRef(day)}
-                maxHeightClass="max-h-[calc(100svh-210px)] md:max-h-[calc(100vh-170px)]"
+                // Make each day column's list height track the available height.
+                // This avoids any vertical scroll on the page itself.
+                maxHeightClass="max-h-[calc(100%-84px)] md:max-h-[calc(100%-84px)]"
                 footer={
-                  // show the button only when the bottom-composer for this day is NOT open
                   !(
                     composer &&
                     composer.day === day &&
@@ -282,10 +293,9 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* Mobile pagination dots */}
-      <PaginationDots count={slides.length} activeIndex={pageIndex} />
+      {/* Mobile pagination dots (positioned over content; doesn't affect layout height) */}
+      <PaginationDots count={DAYS} activeIndex={pageIndex} />
 
-      {/* Drag overlay */}
       {drag?.active && (
         <DragOverlay
           x={drag.x}

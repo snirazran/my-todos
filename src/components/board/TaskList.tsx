@@ -52,6 +52,18 @@ export default function TaskList({
   const placeholderAt =
     drag && targetDay === day && targetIndex != null ? targetIndex : null;
 
+  if (process.env.NODE_ENV !== 'production') {
+    const seen = new Set<string>();
+    const dups: string[] = [];
+    for (const t of items) {
+      if (seen.has(t.id)) dups.push(t.id);
+      else seen.add(t.id);
+    }
+    if (dups.length) {
+      // eslint-disable-next-line no-console
+      console.warn(`TaskList day=${day} duplicate task ids:`, dups);
+    }
+  }
   const rows: React.ReactNode[] = [];
 
   // TOP rail
@@ -98,7 +110,7 @@ export default function TaskList({
 
     children.push(
       <TaskCard
-        key={`card-${t.id}`}
+        key={`card-${day}-${i}-${t.id}`}
         innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
         dragId={draggableIdFor(day, t.id)}
         // ✅ REMOVED: The unnecessary 'index' prop was removed from here.
@@ -166,7 +178,7 @@ export default function TaskList({
     }
 
     rows.push(
-      <div key={`wrap-${day}-${t.id}`} className="relative">
+      <div key={`wrap-${day}-${i}-${t.id}`} className="relative">
         {children}
       </div>
     );
