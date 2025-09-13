@@ -239,14 +239,12 @@ export default function TaskBoard({
             sm:w-[380px]    /* small screens */
             md:w-[340px]    /* laptops */
             lg:w-[320px]    /* desktops */
-            xl:w-[300px]" /* big desktops */
+            xl:w-[300px] h-full"
             >
               <DayColumn
                 title={titles[day]}
                 listRef={setListRef(day)}
-                // Make each day column's list height track the available height.
-                // This avoids any vertical scroll on the page itself.
-                maxHeightClass="max-h-[calc(100%-84px)] md:max-h-[calc(100%-84px)]"
+                maxHeightClass="max-h-[80svh]"
                 footer={
                   !(
                     composer &&

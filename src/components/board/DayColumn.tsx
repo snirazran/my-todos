@@ -7,7 +7,7 @@ export default function DayColumn({
   listRef,
   children,
   footer,
-  maxHeightClass = 'max-h-[calc(100vh-170px)]',
+  maxHeightClass = 'max-h-[80svh]',
 }: {
   title: string;
   listRef: (el: HTMLDivElement | null) => void;
@@ -24,7 +24,10 @@ export default function DayColumn({
         'rounded-2xl shadow border border-slate-200/70 dark:border-slate-700/60',
         maxHeightClass,
         'p-1.5',
+        // keep a small min so empty days still look clickable
         'min-h-[100px] md:min-h-[100px]',
+        // prevent the column itself from overflowing; list will scroll
+        'overflow-hidden',
       ].join(' ')}
     >
       <h2 className="mb-3 font-semibold text-center md:mb-4 text-slate-900 dark:text-white">
