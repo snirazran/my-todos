@@ -28,17 +28,17 @@ export default function LoginPage() {
     e.preventDefault();
     const nextErrs: typeof errs = {};
 
-    /* 1️⃣ client‑side validation (HE) */
-    if (!email.trim()) nextErrs.email = 'חובה למלא כתובת אימייל';
-    else if (!mailRx.test(email)) nextErrs.email = 'אימייל לא תקין';
+    /* 1️⃣ client-side validation (EN) */
+    if (!email.trim()) nextErrs.email = 'Email is required';
+    else if (!mailRx.test(email)) nextErrs.email = 'Invalid email address';
 
-    if (!password) nextErrs.password = 'חובה להזין סיסמה';
-    else if (password.length < 8) nextErrs.password = 'לפחות 8 תווים';
+    if (!password) nextErrs.password = 'Password is required';
+    else if (password.length < 8) nextErrs.password = 'At least 8 characters';
 
     setErrs(nextErrs);
     if (Object.keys(nextErrs).length) return;
 
-    /* 2️⃣ sign‑in */
+    /* 2️⃣ sign-in */
     setSubmitting(true);
     const res = await signIn('credentials', {
       email,
@@ -49,11 +49,11 @@ export default function LoginPage() {
 
     if (res?.ok) return router.push('/');
 
-    /* 3️⃣ server‑side errors (HE) */
+    /* 3️⃣ server-side errors (EN) */
     if (res?.error === 'CredentialsSignin') {
-      setErrs({ server: 'אימייל או סיסמה שגויים' });
+      setErrs({ server: 'Incorrect email or password' });
     } else {
-      setErrs({ server: 'אירעה שגיאה – נסה שוב' });
+      setErrs({ server: 'An error occurred — please try again' });
     }
   };
 
@@ -62,7 +62,7 @@ export default function LoginPage() {
     <main className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="w-full max-w-[32rem] p-10 bg-white shadow-2xl dark:bg-slate-800 rounded-3xl">
         <h1 className="mb-8 text-3xl font-extrabold tracking-tight text-center text-slate-900 dark:text-white">
-          התחברות
+          Sign in
         </h1>
 
         {errs.server && (
@@ -76,7 +76,7 @@ export default function LoginPage() {
           <div>
             <input
               type="email"
-              placeholder="אימייל"
+              placeholder="Email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-5 py-3 text-lg border rounded-xl focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-white"
@@ -88,7 +88,7 @@ export default function LoginPage() {
           <div>
             <input
               type="password"
-              placeholder="סיסמה"
+              placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-5 py-3 text-lg border rounded-xl focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-white"
@@ -102,17 +102,17 @@ export default function LoginPage() {
             disabled={submitting}
             className="w-full py-3 text-lg font-semibold text-white transition bg-violet-600 rounded-xl hover:bg-purple-700 disabled:opacity-50"
           >
-            {submitting ? 'טוען…' : 'התחבר'}
+            {submitting ? 'Loading…' : 'Sign in'}
           </button>
         </form>
 
         <p className="mt-8 text-base text-center text-slate-600 dark:text-slate-400">
-          אין לך משתמש?{' '}
+          Don&apos;t have an account?{' '}
           <Link
             href="/register"
             className="font-semibold text-purple-600 hover:underline"
           >
-            הירשם כאן
+            Sign up here
           </Link>
         </p>
       </div>

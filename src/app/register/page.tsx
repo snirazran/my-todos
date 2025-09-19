@@ -31,7 +31,7 @@ export default function RegisterPage() {
 
     /* local checks */
     if (pw !== pw2) {
-      setServerErr('הסיסמאות אינן תואמות');
+      setServerErr('Passwords do not match');
       return;
     }
 
@@ -52,21 +52,21 @@ export default function RegisterPage() {
             ? Object.values(details ?? {})
                 .flat()
                 .join(' · ')
-            : error || 'קרתה שגיאה – נסה שוב'
+            : error || 'An error occurred — please try again'
         );
         return;
       }
 
-      /* 2️⃣  log‑in immediately */
+      /* 2️⃣  log-in immediately */
       await signIn('credentials', {
         email,
         password: pw,
         redirect: true,
-        callbackUrl: '/', // landing page after auto‑login
+        callbackUrl: '/', // landing page after auto-login
       });
       /* signIn handles the redirect – no router.push() needed */
     } catch {
-      setServerErr('קרתה שגיאה – נסה שוב');
+      setServerErr('An error occurred — please try again');
     } finally {
       setSubmitting(false);
     }
@@ -77,7 +77,7 @@ export default function RegisterPage() {
     <main className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
       <div className="w-full max-w-[32rem] p-10 bg-white shadow-2xl dark:bg-slate-800 rounded-3xl">
         <h1 className="mb-8 text-3xl font-extrabold tracking-tight text-center text-slate-900 dark:text-white">
-          הרשמה
+          Register
         </h1>
 
         {serverErr && (
@@ -88,7 +88,7 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <input
-            placeholder="שם מלא"
+            placeholder="Full name"
             required
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -97,7 +97,7 @@ export default function RegisterPage() {
 
           <input
             type="email"
-            placeholder="אימייל"
+            placeholder="Email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -108,7 +108,7 @@ export default function RegisterPage() {
           <div className="relative">
             <input
               type={showPw ? 'text' : 'password'}
-              placeholder="סיסמה"
+              placeholder="Password"
               required
               value={pw}
               onChange={(e) => setPw(e.target.value)}
@@ -128,7 +128,7 @@ export default function RegisterPage() {
           <div className="relative">
             <input
               type={showPw2 ? 'text' : 'password'}
-              placeholder="אישור סיסמה"
+              placeholder="Confirm password"
               required
               value={pw2}
               onChange={(e) => setPw2(e.target.value)}
@@ -149,17 +149,17 @@ export default function RegisterPage() {
             disabled={submitting}
             className="w-full py-3 text-lg font-semibold text-white transition bg-violet-600 rounded-xl hover:bg-purple-700 disabled:opacity-50"
           >
-            {submitting ? 'טוען…' : 'צור משתמש'}
+            {submitting ? 'Loading…' : 'Create account'}
           </button>
         </form>
 
         <p className="mt-8 text-base text-center text-slate-600 dark:text-slate-400">
-          יש לך משתמש קיים?{' '}
+          Already have an account?{' '}
           <Link
             href="/login"
             className="font-semibold text-purple-600 hover:underline"
           >
-            התחבר כאן
+            Sign in here
           </Link>
         </p>
       </div>
