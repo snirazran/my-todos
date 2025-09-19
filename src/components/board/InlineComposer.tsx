@@ -27,14 +27,23 @@ export default function InlineComposer({
   React.useEffect(grow, [value, grow]);
 
   return (
-    <div className="px-3 py-3 bg-slate-50 dark:bg-slate-700 rounded-xl">
+    <div className="px-3 py-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-900/30 ring-1 ring-emerald-600/15">
       <textarea
         ref={taRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="Task name…"
         rows={1}
-        className="w-full resize-none overflow-hidden leading-6 min-h-[40px] px-3 py-2 bg-white border rounded-md dark:bg-slate-800 border-slate-200 dark:border-slate-600"
+        className={[
+          // smaller type + tighter vertical rhythm
+          'w-full resize-none overflow-hidden px-3 py-2',
+          'text-sm leading-[1.25rem]', // 14px text, 20px line-height
+          'min-h-[38px]',
+          'bg-white/90 rounded-xl border-0 ring-1 ring-emerald-700/20',
+          'placeholder:text-emerald-900/40 dark:placeholder:text-emerald-200/40',
+          'focus:ring-2 focus:ring-lime-400 outline-none',
+          'dark:bg-emerald-950/50 dark:text-emerald-50',
+        ].join(' ')}
         onInput={grow}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onConfirm();
@@ -42,17 +51,30 @@ export default function InlineComposer({
         }}
         autoFocus={autoFocus}
       />
-      <div className="flex gap-2 mt-2">
+
+      <div className="grid grid-cols-2 gap-2 mt-2">
         <button
           onClick={onConfirm}
-          className="px-4 py-2 text-white rounded-md bg-violet-600 hover:bg-violet-700 disabled:opacity-60"
+          className={[
+            'rounded-2xl ring-1 ring-emerald-700/30 shadow',
+            'bg-gradient-to-br from-emerald-500 to-lime-500 text-emerald-950',
+            // smaller text & padding
+            'px-3 py-2 text-sm font-medium',
+            'hover:brightness-105 disabled:opacity-60',
+          ].join(' ')}
           disabled={!value.trim()}
         >
-          Add
+          Add a fly
         </button>
+
         <button
           onClick={onCancel}
-          className="px-4 py-2 rounded-md bg-slate-200 dark:bg-slate-600"
+          className={[
+            'rounded-2xl ring-1 ring-emerald-700/10',
+            'bg-emerald-900/10 text-emerald-900',
+            'dark:bg-emerald-900/40 dark:text-emerald-100',
+            'px-3 py-2 text-sm',
+          ].join(' ')}
           title="Cancel"
         >
           Cancel

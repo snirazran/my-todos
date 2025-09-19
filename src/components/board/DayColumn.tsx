@@ -18,33 +18,26 @@ export default function DayColumn({
   return (
     <section
       className={[
-        'group flex flex-col',
-        'bg-white/90 dark:bg-slate-800/90',
-        'rounded-2xl shadow border border-slate-200/70 dark:border-slate-700/60',
+        'group flex flex-col overflow-hidden',
+        'rounded-[26px] bg-white/90 backdrop-blur-xl shadow-2xl',
+        'ring-1 ring-emerald-700/20 dark:bg-emerald-950/60 dark:ring-emerald-300/10',
         maxHeightClass,
-        'p-1.5',
-        'min-h-[100px] md:min-h-[100px]',
-        'overflow-hidden',
+        'p-2.5 md:p-3',
+        'min-h-[100px]',
       ].join(' ')}
     >
-      <h2 className="mb-3 font-semibold text-center md:mb-4 text-slate-900 dark:text-white">
+      <h2 className="mb-3 font-extrabold tracking-tight text-center text-transparent md:mb-4 bg-gradient-to-r from-emerald-700 via-lime-600 to-emerald-700 bg-clip-text dark:from-emerald-300 dark:via-lime-300 dark:to-emerald-200">
         {title}
       </h2>
 
-      {/* Scrollable list area */}
       <div
         ref={listRef}
-        className={[
-          'flex-1 overflow-y-auto pr-1 rounded-xl transition-colors',
-          'no-scrollbar',
-          'touch-auto',
-          'overscroll-y-contain',
-        ].join(' ')}
+        className="flex-1 pr-1 overflow-y-auto transition-colors rounded-xl no-scrollbar touch-auto overscroll-y-contain"
       >
         {children}
       </div>
 
-      {footer ? <div className="mt-2">{footer}</div> : null}
+      {footer ? <div className="mt-4">{footer}</div> : null}
     </section>
   );
 }

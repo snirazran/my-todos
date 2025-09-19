@@ -15,7 +15,7 @@ import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
 import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
-import AddTaskModal from '@/components/ui/dialog/AddTaskModal';
+import AddTaskModal from '@/components/ui/addTaskModal';
 
 /* === Tunables ============================================================ */
 const TONGUE_MS = 1111; // tongue extend+retract total

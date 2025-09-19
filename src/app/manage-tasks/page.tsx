@@ -1,8 +1,12 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import AddTaskModal from '@/components/ui/dialog/AddTaskModal';
+import AddTaskModal from '@/components/ui/addTaskModal';
 import TaskBoard from '@/components/board/TaskBoard';
+import Frog from '@/components/ui/frog';
+import { byId } from '@/lib/skins/catalog';
+import useSWR from 'swr';
+
 import {
   Task,
   DAYS,
@@ -23,15 +27,29 @@ export default function ManageTasksPage() {
   const [prefillDays, setPrefillDays] = useState<number[]>([]);
   const [insertAt, setInsertAt] = useState<number | null>(null);
 
-  /** 🔁 Map API order (Sun..Sat, extra at 7) → Display order (Mon-first if configured) */
+  // wardrobe → frog indices (to match your modal’s frog)
+  const { data: wardrobeData } = useSWR(
+    '/api/skins/inventory',
+    (u) => fetch(u).then((r) => r.json()),
+    { revalidateOnFocus: false }
+  );
+  const frogIndices = (() => {
+    const eq = wardrobeData?.wardrobe?.equipped ?? {};
+    return {
+      skin: eq?.skin ? byId[eq.skin].riveIndex : 0,
+      hat: eq?.hat ? byId[eq.hat].riveIndex : 0,
+      scarf: eq?.scarf ? byId[eq.scarf].riveIndex : 0,
+      hand_item: eq?.hand_item ? byId[eq.hand_item].riveIndex : 0,
+    };
+  })();
+
+  /** 🔁 Map API order (Sun..Sat, extra at 7) → Display order */
   const mapApiToDisplay = (apiWeek: Task[][]): Task[][] => {
     const out: Task[][] = Array.from({ length: DAYS }, () => []);
-    // real days 0..6 (API)
     for (let apiDay = 0; apiDay <= 6; apiDay++) {
-      const displayIdx = displayDayFromApi(apiDay); // 0..6 in display order
+      const displayIdx = displayDayFromApi(apiDay);
       out[displayIdx] = apiWeek[apiDay] ?? [];
     }
-    // extra bucket stays at 7
     out[7] = apiWeek[7] ?? [];
     return out;
   };
@@ -57,7 +75,7 @@ export default function ManageTasksPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          day: apiDayFromDisplay(displayDay), // 0..6 or -1
+          day: apiDayFromDisplay(displayDay),
           tasks: ordered,
         }),
       });
@@ -73,12 +91,11 @@ export default function ManageTasksPage() {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          day: apiDayFromDisplay(displayDay), // 0..6 or -1
+          day: apiDayFromDisplay(displayDay),
           taskId: id,
         }),
       });
     } finally {
-      // local optimistic update is already in display order
       setWeek((w) => {
         const clone = [...w];
         clone[displayDay] = clone[displayDay].filter((t) => t.id !== id);
@@ -94,7 +111,7 @@ export default function ManageTasksPage() {
     repeat,
   }: {
     text: string;
-    days: number[]; // API day numbers (0..6) or -1
+    days: number[];
     repeat: string;
   }) => {
     await fetch('/api/manage-tasks', {
@@ -102,13 +119,12 @@ export default function ManageTasksPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         text,
-        days, // ✅ already API days
+        days, // already API days
         repeat,
         insertAt,
       }),
     });
 
-    // IMPORTANT: refetch and remap to display order
     const data = await fetch('/api/manage-tasks').then((r) => r.json());
     setWeek(mapApiToDisplay(data));
 
@@ -129,22 +145,38 @@ export default function ManageTasksPage() {
 
   return (
     <main
-      className="relative overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 min-h-100svh pb-safe"
+      className="relative overflow-hidden min-h-100svh pb-safe"
       style={{
         height: 'calc(100dvh - var(--header-h))',
         minHeight: 'calc(-webkit-fill-available - var(--header-h))',
       }}
     >
+      {/* Pond background */}
+      <div
+        aria-hidden
+        className="absolute inset-0 -z-20"
+        style={{
+          background:
+            'linear-gradient(140deg, #065f46 0%, rgba(16,185,129,0.20) 45%, rgba(101,163,13,0.26) 100%)',
+        }}
+      />
+      {/* Soft ripples */}
+      <div className="absolute inset-0 pointer-events-none -z-10 opacity-40">
+        <div className="absolute w-[42vmin] h-[42vmin] rounded-full left-[6%] top-[18%] bg-lime-300/15 animate-ripple" />
+        <div className="absolute w-[54vmin] h-[54vmin] rounded-full right-[10%] top-[6%] bg-emerald-200/15 animate-ripple-slow" />
+        <div className="absolute w-[60vmin] h-[60vmin] rounded-full left-[28%] bottom-[10%] bg-lime-200/15 animate-ripple" />
+      </div>
+
+      {/* Board */}
       <div className="absolute inset-0">
         <TaskBoard
           titles={titles}
-          week={week} // ✅ now in display order
+          week={week}
           setWeek={setWeek}
           saveDay={saveDay}
           removeTask={removeTask}
           onRequestAdd={(displayDay, text, afterIndex = null) => {
             setPrefillText(text ?? '');
-            // Prefill modal with API day for the chosen display column
             setPrefillDays([apiDayFromDisplay(displayDay)]);
             setInsertAt(
               afterIndex === null ? null : Math.max(0, afterIndex + 1)
@@ -157,7 +189,7 @@ export default function ManageTasksPage() {
       {showModal && (
         <AddTaskModal
           initialText={prefillText}
-          initialDays={prefillDays} // API day(s)
+          initialDays={prefillDays}
           defaultRepeat="weekly"
           onClose={() => {
             setShowModal(false);
@@ -166,6 +198,82 @@ export default function ManageTasksPage() {
           onSave={onAddTask}
         />
       )}
+
+      {/* Local animations (so you don’t need to touch global.css) */}
+      <style jsx global>{`
+        @keyframes ripple {
+          0% {
+            transform: scale(0.9);
+            opacity: 0.3;
+          }
+          50% {
+            transform: scale(1.05);
+            opacity: 0.6;
+          }
+          100% {
+            transform: scale(0.9);
+            opacity: 0.3;
+          }
+        }
+        .animate-ripple {
+          animation: ripple 11s ease-in-out infinite;
+        }
+        .animate-ripple-slow {
+          animation: ripple 16s ease-in-out infinite;
+        }
+        @keyframes bob {
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-4px);
+          }
+        }
+        .animate-bob {
+          animation: bob 3.6s ease-in-out infinite;
+        }
+        @keyframes buzz {
+          0% {
+            transform: translate(0, 0) rotate(0deg);
+          }
+          25% {
+            transform: translate(-1px, 1px) rotate(-1deg);
+          }
+          50% {
+            transform: translate(1px, -1px) rotate(1deg);
+          }
+          75% {
+            transform: translate(-1px, 0px) rotate(0deg);
+          }
+          100% {
+            transform: translate(0, 0) rotate(0deg);
+          }
+        }
+        .animate-buzz {
+          animation: buzz 400ms linear infinite;
+        }
+        @keyframes cardShine {
+          0% {
+            background-position: -150% 0;
+          }
+          100% {
+            background-position: 250% 0;
+          }
+        }
+        .shine {
+          background-image: linear-gradient(
+            120deg,
+            transparent 0%,
+            rgba(255, 255, 255, 0.35) 30%,
+            transparent 60%
+          );
+          background-size: 200% 100%;
+        }
+        .shine:hover {
+          animation: cardShine 1200ms ease;
+        }
+      `}</style>
     </main>
   );
 }

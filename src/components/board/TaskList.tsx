@@ -59,11 +59,10 @@ export default function TaskList({
       if (seen.has(t.id)) dups.push(t.id);
       else seen.add(t.id);
     }
-    if (dups.length) {
-      // eslint-disable-next-line no-console
+    if (dups.length)
       console.warn(`TaskList day=${day} duplicate task ids:`, dups);
-    }
   }
+
   const rows: React.ReactNode[] = [];
 
   // TOP rail
@@ -96,7 +95,7 @@ export default function TaskList({
     rows.push(
       <div
         key={`ph-top-${day}`}
-        className="h-12 my-2 border-2 border-dashed rounded-xl border-violet-400/70"
+        className="h-12 my-2 border-2 border-dashed rounded-2xl border-lime-400/70 bg-lime-50/40"
       />
     );
   }
@@ -113,7 +112,6 @@ export default function TaskList({
         key={`card-${day}-${i}-${t.id}`}
         innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
         dragId={draggableIdFor(day, t.id)}
-        // ✅ REMOVED: The unnecessary 'index' prop was removed from here.
         task={t}
         onDelete={() => removeTask(day, t.id)}
         onGrab={(payload) => {
@@ -126,7 +124,6 @@ export default function TaskList({
             clientX: payload.clientX,
             clientY: payload.clientY,
             pointerType: payload.pointerType,
-            // fresh rect at grab-time (mouse) or when LP actually fires (touch)
             rectGetter: () => {
               const el =
                 document.querySelector<HTMLElement>(`[data-card-id="${id}"]`) ??
@@ -146,7 +143,7 @@ export default function TaskList({
       children.push(
         <div
           key={`ph-${day}-${i + 1}`}
-          className="h-12 my-2 border-2 border-dashed rounded-xl border-violet-400/70"
+          className="h-12 my-2 border-2 border-dashed rounded-2xl border-lime-400/70 bg-lime-50/40"
         />
       );
     }
@@ -184,20 +181,18 @@ export default function TaskList({
     );
   }
 
-  // Empty column: single placeholder at end
   if (items.length === 0 && placeholderAt === 0) {
     rows.push(
       <div
         key={`ph-end-${day}`}
-        className="h-12 my-2 border-2 border-dashed rounded-xl border-violet-400/70"
+        className="h-12 my-2 border-2 border-dashed rounded-2xl border-lime-400/70 bg-lime-50/40"
       />
     );
   }
 
-  // Bottom composer only (footer button lives in DayColumn)
   if (composer && composer.day === day && composer.afterIndex === null) {
     rows.push(
-      <div key={`composer-bottom-wrap-${day}`} className="mt-2">
+      <div key={`composer-bottom-wrap-${day}`} className="px-2 mt-3">
         <InlineComposer
           value={draft}
           onChange={setDraft}

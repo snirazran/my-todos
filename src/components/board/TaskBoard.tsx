@@ -36,7 +36,6 @@ export default function TaskBoard({
   ) => void;
 }) {
   const pathname = usePathname();
-
   const {
     scrollerRef,
     setSlideRef,
@@ -53,7 +52,6 @@ export default function TaskBoard({
     cancelDrag,
   } = useDragManager();
 
-  // Cancel drag on route change
   useEffect(() => {
     cancelDrag();
   }, [pathname, cancelDrag]);
@@ -156,7 +154,6 @@ export default function TaskBoard({
         if (drag.fromDay === toDay && drag.fromIndex < toIndex) {
           insertIndex = Math.max(0, toIndex - 1);
         }
-
         next[toDay].splice(Math.min(insertIndex, next[toDay].length), 0, moved);
         Promise.all(
           drag.fromDay === toDay
@@ -215,11 +212,8 @@ export default function TaskBoard({
         onPointerMove={onPanMove}
         onPointerUp={endPan}
         className={[
-          'no-scrollbar',
-          'absolute inset-0',
-          'w-full h-full',
-          'overflow-x-auto overflow-y-hidden overscroll-x-contain',
-          'touch-pan-x',
+          'no-scrollbar absolute inset-0 w-full h-full',
+          'overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x',
           snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth',
         ].join(' ')}
         style={{
@@ -227,21 +221,14 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div
-          className="flex gap-3 px-3 pt-3 pb-3 md:gap-3 md:px-6 md:pt-6 lg:pt-8"
-          dir="ltr"
-        >
+        <div className="flex gap-5 px-4 pt-4 pb-6 md:px-6 md:pt-6 lg:pt-8">
           {slides.map(({ day, key }) => (
             <div
               key={key}
               ref={setSlideRef(day)}
               data-col="true"
               className="shrink-0 snap-center
-            w-[88vw]
-            sm:w-[380px]
-            md:w-[340px]
-            lg:w-[320px]
-            xl:w-[300px] h-full"
+                w-[88vw] sm:w-[380px] md:w-[340px] lg:w-[320px] xl:w-[300px] h-full"
             >
               <DayColumn
                 title={titles[day]}
@@ -257,15 +244,13 @@ export default function TaskBoard({
                       onClick={() => openBottomComposer(day)}
                       disabled={!!drag?.active}
                       className={[
-                        'w-full px-3 py-2 text-left rounded-xl',
-                        'bg-violet-50/70 dark:bg-violet-950/20',
-                        'text-violet-700 dark:text-violet-300',
-                        !!drag?.active
-                          ? 'opacity-60 pointer-events-none'
-                          : 'hover:bg-violet-100 dark:hover:bg-violet-900/30',
+                        'w-full px-4 py-2.5 text-center rounded-2xl transition relative shine',
+                        'bg-gradient-to-br from-emerald-500 to-lime-500 text-emerald-950 font-medium',
+                        'ring-1 ring-emerald-700/30 shadow hover:brightness-105',
+                        !!drag?.active ? 'opacity-60 pointer-events-none' : '',
                       ].join(' ')}
                     >
-                      + Add task
+                      + Add a fly
                     </button>
                   )
                 }

@@ -3,6 +3,7 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import { Trash2 } from 'lucide-react';
 import type { Task } from './helpers';
+import Fly from '@/components/ui/fly';
 
 type OnGrabParams = {
   clientX: number;
@@ -50,16 +51,12 @@ export default function TaskCard({
       if (!startPos.current) return;
       const dx = Math.abs(e.clientX - startPos.current.x);
       const dy = Math.abs(e.clientY - startPos.current.y);
-      if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
-        cleanupLP();
-      }
+      if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) cleanupLP();
     },
     [cleanupLP]
   );
 
-  const handlePointerUp = useCallback(() => {
-    cleanupLP();
-  }, [cleanupLP]);
+  const handlePointerUp = useCallback(() => cleanupLP(), [cleanupLP]);
 
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
@@ -78,7 +75,6 @@ export default function TaskCard({
       }
 
       startPos.current = { x: e.clientX, y: e.clientY };
-
       const el = cardRef.current;
       if (el) {
         el.addEventListener('pointermove', handlePointerMove as any, {
@@ -132,26 +128,31 @@ export default function TaskCard({
       onDragStart={(e) => e.preventDefault()}
       style={{ touchAction: 'auto' }}
       className={[
-        'flex items-center gap-3 p-3 select-none rounded-xl transition-colors',
-        'bg-white dark:bg-slate-700',
-        'border border-slate-200 dark:border-slate-600 shadow-sm',
-        'cursor-grab',
-        hiddenWhileDragging ? 'opacity-0' : '',
+        'group flex items-center gap-3 p-3 select-none rounded-2xl cursor-grab transition',
+        'bg-white/85 dark:bg-emerald-900/40 backdrop-blur',
+        'border border-emerald-700/20 dark:border-emerald-300/15 shadow',
+
+        hiddenWhileDragging ? 'opacity-0' : 'hover:shadow-md',
       ].join(' ')}
       role="listitem"
       aria-grabbed={false}
     >
-      <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
+      {/* Animated fly (your component) */}
+      <span className="relative grid shrink-0 h-7 w-7 place-items-center">
+        <Fly size={22} x={-2} y={-2} />
+      </span>
+
+      <span className="flex-1 text-sm text-emerald-950 dark:text-emerald-50">
         {task.text}
       </span>
 
       <button
         onClick={onDelete}
         title="Delete"
-        className="shrink-0"
+        className="shrink-0 rounded-full p-1.5 hover:bg-emerald-100/60 dark:hover:bg-emerald-800/50 transition"
         type="button"
       >
-        <Trash2 className="w-4 h-4 text-red-500 hover:text-red-600" />
+        <Trash2 className="w-4 h-4 text-red-500 group-hover:text-red-600" />
       </button>
     </div>
   );
