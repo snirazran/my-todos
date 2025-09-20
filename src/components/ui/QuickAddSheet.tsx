@@ -102,22 +102,22 @@ export default function QuickAddSheet({
             autoFocus
           />
 
-          {/* When chooser — grid on mobile, flex on sm+ */}
-          <div className="grid items-center grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+          {/* When chooser — one row on mobile; tighter spacing & text */}
+          <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={() => setWhen('today')}
               aria-pressed={when === 'today'}
               className={[
-                'h-9 px-3 rounded-full text-[13px] font-medium inline-flex items-center gap-1.5 ring-1 transition',
-                'w-full sm:w-auto',
+                'h-9 px-2 sm:px-3 rounded-full text-[12px] sm:text-[13px] leading-tight',
+                'inline-flex items-center gap-1 sm:gap-1.5 ring-1 transition whitespace-nowrap',
                 when === 'today'
                   ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
                   : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
               ].join(' ')}
               title="Add to today"
             >
-              <Sun className="w-4 h-4" />
+              <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               Today
             </button>
 
@@ -126,15 +126,15 @@ export default function QuickAddSheet({
               onClick={() => setWhen('pick')}
               aria-pressed={when === 'pick'}
               className={[
-                'h-9 px-3 rounded-full text-[13px] font-medium inline-flex items-center gap-1.5 ring-1 transition',
-                'w-full sm:w-auto',
+                'h-9 px-2 sm:px-3 rounded-full text-[12px] sm:text-[13px] leading-tight',
+                'inline-flex items-center gap-1 sm:gap-1.5 ring-1 transition whitespace-nowrap',
                 when === 'pick'
                   ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
                   : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
               ].join(' ')}
               title="Pick specific day(s)"
             >
-              <CalendarDays className="w-4 h-4" />
+              <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
               Pick day
             </button>
 
@@ -146,36 +146,18 @@ export default function QuickAddSheet({
               }}
               aria-pressed={when === 'later'}
               className={[
-                'h-9 px-3 rounded-full text-[13px] font-medium inline-flex items-center gap-1.5 ring-1 transition',
-                'w-full sm:w-auto',
+                'h-9 px-2 sm:px-3 rounded-full text-[12px] sm:text-[13px] leading-tight',
+                'inline-flex items-center gap-1 sm:gap-1.5 ring-1 transition whitespace-nowrap',
                 when === 'later'
                   ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
                   : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
               ].join(' ')}
               title="Save to Later this week"
             >
-              <CalendarCheck className="w-4 h-4" />
-              Later this week
-            </button>
-
-            {/* Repeat toggle — full width under chips on mobile; right-aligned on sm+ */}
-            <button
-              type="button"
-              onClick={() =>
-                setRepeat((r) => (r === 'weekly' ? 'this-week' : 'weekly'))
-              }
-              aria-pressed={repeat === 'weekly'}
-              className={[
-                'h-9 px-3 rounded-full text-[13px] font-medium inline-flex items-center gap-1.5 ring-1 transition justify-center',
-                'col-span-3 w-full sm:col-auto sm:w-auto sm:ml-auto',
-                repeat === 'weekly'
-                  ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
-                  : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
-              ].join(' ')}
-              title="Toggle weekly repeat"
-            >
-              <RotateCcw className="w-4 h-4" />
-              {repeat === 'weekly' ? 'Repeats' : 'One-time'}
+              <CalendarCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
+              {/* Short label on mobile, full on sm+ */}
+              <span className="sm:hidden">Later</span>
+              <span className="hidden sm:inline">Later this week</span>
             </button>
           </div>
 
@@ -214,6 +196,28 @@ export default function QuickAddSheet({
               </span>
             </div>
           )}
+
+          {/* Repeat toggle — its own row (clean on mobile) */}
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() =>
+                setRepeat((r) => (r === 'weekly' ? 'this-week' : 'weekly'))
+              }
+              aria-pressed={repeat === 'weekly'}
+              className={[
+                'w-full h-9 px-3 rounded-full text-[13px] leading-tight',
+                'inline-flex items-center justify-center gap-1.5 ring-1 transition',
+                repeat === 'weekly'
+                  ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
+                  : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
+              ].join(' ')}
+              title="Toggle weekly repeat"
+            >
+              <RotateCcw className="w-4 h-4 shrink-0" />
+              {repeat === 'weekly' ? 'Repeats' : 'One-time'}
+            </button>
+          </div>
 
           {/* Actions */}
           <div className="grid grid-cols-2 gap-2 mt-3">
