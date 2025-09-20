@@ -15,7 +15,7 @@ import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
 import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
-import AddTaskModal from '@/components/ui/addTaskModal';
+import QuickAddSheet from '@/components/ui/QuickAddSheet';
 
 /* === Tunables ============================================================ */
 const TONGUE_MS = 1111; // tongue extend+retract total
@@ -82,14 +82,8 @@ export default function Home() {
   const [openWardrobe, setOpenWardrobe] = useState(false);
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
   const [loading, setLoading] = useState(true);
-
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [addDraft, setAddDraft] = useState('');
-  const [insertAfter, setInsertAfter] = useState<number | null>(null);
-  const [preselectedDays, setPreselectedDays] = useState<number[]>([]);
-  const [defaultRepeat, setDefaultRepeat] = useState<'this-week' | 'weekly'>(
-    'this-week'
-  );
+  const [quickText, setQuickText] = useState('');
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [weeklyIds, setWeeklyIds] = useState<Set<string>>(new Set());
 
   const [weeklyBacklog, setWeeklyBacklog] = useState<
@@ -613,12 +607,9 @@ export default function Home() {
                 />
               )
             }
-            onAddRequested={(prefill, afterIdx, opts) => {
-              setAddDraft(prefill);
-              setInsertAfter(afterIdx);
-              const dow = new Date().getDay(); // API day (0..6, Sun..Sat)
-              setPreselectedDays(opts?.preselectToday ? [dow] : []);
-              setShowAddModal(true);
+            onAddRequested={(prefill /*, afterIdx, opts */) => {
+              setQuickText(prefill || '');
+              setShowQuickAdd(true);
             }}
             weeklyIds={weeklyIds}
             onDeleteToday={async (taskId) => {
@@ -713,36 +704,33 @@ export default function Home() {
         </svg>
       )}
 
-      {showAddModal && (
-        <AddTaskModal
-          initialText={addDraft}
-          initialDays={preselectedDays}
-          defaultRepeat="this-week"
-          onClose={() => setShowAddModal(false)}
-          onSave={async ({ text, days, repeat }) => {
-            // unified API (handles weekly & this-week & backlog)
-            await fetch('/api/manage-tasks', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text, days, repeat }),
-            });
+      <QuickAddSheet
+        open={showQuickAdd}
+        onOpenChange={setShowQuickAdd}
+        initialText={quickText}
+        defaultRepeat="this-week"
+        onSubmit={async ({ text, days, repeat }) => {
+          await fetch('/api/manage-tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, days, repeat }),
+          });
 
-            // refresh today list
-            if (session) {
-              const res = await fetch(`/api/tasks?date=${dateStr}`);
-              const json = await res.json();
-              setTasks(json.tasks ?? []);
-            } else {
-              setGuestTasks((prev) => [
-                ...prev,
-                { id: crypto.randomUUID(), text, completed: false },
-              ]);
-            }
+          // Refresh "today" list
+          if (session) {
+            const res = await fetch(`/api/tasks?date=${dateStr}`);
+            const json = await res.json();
+            setTasks(json.tasks ?? []);
+          } else {
+            setGuestTasks((prev) => [
+              ...prev,
+              { id: crypto.randomUUID(), text, completed: false },
+            ]);
+          }
 
-            fetchBacklog();
-          }}
-        />
-      )}
+          fetchBacklog();
+        }}
+      />
     </main>
   );
 }

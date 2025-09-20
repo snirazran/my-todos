@@ -41,31 +41,12 @@ export default function TaskList({
 }) {
   const vSet = visuallyCompleted ?? new Set<string>();
 
-  // bottom composer
-  const [inlineOpen, setInlineOpen] = useState(false);
-  const [draft, setDraft] = useState('');
-
   // hover state for separators (desktop only)
   const [hoverSep, setHoverSep] = useState<number | null>(null);
-
-  // inline composer between rows
-  const [openGap, setOpenGap] = useState<number | null>(null);
-  const [gapDrafts, setGapDrafts] = useState<Record<number, string>>({});
 
   // delete modal
   const [toDelete, setToDelete] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
-
-  const openInline = () => setInlineOpen(true);
-  const closeInline = () => {
-    setDraft('');
-    setInlineOpen(false);
-  };
-  const fireAddBottom = () => {
-    if (!draft.trim()) return;
-    onAddRequested(draft.trim(), null, { preselectToday: true });
-    closeInline();
-  };
 
   const isWeekly = (t: Task) => weeklyIds.has(t.id);
 
@@ -204,80 +185,29 @@ export default function TaskList({
                   </div>
                 </div>
 
-                {/* between i and i+1 (desktop only) */}
+                {/* Between i and i+1: open QuickAdd directly */}
                 {i < tasks.length - 1 && (
-                  <>
-                    {openGap === i ? (
-                      <GapComposer
-                        index={i}
-                        value={gapDrafts[i] ?? ''}
-                        onChange={(txt) =>
-                          setGapDrafts((m) => ({ ...m, [i]: txt }))
-                        }
-                        onConfirm={() => {
-                          const txt = (gapDrafts[i] ?? '').trim();
-                          if (!txt) return;
-                          onAddRequested(txt, i, { preselectToday: true });
-                          setOpenGap(null);
-                        }}
-                        onCancel={() => setOpenGap(null)}
-                      />
-                    ) : (
-                      <SeparatorHover
-                        index={i}
-                        hoverSep={hoverSep}
-                        setHoverSep={setHoverSep}
-                        onOpen={() => {
-                          setHoverSep(null);
-                          setOpenGap(i);
-                        }}
-                      />
-                    )}
-                  </>
+                  <SeparatorHover
+                    index={i}
+                    hoverSep={hoverSep}
+                    setHoverSep={setHoverSep}
+                    onOpen={() => {
+                      // Open the sheet immediately, preselect “today”, insert after this index
+                      onAddRequested('', i, { preselectToday: true });
+                    }}
+                  />
                 )}
               </div>
             );
           })}
 
-          {/* Bottom “Add task” */}
-          {!inlineOpen ? (
-            <button
-              onClick={openInline}
-              className="flex items-center justify-center w-full gap-2 px-4 py-3 mt-2 rounded-xl bg-violet-50/70 text-violet-700 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-900/30"
-            >
-              <Plus className="w-5 h-5" /> Add task
-            </button>
-          ) : (
-            <div className="px-4 py-3 mt-2 rounded-xl bg-slate-50 dark:bg-slate-700">
-              <div className="flex items-center gap-2">
-                <input
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  placeholder="New task…"
-                  className="flex-1 px-3 py-2 bg-white border rounded-md border-slate-200 dark:border-slate-600 dark:bg-slate-800"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') fireAddBottom();
-                    if (e.key === 'Escape') closeInline();
-                  }}
-                />
-                <button
-                  onClick={fireAddBottom}
-                  className="px-3 py-2 text-white rounded-md bg-violet-600 hover:bg-violet-700 disabled:opacity-60"
-                  disabled={!draft.trim()}
-                >
-                  Add
-                </button>
-                <button
-                  onClick={closeInline}
-                  className="px-3 py-2 rounded-md bg-slate-200 dark:bg-slate-600"
-                  title="Cancel"
-                  aria-label="Cancel"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Bottom “Add task” → open QuickAdd immediately */}
+          <button
+            onClick={() => onAddRequested('', null, { preselectToday: true })}
+            className="flex items-center justify-center w-full gap-2 px-4 py-3 mt-2 rounded-xl bg-violet-50/70 text-violet-700 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-900/30"
+          >
+            <Plus className="w-5 h-5" /> Add task
+          </button>
         </div>
       </div>
 
@@ -306,12 +236,12 @@ export default function TaskList({
               <div className="flex items-start gap-3">
                 <div className="flex-1">
                   <h4 className="mb-1 text-lg font-semibold">
-                    {isWeekly(toDelete)
+                    {toDelete && isWeekly(toDelete)
                       ? 'Delete weekly task'
                       : 'Delete task for today'}
                   </h4>
                   <p className="mb-4 text-slate-600 dark:text-slate-300">
-                    {isWeekly(toDelete)
+                    {toDelete && isWeekly(toDelete)
                       ? 'Remove only from today, or delete from this week entirely?'
                       : 'Delete this task from today? This action is permanent.'}
                   </p>
@@ -335,7 +265,7 @@ export default function TaskList({
                   Cancel
                 </button>
 
-                {isWeekly(toDelete) ? (
+                {toDelete && isWeekly(toDelete) ? (
                   <>
                     <button
                       className="px-4 py-2 text-white rounded-lg bg-rose-600 disabled:opacity-60"
@@ -418,7 +348,7 @@ function SeparatorHover({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                onOpen();
+                onOpen(); // opens QuickAdd
               }}
               className="pointer-events-auto mx-3 flex items-center justify-center rounded-full bg-white px-2.5 py-1 text-violet-700 shadow-sm ring-1 ring-violet-200/70 dark:bg-slate-800 dark:text-violet-300 dark:ring-violet-900/40"
               title="Add a task here"
@@ -457,84 +387,5 @@ function Rail() {
         }}
       />
     </div>
-  );
-}
-
-/* ────────────────────────────────────────────── */
-/*  Inline composer (animated gap)               */
-/*  Closes on outside click; keeps draft         */
-/* ────────────────────────────────────────────── */
-function GapComposer({
-  index,
-  value,
-  onChange,
-  onConfirm,
-  onCancel,
-}: {
-  index: number;
-  value: string;
-  onChange: (v: string) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const ref = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const onDocDown = (e: MouseEvent) => {
-      if (!ref.current) return;
-      if (!ref.current.contains(e.target as Node)) onCancel();
-    };
-    document.addEventListener('mousedown', onDocDown, { passive: true });
-    return () => document.removeEventListener('mousedown', onDocDown as any);
-  }, [onCancel]);
-
-  useEffect(() => {
-    // focus input when it opens
-    const el = ref.current?.querySelector('input') as HTMLInputElement | null;
-    el?.focus();
-    el?.select();
-  }, []);
-
-  return (
-    <AnimatePresence initial={false}>
-      <motion.div
-        key={`gap-${index}`}
-        ref={ref}
-        className="relative my-0.5"
-        initial={{ opacity: 0, height: 0 }}
-        animate={{ opacity: 1, height: 'auto' }}
-        exit={{ opacity: 0, height: 0 }}
-        transition={{ duration: 0.22, ease: 'easeInOut' }}
-        layout
-      >
-        <div className="flex items-center gap-2 px-3 py-2 shadow-sm rounded-xl bg-slate-50 dark:bg-slate-700">
-          <input
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder="New task…"
-            className="flex-1 px-3 py-2 bg-white border rounded-md border-slate-200 dark:border-slate-600 dark:bg-slate-800"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') onConfirm();
-              if (e.key === 'Escape') onCancel();
-            }}
-          />
-          <button
-            onClick={onConfirm}
-            className="px-3 py-2 text-white rounded-md bg-violet-600 hover:bg-violet-700 disabled:opacity-60"
-            disabled={!value.trim()}
-          >
-            Add
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-3 py-2 rounded-md bg-slate-200 dark:bg-slate-600"
-            title="Cancel"
-            aria-label="Cancel"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-      </motion.div>
-    </AnimatePresence>
   );
 }

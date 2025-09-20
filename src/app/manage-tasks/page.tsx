@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import TaskBoard from '@/components/board/TaskBoard';
-import { byId } from '@/lib/skins/catalog';
 import useSWR from 'swr';
 
 import {
@@ -20,37 +19,14 @@ export default function ManageTasksPage() {
     Array.from({ length: DAYS }, () => [])
   );
 
-  const [showModal, setShowModal] = useState(false);
-  const [prefillText, setPrefillText] = useState<string>('');
-  const [prefillDays, setPrefillDays] = useState<number[]>([]);
-  const [insertAt, setInsertAt] = useState<number | null>(null);
-  const [modalRepeat, setModalRepeat] = useState<'this-week' | 'weekly'>(
-    'weekly'
-  );
-
-  // wardrobe → frog indices (to match your modal’s frog)
-  const { data: wardrobeData } = useSWR(
-    '/api/skins/inventory',
-    (u) => fetch(u).then((r) => r.json()),
-    { revalidateOnFocus: false }
-  );
-  const frogIndices = (() => {
-    const eq = wardrobeData?.wardrobe?.equipped ?? {};
-    return {
-      skin: eq?.skin ? byId[eq.skin].riveIndex : 0,
-      hat: eq?.hat ? byId[eq.hat].riveIndex : 0,
-      scarf: eq?.scarf ? byId[eq.scarf].riveIndex : 0,
-      hand_item: eq?.hand_item ? byId[eq.hand_item].riveIndex : 0,
-    };
-  })();
-
-  /** 🔁 Map API order (Sun..Sat, extra at 7) → Display order */
+  /** Map API order (Sun..Sat, Later at index 7) → Display order */
   const mapApiToDisplay = (apiWeek: Task[][]): Task[][] => {
     const out: Task[][] = Array.from({ length: DAYS }, () => []);
     for (let apiDay = 0; apiDay <= 6; apiDay++) {
       const displayIdx = displayDayFromApi(apiDay);
       out[displayIdx] = apiWeek[apiDay] ?? [];
     }
+    // Later bucket
     out[7] = apiWeek[7] ?? [];
     return out;
   };
@@ -105,7 +81,7 @@ export default function ManageTasksPage() {
     }
   };
 
-  /** Add task; the modal returns API days (0..6 or -1). After POST, refetch & remap. */
+  /** Direct add from QuickAddSheet: days are API days (0..6 or 7 for “Later”) */
   const onAddTask = async ({
     text,
     days,
@@ -113,26 +89,16 @@ export default function ManageTasksPage() {
   }: {
     text: string;
     days: number[];
-    repeat: string;
+    repeat: 'this-week' | 'weekly';
   }) => {
     await fetch('/api/manage-tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        days, // already API days
-        repeat,
-        insertAt,
-      }),
+      body: JSON.stringify({ text, days, repeat }),
     });
 
     const data = await fetch('/api/manage-tasks').then((r) => r.json());
     setWeek(mapApiToDisplay(data));
-
-    setShowModal(false);
-    setInsertAt(null);
-    setPrefillText('');
-    setPrefillDays([]);
   };
 
   /** Titles in display order */
@@ -152,16 +118,6 @@ export default function ManageTasksPage() {
         minHeight: 'calc(-webkit-fill-available - var(--header-h))',
       }}
     >
-      {/* Pond background */}
-
-      {/* Soft ripples */}
-      <div className="absolute inset-0 pointer-events-none -z-10 opacity-40">
-        <div className="absolute w-[42vmin] h-[42vmin] rounded-full left-[6%] top-[18%] bg-lime-300/15 animate-ripple" />
-        <div className="absolute w-[54vmin] h-[54vmin] rounded-full right-[10%] top-[6%] bg-emerald-200/15 animate-ripple-slow" />
-        <div className="absolute w-[60vmin] h-[60vmin] rounded-full left-[28%] bottom-[10%] bg-lime-200/15 animate-ripple" />
-      </div>
-
-      {/* Board */}
       <div className="absolute inset-0">
         <TaskBoard
           titles={titles}
@@ -169,30 +125,13 @@ export default function ManageTasksPage() {
           setWeek={setWeek}
           saveDay={saveDay}
           removeTask={removeTask}
-          onRequestAdd={(
-            displayDayOrNull,
-            text,
-            afterIndex = null,
-            repeat = 'weekly'
-          ) => {
-            setPrefillText(text ?? '');
-            setPrefillDays(
-              displayDayOrNull == null
-                ? []
-                : [apiDayFromDisplay(displayDayOrNull)]
-            );
-            setInsertAt(
-              afterIndex === null ? null : Math.max(0, afterIndex + 1)
-            );
-            setModalRepeat(repeat);
-            setShowModal(true);
+          onRequestAdd={() => {
+            /* no-op: QuickAddSheet path is used */
           }}
-          /** NEW: direct add from Quick Add without opening the modal */
           onQuickAdd={onAddTask}
         />
       </div>
 
-      {/* Local animations (so you don’t need to touch global.css) */}
       <style jsx global>{`
         @keyframes ripple {
           0% {
@@ -237,7 +176,7 @@ export default function ManageTasksPage() {
             transform: translate(1px, -1px) rotate(1deg);
           }
           75% {
-            transform: translate(-1px, 0px) rotate(0deg);
+            transform: translate(-1px, 0) rotate(0deg);
           }
           100% {
             transform: translate(0, 0) rotate(0deg);
