@@ -15,6 +15,8 @@ import type { RepeatMode, WhenMode } from './types';
 import { todayIdx } from './utils';
 
 type FrogIndices = Partial<Record<WardrobeSlot, number>>;
+/** Extend the local state to support an unselected mode */
+type WhenState = WhenMode | 'unset';
 
 type Props = Readonly<{
   initialText?: string;
@@ -25,7 +27,7 @@ type Props = Readonly<{
     repeat: RepeatMode;
   }) => Promise<void> | void;
   allowMultipleDays?: boolean;
-  defaultRepeat?: RepeatMode; // used as a fixed repeat mode now
+  defaultRepeat?: RepeatMode; // fixed repeat mode
   initialDays?: number[];
   frogIndices?: FrogIndices;
 }>;
@@ -39,27 +41,27 @@ export default function AddTaskModal({
   initialDays = [],
   frogIndices,
 }: Props) {
-  // Start with no preselected day when initialDays is empty
-  const initWhen: WhenMode = useMemo(() => {
-    if (!initialDays || initialDays.length === 0) return 'pick-days';
+  // 🔑 Nothing preselected by default
+  const initWhen: WhenState = useMemo<WhenState>(() => {
+    if (!initialDays || initialDays.length === 0) return 'unset';
     if (initialDays.includes(7)) return 'week-no-day';
     if (initialDays.some((d) => d >= 0 && d <= 6)) {
       return initialDays.length === 1 && initialDays[0] === todayIdx()
         ? 'today'
         : 'pick-days';
     }
-    return 'pick-days';
+    return 'unset';
   }, [initialDays]);
 
   const [text, setText] = useState(initialText);
-  const [when, setWhen] = useState<WhenMode>(initWhen);
+  const [when, setWhen] = useState<WhenState>(initWhen);
 
   const [pickedDays, setPickedDays] = useState<number[]>(
     initWhen === 'pick-days'
       ? (initialDays ?? []).filter((d) => d >= 0 && d <= 6)
       : initWhen === 'today'
       ? [todayIdx()]
-      : [] // week-no-day or others → []
+      : [] // 'unset' or 'week-no-day'
   );
 
   useEffect(() => {
@@ -70,7 +72,9 @@ export default function AddTaskModal({
 
   const canSave =
     text.trim().length > 0 &&
-    (when === 'today' || when === 'week-no-day' || pickedDays.length > 0);
+    (when === 'today' ||
+      when === 'week-no-day' ||
+      (when === 'pick-days' && pickedDays.length > 0));
 
   const saveNow = async () => {
     if (!canSave) return;
@@ -87,8 +91,16 @@ export default function AddTaskModal({
 
   const toggleDay = (d: number) => {
     setPickedDays((prev) => {
-      if (!allowMultipleDays) return prev.includes(d) ? [] : [d];
-      return prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d];
+      const next = allowMultipleDays
+        ? prev.includes(d)
+          ? prev.filter((x) => x !== d)
+          : [...prev, d]
+        : prev.includes(d)
+        ? []
+        : [d];
+      // If user taps a day while unset, switch into 'pick-days'
+      if (when === 'unset') setWhen('pick-days');
+      return next;
     });
   };
 
@@ -171,7 +183,7 @@ export default function AddTaskModal({
 
         {/* BODY */}
         <div className="flex-1 px-4 pb-4 overflow-y-auto sm:px-6 overscroll-contain no-scrollbar">
-          {/* Frog sits just above the input */}
+          {/* Frog */}
           <div className="relative pt-[110px]">
             <div className="absolute left-1/2 -translate-x-1/2 -top-[40px]">
               <Frog width={220} height={157} indices={resolvedFrogIndices} />
@@ -193,16 +205,14 @@ export default function AddTaskModal({
             />
           </div>
 
-          {/* When selector (single step) */}
+          {/* When selector (no default) */}
           <StepWhen
             when={when}
-            setWhen={(w) => {
-              setWhen(w);
-              // Optional: save immediately when choosing "week-no-day"
-              // if (w === 'week-no-day' && text.trim()) void saveNow();
-            }}
+            setWhen={setWhen}
             pickedDays={pickedDays}
             toggleDay={toggleDay}
+            onPickToday={() => setPickedDays([todayIdx()])}
+            onPickWeekNoDay={() => setPickedDays([])}
           />
         </div>
 
@@ -217,7 +227,7 @@ export default function AddTaskModal({
             </button>
 
             <PrimaryButton
-              label={when === 'week-no-day' ? 'Add to this week' : 'Add task'}
+              label={'Add task'}
               disabled={!canSave}
               onClick={saveNow}
             />

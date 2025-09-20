@@ -203,8 +203,8 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        {/* extra space so the bar never overlaps content */}
-        <div className="flex gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[120px] md:pb-[136px]">
+        {/* extra space so the bar and pagination never overlap content */}
+        <div className="flex gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[156px] sm:pb-[144px] md:pb-[150px]">
           {Array.from({ length: DAYS }, (_, day) => ({
             day,
             key: `day-${day}`,
@@ -236,8 +236,17 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* Pagination */}
-      <PaginationDots count={DAYS} activeIndex={pageIndex} />
+      {/* Pagination — under the day columns, above the add bar (esp. on mobile) */}
+      <div
+        className="
+          absolute left-0 right-0 z-10 flex justify-center pointer-events-none
+          bottom-[112px] sm:bottom-[96px] md:bottom-[84px]
+        "
+      >
+        <div className="pointer-events-auto">
+          <PaginationDots count={DAYS} activeIndex={pageIndex} />
+        </div>
+      </div>
 
       {/* Drag overlay */}
       {drag?.active && (
@@ -253,8 +262,8 @@ export default function TaskBoard({
       )}
 
       {/* GLOBAL BOTTOM ADD BAR (Apple-style glass) */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 px-4 py-4 pointer-events-none sm:px-6 sm:py-4">
-        <div className="pointer-events-auto mx-auto w-full max-w-[820px]">
+      <div className="absolute bottom-0 left-0 right-0 z-20 px-4 py-6 pointer-events-none  sm:px-6 sm:py-4">
+        <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
           {!globalOpen ? (
             <div className="rounded-[28px] bg-white/75 dark:bg-white/8 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
               <button
@@ -270,7 +279,6 @@ export default function TaskBoard({
                   !!drag?.active ? 'opacity-60 pointer-events-none' : '',
                 ].join(' ')}
               >
-                {/* soft top highlight */}
                 <span className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-b from-white/55 to-white/0 dark:from-white/10 dark:to-transparent" />
                 <span className="relative z-10 flex items-center justify-center h-full gap-2">
                   <span>Add a</span>

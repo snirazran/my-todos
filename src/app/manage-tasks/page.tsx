@@ -14,7 +14,7 @@ import {
   displayDayFromApi,
 } from '@/components/board/helpers';
 
-const EXTRA = 'No day (this week)';
+const EXTRA = 'Later this week';
 
 export default function ManageTasksPage() {
   const [week, setWeek] = useState<Task[][]>(
