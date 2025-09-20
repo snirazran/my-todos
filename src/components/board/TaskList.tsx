@@ -1,8 +1,6 @@
 'use client';
 
 import React from 'react';
-import GapRail from './GapRail';
-import InlineComposer from './InlineComposer';
 import TaskCard from './TaskCard';
 import { Task, draggableIdFor } from './helpers';
 import { DragState } from './hooks/useDragManager';
@@ -13,13 +11,6 @@ export default function TaskList({
   drag,
   targetDay,
   targetIndex,
-  composer,
-  draft,
-  setDraft,
-  openBetweenComposer,
-  openBottomComposer,
-  cancelComposer,
-  confirmComposer,
   removeTask,
   onGrab,
   setCardRef,
@@ -29,13 +20,6 @@ export default function TaskList({
   drag: DragState | null;
   targetDay: number | null;
   targetIndex: number | null;
-  composer: { day: number; afterIndex: number | null } | null;
-  draft: string;
-  setDraft: (s: string) => void;
-  openBetweenComposer: (day: number, afterIndex: number) => void;
-  openBottomComposer: (day: number) => void;
-  cancelComposer: () => void;
-  confirmComposer: (day: number, repeat: 'this-week' | 'weekly') => void;
   removeTask: (day: number, id: string) => Promise<void>;
   onGrab: (p: {
     day: number;
@@ -55,43 +39,14 @@ export default function TaskList({
   if (process.env.NODE_ENV !== 'production') {
     const seen = new Set<string>();
     const dups: string[] = [];
-    for (const t of items) {
-      if (seen.has(t.id)) dups.push(t.id);
-      else seen.add(t.id);
-    }
+    for (const t of items) seen.has(t.id) ? dups.push(t.id) : seen.add(t.id);
     if (dups.length)
       console.warn(`TaskList day=${day} duplicate task ids:`, dups);
   }
 
   const rows: React.ReactNode[] = [];
 
-  // TOP rail
-  if (items.length > 0) {
-    const topOpen =
-      !!composer && composer.day === day && composer.afterIndex === -1;
-    rows.push(
-      <GapRail
-        key={`rail-top-${day}`}
-        overlayHidden={topOpen}
-        onAdd={() => openBetweenComposer(day, -1)}
-        disabled={!!drag?.active}
-      />
-    );
-    if (topOpen) {
-      rows.push(
-        <InlineComposer
-          key={`composer-top-${day}`}
-          value={draft}
-          onChange={setDraft}
-          onConfirm={(repeat) => confirmComposer(day, repeat)}
-          onCancel={cancelComposer}
-          autoFocus
-          scrollIntoViewOnMount
-        />
-      );
-    }
-  }
-
+  // Top placeholder when dragging into empty top
   if (items.length > 0 && placeholderAt === 0) {
     rows.push(
       <div
@@ -140,6 +95,7 @@ export default function TaskList({
       />
     );
 
+    // Placeholder between cards while dragging
     if (placeholderAt === i + 1) {
       children.push(
         <div
@@ -149,33 +105,6 @@ export default function TaskList({
       );
     }
 
-    if (i < items.length - 1) {
-      const gapOpen =
-        !!composer && composer.day === day && composer.afterIndex === i;
-      children.push(
-        <GapRail
-          key={`rail-${day}-${i}`}
-          overlayHidden={gapOpen}
-          onAdd={() => openBetweenComposer(day, i)}
-          disabled={!!drag?.active}
-        />
-      );
-
-      if (gapOpen) {
-        children.push(
-          <InlineComposer
-            key={`composer-gap-${day}-${i}`}
-            value={draft}
-            onChange={setDraft}
-            onConfirm={(repeat) => confirmComposer(day, repeat)}
-            onCancel={cancelComposer}
-            autoFocus
-            scrollIntoViewOnMount
-          />
-        );
-      }
-    }
-
     rows.push(
       <div key={`wrap-${day}-${i}-${t.id}`} className="relative">
         {children}
@@ -183,27 +112,13 @@ export default function TaskList({
     );
   }
 
+  // Empty list placeholder when dragging to empty column top
   if (items.length === 0 && placeholderAt === 0) {
     rows.push(
       <div
         key={`ph-end-${day}`}
         className="h-12 my-2 border-2 border-dashed rounded-2xl border-lime-400/70 bg-lime-50/40"
       />
-    );
-  }
-
-  if (composer && composer.day === day && composer.afterIndex === null) {
-    rows.push(
-      <div key={`composer-bottom-wrap-${day}`} className="mt-3 ">
-        <InlineComposer
-          value={draft}
-          onChange={setDraft}
-          onConfirm={(repeat) => confirmComposer(day, repeat)}
-          onCancel={cancelComposer}
-          autoFocus
-          scrollIntoViewOnMount
-        />
-      </div>
     );
   }
 

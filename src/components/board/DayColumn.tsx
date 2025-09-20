@@ -7,7 +7,7 @@ export default function DayColumn({
   listRef,
   children,
   footer,
-  maxHeightClass = 'max-h-[80svh]',
+  maxHeightClass = 'max-h-[74svh]', // ⬅ default a bit shorter
   /** Set true when a composer is open in this column to make it a bit shorter */
   compact = false,
 }: {
@@ -18,7 +18,7 @@ export default function DayColumn({
   maxHeightClass?: string;
   compact?: boolean;
 }) {
-  const appliedMax = compact ? 'max-h-[74svh]' : maxHeightClass;
+  const appliedMax = compact ? 'max-h-[70svh]' : maxHeightClass;
 
   return (
     <section
@@ -40,9 +40,8 @@ export default function DayColumn({
         className={[
           'flex-1 pr-1 overflow-y-auto transition-colors rounded-xl',
           'no-scrollbar touch-auto overscroll-y-contain',
-          // Give space under the last item so the composer/buttons aren’t clipped
-          'pb-24 scroll-pb-24',
-          // Respect safe area on iOS
+          // a bit less internal padding now that the global bar exists
+          'pb-12 scroll-pb-12',
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}
       >

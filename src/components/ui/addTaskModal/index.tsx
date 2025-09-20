@@ -39,14 +39,16 @@ export default function AddTaskModal({
   initialDays = [],
   frogIndices,
 }: Props) {
+  // Start with no preselected day when initialDays is empty
   const initWhen: WhenMode = useMemo(() => {
+    if (!initialDays || initialDays.length === 0) return 'pick-days';
     if (initialDays.includes(7)) return 'week-no-day';
     if (initialDays.some((d) => d >= 0 && d <= 6)) {
       return initialDays.length === 1 && initialDays[0] === todayIdx()
         ? 'today'
         : 'pick-days';
     }
-    return 'today';
+    return 'pick-days';
   }, [initialDays]);
 
   const [text, setText] = useState(initialText);
@@ -54,8 +56,10 @@ export default function AddTaskModal({
 
   const [pickedDays, setPickedDays] = useState<number[]>(
     initWhen === 'pick-days'
-      ? initialDays.filter((d) => d >= 0 && d <= 6)
-      : [todayIdx()]
+      ? (initialDays ?? []).filter((d) => d >= 0 && d <= 6)
+      : initWhen === 'today'
+      ? [todayIdx()]
+      : [] // week-no-day or others → []
   );
 
   useEffect(() => {
@@ -87,13 +91,6 @@ export default function AddTaskModal({
       return prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d];
     });
   };
-
-  // Optional: auto-save immediately when choosing "This week (no day)"
-  // useEffect(() => {
-  //   if (when === 'week-no-day' && text.trim()) {
-  //     void saveNow();
-  //   }
-  // }, [when]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: wardrobeData } = useSWR(
     frogIndices ? null : '/api/skins/inventory',
@@ -201,7 +198,7 @@ export default function AddTaskModal({
             when={when}
             setWhen={(w) => {
               setWhen(w);
-              // If you want immediate save on selecting "week-no-day", uncomment:
+              // Optional: save immediately when choosing "week-no-day"
               // if (w === 'week-no-day' && text.trim()) void saveNow();
             }}
             pickedDays={pickedDays}

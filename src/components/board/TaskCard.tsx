@@ -131,7 +131,7 @@ export default function TaskCard({
         'group flex items-center gap-3 p-3 select-none rounded-2xl cursor-grab transition',
         'bg-white/85 dark:bg-emerald-900/40 backdrop-blur',
         'border border-emerald-700/20 dark:border-emerald-300/15 shadow',
-
+        'mb-2',
         hiddenWhileDragging ? 'opacity-0' : 'hover:shadow-md',
       ].join(' ')}
       role="listitem"

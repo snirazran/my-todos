@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AddTaskModal from '@/components/ui/addTaskModal';
 import TaskBoard from '@/components/board/TaskBoard';
-import Frog from '@/components/ui/frog';
 import { byId } from '@/lib/skins/catalog';
 import useSWR from 'swr';
 
@@ -26,6 +25,9 @@ export default function ManageTasksPage() {
   const [prefillText, setPrefillText] = useState<string>('');
   const [prefillDays, setPrefillDays] = useState<number[]>([]);
   const [insertAt, setInsertAt] = useState<number | null>(null);
+  const [modalRepeat, setModalRepeat] = useState<'this-week' | 'weekly'>(
+    'weekly'
+  );
 
   // wardrobe → frog indices (to match your modal’s frog)
   const { data: wardrobeData } = useSWR(
@@ -168,12 +170,24 @@ export default function ManageTasksPage() {
           setWeek={setWeek}
           saveDay={saveDay}
           removeTask={removeTask}
-          onRequestAdd={(displayDay, text, afterIndex = null) => {
+          // NOTE: updated signature: day can be null, repeat is passed through
+          onRequestAdd={(
+            displayDayOrNull,
+            text,
+            afterIndex = null,
+            repeat = 'weekly'
+          ) => {
             setPrefillText(text ?? '');
-            setPrefillDays([apiDayFromDisplay(displayDay)]);
+            // No default day if global button used
+            setPrefillDays(
+              displayDayOrNull == null
+                ? []
+                : [apiDayFromDisplay(displayDayOrNull)]
+            );
             setInsertAt(
               afterIndex === null ? null : Math.max(0, afterIndex + 1)
             );
+            setModalRepeat(repeat);
             setShowModal(true);
           }}
         />
@@ -182,8 +196,9 @@ export default function ManageTasksPage() {
       {showModal && (
         <AddTaskModal
           initialText={prefillText}
-          initialDays={prefillDays}
-          defaultRepeat="weekly"
+          initialDays={prefillDays} // [] → no preselected day
+          defaultRepeat={modalRepeat} // from global composer choice
+          frogIndices={frogIndices}
           onClose={() => {
             setShowModal(false);
             setInsertAt(null);

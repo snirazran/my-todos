@@ -1,12 +1,6 @@
 'use client';
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Task, DAYS, todayDisplayIndex } from './helpers';
 import DayColumn from './DayColumn';
@@ -16,6 +10,9 @@ import DragOverlay from './DragOverlay';
 import { useDragManager } from './hooks/useDragManager';
 import { usePan } from './hooks/usePan';
 import Fly from '../ui/fly';
+import { RotateCcw, CalendarCheck, X, Plus } from 'lucide-react';
+
+type RepeatChoice = 'this-week' | 'weekly';
 
 export default function TaskBoard({
   titles,
@@ -31,9 +28,10 @@ export default function TaskBoard({
   saveDay: (day: number, tasks: Task[]) => Promise<void>;
   removeTask: (day: number, id: string) => Promise<void>;
   onRequestAdd: (
-    day: number,
+    day: number | null,
     text?: string,
-    afterIndex?: number | null
+    afterIndex?: number | null,
+    repeat?: RepeatChoice
   ) => void;
 }) {
   const pathname = usePathname();
@@ -110,38 +108,20 @@ export default function TaskBoard({
 
   const snapSuppressed = !!drag?.active || panActive;
 
-  const [composer, setComposer] = useState<{
-    day: number;
-    afterIndex: number | null;
-  } | null>(null);
-  const [draft, setDraft] = useState('');
+  // ---- Global bottom composer state ----
+  const [globalOpen, setGlobalOpen] = useState(false);
+  const [gText, setGText] = useState('');
+  const [gRepeat, setGRepeat] = useState<RepeatChoice>('this-week');
+  const disabled = !gText.trim();
 
-  const openBottomComposer = (day: number) => {
-    setComposer({ day, afterIndex: null });
-    setDraft('');
-  };
-  const openBetweenComposer = (day: number, afterIndex: number) => {
-    setComposer({ day, afterIndex });
-    setDraft('');
-  };
-  const cancelComposer = () => {
-    setComposer(null);
-    setDraft('');
-  };
-  const confirmComposer = (day: number) => {
-    const text = draft.trim();
-    if (!text) return;
-    const after = composer?.afterIndex ?? null;
-    cancelComposer();
-    onRequestAdd(day, text, after);
+  const openModalFromGlobal = () => {
+    if (disabled) return;
+    onRequestAdd(null, gText.trim(), null, gRepeat);
+    setGlobalOpen(false);
+    setGText('');
   };
 
-  const slides = useMemo(
-    () =>
-      Array.from({ length: DAYS }, (_, day) => ({ day, key: `day-${day}` })),
-    []
-  );
-
+  // ---- drag reorder commit ----
   const commitDragReorder = useCallback(
     (toDay: number, toIndex: number) => {
       if (!drag) return;
@@ -204,6 +184,7 @@ export default function TaskBoard({
 
   return (
     <div className="relative w-full h-full">
+      {/* SCROLLER */}
       <div
         ref={scrollerRef}
         dir="ltr"
@@ -222,41 +203,22 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex gap-3 px-4 pt-4 pb-6 md:px-6 md:pt-6 lg:pt-8">
-          {slides.map(({ day, key }) => (
+        {/* extra space so the bar never overlaps content */}
+        <div className="flex gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[120px] md:pb-[136px]">
+          {Array.from({ length: DAYS }, (_, day) => ({
+            day,
+            key: `day-${day}`,
+          })).map(({ day, key }) => (
             <div
               key={key}
               ref={setSlideRef(day)}
               data-col="true"
-              className="shrink-0 snap-center
-                w-[88vw] sm:w-[380px] md:w-[340px] lg:w-[320px] xl:w-[300px] h-full"
+              className="shrink-0 snap-center w-[88vw] sm:w-[360px] md:w-[330px] lg:w-[310px] xl:w-[292px] h-full"
             >
               <DayColumn
                 title={titles[day]}
                 listRef={setListRef(day)}
-                maxHeightClass="max-h-[80svh]"
-                footer={
-                  !(
-                    composer &&
-                    composer.day === day &&
-                    composer.afterIndex === null
-                  ) && (
-                    <button
-                      onClick={() => openBottomComposer(day)}
-                      disabled={!!drag?.active}
-                      className={[
-                        'w-full px-4 py-2.5 text-center rounded-2xl transition relative shine',
-                        'bg-gradient-to-br from-emerald-500 to-lime-500 text-emerald-950 font-medium',
-                        'ring-1 ring-emerald-700/30 shadow hover:brightness-105',
-                        !!drag?.active ? 'opacity-60 pointer-events-none' : '',
-                      ].join(' ')}
-                    >
-                      <span>
-                        + Add a <Fly size={24} x={-2} y={-3} />
-                      </span>
-                    </button>
-                  )
-                }
+                maxHeightClass="max-h-[74svh]"
               >
                 <TaskList
                   day={day}
@@ -264,13 +226,6 @@ export default function TaskBoard({
                   drag={drag}
                   targetDay={targetDay}
                   targetIndex={targetIndex}
-                  composer={composer}
-                  draft={draft}
-                  setDraft={setDraft}
-                  openBetweenComposer={openBetweenComposer}
-                  openBottomComposer={openBottomComposer}
-                  cancelComposer={cancelComposer}
-                  confirmComposer={confirmComposer}
                   removeTask={removeTask}
                   onGrab={onGrab}
                   setCardRef={setCardRef}
@@ -281,8 +236,10 @@ export default function TaskBoard({
         </div>
       </div>
 
+      {/* Pagination */}
       <PaginationDots count={DAYS} activeIndex={pageIndex} />
 
+      {/* Drag overlay */}
       {drag?.active && (
         <DragOverlay
           x={drag.x}
@@ -294,6 +251,144 @@ export default function TaskBoard({
           text={drag.taskText}
         />
       )}
+
+      {/* GLOBAL BOTTOM ADD BAR (Apple-style glass) */}
+      <div className="absolute bottom-0 left-0 right-0 z-20 px-4 py-4 pointer-events-none sm:px-6 sm:py-4">
+        <div className="pointer-events-auto mx-auto w-full max-w-[820px]">
+          {!globalOpen ? (
+            <div className="rounded-[28px] bg-white/75 dark:bg-white/8 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
+              <button
+                onClick={() => setGlobalOpen(true)}
+                disabled={!!drag?.active}
+                className={[
+                  'relative w-full h-12 rounded-full',
+                  'bg-white/90 dark:bg-white/10 backdrop-blur-xl',
+                  'text-emerald-900 dark:text-emerald-50 font-semibold tracking-[-0.01em]',
+                  'shadow-[0_1px_0_rgba(255,255,255,.7)_inset,0_8px_24px_rgba(16,185,129,.28)] ring-1 ring-black/10 dark:ring-white/10',
+                  'transition-transform duration-200 hover:shadow-[0_1px_0_rgba(255,255,255,.75)_inset,0_12px_30px_rgba(16,185,129,.32)] hover:bg-white',
+                  'active:scale-[0.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-300',
+                  !!drag?.active ? 'opacity-60 pointer-events-none' : '',
+                ].join(' ')}
+              >
+                {/* soft top highlight */}
+                <span className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-b from-white/55 to-white/0 dark:from-white/10 dark:to-transparent" />
+                <span className="relative z-10 flex items-center justify-center h-full gap-2">
+                  <span>Add a</span>
+                  <span className="translate-y-[1px]">
+                    <Fly size={22} x={-2} y={-3} />
+                  </span>
+                </span>
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-[28px] bg-white/75 dark:bg-white/8 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-3">
+              <input
+                value={gText}
+                onChange={(e) => setGText(e.target.value)}
+                placeholder="Task name…"
+                className="w-full h-11 px-3 mb-3 rounded-[14px] bg-white/90 dark:bg-white/10 text-emerald-900 dark:text-emerald-50 ring-1 ring-black/10 dark:ring-white/10 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-lime-300"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    openModalFromGlobal();
+                  }
+                  if (e.key === 'Escape') setGlobalOpen(false);
+                }}
+                inputMode="text"
+                autoFocus
+              />
+
+              {/* Segmented control */}
+              <div className="relative grid grid-cols-2 gap-1 p-1 rounded-2xl bg-white/65 dark:bg-white/5 ring-1 ring-black/10 dark:ring-white/10">
+                <button
+                  type="button"
+                  onClick={() => setGRepeat('this-week')}
+                  aria-pressed={gRepeat === 'this-week'}
+                  className={[
+                    'h-9 rounded-xl text-[13px] font-medium transition',
+                    gRepeat === 'this-week'
+                      ? 'bg-white shadow-sm ring-1 ring-black/10 dark:bg-white/10 dark:ring-white/10'
+                      : 'bg-transparent text-emerald-900/80 dark:text-emerald-100/80',
+                  ].join(' ')}
+                  title="This week only"
+                >
+                  <span className="inline-flex items-center justify-center gap-1.5 px-3 h-full">
+                    <CalendarCheck className="w-4 h-4" />
+                    One-time
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGRepeat('weekly')}
+                  aria-pressed={gRepeat === 'weekly'}
+                  className={[
+                    'h-9 rounded-xl text-[13px] font-medium transition',
+                    gRepeat === 'weekly'
+                      ? 'bg-white shadow-sm ring-1 ring-black/10 dark:bg-white/10 dark:ring-white/10'
+                      : 'bg-transparent text-emerald-900/80 dark:text-emerald-100/80',
+                  ].join(' ')}
+                  title="Every week"
+                >
+                  <span className="inline-flex items-center justify-center gap-1.5 px-3 h-full">
+                    <RotateCcw className="w-4 h-4" />
+                    Repeats
+                  </span>
+                </button>
+              </div>
+
+              {/* Actions */}
+              <div className="grid grid-cols-2 gap-2 mt-3">
+                <button
+                  type="button"
+                  disabled={disabled}
+                  onClick={openModalFromGlobal}
+                  className={[
+                    'h-11 rounded-full text-[15px] font-semibold',
+                    'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white',
+                    'shadow-[0_10px_24px_rgba(16,185,129,.35)] ring-1 ring-emerald-700/30',
+                    'hover:brightness-105 active:scale-[0.995]',
+                    'disabled:opacity-60',
+                  ].join(' ')}
+                >
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Add
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setGlobalOpen(false)}
+                  className={[
+                    'h-11 rounded-full text-[15px] font-medium',
+                    'bg-white/70 dark:bg-white/10 text-emerald-900 dark:text-emerald-50',
+                    'ring-1 ring-black/10 dark:ring-white/10',
+                    'hover:bg-white/85 dark:hover:bg-white/15 active:scale-[0.995]',
+                  ].join(' ')}
+                >
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Motion preferences */}
+      <style jsx global>{`
+        @media (prefers-reduced-motion: reduce) {
+          * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+          }
+        }
+      `}</style>
     </div>
   );
 }
