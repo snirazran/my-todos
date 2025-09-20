@@ -102,21 +102,23 @@ export default function QuickAddSheet({
             autoFocus
           />
 
-          {/* When chooser */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* When chooser — grid on mobile, flex on sm+ */}
+          <div className="grid items-center grid-cols-3 gap-2 sm:flex sm:flex-wrap">
             <button
               type="button"
               onClick={() => setWhen('today')}
               aria-pressed={when === 'today'}
               className={[
                 'h-9 px-3 rounded-full text-[13px] font-medium inline-flex items-center gap-1.5 ring-1 transition',
+                'w-full sm:w-auto',
                 when === 'today'
                   ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
                   : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
               ].join(' ')}
               title="Add to today"
             >
-              <Sun className="w-4 h-4" /> Today
+              <Sun className="w-4 h-4" />
+              Today
             </button>
 
             <button
@@ -125,13 +127,15 @@ export default function QuickAddSheet({
               aria-pressed={when === 'pick'}
               className={[
                 'h-9 px-3 rounded-full text-[13px] font-medium inline-flex items-center gap-1.5 ring-1 transition',
+                'w-full sm:w-auto',
                 when === 'pick'
                   ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
                   : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
               ].join(' ')}
               title="Pick specific day(s)"
             >
-              <CalendarDays className="w-4 h-4" /> Pick day
+              <CalendarDays className="w-4 h-4" />
+              Pick day
             </button>
 
             <button
@@ -143,16 +147,18 @@ export default function QuickAddSheet({
               aria-pressed={when === 'later'}
               className={[
                 'h-9 px-3 rounded-full text-[13px] font-medium inline-flex items-center gap-1.5 ring-1 transition',
+                'w-full sm:w-auto',
                 when === 'later'
                   ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
                   : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
               ].join(' ')}
               title="Save to Later this week"
             >
-              <CalendarCheck className="w-4 h-4" /> Later this week
+              <CalendarCheck className="w-4 h-4" />
+              Later this week
             </button>
 
-            {/* Repeats toggle */}
+            {/* Repeat toggle — full width under chips on mobile; right-aligned on sm+ */}
             <button
               type="button"
               onClick={() =>
@@ -160,7 +166,8 @@ export default function QuickAddSheet({
               }
               aria-pressed={repeat === 'weekly'}
               className={[
-                'ml-auto h-9 px-3 rounded-full text-[13px] font-medium inline-flex items-center gap-1.5 ring-1 transition',
+                'h-9 px-3 rounded-full text-[13px] font-medium inline-flex items-center gap-1.5 ring-1 transition justify-center',
+                'col-span-3 w-full sm:col-auto sm:w-auto sm:ml-auto',
                 repeat === 'weekly'
                   ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
                   : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
