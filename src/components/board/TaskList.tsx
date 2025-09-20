@@ -35,7 +35,7 @@ export default function TaskList({
   openBetweenComposer: (day: number, afterIndex: number) => void;
   openBottomComposer: (day: number) => void;
   cancelComposer: () => void;
-  confirmComposer: (day: number) => void;
+  confirmComposer: (day: number, repeat: 'this-week' | 'weekly') => void;
   removeTask: (day: number, id: string) => Promise<void>;
   onGrab: (p: {
     day: number;
@@ -83,7 +83,7 @@ export default function TaskList({
           key={`composer-top-${day}`}
           value={draft}
           onChange={setDraft}
-          onConfirm={() => confirmComposer(day)}
+          onConfirm={(repeat) => confirmComposer(day, repeat)}
           onCancel={cancelComposer}
           autoFocus
           scrollIntoViewOnMount
@@ -167,7 +167,7 @@ export default function TaskList({
             key={`composer-gap-${day}-${i}`}
             value={draft}
             onChange={setDraft}
-            onConfirm={() => confirmComposer(day)}
+            onConfirm={(repeat) => confirmComposer(day, repeat)}
             onCancel={cancelComposer}
             autoFocus
             scrollIntoViewOnMount
@@ -198,7 +198,7 @@ export default function TaskList({
         <InlineComposer
           value={draft}
           onChange={setDraft}
-          onConfirm={() => confirmComposer(day)}
+          onConfirm={(repeat) => confirmComposer(day, repeat)}
           onCancel={cancelComposer}
           autoFocus
           scrollIntoViewOnMount

@@ -2,16 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 
 import Frog from '@/components/ui/frog';
 import { byId } from '@/lib/skins/catalog';
 import type { WardrobeSlot } from '@/components/ui/frog';
 
-import StepPill from './StepPill';
 import StepWhen from './StepWhen';
-import StepRepeat from './StepRepeat';
 import PrimaryButton from './PrimaryButton';
 import type { RepeatMode, WhenMode } from './types';
 import { todayIdx } from './utils';
@@ -27,7 +25,7 @@ type Props = Readonly<{
     repeat: RepeatMode;
   }) => Promise<void> | void;
   allowMultipleDays?: boolean;
-  defaultRepeat?: RepeatMode;
+  defaultRepeat?: RepeatMode; // used as a fixed repeat mode now
   initialDays?: number[];
   frogIndices?: FrogIndices;
 }>;
@@ -52,9 +50,8 @@ export default function AddTaskModal({
   }, [initialDays]);
 
   const [text, setText] = useState(initialText);
-  const [step, setStep] = useState<1 | 2>(1);
   const [when, setWhen] = useState<WhenMode>(initWhen);
-  const [repeat, setRepeat] = useState<RepeatMode>(defaultRepeat);
+
   const [pickedDays, setPickedDays] = useState<number[]>(
     initWhen === 'pick-days'
       ? initialDays.filter((d) => d >= 0 && d <= 6)
@@ -67,12 +64,22 @@ export default function AddTaskModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const canContinueStep1 =
-    when === 'today' || when === 'week-no-day' || pickedDays.length > 0;
-
-  const canSaveStep2 =
+  const canSave =
     text.trim().length > 0 &&
-    (when === 'today' || pickedDays.some((d) => d >= 0 && d <= 6));
+    (when === 'today' || when === 'week-no-day' || pickedDays.length > 0);
+
+  const saveNow = async () => {
+    if (!canSave) return;
+    const days =
+      when === 'today'
+        ? [todayIdx()]
+        : when === 'week-no-day'
+        ? [7]
+        : pickedDays.slice().sort((a, b) => a - b);
+
+    await onSave({ text: text.trim(), days, repeat: defaultRepeat });
+    onClose();
+  };
 
   const toggleDay = (d: number) => {
     setPickedDays((prev) => {
@@ -81,43 +88,12 @@ export default function AddTaskModal({
     });
   };
 
-  const saveImmediateWeek = async () => {
-    if (!text.trim()) return;
-    await onSave({ text: text.trim(), days: [7], repeat: 'this-week' });
-    onClose();
-  };
-
-  const saveStep2 = async () => {
-    if (!canSaveStep2) return;
-    const days =
-      when === 'today'
-        ? [todayIdx()]
-        : pickedDays.slice().sort((a, b) => a - b);
-    await onSave({ text: text.trim(), days, repeat });
-    onClose();
-  };
-
-  const cta = (() => {
-    if (step === 1) {
-      if (when === 'week-no-day') {
-        return {
-          label: 'Add to this week',
-          disabled: !text.trim(),
-          onClick: saveImmediateWeek,
-        };
-      }
-      return {
-        label: 'Continue',
-        disabled: !canContinueStep1,
-        onClick: () => setStep(2),
-      };
-    }
-    return {
-      label: 'Add task',
-      disabled: !canSaveStep2,
-      onClick: saveStep2,
-    };
-  })();
+  // Optional: auto-save immediately when choosing "This week (no day)"
+  // useEffect(() => {
+  //   if (when === 'week-no-day' && text.trim()) {
+  //     void saveNow();
+  //   }
+  // }, [when]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { data: wardrobeData } = useSWR(
     frogIndices ? null : '/api/skins/inventory',
@@ -196,67 +172,41 @@ export default function AddTaskModal({
           <div className="w-full h-px mt-3 bg-gradient-to-r from-transparent via-emerald-600/20 to-transparent" />
         </header>
 
-        {/* BODY (scrollable; scrollbar hidden) */}
+        {/* BODY */}
         <div className="flex-1 px-4 pb-4 overflow-y-auto sm:px-6 overscroll-contain no-scrollbar">
           {/* Frog sits just above the input */}
           <div className="relative pt-[110px]">
             <div className="absolute left-1/2 -translate-x-1/2 -top-[40px]">
-              {/* fine-grained nudge: 46px is between top-11 (44px) and top-12 (48px) */}
               <Frog width={220} height={157} indices={resolvedFrogIndices} />
             </div>
 
-            {/* Input (no autofocus) */}
+            {/* Input */}
             <input
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="What are we tackling?"
               className="w-full px-4 py-3 mb-4 text-base border shadow-inner rounded-2xl border-emerald-600/20 bg-white/80 focus:outline-none focus:ring-4 focus:ring-lime-300/50 dark:bg-emerald-900/40 dark:border-emerald-400/20 dark:text-emerald-50"
               onKeyDown={(e) => {
-                if (e.key !== 'Enter') return;
-                if (step === 1) {
-                  if (when === 'week-no-day') void saveImmediateWeek();
-                  else if (canContinueStep1) setStep(2);
-                } else {
-                  void saveStep2();
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  void saveNow();
                 }
               }}
               inputMode="text"
             />
           </div>
 
-          <AnimatePresence mode="wait" initial={false}>
-            {step === 1 ? (
-              <motion.div
-                key="step1"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-              >
-                <StepWhen
-                  when={when}
-                  setWhen={setWhen}
-                  pickedDays={pickedDays}
-                  toggleDay={toggleDay}
-                />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="step2"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 24 }}
-              >
-                <StepRepeat
-                  when={when}
-                  repeat={repeat}
-                  setRepeat={setRepeat}
-                  pickedDays={pickedDays}
-                />
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* When selector (single step) */}
+          <StepWhen
+            when={when}
+            setWhen={(w) => {
+              setWhen(w);
+              // If you want immediate save on selecting "week-no-day", uncomment:
+              // if (w === 'week-no-day' && text.trim()) void saveNow();
+            }}
+            pickedDays={pickedDays}
+            toggleDay={toggleDay}
+          />
         </div>
 
         {/* FOOTER */}
@@ -270,9 +220,9 @@ export default function AddTaskModal({
             </button>
 
             <PrimaryButton
-              label={cta.label}
-              disabled={cta.disabled}
-              onClick={cta.onClick}
+              label={when === 'week-no-day' ? 'Add to this week' : 'Add task'}
+              disabled={!canSave}
+              onClick={saveNow}
             />
           </div>
         </div>
