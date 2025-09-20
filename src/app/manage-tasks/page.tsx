@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useState } from 'react';
-import AddTaskModal from '@/components/ui/addTaskModal';
 import TaskBoard from '@/components/board/TaskBoard';
 import { byId } from '@/lib/skins/catalog';
 import useSWR from 'swr';
@@ -170,7 +169,6 @@ export default function ManageTasksPage() {
           setWeek={setWeek}
           saveDay={saveDay}
           removeTask={removeTask}
-          // NOTE: updated signature: day can be null, repeat is passed through
           onRequestAdd={(
             displayDayOrNull,
             text,
@@ -178,7 +176,6 @@ export default function ManageTasksPage() {
             repeat = 'weekly'
           ) => {
             setPrefillText(text ?? '');
-            // No default day if global button used
             setPrefillDays(
               displayDayOrNull == null
                 ? []
@@ -190,22 +187,10 @@ export default function ManageTasksPage() {
             setModalRepeat(repeat);
             setShowModal(true);
           }}
+          /** NEW: direct add from Quick Add without opening the modal */
+          onQuickAdd={onAddTask}
         />
       </div>
-
-      {showModal && (
-        <AddTaskModal
-          initialText={prefillText}
-          initialDays={prefillDays} // [] → no preselected day
-          defaultRepeat={modalRepeat} // from global composer choice
-          frogIndices={frogIndices}
-          onClose={() => {
-            setShowModal(false);
-            setInsertAt(null);
-          }}
-          onSave={onAddTask}
-        />
-      )}
 
       {/* Local animations (so you don’t need to touch global.css) */}
       <style jsx global>{`
