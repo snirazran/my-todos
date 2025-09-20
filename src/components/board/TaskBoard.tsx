@@ -15,6 +15,7 @@ import PaginationDots from './PaginationDots';
 import DragOverlay from './DragOverlay';
 import { useDragManager } from './hooks/useDragManager';
 import { usePan } from './hooks/usePan';
+import Fly from '../ui/fly';
 
 export default function TaskBoard({
   titles,
@@ -221,7 +222,7 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex gap-5 px-4 pt-4 pb-6 md:px-6 md:pt-6 lg:pt-8">
+        <div className="flex gap-3 px-4 pt-4 pb-6 md:px-6 md:pt-6 lg:pt-8">
           {slides.map(({ day, key }) => (
             <div
               key={key}
@@ -250,7 +251,9 @@ export default function TaskBoard({
                         !!drag?.active ? 'opacity-60 pointer-events-none' : '',
                       ].join(' ')}
                     >
-                      + Add a fly
+                      <span>
+                        + Add a <Fly size={24} x={-2} y={-3} />
+                      </span>
                     </button>
                   )
                 }

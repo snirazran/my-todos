@@ -138,8 +138,8 @@ export default function TaskCard({
       aria-grabbed={false}
     >
       {/* Animated fly (your component) */}
-      <span className="relative grid shrink-0 h-7 w-7 place-items-center">
-        <Fly size={22} x={-2} y={-2} />
+      <span className="relative grid w-5 h-5 shrink-0 place-items-center">
+        <Fly size={25} x={-2} y={-6.5} />
       </span>
 
       <span className="flex-1 text-sm text-emerald-950 dark:text-emerald-50">

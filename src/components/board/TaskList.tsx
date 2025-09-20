@@ -86,6 +86,7 @@ export default function TaskList({
           onConfirm={() => confirmComposer(day)}
           onCancel={cancelComposer}
           autoFocus
+          scrollIntoViewOnMount
         />
       );
     }
@@ -169,6 +170,7 @@ export default function TaskList({
             onConfirm={() => confirmComposer(day)}
             onCancel={cancelComposer}
             autoFocus
+            scrollIntoViewOnMount
           />
         );
       }
@@ -199,6 +201,7 @@ export default function TaskList({
           onConfirm={() => confirmComposer(day)}
           onCancel={cancelComposer}
           autoFocus
+          scrollIntoViewOnMount
         />
       </div>
     );

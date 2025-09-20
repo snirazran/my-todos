@@ -8,20 +8,25 @@ export default function DayColumn({
   children,
   footer,
   maxHeightClass = 'max-h-[80svh]',
+  /** Set true when a composer is open in this column to make it a bit shorter */
+  compact = false,
 }: {
   title: string;
   listRef: (el: HTMLDivElement | null) => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxHeightClass?: string;
+  compact?: boolean;
 }) {
+  const appliedMax = compact ? 'max-h-[74svh]' : maxHeightClass;
+
   return (
     <section
       className={[
         'group flex flex-col overflow-hidden',
         'rounded-[26px] bg-white/90 backdrop-blur-xl shadow-2xl',
         'ring-1 ring-emerald-700/20 dark:bg-emerald-950/60 dark:ring-emerald-300/10',
-        maxHeightClass,
+        appliedMax,
         'p-2.5 md:p-3',
         'min-h-[100px]',
       ].join(' ')}
@@ -32,7 +37,14 @@ export default function DayColumn({
 
       <div
         ref={listRef}
-        className="flex-1 pr-1 overflow-y-auto transition-colors rounded-xl no-scrollbar touch-auto overscroll-y-contain"
+        className={[
+          'flex-1 pr-1 overflow-y-auto transition-colors rounded-xl',
+          'no-scrollbar touch-auto overscroll-y-contain',
+          // Give space under the last item so the composer/buttons aren’t clipped
+          'pb-24 scroll-pb-24',
+          // Respect safe area on iOS
+          'pb-[env(safe-area-inset-bottom)]',
+        ].join(' ')}
       >
         {children}
       </div>

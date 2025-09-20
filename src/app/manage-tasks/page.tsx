@@ -145,21 +145,14 @@ export default function ManageTasksPage() {
 
   return (
     <main
-      className="relative overflow-hidden min-h-100svh pb-safe"
+      className="relative overflow-hidden min-h-100svh pb-safe bg-gradient-to-br from-emerald-900 via-emerald-800 to-lime-900/90"
       style={{
         height: 'calc(100dvh - var(--header-h))',
         minHeight: 'calc(-webkit-fill-available - var(--header-h))',
       }}
     >
       {/* Pond background */}
-      <div
-        aria-hidden
-        className="absolute inset-0 -z-20"
-        style={{
-          background:
-            'linear-gradient(140deg, #065f46 0%, rgba(16,185,129,0.20) 45%, rgba(101,163,13,0.26) 100%)',
-        }}
-      />
+
       {/* Soft ripples */}
       <div className="absolute inset-0 pointer-events-none -z-10 opacity-40">
         <div className="absolute w-[42vmin] h-[42vmin] rounded-full left-[6%] top-[18%] bg-lime-300/15 animate-ripple" />
