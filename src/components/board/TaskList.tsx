@@ -194,7 +194,7 @@ export default function TaskList({
 
   if (composer && composer.day === day && composer.afterIndex === null) {
     rows.push(
-      <div key={`composer-bottom-wrap-${day}`} className="px-2 mt-3">
+      <div key={`composer-bottom-wrap-${day}`} className="mt-3 ">
         <InlineComposer
           value={draft}
           onChange={setDraft}

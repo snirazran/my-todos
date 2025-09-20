@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
@@ -28,9 +28,7 @@ type Props = Readonly<{
   }) => Promise<void> | void;
   allowMultipleDays?: boolean;
   defaultRepeat?: RepeatMode;
-  /** pass [todayIndex] to pre-select today; pass [7] for “no day” (weekly backlog) */
   initialDays?: number[];
-  /** Optional: if omitted, we fetch /api/skins/inventory to mirror the user’s outfit */
   frogIndices?: FrogIndices;
 }>;
 
@@ -43,7 +41,6 @@ export default function AddTaskModal({
   initialDays = [],
   frogIndices,
 }: Props) {
-  // derive initial "when"
   const initWhen: WhenMode = useMemo(() => {
     if (initialDays.includes(7)) return 'week-no-day';
     if (initialDays.some((d) => d >= 0 && d <= 6)) {
@@ -54,7 +51,6 @@ export default function AddTaskModal({
     return 'today';
   }, [initialDays]);
 
-  // state
   const [text, setText] = useState(initialText);
   const [step, setStep] = useState<1 | 2>(1);
   const [when, setWhen] = useState<WhenMode>(initWhen);
@@ -65,14 +61,12 @@ export default function AddTaskModal({
       : [todayIdx()]
   );
 
-  // Close on Esc
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  // helpers
   const canContinueStep1 =
     when === 'today' || when === 'week-no-day' || pickedDays.length > 0;
 
@@ -103,7 +97,6 @@ export default function AddTaskModal({
     onClose();
   };
 
-  // Resolve CTA without nested ternary (lint-friendly)
   const cta = (() => {
     if (step === 1) {
       if (when === 'week-no-day') {
@@ -126,11 +119,6 @@ export default function AddTaskModal({
     };
   })();
 
-  /** ─────────────────────────────────────────────────────────
-   * Outfit indices for frog
-   * - If frogIndices prop is provided, use it.
-   * - Else fetch from /api/skins/inventory and map to rive indices via byId.
-   * ─────────────────────────────────────────────────────────*/
   const { data: wardrobeData } = useSWR(
     frogIndices ? null : '/api/skins/inventory',
     (u: string) => fetch(u).then((r) => r.json()),
@@ -151,6 +139,19 @@ export default function AddTaskModal({
 
   const spring = { type: 'spring', stiffness: 360, damping: 28 } as const;
 
+  // Keep keyboard closed on open
+  const closeBtnRef = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    const id = setTimeout(() => {
+      closeBtnRef.current?.focus({ preventScroll: true });
+      const ae = document.activeElement as HTMLElement | null;
+      if (ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')) {
+        (ae as HTMLInputElement | HTMLTextAreaElement).blur();
+      }
+    }, 30);
+    return () => clearTimeout(id);
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4"
@@ -159,7 +160,6 @@ export default function AddTaskModal({
       dir="ltr"
       aria-modal="true"
     >
-      {/* Pond backdrop */}
       <motion.div
         aria-hidden
         initial={{ opacity: 0 }}
@@ -168,7 +168,6 @@ export default function AddTaskModal({
         className="absolute inset-0 bg-gradient-to-br from-emerald-900 via-emerald-800 to-lime-900/90"
       />
 
-      {/* Modal card — flex column with pinned footer */}
       <motion.div
         role="dialog"
         aria-label="Add new task"
@@ -176,11 +175,12 @@ export default function AddTaskModal({
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 8 }}
         transition={spring}
-        className="relative w-full max-w-[640px] max-h-[90vh] sm:max-h-[88vh] rounded-[24px] bg-white/90 backdrop-blur-xl shadow-2xl ring-1 ring-emerald-700/20 dark:bg-emerald-950/70 dark:ring-emerald-300/10 overflow-hidden flex flex-col"
+        className="relative w-full max-w-[640px] max-h-[88vh] sm:max-h-[78vh] rounded-[24px] bg-white/90 backdrop-blur-xl shadow-2xl ring-1 ring-emerald-700/20 dark:bg-emerald-950/70 dark:ring-emerald-300/10 overflow-hidden flex flex-col"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Close */}
         <button
+          ref={closeBtnRef}
           aria-label="Close"
           onClick={onClose}
           className="absolute z-20 p-2 rounded-full shadow-md top-3 right-3 ring-1 ring-emerald-600/20 bg-emerald-50 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-100 dark:ring-emerald-500/30"
@@ -188,44 +188,41 @@ export default function AddTaskModal({
           <X className="w-4 h-4" />
         </button>
 
-        {/* Header with frog */}
-        <div className="relative px-4 pb-2 text-center sm:px-6 sm:pb-3 bg-gradient-to-b from-emerald-200/50 to-transparent dark:from-emerald-800/30">
-          <div className="flex justify-center">
-            <div
-              className="relative"
-              style={{
-                transform: 'translateY(-6px)' /* lift to avoid finger crop */,
-              }}
-            >
+        {/* TITLE BAR */}
+        <header className="px-4 pt-4 pb-3 sm:px-6">
+          <h1 className="text-2xl font-extrabold tracking-tight text-center text-transparent bg-gradient-to-r from-emerald-700 via-lime-600 to-emerald-700 bg-clip-text dark:from-emerald-300 dark:via-lime-300 dark:to-emerald-200">
+            Add a task
+          </h1>
+          <div className="w-full h-px mt-3 bg-gradient-to-r from-transparent via-emerald-600/20 to-transparent" />
+        </header>
+
+        {/* BODY (scrollable; scrollbar hidden) */}
+        <div className="flex-1 px-4 pb-4 overflow-y-auto sm:px-6 overscroll-contain no-scrollbar">
+          {/* Frog sits just above the input */}
+          <div className="relative pt-[110px]">
+            <div className="absolute left-1/2 -translate-x-1/2 -top-[40px]">
+              {/* fine-grained nudge: 46px is between top-11 (44px) and top-12 (48px) */}
               <Frog width={220} height={157} indices={resolvedFrogIndices} />
             </div>
-          </div>
-          <h3 className="mt-0.5 text-2xl sm:text-[28px] font-extrabold tracking-tight bg-gradient-to-r from-emerald-700 via-lime-600 to-emerald-700 bg-clip-text text-transparent dark:from-emerald-300 dark:via-lime-300 dark:to-emerald-200">
-            New task <span aria-hidden>🐸</span>
-          </h3>
-          <p className="mt-1 text-xs sm:text-sm text-emerald-700/70 dark:text-emerald-200/70">
-            Flies are tasks. The frog is hungry.
-          </p>
-        </div>
 
-        {/* BODY — single scroll area */}
-        <div className="flex-1 px-4 pb-4 overflow-y-auto sm:px-6 overscroll-contain">
-          <input
-            autoFocus
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="What are we tackling?"
-            className="w-full px-4 py-3 mb-4 text-base border shadow-inner rounded-2xl border-emerald-600/20 bg-white/80 focus:outline-none focus:ring-4 focus:ring-lime-300/50 dark:bg-emerald-900/40 dark:border-emerald-400/20 dark:text-emerald-50"
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter') return;
-              if (step === 1) {
-                if (when === 'week-no-day') void saveImmediateWeek();
-                else if (canContinueStep1) setStep(2);
-              } else {
-                void saveStep2();
-              }
-            }}
-          />
+            {/* Input (no autofocus) */}
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="What are we tackling?"
+              className="w-full px-4 py-3 mb-4 text-base border shadow-inner rounded-2xl border-emerald-600/20 bg-white/80 focus:outline-none focus:ring-4 focus:ring-lime-300/50 dark:bg-emerald-900/40 dark:border-emerald-400/20 dark:text-emerald-50"
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                if (step === 1) {
+                  if (when === 'week-no-day') void saveImmediateWeek();
+                  else if (canContinueStep1) setStep(2);
+                } else {
+                  void saveStep2();
+                }
+              }}
+              inputMode="text"
+            />
+          </div>
 
           <AnimatePresence mode="wait" initial={false}>
             {step === 1 ? (
@@ -262,7 +259,7 @@ export default function AddTaskModal({
           </AnimatePresence>
         </div>
 
-        {/* FOOTER — pinned */}
+        {/* FOOTER */}
         <div className="px-4 py-3 border-t sm:px-6 border-emerald-900/10 dark:border-emerald-200/10 bg-white/70 dark:bg-emerald-950/70 backdrop-blur">
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
