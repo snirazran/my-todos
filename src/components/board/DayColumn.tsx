@@ -41,7 +41,7 @@ export default function DayColumn({
           'flex-1 pr-1 overflow-y-auto transition-colors rounded-xl',
           'no-scrollbar touch-auto overscroll-y-contain',
           // a bit less internal padding now that the global bar exists
-          'pb-12 scroll-pb-12',
+
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}
       >

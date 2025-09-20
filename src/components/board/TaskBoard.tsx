@@ -204,7 +204,7 @@ export default function TaskBoard({
         }}
       >
         {/* extra space so the bar and pagination never overlap content */}
-        <div className="flex gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[156px] sm:pb-[144px] md:pb-[150px]">
+        <div className="flex gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[220px] sm:pb-[180px] md:pb-[188px]">
           {Array.from({ length: DAYS }, (_, day) => ({
             day,
             key: `day-${day}`,
@@ -218,7 +218,7 @@ export default function TaskBoard({
               <DayColumn
                 title={titles[day]}
                 listRef={setListRef(day)}
-                maxHeightClass="max-h-[74svh]"
+                maxHeightClass="max-h-[73svh]"
               >
                 <TaskList
                   day={day}
@@ -236,12 +236,10 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* Pagination — under the day columns, above the add bar (esp. on mobile) */}
+      {/* Pagination — under day columns, above the add bar. High z-index to sit OVER the bar. */}
       <div
-        className="
-          absolute left-0 right-0 z-10 flex justify-center pointer-events-none
-          bottom-[112px] sm:bottom-[96px] md:bottom-[84px]
-        "
+        className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 112px)' }}
       >
         <div className="pointer-events-auto">
           <PaginationDots count={DAYS} activeIndex={pageIndex} />
@@ -262,7 +260,7 @@ export default function TaskBoard({
       )}
 
       {/* GLOBAL BOTTOM ADD BAR (Apple-style glass) */}
-      <div className="absolute bottom-0 left-0 right-0 z-20 px-4 py-6 pointer-events-none  sm:px-6 sm:py-4">
+      <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 py-12 pointer-events-none sm:px-6 sm:py-5">
         <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
           {!globalOpen ? (
             <div className="rounded-[28px] bg-white/75 dark:bg-white/8 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
