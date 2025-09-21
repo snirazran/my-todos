@@ -8,18 +8,25 @@ import clientPromise from '@/lib/mongodb';
 import { ObjectId } from 'mongodb';
 
 /* ---------- types (daily snapshot) ---------- */
+type Origin = 'weekly' | 'regular' | 'manual';
+
 interface TaskItem {
   id: string;
   text: string;
   order: number;
   completed: boolean;
+  /** Mark where the task came from; older docs may not have this yet */
+  origin?: Origin;
 }
+
 interface DayRecord {
   _id?: ObjectId;
   userId: ObjectId;
-  date: string; // YYYY-MM-DD (LOCAL)
+  /** YYYY-MM-DD (LOCAL time) */
+  date: string;
   tasks: TaskItem[];
-  suppressed?: string[]; // ids hidden for *this* date only
+  /** ids hidden for *this* date only (delete-today behavior) */
+  suppressed?: string[];
 }
 
 /* ---------- types (unified manager collection) ---------- */
@@ -28,12 +35,12 @@ interface UnifiedTask {
   _id?: ObjectId;
   userId: ObjectId;
   type: TaskType;
-  id: string; // logical id
+  id: string; // logical id (stable across collections)
   text: string;
   order: number;
   dayOfWeek?: number; // weekly: 0..6
   date?: string; // regular: 'YYYY-MM-DD' (LOCAL)
-  weekStart?: string; // backlog
+  weekStart?: string; // backlog bucket marker (unused here)
 }
 
 /* ---------- helpers: LOCAL calendar (matches /manage-tasks) ---------- */
@@ -47,12 +54,15 @@ function ymdLocal(d: Date) {
 }
 
 function dowLocalFromYMD(ymd: string) {
-  // interpret the YYYY-MM-DD in local time (00:00 local)
+  // interpret the YYYY-MM-DD in *local* time (00:00 local)
   const [y, m, d] = ymd.split('-').map(Number);
   const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
   return dt.getDay(); // 0..6 Sun..Sat
 }
 
+/* ====================================================================== */
+/* GET: read/seed/merge/prune daily snapshot                              */
+/* ====================================================================== */
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -74,8 +84,7 @@ export async function GET(req: NextRequest) {
 
     const dow = dowLocalFromYMD(date);
 
-    // --- 1) Fetch the combined template for this day from unified tasks
-    // weekly (dayOfWeek=dow) + regular (date = given date), sorted by order
+    // 1) Fetch unified template for this day: weekly(dow) + regular(date)
     const unified = await tasksCol
       .find(
         {
@@ -90,22 +99,22 @@ export async function GET(req: NextRequest) {
       .sort({ order: 1 })
       .toArray();
 
-    const weeklyIds = unified
-      .filter((t) => t.type === 'weekly')
-      .map((t) => t.id);
+    // For UI: which ids are weekly (used for "remove from week" option)
+    const weeklyIdsForUI = new Set(
+      unified.filter((t) => t.type === 'weekly').map((t) => t.id)
+    );
 
-    // Ensure a DayRecord exists
+    // 2) Ensure a daily snapshot doc exists
     await daysCol.updateOne(
       { userId, date },
       { $setOnInsert: { userId, date, tasks: [], suppressed: [] } },
       { upsert: true }
     );
 
-    // Load the day
+    // 3) Load snapshot + build today's template (respect suppressed)
     let dayRecord = await daysCol.findOne({ userId, date });
     const suppressed = dayRecord?.suppressed ?? [];
 
-    // Filter template by suppressed, map to daily TaskItem shape
     const templateFiltered: TaskItem[] = unified
       .filter((t) => !suppressed.includes(t.id))
       .map((t) => ({
@@ -113,9 +122,18 @@ export async function GET(req: NextRequest) {
         text: t.text,
         order: t.order ?? 0,
         completed: false,
+        origin:
+          (t.type as Origin) === 'weekly' || (t.type as Origin) === 'regular'
+            ? (t.type as Origin)
+            : 'manual', // shouldn't happen for unified query, but safe default
       }));
 
-    // If brand new or empty, seed from template
+    // Fast map for lookups
+    const templateById = new Map(
+      templateFiltered.map((t) => [t.id, t] as const)
+    );
+
+    // 4) If brand new or empty → seed with filtered template (with origin + completed=false)
     if (!dayRecord || (dayRecord.tasks?.length ?? 0) === 0) {
       if (templateFiltered.length) {
         await daysCol.updateOne(
@@ -124,44 +142,78 @@ export async function GET(req: NextRequest) {
         );
         dayRecord = await daysCol.findOne({ userId, date });
       }
-    } else {
-      // Merge any missing items (e.g., new weekly or regular added later)
-      const missing = templateFiltered.filter(
-        (tpl) => !dayRecord!.tasks.some((d) => d.id === tpl.id)
-      );
-      if (missing.length) {
-        await daysCol.updateOne(
-          { userId, date },
-          { $push: { tasks: { $each: missing } } }
-        );
-        dayRecord = await daysCol.findOne({ userId, date });
-      }
+    }
 
-      // Optionally, keep orders in sync with manager (only for items that exist)
-      // We won’t overwrite completion state.
-      if (dayRecord) {
-        const byIdOrder = new Map(templateFiltered.map((t) => [t.id, t.order]));
-        const reOrdered = dayRecord.tasks
-          .map((t) => ({ ...t, order: byIdOrder.get(t.id) ?? t.order ?? 0 }))
-          .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-        await daysCol.updateOne(
-          { userId, date },
-          { $set: { tasks: reOrdered } }
-        );
-        dayRecord = await daysCol.findOne({ userId, date });
+    // Ensure we have a runtime copy to modify safely
+    const currentTasks: TaskItem[] = (dayRecord?.tasks ?? []).slice();
+
+    // 5) Retro-tag: mark any existing tasks that are in today's template
+    // as origin 'weekly'/'regular' if they lack an origin.
+    let mutated = false;
+    for (let i = 0; i < currentTasks.length; i++) {
+      const t = currentTasks[i];
+      if (!t.origin && templateById.has(t.id)) {
+        const tpl = templateById.get(t.id)!;
+        currentTasks[i] = { ...t, origin: tpl.origin as Origin };
+        mutated = true;
       }
     }
 
-    const tasksSorted = (dayRecord?.tasks ?? []).slice().sort((a, b) => {
-      const ao = a.order ?? 0;
-      const bo = b.order ?? 0;
-      return ao - bo;
+    // 6) Prune: remove templated (weekly/regular) tasks that no longer exist in the template
+    // Keep 'manual' tasks intact.
+    const allowedIds = new Set(templateFiltered.map((t) => t.id));
+    const prunedTasks = currentTasks.filter((t) => {
+      if (t.origin === 'weekly' || t.origin === 'regular') {
+        return allowedIds.has(t.id);
+      }
+      // No origin => treat as manual (user-added for the day)
+      return true;
     });
+    if (prunedTasks.length !== currentTasks.length) mutated = true;
+
+    // 7) Merge: add any newly added template tasks that aren't present (completed=false)
+    const presentIds = new Set(prunedTasks.map((t) => t.id));
+    const missing = templateFiltered.filter((tpl) => !presentIds.has(tpl.id));
+    let mergedTasks = prunedTasks;
+    if (missing.length) {
+      mergedTasks = prunedTasks.concat(
+        missing.map((m) => ({ ...m, completed: false }))
+      );
+      mutated = true;
+    }
+
+    // 8) Sync order from manager for templated items (preserve completed + manual order)
+    const synced = mergedTasks.map((t) => {
+      if (t.origin === 'weekly' || t.origin === 'regular') {
+        const tpl = templateById.get(t.id);
+        if (tpl && tpl.order !== t.order) {
+          mutated = true;
+          return { ...t, order: tpl.order };
+        }
+      }
+      return t;
+    });
+
+    // 9) Sort by order (stable display)
+    const finalTasks = synced
+      .slice()
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    // 10) Write back only if changed
+    if (mutated) {
+      await daysCol.updateOne(
+        { userId, date },
+        { $set: { tasks: finalTasks } }
+      );
+      dayRecord = await daysCol.findOne({ userId, date });
+    }
 
     return NextResponse.json({
       date,
-      tasks: tasksSorted,
-      weeklyIds, // so the client can show “delete from week”
+      tasks: (dayRecord?.tasks ?? [])
+        .slice()
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+      weeklyIds: Array.from(weeklyIdsForUI),
     });
   } catch (err) {
     console.error(err);
@@ -172,6 +224,9 @@ export async function GET(req: NextRequest) {
   }
 }
 
+/* ====================================================================== */
+/* PUT: toggle completion for a task in the daily snapshot                */
+/* ====================================================================== */
 export async function PUT(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -205,6 +260,9 @@ export async function PUT(request: NextRequest) {
   return NextResponse.json({ ok: true });
 }
 
+/* ====================================================================== */
+/* DELETE: remove from today's list and suppress reinjection for this day */
+/* ====================================================================== */
 export async function DELETE(request: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {

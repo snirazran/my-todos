@@ -1,4 +1,6 @@
 // src/app/api/manage-tasks/route.ts
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
@@ -12,7 +14,8 @@ type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 const isWeekday = (n: number): n is Weekday =>
   Number.isInteger(n) && n >= 0 && n <= 6;
 
-type BoardItem = { id: string; text: string; order: number };
+// NOTE: include "type" so the UI can show the repeat badge per item
+type BoardItem = { id: string; text: string; order: number; type: TaskType };
 
 interface TaskDoc {
   _id?: ObjectId;
@@ -120,20 +123,26 @@ export async function GET(req: NextRequest) {
 
   const dayParam = req.nextUrl.searchParams.get('day');
 
+  // Single-column fetch
   if (dayParam !== null) {
     const dayNum = Number(dayParam);
 
+    // Later (backlog)
     if (dayNum === -1) {
       const later = await c
-        .find<Pick<TaskDoc, 'id' | 'text' | 'order'>>(
+        .find<Pick<TaskDoc, 'id' | 'text' | 'order' | 'type'>>(
           { userId: uid, type: 'backlog', weekStart },
-          { projection: { id: 1, text: 1, order: 1 } }
+          { projection: { id: 1, text: 1, order: 1, type: 1 } }
         )
         .sort({ order: 1 })
         .toArray();
-      return NextResponse.json(
-        later.map(({ id, text, order }) => ({ id, text, order }))
-      );
+      const out: BoardItem[] = later.map(({ id, text, order, type }) => ({
+        id,
+        text,
+        order,
+        type,
+      }));
+      return NextResponse.json(out);
     }
 
     if (!isWeekday(dayNum)) {
@@ -143,8 +152,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Weekly + Regular for that weekday
     const docs = await c
-      .find<Pick<TaskDoc, 'id' | 'text' | 'order'>>(
+      .find<Pick<TaskDoc, 'id' | 'text' | 'order' | 'type'>>(
         {
           userId: uid,
           $or: [
@@ -152,21 +162,26 @@ export async function GET(req: NextRequest) {
             { type: 'regular', date: weekDates[dayNum] },
           ],
         },
-        { projection: { id: 1, text: 1, order: 1 } }
+        { projection: { id: 1, text: 1, order: 1, type: 1 } }
       )
       .sort({ order: 1 })
       .toArray();
 
-    return NextResponse.json(
-      docs.map(({ id, text, order }) => ({ id, text, order }))
-    );
+    const out: BoardItem[] = docs.map(({ id, text, order, type }) => ({
+      id,
+      text,
+      order,
+      type,
+    }));
+    return NextResponse.json(out);
   }
 
+  // Full week fetch (Sun..Sat + Later)
   const week: BoardItem[][] = Array.from({ length: 8 }, () => []);
 
   for (let d: Weekday = 0; d <= 6; d = (d + 1) as Weekday) {
     const docs = await c
-      .find<Pick<TaskDoc, 'id' | 'text' | 'order'>>(
+      .find<Pick<TaskDoc, 'id' | 'text' | 'order' | 'type'>>(
         {
           userId: uid,
           $or: [
@@ -174,23 +189,33 @@ export async function GET(req: NextRequest) {
             { type: 'regular', date: weekDates[d] },
           ],
         },
-        { projection: { id: 1, text: 1, order: 1 } }
+        { projection: { id: 1, text: 1, order: 1, type: 1 } }
       )
       .sort({ order: 1 })
       .toArray();
 
-    week[d] = docs.map(({ id, text, order }) => ({ id, text, order }));
+    week[d] = docs.map(({ id, text, order, type }) => ({
+      id,
+      text,
+      order,
+      type,
+    }));
   }
 
   const backlogDocs = await c
-    .find<Pick<TaskDoc, 'id' | 'text' | 'order'>>(
+    .find<Pick<TaskDoc, 'id' | 'text' | 'order' | 'type'>>(
       { userId: uid, type: 'backlog', weekStart },
-      { projection: { id: 1, text: 1, order: 1 } }
+      { projection: { id: 1, text: 1, order: 1, type: 1 } }
     )
     .sort({ order: 1 })
     .toArray();
 
-  week[7] = backlogDocs.map(({ id, text, order }) => ({ id, text, order }));
+  week[7] = backlogDocs.map(({ id, text, order, type }) => ({
+    id,
+    text,
+    order,
+    type,
+  }));
 
   return NextResponse.json(week);
 }
@@ -263,6 +288,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
+    // One-time tasks: either backlog (-1) or regular (specific weekday)
     for (const d of days) {
       const id = uuid();
       if (d === -1) {
@@ -331,6 +357,7 @@ export async function PUT(req: NextRequest) {
     return ymdLocal(d);
   });
 
+  // Reorder/update the Later bucket
   if (day === -1) {
     const ids = (tasks as Array<{ id: string }>).map((t) => t.id);
 
@@ -378,10 +405,12 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
+  // Reorder/update a weekday column
   const weekday: Weekday = day as Weekday;
   const batch = tasks as Array<{ id: string; text?: string }>;
   const ids = batch.map((t) => t.id);
 
+  // Remove one-time (regular) not present anymore
   await c.deleteMany({
     userId: uid,
     type: 'regular',
@@ -389,6 +418,7 @@ export async function PUT(req: NextRequest) {
     id: { $nin: ids },
   });
 
+  // Get current types/text for all involved ids
   const docs = await c
     .find({ userId: uid, id: { $in: ids } })
     .project<Pick<TaskDoc, 'id' | 'type' | 'text'>>({ id: 1, type: 1, text: 1 })
@@ -403,18 +433,21 @@ export async function PUT(req: NextRequest) {
       const textFromReq = t.text ?? textById.get(t.id) ?? '';
 
       if (ttype === 'weekly') {
+        // just move/renumber the weekly item
         return c.updateOne(
           { userId: uid, type: 'weekly', id: t.id },
           { $set: { dayOfWeek: weekday, order: i + 1, updatedAt: now } }
         );
       }
       if (ttype === 'regular') {
+        // move/renumber inside this week
         return c.updateOne(
           { userId: uid, type: 'regular', id: t.id },
           { $set: { date: weekDates[weekday], order: i + 1, updatedAt: now } }
         );
       }
       if (ttype === 'backlog') {
+        // promote backlog → one-time on that weekday
         return Promise.all([
           c.deleteOne({ userId: uid, type: 'backlog', weekStart, id: t.id }),
           c.updateOne(
@@ -438,7 +471,7 @@ export async function PUT(req: NextRequest) {
         ]);
       }
 
-      // Fallback: id not found (e.g., backlog was deleted by the other PUT first)
+      // Fallback: id not found (treat as new one-time on this weekday)
       return c.updateOne(
         { userId: uid, type: 'regular', id: t.id },
         {
@@ -481,24 +514,29 @@ export async function DELETE(req: NextRequest) {
 
   const c = await colTasks();
 
+  // Delete from Later (backlog)
   if (day === -1) {
     const weekStart = ymdLocal(sundayOf());
     await c.deleteOne({ userId: uid, type: 'backlog', weekStart, id: taskId });
     return NextResponse.json({ ok: true });
   }
 
+  // Determine the type for this id
   const doc = await c.findOne<Pick<TaskDoc, 'type'>>(
     { userId: uid, id: taskId },
     { projection: { type: 1 } }
   );
 
   if (doc?.type === 'regular') {
+    // remove just the one-time instance
     await c.deleteOne({ userId: uid, type: 'regular', id: taskId });
     return NextResponse.json({ ok: true });
   }
 
+  // weekly: remove the weekly template entry
   await c.deleteOne({ userId: uid, type: 'weekly', id: taskId });
 
+  // also remove any future one-time clones with the same id (safety)
   const today = todayLocalYMD();
   await c.deleteMany({
     userId: uid,

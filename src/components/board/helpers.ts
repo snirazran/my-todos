@@ -1,6 +1,12 @@
 // components/board/helpers.ts
 
-export type Task = { id: string; text: string; order: number };
+export type Task = {
+  id: string;
+  text: string;
+  order: number;
+  /** provided by /api/manage-tasks */
+  type?: 'weekly' | 'regular' | 'backlog';
+};
 
 // Display has 7 weekday columns + 1 “Later” column at index 7
 export type DisplayDay = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;

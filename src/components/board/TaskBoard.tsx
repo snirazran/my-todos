@@ -306,19 +306,15 @@ export default function TaskBoard({
         initialText={quickText}
         defaultRepeat="this-week"
         onSubmit={async ({ text, days, repeat }) => {
-          // QuickAdd may still return "7" for Later — convert to API -1 here.
-          const apiDays: ApiDay[] = (days ?? []).map((d: number) =>
-            d === 7 ? -1 : (Math.max(0, Math.min(6, d)) as ApiDay)
-          );
-
+          // `days` is already API format from QuickAddSheet: -1 for Later, 0..6 for Sun..Sat.
           if (onQuickAdd) {
             await onQuickAdd({
               text,
-              days: apiDays,
+              days, // pass through as-is (ApiDay[])
               repeat: repeat as RepeatChoice,
             });
           } else {
-            // fallback to old flow if parent didn’t provide onQuickAdd
+            // fallback if parent didn’t provide onQuickAdd
             onRequestAdd(null, text, null, repeat as RepeatChoice);
           }
           setShowQuickAdd(false);

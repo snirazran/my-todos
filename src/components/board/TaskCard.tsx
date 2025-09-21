@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useCallback, useEffect } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, RotateCcw } from 'lucide-react';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
 
@@ -18,6 +18,8 @@ export default function TaskCard({
   onGrab,
   innerRef,
   hiddenWhileDragging,
+  /** Trello-like repeating badge when true */
+  isRepeating = false,
 }: {
   dragId: string;
   task: Task;
@@ -25,6 +27,7 @@ export default function TaskCard({
   innerRef?: (el: HTMLDivElement | null) => void;
   onGrab: (params: OnGrabParams) => void;
   hiddenWhileDragging?: boolean;
+  isRepeating?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -128,7 +131,7 @@ export default function TaskCard({
       onDragStart={(e) => e.preventDefault()}
       style={{ touchAction: 'auto' }}
       className={[
-        'group flex items-center gap-3 p-3 select-none rounded-2xl cursor-grab transition',
+        'group flex items-start gap-3 p-3 select-none rounded-2xl cursor-grab transition',
         'bg-white/85 dark:bg-emerald-900/40 backdrop-blur',
         'border border-emerald-700/20 dark:border-emerald-300/15 shadow',
         'mb-2',
@@ -137,19 +140,39 @@ export default function TaskCard({
       role="listitem"
       aria-grabbed={false}
     >
-      {/* Animated fly (your component) */}
-      <span className="relative grid w-5 h-5 shrink-0 place-items-center">
-        <Fly size={25} x={-2} y={-6.5} />
+      {/* Avatar */}
+      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center">
+        <Fly size={21} x={-1} y={-4} />
       </span>
 
-      <span className="flex-1 text-sm text-emerald-950 dark:text-emerald-50">
-        {task.text}
-      </span>
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="truncate text-[15px] leading-6 text-emerald-950 dark:text-emerald-50">
+          {task.text}
+        </div>
 
+        {/* Trello-like badges row (only if repeating) */}
+        {isRepeating && (
+          <div className="mt-1 flex items-center gap-1.5">
+            <span
+              title="Repeats weekly"
+              className="inline-flex items-center gap-1 rounded-md border border-emerald-300/50 bg-emerald-50/80 px-1.5 py-0.5
+                         text-[11px] font-medium text-emerald-700 shadow-sm
+                         dark:border-emerald-400/30 dark:bg-emerald-900/40 dark:text-emerald-100
+                         transition-colors group-hover:bg-emerald-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+              <span className="tracking-wide uppercase">Repeats</span>
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Action */}
       <button
         onClick={onDelete}
         title="Delete"
-        className="shrink-0 rounded-full p-1.5 hover:bg-emerald-100/60 dark:hover:bg-emerald-800/50 transition"
+        className="ml-1 shrink-0 rounded-full p-1.5 hover:bg-emerald-100/60 dark:hover:bg-emerald-800/50 transition"
         type="button"
       >
         <Trash2 className="w-4 h-4 text-red-500 group-hover:text-red-600" />

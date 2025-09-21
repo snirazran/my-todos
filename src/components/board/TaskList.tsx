@@ -92,6 +92,7 @@ export default function TaskList({
           });
         }}
         hiddenWhileDragging={!!isDragged}
+        isRepeating={t.type === 'weekly'}
       />
     );
 
