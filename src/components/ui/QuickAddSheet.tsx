@@ -41,6 +41,7 @@ export default function QuickAddSheet({
   const [when, setWhen] = useState<WhenChoice>('pick');
   const [pickedDays, setPickedDays] = useState<number[]>([]); // 0..6
 
+  // Reset every time the sheet opens
   useEffect(() => {
     if (open) {
       setText(initialText);
@@ -50,6 +51,7 @@ export default function QuickAddSheet({
     }
   }, [open, initialText, defaultRepeat]);
 
+  // Safety: ensure at least one day is selected in "pick" mode
   useEffect(() => {
     if (open && when === 'pick' && pickedDays.length === 0) {
       setPickedDays([todayDisplayIndex()]);
@@ -91,7 +93,7 @@ export default function QuickAddSheet({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="New task…"
-            className="w-full h-11 px-3 mb-3 rounded-[14px] bg-white/90 dark:bg-white/10 text-emerald-900 dark:text-emerald-50 ring-1 ring-black/10 dark:ring-white/10 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-emerald-300"
+            className="w-full h-11 px-3 mb-3 rounded-[14px] bg-white/90 dark:bg-white/10 text-slate-900 dark:text-emerald-50 ring-1 ring-black/10 dark:ring-white/10 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-emerald-300"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -148,79 +150,74 @@ export default function QuickAddSheet({
             </div>
           </div>
 
-          {/* Pick mode */}
+          {/* PICK MODE */}
           {when === 'pick' && (
-            <>
-              <div className="flex items-center gap-2 mt-1">
-                {/* Day chips (now true circles + border; allow vertical overflow) */}
-                <div className="flex-1 min-w-0 overflow-x-auto overflow-y-visible no-scrollbar">
-                  <div className="flex gap-2 py-1 pr-1">
-                    {dayLabels.map((label, d) => {
-                      const on = pickedDays.includes(d);
-                      return (
-                        <button
-                          key={d}
-                          type="button"
-                          onClick={() => toggleDay(d)}
-                          aria-pressed={on}
-                          data-active={on}
-                          title={label}
-                          className={[
-                            'inline-flex items-center justify-center select-none',
-                            // circle sizing
-                            'h-9 w-9 sm:h-10 sm:w-10 rounded-full text-sm font-semibold',
-                            // border (no ring so it never gets clipped)
-                            'border border-slate-300/80 dark:border-white/15',
-                            // colors
-                            'bg-white dark:bg-white/10 text-slate-800 dark:text-emerald-50',
-                            'data-[active=true]:bg-emerald-50 data-[active=true]:border-emerald-300 data-[active=true]:text-emerald-900',
-                            'transition-colors',
-                          ].join(' ')}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Compact repeat switch */}
-                <div className="pl-1 shrink-0">
-                  <div className="inline-flex items-center gap-2 px-2 py-1 border rounded-full bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-white/10">
-                    <RotateCcw className="w-4 h-4 text-emerald-800/80 dark:text-emerald-200" />
-                    <span className="text-[13px] font-medium text-slate-700 dark:text-emerald-50">
-                      Repeat every week
-                    </span>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={repeatsOn}
-                      onClick={() =>
-                        setRepeat((r) =>
-                          r === 'weekly' ? 'this-week' : 'weekly'
-                        )
-                      }
-                      data-on={repeatsOn}
-                      className={[
-                        'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                        'bg-slate-300/70 data-[on=true]:bg-emerald-400',
-                      ].join(' ')}
-                      title={repeatsOn ? 'Weekly' : 'One-time'}
-                    >
-                      <span
+            <div className="flex flex-col gap-2 mt-1 sm:flex-row sm:items-center">
+              {/* Day chips — true circles, horizontally scrollable, no clipping */}
+              <div className="flex-1 min-w-0 px-1 -mx-1 overflow-x-auto overflow-y-visible no-scrollbar">
+                <div className="inline-flex w-max gap-2 pr-2 py-1.5">
+                  {dayLabels.map((label, d) => {
+                    const on = pickedDays.includes(d);
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => toggleDay(d)}
+                        aria-pressed={on}
+                        data-active={on}
+                        title={label}
                         className={[
-                          'inline-block h-4 w-4 transform rounded-full bg-white shadow ring-1 ring-black/10 transition-transform',
-                          repeatsOn ? 'translate-x-4' : 'translate-x-1',
+                          'inline-flex items-center justify-center select-none',
+                          'h-10 w-10 rounded-full text-sm font-semibold',
+                          'border border-slate-300/80 dark:border-white/15',
+                          'bg-white dark:bg-white/10 text-slate-800 dark:text-emerald-50',
+                          'data-[active=true]:bg-emerald-50 data-[active=true]:border-emerald-300 data-[active=true]:text-emerald-900',
+                          'transition-colors',
                         ].join(' ')}
-                      />
-                    </button>
-                  </div>
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-            </>
+
+              {/* Compact repeat switch — stacks under chips on mobile */}
+              <div className="sm:shrink-0 sm:pl-1">
+                <div className="inline-flex items-center gap-2 px-2 py-1 border rounded-full bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-white/10">
+                  <RotateCcw className="w-4 h-4 text-emerald-800/80 dark:text-emerald-200" />
+                  <span className="text-[13px] font-medium text-slate-700 dark:text-emerald-50">
+                    Repeat every week
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={repeatsOn}
+                    onClick={() =>
+                      setRepeat((r) =>
+                        r === 'weekly' ? 'this-week' : 'weekly'
+                      )
+                    }
+                    data-on={repeatsOn}
+                    className={[
+                      'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                      'bg-slate-300/70 data-[on=true]:bg-emerald-400',
+                    ].join(' ')}
+                    title={repeatsOn ? 'Weekly' : 'One-time'}
+                  >
+                    <span
+                      className={[
+                        'inline-block h-4 w-4 transform rounded-full bg-white shadow ring-1 ring-black/10 transition-transform',
+                        repeatsOn ? 'translate-x-4' : 'translate-x-1',
+                      ].join(' ')}
+                    />
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
-          {/* Later hint */}
+          {/* LATER MODE HINT */}
           {when === 'later' && (
             <div className="mt-2 flex items-start gap-2 rounded-xl bg-emerald-50/75 dark:bg-emerald-900/30 ring-1 ring-emerald-700/15 p-2.5 text-[13px] text-emerald-900/90 dark:text-emerald-100/90">
               <Info className="w-4 h-4 mt-0.5 shrink-0" />
@@ -269,6 +266,17 @@ export default function QuickAddSheet({
           </div>
         </div>
       </div>
+
+      {/* Hide mobile scrollbars for the chip scroller */}
+      <style jsx>{`
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </div>
   );
 }
