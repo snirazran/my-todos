@@ -86,10 +86,7 @@ export default function Home() {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [weeklyIds, setWeeklyIds] = useState<Set<string>>(new Set());
 
-  const [weeklyBacklog, setWeeklyBacklog] = useState<
-    { id: string; text: string }[]
-  >([]);
-  const [weeklyTemplateBacklog, setWeeklyTemplateBacklog] = useState<
+  const [laterThisWeek, setLaterThisWeek] = useState<
     { id: string; text: string }[]
   >([]);
 
@@ -131,14 +128,8 @@ export default function Home() {
 
   const fetchBacklog = useCallback(async () => {
     if (!session) return;
-    const [thisWeek, weeklyTemplate] = await Promise.all([
-      fetch('/api/weekly-backlog').then((r) => r.json()),
-      fetch('/api/manage-tasks?day=-1').then((r) => r.json()),
-    ]);
-    setWeeklyBacklog(thisWeek.map((t: any) => ({ id: t.id, text: t.text })));
-    setWeeklyTemplateBacklog(
-      weeklyTemplate.map((t: any) => ({ id: t.id, text: t.text }))
-    );
+    const items = await fetch('/api/manage-tasks?day=-1').then((r) => r.json());
+    setLaterThisWeek(items.map((t: any) => ({ id: t.id, text: t.text })));
   }, [session]);
 
   const today = new Date();
@@ -638,14 +629,9 @@ export default function Home() {
 
           {session && (
             <BacklogPanel
-              weeklyBacklog={weeklyBacklog}
-              weeklyTemplateBacklog={weeklyTemplateBacklog}
-              dateStr={dateStr}
+              later={laterThisWeek}
               onRefreshToday={refreshToday}
-              onRefreshBacklog={() => {
-                fetchBacklog();
-                loadWeeklyIds();
-              }}
+              onRefreshBacklog={fetchBacklog}
             />
           )}
         </div>

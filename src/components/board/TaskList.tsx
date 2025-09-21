@@ -2,7 +2,7 @@
 
 import React from 'react';
 import TaskCard from './TaskCard';
-import { Task, draggableIdFor } from './helpers';
+import { Task, draggableIdFor, type DisplayDay } from './helpers';
 import { DragState } from './hooks/useDragManager';
 
 export default function TaskList({
@@ -15,14 +15,14 @@ export default function TaskList({
   onGrab,
   setCardRef,
 }: {
-  day: number;
+  day: DisplayDay;
   items: Task[];
   drag: DragState | null;
-  targetDay: number | null;
+  targetDay: DisplayDay | null;
   targetIndex: number | null;
-  removeTask: (day: number, id: string) => Promise<void>;
+  removeTask: (day: DisplayDay, id: string) => Promise<void>;
   onGrab: (p: {
-    day: number;
+    day: DisplayDay;
     index: number;
     taskId: string;
     taskText: string;

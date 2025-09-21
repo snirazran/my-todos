@@ -2,8 +2,11 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  apiDayFromDisplay,
   todayDisplayIndex,
+  apiDayFromDisplay,
+  labelForDisplayDay,
+  type ApiDay,
+  type DisplayDay,
 } from '@/components/board/helpers';
 import {
   CalendarDays,
@@ -22,7 +25,8 @@ type Props = Readonly<{
   onOpenChange: (v: boolean) => void;
   onSubmit: (data: {
     text: string;
-    days: number[];
+    /** API days: 0..6 (Sun..Sat), -1 for “Later” */
+    days: ApiDay[];
     repeat: RepeatChoice;
   }) => Promise<void> | void;
   initialText?: string;
@@ -39,14 +43,18 @@ export default function QuickAddSheet({
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
   const [when, setWhen] = useState<WhenChoice>('pick');
-  const [pickedDays, setPickedDays] = useState<number[]>([]); // 0..6
+
+  // DISPLAY indices only (0..6). 7 (“Later”) is handled via `when === 'later'`.
+  const [pickedDays, setPickedDays] = useState<Array<Exclude<DisplayDay, 7>>>(
+    []
+  );
 
   // Reset every time the sheet opens
   useEffect(() => {
     if (open) {
       setText(initialText);
       setWhen('pick');
-      setPickedDays([todayDisplayIndex()]); // default to today
+      setPickedDays([todayDisplayIndex()]); // default to today (DISPLAY index)
       setRepeat(defaultRepeat);
     }
   }, [open, initialText, defaultRepeat]);
@@ -58,12 +66,17 @@ export default function QuickAddSheet({
     }
   }, [open, when, pickedDays.length]);
 
+  // Labels that respect WEEK_START config via helpers
   const dayLabels = useMemo(
-    () => ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+    () =>
+      Array.from({ length: 7 }, (_, d) => {
+        const full = labelForDisplayDay(d as Exclude<DisplayDay, 7>); // e.g., "Sunday"
+        return { short: full.slice(0, 2), title: full };
+      }),
     []
   );
 
-  const toggleDay = (d: number) =>
+  const toggleDay = (d: Exclude<DisplayDay, 7>) =>
     setPickedDays((prev) =>
       prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
     );
@@ -72,10 +85,14 @@ export default function QuickAddSheet({
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    const displayDays = when === 'later' ? [7] : pickedDays.slice().sort();
-    if (displayDays.length === 0) return;
+    // Convert DISPLAY → API days
+    const apiDays: ApiDay[] =
+      when === 'later'
+        ? [-1]
+        : pickedDays.slice().sort().map(apiDayFromDisplay);
 
-    const apiDays = displayDays.map(apiDayFromDisplay);
+    if (apiDays.length === 0) return;
+
     await onSubmit({ text: trimmed, days: apiDays, repeat });
     onOpenChange(false);
   };
@@ -153,10 +170,10 @@ export default function QuickAddSheet({
           {/* PICK MODE */}
           {when === 'pick' && (
             <div className="flex flex-col gap-2 mt-1 sm:flex-row sm:items-center">
-              {/* Day chips — true circles, horizontally scrollable, no clipping */}
               <div className="flex-1 min-w-0 px-1 -mx-1 overflow-x-auto overflow-y-visible no-scrollbar">
                 <div className="inline-flex w-max gap-2 pr-2 py-1.5">
-                  {dayLabels.map((label, d) => {
+                  {dayLabels.map(({ short, title }, idx) => {
+                    const d = idx as Exclude<DisplayDay, 7>;
                     const on = pickedDays.includes(d);
                     return (
                       <button
@@ -165,7 +182,7 @@ export default function QuickAddSheet({
                         onClick={() => toggleDay(d)}
                         aria-pressed={on}
                         data-active={on}
-                        title={label}
+                        title={title}
                         className={[
                           'inline-flex items-center justify-center select-none',
                           'h-10 w-10 rounded-full text-sm font-semibold',
@@ -175,14 +192,13 @@ export default function QuickAddSheet({
                           'transition-colors',
                         ].join(' ')}
                       >
-                        {label}
+                        {short}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Compact repeat switch — stacks under chips on mobile */}
               <div className="sm:shrink-0 sm:pl-1">
                 <div className="inline-flex items-center gap-2 px-2 py-1 border rounded-full bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-white/10">
                   <RotateCcw className="w-4 h-4 text-emerald-800/80 dark:text-emerald-200" />
@@ -217,7 +233,6 @@ export default function QuickAddSheet({
             </div>
           )}
 
-          {/* LATER MODE HINT */}
           {when === 'later' && (
             <div className="mt-2 flex items-start gap-2 rounded-xl bg-emerald-50/75 dark:bg-emerald-900/30 ring-1 ring-emerald-700/15 p-2.5 text-[13px] text-emerald-900/90 dark:text-emerald-100/90">
               <Info className="w-4 h-4 mt-0.5 shrink-0" />
@@ -267,7 +282,6 @@ export default function QuickAddSheet({
         </div>
       </div>
 
-      {/* Hide mobile scrollbars for the chip scroller */}
       <style jsx>{`
         .no-scrollbar::-webkit-scrollbar {
           display: none;

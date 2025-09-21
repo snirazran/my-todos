@@ -2,7 +2,6 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import TaskBoard from '@/components/board/TaskBoard';
-import useSWR from 'swr';
 
 import {
   Task,
@@ -10,6 +9,8 @@ import {
   labelForDisplayDay,
   apiDayFromDisplay,
   displayDayFromApi,
+  type ApiDay,
+  type DisplayDay,
 } from '@/components/board/helpers';
 
 const EXTRA = 'Later this week';
@@ -22,11 +23,16 @@ export default function ManageTasksPage() {
   /** Map API order (Sun..Sat, Later at index 7) → Display order */
   const mapApiToDisplay = (apiWeek: Task[][]): Task[][] => {
     const out: Task[][] = Array.from({ length: DAYS }, () => []);
-    for (let apiDay = 0; apiDay <= 6; apiDay++) {
+    // API days 0..6 (Sun..Sat)
+    for (
+      let apiDay = 0 as ApiDay;
+      apiDay <= 6;
+      apiDay = (apiDay + 1) as ApiDay
+    ) {
       const displayIdx = displayDayFromApi(apiDay);
       out[displayIdx] = apiWeek[apiDay] ?? [];
     }
-    // Later bucket
+    // Later bucket is already at index 7 from the API
     out[7] = apiWeek[7] ?? [];
     return out;
   };
@@ -45,14 +51,14 @@ export default function ManageTasksPage() {
   }, []);
 
   /** Save order for one display column (maps → API day) */
-  const saveDay = async (displayDay: number, tasks: Task[]) => {
+  const saveDay = async (displayDay: DisplayDay, tasks: Task[]) => {
     const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
     try {
       await fetch('/api/manage-tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          day: apiDayFromDisplay(displayDay),
+          day: apiDayFromDisplay(displayDay), // 7 -> -1, else 0..6
           tasks: ordered,
         }),
       });
@@ -62,13 +68,13 @@ export default function ManageTasksPage() {
   };
 
   /** Delete from one display column (maps → API day) */
-  const removeTask = async (displayDay: number, id: string) => {
+  const removeTask = async (displayDay: DisplayDay, id: string) => {
     try {
       await fetch('/api/manage-tasks', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          day: apiDayFromDisplay(displayDay),
+          day: apiDayFromDisplay(displayDay), // 7 -> -1, else 0..6
           taskId: id,
         }),
       });
@@ -81,14 +87,15 @@ export default function ManageTasksPage() {
     }
   };
 
-  /** Direct add from QuickAddSheet: days are API days (0..6 or 7 for “Later”) */
+  /** Direct add from QuickAddSheet: days are API days (0..6) or -1 for “Later” */
   const onAddTask = async ({
     text,
     days,
     repeat,
   }: {
     text: string;
-    days: number[];
+    // -1 = Later, 0..6 = Sun..Sat (API days)
+    days: (-1 | 0 | 1 | 2 | 3 | 4 | 5 | 6)[];
     repeat: 'this-week' | 'weekly';
   }) => {
     await fetch('/api/manage-tasks', {
@@ -97,7 +104,9 @@ export default function ManageTasksPage() {
       body: JSON.stringify({ text, days, repeat }),
     });
 
-    const data = await fetch('/api/manage-tasks').then((r) => r.json());
+    const data = (await fetch('/api/manage-tasks').then((r) =>
+      r.json()
+    )) as Task[][];
     setWeek(mapApiToDisplay(data));
   };
 
@@ -105,7 +114,7 @@ export default function ManageTasksPage() {
   const titles = useMemo(
     () =>
       Array.from({ length: DAYS }, (_, i) =>
-        i === 7 ? EXTRA : labelForDisplayDay(i)
+        i === 7 ? EXTRA : labelForDisplayDay(i as Exclude<DisplayDay, 7>)
       ),
     []
   );

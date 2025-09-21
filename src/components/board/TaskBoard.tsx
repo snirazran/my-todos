@@ -2,7 +2,13 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Task, DAYS, todayDisplayIndex } from './helpers';
+import {
+  Task,
+  DAYS,
+  todayDisplayIndex,
+  type DisplayDay,
+  type ApiDay,
+} from './helpers';
 import DayColumn from './DayColumn';
 import TaskList from './TaskList';
 import PaginationDots from './PaginationDots';
@@ -27,17 +33,19 @@ export default function TaskBoard({
   titles: string[];
   week: Task[][];
   setWeek: React.Dispatch<React.SetStateAction<Task[][]>>;
-  saveDay: (day: number, tasks: Task[]) => Promise<void>;
-  removeTask: (day: number, id: string) => Promise<void>;
+  // Use DisplayDay (0..7) for board columns
+  saveDay: (day: DisplayDay, tasks: Task[]) => Promise<void>;
+  removeTask: (day: DisplayDay, id: string) => Promise<void>;
   onRequestAdd: (
-    day: number | null,
+    day: DisplayDay | null,
     text?: string,
     afterIndex?: number | null,
     repeat?: RepeatChoice
   ) => void;
+  // Pass ApiDay[] (-1 | 0..6) to the parent for server calls
   onQuickAdd?: (data: {
     text: string;
-    days: number[]; // API days (0..6 or 7 for “later”)
+    days: ApiDay[]; // -1 = Later, 0..6 = Sun..Sat
     repeat: RepeatChoice;
   }) => Promise<void> | void;
 }) {
@@ -62,10 +70,12 @@ export default function TaskBoard({
     cancelDrag();
   }, [pathname, cancelDrag]);
 
-  const [pageIndex, setPageIndex] = useState(todayDisplayIndex());
+  const [pageIndex, setPageIndex] = useState<DisplayDay>(
+    todayDisplayIndex() as DisplayDay
+  );
   const recomputeCanPanRef = useRef<() => void>();
 
-  const centerColumnSmooth = (day: number) => {
+  const centerColumnSmooth = (day: DisplayDay) => {
     const s = scrollerRef.current;
     const col = (document.querySelectorAll('[data-col="true"]')[day] ??
       null) as HTMLElement | null;
@@ -78,7 +88,7 @@ export default function TaskBoard({
 
   useEffect(() => {
     const s = scrollerRef.current;
-    const t = todayDisplayIndex();
+    const t = todayDisplayIndex() as DisplayDay;
     const col = (document.querySelectorAll('[data-col="true"]')[t] ??
       null) as HTMLElement | null;
     if (!s || !col) return;
@@ -103,7 +113,7 @@ export default function TaskBoard({
         const scrollCenter = s.scrollLeft + s.clientWidth / 2;
         return Math.abs(colCenter - scrollCenter) < col.clientWidth / 2;
       });
-      if (idx >= 0) setPageIndex(idx);
+      if (idx >= 0) setPageIndex(idx as DisplayDay);
     };
     s.addEventListener('scroll', handler, { passive: true });
     return () => s.removeEventListener('scroll', handler);
@@ -121,7 +131,7 @@ export default function TaskBoard({
 
   // ---- drag reorder commit ----
   const commitDragReorder = useCallback(
-    (toDay: number, toIndex: number) => {
+    (toDay: DisplayDay, toIndex: number) => {
       if (!drag) return;
       const sameSpot = drag.fromDay === toDay && drag.fromIndex === toIndex;
       if (sameSpot) return;
@@ -138,7 +148,7 @@ export default function TaskBoard({
           drag.fromDay === toDay
             ? [saveDay(toDay, next[toDay])]
             : [
-                saveDay(drag.fromDay, next[drag.fromDay]),
+                saveDay(drag.fromDay as DisplayDay, next[drag.fromDay]),
                 saveDay(toDay, next[toDay]),
               ]
         ).catch(() => {});
@@ -150,7 +160,7 @@ export default function TaskBoard({
 
   const onDrop = useCallback(() => {
     if (!drag) return;
-    const toDay = targetDay ?? drag.fromDay;
+    const toDay = (targetDay ?? drag.fromDay) as DisplayDay;
     const toIndex = targetIndex ?? drag.fromIndex;
 
     setDrag(null);
@@ -204,7 +214,7 @@ export default function TaskBoard({
         {/* extra space so the bar and pagination never overlap content */}
         <div className="flex gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[220px] sm:pb-[180px] md:pb-[188px]">
           {Array.from({ length: DAYS }, (_, day) => ({
-            day,
+            day: day as DisplayDay,
             key: `day-${day}`,
           })).map(({ day, key }) => (
             <div
@@ -222,7 +232,7 @@ export default function TaskBoard({
                   day={day}
                   items={week[day]}
                   drag={drag}
-                  targetDay={targetDay}
+                  targetDay={targetDay as DisplayDay | null} // <-- add cast
                   targetIndex={targetIndex}
                   removeTask={removeTask}
                   onGrab={onGrab}
@@ -260,7 +270,7 @@ export default function TaskBoard({
       {/* GLOBAL BOTTOM ADD (trigger only) */}
       <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 py-12 pointer-events-none sm:px-6 sm:py-5">
         <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
-          <div className="rounded-[28px] bg-white/75 dark:bg-white/8 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
+          <div className="rounded-[28px] bg-white/75 dark:bg:white/8 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
             <button
               onClick={() => {
                 setQuickText('');
@@ -296,9 +306,17 @@ export default function TaskBoard({
         initialText={quickText}
         defaultRepeat="this-week"
         onSubmit={async ({ text, days, repeat }) => {
-          // `days` here are assumed to be API day indexes already (0..6, or 7 for “Later”).
+          // QuickAdd may still return "7" for Later — convert to API -1 here.
+          const apiDays: ApiDay[] = (days ?? []).map((d: number) =>
+            d === 7 ? -1 : (Math.max(0, Math.min(6, d)) as ApiDay)
+          );
+
           if (onQuickAdd) {
-            await onQuickAdd({ text, days, repeat });
+            await onQuickAdd({
+              text,
+              days: apiDays,
+              repeat: repeat as RepeatChoice,
+            });
           } else {
             // fallback to old flow if parent didn’t provide onQuickAdd
             onRequestAdd(null, text, null, repeat as RepeatChoice);
