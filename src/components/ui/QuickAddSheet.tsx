@@ -6,17 +6,16 @@ import {
   todayDisplayIndex,
 } from '@/components/board/helpers';
 import {
-  RotateCcw,
-  CalendarCheck,
   CalendarDays,
-  Sun,
+  CalendarCheck,
+  RotateCcw,
+  Info,
   Plus,
   X,
-  Info,
 } from 'lucide-react';
 
 type RepeatChoice = 'this-week' | 'weekly';
-type WhenChoice = 'today' | 'pick' | 'later';
+type WhenChoice = 'pick' | 'later';
 
 type Props = Readonly<{
   open: boolean;
@@ -39,19 +38,24 @@ export default function QuickAddSheet({
 }: Props) {
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
-  const [when, setWhen] = useState<WhenChoice>('today');
-  const [pickedDays, setPickedDays] = useState<number[]>([]); // display indices 0..6
+  const [when, setWhen] = useState<WhenChoice>('pick');
+  const [pickedDays, setPickedDays] = useState<number[]>([]); // 0..6
 
   useEffect(() => {
     if (open) {
       setText(initialText);
+      setWhen('pick');
+      setPickedDays([todayDisplayIndex()]); // default to today
       setRepeat(defaultRepeat);
-      setWhen('today');
-      setPickedDays([]);
     }
   }, [open, initialText, defaultRepeat]);
 
-  const disabled = !text.trim();
+  useEffect(() => {
+    if (open && when === 'pick' && pickedDays.length === 0) {
+      setPickedDays([todayDisplayIndex()]);
+    }
+  }, [open, when, pickedDays.length]);
+
   const dayLabels = useMemo(
     () => ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
     []
@@ -63,34 +67,31 @@ export default function QuickAddSheet({
     );
 
   const handleSubmit = async () => {
-    if (disabled) return;
+    const trimmed = text.trim();
+    if (!trimmed) return;
 
-    const displayDays =
-      when === 'today'
-        ? [todayDisplayIndex()]
-        : when === 'later'
-        ? [7] // “Later this week” bucket
-        : pickedDays.slice().sort((a, b) => a - b);
-
+    const displayDays = when === 'later' ? [7] : pickedDays.slice().sort();
     if (displayDays.length === 0) return;
 
     const apiDays = displayDays.map(apiDayFromDisplay);
-    await onSubmit({ text: text.trim(), days: apiDays, repeat });
+    await onSubmit({ text: trimmed, days: apiDays, repeat });
     onOpenChange(false);
   };
 
   if (!open) return null;
 
+  const repeatsOn = repeat === 'weekly';
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[70] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none">
       <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
-        <div className="rounded-[28px] bg-white/75 dark:bg-white/8 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-3">
+        <div className="rounded-[28px] bg-white/80 dark:bg-white/10 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-3">
           {/* Input */}
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="New task…"
-            className="w-full h-11 px-3 mb-3 rounded-[14px] bg-white/90 dark:bg-white/10 text-emerald-900 dark:text-emerald-50 ring-1 ring-black/10 dark:ring-white/10 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-lime-300"
+            className="w-full h-11 px-3 mb-3 rounded-[14px] bg-white/90 dark:bg-white/10 text-emerald-900 dark:text-emerald-50 ring-1 ring-black/10 dark:ring-white/10 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-emerald-300"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -102,129 +103,140 @@ export default function QuickAddSheet({
             autoFocus
           />
 
-          {/* When chooser — one row on mobile; tighter spacing & text */}
-          <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2">
-            <button
-              type="button"
-              onClick={() => setWhen('today')}
-              aria-pressed={when === 'today'}
-              className={[
-                'h-9 px-2 sm:px-3 rounded-full text-[12px] sm:text-[13px] leading-tight',
-                'inline-flex items-center gap-1 sm:gap-1.5 ring-1 transition whitespace-nowrap',
-                when === 'today'
-                  ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
-                  : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
-              ].join(' ')}
-              title="Add to today"
-            >
-              <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              Today
-            </button>
+          {/* Segmented control */}
+          <div className="mb-2">
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-100/70 dark:bg-white/10 ring-1 ring-black/10 dark:ring-white/10">
+              <button
+                type="button"
+                aria-pressed={when === 'pick'}
+                data-active={when === 'pick'}
+                onClick={() => {
+                  setWhen('pick');
+                  setPickedDays((prev) =>
+                    prev.length ? prev : [todayDisplayIndex()]
+                  );
+                }}
+                className={[
+                  'h-10 rounded-xl text-[14px] font-medium inline-flex items-center justify-center gap-2 transition',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300',
+                  'data-[active=true]:bg-white data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-black/10',
+                  'data-[active=false]:text-slate-600 dark:data-[active=false]:text-emerald-100/85',
+                ].join(' ')}
+              >
+                <CalendarDays className="w-4 h-4" />
+                Pick day
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setWhen('pick')}
-              aria-pressed={when === 'pick'}
-              className={[
-                'h-9 px-2 sm:px-3 rounded-full text-[12px] sm:text-[13px] leading-tight',
-                'inline-flex items-center gap-1 sm:gap-1.5 ring-1 transition whitespace-nowrap',
-                when === 'pick'
-                  ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
-                  : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
-              ].join(' ')}
-              title="Pick specific day(s)"
-            >
-              <CalendarDays className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              Pick day
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setWhen('later');
-                setPickedDays([]);
-              }}
-              aria-pressed={when === 'later'}
-              className={[
-                'h-9 px-2 sm:px-3 rounded-full text-[12px] sm:text-[13px] leading-tight',
-                'inline-flex items-center gap-1 sm:gap-1.5 ring-1 transition whitespace-nowrap',
-                when === 'later'
-                  ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
-                  : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
-              ].join(' ')}
-              title="Save to Later this week"
-            >
-              <CalendarCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" />
-              {/* Short label on mobile, full on sm+ */}
-              <span className="sm:hidden">Later</span>
-              <span className="hidden sm:inline">Later this week</span>
-            </button>
+              <button
+                type="button"
+                aria-pressed={when === 'later'}
+                data-active={when === 'later'}
+                onClick={() => {
+                  setWhen('later');
+                  setPickedDays([]);
+                }}
+                className={[
+                  'h-10 rounded-xl text-[14px] font-medium inline-flex items-center justify-center gap-2 transition',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300',
+                  'data-[active=true]:bg-white data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-black/10',
+                  'data-[active=false]:text-slate-600 dark:data-[active=false]:text-emerald-100/85',
+                ].join(' ')}
+              >
+                <CalendarCheck className="w-4 h-4" />
+                Later
+              </button>
+            </div>
           </div>
 
-          {/* Pick-day chips */}
+          {/* Pick mode */}
           {when === 'pick' && (
-            <div className="grid grid-cols-7 gap-1 mt-2">
-              {dayLabels.map((label, d) => {
-                const on = pickedDays.includes(d);
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => toggleDay(d)}
-                    title={label}
-                    className={[
-                      'h-8 rounded-md text-sm font-medium ring-1 transition-colors',
-                      on
-                        ? 'bg-emerald-500 text-white ring-emerald-600/40'
-                        : 'bg-white/70 dark:bg-white/10 text-emerald-900 dark:text-emerald-50 ring-black/10 dark:ring-white/10',
-                    ].join(' ')}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
+            <>
+              <div className="flex items-center gap-2 mt-1">
+                {/* Day chips (now true circles + border; allow vertical overflow) */}
+                <div className="flex-1 min-w-0 overflow-x-auto overflow-y-visible no-scrollbar">
+                  <div className="flex gap-2 py-1 pr-1">
+                    {dayLabels.map((label, d) => {
+                      const on = pickedDays.includes(d);
+                      return (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => toggleDay(d)}
+                          aria-pressed={on}
+                          data-active={on}
+                          title={label}
+                          className={[
+                            'inline-flex items-center justify-center select-none',
+                            // circle sizing
+                            'h-9 w-9 sm:h-10 sm:w-10 rounded-full text-sm font-semibold',
+                            // border (no ring so it never gets clipped)
+                            'border border-slate-300/80 dark:border-white/15',
+                            // colors
+                            'bg-white dark:bg-white/10 text-slate-800 dark:text-emerald-50',
+                            'data-[active=true]:bg-emerald-50 data-[active=true]:border-emerald-300 data-[active=true]:text-emerald-900',
+                            'transition-colors',
+                          ].join(' ')}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Compact repeat switch */}
+                <div className="pl-1 shrink-0">
+                  <div className="inline-flex items-center gap-2 px-2 py-1 border rounded-full bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-white/10">
+                    <RotateCcw className="w-4 h-4 text-emerald-800/80 dark:text-emerald-200" />
+                    <span className="text-[13px] font-medium text-slate-700 dark:text-emerald-50">
+                      Repeat every week
+                    </span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={repeatsOn}
+                      onClick={() =>
+                        setRepeat((r) =>
+                          r === 'weekly' ? 'this-week' : 'weekly'
+                        )
+                      }
+                      data-on={repeatsOn}
+                      className={[
+                        'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
+                        'bg-slate-300/70 data-[on=true]:bg-emerald-400',
+                      ].join(' ')}
+                      title={repeatsOn ? 'Weekly' : 'One-time'}
+                    >
+                      <span
+                        className={[
+                          'inline-block h-4 w-4 transform rounded-full bg-white shadow ring-1 ring-black/10 transition-transform',
+                          repeatsOn ? 'translate-x-4' : 'translate-x-1',
+                        ].join(' ')}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
 
           {/* Later hint */}
           {when === 'later' && (
-            <div className="mt-2 flex items-start gap-2 rounded-xl bg-emerald-50/70 dark:bg-emerald-900/30 ring-1 ring-emerald-700/15 p-2.5 text-[13px] text-emerald-900/90 dark:text-emerald-100/90">
+            <div className="mt-2 flex items-start gap-2 rounded-xl bg-emerald-50/75 dark:bg-emerald-900/30 ring-1 ring-emerald-700/15 p-2.5 text-[13px] text-emerald-900/90 dark:text-emerald-100/90">
               <Info className="w-4 h-4 mt-0.5 shrink-0" />
               <span>
-                Saved to <span className="font-medium">Later this week</span>{' '}
-                under your daily list. Add it to a day whenever you’re ready.
+                Saved to <span className="font-medium">Later this week</span>.
+                Drag it onto a specific day whenever you’re ready.
               </span>
             </div>
           )}
-
-          {/* Repeat toggle — its own row (clean on mobile) */}
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={() =>
-                setRepeat((r) => (r === 'weekly' ? 'this-week' : 'weekly'))
-              }
-              aria-pressed={repeat === 'weekly'}
-              className={[
-                'w-full h-9 px-3 rounded-full text-[13px] leading-tight',
-                'inline-flex items-center justify-center gap-1.5 ring-1 transition',
-                repeat === 'weekly'
-                  ? 'bg-white shadow-sm ring-black/10 dark:bg-white/10 dark:ring-white/10'
-                  : 'bg-transparent ring-black/10 dark:ring-white/10 text-emerald-900/85 dark:text-emerald-100/85',
-              ].join(' ')}
-              title="Toggle weekly repeat"
-            >
-              <RotateCcw className="w-4 h-4 shrink-0" />
-              {repeat === 'weekly' ? 'Repeats' : 'One-time'}
-            </button>
-          </div>
 
           {/* Actions */}
           <div className="grid grid-cols-2 gap-2 mt-3">
             <button
               type="button"
-              disabled={disabled}
               onClick={handleSubmit}
+              disabled={!text.trim()}
               className={[
                 'h-11 rounded-full text-[15px] font-semibold',
                 'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white',
@@ -244,9 +256,9 @@ export default function QuickAddSheet({
               onClick={() => onOpenChange(false)}
               className={[
                 'h-11 rounded-full text-[15px] font-medium',
-                'bg-white/70 dark:bg-white/10 text-emerald-900 dark:text-emerald-50',
+                'bg-white/80 dark:bg-white/10 text-slate-800 dark:text-emerald-50',
                 'ring-1 ring-black/10 dark:ring-white/10',
-                'hover:bg-white/85 dark:hover:bg-white/15 active:scale-[0.995]',
+                'hover:bg-white active:scale-[0.995]',
               ].join(' ')}
             >
               <span className="inline-flex items-center justify-center gap-2">
