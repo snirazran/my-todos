@@ -326,13 +326,15 @@ export default function TaskBoard({
 
       {/* Motion preferences */}
       <style jsx global>{`
-        @media (prefers-reduced-motion: reduce) {
-          * {
-            animation-duration: 0.01ms !important;
-            animation-iteration-count: 1 !important;
-            transition-duration: 0.01ms !important;
-            scroll-behavior: auto !important;
-          }
+        /* When dragging, stop UA gestures on the scroller *and* the cards */
+        html.dragging [data-role='board-scroller'] {
+          touch-action: none !important;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: auto;
+          scroll-snap-type: none;
+        }
+        html.dragging [data-card-id] {
+          touch-action: none !important; /* ensure pointer stays with our drag */
         }
       `}</style>
     </div>
