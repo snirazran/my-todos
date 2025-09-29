@@ -33,16 +33,11 @@ export default function TaskList({
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
 }) {
-  // Raw target index from the hook (computed against DOM WITHOUT the dragged card).
-  const rawPlaceholderAt =
+  const placeholderAt =
     drag && targetDay === day && targetIndex != null ? targetIndex : null;
 
   const isSelfDrag = !!drag && drag.active && drag.fromDay === day;
   const sourceIndex = isSelfDrag ? drag!.fromIndex : null;
-
-  // IMPORTANT: Do NOT shift by -1 here. The hook's targetIndex already
-  // corresponds to the visible (dragged-free) list.
-  const placeholderAt: number | null = rawPlaceholderAt;
 
   if (process.env.NODE_ENV !== 'production') {
     const seen = new Set<string>();
@@ -61,25 +56,33 @@ export default function TaskList({
     />
   );
 
-  // We iterate original items but keep a "visible index" that only counts rendered cards
-  let visibleIndex = 0;
+  // ---- Empty list: render a single placeholder (if targeting index 0) and return
+  if (items.length === 0) {
+    if (placeholderAt === 0) {
+      rows.push(renderPlaceholder(`ph-empty-${day}`));
+    }
+    return <>{rows}</>;
+  }
 
+  // ---- Non-empty list
   // If inserting at the very start
   if (placeholderAt === 0) {
     rows.push(renderPlaceholder(`ph-top-${day}`));
   }
 
+  let visibleIndex = 0;
+
   for (let i = 0; i < items.length; i++) {
     const t = items[i];
     const isDraggedHere = isSelfDrag && sourceIndex === i;
 
-    // Skip rendering the dragged card in its source list to avoid the ghost gap.
     if (!isDraggedHere) {
       const cardKey = `card-${day}-${i}-${t.id}`;
+      const wrapKey = `wrap-${day}-${i}-${t.id}`;
       const afterKey = `ph-${day}-${visibleIndex + 1}`;
 
       rows.push(
-        <div key={`wrap-${day}-${i}-${t.id}`} className="relative">
+        <div key={wrapKey} className="relative">
           <TaskCard
             key={cardKey}
             innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
@@ -90,7 +93,7 @@ export default function TaskList({
               const id = draggableIdFor(day, t.id);
               onGrab({
                 day,
-                index: i, // pass original index to the hook
+                index: i, // original array index
                 taskId: t.id,
                 taskText: t.text,
                 clientX: payload.clientX,
@@ -114,18 +117,12 @@ export default function TaskList({
         </div>
       );
 
-      // Insert placeholder after this visible card when it matches
       if (placeholderAt === visibleIndex + 1) {
         rows.push(renderPlaceholder(afterKey));
       }
 
       visibleIndex++;
     }
-  }
-
-  // Special case: inserting into an empty list
-  if (items.length === 0 && placeholderAt === 0) {
-    rows.push(renderPlaceholder(`ph-end-${day}`));
   }
 
   return <>{rows}</>;
