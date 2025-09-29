@@ -206,13 +206,11 @@ export default function TaskBoard({
         onPointerUp={endPan}
         className={[
           'no-scrollbar absolute inset-0 w-full h-full',
-          'overflow-x-auto overflow-y-hidden overscroll-x-contain',
-          // IMPORTANT: disable native touch panning during drag so cross-column drag feels Trello-like
-          drag?.active ? 'touch-none' : 'touch-pan-x',
+          'overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x',
           snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth',
         ].join(' ')}
         style={{
-          WebkitOverflowScrolling: drag?.active ? 'auto' : 'touch', // iOS
+          WebkitOverflowScrolling: 'touch',
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
@@ -335,12 +333,6 @@ export default function TaskBoard({
             transition-duration: 0.01ms !important;
             scroll-behavior: auto !important;
           }
-        }
-
-        /* Harden drag behavior across browsers */
-        html.dragging [data-role='board-scroller'] {
-          touch-action: none !important; /* block native pan during drag */
-          overscroll-behavior: contain; /* avoid pull-to-refresh conflicts */
         }
       `}</style>
     </div>
