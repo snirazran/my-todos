@@ -34,6 +34,11 @@ export function useDragManager() {
   const pxVelRef = useRef(0);
   const pxVelSmoothedRef = useRef(0);
 
+  // remember scroller inline styles so we can restore them after drag
+  const scrollerTouchPrev = useRef<string>('');
+  const scrollerSnapPrev = useRef<string>('');
+  const scrollerWebkitScrollPrev = useRef<string>('');
+
   const setSlideRef =
     (day: number) =>
     (el: HTMLDivElement | null): void => {
@@ -53,6 +58,14 @@ export function useDragManager() {
     document.body.style.userSelect = '';
     document.body.style.touchAction = ''; // re-enable page scroll on mobile
     document.documentElement.classList.remove('dragging');
+
+    // Restore scroller styles (prevents native pan during drag on mobile)
+    const s = scrollerRef.current as any;
+    if (s) {
+      s.style.touchAction = scrollerTouchPrev.current || '';
+      s.style.scrollSnapType = scrollerSnapPrev.current || '';
+      s.style.webkitOverflowScrolling = scrollerWebkitScrollPrev.current || '';
+    }
   }, []);
 
   const beginDragFromCard = useCallback(
@@ -66,8 +79,21 @@ export function useDragManager() {
       rect: DOMRect
     ) => {
       document.body.style.userSelect = 'none';
-      document.body.style.touchAction = 'none';
+      document.body.style.touchAction = 'none'; // block body scroll
       document.documentElement.classList.add('dragging');
+
+      // Also block the scroller's native touch pan & snap during drag
+      const s = scrollerRef.current as any;
+      if (s) {
+        scrollerTouchPrev.current = s.style.touchAction || '';
+        scrollerSnapPrev.current = s.style.scrollSnapType || '';
+        scrollerWebkitScrollPrev.current =
+          s.style.webkitOverflowScrolling || '';
+
+        s.style.touchAction = 'none'; // Android/Chrome
+        s.style.scrollSnapType = 'none'; // prevent snap-fights
+        s.style.webkitOverflowScrolling = 'auto'; // iOS: disable momentum
+      }
 
       pointerXRef.current = clientX;
       pointerYRef.current = clientY;
@@ -221,7 +247,7 @@ export function useDragManager() {
     };
   }, [drag, cancelDrag]);
 
-  // Edge auto-scroll
+  // Edge auto-scroll (unchanged)
   useEffect(() => {
     if (!drag) return;
     const s = scrollerRef.current;
@@ -243,7 +269,7 @@ export function useDragManager() {
       const px = pointerXRef.current;
       const py = pointerYRef.current;
 
-      // horizontal
+      // horizontal autoscroll near edges
       const rect = s.getBoundingClientRect();
       let distFactor = 0,
         dir = 0;
@@ -272,7 +298,7 @@ export function useDragManager() {
       const vx = dir * (MIN_V + (MAX_V - MIN_V) * combined);
       if (dir !== 0) s.scrollLeft += vx;
 
-      // vertical
+      // vertical autoscroll inside the list (unchanged)
       const dayForV = targetDay != null ? targetDay : drag.fromDay;
       const list = listRefs.current[dayForV];
       if (list) {
@@ -323,7 +349,7 @@ export function useDragManager() {
     return () => cancelAnimationFrame(raf);
   }, [drag, targetDay]);
 
-  // SAFETY NETS: always restore interaction on unmount / lifecycle edges
+  // SAFETY NETS
   useEffect(() => {
     return () => {
       restoreGlobalInteraction();
