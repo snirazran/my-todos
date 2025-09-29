@@ -2,7 +2,7 @@
 
 import { CheckCircle2, Circle, Plus, X, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 
 interface Task {
   id: string;
@@ -91,6 +91,9 @@ export default function TaskList({
                   onClick={() => toggle(task.id)}
                   className="p-4 transition-colors duration-200 cursor-pointer rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700"
                   style={{
+                    // Prevent horizontal swipe from hijacking gestures when touching a row.
+                    // Keeps vertical scrolling natural.
+                    touchAction: 'pan-y',
                     animation: `fadeInUp 0.5s ease-out ${i * 0.05}s`,
                     animationFillMode: 'both',
                   }}
@@ -192,7 +195,6 @@ export default function TaskList({
                     hoverSep={hoverSep}
                     setHoverSep={setHoverSep}
                     onOpen={() => {
-                      // Open the sheet immediately, preselect “today”, insert after this index
                       onAddRequested('', i, { preselectToday: true });
                     }}
                   />
@@ -332,6 +334,8 @@ function SeparatorHover({
   return (
     <div
       className="relative h-1.5 select-none md:h-5"
+      // Also block horizontal pan if a drag starts on the rail area
+      style={{ touchAction: 'pan-y' }}
       onMouseEnter={() => setHoverSep(index)}
       onMouseLeave={() => setHoverSep(null)}
     >
