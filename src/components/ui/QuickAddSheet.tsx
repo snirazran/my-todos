@@ -93,13 +93,17 @@ export default function QuickAddSheet({
 
     if (apiDays.length === 0) return;
 
-    await onSubmit({ text: trimmed, days: apiDays, repeat });
+    // ✅ Guard: if "Later", force non-repeating
+    const finalRepeat: RepeatChoice = when === 'later' ? 'this-week' : repeat;
+
+    await onSubmit({ text: trimmed, days: apiDays, repeat: finalRepeat });
     onOpenChange(false);
   };
 
   if (!open) return null;
 
   const repeatsOn = repeat === 'weekly';
+  const isLater = when === 'later';
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[70] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none">
@@ -134,6 +138,7 @@ export default function QuickAddSheet({
                   setPickedDays((prev) =>
                     prev.length ? prev : [todayDisplayIndex()]
                   );
+                  // no change to repeat here (user’s last choice is kept)
                 }}
                 className={[
                   'h-10 rounded-xl text-[14px] font-medium inline-flex items-center justify-center gap-2 transition',
@@ -153,6 +158,8 @@ export default function QuickAddSheet({
                 onClick={() => {
                   setWhen('later');
                   setPickedDays([]);
+                  // ✅ Auto-untoggle repeat when switching to Later
+                  setRepeat('this-week');
                 }}
                 className={[
                   'h-10 rounded-xl text-[14px] font-medium inline-flex items-center justify-center gap-2 transition',
@@ -200,7 +207,17 @@ export default function QuickAddSheet({
               </div>
 
               <div className="sm:shrink-0 sm:pl-1">
-                <div className="inline-flex items-center gap-2 px-2 py-1 border rounded-full bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-white/10">
+                <div
+                  className={[
+                    'inline-flex items-center gap-2 px-2 py-1 border rounded-full bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-white/10',
+                    // ✅ Dim & block interaction when Later is active
+                    isLater ? 'opacity-50 pointer-events-none' : '',
+                  ].join(' ')}
+                  aria-disabled={isLater}
+                  title={
+                    isLater ? 'Repeat is not available for Later' : undefined
+                  }
+                >
                   <RotateCcw className="w-4 h-4 text-emerald-800/80 dark:text-emerald-200" />
                   <span className="text-[13px] font-medium text-slate-700 dark:text-emerald-50">
                     Repeat every week
@@ -220,6 +237,7 @@ export default function QuickAddSheet({
                       'bg-slate-300/70 data-[on=true]:bg-emerald-400',
                     ].join(' ')}
                     title={repeatsOn ? 'Weekly' : 'One-time'}
+                    disabled={isLater}
                   >
                     <span
                       className={[
