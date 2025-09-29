@@ -139,11 +139,14 @@ export default function TaskBoard({
       setWeek((prev) => {
         const next = prev.map((d) => d.slice());
         const [moved] = next[drag.fromDay].splice(drag.fromIndex, 1);
+
+        // IMPORTANT: Since TaskList doesn't render the dragged card,
+        // `toIndex` is already computed against the list *without* it.
+        // So we should NOT subtract 1 for same-column moves anymore.
         let insertIndex = toIndex;
-        if (drag.fromDay === toDay && drag.fromIndex < toIndex) {
-          insertIndex = Math.max(0, toIndex - 1);
-        }
+
         next[toDay].splice(Math.min(insertIndex, next[toDay].length), 0, moved);
+
         Promise.all(
           drag.fromDay === toDay
             ? [saveDay(toDay, next[toDay])]

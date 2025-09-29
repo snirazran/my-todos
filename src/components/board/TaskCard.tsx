@@ -131,7 +131,7 @@ export default function TaskCard({
       onDragStart={(e) => e.preventDefault()}
       style={{ touchAction: 'auto' }}
       className={[
-        'group flex items-start gap-3 p-3 select-none rounded-2xl cursor-grab transition',
+        'group flex items-stretch gap-2 p-3 select-none rounded-2xl cursor-grab transition',
         'bg-white/85 dark:bg-emerald-900/40 backdrop-blur',
         'border border-emerald-700/20 dark:border-emerald-300/15 shadow',
         'mb-2',
@@ -140,39 +140,36 @@ export default function TaskCard({
       role="listitem"
       aria-grabbed={false}
     >
-      {/* Avatar */}
-      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center">
-        <Fly size={21} x={-1} y={-4} />
+      {/* Avatar (always vertically centered) */}
+      <span className="grid self-center mt-0 h-7 w-7 shrink-0 place-items-center">
+        <Fly size={26} x={-1} y={-4} />
       </span>
 
-      {/* Content */}
+      {/* Content (top-aligned text, grows) */}
       <div className="flex-1 min-w-0">
-        <div className="truncate text-[15px] leading-6 text-emerald-950 dark:text-emerald-50">
-          {task.text}
-        </div>
-
-        {/* Trello-like badges row (only if repeating) */}
         {isRepeating && (
           <div className="mt-1 flex items-center gap-1.5">
             <span
               title="Repeats weekly"
-              className="inline-flex items-center gap-1 rounded-md border border-emerald-300/50 bg-emerald-50/80 px-1.5 py-0.5
-                         text-[11px] font-medium text-emerald-700 shadow-sm
-                         dark:border-emerald-400/30 dark:bg-emerald-900/40 dark:text-emerald-100
-                         transition-colors group-hover:bg-emerald-50"
+              className="inline-flex items-center gap-1 rounded-md border border-emerald-300/50 bg-emerald-50/80 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 shadow-sm dark:border-emerald-400/30 dark:bg-emerald-900/40 dark:text-emerald-100 transition-colors group-hover:bg-emerald-50"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="tracking-wide uppercase">Repeats</span>
             </span>
           </div>
         )}
+        <div className="truncate text-[15px] leading-6 text-emerald-950 dark:text-emerald-50">
+          {task.text}
+        </div>
+
+        {/* Trello-like badges row (only if repeating) */}
       </div>
 
-      {/* Action */}
+      {/* Action (always vertically centered) */}
       <button
         onClick={onDelete}
         title="Delete"
-        className="ml-1 shrink-0 rounded-full p-1.5 hover:bg-emerald-100/60 dark:hover:bg-emerald-800/50 transition"
+        className="self-center ml-1 shrink-0 rounded-full p-1.5 hover:bg-emerald-100/60 dark:hover:bg-emerald-800/50 transition"
         type="button"
       >
         <Trash2 className="w-4 h-4 text-red-500 group-hover:text-red-600" />
