@@ -1,33 +1,52 @@
 // src/app/api/time-tracker/categories/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import clientPromise from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
 
-export async function GET() {
+interface TimeCategoriesDoc {
+  _id?: ObjectId;
+  userId: ObjectId;
+  categories: string[];
+}
+
+/* ---------- helpers ---------- */
+async function currentUserId() {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user || !session.user.id) {
+  return session?.user?.id ? new ObjectId(session.user.id) : null;
+}
+
+function unauth() {
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}
+
+const getCategoriesCol = async () =>
+  (await clientPromise)
+    .db('todoTracker')
+    .collection<TimeCategoriesDoc>('timeCategories');
+
+/* ─────────────────── GET ─────────────────── */
+export async function GET() {
+  const uid = await currentUserId();
+  if (!uid) {
+    // For unauthenticated user we can just return empty list
     return NextResponse.json({ categories: [] }, { status: 200 });
   }
-  const userId = String(session.user.id);
 
-  const client = await clientPromise;
-  const db = client.db();
-  const col = db.collection('timeCategories');
+  const col = await getCategoriesCol();
+  const doc = await col.findOne({ userId: uid });
 
-  const doc = await col.findOne({ userId });
   return NextResponse.json({ categories: doc?.categories ?? [] });
 }
 
+/* ─────────────────── POST ─────────────────── */
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session || !session.user || !session.user.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const userId = String(session.user.id);
+  const uid = await currentUserId();
+  if (!uid) return unauth();
 
   const body = await req.json();
-  const name = String(body.name || '').trim();
+  const name = String(body?.name || '').trim();
 
   if (!name) {
     return NextResponse.json(
@@ -36,17 +55,15 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const client = await clientPromise;
-  const db = client.db();
-  const col = db.collection('timeCategories');
+  const col = await getCategoriesCol();
 
   await col.updateOne(
-    { userId },
+    { userId: uid },
     { $addToSet: { categories: name } },
     { upsert: true }
   );
 
-  const doc = await col.findOne({ userId });
+  const doc = await col.findOne({ userId: uid });
 
   return NextResponse.json(
     { categories: doc?.categories ?? [] },

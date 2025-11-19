@@ -1,28 +1,58 @@
 // src/app/api/time-tracker/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
 import clientPromise from '@/lib/mongodb';
+import { ObjectId } from 'mongodb';
 
-export async function GET(req: NextRequest) {
+/* ---------- types ---------- */
+interface TimeEntryDoc {
+  _id?: ObjectId;
+  userId: ObjectId;
+  task: string;
+  category: string;
+  start: Date;
+  end: Date;
+  durationMs: number;
+  plannedMinutes?: number | null;
+  dateKey: string; // YYYY-MM-DD (LOCAL-ish, coming from client)
+  createdAt: Date;
+}
+
+/* ---------- helpers ---------- */
+async function currentUserId() {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user || !session.user.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const userId = String(session.user.id);
+  return session?.user?.id ? new ObjectId(session.user.id) : null;
+}
 
-  const { searchParams } = new URL(req.url);
+function unauth() {
+  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+}
+
+const getTimeEntriesCol = async () =>
+  (await clientPromise)
+    .db('todoTracker')
+    .collection<TimeEntryDoc>('timeEntries');
+
+/* ─────────────────── GET ─────────────────── */
+// GET /api/time-tracker?date=YYYY-MM-DD
+export async function GET(req: NextRequest) {
+  const uid = await currentUserId();
+  if (!uid) return unauth();
+
+  const { searchParams } = req.nextUrl;
   const dateKey =
     searchParams.get('date') || new Date().toISOString().slice(0, 10);
 
-  const client = await clientPromise;
-  const db = client.db();
-  const col = db.collection('timeEntries');
+  const col = await getTimeEntriesCol();
 
-  const docs = await col.find({ userId, dateKey }).sort({ start: 1 }).toArray();
+  const docs = await col
+    .find({ userId: uid, dateKey })
+    .sort({ start: 1 })
+    .toArray();
 
-  const sessions = docs.map((d: any) => ({
-    id: d._id.toString(),
+  const sessions = docs.map((d) => ({
+    id: d._id!.toString(),
     task: d.task,
     category: d.category,
     start: d.start,
@@ -37,12 +67,12 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ sessions, totalMs });
 }
 
+/* ─────────────────── POST ─────────────────── */
+// POST /api/time-tracker
+// body: see explanation in previous message (mode: 'timer' | 'manual', etc.)
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session || !session.user || !session.user.id) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  const userId = String(session.user.id);
+  const uid = await currentUserId();
+  if (!uid) return unauth();
 
   const body = await req.json();
 
@@ -65,7 +95,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const clientDate =
+  const dateKey =
     clientDateKey ||
     (start || end
       ? new Date(start || end).toISOString().slice(0, 10)
@@ -76,7 +106,7 @@ export async function POST(req: NextRequest) {
   let endDate: Date;
 
   if (mode === 'manual') {
-    if (!durationMinutes || !clientDate) {
+    if (!durationMinutes || !dateKey) {
       return NextResponse.json(
         { error: 'Manual mode requires durationMinutes and dateKey' },
         { status: 400 }
@@ -84,7 +114,7 @@ export async function POST(req: NextRequest) {
     }
     finalDurationMs = durationMinutes * 60_000;
 
-    // Start/end are mostly informational; dateKey is used for grouping
+    // Mostly informational; dateKey is what you group by
     startDate = new Date();
     endDate = new Date(startDate.getTime() + finalDurationMs);
   } else {
@@ -95,6 +125,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
     if (durationMs) {
       finalDurationMs = durationMs;
     } else {
@@ -102,23 +133,22 @@ export async function POST(req: NextRequest) {
       const e = new Date(end);
       finalDurationMs = Math.max(0, e.getTime() - s.getTime());
     }
+
     startDate = start ? new Date(start) : new Date();
     endDate = end ? new Date(end) : new Date();
   }
 
-  const client = await clientPromise;
-  const db = client.db();
-  const col = db.collection('timeEntries');
+  const col = await getTimeEntriesCol();
 
-  const doc = {
-    userId,
+  const doc: TimeEntryDoc = {
+    userId: uid,
     task: String(task),
     category: String(category),
     start: startDate,
     end: endDate,
     durationMs: finalDurationMs,
     plannedMinutes: plannedMinutes ?? null,
-    dateKey: clientDate,
+    dateKey,
     createdAt: new Date(),
   };
 
