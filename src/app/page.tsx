@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Calendar, History, CheckCircle2, Shirt } from 'lucide-react';
+import { Calendar, History, CheckCircle2, Shirt, Clock3 } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 import { signIn, useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
@@ -742,6 +742,14 @@ function Header({ session, router }: { session: any; router: any }) {
         >
           <History className="w-5 h-5" />
           History
+        </Link>
+
+        <Link
+          href="/time-tracker"
+          className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"
+        >
+          <Clock3 className="w-5 h-5" />
+          Time tracker
         </Link>
 
         <button
