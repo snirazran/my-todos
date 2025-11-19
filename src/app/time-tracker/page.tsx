@@ -1,15 +1,8 @@
-// src/app/time-tracker/page.tsx
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
 import { format, addDays } from 'date-fns';
-import {
-  Calendar,
-  Clock3,
-  Timer as TimerIcon,
-  FolderPlus,
-  Shirt,
-} from 'lucide-react';
+import { Calendar, Clock3, Timer as TimerIcon, Shirt } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import useSWR from 'swr';
 import { byId } from '@/lib/skins/catalog';
@@ -49,7 +42,6 @@ type ActiveSession = {
   lastStartedAt: string | null;
 };
 
-// duration formatting
 function formatDuration(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
   const hours = Math.floor(totalSeconds / 3600);
@@ -108,7 +100,7 @@ export default function TimeTrackerPage() {
       ? dayData.totalMs
       : sessionsForDay.reduce((sum, s) => sum + (s.durationMs || 0), 0);
 
-  // active timer state (local only)
+  // active timer state
   const [activeSession, setActiveSession] = useState<ActiveSession | null>(
     null
   );
@@ -124,7 +116,6 @@ export default function TimeTrackerPage() {
   const [manualMinutes, setManualMinutes] = useState<number>(30);
   const [manualDateStr, setManualDateStr] = useState<string>(selectedDateStr);
 
-  // keep manual date in sync with selected date
   useEffect(() => {
     setManualDateStr(selectedDateStr);
   }, [selectedDateStr]);
@@ -180,7 +171,7 @@ export default function TimeTrackerPage() {
     window.localStorage.setItem(ACTIVE_KEY, JSON.stringify(activeSession));
   }, [activeSession]);
 
-  // recompute elapsed when activeSession changes / ticks
+  // recompute elapsed
   useEffect(() => {
     if (!activeSession || activeSession.isPaused) {
       setElapsedMs(computeElapsedMs(activeSession));
@@ -330,22 +321,21 @@ export default function TimeTrackerPage() {
     });
   };
 
-  // Unauthorized / not logged in: show friendly gate
   if (!session) {
     return (
-      <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8">
-        <div className="max-w-4xl mx-auto space-y-8">
+      <main className="min-h-screen p-4 bg-slate-50 md:p-8">
+        <div className="max-w-4xl mx-auto space-y-6">
           <div>
-            <h1 className="text-4xl font-bold text-slate-900 dark:text-white md:text-5xl">
+            <h1 className="text-4xl font-bold text-slate-900 md:text-5xl">
               Time tracker
             </h1>
-            <p className="mt-2 text-lg text-slate-600 dark:text-slate-400">
+            <p className="mt-2 text-lg text-slate-600">
               Please sign in to track your time and sync it across devices.
             </p>
           </div>
           <a
             href="/login"
-            className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-slate-900 bg-white border border-slate-200 rounded-2xl shadow-sm hover:bg-slate-100"
           >
             Go to login
           </a>
@@ -358,7 +348,6 @@ export default function TimeTrackerPage() {
     ? mergedCategories
     : DEFAULT_CATEGORIES;
 
-  // make sure selectedCategory is always valid
   useEffect(() => {
     if (!categoriesToUse.includes(selectedCategory)) {
       setSelectedCategory(categoriesToUse[0]);
@@ -367,33 +356,30 @@ export default function TimeTrackerPage() {
   }, [categoriesToUse.join(',')]);
 
   return (
-    <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8">
+    <main className="min-h-screen p-4 bg-slate-50 md:p-8">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col gap-4 mb-8 md:flex-row md:items-center md:justify-between">
+        <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-4xl font-bold text-slate-900 dark:text-white md:text-5xl">
-              Time tracker
+            <h1 className="text-4xl font-bold text-slate-900">
+              {format(new Date(), 'EEEE')}
             </h1>
-            <p className="flex items-center gap-2 text-lg text-slate-600 dark:text-slate-400">
-              <Calendar className="w-5 h-5" />
-              {format(new Date(), 'EEEE, MMMM d, yyyy')}
+            <p className="flex items-center gap-2 mt-1 text-sm text-slate-500">
+              <Calendar className="w-4 h-4" />
+              {format(new Date(), 'MMMM d, yyyy')}
             </p>
           </div>
-
-          <div className="flex self-start gap-2 md:self-auto">
-            <a
-              href="/"
-              className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"
-            >
-              ← Back to tasks
-            </a>
-          </div>
+          <a
+            href="/"
+            className="inline-flex items-center px-4 py-2 text-sm font-medium bg-white border rounded-full shadow-sm text-slate-900 border-slate-200 hover:bg-slate-100"
+          >
+            ← Back to tasks
+          </a>
         </div>
 
-        {/* Frog + wardrobe */}
-        <div className="flex flex-col items-center w-full">
-          <div className="relative z-10">
+        {/* Frog */}
+        <div className="flex flex-col items-center">
+          <div className="relative">
             <Frog
               ref={frogRef}
               mouthOpen={!!activeSession && !activeSession.isPaused}
@@ -402,92 +388,70 @@ export default function TimeTrackerPage() {
             />
             <button
               onClick={() => setOpenWardrobe(true)}
-              className="absolute p-2 rounded-full shadow right-2 top-2 bg-white/80 hover:shadow-md dark:bg-slate-800"
+              className="absolute p-1.5 rounded-full shadow-sm right-2 top-2 bg-white/90 hover:bg-slate-100"
               title="Wardrobe"
             >
-              <Shirt className="w-5 h-5" />
+              <Shirt className="w-4 h-4 text-slate-600" />
             </button>
           </div>
           <WardrobePanel open={openWardrobe} onOpenChange={setOpenWardrobe} />
         </div>
 
-        {/* Summary card */}
+        {/* Summary */}
         <div className="mt-4 mb-6">
-          <div className="relative z-0 w-full">
-            <div className="flex items-center justify-between gap-4 p-5 bg-white shadow-lg rounded-2xl dark:bg-slate-800">
-              <div>
-                <p className="text-sm tracking-wide uppercase text-slate-500 dark:text-slate-400">
-                  Focus time today
-                </p>
-                <p className="mt-1 text-2xl font-semibold text-slate-900 dark:text-white">
-                  {formatDuration(totalMsForDay || 0)}
-                </p>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {sessionsForDay.length} session
-                  {sessionsForDay.length === 1 ? '' : 's'}
-                </p>
-              </div>
-              <div className="flex items-center gap-3">
-                <Clock3 className="w-9 h-9 text-violet-500" />
-              </div>
+          <div className="flex items-center justify-between w-full px-5 py-4 bg-white border shadow-sm border-slate-200 rounded-2xl">
+            <div>
+              <p className="text-xs font-medium tracking-wide uppercase text-slate-500">
+                Focus time today
+              </p>
+              <p className="mt-1 text-2xl font-semibold text-slate-900">
+                {formatDuration(totalMsForDay || 0)}
+              </p>
+              <p className="text-xs text-slate-500">
+                {sessionsForDay.length} session
+                {sessionsForDay.length === 1 ? '' : 's'}
+              </p>
             </div>
+            <Clock3 className="w-8 h-8 text-violet-500" />
           </div>
         </div>
 
-        {/* Main: timer + log */}
+        {/* Main layout */}
         <div className="grid gap-6 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-          {/* Timer card */}
-          <section className="p-6 bg-white shadow-lg rounded-2xl dark:bg-slate-800">
-            <div className="flex items-center gap-2 mb-4">
-              <TimerIcon className="w-5 h-5 text-violet-500" />
-              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                Current session
-              </h2>
-            </div>
-
-            {/* Task name */}
-            <div className="mb-4 space-y-1">
-              <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                What are you working on?
-              </label>
+          {/* Timer */}
+          <section className="p-5 bg-white border shadow-sm border-slate-200 rounded-2xl">
+            {/* Task */}
+            <div className="mb-4">
               <input
                 value={taskName}
                 onChange={(e) => setTaskName(e.target.value)}
-                placeholder="e.g. Deep work, writing, sketching…"
-                className="w-full px-3 py-2 text-base bg-white border rounded-lg border-slate-200 dark:border-slate-600 dark:bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-violet-500/60"
+                placeholder="What are you working on?"
+                className="w-full px-3 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
               />
             </div>
 
-            {/* Category + add category */}
-            <div className="grid items-end gap-3 mb-4 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-              <div className="space-y-1">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Category
-                </label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  className="w-full px-3 py-2 bg-white border rounded-lg border-slate-200 dark:border-slate-600 dark:bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-violet-500/60"
-                >
-                  {categoriesToUse.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Category + add */}
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="px-3 py-2 text-sm bg-white border rounded-full border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
+              >
+                {categoriesToUse.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
 
-              <div className="space-y-1">
-                <label className="flex items-center gap-1 text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Add category
-                  <FolderPlus className="w-4 h-4 text-slate-500" />
-                </label>
-                <div className="flex gap-2">
+              <div className="flex items-center gap-2 text-xs text-slate-500">
+                <span>New:</span>
+                <div className="flex items-center gap-1">
                   <input
                     value={newCategoryName}
                     onChange={(e) => setNewCategoryName(e.target.value)}
-                    placeholder="e.g. Studio, Standup, Coding"
-                    className="flex-1 px-3 py-2 bg-white border rounded-lg border-slate-200 dark:border-slate-600 dark:bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-violet-500/60"
+                    placeholder="Category"
+                    className="px-2 py-1 text-xs border rounded-full bg-slate-50 border-slate-200 focus:bg-white focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
                         e.preventDefault();
@@ -498,8 +462,8 @@ export default function TimeTrackerPage() {
                   <button
                     type="button"
                     onClick={handleAddCategory}
-                    className="px-3 py-2 text-sm font-medium text-white rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-50"
                     disabled={!newCategoryName.trim()}
+                    className="px-2 py-1 text-xs font-medium rounded-full text-slate-900 bg-slate-100 hover:bg-slate-200 disabled:opacity-50"
                   >
                     Add
                   </button>
@@ -510,15 +474,15 @@ export default function TimeTrackerPage() {
             {/* Planned duration */}
             <div className="mb-5 space-y-2">
               <div className="flex items-center justify-between gap-2">
-                <label className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                  Planned duration (minutes)
-                </label>
-                <div className="flex gap-1 text-xs text-slate-500 dark:text-slate-400">
+                <span className="text-xs font-medium text-slate-700">
+                  Planned minutes
+                </span>
+                <div className="flex gap-1 text-xs">
                   {[25, 50, 60].map((val) => (
                     <button
                       key={val}
                       type="button"
-                      className="px-2 py-1 border rounded-full border-slate-300 text-slate-700 dark:text-slate-200 dark:border-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700"
+                      className="px-2 py-1 border rounded-full border-slate-200 text-slate-700 hover:bg-slate-100"
                       onClick={() => setPlannedMinutes(val)}
                     >
                       {val}
@@ -537,38 +501,34 @@ export default function TimeTrackerPage() {
                       e.target.value ? Math.max(1, Number(e.target.value)) : 0
                     )
                   }
-                  className="px-3 py-2 bg-white border rounded-lg w-28 border-slate-200 dark:border-slate-600 dark:bg-slate-900/60 focus:outline-none focus:ring-2 focus:ring-violet-500/60"
+                  className="w-24 px-3 py-2 text-sm bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900/10"
                 />
                 {plannedMinutes > 0 && (
-                  <span className="text-sm text-slate-500 dark:text-slate-400">
-                    Target ~{plannedMinutes} minutes
+                  <span className="text-xs text-slate-500">
+                    Target ~{plannedMinutes} min
                   </span>
                 )}
               </div>
 
               {plannedMinutes > 0 && (
                 <div className="mt-2">
-                  <div className="h-2 overflow-hidden rounded-full bg-slate-200/80 dark:bg-slate-700">
+                  <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-violet-500 to-emerald-500"
+                      className="h-full rounded-full bg-slate-900"
                       style={{ width: `${plannedProgress * 100}%` }}
                     />
-                  </div>
-                  <div className="flex justify-between mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    <span>0</span>
-                    <span>{plannedMinutes} min</span>
                   </div>
                 </div>
               )}
             </div>
 
-            {/* Big timer */}
-            <div className="flex flex-col items-center mb-4">
-              <div className="px-6 py-4 mb-2 font-mono text-4xl font-semibold tracking-tight rounded-2xl bg-slate-900 text-slate-50 dark:bg-slate-950">
+            {/* Timer display */}
+            <div className="flex flex-col items-center mb-5">
+              <div className="px-6 py-3 mb-1 font-mono text-4xl font-semibold tracking-tight text-slate-900 rounded-2xl bg-slate-900/5">
                 {formatTimer(elapsedMs)}
               </div>
               {plannedMinutes > 0 && (
-                <p className="text-sm text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500">
                   {remainingMs > 0
                     ? `~${formatDuration(remainingMs)} remaining`
                     : `Over plan by ${formatDuration(Math.abs(remainingMs))}`}
@@ -577,22 +537,22 @@ export default function TimeTrackerPage() {
             </div>
 
             {/* Controls */}
-            <div className="flex flex-wrap items-center justify-center gap-3 mb-6">
+            <div className="flex flex-wrap items-center justify-center gap-3 mb-5">
               {!activeSession || activeSession.isPaused ? (
                 <button
                   type="button"
                   onClick={handleStart}
                   disabled={!taskName.trim()}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-xl shadow-sm bg-violet-600 hover:bg-violet-700 disabled:opacity-60"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white rounded-full shadow-sm bg-slate-900 hover:bg-slate-800 disabled:opacity-50"
                 >
                   <TimerIcon className="w-4 h-4" />
-                  {activeSession ? 'Resume' : 'Start session'}
+                  {activeSession ? 'Resume' : 'Start'}
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handlePause}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl shadow-sm bg-slate-200 text-slate-900 hover:bg-slate-300 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600"
+                  className="inline-flex items-center px-5 py-2.5 text-sm font-semibold text-slate-900 bg-slate-100 rounded-full hover:bg-slate-200"
                 >
                   Pause
                 </button>
@@ -602,110 +562,90 @@ export default function TimeTrackerPage() {
                 type="button"
                 onClick={handleFinish}
                 disabled={!activeSession}
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl shadow-sm bg-emerald-500 text-white hover:bg-emerald-600 disabled:opacity-60"
+                className="px-4 py-2.5 text-sm font-semibold text-slate-900 bg-slate-50 border border-slate-200 rounded-full hover:bg-slate-100 disabled:opacity-40"
               >
-                Save session
+                Save
               </button>
 
               <button
                 type="button"
                 onClick={handleCancel}
                 disabled={!activeSession}
-                className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-rose-300 text-rose-600 hover:bg-rose-50 dark:border-rose-700 dark:text-rose-300 dark:hover:bg-rose-950/40 disabled:opacity-60"
+                className="px-3 py-2.5 text-sm text-slate-500 rounded-full hover:bg-slate-100 disabled:opacity-40"
               >
                 Cancel
               </button>
             </div>
 
-            {/* Manual / quick log */}
-            <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700">
-              <h3 className="mb-2 text-sm font-semibold text-slate-800 dark:text-slate-100">
-                Log time without timer
-              </h3>
-              <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
-                For sessions you already did, enter duration and date and save
-                directly.
-              </p>
+            {/* Manual log (compact) */}
+            <div className="pt-3 mt-3 border-t border-slate-100">
+              <div className="flex flex-wrap items-center gap-3 text-xs">
+                <span className="font-medium text-slate-700">
+                  Log without timer
+                </span>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-200">
-                    Date
-                  </label>
-                  <input
-                    type="date"
-                    value={manualDateStr}
-                    max={todayStr}
-                    onChange={(e) =>
-                      e.target.value && setManualDateStr(e.target.value)
-                    }
-                    className="px-3 py-1.5 text-sm bg-white border rounded-full border-slate-200 dark:border-slate-700 dark:bg-slate-900/60 text-slate-700 dark:text-slate-100"
-                  />
-                </div>
+                <input
+                  type="date"
+                  value={manualDateStr}
+                  max={todayStr}
+                  onChange={(e) =>
+                    e.target.value && setManualDateStr(e.target.value)
+                  }
+                  className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-full"
+                />
 
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-slate-700 dark:text-slate-200">
-                    Duration (minutes)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={600}
-                    value={manualMinutes}
-                    onChange={(e) =>
-                      setManualMinutes(
-                        e.target.value ? Math.max(1, Number(e.target.value)) : 0
-                      )
-                    }
-                    className="w-28 px-3 py-1.5 bg-white border rounded-full border-slate-200 dark:border-slate-700 dark:bg-slate-900/60 text-sm"
-                  />
-                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={600}
+                  value={manualMinutes}
+                  onChange={(e) =>
+                    setManualMinutes(
+                      e.target.value ? Math.max(1, Number(e.target.value)) : 0
+                    )
+                  }
+                  className="w-24 px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-full"
+                  placeholder="Minutes"
+                />
 
                 <button
                   type="button"
                   onClick={handleManualLog}
                   disabled={!taskName.trim() || !manualMinutes}
-                  className="px-4 py-2 text-sm font-semibold text-white rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-slate-50 dark:text-slate-900 dark:hover:bg-slate-200 disabled:opacity-60"
+                  className="px-3 py-1.5 text-xs font-semibold text-white rounded-full bg-slate-900 hover:bg-slate-800 disabled:opacity-40"
                 >
-                  Save manual log
+                  Save
                 </button>
               </div>
             </div>
           </section>
 
-          {/* Logs card */}
-          <section className="p-6 bg-white shadow-lg rounded-2xl dark:bg-slate-800">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div>
-                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">
-                  Time log
-                </h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  Default: today. Navigate to previous days as needed.
-                </p>
-              </div>
+          {/* Time log */}
+          <section className="p-5 bg-white border shadow-sm border-slate-200 rounded-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Time log</h2>
             </div>
 
             {/* Date controls */}
             <div className="flex flex-wrap items-center gap-3 mb-4">
-              <div className="inline-flex overflow-hidden text-sm border rounded-full bg-slate-100/70 border-slate-200 dark:bg-slate-900/40 dark:border-slate-700">
+              <div className="inline-flex items-center overflow-hidden text-xs border rounded-full bg-slate-50 border-slate-200">
                 <button
                   type="button"
                   onClick={goPrevDay}
-                  className="px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-slate-700"
+                  className="px-3 py-1.5 hover:bg-slate-100"
                 >
                   ←
                 </button>
-                <span className="px-4 py-1.5 text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                <span className="px-4 py-1.5 text-slate-800 whitespace-nowrap">
                   {selectedDateStr === todayStr
                     ? 'Today'
-                    : format(selectedDate, 'EEEE, MMM d')}
+                    : format(selectedDate, 'EEE, MMM d')}
                 </span>
                 <button
                   type="button"
                   onClick={goNextDay}
                   disabled={!canGoNext}
-                  className="px-3 py-1.5 hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-40"
+                  className="px-3 py-1.5 hover:bg-slate-100 disabled:opacity-30"
                 >
                   →
                 </button>
@@ -718,14 +658,14 @@ export default function TimeTrackerPage() {
                 onChange={(e) =>
                   e.target.value && setSelectedDate(new Date(e.target.value))
                 }
-                className="px-3 py-1.5 text-sm bg-white border rounded-full border-slate-200 dark:border-slate-700 dark:bg-slate-900/60 text-slate-700 dark:text-slate-100"
+                className="px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-full text-slate-700"
               />
             </div>
 
-            {/* List of sessions */}
+            {/* List */}
             {sessionsForDay.length === 0 ? (
-              <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">
-                No sessions logged for this day yet.
+              <p className="mt-4 text-sm text-slate-500">
+                No sessions logged for this day.
               </p>
             ) : (
               <div className="space-y-3">
@@ -741,18 +681,18 @@ export default function TimeTrackerPage() {
                     return (
                       <div
                         key={s.id}
-                        className="flex items-start justify-between gap-3 px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-900/50"
+                        className="flex items-start justify-between gap-3 px-3 py-2 rounded-xl bg-slate-50"
                       >
                         <div>
-                          <p className="text-sm font-medium text-slate-900 dark:text-slate-50">
+                          <p className="text-sm font-medium text-slate-900">
                             {s.task || 'Untitled session'}
                           </p>
-                          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                          <p className="mt-0.5 text-xs text-slate-500">
                             {format(start, 'HH:mm')} – {format(end, 'HH:mm')} ·{' '}
                             {formatDuration(s.durationMs)}
                           </p>
                         </div>
-                        <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-violet-100 text-violet-700 dark:bg-violet-950/40 dark:text-violet-200">
+                        <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-slate-900/5 text-slate-900">
                           {s.category || 'Other'}
                         </span>
                       </div>
