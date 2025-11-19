@@ -1,20 +1,24 @@
 'use client';
 
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Task, DAYS, todayDisplayIndex } from './helpers';
+import {
+  Task,
+  DAYS,
+  todayDisplayIndex,
+  type DisplayDay,
+  type ApiDay,
+} from './helpers';
 import DayColumn from './DayColumn';
 import TaskList from './TaskList';
 import PaginationDots from './PaginationDots';
 import DragOverlay from './DragOverlay';
 import { useDragManager } from './hooks/useDragManager';
 import { usePan } from './hooks/usePan';
+import QuickAddSheet from '@/components/ui/QuickAddSheet';
+import Fly from '../ui/fly';
+
+type RepeatChoice = 'this-week' | 'weekly';
 
 export default function TaskBoard({
   titles,
@@ -23,20 +27,29 @@ export default function TaskBoard({
   saveDay,
   removeTask,
   onRequestAdd,
+  /** Let TaskBoard add directly without modal */
+  onQuickAdd,
 }: {
   titles: string[];
   week: Task[][];
   setWeek: React.Dispatch<React.SetStateAction<Task[][]>>;
-  saveDay: (day: number, tasks: Task[]) => Promise<void>;
-  removeTask: (day: number, id: string) => Promise<void>;
+  // Use DisplayDay (0..7) for board columns
+  saveDay: (day: DisplayDay, tasks: Task[]) => Promise<void>;
+  removeTask: (day: DisplayDay, id: string) => Promise<void>;
   onRequestAdd: (
-    day: number,
+    day: DisplayDay | null,
     text?: string,
-    afterIndex?: number | null
+    afterIndex?: number | null,
+    repeat?: RepeatChoice
   ) => void;
+  // Pass ApiDay[] (-1 | 0..6) to the parent for server calls
+  onQuickAdd?: (data: {
+    text: string;
+    days: ApiDay[]; // -1 = Later, 0..6 = Sun..Sat
+    repeat: RepeatChoice;
+  }) => Promise<void> | void;
 }) {
   const pathname = usePathname();
-
   const {
     scrollerRef,
     setSlideRef,
@@ -53,15 +66,16 @@ export default function TaskBoard({
     cancelDrag,
   } = useDragManager();
 
-  // Cancel drag on route change
   useEffect(() => {
     cancelDrag();
   }, [pathname, cancelDrag]);
 
-  const [pageIndex, setPageIndex] = useState(todayDisplayIndex());
+  const [pageIndex, setPageIndex] = useState<DisplayDay>(
+    todayDisplayIndex() as DisplayDay
+  );
   const recomputeCanPanRef = useRef<() => void>();
 
-  const centerColumnSmooth = (day: number) => {
+  const centerColumnSmooth = (day: DisplayDay) => {
     const s = scrollerRef.current;
     const col = (document.querySelectorAll('[data-col="true"]')[day] ??
       null) as HTMLElement | null;
@@ -74,7 +88,7 @@ export default function TaskBoard({
 
   useEffect(() => {
     const s = scrollerRef.current;
-    const t = todayDisplayIndex();
+    const t = todayDisplayIndex() as DisplayDay;
     const col = (document.querySelectorAll('[data-col="true"]')[t] ??
       null) as HTMLElement | null;
     if (!s || !col) return;
@@ -99,7 +113,7 @@ export default function TaskBoard({
         const scrollCenter = s.scrollLeft + s.clientWidth / 2;
         return Math.abs(colCenter - scrollCenter) < col.clientWidth / 2;
       });
-      if (idx >= 0) setPageIndex(idx);
+      if (idx >= 0) setPageIndex(idx as DisplayDay);
     };
     s.addEventListener('scroll', handler, { passive: true });
     return () => s.removeEventListener('scroll', handler);
@@ -111,40 +125,13 @@ export default function TaskBoard({
 
   const snapSuppressed = !!drag?.active || panActive;
 
-  const [composer, setComposer] = useState<{
-    day: number;
-    afterIndex: number | null;
-  } | null>(null);
-  const [draft, setDraft] = useState('');
+  // ---- QuickAddSheet state ----
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickText, setQuickText] = useState('');
 
-  const openBottomComposer = (day: number) => {
-    setComposer({ day, afterIndex: null });
-    setDraft('');
-  };
-  const openBetweenComposer = (day: number, afterIndex: number) => {
-    setComposer({ day, afterIndex });
-    setDraft('');
-  };
-  const cancelComposer = () => {
-    setComposer(null);
-    setDraft('');
-  };
-  const confirmComposer = (day: number) => {
-    const text = draft.trim();
-    if (!text) return;
-    const after = composer?.afterIndex ?? null;
-    cancelComposer();
-    onRequestAdd(day, text, after);
-  };
-
-  const slides = useMemo(
-    () =>
-      Array.from({ length: DAYS }, (_, day) => ({ day, key: `day-${day}` })),
-    []
-  );
-
+  // ---- drag reorder commit ----
   const commitDragReorder = useCallback(
-    (toDay: number, toIndex: number) => {
+    (toDay: DisplayDay, toIndex: number) => {
       if (!drag) return;
       const sameSpot = drag.fromDay === toDay && drag.fromIndex === toIndex;
       if (sameSpot) return;
@@ -152,17 +139,19 @@ export default function TaskBoard({
       setWeek((prev) => {
         const next = prev.map((d) => d.slice());
         const [moved] = next[drag.fromDay].splice(drag.fromIndex, 1);
+
+        // IMPORTANT: Since TaskList doesn't render the dragged card,
+        // `toIndex` is already computed against the list *without* it.
+        // So we should NOT subtract 1 for same-column moves anymore.
         let insertIndex = toIndex;
-        if (drag.fromDay === toDay && drag.fromIndex < toIndex) {
-          insertIndex = Math.max(0, toIndex - 1);
-        }
 
         next[toDay].splice(Math.min(insertIndex, next[toDay].length), 0, moved);
+
         Promise.all(
           drag.fromDay === toDay
             ? [saveDay(toDay, next[toDay])]
             : [
-                saveDay(drag.fromDay, next[drag.fromDay]),
+                saveDay(drag.fromDay as DisplayDay, next[drag.fromDay]),
                 saveDay(toDay, next[toDay]),
               ]
         ).catch(() => {});
@@ -174,7 +163,7 @@ export default function TaskBoard({
 
   const onDrop = useCallback(() => {
     if (!drag) return;
-    const toDay = targetDay ?? drag.fromDay;
+    const toDay = (targetDay ?? drag.fromDay) as DisplayDay;
     const toIndex = targetIndex ?? drag.fromIndex;
 
     setDrag(null);
@@ -206,6 +195,7 @@ export default function TaskBoard({
 
   return (
     <div className="relative w-full h-full">
+      {/* SCROLLER */}
       <div
         ref={scrollerRef}
         dir="ltr"
@@ -215,11 +205,8 @@ export default function TaskBoard({
         onPointerMove={onPanMove}
         onPointerUp={endPan}
         className={[
-          'no-scrollbar',
-          'absolute inset-0',
-          'w-full h-full',
-          'overflow-x-auto overflow-y-hidden overscroll-x-contain',
-          'touch-pan-x',
+          'no-scrollbar absolute inset-0 w-full h-full',
+          'overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x',
           snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth',
         ].join(' ')}
         style={{
@@ -227,62 +214,29 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div
-          className="flex gap-3 px-3 pt-3 pb-3 md:gap-3 md:px-6 md:pt-6 lg:pt-8"
-          dir="ltr"
-        >
-          {slides.map(({ day, key }) => (
+        {/* extra space so the bar and pagination never overlap content */}
+        <div className="flex gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[220px] sm:pb-[180px] md:pb-[188px]">
+          {Array.from({ length: DAYS }, (_, day) => ({
+            day: day as DisplayDay,
+            key: `day-${day}`,
+          })).map(({ day, key }) => (
             <div
               key={key}
               ref={setSlideRef(day)}
               data-col="true"
-              className="shrink-0 snap-center
-            w-[88vw]
-            sm:w-[380px]
-            md:w-[340px]
-            lg:w-[320px]
-            xl:w-[300px] h-full"
+              className="shrink-0 snap-center w-[88vw] sm:w-[360px] md:w-[330px] lg:w-[310px] xl:w-[292px] h-full"
             >
               <DayColumn
                 title={titles[day]}
                 listRef={setListRef(day)}
-                maxHeightClass="max-h-[80svh]"
-                footer={
-                  !(
-                    composer &&
-                    composer.day === day &&
-                    composer.afterIndex === null
-                  ) && (
-                    <button
-                      onClick={() => openBottomComposer(day)}
-                      disabled={!!drag?.active}
-                      className={[
-                        'w-full px-3 py-2 text-left rounded-xl',
-                        'bg-violet-50/70 dark:bg-violet-950/20',
-                        'text-violet-700 dark:text-violet-300',
-                        !!drag?.active
-                          ? 'opacity-60 pointer-events-none'
-                          : 'hover:bg-violet-100 dark:hover:bg-violet-900/30',
-                      ].join(' ')}
-                    >
-                      + Add task
-                    </button>
-                  )
-                }
+                maxHeightClass="max-h-[73svh]"
               >
                 <TaskList
                   day={day}
                   items={week[day]}
                   drag={drag}
-                  targetDay={targetDay}
+                  targetDay={targetDay as DisplayDay | null} // <-- add cast
                   targetIndex={targetIndex}
-                  composer={composer}
-                  draft={draft}
-                  setDraft={setDraft}
-                  openBetweenComposer={openBetweenComposer}
-                  openBottomComposer={openBottomComposer}
-                  cancelComposer={cancelComposer}
-                  confirmComposer={confirmComposer}
                   removeTask={removeTask}
                   onGrab={onGrab}
                   setCardRef={setCardRef}
@@ -293,8 +247,17 @@ export default function TaskBoard({
         </div>
       </div>
 
-      <PaginationDots count={DAYS} activeIndex={pageIndex} />
+      {/* Pagination — under day columns, above the add bar. */}
+      <div
+        className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 112px)' }}
+      >
+        <div className="pointer-events-auto">
+          <PaginationDots count={DAYS} activeIndex={pageIndex} />
+        </div>
+      </div>
 
+      {/* Drag overlay */}
       {drag?.active && (
         <DragOverlay
           x={drag.x}
@@ -306,6 +269,74 @@ export default function TaskBoard({
           text={drag.taskText}
         />
       )}
+
+      {/* GLOBAL BOTTOM ADD (trigger only) */}
+      <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 py-12 pointer-events-none sm:px-6 sm:py-5">
+        <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
+          <div className="rounded-[28px] bg-white/75 dark:bg:white/8 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
+            <button
+              onClick={() => {
+                setQuickText('');
+                setShowQuickAdd(true);
+              }}
+              disabled={!!drag?.active}
+              className={[
+                'relative w-full h-12 rounded-full',
+                'bg-white/90 dark:bg-white/10 backdrop-blur-xl',
+                'text-emerald-900 dark:text-emerald-50 font-semibold tracking-[-0.01em]',
+                'shadow-[0_1px_0_rgba(255,255,255,.7)_inset,0_8px_24px_rgba(16,185,129,.28)] ring-1 ring-black/10 dark:ring-white/10',
+                'transition-transform duration-200 hover:shadow-[0_1px_0_rgba(255,255,255,.75)_inset,0_12px_30px_rgba(16,185,129,.32)] hover:bg-white',
+                'active:scale-[0.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-300',
+                !!drag?.active ? 'opacity-60 pointer-events-none' : '',
+              ].join(' ')}
+            >
+              <span className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-b from-white/55 to-white/0 dark:from-white/10 dark:to-transparent" />
+              <span className="relative z-10 flex items-center justify-center h-full gap-2">
+                <span>Add a</span>
+                <span className="translate-y-[1px]">
+                  <Fly size={22} x={-2} y={-3} />
+                </span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* QuickAddSheet */}
+      <QuickAddSheet
+        open={showQuickAdd}
+        onOpenChange={setShowQuickAdd}
+        initialText={quickText}
+        defaultRepeat="this-week"
+        onSubmit={async ({ text, days, repeat }) => {
+          // `days` is already API format from QuickAddSheet: -1 for Later, 0..6 for Sun..Sat.
+          if (onQuickAdd) {
+            await onQuickAdd({
+              text,
+              days, // pass through as-is (ApiDay[])
+              repeat: repeat as RepeatChoice,
+            });
+          } else {
+            // fallback if parent didn’t provide onQuickAdd
+            onRequestAdd(null, text, null, repeat as RepeatChoice);
+          }
+          setShowQuickAdd(false);
+        }}
+      />
+
+      {/* Motion preferences */}
+      <style jsx global>{`
+        /* When dragging, stop UA gestures on the scroller *and* the cards */
+        html.dragging [data-role='board-scroller'] {
+          touch-action: none !important;
+          overscroll-behavior: contain;
+          -webkit-overflow-scrolling: auto;
+          scroll-snap-type: none;
+        }
+        html.dragging [data-card-id] {
+          touch-action: none !important; /* ensure pointer stays with our drag */
+        }
+      `}</style>
     </div>
   );
 }

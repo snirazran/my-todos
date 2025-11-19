@@ -1,10 +1,8 @@
 'use client';
 
 import React from 'react';
-import GapRail from './GapRail';
-import InlineComposer from './InlineComposer';
 import TaskCard from './TaskCard';
-import { Task, draggableIdFor } from './helpers';
+import { Task, draggableIdFor, type DisplayDay } from './helpers';
 import { DragState } from './hooks/useDragManager';
 
 export default function TaskList({
@@ -13,32 +11,18 @@ export default function TaskList({
   drag,
   targetDay,
   targetIndex,
-  composer,
-  draft,
-  setDraft,
-  openBetweenComposer,
-  openBottomComposer,
-  cancelComposer,
-  confirmComposer,
   removeTask,
   onGrab,
   setCardRef,
 }: {
-  day: number;
+  day: DisplayDay;
   items: Task[];
   drag: DragState | null;
-  targetDay: number | null;
+  targetDay: DisplayDay | null;
   targetIndex: number | null;
-  composer: { day: number; afterIndex: number | null } | null;
-  draft: string;
-  setDraft: (s: string) => void;
-  openBetweenComposer: (day: number, afterIndex: number) => void;
-  openBottomComposer: (day: number) => void;
-  cancelComposer: () => void;
-  confirmComposer: (day: number) => void;
-  removeTask: (day: number, id: string) => Promise<void>;
+  removeTask: (day: DisplayDay, id: string) => Promise<void>;
   onGrab: (p: {
-    day: number;
+    day: DisplayDay;
     index: number;
     taskId: string;
     taskText: string;
@@ -52,161 +36,93 @@ export default function TaskList({
   const placeholderAt =
     drag && targetDay === day && targetIndex != null ? targetIndex : null;
 
+  const isSelfDrag = !!drag && drag.active && drag.fromDay === day;
+  const sourceIndex = isSelfDrag ? drag!.fromIndex : null;
+
   if (process.env.NODE_ENV !== 'production') {
     const seen = new Set<string>();
     const dups: string[] = [];
-    for (const t of items) {
-      if (seen.has(t.id)) dups.push(t.id);
-      else seen.add(t.id);
-    }
-    if (dups.length) {
-      // eslint-disable-next-line no-console
+    for (const t of items) seen.has(t.id) ? dups.push(t.id) : seen.add(t.id);
+    if (dups.length)
       console.warn(`TaskList day=${day} duplicate task ids:`, dups);
-    }
   }
+
   const rows: React.ReactNode[] = [];
 
-  // TOP rail
-  if (items.length > 0) {
-    const topOpen =
-      !!composer && composer.day === day && composer.afterIndex === -1;
-    rows.push(
-      <GapRail
-        key={`rail-top-${day}`}
-        overlayHidden={topOpen}
-        onAdd={() => openBetweenComposer(day, -1)}
-        disabled={!!drag?.active}
-      />
-    );
-    if (topOpen) {
-      rows.push(
-        <InlineComposer
-          key={`composer-top-${day}`}
-          value={draft}
-          onChange={setDraft}
-          onConfirm={() => confirmComposer(day)}
-          onCancel={cancelComposer}
-          autoFocus
-        />
-      );
+  const renderPlaceholder = (k: string) => (
+    <div
+      key={k}
+      className="h-12 my-2 border-2 border-dashed rounded-2xl border-lime-400/70 bg-lime-50/40"
+    />
+  );
+
+  // ---- Empty list: render a single placeholder (if targeting index 0) and return
+  if (items.length === 0) {
+    if (placeholderAt === 0) {
+      rows.push(renderPlaceholder(`ph-empty-${day}`));
     }
+    return <>{rows}</>;
   }
 
-  if (items.length > 0 && placeholderAt === 0) {
-    rows.push(
-      <div
-        key={`ph-top-${day}`}
-        className="h-12 my-2 border-2 border-dashed rounded-xl border-violet-400/70"
-      />
-    );
+  // ---- Non-empty list
+  // If inserting at the very start
+  if (placeholderAt === 0) {
+    rows.push(renderPlaceholder(`ph-top-${day}`));
   }
+
+  let visibleIndex = 0;
 
   for (let i = 0; i < items.length; i++) {
     const t = items[i];
-    const isDragged =
-      drag && drag.active && drag.fromDay === day && drag.fromIndex === i;
+    const isDraggedHere = isSelfDrag && sourceIndex === i;
 
-    const children: React.ReactNode[] = [];
+    if (!isDraggedHere) {
+      const cardKey = `card-${day}-${i}-${t.id}`;
+      const wrapKey = `wrap-${day}-${i}-${t.id}`;
+      const afterKey = `ph-${day}-${visibleIndex + 1}`;
 
-    children.push(
-      <TaskCard
-        key={`card-${day}-${i}-${t.id}`}
-        innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
-        dragId={draggableIdFor(day, t.id)}
-        // ✅ REMOVED: The unnecessary 'index' prop was removed from here.
-        task={t}
-        onDelete={() => removeTask(day, t.id)}
-        onGrab={(payload) => {
-          const id = draggableIdFor(day, t.id);
-          onGrab({
-            day,
-            index: i,
-            taskId: t.id,
-            taskText: t.text,
-            clientX: payload.clientX,
-            clientY: payload.clientY,
-            pointerType: payload.pointerType,
-            // fresh rect at grab-time (mouse) or when LP actually fires (touch)
-            rectGetter: () => {
-              const el =
-                document.querySelector<HTMLElement>(`[data-card-id="${id}"]`) ??
-                null;
-              return (
-                el?.getBoundingClientRect() ??
-                new DOMRect(payload.clientX - 1, payload.clientY - 1, 1, 1)
-              );
-            },
-          });
-        }}
-        hiddenWhileDragging={!!isDragged}
-      />
-    );
-
-    if (placeholderAt === i + 1) {
-      children.push(
-        <div
-          key={`ph-${day}-${i + 1}`}
-          className="h-12 my-2 border-2 border-dashed rounded-xl border-violet-400/70"
-        />
-      );
-    }
-
-    if (i < items.length - 1) {
-      const gapOpen =
-        !!composer && composer.day === day && composer.afterIndex === i;
-      children.push(
-        <GapRail
-          key={`rail-${day}-${i}`}
-          overlayHidden={gapOpen}
-          onAdd={() => openBetweenComposer(day, i)}
-          disabled={!!drag?.active}
-        />
-      );
-
-      if (gapOpen) {
-        children.push(
-          <InlineComposer
-            key={`composer-gap-${day}-${i}`}
-            value={draft}
-            onChange={setDraft}
-            onConfirm={() => confirmComposer(day)}
-            onCancel={cancelComposer}
-            autoFocus
+      rows.push(
+        <div key={wrapKey} className="relative">
+          <TaskCard
+            key={cardKey}
+            innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
+            dragId={draggableIdFor(day, t.id)}
+            task={t}
+            onDelete={() => removeTask(day, t.id)}
+            onGrab={(payload) => {
+              const id = draggableIdFor(day, t.id);
+              onGrab({
+                day,
+                index: i, // original array index
+                taskId: t.id,
+                taskText: t.text,
+                clientX: payload.clientX,
+                clientY: payload.clientY,
+                pointerType: payload.pointerType,
+                rectGetter: () => {
+                  const el =
+                    document.querySelector<HTMLElement>(
+                      `[data-card-id="${id}"]`
+                    ) ?? null;
+                  return (
+                    el?.getBoundingClientRect() ??
+                    new DOMRect(payload.clientX - 1, payload.clientY - 1, 1, 1)
+                  );
+                },
+              });
+            }}
+            hiddenWhileDragging={false}
+            isRepeating={t.type === 'weekly'}
           />
-        );
+        </div>
+      );
+
+      if (placeholderAt === visibleIndex + 1) {
+        rows.push(renderPlaceholder(afterKey));
       }
+
+      visibleIndex++;
     }
-
-    rows.push(
-      <div key={`wrap-${day}-${i}-${t.id}`} className="relative">
-        {children}
-      </div>
-    );
-  }
-
-  // Empty column: single placeholder at end
-  if (items.length === 0 && placeholderAt === 0) {
-    rows.push(
-      <div
-        key={`ph-end-${day}`}
-        className="h-12 my-2 border-2 border-dashed rounded-xl border-violet-400/70"
-      />
-    );
-  }
-
-  // Bottom composer only (footer button lives in DayColumn)
-  if (composer && composer.day === day && composer.afterIndex === null) {
-    rows.push(
-      <div key={`composer-bottom-wrap-${day}`} className="mt-2">
-        <InlineComposer
-          value={draft}
-          onChange={setDraft}
-          onConfirm={() => confirmComposer(day)}
-          onCancel={cancelComposer}
-          autoFocus
-        />
-      </div>
-    );
   }
 
   return <>{rows}</>;

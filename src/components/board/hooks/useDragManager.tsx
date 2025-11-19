@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DAYS } from '../helpers'; // adjust path if different
+import { DAYS } from '../helpers';
 
 export type DragState = {
   active: boolean;
@@ -34,6 +34,12 @@ export function useDragManager() {
   const pxVelRef = useRef(0);
   const pxVelSmoothedRef = useRef(0);
 
+  // remember scroller inline styles so we can restore after drag
+  const prevTouchAction = useRef<string>('');
+  const prevSnapType = useRef<string>('');
+  const prevWebkitOverflow = useRef<string>('');
+  const prevOverscroll = useRef<string>('');
+
   const setSlideRef =
     (day: number) =>
     (el: HTMLDivElement | null): void => {
@@ -49,10 +55,37 @@ export function useDragManager() {
     else cardRefs.current.set(id, el);
   }, []);
 
+  const lockScrollerForDrag = () => {
+    const s = scrollerRef.current as HTMLDivElement | null;
+    if (!s) return;
+    // save
+    const st = s.style as any;
+    prevTouchAction.current = st.touchAction || '';
+    prevSnapType.current = st.scrollSnapType || '';
+    prevWebkitOverflow.current = st.webkitOverflowScrolling || '';
+    prevOverscroll.current = st.overscrollBehavior || '';
+    // lock
+    st.touchAction = 'none'; // block UA panning on both axes
+    st.scrollSnapType = 'none'; // avoid snap fights during drag
+    st.webkitOverflowScrolling = 'auto'; // iOS: disable momentum
+    st.overscrollBehavior = 'contain'; // avoid nav gestures / PTR
+  };
+
+  const unlockScrollerAfterDrag = () => {
+    const s = scrollerRef.current as HTMLDivElement | null;
+    if (!s) return;
+    const st = s.style as any;
+    st.touchAction = prevTouchAction.current || '';
+    st.scrollSnapType = prevSnapType.current || '';
+    st.webkitOverflowScrolling = prevWebkitOverflow.current || '';
+    st.overscrollBehavior = prevOverscroll.current || '';
+  };
+
   const restoreGlobalInteraction = useCallback(() => {
     document.body.style.userSelect = '';
-    document.body.style.touchAction = ''; // re-enable page scroll on mobile
+    document.body.style.touchAction = '';
     document.documentElement.classList.remove('dragging');
+    unlockScrollerAfterDrag();
   }, []);
 
   const beginDragFromCard = useCallback(
@@ -66,8 +99,11 @@ export function useDragManager() {
       rect: DOMRect
     ) => {
       document.body.style.userSelect = 'none';
-      document.body.style.touchAction = 'none';
+      document.body.style.touchAction = 'none'; // block body scroll
       document.documentElement.classList.add('dragging');
+
+      // CRITICAL: lock the actual scroller that would normally pan horizontally.
+      lockScrollerForDrag();
 
       pointerXRef.current = clientX;
       pointerYRef.current = clientY;
@@ -102,7 +138,7 @@ export function useDragManager() {
       taskText: string;
       clientX: number;
       clientY: number;
-      rectGetter: () => DOMRect; // fresh rect provider
+      rectGetter: () => DOMRect;
     }) => {
       const { day, index, taskId, taskText, clientX, clientY, rectGetter } =
         params;
@@ -127,14 +163,12 @@ export function useDragManager() {
     setTargetIndex(null);
   }, [restoreGlobalInteraction]);
 
-  // Update drag position, compute target day/index
+  // movement + target computation
   useEffect(() => {
     if (!drag) return;
 
     const handleMove = (ev: PointerEvent | MouseEvent | TouchEvent) => {
-      // prevent native scroll/selection while dragging (mobile)
-      if ((ev as any).cancelable) ev.preventDefault();
-
+      if ((ev as any).cancelable) ev.preventDefault(); // keep UA from hijacking
       // @ts-ignore
       const pt = 'touches' in ev ? ev.touches?.[0] : ev;
       const x = (pt?.clientX ?? 0) as number;
@@ -176,7 +210,7 @@ export function useDragManager() {
         newDay = best;
       }
 
-      // index using only cards
+      // compute index (cards only)
       let newIndex = 0;
       if (newDay != null) {
         const list = listRefs.current[newDay];
@@ -208,7 +242,6 @@ export function useDragManager() {
       if (e.key === 'Escape') cancelDrag();
     };
 
-    // IMPORTANT: non-passive so preventDefault works on iOS/Android
     window.addEventListener('pointermove', handleMove as any, {
       passive: false,
     });
@@ -221,7 +254,7 @@ export function useDragManager() {
     };
   }, [drag, cancelDrag]);
 
-  // Edge auto-scroll
+  // edge auto-scroll (unchanged)
   useEffect(() => {
     if (!drag) return;
     const s = scrollerRef.current;
@@ -243,7 +276,7 @@ export function useDragManager() {
       const px = pointerXRef.current;
       const py = pointerYRef.current;
 
-      // horizontal
+      // horizontal autoscroll near edges
       const rect = s.getBoundingClientRect();
       let distFactor = 0,
         dir = 0;
@@ -272,7 +305,7 @@ export function useDragManager() {
       const vx = dir * (MIN_V + (MAX_V - MIN_V) * combined);
       if (dir !== 0) s.scrollLeft += vx;
 
-      // vertical
+      // vertical autoscroll inside the list (unchanged)
       const dayForV = targetDay != null ? targetDay : drag.fromDay;
       const list = listRefs.current[dayForV];
       if (list) {
@@ -323,7 +356,7 @@ export function useDragManager() {
     return () => cancelAnimationFrame(raf);
   }, [drag, targetDay]);
 
-  // SAFETY NETS: always restore interaction on unmount / lifecycle edges
+  // safety nets
   useEffect(() => {
     return () => {
       restoreGlobalInteraction();
@@ -352,7 +385,6 @@ export function useDragManager() {
   }, [drag?.active, cancelDrag]);
 
   return {
-    // refs
     scrollerRef,
     slideRefs,
     listRefs,
@@ -360,14 +392,12 @@ export function useDragManager() {
     setSlideRef,
     setListRef,
     setCardRef,
-    // drag state
     drag,
     setDrag,
     targetDay,
     setTargetDay,
     targetIndex,
     setTargetIndex,
-    // handlers
     onGrab,
     endDrag,
     cancelDrag,

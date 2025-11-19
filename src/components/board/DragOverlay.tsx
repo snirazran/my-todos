@@ -1,4 +1,5 @@
 'use client';
+import Fly from '@/components/ui/fly';
 
 export default function DragOverlay({
   x,
@@ -20,29 +21,25 @@ export default function DragOverlay({
   return (
     <div
       className="fixed z-50 pointer-events-none"
-      style={{
-        left: `${x - dx}px`,
-        top: `${y - dy}px`,
-        width: `${width}px`,
-      }}
+      style={{ left: `${x - dx}px`, top: `${y - dy}px`, width: `${width}px` }}
     >
       <div
         className={[
-          'flex items-center gap-3 p-3 select-none rounded-xl',
-          'bg-white/90 dark:bg-slate-700/90',
-          'border border-slate-200 dark:border-slate-600',
-          'shadow-2xl',
+          'flex items-center gap-3 p-3 select-none rounded-2xl',
+          'bg-white/90 backdrop-blur border border-emerald-700/20 shadow-2xl', // ← border, not ring
+          'shine',
         ].join(' ')}
         style={{
           height,
-          transform: 'rotate(-3.5deg) scale(1.02)',
-          opacity: 0.92,
+          transform: 'rotate(-4deg) scale(1.02)',
+          opacity: 0.96,
           transition: 'transform 80ms ease-out, opacity 120ms ease-out',
         }}
       >
-        <span className="flex-1 text-sm text-slate-800 dark:text-slate-200">
-          {text}
+        <span className="relative grid shrink-0 h-7 w-7 place-items-center">
+          <Fly size={22} x={-2} y={-2} className="animate-buzz" />
         </span>
+        <span className="flex-1 text-sm text-emerald-950">{text}</span>
       </div>
     </div>
   );

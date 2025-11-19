@@ -15,7 +15,7 @@ import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
 import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
-import AddTaskModal from '@/components/ui/dialog/AddTaskModal';
+import QuickAddSheet from '@/components/ui/QuickAddSheet';
 
 /* === Tunables ============================================================ */
 const TONGUE_MS = 1111; // tongue extend+retract total
@@ -82,20 +82,11 @@ export default function Home() {
   const [openWardrobe, setOpenWardrobe] = useState(false);
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
   const [loading, setLoading] = useState(true);
-
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [addDraft, setAddDraft] = useState('');
-  const [insertAfter, setInsertAfter] = useState<number | null>(null);
-  const [preselectedDays, setPreselectedDays] = useState<number[]>([]);
-  const [defaultRepeat, setDefaultRepeat] = useState<'this-week' | 'weekly'>(
-    'this-week'
-  );
+  const [quickText, setQuickText] = useState('');
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [weeklyIds, setWeeklyIds] = useState<Set<string>>(new Set());
 
-  const [weeklyBacklog, setWeeklyBacklog] = useState<
-    { id: string; text: string }[]
-  >([]);
-  const [weeklyTemplateBacklog, setWeeklyTemplateBacklog] = useState<
+  const [laterThisWeek, setLaterThisWeek] = useState<
     { id: string; text: string }[]
   >([]);
 
@@ -137,14 +128,8 @@ export default function Home() {
 
   const fetchBacklog = useCallback(async () => {
     if (!session) return;
-    const [thisWeek, weeklyTemplate] = await Promise.all([
-      fetch('/api/weekly-backlog').then((r) => r.json()),
-      fetch('/api/manage-tasks?day=-1').then((r) => r.json()),
-    ]);
-    setWeeklyBacklog(thisWeek.map((t: any) => ({ id: t.id, text: t.text })));
-    setWeeklyTemplateBacklog(
-      weeklyTemplate.map((t: any) => ({ id: t.id, text: t.text }))
-    );
+    const items = await fetch('/api/manage-tasks?day=-1').then((r) => r.json());
+    setLaterThisWeek(items.map((t: any) => ({ id: t.id, text: t.text })));
   }, [session]);
 
   const today = new Date();
@@ -613,12 +598,9 @@ export default function Home() {
                 />
               )
             }
-            onAddRequested={(prefill, afterIdx, opts) => {
-              setAddDraft(prefill);
-              setInsertAfter(afterIdx);
-              const dow = new Date().getDay(); // API day (0..6, Sun..Sat)
-              setPreselectedDays(opts?.preselectToday ? [dow] : []);
-              setShowAddModal(true);
+            onAddRequested={(prefill /*, afterIdx, opts */) => {
+              setQuickText(prefill || '');
+              setShowQuickAdd(true);
             }}
             weeklyIds={weeklyIds}
             onDeleteToday={async (taskId) => {
@@ -647,14 +629,9 @@ export default function Home() {
 
           {session && (
             <BacklogPanel
-              weeklyBacklog={weeklyBacklog}
-              weeklyTemplateBacklog={weeklyTemplateBacklog}
-              dateStr={dateStr}
+              later={laterThisWeek}
               onRefreshToday={refreshToday}
-              onRefreshBacklog={() => {
-                fetchBacklog();
-                loadWeeklyIds();
-              }}
+              onRefreshBacklog={fetchBacklog}
             />
           )}
         </div>
@@ -713,36 +690,33 @@ export default function Home() {
         </svg>
       )}
 
-      {showAddModal && (
-        <AddTaskModal
-          initialText={addDraft}
-          initialDays={preselectedDays}
-          defaultRepeat="this-week"
-          onClose={() => setShowAddModal(false)}
-          onSave={async ({ text, days, repeat }) => {
-            // unified API (handles weekly & this-week & backlog)
-            await fetch('/api/manage-tasks', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text, days, repeat }),
-            });
+      <QuickAddSheet
+        open={showQuickAdd}
+        onOpenChange={setShowQuickAdd}
+        initialText={quickText}
+        defaultRepeat="this-week"
+        onSubmit={async ({ text, days, repeat }) => {
+          await fetch('/api/manage-tasks', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, days, repeat }),
+          });
 
-            // refresh today list
-            if (session) {
-              const res = await fetch(`/api/tasks?date=${dateStr}`);
-              const json = await res.json();
-              setTasks(json.tasks ?? []);
-            } else {
-              setGuestTasks((prev) => [
-                ...prev,
-                { id: crypto.randomUUID(), text, completed: false },
-              ]);
-            }
+          // Refresh "today" list
+          if (session) {
+            const res = await fetch(`/api/tasks?date=${dateStr}`);
+            const json = await res.json();
+            setTasks(json.tasks ?? []);
+          } else {
+            setGuestTasks((prev) => [
+              ...prev,
+              { id: crypto.randomUUID(), text, completed: false },
+            ]);
+          }
 
-            fetchBacklog();
-          }}
-        />
-      )}
+          fetchBacklog();
+        }}
+      />
     </main>
   );
 }
