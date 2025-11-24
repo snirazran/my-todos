@@ -18,7 +18,6 @@ export default function TaskCard({
   onGrab,
   innerRef,
   hiddenWhileDragging,
-  /** Trello-like repeating badge when true */
   isRepeating = false,
 }: {
   dragId: string;
@@ -32,7 +31,6 @@ export default function TaskCard({
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const startPos = useRef<{ x: number; y: number } | null>(null);
-  // Track the pointer ID to capture it later
   const pointerIdRef = useRef<number | null>(null);
 
   const MOVE_TOLERANCE = 8;
@@ -48,6 +46,10 @@ export default function TaskCard({
       el.removeEventListener('pointermove', handlePointerMove as any);
       el.removeEventListener('pointerup', handlePointerUp as any);
       el.removeEventListener('pointercancel', handlePointerUp as any);
+
+      // 🟢 RESTORE SCROLLING:
+      // Once drag/interaction is done, let the user scroll the list again.
+      el.style.touchAction = 'pan-y';
     }
   }, []);
 
@@ -70,7 +72,6 @@ export default function TaskCard({
       const target = e.target as HTMLElement;
       if (target.closest('button, a, input, textarea, [role="button"]')) return;
 
-      // Save the pointer ID so we can capture it if the long press succeeds
       pointerIdRef.current = e.pointerId;
 
       if (e.pointerType === 'mouse') {
@@ -85,6 +86,7 @@ export default function TaskCard({
       startPos.current = { x: e.clientX, y: e.clientY };
       const el = cardRef.current;
       if (el) {
+        // Prepare listeners
         el.addEventListener('pointermove', handlePointerMove as any, {
           passive: true,
         });
@@ -97,14 +99,17 @@ export default function TaskCard({
       }
 
       longPressTimer.current = window.setTimeout(() => {
-        // CRITICAL FIX: Capture the pointer.
-        // This prevents the browser from cancelling the event stream
-        // when you drag outside the scrolling container (DayColumn).
         if (el && pointerIdRef.current !== null) {
           try {
+            // 1. Capture the pointer (keep events coming even if off-screen)
             el.setPointerCapture(pointerIdRef.current);
+
+            // 🟢 CRITICAL FIX: FREEZE THE BROWSER INSTANTLY
+            // We directly set the style object. We do NOT wait for React state updates.
+            // This prevents the browser from seeing a vertical move and scrolling the list.
+            el.style.touchAction = 'none';
           } catch (err) {
-            // Pointer might be gone if user lifted finger exactly at timeout
+            // Pointer lost
           }
         }
 
@@ -113,7 +118,18 @@ export default function TaskCard({
           clientY: startPos.current!.y,
           pointerType: 'touch',
         });
+
+        // Note: We do NOT call cleanupLP() here completely,
+        // because we want to keep the listeners active,
+        // but we do want to clear the timer logic.
+        // Actually, your original code called cleanupLP() here.
+        // If cleanupLP removes listeners, how do we track the drag?
+        // Ah, useDragManager tracks window events.
+        // So we just need to clean up the 'wait for drag' listeners.
         cleanupLP();
+
+        // 🟢 Re-apply the lock because cleanupLP() just reset it to pan-y!
+        if (el) el.style.touchAction = 'none';
       }, LONG_PRESS_DURATION);
     },
     [onGrab, handlePointerMove, handlePointerUp, cleanupLP]
@@ -145,8 +161,8 @@ export default function TaskCard({
       data-card-id={dragId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
-      // CRITICAL FIX: 'pan-y' allows vertical scroll but prevents horizontal
-      // browser gestures, letting JS handle the cross-column move.
+      // Default state: Allow vertical scrolling ('pan-y')
+      // The timer logic above will swap this to 'none' momentarily during a drag.
       style={{ touchAction: 'pan-y' }}
       className={[
         'group flex items-stretch gap-2 p-3 select-none rounded-2xl cursor-grab transition',
@@ -158,12 +174,10 @@ export default function TaskCard({
       role="listitem"
       aria-grabbed={false}
     >
-      {/* Avatar (always vertically centered) */}
       <span className="grid self-center mt-0 h-7 w-7 shrink-0 place-items-center">
         <Fly size={26} x={-1} y={-4} />
       </span>
 
-      {/* Content (top-aligned text, grows) */}
       <div className="flex-1 min-w-0">
         {isRepeating && (
           <div className="mt-1 flex items-center gap-1.5">
@@ -181,7 +195,6 @@ export default function TaskCard({
         </div>
       </div>
 
-      {/* Action (always vertically centered) */}
       <button
         onClick={onDelete}
         title="Delete"
