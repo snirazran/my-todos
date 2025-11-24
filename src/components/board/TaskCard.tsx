@@ -32,6 +32,8 @@ export default function TaskCard({
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const startPos = useRef<{ x: number; y: number } | null>(null);
+  // Track the pointer ID to capture it later
+  const pointerIdRef = useRef<number | null>(null);
 
   const MOVE_TOLERANCE = 8;
   const LONG_PRESS_DURATION = 230;
@@ -68,6 +70,9 @@ export default function TaskCard({
       const target = e.target as HTMLElement;
       if (target.closest('button, a, input, textarea, [role="button"]')) return;
 
+      // Save the pointer ID so we can capture it if the long press succeeds
+      pointerIdRef.current = e.pointerId;
+
       if (e.pointerType === 'mouse') {
         onGrab({
           clientX: e.clientX,
@@ -92,6 +97,17 @@ export default function TaskCard({
       }
 
       longPressTimer.current = window.setTimeout(() => {
+        // CRITICAL FIX: Capture the pointer.
+        // This prevents the browser from cancelling the event stream
+        // when you drag outside the scrolling container (DayColumn).
+        if (el && pointerIdRef.current !== null) {
+          try {
+            el.setPointerCapture(pointerIdRef.current);
+          } catch (err) {
+            // Pointer might be gone if user lifted finger exactly at timeout
+          }
+        }
+
         onGrab({
           clientX: startPos.current!.x,
           clientY: startPos.current!.y,
@@ -129,6 +145,8 @@ export default function TaskCard({
       data-card-id={dragId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
+      // CRITICAL FIX: 'pan-y' allows vertical scroll but prevents horizontal
+      // browser gestures, letting JS handle the cross-column move.
       style={{ touchAction: 'pan-y' }}
       className={[
         'group flex items-stretch gap-2 p-3 select-none rounded-2xl cursor-grab transition',
@@ -161,8 +179,6 @@ export default function TaskCard({
         <div className="truncate text-[15px] leading-6 text-emerald-950 dark:text-emerald-50">
           {task.text}
         </div>
-
-        {/* Trello-like badges row (only if repeating) */}
       </div>
 
       {/* Action (always vertically centered) */}
