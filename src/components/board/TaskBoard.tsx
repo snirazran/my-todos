@@ -53,13 +53,13 @@ export default function TaskBoard({
     setListRef,
     setCardRef,
     drag,
-    setDrag,
+    // setDrag,      <-- remove or ignore this
+    // setTargetDay, <-- remove or ignore this
+    // setTargetIndex, <-- remove or ignore this
     targetDay,
-    setTargetDay,
     targetIndex,
-    setTargetIndex,
     onGrab,
-    endDrag,
+    endDrag, // 🟢 WE NEED TO USE THIS
     cancelDrag,
   } = useDragManager();
 
@@ -122,11 +122,9 @@ export default function TaskBoard({
 
   const snapSuppressed = !!drag?.active || panActive;
 
-  // ---- QuickAddSheet state ----
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickText, setQuickText] = useState('');
 
-  // ---- drag reorder commit ----
   const commitDragReorder = useCallback(
     (toDay: DisplayDay, toIndex: number) => {
       if (!drag) return;
@@ -136,9 +134,11 @@ export default function TaskBoard({
       setWeek((prev) => {
         const next = prev.map((d) => d.slice());
         const [moved] = next[drag.fromDay].splice(drag.fromIndex, 1);
-
         let insertIndex = toIndex;
-
+        // Fix index if moving within same list downwards
+        if (drag.fromDay === toDay && drag.fromIndex < toIndex) {
+          insertIndex = Math.max(0, toIndex - 1);
+        }
         next[toDay].splice(Math.min(insertIndex, next[toDay].length), 0, moved);
 
         Promise.all(
@@ -155,25 +155,24 @@ export default function TaskBoard({
     [drag, saveDay, setWeek]
   );
 
+  // 🟢 UPDATED ONDROP FUNCTION
   const onDrop = useCallback(() => {
     if (!drag) return;
     const toDay = (targetDay ?? drag.fromDay) as DisplayDay;
     const toIndex = targetIndex ?? drag.fromIndex;
 
-    setDrag(null);
-    setTargetDay(null);
-    setTargetIndex(null);
-
+    // 1. Commit changes first (while drag state exists)
     centerColumnSmooth(toDay);
     commitDragReorder(toDay, toIndex);
+
+    // 2. Use endDrag() to clear state AND restore browser scrolling
+    endDrag();
   }, [
     drag,
     targetDay,
     targetIndex,
-    setDrag,
-    setTargetDay,
-    setTargetIndex,
     commitDragReorder,
+    endDrag, // <--- Dependency added
   ]);
 
   useEffect(() => {
@@ -314,11 +313,7 @@ export default function TaskBoard({
         }}
       />
 
-      {/* 🔴 UPDATE THIS SECTION 🔴
-        We enforce touch-action: none globally on body/html when dragging 
-      */}
       <style jsx global>{`
-        /* Optional: reduce motion support */
         @media (prefers-reduced-motion: reduce) {
           * {
             animation-duration: 0.01ms !important;
@@ -328,7 +323,6 @@ export default function TaskBoard({
           }
         }
 
-        /* LOCK THE BODY / HTML */
         html.dragging,
         html.dragging body {
           touch-action: none !important;
@@ -338,7 +332,6 @@ export default function TaskBoard({
           -webkit-user-select: none !important;
         }
 
-        /* LOCK THE SCROLLER */
         html.dragging [data-role='board-scroller'] {
           touch-action: none !important;
           overflow: hidden !important;
