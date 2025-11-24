@@ -129,7 +129,7 @@ export default function TaskCard({
       data-card-id={dragId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
-      style={{ touchAction: 'auto' }}
+      style={{ touchAction: 'pan-y' }}
       className={[
         'group flex items-stretch gap-2 p-3 select-none rounded-2xl cursor-grab transition',
         'bg-white/85 dark:bg-emerald-900/40 backdrop-blur',
