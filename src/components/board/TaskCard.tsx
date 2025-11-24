@@ -47,8 +47,7 @@ export default function TaskCard({
       el.removeEventListener('pointerup', handlePointerUp as any);
       el.removeEventListener('pointercancel', handlePointerUp as any);
 
-      // 🟢 RESTORE SCROLLING:
-      // Once drag/interaction is done, let the user scroll the list again.
+      // 🟢 RESTORE: Allow vertical scrolling again after interaction ends
       el.style.touchAction = 'pan-y';
     }
   }, []);
@@ -86,7 +85,6 @@ export default function TaskCard({
       startPos.current = { x: e.clientX, y: e.clientY };
       const el = cardRef.current;
       if (el) {
-        // Prepare listeners
         el.addEventListener('pointermove', handlePointerMove as any, {
           passive: true,
         });
@@ -101,15 +99,13 @@ export default function TaskCard({
       longPressTimer.current = window.setTimeout(() => {
         if (el && pointerIdRef.current !== null) {
           try {
-            // 1. Capture the pointer (keep events coming even if off-screen)
             el.setPointerCapture(pointerIdRef.current);
-
-            // 🟢 CRITICAL FIX: FREEZE THE BROWSER INSTANTLY
-            // We directly set the style object. We do NOT wait for React state updates.
-            // This prevents the browser from seeing a vertical move and scrolling the list.
+            // 🟢 FIX: Manually force 'none' INSTANTLY.
+            // Do not wait for React to update classes.
+            // This stops the horizontal scroll on the parent from stealing the event.
             el.style.touchAction = 'none';
           } catch (err) {
-            // Pointer lost
+            // ignore
           }
         }
 
@@ -119,17 +115,12 @@ export default function TaskCard({
           pointerType: 'touch',
         });
 
-        // Note: We do NOT call cleanupLP() here completely,
-        // because we want to keep the listeners active,
-        // but we do want to clear the timer logic.
-        // Actually, your original code called cleanupLP() here.
-        // If cleanupLP removes listeners, how do we track the drag?
-        // Ah, useDragManager tracks window events.
-        // So we just need to clean up the 'wait for drag' listeners.
-        cleanupLP();
-
-        // 🟢 Re-apply the lock because cleanupLP() just reset it to pan-y!
-        if (el) el.style.touchAction = 'none';
+        // We don't fully cleanup here because we want to keep the drag going,
+        // but we clear the timer reference.
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
       }, LONG_PRESS_DURATION);
     },
     [onGrab, handlePointerMove, handlePointerUp, cleanupLP]
@@ -161,8 +152,8 @@ export default function TaskCard({
       data-card-id={dragId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
-      // Default state: Allow vertical scrolling ('pan-y')
-      // The timer logic above will swap this to 'none' momentarily during a drag.
+      // Initial state: 'pan-y' allows you to scroll the list up/down.
+      // The timer above swaps this to 'none' when dragging starts.
       style={{ touchAction: 'pan-y' }}
       className={[
         'group flex items-stretch gap-2 p-3 select-none rounded-2xl cursor-grab transition',

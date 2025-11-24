@@ -27,13 +27,11 @@ export default function TaskBoard({
   saveDay,
   removeTask,
   onRequestAdd,
-  /** Let TaskBoard add directly without modal */
   onQuickAdd,
 }: {
   titles: string[];
   week: Task[][];
   setWeek: React.Dispatch<React.SetStateAction<Task[][]>>;
-  // Use DisplayDay (0..7) for board columns
   saveDay: (day: DisplayDay, tasks: Task[]) => Promise<void>;
   removeTask: (day: DisplayDay, id: string) => Promise<void>;
   onRequestAdd: (
@@ -42,10 +40,9 @@ export default function TaskBoard({
     afterIndex?: number | null,
     repeat?: RepeatChoice
   ) => void;
-  // Pass ApiDay[] (-1 | 0..6) to the parent for server calls
   onQuickAdd?: (data: {
     text: string;
-    days: ApiDay[]; // -1 = Later, 0..6 = Sun..Sat
+    days: ApiDay[];
     repeat: RepeatChoice;
   }) => Promise<void> | void;
 }) {
@@ -140,9 +137,6 @@ export default function TaskBoard({
         const next = prev.map((d) => d.slice());
         const [moved] = next[drag.fromDay].splice(drag.fromIndex, 1);
 
-        // IMPORTANT: Since TaskList doesn't render the dragged card,
-        // `toIndex` is already computed against the list *without* it.
-        // So we should NOT subtract 1 for same-column moves anymore.
         let insertIndex = toIndex;
 
         next[toDay].splice(Math.min(insertIndex, next[toDay].length), 0, moved);
@@ -214,7 +208,6 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        {/* extra space so the bar and pagination never overlap content */}
         <div className="flex gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[220px] sm:pb-[180px] md:pb-[188px]">
           {Array.from({ length: DAYS }, (_, day) => ({
             day: day as DisplayDay,
@@ -235,7 +228,7 @@ export default function TaskBoard({
                   day={day}
                   items={week[day]}
                   drag={drag}
-                  targetDay={targetDay as DisplayDay | null} // <-- add cast
+                  targetDay={targetDay as DisplayDay | null}
                   targetIndex={targetIndex}
                   removeTask={removeTask}
                   onGrab={onGrab}
@@ -247,7 +240,7 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* Pagination — under day columns, above the add bar. */}
+      {/* Pagination */}
       <div
         className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none"
         style={{ bottom: 'calc(env(safe-area-inset-bottom) + 112px)' }}
@@ -302,39 +295,59 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* QuickAddSheet */}
       <QuickAddSheet
         open={showQuickAdd}
         onOpenChange={setShowQuickAdd}
         initialText={quickText}
         defaultRepeat="this-week"
         onSubmit={async ({ text, days, repeat }) => {
-          // `days` is already API format from QuickAddSheet: -1 for Later, 0..6 for Sun..Sat.
           if (onQuickAdd) {
             await onQuickAdd({
               text,
-              days, // pass through as-is (ApiDay[])
+              days,
               repeat: repeat as RepeatChoice,
             });
           } else {
-            // fallback if parent didn’t provide onQuickAdd
             onRequestAdd(null, text, null, repeat as RepeatChoice);
           }
           setShowQuickAdd(false);
         }}
       />
 
-      {/* Motion preferences */}
+      {/* 🔴 UPDATE THIS SECTION 🔴
+        We enforce touch-action: none globally on body/html when dragging 
+      */}
       <style jsx global>{`
-        /* When dragging, stop UA gestures on the scroller *and* the cards */
+        /* Optional: reduce motion support */
+        @media (prefers-reduced-motion: reduce) {
+          * {
+            animation-duration: 0.01ms !important;
+            animation-iteration-count: 1 !important;
+            transition-duration: 0.01ms !important;
+            scroll-behavior: auto !important;
+          }
+        }
+
+        /* LOCK THE BODY / HTML */
+        html.dragging,
+        html.dragging body {
+          touch-action: none !important;
+          overscroll-behavior: none !important;
+          overflow: hidden !important;
+          user-select: none !important;
+          -webkit-user-select: none !important;
+        }
+
+        /* LOCK THE SCROLLER */
         html.dragging [data-role='board-scroller'] {
           touch-action: none !important;
-          overscroll-behavior: contain;
-          -webkit-overflow-scrolling: auto;
-          scroll-snap-type: none;
+          overflow: hidden !important;
+          scroll-snap-type: none !important;
+          overscroll-behavior: none !important;
         }
+
         html.dragging [data-card-id] {
-          touch-action: none !important; /* ensure pointer stays with our drag */
+          touch-action: none !important;
         }
       `}</style>
     </div>
