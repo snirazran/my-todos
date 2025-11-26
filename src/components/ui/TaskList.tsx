@@ -62,7 +62,10 @@ export default function TaskList({
     };
     window.addEventListener('task-menu-open', closeIfOther as EventListener);
     return () =>
-      window.removeEventListener('task-menu-open', closeIfOther as EventListener);
+      window.removeEventListener(
+        'task-menu-open',
+        closeIfOther as EventListener
+      );
   }, []);
 
   const taskKind = (t: Task) => {
@@ -102,13 +105,13 @@ export default function TaskList({
     <>
       <div
         dir="ltr"
-        className="px-6 pt-6 pb-4 bg-white shadow-lg rounded-2xl dark:bg-slate-800 overflow-visible"
+        className="px-6 pt-6 pb-4 overflow-visible bg-white shadow-lg rounded-2xl dark:bg-slate-800"
       >
         <h2 className="mb-6 text-2xl font-bold text-slate-900 dark:text-white">
           Your tasks today:
         </h2>
 
-        <div className="space-y-3 pb-2 overflow-visible">
+        <div className="pb-2 space-y-3 overflow-visible">
           {tasks.map((task, i) => {
             const isDone = task.completed || vSet.has(task.id);
             const isMenuOpen = menuFor === task.id;
@@ -232,7 +235,7 @@ export default function TaskList({
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
-                            className="flex w-full items-center justify-center gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-700"
+                            className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-700"
                             onClick={() => {
                               setMenuFor(null);
                               setDialog({

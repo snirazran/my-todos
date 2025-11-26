@@ -243,9 +243,9 @@ export default function Home() {
                     flyRefs.current[task.id] = el;
                   }}
                   onClick={() => /* your existing toggle */ null}
-                  size={30}
-                  y={-6}
-                  x={-4}
+                  size={28}
+                  y={-4}
+                  x={-2}
                 />
               )
             }
