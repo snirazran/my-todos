@@ -114,7 +114,7 @@ export default function TaskList({
         <div className="pb-2 space-y-3 overflow-visible">
           {tasks.length === 0 && (
             <div className="px-4 py-6 text-center border text-slate-500 rounded-xl border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60">
-              No tasks for today. Add one to get started.
+              No tasks for today. <br></br>Add one to get started.
             </div>
           )}
           {tasks.map((task, i) => {

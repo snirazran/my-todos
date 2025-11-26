@@ -15,6 +15,7 @@ import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import {
   useFrogTongue,
   HIT_AT,
@@ -44,7 +45,8 @@ const demoTasks: Task[] = [
 ];
 
 export default function Home() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const sessionLoading = status === 'loading';
   const router = useRouter();
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -115,6 +117,7 @@ export default function Home() {
       setLoading(false);
       return;
     }
+    setLoading(true);
     (async () => {
       try {
         const res = await fetch(`/api/tasks?date=${dateStr}`);
@@ -179,12 +182,8 @@ export default function Home() {
     });
   };
 
-  if (loading && session) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-16 h-16 border-4 border-purple-500 rounded-full animate-spin border-t-transparent" />
-      </div>
-    );
+  if (sessionLoading || (session && loading)) {
+    return <LoadingScreen message="Loading your day..." />;
   }
 
   return (

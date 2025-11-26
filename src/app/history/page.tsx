@@ -26,6 +26,7 @@ import {
   TONGUE_STROKE,
   useFrogTongue,
 } from '@/hooks/useFrogTongue';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 const FLY_PX = 24;
 
@@ -35,7 +36,8 @@ interface DayRecord {
 }
 
 export default function History() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
+  const sessionLoading = status === 'loading';
   const [openWardrobe, setOpenWardrobe] = useState(false);
   const [history, setHistory] = useState<DayRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,7 @@ export default function History() {
       setLoading(false);
       return;
     }
+    setLoading(true);
     (async () => {
       try {
         const res = await fetch('/api/history');
@@ -151,12 +154,8 @@ export default function History() {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="w-16 h-16 border-4 border-purple-500 rounded-full animate-spin border-t-transparent" />
-      </div>
-    );
+  if (sessionLoading || loading) {
+    return <LoadingScreen message="Loading your history..." />;
   }
 
   return (

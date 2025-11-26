@@ -19,6 +19,7 @@ export default function ManageTasksPage() {
   const [week, setWeek] = useState<Task[][]>(
     Array.from({ length: DAYS }, () => [])
   );
+  const [loading, setLoading] = useState(true);
 
   /** Map API order (Sun..Sat, Later at index 7) → Display order */
   const mapApiToDisplay = (apiWeek: Task[][]): Task[][] => {
@@ -46,6 +47,8 @@ export default function ManageTasksPage() {
         if (Array.isArray(data)) setWeek(mapApiToDisplay(data));
       } catch (err) {
         console.error('Failed to fetch weekly tasks:', err);
+      } finally {
+        setLoading(false);
       }
     })();
   }, []);
@@ -118,6 +121,23 @@ export default function ManageTasksPage() {
       ),
     []
   );
+
+  if (loading) {
+    return (
+      <main
+        className="flex items-center justify-center min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-lime-900/90"
+        style={{
+          height: 'calc(100dvh - var(--header-h))',
+          minHeight: 'calc(-webkit-fill-available - var(--header-h))',
+        }}
+      >
+        <div
+          className="w-12 h-12 rounded-full border-4 border-white/40 border-t-white animate-spin"
+          aria-label="Loading task board"
+        />
+      </main>
+    );
+  }
 
   return (
     <main
