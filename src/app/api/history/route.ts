@@ -55,34 +55,40 @@ export async function GET(_req: NextRequest) {
         suppressedDates: 1,
       }
     )
-      .lean<TaskDoc>()
+      .lean<TaskDoc[]>()
       .exec();
 
-    const byDate: Record<
-      string,
-      { id: string; text: string; order: number; completed: boolean }[]
-    > = {};
+    type HistoryTask = {
+      id: string;
+      text: string;
+      order: number;
+      completed: boolean;
+    };
+
+    const byDate: Record<string, HistoryTask[]> = {};
 
     for (const date of dates) {
       const dt = new Date(date);
       const dow = dt.getDay() as Weekday;
 
       const dayTasks = tasks
-        .filter((t) => {
+        .filter((t: TaskDoc) => {
           if (t.type === 'regular') return t.date === date;
           if (t.type === 'weekly') return t.dayOfWeek === dow;
           return false;
         })
-        .filter((t) => !(t.suppressedDates ?? []).includes(date))
-        .map((t) => ({
-          id: t.id,
-          text: t.text,
-          order: t.order ?? 0,
-          completed:
-            (t.completedDates ?? []).includes(date) ||
-            (!!t.completed && t.type === 'regular'),
-        }))
-        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+        .filter((t: TaskDoc) => !(t.suppressedDates ?? []).includes(date))
+        .map(
+          (t): HistoryTask => ({
+            id: t.id,
+            text: t.text,
+            order: t.order ?? 0,
+            completed:
+              (t.completedDates ?? []).includes(date) ||
+              (!!t.completed && t.type === 'regular'),
+          })
+        )
+        .sort((a: HistoryTask, b: HistoryTask) => a.order - b.order);
 
       if (dayTasks.length) {
         byDate[date] = dayTasks;
@@ -90,8 +96,16 @@ export async function GET(_req: NextRequest) {
     }
 
     const history = Object.entries(byDate)
-      .map(([date, tasks]) => ({ date, tasks }))
-      .sort((a, b) => (a.date > b.date ? -1 : 1));
+      .map(([date, tasks]): { date: string; tasks: HistoryTask[] } => ({
+        date,
+        tasks,
+      }))
+      .sort(
+        (
+          a: { date: string; tasks: HistoryTask[] },
+          b: { date: string; tasks: HistoryTask[] }
+        ) => (a.date > b.date ? -1 : 1)
+      );
 
     return NextResponse.json(history);
   } catch (err) {

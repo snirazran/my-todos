@@ -15,21 +15,15 @@ import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
+import {
+  useFrogTongue,
+  HIT_AT,
+  OFFSET_MS,
+  TONGUE_MS,
+  TONGUE_STROKE,
+} from '@/hooks/useFrogTongue';
 
-/* === Tunables ============================================================ */
-const TONGUE_MS = 1111; // tongue extend+retract total
-const OFFSET_MS = 160; // anticipation delay before tongue starts
-const PRE_PAN_MS = 600; // camera pre-pan up to frog
-const PRE_LINGER_MS = 180; // small pause on frog before firing
-const CAM_START_DELAY = 140; // start following down after tongue begins
-const RETURN_MS = 520; // (not used for return now, but kept for future)
-const ORIGIN_Y_ADJ = -5;
-const TONGUE_STROKE = 8;
-const FOLLOW_EASE = (t: number) =>
-  t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; // easeInOutCubic
-const HIT_AT = 0.5; // impact at 50% of tongue
 const FLY_PX = 24;
-/* ======================================================================== */
 
 interface Task {
   id: string;
@@ -49,31 +43,9 @@ const demoTasks: Task[] = [
   },
 ];
 
-function easeOutQuad(t: number) {
-  return 1 - (1 - t) * (1 - t);
-}
-
-function animateScrollTo(targetY: number, duration: number) {
-  return new Promise<void>((resolve) => {
-    const start = window.scrollY;
-    const dy = targetY - start;
-    const t0 = performance.now();
-
-    function frame(t: number) {
-      const p = Math.min(1, (t - t0) / duration);
-      const y = start + dy * easeOutQuad(p);
-      window.scrollTo(0, y);
-      if (p < 1) requestAnimationFrame(frame);
-      else resolve();
-    }
-    requestAnimationFrame(frame);
-  });
-}
-
 export default function Home() {
   const { data: session } = useSession();
   const router = useRouter();
-  const cooldownUntil = useRef(0);
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
 
@@ -89,41 +61,17 @@ export default function Home() {
     { id: string; text: string }[]
   >([]);
 
-  const [visuallyDone, setVisuallyDone] = useState<Set<string>>(new Set());
-
-  const [vp, setVp] = useState({ w: 0, h: 0 });
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
-  // lock manual scroll during sequence
-  const [cinematic, setCinematic] = useState(false);
-
-  // tongue sequence data in DOC coordinates
-  const [grab, setGrab] = useState<{
-    taskId: string;
-    completed: boolean;
-    originDoc: { x: number; y: number };
-    targetDoc: { x: number; y: number };
-    returnToY: number;
-    startAt: number; // perf timestamp when tongue begins (after OFFSET_MS)
-    camStartAt: number; // when camera follow starts (after CAM_START_DELAY)
-    follow: boolean; // whether to drive the camera down
-    frogFocusY: number;
-    flyFocusY: number;
-  } | null>(null);
-
-  // tip glued fly (viewport)
-  const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
-  const [tipVisible, setTipVisible] = useState(false);
-
-  // SVG path DOM ref (we update `d` every frame so it never drifts on scroll)
-  const tonguePathEl = useRef<SVGPathElement | null>(null);
-
-  // path geometry cache (doc space)
-  const geomRef = useRef<{
-    total: number;
-    getPointAtLength: (s: number) => DOMPoint;
-    hidImpact: boolean;
-    raf: number;
-  } | null>(null);
+  const {
+    vp,
+    cinematic,
+    grab,
+    tip,
+    tipVisible,
+    tonguePathEl,
+    triggerTongue,
+    visuallyDone,
+  } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
   const fetchBacklog = useCallback(async () => {
     if (!session) return;
@@ -146,15 +94,6 @@ export default function Home() {
     setTasks(json.tasks ?? []);
     await fetchWeeklyIds();
   }, [session, dateStr]);
-
-  const loadWeeklyIds = useCallback(async () => {
-    if (!session) return;
-    const dow = new Date().getDay(); // 0..6 (Sun..Sat)
-    const arr = await fetch(
-      `/api/tasks?view=board&day=${dow}`
-    ).then((r) => r.json());
-    setWeeklyIds(new Set(arr.map((t: any) => t.id)));
-  }, [session]);
 
   const fetchWeeklyIds = React.useCallback(async () => {
     if (!session) return;
@@ -187,31 +126,6 @@ export default function Home() {
     })();
   }, [session, dateStr]);
 
-  /* -------- viewport tracking (for initial viewBox size) -------- */
-  useEffect(() => {
-    const set = () => {
-      const vv = window.visualViewport;
-      if (vv) {
-        setVp({ w: Math.round(vv.width), h: Math.round(vv.height) });
-      } else {
-        setVp({ w: window.innerWidth, h: window.innerHeight });
-      }
-    };
-    set();
-    window.addEventListener('resize', set);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', set);
-      window.visualViewport.addEventListener('scroll', set);
-    }
-    return () => {
-      window.removeEventListener('resize', set);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', set);
-        window.visualViewport.removeEventListener('scroll', set);
-      }
-    };
-  }, []);
-
   /* -------- block manual scroll during cinematic -------- */
   useEffect(() => {
     if (!cinematic) return;
@@ -243,36 +157,10 @@ export default function Home() {
 
   const { indices } = useWardrobeIndices(!!session);
 
-  /* -------- doc-space helpers -------- */
-  const getMouthDoc = useCallback(() => {
-    const p = frogRef.current?.getMouthPoint() ?? { x: 0, y: 0 };
-    const vv = window.visualViewport;
-    const offX = window.scrollX + Math.max(0, vv?.offsetLeft ?? 0);
-    const offY = window.scrollY + Math.max(0, vv?.offsetTop ?? 0);
-    return { x: p.x + offX, y: p.y + offY + ORIGIN_Y_ADJ };
-  }, []);
-
-  const getFlyDoc = useCallback((el: HTMLElement) => {
-    const r = el.getBoundingClientRect();
-    const vv = window.visualViewport;
-    const offX = window.scrollX + Math.max(0, vv?.offsetLeft ?? 0);
-    const offY = window.scrollY + Math.max(0, vv?.offsetTop ?? 0);
-    return { x: r.left + r.width / 2 + offX, y: r.top + r.height / 2 + offY };
-  }, []);
-  const visibleRatio = (r: DOMRect) => {
-    const vw = window.innerWidth,
-      vh = window.innerHeight;
-    const xOverlap = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
-    const yOverlap = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
-    const visArea = xOverlap * yOverlap;
-    const totalArea = Math.max(1, r.width * r.height);
-    return visArea / totalArea; // 0..1
-  };
-
   /* -------- main toggle with cinematic timeline -------- */
 
   const handleToggle = async (taskId: string, explicitCompleted?: boolean) => {
-    if (cinematic || grab || performance.now() < cooldownUntil.current) return;
+    if (cinematic || grab) return;
     const task = data.find((t) => t.id === taskId);
     if (!task) return;
 
@@ -284,229 +172,12 @@ export default function Home() {
       return;
     }
 
-    const flyEl = flyRefs.current[taskId];
-    if (!flyEl) {
-      persistTask(taskId, true);
-      return;
-    }
-
-    // Initial measure
-    const startY = window.scrollY; // you pass this into setGrab
-
-    const originDoc0 = getMouthDoc(); // first measurement
-    const targetDoc0 = getFlyDoc(flyEl);
-
-    let frogFocusY = Math.max(0, originDoc0.y - window.innerHeight * 0.35);
-    let flyFocusY = Math.max(0, targetDoc0.y - window.innerHeight * 0.45);
-    const mouthV = frogRef.current?.getMouthPoint() ?? { x: -1, y: -1 };
-    const flyR = flyEl.getBoundingClientRect();
-    const frogR = frogBoxRef.current?.getBoundingClientRect();
-
-    const frogRatio = frogR ? visibleRatio(frogR) : 0;
-    const flyVisible =
-      flyR.top < window.innerHeight &&
-      flyR.bottom > 0 &&
-      flyR.left < window.innerWidth &&
-      flyR.right > 0;
-
-    // Now require 75% of frog to be visible
-    const needCine = frogRatio < 0.75 || !flyVisible;
-    setCinematic(true);
-
-    if (needCine) {
-      // Pre-pan to frog, then linger a bit
-      await animateScrollTo(frogFocusY, PRE_PAN_MS);
-      await new Promise((r) => setTimeout(r, PRE_LINGER_MS));
-    }
-
-    // Re-measure after any layout shift
-    const originDoc = getMouthDoc();
-    const targetDoc = getFlyDoc(flyEl);
-    frogFocusY = Math.max(0, originDoc.y - window.innerHeight * 0.35);
-    flyFocusY = Math.max(0, targetDoc.y - window.innerHeight * 0.45);
-
-    const startAt = performance.now() + OFFSET_MS;
-    const camStartAt = startAt + CAM_START_DELAY;
-
-    if (flyEl) flyEl.style.visibility = 'visible';
-    setTipVisible(false);
-
-    setGrab({
-      taskId,
+    await triggerTongue({
+      key: taskId,
       completed,
-      originDoc,
-      targetDoc,
-      returnToY: startY,
-      startAt,
-      camStartAt,
-      follow: needCine, // follow only if needed
-      frogFocusY,
-      flyFocusY,
+      onPersist: () => persistTask(taskId, true),
     });
   };
-
-  /* -------- unified RAF: tongue, camera follow (down only), tip glue, impact -------- */
-  useEffect(() => {
-    if (!grab) return;
-
-    // --- Build doc path with settling & visualViewport support ---
-    let p0Doc = getMouthDoc(); // fresh mouth position at fire-time
-    const p2 = grab.targetDoc; // target stays fixed for this shot
-
-    const buildGeom = (p0: { x: number; y: number }) => {
-      const p1 = { x: (p0.x + p2.x) / 2, y: p0.y - 120 };
-      const tmp = document.createElementNS(
-        'http://www.w3.org/2000/svg',
-        'path'
-      );
-      tmp.setAttribute(
-        'd',
-        `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`
-      );
-      const total = tmp.getTotalLength();
-      return { tmp, total, p1 };
-    };
-
-    let { tmp, total, p1: p1Doc } = buildGeom(p0Doc);
-
-    geomRef.current = {
-      total,
-      getPointAtLength: (s: number) => tmp.getPointAtLength(s),
-      hidImpact: false,
-      raf: 0,
-    };
-
-    // Seed the visible path immediately (avoid 1-frame mismatch)
-    const seedViewportPath = () => {
-      const vv = window.visualViewport;
-      const offX = window.scrollX + (vv?.offsetLeft ?? 0);
-      const offY = window.scrollY + (vv?.offsetTop ?? 0);
-
-      const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
-      const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
-      const p2V = { x: p2.x - offX, y: p2.y - offY };
-      tonguePathEl.current?.setAttribute(
-        'd',
-        `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`
-      );
-    };
-    seedViewportPath();
-
-    // Let the mouth "settle" for ~140ms (Rive state machine can move it slightly)
-    const settleUntil = grab.startAt + 140;
-
-    let raf = 0;
-    const tick = () => {
-      const now = performance.now();
-      const tRaw = (now - grab.startAt) / TONGUE_MS;
-      const t = Math.max(0, Math.min(1, tRaw));
-
-      // For the first frames, re-measure mouth and rebuild the curve if it moved
-      if (now < settleUntil) {
-        const fresh = getMouthDoc();
-        const next = {
-          x: p0Doc.x + (fresh.x - p0Doc.x) * 0.35,
-          y: p0Doc.y + (fresh.y - p0Doc.y) * 0.35,
-        };
-        if (Math.abs(next.x - p0Doc.x) + Math.abs(next.y - p0Doc.y) > 0.25) {
-          p0Doc = next;
-          ({ tmp, total, p1: p1Doc } = buildGeom(p0Doc));
-          if (geomRef.current) {
-            geomRef.current.total = total;
-            geomRef.current.getPointAtLength = (s: number) =>
-              tmp.getPointAtLength(s);
-          }
-        }
-      }
-
-      // progress 0..1..0 for extend/retract
-      const forward =
-        t <= HIT_AT ? t / HIT_AT : 1 - (t - HIT_AT) / (1 - HIT_AT);
-
-      // Keep the SVG path aligned to current visual viewport each frame
-      {
-        const vv = window.visualViewport;
-        const offX = window.scrollX + (vv?.offsetLeft ?? 0);
-        const offY = window.scrollY + (vv?.offsetTop ?? 0);
-
-        const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
-        const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
-        const p2V = { x: p2.x - offX, y: p2.y - offY };
-        tonguePathEl.current?.setAttribute(
-          'd',
-          `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`
-        );
-      }
-
-      // Tip position (doc -> viewport), nudged to the rounded end-cap
-      const sLen = total * forward;
-      const pt = geomRef.current!.getPointAtLength(sLen);
-      const ahead = geomRef.current!.getPointAtLength(
-        Math.min(total, sLen + 1)
-      );
-      const dx = ahead.x - pt.x;
-      const dy = ahead.y - pt.y;
-      const len = Math.hypot(dx, dy) || 1;
-      const ox = (dx / len) * (TONGUE_STROKE / 2);
-      const oy = (dy / len) * (TONGUE_STROKE / 2);
-      {
-        const vv = window.visualViewport;
-        const offX = window.scrollX + (vv?.offsetLeft ?? 0);
-        const offY = window.scrollY + (vv?.offsetTop ?? 0);
-        setTip({ x: pt.x + ox - offX, y: pt.y + oy - offY });
-      }
-
-      // Impact: swap bullet to check + show tip-mounted fly immediately
-      if (!geomRef.current!.hidImpact && t >= HIT_AT) {
-        geomRef.current!.hidImpact = true;
-        setVisuallyDone((prev) => new Set(prev).add(grab.taskId));
-        setTipVisible(true);
-      }
-
-      // Camera follow (down only) until impact
-      if (grab.follow && now >= grab.camStartAt && t <= HIT_AT) {
-        const seg =
-          (now - grab.camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
-        const clamped = Math.max(0, Math.min(1, seg));
-        const eased = FOLLOW_EASE(clamped);
-        const camY =
-          grab.frogFocusY + (grab.flyFocusY - grab.frogFocusY) * eased;
-        window.scrollTo(0, camY);
-      }
-
-      if (t < 1) {
-        raf = requestAnimationFrame(tick);
-      } else {
-        // Finished
-        setTip(null);
-        setTipVisible(false);
-        persistTask(grab.taskId, grab.completed);
-        setVisuallyDone((prev) => {
-          const s = new Set(prev);
-          s.delete(grab.taskId);
-          return s;
-        });
-
-        // short cooldown AFTER the shot completes (prevents spam-ghosts)
-        cooldownUntil.current = performance.now() + 220; // ~0.2s
-
-        // tiny linger; we don't return the camera up
-        setTimeout(() => {
-          setCinematic(false);
-          setGrab(null);
-        }, 140);
-      }
-    };
-
-    setCinematic(true);
-    raf = requestAnimationFrame(tick);
-    if (geomRef.current) geomRef.current.raf = raf;
-
-    return () => {
-      if (geomRef.current?.raf) cancelAnimationFrame(geomRef.current.raf);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [grab]);
 
   if (loading && session) {
     return (
