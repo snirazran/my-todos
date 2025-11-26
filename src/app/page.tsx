@@ -358,6 +358,7 @@ export default function Home() {
             const res = await fetch(`/api/tasks?date=${dateStr}`);
             const json = await res.json();
             setTasks(json.tasks ?? []);
+            await fetchWeeklyIds();
           } else {
             setGuestTasks((prev) => [
               ...prev,

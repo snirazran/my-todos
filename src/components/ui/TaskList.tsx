@@ -1,13 +1,16 @@
 'use client';
 
-import { CheckCircle2, Circle, Plus, X, Trash2 } from 'lucide-react';
+import { CheckCircle2, Circle, EllipsisVertical } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useState } from 'react';
+import { DeleteDialog } from '@/components/ui/DeleteDialog';
+import { AddTaskButton } from '@/components/ui/AddTaskButton';
 
 interface Task {
   id: string;
   text: string;
   completed: boolean;
+  type?: 'regular' | 'weekly' | 'backlog';
 }
 
 export default function TaskList({
@@ -32,41 +35,64 @@ export default function TaskList({
     opts?: { preselectToday?: boolean }
   ) => void;
 
-  /** IDs that belong to the weekly template for *today* */
   weeklyIds?: Set<string>;
-  /** remove from *today only* */
   onDeleteToday: (taskId: string) => Promise<void> | void;
-  /** remove from the weekly template (and today/future days) */
   onDeleteFromWeek: (taskId: string) => Promise<void> | void;
 }) {
   const vSet = visuallyCompleted ?? new Set<string>();
 
-  // hover state for separators (desktop only)
-  const [hoverSep, setHoverSep] = useState<number | null>(null);
-
-  // delete modal
-  const [toDelete, setToDelete] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<{
+    task: Task;
+    kind: 'regular' | 'weekly' | 'backlog';
+  } | null>(null);
 
-  const isWeekly = (t: Task) => weeklyIds.has(t.id);
+  React.useEffect(() => {
+    if (!menuFor) return;
+    const close = () => setMenuFor(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [menuFor]);
+
+  React.useEffect(() => {
+    const closeIfOther = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      setMenuFor((curr) => (curr && curr !== id ? null : curr));
+    };
+    window.addEventListener('task-menu-open', closeIfOther as EventListener);
+    return () =>
+      window.removeEventListener('task-menu-open', closeIfOther as EventListener);
+  }, []);
+
+  const taskKind = (t: Task) => {
+    if (t.type === 'weekly') return 'weekly';
+    if (t.type === 'backlog') return 'backlog';
+    if (!t.type && weeklyIds.has(t.id)) return 'weekly';
+    return t.type ?? 'regular';
+  };
 
   const confirmDeleteToday = async () => {
-    if (!toDelete) return;
+    if (!dialog) return;
+    const taskId = dialog.task.id;
     setBusy(true);
     try {
-      await onDeleteToday(toDelete.id);
-      setToDelete(null);
+      await onDeleteToday(taskId);
+      setDialog(null);
+      setMenuFor(null);
     } finally {
       setBusy(false);
     }
   };
 
   const confirmDeleteWeek = async () => {
-    if (!toDelete) return;
+    if (!dialog) return;
+    const taskId = dialog.task.id;
     setBusy(true);
     try {
-      await onDeleteFromWeek(toDelete.id);
-      setToDelete(null);
+      await onDeleteFromWeek(taskId);
+      setDialog(null);
+      setMenuFor(null);
     } finally {
       setBusy(false);
     }
@@ -76,26 +102,33 @@ export default function TaskList({
     <>
       <div
         dir="ltr"
-        className="p-6 bg-white shadow-lg rounded-2xl dark:bg-slate-800"
+        className="px-6 pt-6 pb-4 bg-white shadow-lg rounded-2xl dark:bg-slate-800 overflow-visible"
       >
-        <h2 className="mb-6 text-2xl font-bold">Your tasks today:</h2>
+        <h2 className="mb-6 text-2xl font-bold text-slate-900 dark:text-white">
+          Your tasks today:
+        </h2>
 
-        <div className="space-y-0">
+        <div className="space-y-3 pb-2 overflow-visible">
           {tasks.map((task, i) => {
             const isDone = task.completed || vSet.has(task.id);
+            const isMenuOpen = menuFor === task.id;
 
             return (
-              <div key={task.id} className="group">
+              <div
+                key={task.id}
+                className={`group relative overflow-visible ${
+                  isMenuOpen ? 'z-50' : 'z-0'
+                }`}
+              >
                 {/* Row */}
                 <div
                   onClick={() => toggle(task.id)}
                   className="p-4 transition-colors duration-200 cursor-pointer rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700"
                   style={{
-                    // Prevent horizontal swipe from hijacking gestures when touching a row.
-                    // Keeps vertical scrolling natural.
                     touchAction: 'pan-y',
                     animation: `fadeInUp 0.5s ease-out ${i * 0.05}s`,
                     animationFillMode: 'both',
+                    overflow: 'visible',
                   }}
                 >
                   <div className="flex items-center gap-4">
@@ -173,43 +206,60 @@ export default function TaskList({
                       {task.text}
                     </motion.span>
 
-                    {/* delete button (shows on hover on desktop, always visible on touch) */}
-                    <button
-                      className="p-2 transition-opacity rounded-md opacity-0 hover:bg-slate-100 dark:hover:bg-slate-600 md:opacity-0 md:group-hover:opacity-100"
-                      title="Delete task"
-                      aria-label="Delete task"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setToDelete(task);
-                      }}
-                    >
-                      <Trash2 className="w-5 h-5 text-slate-500" />
-                    </button>
+                    {/* actions */}
+                    <div className="relative z-40">
+                      <button
+                        className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-600"
+                        title="Task actions"
+                        aria-label="Task actions"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.dispatchEvent(
+                            new CustomEvent('task-menu-open', {
+                              detail: { id: `task:${task.id}` },
+                            })
+                          );
+                          setMenuFor((prev) =>
+                            prev === task.id ? null : task.id
+                          );
+                        }}
+                      >
+                        <EllipsisVertical className="w-5 h-5 text-slate-500" />
+                      </button>
+                      {menuFor === task.id && (
+                        <div
+                          className="absolute left-1/2 top-11 z-[60] w-44 -translate-x-1/2 rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            className="flex w-full items-center justify-center gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-700"
+                            onClick={() => {
+                              setMenuFor(null);
+                              setDialog({
+                                task,
+                                kind: taskKind(task) as
+                                  | 'regular'
+                                  | 'weekly'
+                                  | 'backlog',
+                              });
+                            }}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                {/* Between i and i+1: open QuickAdd directly */}
-                {i < tasks.length - 1 && (
-                  <SeparatorHover
-                    index={i}
-                    hoverSep={hoverSep}
-                    setHoverSep={setHoverSep}
-                    onOpen={() => {
-                      onAddRequested('', i, { preselectToday: true });
-                    }}
-                  />
-                )}
               </div>
             );
           })}
 
-          {/* Bottom “Add task” → open QuickAdd immediately */}
-          <button
-            onClick={() => onAddRequested('', null, { preselectToday: true })}
-            className="flex items-center justify-center w-full gap-2 px-4 py-3 mt-2 rounded-xl bg-violet-50/70 text-violet-700 hover:bg-violet-100 dark:bg-violet-950/20 dark:hover:bg-violet-900/30"
-          >
-            <Plus className="w-5 h-5" /> Add task
-          </button>
+          <div className="mt-20">
+            <AddTaskButton
+              onClick={() => onAddRequested('', null, { preselectToday: true })}
+            />
+          </div>
         </div>
       </div>
 
@@ -220,86 +270,25 @@ export default function TaskList({
         </div>
       )}
 
-      {/* delete modal */}
-      <AnimatePresence>
-        {toDelete && (
-          <div
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-            role="dialog"
-            aria-modal="true"
-            onMouseDown={(e) => {
-              if (e.target === e.currentTarget) setToDelete(null);
-            }}
-          >
-            <div
-              className="w-[440px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white p-5 shadow-lg dark:bg-slate-800"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex-1">
-                  <h4 className="mb-1 text-lg font-semibold">
-                    {toDelete && isWeekly(toDelete)
-                      ? 'Delete weekly task'
-                      : 'Delete task for today'}
-                  </h4>
-                  <p className="mb-4 text-slate-600 dark:text-slate-300">
-                    {toDelete && isWeekly(toDelete)
-                      ? 'Remove only from today, or delete from this week entirely?'
-                      : 'Delete this task from today? This action is permanent.'}
-                  </p>
-                </div>
-                <button
-                  className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
-                  onClick={() => setToDelete(null)}
-                  aria-label="Close"
-                  title="Close"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="flex justify-end gap-2">
-                <button
-                  className="px-4 py-2 rounded-lg bg-slate-200 dark:bg-slate-600"
-                  onClick={() => setToDelete(null)}
-                  disabled={busy}
-                >
-                  Cancel
-                </button>
-
-                {toDelete && isWeekly(toDelete) ? (
-                  <>
-                    <button
-                      className="px-4 py-2 text-white rounded-lg bg-rose-600 disabled:opacity-60"
-                      onClick={confirmDeleteToday}
-                      disabled={busy}
-                      title="Remove only from today's list"
-                    >
-                      Remove today only
-                    </button>
-                    <button
-                      className="px-4 py-2 text-white rounded-lg bg-rose-700 disabled:opacity-60"
-                      onClick={confirmDeleteWeek}
-                      disabled={busy}
-                      title="Remove from weekly template and upcoming days"
-                    >
-                      Remove from this week
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    className="px-4 py-2 text-white rounded-lg bg-rose-600 disabled:opacity-60"
-                    onClick={confirmDeleteToday}
-                    disabled={busy}
-                  >
-                    Delete
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-      </AnimatePresence>
+      <DeleteDialog
+        open={!!dialog}
+        variant={(dialog?.kind as any) ?? 'regular'}
+        itemLabel={dialog?.task.text}
+        busy={busy}
+        onClose={() => setDialog(null)}
+        onDeleteToday={
+          dialog?.kind === 'weekly' || dialog?.kind === 'regular'
+            ? confirmDeleteToday
+            : undefined
+        }
+        onDeleteAll={
+          dialog?.kind === 'weekly'
+            ? confirmDeleteWeek
+            : dialog?.kind === 'backlog'
+            ? confirmDeleteToday
+            : undefined
+        }
+      />
 
       <style jsx>{`
         @keyframes fadeInUp {
@@ -314,82 +303,5 @@ export default function TaskList({
         }
       `}</style>
     </>
-  );
-}
-
-/* ────────────────────────────────────────────── */
-/*  Subtle Trello-style hover rails + “+”        */
-/* ────────────────────────────────────────────── */
-function SeparatorHover({
-  index,
-  hoverSep,
-  setHoverSep,
-  onOpen,
-}: {
-  index: number;
-  hoverSep: number | null;
-  setHoverSep: React.Dispatch<React.SetStateAction<number | null>>;
-  onOpen: () => void;
-}) {
-  return (
-    <div
-      className="relative h-1.5 select-none md:h-5"
-      // Also block horizontal pan if a drag starts on the rail area
-      style={{ touchAction: 'pan-y' }}
-      onMouseEnter={() => setHoverSep(index)}
-      onMouseLeave={() => setHoverSep(null)}
-    >
-      <AnimatePresence>
-        {hoverSep === index && (
-          <motion.div
-            className="absolute inset-0 z-10 items-center justify-center hidden pointer-events-none md:flex"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <Rail />
-            <motion.button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpen(); // opens QuickAdd
-              }}
-              className="pointer-events-auto mx-3 flex items-center justify-center rounded-full bg-white px-2.5 py-1 text-violet-700 shadow-sm ring-1 ring-violet-200/70 dark:bg-slate-800 dark:text-violet-300 dark:ring-violet-900/40"
-              title="Add a task here"
-              aria-label="Add a task here"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              transition={{ duration: 0.18, ease: 'easeOut' }}
-              whileHover={{ scale: 1.03 }}
-            >
-              <Plus className="w-5 h-5" />
-            </motion.button>
-            <Rail />
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
-
-function Rail() {
-  return (
-    <div className="h-[2px] flex-1 overflow-hidden">
-      <motion.div
-        className="h-full text-violet-400 dark:text-violet-300"
-        initial={{ width: '60%', opacity: 0.7 }}
-        animate={{ width: '100%', opacity: 1 }}
-        exit={{ width: '60%', opacity: 0 }}
-        transition={{ duration: 0.22, ease: 'easeOut' }}
-        style={{
-          backgroundImage:
-            'linear-gradient(to right, currentColor 0 12px, transparent 12px 22px)',
-          backgroundSize: '22px 2px',
-          backgroundRepeat: 'repeat-x',
-          backgroundPosition: 'center',
-        }}
-      />
-    </div>
   );
 }

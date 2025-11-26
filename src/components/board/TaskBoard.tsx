@@ -17,6 +17,7 @@ import { useDragManager } from './hooks/useDragManager';
 import { usePan } from './hooks/usePan';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import Fly from '../ui/fly';
+import { AddTaskButton } from '../ui/AddTaskButton';
 
 type RepeatChoice = 'this-week' | 'weekly';
 
@@ -266,30 +267,13 @@ export default function TaskBoard({
       <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 py-12 pointer-events-none sm:px-6 sm:py-5">
         <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
           <div className="rounded-[28px] bg-white/75 dark:bg:white/8 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
-            <button
+            <AddTaskButton
               onClick={() => {
                 setQuickText('');
                 setShowQuickAdd(true);
               }}
               disabled={!!drag?.active}
-              className={[
-                'relative w-full h-12 rounded-full',
-                'bg-white/90 dark:bg-white/10 backdrop-blur-xl',
-                'text-emerald-900 dark:text-emerald-50 font-semibold tracking-[-0.01em]',
-                'shadow-[0_1px_0_rgba(255,255,255,.7)_inset,0_8px_24px_rgba(16,185,129,.28)] ring-1 ring-black/10 dark:ring-white/10',
-                'transition-transform duration-200 hover:shadow-[0_1px_0_rgba(255,255,255,.75)_inset,0_12px_30px_rgba(16,185,129,.32)] hover:bg-white',
-                'active:scale-[0.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-300',
-                !!drag?.active ? 'opacity-60 pointer-events-none' : '',
-              ].join(' ')}
-            >
-              <span className="absolute inset-0 rounded-full pointer-events-none bg-gradient-to-b from-white/55 to-white/0 dark:from-white/10 dark:to-transparent" />
-              <span className="relative z-10 flex items-center justify-center h-full gap-2">
-                <span>Add a</span>
-                <span className="translate-y-[1px]">
-                  <Fly size={22} x={-2} y={-3} />
-                </span>
-              </span>
-            </button>
+            />
           </div>
         </div>
       </div>
