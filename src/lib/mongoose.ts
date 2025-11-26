@@ -5,6 +5,7 @@ const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
   throw new Error('Invalid/Missing environment variable: "MONGODB_URI"');
 }
+const MONGO_URI_STR = MONGODB_URI as string;
 
 // Cache the connection across hot reloads in dev
 const globalWithMongoose = global as typeof globalThis & {
@@ -24,7 +25,7 @@ globalWithMongoose.mongooseConn = cached;
 export default async function connectMongo() {
   if (cached.conn) return cached.conn;
   if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
+    cached.promise = mongoose.connect(MONGO_URI_STR, {
       bufferCommands: false,
       dbName: 'todoTracker',
     });
