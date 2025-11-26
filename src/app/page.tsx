@@ -4,18 +4,17 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Calendar, History, CheckCircle2, Shirt, Clock3 } from 'lucide-react';
+import { Calendar, History, CheckCircle2 } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 import { signIn, useSession } from 'next-auth/react';
 import { motion } from 'framer-motion';
-import useSWR from 'swr';
-import { byId } from '@/lib/skins/catalog';
-import Frog, { FrogHandle } from '@/components/ui/frog';
+import { type FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
-import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { FrogDisplay } from '@/components/ui/FrogDisplay';
 
 /* === Tunables ============================================================ */
 const TONGUE_MS = 1111; // tongue extend+retract total
@@ -242,21 +241,7 @@ export default function Home() {
     }
   };
 
-  const { data: wardrobeData } = useSWR(
-    '/api/skins/inventory',
-    (u) => fetch(u).then((r) => r.json()),
-    { revalidateOnFocus: false }
-  );
-
-  const indices = (() => {
-    const eq = wardrobeData?.wardrobe?.equipped ?? {};
-    return {
-      skin: eq?.skin ? byId[eq.skin].riveIndex : 0,
-      hat: eq?.hat ? byId[eq.hat].riveIndex : 0,
-      scarf: eq?.scarf ? byId[eq.scarf].riveIndex : 0,
-      hand_item: eq?.hand_item ? byId[eq.hand_item].riveIndex : 0,
-    };
-  })();
+  const { indices } = useWardrobeIndices(!!session);
 
   /* -------- doc-space helpers -------- */
   const getMouthDoc = useCallback(() => {
@@ -557,22 +542,15 @@ export default function Home() {
         )}
 
         <div className="flex flex-col items-center w-full">
-          <div ref={frogBoxRef} className="relative z-10">
-            <Frog
-              ref={frogRef}
-              mouthOpen={!!grab}
-              mouthOffset={{ y: -4 }}
-              indices={indices}
-            />
-            <button
-              onClick={() => setOpenWardrobe(true)}
-              className="absolute p-2 rounded-full shadow right-2 top-2 bg-white/80 hover:shadow-md dark:bg-slate-800"
-              title="Wardrobe"
-            >
-              <Shirt className="w-5 h-5" />
-            </button>
-          </div>
-          <WardrobePanel open={openWardrobe} onOpenChange={setOpenWardrobe} />
+          <FrogDisplay
+            frogRef={frogRef}
+            frogBoxRef={frogBoxRef}
+            mouthOpen={!!grab}
+            mouthOffset={{ y: -4 }}
+            indices={indices}
+            openWardrobe={openWardrobe}
+            onOpenChange={setOpenWardrobe}
+          />
           <div className="relative z-0 -mt-2.5 w-full">
             <ProgressCard rate={rate} done={doneCount} total={data.length} />
           </div>
@@ -744,14 +722,6 @@ function Header({ session, router }: { session: any; router: any }) {
         >
           <History className="w-5 h-5" />
           History
-        </Link>
-
-        <Link
-          href="/time-tracker"
-          className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"
-        >
-          <Clock3 className="w-5 h-5" />
-          Time tracker
         </Link>
 
         <button

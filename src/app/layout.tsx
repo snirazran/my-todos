@@ -16,15 +16,15 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#f8fafc' }, // slate-50
+    { media: '(prefers-color-scheme: dark)', color: '#0f172a' }, // slate-900
+  ],
 };
 
 export const metadata: Metadata = {
   title: 'My Daily Tasks',
   description: 'Track your daily tasks',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f8fafc' }, // slate-50
-    { media: '(prefers-color-scheme: dark)', color: '#0f172a' }, // slate-900
-  ],
 };
 
 export default function RootLayout({

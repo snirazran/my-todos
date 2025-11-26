@@ -69,7 +69,7 @@ const Frog = memo(
   ) {
     const wrapperRef = useRef<HTMLDivElement | null>(null);
 
-    const { RiveComponent, rive, setCanvasRef } = useRive({
+    const { RiveComponent, rive } = useRive({
       src: '/frog_idle.riv',
       artboard: ARTBOARD_NAME,
       stateMachines: STATE_MACHINE,
@@ -150,7 +150,6 @@ const Frog = memo(
         style={{ width, height, position: 'relative' }}
       >
         <RiveComponent
-          ref={(node) => setCanvasRef(node as HTMLCanvasElement | null)}
           style={{ width: '100%', height: '100%', display: 'block' }}
         />
       </div>

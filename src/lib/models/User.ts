@@ -23,8 +23,6 @@ const UserSchema = new Schema<UserDoc>(
   { collection: 'users' }
 );
 
-UserSchema.index({ email: 1 });
-
 const UserModel: Model<UserDoc> =
   (mongoose.models.User as Model<UserDoc>) ||
   mongoose.model<UserDoc>('User', UserSchema);

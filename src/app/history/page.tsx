@@ -10,17 +10,15 @@ import {
   History as HistoryIcon,
   TrendingUp,
   CheckCircle2,
-  Shirt,
 } from 'lucide-react';
 
-import Frog, { FrogHandle } from '@/components/ui/frog';
+import { type FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import StatCard from '@/components/ui/StatCard';
 import ProgressBadge from '@/components/ui/ProgressBadge';
 import HistoryTaskList, { HistoryTask } from '@/components/ui/HistoryTaskList';
-import { byId } from '@/lib/skins/catalog';
-import useSWR from 'swr';
-import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
+import { FrogDisplay } from '@/components/ui/FrogDisplay';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 
 /* === same tunables as Home === */
 const TONGUE_MS = 1111;
@@ -143,21 +141,7 @@ export default function History() {
     };
   }, [cinematic]);
 
-  const { data: wardrobeData } = useSWR(
-    session ? '/api/skins/inventory' : null,
-    (u) => fetch(u).then((r) => r.json()),
-    { revalidateOnFocus: false }
-  );
-
-  const indices = useMemo(() => {
-    const eq = wardrobeData?.wardrobe?.equipped ?? {};
-    return {
-      skin: eq?.skin ? byId[eq.skin].riveIndex : 0,
-      hat: eq?.hat ? byId[eq.hat].riveIndex : 0,
-      scarf: eq?.scarf ? byId[eq.scarf].riveIndex : 0,
-      hand_item: eq?.hand_item ? byId[eq.hand_item].riveIndex : 0,
-    };
-  }, [wardrobeData]);
+  const { indices } = useWardrobeIndices(!!session);
 
   /* ---- helpers (same as Home) ---- */
   const getMouthDoc = useCallback(() => {
@@ -479,22 +463,15 @@ export default function History() {
 
         {/* Frog + KPIs */}
         <div className="flex flex-col items-center w-full">
-          <div ref={frogBoxRef} className="relative z-10">
-            <Frog
-              ref={frogRef}
-              mouthOpen={!!grab}
-              mouthOffset={{ y: -4 }}
-              indices={indices}
-            />
-            <button
-              onClick={() => setOpenWardrobe(true)}
-              className="absolute p-2 rounded-full shadow -right-2 top-2 bg-white/80 hover:shadow-md dark:bg-slate-800"
-              title="Wardrobe"
-            >
-              <Shirt className="w-5 h-5" />
-            </button>
-          </div>
-          <WardrobePanel open={openWardrobe} onOpenChange={setOpenWardrobe} />
+          <FrogDisplay
+            frogRef={frogRef}
+            frogBoxRef={frogBoxRef}
+            mouthOpen={!!grab}
+            mouthOffset={{ y: -4 }}
+            indices={indices}
+            openWardrobe={openWardrobe}
+            onOpenChange={setOpenWardrobe}
+          />
         </div>
 
         <div className="-mt-2.5 mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
