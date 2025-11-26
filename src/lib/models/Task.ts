@@ -11,6 +11,8 @@ export interface TaskDoc {
   text: string;
   order: number;
   completed?: boolean;
+  completedDates?: string[]; // YYYY-MM-DD entries where the task was completed
+  suppressedDates?: string[]; // YYYY-MM-DD entries hidden for that date
   dayOfWeek?: Weekday;
   date?: string;
   weekStart?: string;
@@ -26,6 +28,8 @@ const TaskSchema = new Schema<TaskDoc>(
     text: { type: String, required: true },
     order: { type: Number, required: true },
     completed: { type: Boolean, default: false },
+    completedDates: { type: [String], default: [] },
+    suppressedDates: { type: [String], default: [] },
     dayOfWeek: { type: Number, min: 0, max: 6 },
     date: { type: String },
     weekStart: { type: String },

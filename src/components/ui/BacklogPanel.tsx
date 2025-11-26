@@ -18,7 +18,7 @@ export default function BacklogPanel({
     const dow = new Date().getDay(); // 0..6 (Sun..Sat)
 
     // 1) create a one-time task for *today* (this week)
-    await fetch('/api/manage-tasks', {
+    await fetch('/api/tasks?view=board', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -29,7 +29,7 @@ export default function BacklogPanel({
     });
 
     // 2) remove it from "Later this week"
-    await fetch('/api/manage-tasks', {
+    await fetch('/api/tasks?view=board', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ day: -1, taskId: item.id }),
@@ -40,7 +40,7 @@ export default function BacklogPanel({
   };
 
   const removeLater = async (taskId: string) => {
-    await fetch('/api/manage-tasks', {
+    await fetch('/api/tasks?view=board', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ day: -1, taskId }),

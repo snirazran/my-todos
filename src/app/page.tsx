@@ -128,7 +128,9 @@ export default function Home() {
 
   const fetchBacklog = useCallback(async () => {
     if (!session) return;
-    const items = await fetch('/api/manage-tasks?day=-1').then((r) => r.json());
+    const items = await fetch('/api/tasks?view=board&day=-1').then((r) =>
+      r.json()
+    );
     setLaterThisWeek(items.map((t: any) => ({ id: t.id, text: t.text })));
   }, [session]);
 
@@ -149,18 +151,18 @@ export default function Home() {
   const loadWeeklyIds = useCallback(async () => {
     if (!session) return;
     const dow = new Date().getDay(); // 0..6 (Sun..Sat)
-    const arr = await fetch(`/api/manage-tasks?day=${dow}`).then((r) =>
-      r.json()
-    );
+    const arr = await fetch(
+      `/api/tasks?view=board&day=${dow}`
+    ).then((r) => r.json());
     setWeeklyIds(new Set(arr.map((t: any) => t.id)));
   }, [session]);
 
   const fetchWeeklyIds = React.useCallback(async () => {
     if (!session) return;
     const dow = new Date().getDay();
-    const templ = await fetch(`/api/manage-tasks?day=${dow}`).then((r) =>
-      r.json()
-    );
+    const templ = await fetch(
+      `/api/tasks?view=board&day=${dow}`
+    ).then((r) => r.json());
     setWeeklyIds(new Set(templ.map((t: any) => t.id)));
   }, [session]);
 
@@ -613,7 +615,7 @@ export default function Home() {
             }}
             onDeleteFromWeek={async (taskId) => {
               const dow = new Date().getDay();
-              await fetch('/api/manage-tasks', {
+              await fetch('/api/tasks?view=board', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ day: dow, taskId }),
@@ -696,7 +698,7 @@ export default function Home() {
         initialText={quickText}
         defaultRepeat="this-week"
         onSubmit={async ({ text, days, repeat }) => {
-          await fetch('/api/manage-tasks', {
+          await fetch('/api/tasks?view=board', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, days, repeat }),

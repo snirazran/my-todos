@@ -4,7 +4,7 @@ export type Task = {
   id: string;
   text: string;
   order: number;
-  /** provided by /api/manage-tasks */
+  /** provided by /api/tasks?view=board */
   type?: 'weekly' | 'regular' | 'backlog';
 };
 
