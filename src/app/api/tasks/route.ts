@@ -200,7 +200,10 @@ export async function PUT(req: NextRequest) {
     );
   }
 
-  const doc = await TaskModel.findOne({ userId: uid, id: taskId }).lean<TaskDoc>();
+  const doc = await TaskModel.findOne({
+    userId: uid,
+    id: taskId,
+  }).lean<TaskDoc>();
   if (!doc) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   }
@@ -243,7 +246,10 @@ export async function DELETE(req: NextRequest) {
     );
   }
 
-  const doc = await TaskModel.findOne({ userId: uid, id: taskId }).lean<TaskDoc>();
+  const doc = await TaskModel.findOne({
+    userId: uid,
+    id: taskId,
+  }).lean<TaskDoc>();
   if (!doc) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   }
@@ -276,7 +282,7 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
   const date = dateParam ?? todayLocal;
   const dow = dowLocalFromYMD(date);
 
-  const tasks = await TaskModel.find(
+  const tasks: TaskDoc[] = await TaskModel.find(
     {
       userId,
       $or: [
@@ -284,30 +290,42 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
         { type: 'regular', date },
       ],
     },
-    { id: 1, text: 1, order: 1, type: 1, completed: 1, completedDates: 1, suppressedDates: 1 }
+    {
+      id: 1,
+      text: 1,
+      order: 1,
+      type: 1,
+      completed: 1,
+      completedDates: 1,
+      suppressedDates: 1,
+    }
   )
     .sort({ order: 1 })
-    .lean<TaskDoc>()
+    .lean<TaskDoc[]>()
     .exec();
 
   const weeklyIdsForUI = new Set(
-    tasks.filter((t) => t.type === 'weekly').map((t) => t.id)
+    tasks.filter((t: TaskDoc) => t.type === 'weekly').map((t: TaskDoc) => t.id)
   );
 
   const filtered = tasks.filter(
-    (t) => !(t.suppressedDates ?? []).includes(date)
+    (t: TaskDoc) => !(t.suppressedDates ?? []).includes(date)
   );
 
   const output = filtered
-    .map((t) => ({
+    .map((t: TaskDoc) => ({
       id: t.id,
       text: t.text,
       order: t.order ?? 0,
       completed:
-        (t.completedDates ?? []).includes(date) || (!!t.completed && t.type === 'regular'),
+        (t.completedDates ?? []).includes(date) ||
+        (!!t.completed && t.type === 'regular'),
       origin: t.type as Origin,
     }))
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    .sort(
+      (a: { order?: number }, b: { order?: number }) =>
+        (a.order ?? 0) - (b.order ?? 0)
+    );
 
   return NextResponse.json({
     date,
@@ -331,20 +349,22 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
 
     // Later (backlog)
     if (dayNum === -1) {
-      const later = await Task.find(
+      const later: TaskDoc[] = await Task.find(
         { userId: uid, type: 'backlog', weekStart },
         { id: 1, text: 1, order: 1, type: 1, _id: 0 }
       )
         .sort({ order: 1 })
-        .lean<TaskDoc>()
+        .lean<TaskDoc[]>()
         .exec();
 
-      const out: BoardItem[] = later.map(({ id, text, order, type }) => ({
-        id,
-        text,
-        order,
-        type,
-      }));
+      const out: BoardItem[] = later.map(
+        ({ id, text, order, type }: TaskDoc) => ({
+          id,
+          text,
+          order,
+          type,
+        })
+      );
       return NextResponse.json(out);
     }
 
@@ -356,7 +376,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
     }
 
     // Weekly + Regular for that weekday
-    const docs = await Task.find(
+    const docs: TaskDoc[] = await Task.find(
       {
         userId: uid,
         $or: [
@@ -367,10 +387,10 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
       { id: 1, text: 1, order: 1, type: 1, _id: 0 }
     )
       .sort({ order: 1 })
-      .lean<TaskDoc>()
+      .lean<TaskDoc[]>()
       .exec();
 
-    const out: BoardItem[] = docs.map(({ id, text, order, type }) => ({
+    const out: BoardItem[] = docs.map(({ id, text, order, type }: TaskDoc) => ({
       id,
       text,
       order,
@@ -383,7 +403,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
   const week: BoardItem[][] = Array.from({ length: 8 }, () => []);
 
   for (let d: Weekday = 0; d <= 6; d = (d + 1) as Weekday) {
-    const docs = await Task.find(
+    const docs: TaskDoc[] = await Task.find(
       {
         userId: uid,
         $or: [
@@ -394,10 +414,10 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
       { id: 1, text: 1, order: 1, type: 1, _id: 0 }
     )
       .sort({ order: 1 })
-      .lean<TaskDoc>()
+      .lean<TaskDoc[]>()
       .exec();
 
-    week[d] = docs.map(({ id, text, order, type }) => ({
+    week[d] = docs.map(({ id, text, order, type }: TaskDoc) => ({
       id,
       text,
       order,
@@ -405,15 +425,15 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
     }));
   }
 
-  const backlogDocs = await Task.find(
+  const backlogDocs: TaskDoc[] = await Task.find(
     { userId: uid, type: 'backlog', weekStart },
     { id: 1, text: 1, order: 1, type: 1, _id: 0 }
   )
     .sort({ order: 1 })
-    .lean<TaskDoc>()
+    .lean<TaskDoc[]>()
     .exec();
 
-  week[7] = backlogDocs.map(({ id, text, order, type }) => ({
+  week[7] = backlogDocs.map(({ id, text, order, type }: TaskDoc) => ({
     id,
     text,
     order,
@@ -456,11 +476,11 @@ async function handleBoardPut(
     });
 
     // Fetch any existing docs (any type) to preserve text
-    const docs = await TaskModel.find(
+    const docs: TaskDoc[] = await TaskModel.find(
       { userId: uid, id: { $in: ids } },
       { id: 1, text: 1, type: 1 }
     )
-      .lean<TaskDoc>()
+      .lean<TaskDoc[]>()
       .exec();
 
     // Prefer DB text; fall back to request payload text so backlog entries never go blank
@@ -470,9 +490,10 @@ async function handleBoardPut(
         t.text ?? '',
       ])
     );
-    const textById = new Map(
-      docs.map((d) => [d.id, d.text]).map(([id, text]) => [id, text ?? ''])
-    );
+    const textById = new Map<string, string>();
+    for (const d of docs) {
+      textById.set(d.id, d.text ?? '');
+    }
 
     // Upsert backlog entries in the given order
     await Promise.all(
@@ -524,11 +545,11 @@ async function handleBoardPut(
   });
 
   // Get current types/text for all involved ids
-  const docs = await TaskModel.find(
+  const docs: TaskDoc[] = await TaskModel.find(
     { userId: uid, id: { $in: ids } },
     { id: 1, type: 1, text: 1 }
   )
-    .lean<TaskDoc>()
+    .lean<TaskDoc[]>()
     .exec();
 
   const typeById = new Map(docs.map((d) => [d.id, d.type]));
@@ -628,7 +649,12 @@ async function handleBoardDelete(
   // Delete from Later (backlog)
   if (day === -1) {
     const { weekStart } = getWeekDates();
-    await Task.deleteOne({ userId: uid, type: 'backlog', weekStart, id: taskId });
+    await Task.deleteOne({
+      userId: uid,
+      type: 'backlog',
+      weekStart,
+      id: taskId,
+    });
     return NextResponse.json({ ok: true });
   }
 
