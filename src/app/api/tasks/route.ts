@@ -447,6 +447,7 @@ async function handleBoardPut(
       return NextResponse.json({ ok: true });
     }
 
+    // Remove backlog entries not present anymore
     await TaskModel.deleteMany({
       userId: uid,
       type: 'backlog',
@@ -454,14 +455,26 @@ async function handleBoardPut(
       id: { $nin: ids },
     });
 
+    // Fetch any existing docs (any type) to preserve text
     const docs = await TaskModel.find(
       { userId: uid, id: { $in: ids } },
-      { id: 1, text: 1 }
+      { id: 1, text: 1, type: 1 }
     )
       .lean<TaskDoc>()
       .exec();
-    const textById = new Map(docs.map((d) => [d.id, d.text]));
 
+    // Prefer DB text; fall back to request payload text so backlog entries never go blank
+    const textFromReq = new Map(
+      (tasks as Array<{ id: string; text?: string }>).map((t) => [
+        t.id,
+        t.text ?? '',
+      ])
+    );
+    const textById = new Map(
+      docs.map((d) => [d.id, d.text]).map(([id, text]) => [id, text ?? ''])
+    );
+
+    // Upsert backlog entries in the given order
     await Promise.all(
       ids.map((id, i) =>
         TaskModel.updateOne(
@@ -469,7 +482,7 @@ async function handleBoardPut(
           {
             $set: {
               order: i + 1,
-              text: textById.get(id) ?? '',
+              text: textById.get(id) ?? textFromReq.get(id) ?? '',
               weekStart,
               updatedAt: now,
             },
@@ -478,12 +491,21 @@ async function handleBoardPut(
               type: 'backlog',
               createdAt: now,
               completed: false,
+              completedDates: [],
+              suppressedDates: [],
             },
           },
           { upsert: true }
         )
       )
     );
+
+    // Convert any weekly/regular with these ids into backlog (remove old types)
+    await TaskModel.deleteMany({
+      userId: uid,
+      id: { $in: ids },
+      type: { $in: ['weekly', 'regular'] },
+    });
 
     return NextResponse.json({ ok: true });
   }
