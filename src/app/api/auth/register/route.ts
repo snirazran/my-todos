@@ -1,19 +1,20 @@
 // /app/api/register/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
 import { hash } from 'bcryptjs';
 import { z } from 'zod';
+import connectMongo from '@/lib/mongoose';
+import UserModel from '@/lib/models/User';
 
-/* ───────── schema & helpers ───────── */
+/* ---------- schema & helpers ---------- */
 const schema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 chars'),
   email: z
     .string()
-    .email('Invalid e‑mail')
+    .email('Invalid email')
     .transform((v) => v.toLowerCase()),
   password: z
     .string()
-    .min(8, 'Password must be ≥ 8 chars')
+    .min(8, 'Password must be at least 8 chars')
     .refine(
       (p) => /[a-z]/i.test(p) && /\d/.test(p) && /[^A-Za-z0-9]/.test(p),
       'Password must contain letter, number & symbol'
@@ -23,9 +24,9 @@ const schema = z.object({
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
 
-/* ───────── handler ───────── */
+/* ---------- handler ---------- */
 export async function POST(req: NextRequest) {
-  /* 1 ▸ ensure JSON body is valid ------------------------------------ */
+  /* 1. ensure JSON body is valid */
   let data;
   try {
     data = await req.json();
@@ -45,19 +46,18 @@ export async function POST(req: NextRequest) {
   }
   const { name, email, password } = parsed.data;
 
-  /* 2 ▸ DB ops -------------------------------------------------------- */
+  /* 2. DB ops */
   try {
-    const db = (await clientPromise).db('todoTracker');
-    const users = db.collection('users');
+    await connectMongo();
 
-    // (Optional but recommended) – make sure there's a unique index
-    // await users.createIndex({ email: 1 }, { unique: true });
+    // (Optional but recommended) ensure the index exists
+    // await UserModel.createIndexes();
 
-    if (await users.findOne({ email })) {
+    if (await UserModel.exists({ email })) {
       return json({ error: 'Email already registered' }, 409);
     }
 
-    await users.insertOne({
+    await UserModel.create({
       name,
       email,
       passwordHash: await hash(password, 12),
@@ -71,7 +71,7 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/* ───────── only allow POST ───────── */
+/* ---------- only allow POST ---------- */
 export async function GET() {
   return json({ error: 'Method not allowed' }, 405);
 }

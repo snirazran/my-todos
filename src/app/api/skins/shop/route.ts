@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
-import type { UserDoc, UserWardrobe } from '@/lib/types/UserDoc';
+import { Types } from 'mongoose';
+import connectMongo from '@/lib/mongoose';
+import UserModel, { type UserDoc } from '@/lib/models/User';
+import type { UserWardrobe } from '@/lib/types/UserDoc';
 import { byId } from '@/lib/skins/catalog';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
+
+type LeanUser = UserDoc & { _id: Types.ObjectId };
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -21,10 +25,10 @@ export async function POST(req: NextRequest) {
   const itemId = body.itemId;
   if (!itemId || !byId[itemId]) return json({ error: 'Unknown itemId' }, 400);
 
-  const db = (await clientPromise).db('todoTracker');
-  const users = db.collection<UserDoc>('users');
-
-  const user = await users.findOne({ email: session.user.email });
+  await connectMongo();
+  const user = (await UserModel.findOne({
+    email: session.user.email,
+  }).lean()) as LeanUser | null;
   if (!user) return json({ error: 'User not found' }, 404);
 
   // init if missing
@@ -34,7 +38,7 @@ export async function POST(req: NextRequest) {
       inventory: { [itemId]: 1 },
       flies: 0,
     };
-    await users.updateOne({ _id: user._id }, { $set: { wardrobe: init } });
+    await UserModel.updateOne({ _id: user._id }, { $set: { wardrobe: init } });
     return json({ ok: true });
   }
 
@@ -43,7 +47,7 @@ export async function POST(req: NextRequest) {
     return json({ ok: true, message: 'Already owned' });
   }
 
-  await users.updateOne(
+  await UserModel.updateOne(
     { _id: user._id },
     { $inc: { [`wardrobe.inventory.${itemId}`]: 1 } }
   );

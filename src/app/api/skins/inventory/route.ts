@@ -1,18 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server';
-import clientPromise from '@/lib/mongodb';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
-import type { UserDoc, UserWardrobe } from '@/lib/types/UserDoc';
+import { Types } from 'mongoose';
+import connectMongo from '@/lib/mongoose';
+import UserModel, { type UserDoc } from '@/lib/models/User';
 import { CATALOG, byId, type WardrobeSlot } from '@/lib/skins/catalog';
+import type { UserWardrobe } from '@/lib/types/UserDoc';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
 
+type LeanUser = UserDoc & { _id: Types.ObjectId };
+
 /** Ensure user.wardrobe exists; sanitize equipped vs inventory */
 async function ensureWardrobe(email: string) {
-  const db = (await clientPromise).db('todoTracker');
-  const users = db.collection<UserDoc>('users');
-  const user = await users.findOne({ email });
+  await connectMongo();
+  const user = (await UserModel.findOne({ email }).lean()) as LeanUser | null;
   if (!user) return null;
 
   const current: UserWardrobe = user.wardrobe ?? {
@@ -35,7 +38,7 @@ async function ensureWardrobe(email: string) {
     !user.wardrobe ||
     JSON.stringify(user.wardrobe) !== JSON.stringify(next)
   ) {
-    await users.updateOne({ _id: user._id }, { $set: { wardrobe: next } });
+    await UserModel.updateOne({ _id: user._id }, { $set: { wardrobe: next } });
   }
 
   return next;
@@ -68,16 +71,17 @@ export async function PUT(req: NextRequest) {
   if (!slot || !['skin', 'hat', 'scarf', 'hand_item'].includes(slot))
     return json({ error: 'Unknown slot' }, 400);
 
-  const db = (await clientPromise).db('todoTracker');
-  const users = db.collection<UserDoc>('users');
-  const user = await users.findOne({ email: session.user.email });
+  await connectMongo();
+  const user = (await UserModel.findOne({
+    email: session.user.email,
+  }).lean()) as LeanUser | null;
   if (!user) return json({ error: 'User not found' }, 404);
 
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
 
   // Unequip for this slot
   if (itemId === null) {
-    await users.updateOne(
+    await UserModel.updateOne(
       { _id: user._id },
       { $set: { [`wardrobe.equipped.${slot}`]: null } }
     );
@@ -93,7 +97,7 @@ export async function PUT(req: NextRequest) {
   if ((wardrobe.inventory[itemId] ?? 0) <= 0)
     return json({ error: 'You do not own this item' }, 403);
 
-  await users.updateOne(
+  await UserModel.updateOne(
     { _id: user._id },
     { $set: { [`wardrobe.equipped.${slot}`]: itemId } }
   );

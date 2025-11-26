@@ -2,15 +2,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
-import clientPromise from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
+import { Types } from 'mongoose';
+import connectMongo from '@/lib/mongoose';
+import WeeklyBacklogModel, {
+  type WeeklyBacklogDoc,
+} from '@/lib/models/WeeklyBacklog';
 import { v4 as uuid } from 'uuid';
-
-interface WeeklyBacklogDoc {
-  userId: ObjectId;
-  weekStart: string; // LOCAL Sunday YYYY-MM-DD
-  tasks: { id: string; text: string; order: number; completed: boolean }[];
-}
 
 /* local helpers (LOCAL time) */
 function atLocalMidnight(d = new Date()) {
@@ -31,7 +28,7 @@ function ymdLocal(d: Date) {
 
 async function uid() {
   const s = await getServerSession(authOptions);
-  return s?.user?.id ? new ObjectId(s.user.id) : null;
+  return s?.user?.id ? new Types.ObjectId(s.user.id) : null;
 }
 
 export async function GET() {
@@ -41,11 +38,11 @@ export async function GET() {
   }
 
   const weekStart = ymdLocal(sundayOf());
-  const col = (await clientPromise)
-    .db('todoTracker')
-    .collection<WeeklyBacklogDoc>('weeklyBacklog');
+  await connectMongo();
 
-  const doc = await col.findOne({ userId, weekStart });
+  const doc = await WeeklyBacklogModel.findOne({ userId, weekStart })
+    .lean<WeeklyBacklogDoc>()
+    .exec();
   const tasks = (doc?.tasks ?? []).slice().sort((a, b) => a.order - b.order);
   return NextResponse.json(tasks);
 }
@@ -62,25 +59,28 @@ export async function POST(req: NextRequest) {
   }
 
   const weekStart = ymdLocal(sundayOf());
-  const col = (await clientPromise)
-    .db('todoTracker')
-    .collection<WeeklyBacklogDoc>('weeklyBacklog');
+  await connectMongo();
 
   // STEP 1: ensure the doc exists (no 'tasks' field here)
-  await col.updateOne(
+  await WeeklyBacklogModel.updateOne(
     { userId, weekStart },
     { $setOnInsert: { userId, weekStart, tasks: [] } },
     { upsert: true }
   );
 
   // Compute next order after ensuring existence
-  const current = await col.findOne({ userId, weekStart });
+  const current = await WeeklyBacklogModel.findOne({ userId, weekStart })
+    .lean<WeeklyBacklogDoc>()
+    .exec();
   const nextOrder =
     (current?.tasks?.reduce((m, t) => Math.max(m, t.order), 0) ?? 0) + 1;
 
   // STEP 2: push the task (safe—no path conflict)
   const newTask = { id: uuid(), text, order: nextOrder, completed: false };
-  await col.updateOne({ userId, weekStart }, { $push: { tasks: newTask } });
+  await WeeklyBacklogModel.updateOne(
+    { userId, weekStart },
+    { $push: { tasks: newTask } }
+  );
 
   return NextResponse.json({ ok: true, task: newTask });
 }
@@ -96,11 +96,9 @@ export async function DELETE(req: NextRequest) {
   }
 
   const weekStart = ymdLocal(sundayOf());
-  const col = (await clientPromise)
-    .db('todoTracker')
-    .collection<WeeklyBacklogDoc>('weeklyBacklog');
+  await connectMongo();
 
-  await col.updateOne(
+  await WeeklyBacklogModel.updateOne(
     { userId, weekStart },
     { $pull: { tasks: { id: taskId } } }
   );

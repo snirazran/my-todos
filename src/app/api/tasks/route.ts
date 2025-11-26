@@ -4,44 +4,14 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
-import clientPromise from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
-
-/* ---------- types (daily snapshot) ---------- */
-type Origin = 'weekly' | 'regular' | 'manual';
-
-interface TaskItem {
-  id: string;
-  text: string;
-  order: number;
-  completed: boolean;
-  /** Mark where the task came from; older docs may not have this yet */
-  origin?: Origin;
-}
-
-interface DayRecord {
-  _id?: ObjectId;
-  userId: ObjectId;
-  /** YYYY-MM-DD (LOCAL time) */
-  date: string;
-  tasks: TaskItem[];
-  /** ids hidden for *this* date only (delete-today behavior) */
-  suppressed?: string[];
-}
-
-/* ---------- types (unified manager collection) ---------- */
-type TaskType = 'weekly' | 'regular' | 'backlog';
-interface UnifiedTask {
-  _id?: ObjectId;
-  userId: ObjectId;
-  type: TaskType;
-  id: string; // logical id (stable across collections)
-  text: string;
-  order: number;
-  dayOfWeek?: number; // weekly: 0..6
-  date?: string; // regular: 'YYYY-MM-DD' (LOCAL)
-  weekStart?: string; // backlog bucket marker (unused here)
-}
+import { Types } from 'mongoose';
+import connectMongo from '@/lib/mongoose';
+import TaskModel, { type TaskDoc } from '@/lib/models/Task';
+import DailyTaskModel, {
+  type DailyTaskDoc,
+  type DailyTaskItem,
+  type TaskOrigin,
+} from '@/lib/models/DailyTask';
 
 /* ---------- helpers: LOCAL calendar (matches /manage-tasks) ---------- */
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -68,7 +38,7 @@ export async function GET(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
   }
-  const userId = new ObjectId(session.user.id);
+  const userId = new Types.ObjectId(session.user.id);
 
   try {
     // default to *local* today
@@ -77,27 +47,24 @@ export async function GET(req: NextRequest) {
     const todayLocal = ymdLocal(new Date());
     const date = dateParam ?? todayLocal;
 
-    const client = await clientPromise;
-    const db = client.db('todoTracker');
-    const daysCol = db.collection<DayRecord>('dailyTasks');
-    const tasksCol = db.collection<UnifiedTask>('tasks');
+    await connectMongo();
 
     const dow = dowLocalFromYMD(date);
 
     // 1) Fetch unified template for this day: weekly(dow) + regular(date)
-    const unified = await tasksCol
-      .find(
-        {
-          userId,
-          $or: [
-            { type: 'weekly', dayOfWeek: dow },
-            { type: 'regular', date },
-          ],
-        },
-        { projection: { id: 1, text: 1, order: 1, type: 1 } }
-      )
+    const unified = await TaskModel.find(
+      {
+        userId,
+        $or: [
+          { type: 'weekly', dayOfWeek: dow },
+          { type: 'regular', date },
+        ],
+      },
+      { id: 1, text: 1, order: 1, type: 1, _id: 0 }
+    )
       .sort({ order: 1 })
-      .toArray();
+      .lean<TaskDoc>()
+      .exec();
 
     // For UI: which ids are weekly (used for "remove from week" option)
     const weeklyIdsForUI = new Set(
@@ -105,17 +72,19 @@ export async function GET(req: NextRequest) {
     );
 
     // 2) Ensure a daily snapshot doc exists
-    await daysCol.updateOne(
+    await DailyTaskModel.updateOne(
       { userId, date },
       { $setOnInsert: { userId, date, tasks: [], suppressed: [] } },
       { upsert: true }
     );
 
     // 3) Load snapshot + build today's template (respect suppressed)
-    let dayRecord = await daysCol.findOne({ userId, date });
+    let dayRecord = await DailyTaskModel.findOne({ userId, date })
+      .lean<DailyTaskDoc>()
+      .exec();
     const suppressed = dayRecord?.suppressed ?? [];
 
-    const templateFiltered: TaskItem[] = unified
+    const templateFiltered: DailyTaskItem[] = unified
       .filter((t) => !suppressed.includes(t.id))
       .map((t) => ({
         id: t.id,
@@ -123,9 +92,10 @@ export async function GET(req: NextRequest) {
         order: t.order ?? 0,
         completed: false,
         origin:
-          (t.type as Origin) === 'weekly' || (t.type as Origin) === 'regular'
-            ? (t.type as Origin)
-            : 'manual', // shouldn't happen for unified query, but safe default
+          (t.type as TaskOrigin) === 'weekly' ||
+          (t.type as TaskOrigin) === 'regular'
+            ? (t.type as TaskOrigin)
+            : 'manual',
       }));
 
     // Fast map for lookups
@@ -133,19 +103,21 @@ export async function GET(req: NextRequest) {
       templateFiltered.map((t) => [t.id, t] as const)
     );
 
-    // 4) If brand new or empty → seed with filtered template (with origin + completed=false)
+    // 4) If brand new or empty, seed with filtered template (with origin + completed=false)
     if (!dayRecord || (dayRecord.tasks?.length ?? 0) === 0) {
       if (templateFiltered.length) {
-        await daysCol.updateOne(
+        await DailyTaskModel.updateOne(
           { userId, date },
           { $set: { tasks: templateFiltered } }
         );
-        dayRecord = await daysCol.findOne({ userId, date });
+        dayRecord = await DailyTaskModel.findOne({ userId, date })
+          .lean<DailyTaskDoc>()
+          .exec();
       }
     }
 
     // Ensure we have a runtime copy to modify safely
-    const currentTasks: TaskItem[] = (dayRecord?.tasks ?? []).slice();
+    const currentTasks: DailyTaskItem[] = (dayRecord?.tasks ?? []).slice();
 
     // 5) Retro-tag: mark any existing tasks that are in today's template
     // as origin 'weekly'/'regular' if they lack an origin.
@@ -154,7 +126,7 @@ export async function GET(req: NextRequest) {
       const t = currentTasks[i];
       if (!t.origin && templateById.has(t.id)) {
         const tpl = templateById.get(t.id)!;
-        currentTasks[i] = { ...t, origin: tpl.origin as Origin };
+        currentTasks[i] = { ...t, origin: tpl.origin as TaskOrigin };
         mutated = true;
       }
     }
@@ -201,11 +173,13 @@ export async function GET(req: NextRequest) {
 
     // 10) Write back only if changed
     if (mutated) {
-      await daysCol.updateOne(
+      await DailyTaskModel.updateOne(
         { userId, date },
         { $set: { tasks: finalTasks } }
       );
-      dayRecord = await daysCol.findOne({ userId, date });
+      dayRecord = await DailyTaskModel.findOne({ userId, date })
+        .lean<DailyTaskDoc>()
+        .exec();
     }
 
     return NextResponse.json({
@@ -241,11 +215,10 @@ export async function PUT(request: NextRequest) {
     );
   }
 
-  const userId = new ObjectId(session.user.id);
-  const client = await clientPromise;
-  const daysCol = client.db('todoTracker').collection<DayRecord>('dailyTasks');
+  const userId = new Types.ObjectId(session.user.id);
+  await connectMongo();
 
-  const r = await daysCol.updateOne(
+  const r = await DailyTaskModel.updateOne(
     { userId, date, 'tasks.id': taskId },
     { $set: { 'tasks.$.completed': !!completed } }
   );
@@ -276,12 +249,11 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const userId = new ObjectId(session.user.id);
-  const client = await clientPromise;
-  const daysCol = client.db('todoTracker').collection<DayRecord>('dailyTasks');
+  const userId = new Types.ObjectId(session.user.id);
+  await connectMongo();
 
   // Remove from today's list and remember it in suppressed so GET won't re-inject it
-  const r = await daysCol.updateOne(
+  const r = await DailyTaskModel.updateOne(
     { userId, date },
     {
       $pull: { tasks: { id: taskId } } as any,

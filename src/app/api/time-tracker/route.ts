@@ -2,39 +2,21 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
-import clientPromise from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
-
-/* ---------- types ---------- */
-interface TimeEntryDoc {
-  _id?: ObjectId;
-  userId: ObjectId;
-  task: string;
-  category: string;
-  start: Date;
-  end: Date;
-  durationMs: number;
-  plannedMinutes?: number | null;
-  dateKey: string; // YYYY-MM-DD (LOCAL-ish, coming from client)
-  createdAt: Date;
-}
+import { Types } from 'mongoose';
+import connectMongo from '@/lib/mongoose';
+import TimeEntryModel, { type TimeEntryDoc } from '@/lib/models/TimeEntry';
 
 /* ---------- helpers ---------- */
 async function currentUserId() {
   const session = await getServerSession(authOptions);
-  return session?.user?.id ? new ObjectId(session.user.id) : null;
+  return session?.user?.id ? new Types.ObjectId(session.user.id) : null;
 }
 
 function unauth() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
-const getTimeEntriesCol = async () =>
-  (await clientPromise)
-    .db('todoTracker')
-    .collection<TimeEntryDoc>('timeEntries');
-
-/* ─────────────────── GET ─────────────────── */
+/* ============================== GET ============================== */
 // GET /api/time-tracker?date=YYYY-MM-DD
 export async function GET(req: NextRequest) {
   const uid = await currentUserId();
@@ -44,12 +26,12 @@ export async function GET(req: NextRequest) {
   const dateKey =
     searchParams.get('date') || new Date().toISOString().slice(0, 10);
 
-  const col = await getTimeEntriesCol();
+  await connectMongo();
 
-  const docs = await col
-    .find({ userId: uid, dateKey })
+  const docs = await TimeEntryModel.find({ userId: uid, dateKey })
     .sort({ start: 1 })
-    .toArray();
+    .lean<TimeEntryDoc>()
+    .exec();
 
   const sessions = docs.map((d) => ({
     id: d._id!.toString(),
@@ -67,7 +49,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ sessions, totalMs });
 }
 
-/* ─────────────────── POST ─────────────────── */
+/* ============================== POST ============================== */
 // POST /api/time-tracker
 // body: see explanation in previous message (mode: 'timer' | 'manual', etc.)
 export async function POST(req: NextRequest) {
@@ -138,7 +120,7 @@ export async function POST(req: NextRequest) {
     endDate = end ? new Date(end) : new Date();
   }
 
-  const col = await getTimeEntriesCol();
+  await connectMongo();
 
   const doc: TimeEntryDoc = {
     userId: uid,
@@ -152,11 +134,11 @@ export async function POST(req: NextRequest) {
     createdAt: new Date(),
   };
 
-  const result = await col.insertOne(doc);
+  const result = await TimeEntryModel.create(doc);
 
   return NextResponse.json(
     {
-      id: result.insertedId.toString(),
+      id: result._id.toString(),
       ...doc,
     },
     { status: 201 }

@@ -1,11 +1,9 @@
-// ───────────────────────────────────────────────
-// 1.  src/lib/authOptions.ts
-// ───────────────────────────────────────────────
-import NextAuth, { type AuthOptions, type Session, type User } from 'next-auth';
+// src/lib/authOptions.ts
+import { type AuthOptions, type Session, type User } from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { compare } from 'bcryptjs';
-import clientPromise from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
+import connectMongo from '@/lib/mongoose';
+import UserModel, { type UserDoc } from '@/lib/models/User';
 
 export const authOptions: AuthOptions = {
   session: { strategy: 'jwt' },
@@ -21,17 +19,10 @@ export const authOptions: AuthOptions = {
       async authorize(creds) {
         if (!creds?.email || !creds.password) throw new Error('Missing creds');
 
-        const dbUser = await (
-          await clientPromise
-        )
-          .db('todoTracker')
-          .collection<{
-            _id: ObjectId;
-            email: string;
-            name: string;
-            passwordHash: string;
-          }>('users')
-          .findOne({ email: creds.email });
+        await connectMongo();
+        const dbUser = (await UserModel.findOne({ email: creds.email }).lean()) as
+          | (UserDoc & { _id: Required<UserDoc>['_id'] })
+          | null;
 
         if (!dbUser || !(await compare(creds.password, dbUser.passwordHash))) {
           throw new Error('Invalid credentials');

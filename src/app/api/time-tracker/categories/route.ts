@@ -2,31 +2,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/authOptions';
-import clientPromise from '@/lib/mongodb';
-import { ObjectId } from 'mongodb';
-
-interface TimeCategoriesDoc {
-  _id?: ObjectId;
-  userId: ObjectId;
-  categories: string[];
-}
+import { Types } from 'mongoose';
+import connectMongo from '@/lib/mongoose';
+import TimeCategoryModel, {
+  type TimeCategoryDoc,
+} from '@/lib/models/TimeCategory';
 
 /* ---------- helpers ---------- */
 async function currentUserId() {
   const session = await getServerSession(authOptions);
-  return session?.user?.id ? new ObjectId(session.user.id) : null;
+  return session?.user?.id ? new Types.ObjectId(session.user.id) : null;
 }
 
 function unauth() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
-const getCategoriesCol = async () =>
-  (await clientPromise)
-    .db('todoTracker')
-    .collection<TimeCategoriesDoc>('timeCategories');
-
-/* ─────────────────── GET ─────────────────── */
+/* ============================== GET ============================== */
 export async function GET() {
   const uid = await currentUserId();
   if (!uid) {
@@ -34,13 +26,15 @@ export async function GET() {
     return NextResponse.json({ categories: [] }, { status: 200 });
   }
 
-  const col = await getCategoriesCol();
-  const doc = await col.findOne({ userId: uid });
+  await connectMongo();
+  const doc = await TimeCategoryModel.findOne({ userId: uid })
+    .lean<TimeCategoryDoc>()
+    .exec();
 
   return NextResponse.json({ categories: doc?.categories ?? [] });
 }
 
-/* ─────────────────── POST ─────────────────── */
+/* ============================== POST ============================== */
 export async function POST(req: NextRequest) {
   const uid = await currentUserId();
   if (!uid) return unauth();
@@ -55,15 +49,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const col = await getCategoriesCol();
+  await connectMongo();
 
-  await col.updateOne(
+  await TimeCategoryModel.updateOne(
     { userId: uid },
     { $addToSet: { categories: name } },
     { upsert: true }
   );
 
-  const doc = await col.findOne({ userId: uid });
+  const doc = await TimeCategoryModel.findOne({ userId: uid })
+    .lean<TimeCategoryDoc>()
+    .exec();
 
   return NextResponse.json(
     { categories: doc?.categories ?? [] },
