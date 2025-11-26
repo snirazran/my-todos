@@ -112,6 +112,11 @@ export default function TaskList({
         </h2>
 
         <div className="pb-2 space-y-3 overflow-visible">
+          {tasks.length === 0 && (
+            <div className="px-4 py-6 text-center border text-slate-500 rounded-xl border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/60">
+              No tasks for today. Add one to get started.
+            </div>
+          )}
           {tasks.map((task, i) => {
             const isDone = task.completed || vSet.has(task.id);
             const isMenuOpen = menuFor === task.id;
@@ -126,7 +131,7 @@ export default function TaskList({
                 {/* Row */}
                 <div
                   onClick={() => toggle(task.id)}
-                  className="p-4 transition-colors duration-200 cursor-pointer rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700"
+                  className="px-2 py-4 transition-colors duration-200 cursor-pointer rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700"
                   style={{
                     touchAction: 'pan-y',
                     animation: `fadeInUp 0.5s ease-out ${i * 0.05}s`,
@@ -136,7 +141,7 @@ export default function TaskList({
                 >
                   <div className="flex items-center gap-4">
                     {/* Bullet with animated swap */}
-                    <div className="relative flex-shrink-0 w-6 h-6">
+                    <div className="relative flex-shrink-0 w-7 h-7">
                       <AnimatePresence initial={false}>
                         {!isDone ? (
                           <motion.div
@@ -258,7 +263,7 @@ export default function TaskList({
             );
           })}
 
-          <div className="mt-20">
+          <div className={tasks.length ? 'mt-20' : 'mt-12'}>
             <AddTaskButton
               onClick={() => onAddRequested('', null, { preselectToday: true })}
             />
