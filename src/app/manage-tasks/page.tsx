@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import TaskBoard from '@/components/board/TaskBoard';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 import {
   Task,
@@ -123,20 +124,7 @@ export default function ManageTasksPage() {
   );
 
   if (loading) {
-    return (
-      <main
-        className="flex items-center justify-center min-h-screen bg-gradient-to-br from-emerald-900 via-emerald-800 to-lime-900/90"
-        style={{
-          height: 'calc(100dvh - var(--header-h))',
-          minHeight: 'calc(-webkit-fill-available - var(--header-h))',
-        }}
-      >
-        <div
-          className="w-12 h-12 rounded-full border-4 border-white/40 border-t-white animate-spin"
-          aria-label="Loading task board"
-        />
-      </main>
-    );
+    return <LoadingScreen message="Loading task board…" fullscreen />;
   }
 
   return (
