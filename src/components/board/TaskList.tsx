@@ -124,7 +124,7 @@ export default function TaskList({
   const renderPlaceholder = (k: string) => (
     <div
       key={k}
-      className="h-12 my-2 border-2 border-dashed rounded-2xl border-purple-300/70 bg-purple-50/40 dark:border-purple-300/40 dark:bg-purple-900/25"
+      className="h-12 my-2 border-2 border-dashed rounded-xl border-purple-300/70 bg-purple-50/40 dark:border-purple-300/40 dark:bg-purple-900/25"
     />
   );
 

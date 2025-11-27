@@ -122,11 +122,11 @@ export default function BacklogPanel({
                   </button>
                   {menuFor === t.id && (
                     <div
-                      className="absolute left-1/2 top-11 z-20 w-40 -translate-x-1/2 rounded-xl border border-slate-200/80 bg-white/95 shadow-xl backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/90"
+                      className="absolute left-1/2 top-11 z-20 w-40 -translate-x-1/2 rounded-xl border border-slate-200/80 bg-white/95 shadow-lg backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/90"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button
-                        className="flex w-full items-center justify-center px-3 py-2 text-sm font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-700"
+                        className="flex w-full items-center justify-center px-3 py-2 text-sm font-medium text-slate-800 rounded-xl hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800/70"
                         onClick={() => {
                           setMenuFor(null);
                           setConfirmId(t);

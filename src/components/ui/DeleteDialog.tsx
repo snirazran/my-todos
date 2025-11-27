@@ -51,10 +51,18 @@ export function DeleteDialog({
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
         className="w-[440px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white/90 dark:bg-slate-900/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)] border border-slate-200/80 dark:border-slate-800/70 backdrop-blur-xl"
         onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3">
           <div className="mt-1 h-8 w-8 flex items-center justify-center rounded-full bg-rose-100 text-rose-700 font-semibold dark:bg-rose-900/40 dark:text-rose-200">

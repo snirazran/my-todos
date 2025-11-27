@@ -24,7 +24,7 @@ export default function DayColumn({
     <section
       className={[
         'group relative flex flex-col overflow-visible',
-        'rounded-[26px] bg-white/90 backdrop-blur-xl shadow-2xl',
+        'rounded-2xl bg-white/90 backdrop-blur-xl shadow-2xl',
         'ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:ring-slate-700/70',
         appliedMax,
         'p-2.5 md:p-3',

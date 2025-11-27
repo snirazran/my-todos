@@ -243,11 +243,11 @@ export default function TaskList({
                       </button>
                       {menuFor === task.id && (
                         <div
-                          className="absolute right-0 top-12 z-[60] w-44 max-w-[82vw] rounded-xl border border-slate-200/80 bg-white/95 shadow-xl backdrop-blur md:w-48 dark:border-slate-700/70 dark:bg-slate-900/90"
+                          className="absolute right-0 top-12 z-[60] w-44 max-w-[82vw] rounded-xl border border-slate-200/80 bg-white/95 shadow-lg backdrop-blur md:w-48 dark:border-slate-700/70 dark:bg-slate-900/90"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
-                            className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800"
+                            className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm font-medium text-slate-800 rounded-xl hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800/70"
                             onClick={() => {
                               setMenuFor(null);
                               setDialog({

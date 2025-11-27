@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useRef, useCallback, useEffect } from 'react';
 import { RotateCcw, EllipsisVertical } from 'lucide-react';
@@ -49,7 +49,7 @@ export default function TaskCard({
       el.removeEventListener('pointerup', handlePointerUp as any);
       el.removeEventListener('pointercancel', handlePointerUp as any);
 
-      // 🟢 RESTORE: Allow vertical scrolling again after interaction ends
+      // Restore: allow vertical scrolling again after interaction ends
       el.style.touchAction = 'pan-y';
     }
   }, []);
@@ -102,7 +102,7 @@ export default function TaskCard({
         if (el && pointerIdRef.current !== null) {
           try {
             el.setPointerCapture(pointerIdRef.current);
-            // 🟢 FIX: Manually force 'none' INSTANTLY.
+            // Fix: manually force "none" instantly.
             // Do not wait for React to update classes.
             // This stops the horizontal scroll on the parent from stealing the event.
             el.style.touchAction = 'none';
@@ -158,12 +158,12 @@ export default function TaskCard({
       // The timer above swaps this to 'none' when dragging starts.
       style={{ touchAction: 'pan-y' }}
       className={[
-        'group relative overflow-visible flex items-stretch gap-2 p-3 select-none rounded-2xl cursor-grab transition',
+        'group relative overflow-visible flex items-stretch gap-2 p-3 select-none rounded-xl cursor-grab transition',
         'bg-white/90 dark:bg-slate-900/60 backdrop-blur',
-        'border border-slate-200/70 dark:border-slate-700/60 shadow',
+        'border border-slate-200/70 dark:border-slate-700/60 shadow-sm',
         'mb-2',
-        menuOpen ? 'z-50 shadow-2xl' : '',
-        hiddenWhileDragging ? 'opacity-0' : 'hover:shadow-md',
+        menuOpen ? 'z-50 shadow-md' : '',
+        hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
       role="listitem"
       aria-grabbed={false}
@@ -210,3 +210,11 @@ export default function TaskCard({
     </div>
   );
 }
+
+
+
+
+
+
+
+
