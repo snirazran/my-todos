@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Lock, Shirt, XCircle } from 'lucide-react';
+import { Lock, Shirt, XCircle, X } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
@@ -177,7 +177,7 @@ export function WardrobePanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-[900px] !w-[95vw] p-0 gap-0 !bg-slate-50 !dark:bg-slate-950 max-h-[90vh] flex flex-col overflow-hidden !rounded-[36px] !border-4 !border-slate-200 !dark:border-slate-800 !shadow-2xl">
+      <DialogContent className="!max-w-[900px] !w-[95vw] p-0 gap-0 !bg-slate-50 !dark:bg-slate-950 h-[85vh] md:h-auto md:max-h-[90vh] flex flex-col overflow-hidden !rounded-[36px] !border-4 !border-slate-200 !dark:border-slate-800 !shadow-2xl">
         
         {/* Notification Popup */}
         <Notification 
@@ -188,29 +188,46 @@ export function WardrobePanel({
 
         {/* Top Bar (Game Header) */}
         <div className="px-6 pt-5 pb-4 bg-white dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-800 shrink-0 z-20 shadow-sm relative">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6 gap-2">
             <div>
-               <DialogTitle className="text-4xl font-black tracking-tighter uppercase text-transparent bg-clip-text bg-gradient-to-br from-slate-800 to-slate-600 dark:from-white dark:to-slate-400 drop-shadow-sm">
+               <DialogTitle className="text-2xl md:text-4xl font-black tracking-tighter uppercase text-transparent bg-clip-text bg-gradient-to-br from-slate-800 to-slate-600 dark:from-white dark:to-slate-400 drop-shadow-sm">
                  The Wardrobe
                </DialogTitle>
-               <p className="text-sm font-bold text-slate-400 dark:text-slate-500 tracking-wide mt-0.5">
+               <p className="text-xs md:text-sm font-bold text-slate-400 dark:text-slate-500 tracking-wide mt-0.5">
                  Customize Your Companion
                </p>
             </div>
             
-            {/* Currency Badge */}
-            <div className="flex items-center gap-3 pl-2.5 pr-4 py-1.5 rounded-[18px] bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 shadow-inner backdrop-blur-sm">
-               <div className="relative flex items-center justify-center bg-white rounded-full shadow-sm w-9 h-9 dark:bg-slate-700 ring-1 ring-black/5">
-                 <Fly size={24} y={-2} className="text-slate-600 dark:text-slate-300" />
-               </div>
-               <div className="flex flex-col justify-center">
-                  <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider leading-none mb-0.5">
-                    Balance
-                  </span>
-                  <span className="text-xl font-black leading-none text-slate-700 dark:text-slate-200 tabular-nums">
+            <div className="flex items-center gap-3">
+              {/* Currency Badge */}
+              <div className="hidden min-[400px]:flex items-center gap-3 pl-2.5 pr-4 py-1.5 rounded-[18px] bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 shadow-inner backdrop-blur-sm">
+                 <div className="relative flex items-center justify-center bg-white rounded-full shadow-sm w-9 h-9 dark:bg-slate-700 ring-1 ring-black/5">
+                   <Fly size={24} y={-2} className="text-slate-600 dark:text-slate-300" />
+                 </div>
+                 <div className="flex flex-col justify-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider leading-none mb-0.5">
+                      Balance
+                    </span>
+                    <span className="text-xl font-black leading-none text-slate-700 dark:text-slate-200 tabular-nums">
+                      {balance.toLocaleString()}
+                    </span>
+                  </div>
+              </div>
+              {/* Mobile Balance (Simple) */}
+              <div className="min-[400px]:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                 <Fly size={16} className="text-slate-600 dark:text-slate-300" />
+                 <span className="text-sm font-black text-slate-700 dark:text-slate-200">
                     {balance.toLocaleString()}
-                  </span>
-                </div>
+                 </span>
+              </div>
+
+              {/* Close Button */}
+              <button 
+                onClick={() => onOpenChange(false)}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+              >
+                <X className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+              </button>
             </div>
           </div>
 
@@ -240,7 +257,7 @@ export function WardrobePanel({
                 </div>
 
                 {/* Content Area - Game Grid */}
-                <div className="flex-1 min-h-[400px] relative mt-2 rounded-[24px] bg-slate-100/50 dark:bg-slate-900/50 border-2 border-slate-200/50 dark:border-slate-800/50 overflow-hidden">
+                <div className="flex-1 min-h-0 md:min-h-[400px] relative mt-2 rounded-[24px] bg-slate-100/50 dark:bg-slate-900/50 border-2 border-slate-200/50 dark:border-slate-800/50 overflow-hidden">
                   
                   {/* Inventory Grid */}
                   <TabsContent value="inventory" className="absolute inset-0 overflow-y-auto p-4 data-[state=inactive]:hidden">
