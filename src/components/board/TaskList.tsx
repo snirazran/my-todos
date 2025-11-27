@@ -1,9 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import TaskCard from './TaskCard';
-import { Task, draggableIdFor, type DisplayDay } from './helpers';
+import { Task, draggableIdFor, type DisplayDay, apiDayFromDisplay } from './helpers';
 import { DragState } from './hooks/useDragManager';
+import { DeleteDialog } from '@/components/ui/DeleteDialog';
 
 export default function TaskList({
   day,
@@ -33,11 +35,81 @@ export default function TaskList({
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
 }) {
+  const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+  const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    window.addEventListener('click', close);
+    return () => window.removeEventListener('click', close);
+  }, [menu]);
+
   const placeholderAt =
     drag && targetDay === day && targetIndex != null ? targetIndex : null;
 
   const isSelfDrag = !!drag && drag.active && drag.fromDay === day;
   const sourceIndex = isSelfDrag ? drag!.fromIndex : null;
+
+  const variantFor = (t: Task): 'regular' | 'weekly' | 'backlog' => {
+    if (t.type === 'weekly') return 'weekly';
+    if (t.type === 'backlog') return 'backlog';
+    return 'regular';
+  };
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const ymdLocal = (d: Date) =>
+    `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const dateForDisplayDay = (displayDay: DisplayDay) => {
+    const apiDay = apiDayFromDisplay(displayDay);
+    if (apiDay === -1) return null;
+    const base = new Date();
+    const sunday = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+    sunday.setDate(base.getDate() - base.getDay());
+    const target = new Date(sunday);
+    target.setDate(sunday.getDate() + apiDay);
+    return ymdLocal(target);
+  };
+
+  const dialogVariant: 'regular' | 'weekly' | 'backlog' = dialog
+    ? variantFor(dialog.task)
+    : 'regular';
+
+  const handleDeleteToday = async () => {
+    if (!dialog) return;
+    setBusy(true);
+    try {
+      if (dialogVariant === 'weekly') {
+        const date = dateForDisplayDay(dialog.day);
+        if (date) {
+          await fetch('/api/tasks', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ date, taskId: dialog.task.id }),
+          });
+        }
+      } else {
+        await removeTask(dialog.day, dialog.task.id);
+      }
+    } finally {
+      setBusy(false);
+      setDialog(null);
+      setMenu(null);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!dialog) return;
+    setBusy(true);
+    try {
+      await removeTask(dialog.day, dialog.task.id);
+    } finally {
+      setBusy(false);
+      setDialog(null);
+      setMenu(null);
+    }
+  };
 
   if (process.env.NODE_ENV !== 'production') {
     const seen = new Set<string>();
@@ -88,7 +160,26 @@ export default function TaskList({
             innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
             dragId={draggableIdFor(day, t.id)}
             task={t}
-            onDelete={() => removeTask(day, t.id)}
+            menuOpen={menu?.id === t.id}
+            onToggleMenu={(rect) => {
+              setMenu((prev) => {
+                if (prev?.id === t.id) return null;
+                const MENU_W = 176;
+                const MENU_H = 60;
+                const GAP = 8;
+                const MARGIN = 10;
+                const vw = typeof window !== 'undefined' ? window.innerWidth : 480;
+                const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+                let left = rect.left + rect.width / 2 - MENU_W / 2;
+                left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
+                let top = rect.bottom + GAP;
+                if (top + MENU_H > vh - MARGIN) {
+                  top = rect.top - MENU_H - GAP;
+                }
+                top = Math.max(MARGIN, Math.min(top, vh - MENU_H - MARGIN));
+                return { id: t.id, top, left };
+              });
+            }}
             onGrab={(payload) => {
               const id = draggableIdFor(day, t.id);
               onGrab({
@@ -125,5 +216,48 @@ export default function TaskList({
     }
   }
 
-  return <>{rows}</>;
+  return (
+    <>
+      {rows}
+      {menu &&
+        createPortal(
+          <div
+            className="fixed z-[2000] w-44 max-w-[82vw] origin-top rounded-xl border border-emerald-200/80 bg-white shadow-xl dark:border-emerald-700/60 dark:bg-emerald-900"
+            style={{ top: menu.top, left: menu.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="flex w-full items-center justify-center gap-2 px-3 py-2 text-sm text-emerald-900 rounded-xl hover:bg-emerald-50 dark:text-emerald-50 dark:hover:bg-emerald-800/70"
+              onClick={() => {
+                setMenu(null);
+                if (menu) {
+                  const t = items.find((it) => it.id === menu.id);
+                  if (t) setDialog({ task: t, day });
+                }
+              }}
+            >
+              Delete
+            </button>
+          </div>,
+          document.body
+        )}
+      <DeleteDialog
+        open={!!dialog}
+        variant={dialogVariant}
+        itemLabel={dialog?.task.text}
+        busy={busy}
+        onClose={() => setDialog(null)}
+        onDeleteToday={
+          dialogVariant !== 'backlog' ? handleDeleteToday : handleDeleteAll
+        }
+        onDeleteAll={
+          dialogVariant === 'weekly'
+            ? handleDeleteAll
+            : dialogVariant === 'backlog'
+            ? handleDeleteToday
+            : undefined
+        }
+      />
+    </>
+  );
 }

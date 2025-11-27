@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useCallback, useEffect } from 'react';
-import { Trash2, RotateCcw } from 'lucide-react';
+import { RotateCcw, EllipsisVertical } from 'lucide-react';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
 
@@ -14,7 +14,8 @@ type OnGrabParams = {
 export default function TaskCard({
   dragId,
   task,
-  onDelete,
+  menuOpen,
+  onToggleMenu,
   onGrab,
   innerRef,
   hiddenWhileDragging,
@@ -22,7 +23,8 @@ export default function TaskCard({
 }: {
   dragId: string;
   task: Task;
-  onDelete: () => void;
+  menuOpen: boolean;
+  onToggleMenu: (anchor: DOMRect) => void;
   innerRef?: (el: HTMLDivElement | null) => void;
   onGrab: (params: OnGrabParams) => void;
   hiddenWhileDragging?: boolean;
@@ -156,10 +158,11 @@ export default function TaskCard({
       // The timer above swaps this to 'none' when dragging starts.
       style={{ touchAction: 'pan-y' }}
       className={[
-        'group flex items-stretch gap-2 p-3 select-none rounded-2xl cursor-grab transition',
+        'group relative overflow-visible flex items-stretch gap-2 p-3 select-none rounded-2xl cursor-grab transition',
         'bg-white/85 dark:bg-emerald-900/40 backdrop-blur',
         'border border-emerald-700/20 dark:border-emerald-300/15 shadow',
         'mb-2',
+        menuOpen ? 'z-50 shadow-2xl' : '',
         hiddenWhileDragging ? 'opacity-0' : 'hover:shadow-md',
       ].join(' ')}
       role="listitem"
@@ -186,14 +189,24 @@ export default function TaskCard({
         </div>
       </div>
 
-      <button
-        onClick={onDelete}
-        title="Delete"
-        className="self-center ml-1 shrink-0 rounded-full p-1.5 hover:bg-emerald-100/60 dark:hover:bg-emerald-800/50 transition"
-        type="button"
-      >
-        <Trash2 className="w-4 h-4 text-red-500 group-hover:text-red-600" />
-      </button>
+      <div className="relative self-center ml-1 shrink-0">
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleMenu(e.currentTarget.getBoundingClientRect());
+          }}
+          title="Task actions"
+          aria-label="Task actions"
+          aria-expanded={menuOpen}
+          className={[
+            'rounded-full p-1.5 hover:bg-emerald-100/60 dark:hover:bg-emerald-800/50 transition',
+            menuOpen ? 'bg-emerald-100/80 dark:bg-emerald-800/70' : '',
+          ].join(' ')}
+          type="button"
+        >
+          <EllipsisVertical className="w-4 h-4 text-emerald-700 dark:text-emerald-100" />
+        </button>
+      </div>
     </div>
   );
 }

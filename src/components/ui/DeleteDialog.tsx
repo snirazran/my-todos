@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react';
 import React from 'react';
+import { createPortal } from 'react-dom';
 
 type Variant = 'regular' | 'weekly' | 'backlog';
 
@@ -28,21 +29,23 @@ export function DeleteDialog({
 
   const title =
     variant === 'weekly'
-      ? 'Delete weekly task'
+      ? 'Remove weekly task?'
       : variant === 'backlog'
-      ? 'Remove backlog task'
-      : 'Delete task';
+      ? 'Remove from backlog?'
+      : 'Delete task?';
 
   const desc =
     variant === 'weekly'
-      ? 'Remove just for today or delete this weekly task everywhere.'
+      ? 'Choose how you want to remove it.'
       : variant === 'backlog'
-      ? 'Remove this item from your backlog.'
-      : 'Delete this task from today.';
+      ? 'This will disappear from your backlog.'
+      : 'This removes it from today.';
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  const dialogContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm px-4"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
@@ -50,21 +53,24 @@ export function DeleteDialog({
       }}
     >
       <div
-        className="w-[440px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white p-5 shadow-lg dark:bg-slate-800"
+        className="w-[440px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white/95 p-5 shadow-2xl border border-slate-200/80 dark:bg-slate-800 dark:border-slate-700"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3">
+          <div className="mt-1 h-8 w-8 flex items-center justify-center rounded-full bg-rose-100 text-rose-700 font-semibold dark:bg-rose-900/40 dark:text-rose-200">
+            !
+          </div>
           <div className="flex-1 space-y-1">
             <h4 className="text-lg font-semibold text-slate-900 dark:text-white">
               {title}
             </h4>
             <p className="text-sm text-slate-600 dark:text-slate-300">
-              {itemLabel ? `"${itemLabel}" · ` : ''}
+              {itemLabel ? `"${itemLabel}" - ` : ''}
               {desc}
             </p>
           </div>
           <button
-            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700"
+            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-300/70"
             onClick={onClose}
             aria-label="Close"
             title="Close"
@@ -77,40 +83,38 @@ export function DeleteDialog({
           {variant === 'weekly' ? (
             <>
               <button
-                className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-left text-slate-800 hover:bg-slate-200 disabled:opacity-60 dark:bg-slate-700 dark:text-slate-50 dark:hover:bg-slate-600"
+                className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-left text-slate-800 hover:bg-slate-200 disabled:opacity-60 dark:bg-slate-700 dark:text-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-300/70"
                 onClick={onDeleteToday}
                 disabled={busy}
               >
-                <span>Remove today only</span>
-                <span className="text-xs text-slate-500">
-                  Keeps weekly repeats
-                </span>
+                <span className="font-medium">Hide just today</span>
+                <span className="text-xs text-slate-500">Keeps weekly repeats</span>
               </button>
               <button
-                className="flex w-full items-center justify-between rounded-lg bg-rose-600 px-4 py-3 text-left text-white hover:bg-rose-700 disabled:opacity-60"
+                className="flex w-full items-center justify-between rounded-lg bg-rose-600 px-4 py-3 text-left text-white hover:bg-rose-700 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-rose-300/70 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-800"
                 onClick={onDeleteAll}
                 disabled={busy}
               >
-                <span>Delete everywhere</span>
-                <span className="text-xs text-rose-100">
-                  Future repeats included
-                </span>
+                <span className="font-semibold">Delete all repeats</span>
+                <span className="text-xs text-rose-100">Today and future</span>
               </button>
             </>
           ) : (
             <button
-              className="flex w-full items-center justify-between rounded-lg bg-rose-600 px-4 py-3 text-left text-white hover:bg-rose-700 disabled:opacity-60"
+              className="flex w-full items-center justify-between rounded-lg bg-rose-600 px-4 py-3 text-left text-white hover:bg-rose-700 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-rose-300/70 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-800"
               onClick={onDeleteToday ?? onDeleteAll}
               disabled={busy}
             >
-              <span>
-                {variant === 'backlog' ? 'Remove from backlog' : 'Delete task'}
+              <span className="font-semibold">
+                {variant === 'backlog' ? 'Remove from backlog' : 'Delete for today'}
               </span>
-              <span className="text-xs text-rose-100">Permanent</span>
+              <span className="text-xs text-rose-100">This cannot be undone</span>
             </button>
           )}
         </div>
       </div>
     </div>
   );
+
+  return createPortal(dialogContent, document.body);
 }

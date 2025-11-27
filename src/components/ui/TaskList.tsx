@@ -11,6 +11,8 @@ interface Task {
   text: string;
   completed: boolean;
   type?: 'regular' | 'weekly' | 'backlog';
+  origin?: 'regular' | 'weekly' | 'backlog';
+  kind?: 'regular' | 'weekly' | 'backlog';
 }
 
 export default function TaskList({
@@ -69,10 +71,11 @@ export default function TaskList({
   }, []);
 
   const taskKind = (t: Task) => {
-    if (t.type === 'weekly') return 'weekly';
-    if (t.type === 'backlog') return 'backlog';
-    if (!t.type && weeklyIds.has(t.id)) return 'weekly';
-    return t.type ?? 'regular';
+    const sourceType = t.type ?? t.origin ?? t.kind;
+    if (sourceType === 'weekly') return 'weekly';
+    if (sourceType === 'backlog') return 'backlog';
+    if (sourceType === 'regular') return 'regular';
+    return weeklyIds.has(t.id) ? 'weekly' : 'regular';
   };
 
   const confirmDeleteToday = async () => {
@@ -100,6 +103,10 @@ export default function TaskList({
       setBusy(false);
     }
   };
+
+  const dialogVariant: 'regular' | 'weekly' | 'backlog' = dialog
+    ? taskKind(dialog.task)
+    : 'regular';
 
   return (
     <>
@@ -236,7 +243,7 @@ export default function TaskList({
                       </button>
                       {menuFor === task.id && (
                         <div
-                          className="absolute left-1/2 top-11 z-[60] w-44 -translate-x-1/2 rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800"
+                          className="absolute right-0 top-12 z-[60] w-44 max-w-[82vw] rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800 sm:w-48"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
@@ -280,19 +287,17 @@ export default function TaskList({
 
       <DeleteDialog
         open={!!dialog}
-        variant={(dialog?.kind as any) ?? 'regular'}
+        variant={dialogVariant}
         itemLabel={dialog?.task.text}
         busy={busy}
         onClose={() => setDialog(null)}
         onDeleteToday={
-          dialog?.kind === 'weekly' || dialog?.kind === 'regular'
-            ? confirmDeleteToday
-            : undefined
+          dialogVariant !== 'backlog' ? confirmDeleteToday : undefined
         }
         onDeleteAll={
-          dialog?.kind === 'weekly'
+          dialogVariant === 'weekly'
             ? confirmDeleteWeek
-            : dialog?.kind === 'backlog'
+            : dialogVariant === 'backlog'
             ? confirmDeleteToday
             : undefined
         }
