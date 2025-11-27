@@ -13,14 +13,14 @@ export default function ProgressCard({ rate, done, total }: ProgressCardProps) {
   return (
     <div
       dir="ltr"
-      className="z-10 p-6 mb-6 bg-white shadow-lg rounded-2xl dark:bg-slate-800"
+      className="z-10 p-6 mb-6 rounded-2xl bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
     >
       <div className="flex items-center justify-between mb-4">
         <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-white">
           <Sparkles className="w-6 h-6 text-purple-500" />
           Your progress today
         </h2>
-        <span className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+        <span className="text-3xl font-bold text-slate-900 dark:text-white">
           {Math.round(rate)}%
         </span>
       </div>
@@ -34,7 +34,7 @@ export default function ProgressCard({ rate, done, total }: ProgressCardProps) {
         aria-label="Today's progress"
       >
         <div
-          className="h-full transition-all duration-500 ease-out bg-gradient-to-r from-purple-500 to-pink-500"
+          className="h-full transition-all duration-500 ease-out bg-gradient-to-r from-purple-500 via-indigo-500 to-pink-500 shadow-[0_0_12px_rgba(124,58,237,0.45)]"
           style={{ width: `${Math.max(0, Math.min(100, rate))}%` }}
         />
       </div>

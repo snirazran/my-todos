@@ -112,7 +112,7 @@ export default function TaskList({
     <>
       <div
         dir="ltr"
-        className="px-6 pt-6 pb-4 overflow-visible bg-white shadow-lg rounded-2xl dark:bg-slate-800"
+        className="px-6 pt-6 pb-4 overflow-visible rounded-2xl bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
       >
         <h2 className="mb-6 text-2xl font-bold text-slate-900 dark:text-white">
           Your tasks today:
@@ -138,7 +138,7 @@ export default function TaskList({
                 {/* Row */}
                 <div
                   onClick={() => toggle(task.id)}
-                  className="px-2 py-4 transition-colors duration-200 cursor-pointer rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700"
+                  className="px-2 py-4 transition-colors duration-200 cursor-pointer rounded-xl hover:bg-slate-50/80 dark:hover:bg-slate-800/70"
                   style={{
                     touchAction: 'pan-y',
                     animation: `fadeInUp 0.5s ease-out ${i * 0.05}s`,
@@ -243,11 +243,11 @@ export default function TaskList({
                       </button>
                       {menuFor === task.id && (
                         <div
-                          className="absolute right-0 top-12 z-[60] w-44 max-w-[82vw] rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800 sm:w-48"
+                          className="absolute right-0 top-12 z-[60] w-44 max-w-[82vw] rounded-xl border border-slate-200/80 bg-white/95 shadow-xl backdrop-blur md:w-48 dark:border-slate-700/70 dark:bg-slate-900/90"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <button
-                            className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-700"
+                            className="flex items-center justify-center w-full gap-2 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 dark:hover:bg-slate-800"
                             onClick={() => {
                               setMenuFor(null);
                               setDialog({
@@ -279,7 +279,7 @@ export default function TaskList({
       </div>
 
       {showConfetti && (
-        <div className="p-6 mt-6 text-center text-white shadow-lg rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 animate-pulse">
+        <div className="p-6 mt-6 text-center text-white shadow-lg rounded-2xl bg-gradient-to-r from-purple-500 to-pink-500 animate-pulse">
           <h3 className="mb-2 text-2xl font-bold">🎉 Well done! 🎉</h3>
           <p className="text-lg">You completed all tasks for today!</p>
         </div>

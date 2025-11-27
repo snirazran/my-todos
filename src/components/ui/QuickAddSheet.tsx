@@ -25,7 +25,7 @@ type Props = Readonly<{
   onOpenChange: (v: boolean) => void;
   onSubmit: (data: {
     text: string;
-    /** API days: 0..6 (Sun..Sat), -1 for “Later” */
+    /** API days: 0..6 (Sun..Sat), -1 for "Later" */
     days: ApiDay[];
     repeat: RepeatChoice;
   }) => Promise<void> | void;
@@ -44,7 +44,7 @@ export default function QuickAddSheet({
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
   const [when, setWhen] = useState<WhenChoice>('pick');
 
-  // DISPLAY indices only (0..6). 7 (“Later”) is handled via `when === 'later'`.
+  // DISPLAY indices only (0..6). 7 ("Later") is handled via `when === 'later'`.
   const [pickedDays, setPickedDays] = useState<Array<Exclude<DisplayDay, 7>>>(
     []
   );
@@ -85,7 +85,7 @@ export default function QuickAddSheet({
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    // Convert DISPLAY → API days
+    // Convert DISPLAY -> API days
     const apiDays: ApiDay[] =
       when === 'later'
         ? [-1]
@@ -93,7 +93,7 @@ export default function QuickAddSheet({
 
     if (apiDays.length === 0) return;
 
-    // ✅ Guard: if "Later", force non-repeating
+    // Guard: if "Later", force non-repeating
     const finalRepeat: RepeatChoice = when === 'later' ? 'this-week' : repeat;
 
     await onSubmit({ text: trimmed, days: apiDays, repeat: finalRepeat });
@@ -108,13 +108,13 @@ export default function QuickAddSheet({
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[70] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none">
       <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
-        <div className="rounded-[28px] bg-white/80 dark:bg-white/10 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-3">
+        <div className="rounded-[28px] bg-white/85 dark:bg-slate-950/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_16px_48px_rgba(15,23,42,0.16)] p-3">
           {/* Input */}
           <input
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="New task…"
-            className="w-full h-11 px-3 mb-3 rounded-[14px] bg-white/90 dark:bg-white/10 text-slate-900 dark:text-emerald-50 ring-1 ring-black/10 dark:ring-white/10 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-emerald-300"
+            placeholder="New task?"
+            className="w-full h-11 px-3 mb-3 rounded-[14px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -128,7 +128,7 @@ export default function QuickAddSheet({
 
           {/* Segmented control */}
           <div className="mb-2">
-            <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-100/70 dark:bg-white/10 ring-1 ring-black/10 dark:ring-white/10">
+            <div className="grid grid-cols-2 gap-1 p-1 rounded-2xl bg-slate-100/70 dark:bg-slate-900/80 ring-1 ring-slate-200/80 dark:ring-slate-800/70">
               <button
                 type="button"
                 aria-pressed={when === 'pick'}
@@ -138,13 +138,12 @@ export default function QuickAddSheet({
                   setPickedDays((prev) =>
                     prev.length ? prev : [todayDisplayIndex()]
                   );
-                  // no change to repeat here (user’s last choice is kept)
                 }}
                 className={[
                   'h-10 rounded-xl text-[14px] font-medium inline-flex items-center justify-center gap-2 transition',
-                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300',
-                  'data-[active=true]:bg-white data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-black/10',
-                  'data-[active=false]:text-slate-600 dark:data-[active=false]:text-emerald-100/85',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300',
+                  'data-[active=true]:bg-white data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-slate-200/80',
+                  'data-[active=false]:text-slate-600 dark:data-[active=false]:text-slate-200/85',
                 ].join(' ')}
               >
                 <CalendarDays className="w-4 h-4" />
@@ -158,14 +157,13 @@ export default function QuickAddSheet({
                 onClick={() => {
                   setWhen('later');
                   setPickedDays([]);
-                  // ✅ Auto-untoggle repeat when switching to Later
                   setRepeat('this-week');
                 }}
                 className={[
                   'h-10 rounded-xl text-[14px] font-medium inline-flex items-center justify-center gap-2 transition',
-                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300',
-                  'data-[active=true]:bg-white data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-black/10',
-                  'data-[active=false]:text-slate-600 dark:data-[active=false]:text-emerald-100/85',
+                  'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300',
+                  'data-[active=true]:bg-white data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-slate-200/80',
+                  'data-[active=false]:text-slate-600 dark:data-[active=false]:text-slate-200/85',
                 ].join(' ')}
               >
                 <CalendarCheck className="w-4 h-4" />
@@ -193,9 +191,9 @@ export default function QuickAddSheet({
                         className={[
                           'inline-flex items-center justify-center select-none',
                           'h-10 w-10 rounded-full text-sm font-semibold',
-                          'border border-slate-300/80 dark:border-white/15',
-                          'bg-white dark:bg-white/10 text-slate-800 dark:text-emerald-50',
-                          'data-[active=true]:bg-emerald-50 data-[active=true]:border-emerald-300 data-[active=true]:text-emerald-900',
+                          'border border-slate-300/80 dark:border-slate-700/70',
+                          'bg-white dark:bg-slate-900/70 text-slate-800 dark:text-white',
+                          'data-[active=true]:bg-purple-50 data-[active=true]:border-purple-300 data-[active=true]:text-purple-900',
                           'transition-colors',
                         ].join(' ')}
                       >
@@ -209,17 +207,14 @@ export default function QuickAddSheet({
               <div className="sm:shrink-0 sm:pl-1">
                 <div
                   className={[
-                    'inline-flex items-center gap-2 px-2 py-1 border rounded-full bg-white/90 dark:bg-white/10 border-slate-300/70 dark:border-white/10',
-                    // ✅ Dim & block interaction when Later is active
+                    'inline-flex items-center gap-2 px-2 py-1 border rounded-full bg-white/90 dark:bg-slate-900/70 border-slate-300/70 dark:border-slate-800/70',
                     isLater ? 'opacity-50 pointer-events-none' : '',
                   ].join(' ')}
                   aria-disabled={isLater}
-                  title={
-                    isLater ? 'Repeat is not available for Later' : undefined
-                  }
+                  title={isLater ? 'Repeat is not available for Later' : undefined}
                 >
-                  <RotateCcw className="w-4 h-4 text-emerald-800/80 dark:text-emerald-200" />
-                  <span className="text-[13px] font-medium text-slate-700 dark:text-emerald-50">
+                  <RotateCcw className="w-4 h-4 text-purple-700/80 dark:text-purple-200" />
+                  <span className="text-[13px] font-medium text-slate-700 dark:text-white">
                     Repeat every week
                   </span>
                   <button
@@ -227,14 +222,12 @@ export default function QuickAddSheet({
                     role="switch"
                     aria-checked={repeatsOn}
                     onClick={() =>
-                      setRepeat((r) =>
-                        r === 'weekly' ? 'this-week' : 'weekly'
-                      )
+                      setRepeat((r) => (r === 'weekly' ? 'this-week' : 'weekly'))
                     }
                     data-on={repeatsOn}
                     className={[
                       'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                      'bg-slate-300/70 data-[on=true]:bg-emerald-400',
+                      'bg-slate-300/70 data-[on=true]:bg-purple-500',
                     ].join(' ')}
                     title={repeatsOn ? 'Weekly' : 'One-time'}
                     disabled={isLater}
@@ -252,11 +245,11 @@ export default function QuickAddSheet({
           )}
 
           {when === 'later' && (
-            <div className="mt-2 flex items-start gap-2 rounded-xl bg-emerald-50/75 dark:bg-emerald-900/30 ring-1 ring-emerald-700/15 p-2.5 text-[13px] text-emerald-900/90 dark:text-emerald-100/90">
+            <div className="mt-2 flex items-start gap-2 rounded-xl bg-purple-50/75 dark:bg-purple-900/30 ring-1 ring-purple-300/40 p-2.5 text-[13px] text-purple-900/90 dark:text-purple-100/90">
               <Info className="w-4 h-4 mt-0.5 shrink-0" />
               <span>
                 Saved to <span className="font-medium">Later this week</span>.
-                Drag it onto a specific day whenever you’re ready.
+                Drag it onto a specific day whenever you're ready.
               </span>
             </div>
           )}
@@ -269,8 +262,8 @@ export default function QuickAddSheet({
               disabled={!text.trim()}
               className={[
                 'h-11 rounded-full text-[15px] font-semibold',
-                'bg-gradient-to-b from-emerald-500 to-emerald-600 text-white',
-                'shadow-[0_10px_24px_rgba(16,185,129,.35)] ring-1 ring-emerald-700/30',
+                'bg-gradient-to-b from-purple-500 via-indigo-500 to-pink-500 text-white',
+                'shadow-[0_10px_24px_rgba(124,58,237,.35)] ring-1 ring-purple-500/40',
                 'hover:brightness-105 active:scale-[0.995]',
                 'disabled:opacity-60',
               ].join(' ')}
@@ -286,8 +279,8 @@ export default function QuickAddSheet({
               onClick={() => onOpenChange(false)}
               className={[
                 'h-11 rounded-full text-[15px] font-medium',
-                'bg-white/80 dark:bg-white/10 text-slate-800 dark:text-emerald-50',
-                'ring-1 ring-black/10 dark:ring-white/10',
+                'bg-white/85 dark:bg-slate-900/70 text-slate-800 dark:text-white',
+                'ring-1 ring-slate-200/80 dark:ring-slate-800/70',
                 'hover:bg-white active:scale-[0.995]',
               ].join(' ')}
             >

@@ -78,14 +78,16 @@ export default function BacklogPanel({
 
   return (
     <>
-      <div className="p-4 mt-6 border border-dashed rounded-2xl border-slate-300 dark:border-slate-600 bg-slate-50/60 dark:bg-slate-800/40">
-        <h3 className="mb-3 text-lg font-semibold">Later this week</h3>
+      <div className="p-4 mt-6 border border-dashed rounded-2xl border-slate-300/80 dark:border-slate-700/70 bg-white/80 backdrop-blur-xl shadow-[0_10px_30px_rgba(15,23,42,0.12)] dark:bg-slate-900/70">
+        <h3 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
+          Later this week
+        </h3>
 
         <ul className="space-y-3">
           {later.map((t) => (
             <li
               key={t.id}
-              className="flex items-center justify-between gap-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-slate-200/70 transition hover:-translate-y-0.5 hover:shadow-md dark:bg-slate-800 dark:ring-slate-700"
+              className="flex items-center justify-between gap-3 rounded-xl bg-white/90 p-4 ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(15,23,42,0.12)] dark:bg-slate-900/70 dark:ring-slate-800/70"
             >
               <div className="flex items-center gap-3">
                 <Fly size={28} y={-4} x={-2} />
@@ -95,7 +97,7 @@ export default function BacklogPanel({
               </div>
               <div className="flex items-center gap-2">
                 <button
-                  className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-emerald-700"
+                  className="rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(124,58,237,.28)] hover:brightness-110"
                   onClick={() => addToday(t)}
                   title="Add to today (one-time)"
                 >
@@ -120,7 +122,7 @@ export default function BacklogPanel({
                   </button>
                   {menuFor === t.id && (
                     <div
-                      className="absolute left-1/2 top-11 z-20 w-40 -translate-x-1/2 rounded-lg border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800"
+                      className="absolute left-1/2 top-11 z-20 w-40 -translate-x-1/2 rounded-xl border border-slate-200/80 bg-white/95 shadow-xl backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/90"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <button

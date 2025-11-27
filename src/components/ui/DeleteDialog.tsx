@@ -45,7 +45,7 @@ export function DeleteDialog({
 
   const dialogContent = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm px-4"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
@@ -53,7 +53,7 @@ export function DeleteDialog({
       }}
     >
       <div
-        className="w-[440px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white/95 p-5 shadow-2xl border border-slate-200/80 dark:bg-slate-800 dark:border-slate-700"
+        className="w-[440px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white/90 dark:bg-slate-900/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)] border border-slate-200/80 dark:border-slate-800/70 backdrop-blur-xl"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-start gap-3">
@@ -83,7 +83,7 @@ export function DeleteDialog({
           {variant === 'weekly' ? (
             <>
               <button
-                className="flex w-full items-center justify-between rounded-lg bg-slate-100 px-4 py-3 text-left text-slate-800 hover:bg-slate-200 disabled:opacity-60 dark:bg-slate-700 dark:text-slate-50 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-rose-300/70"
+                className="flex w-full items-center justify-between rounded-lg bg-white/80 px-4 py-3 text-left text-slate-800 hover:bg-slate-100 disabled:opacity-60 dark:bg-slate-800/80 dark:text-slate-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-200/70 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900"
                 onClick={onDeleteToday}
                 disabled={busy}
               >
@@ -91,7 +91,7 @@ export function DeleteDialog({
                 <span className="text-xs text-slate-500">Keeps weekly repeats</span>
               </button>
               <button
-                className="flex w-full items-center justify-between rounded-lg bg-rose-600 px-4 py-3 text-left text-white hover:bg-rose-700 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-rose-300/70 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-800"
+                className="flex w-full items-center justify-between rounded-lg bg-gradient-to-r from-rose-500 to-rose-600 px-4 py-3 text-left text-white hover:brightness-110 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-rose-200/70 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900"
                 onClick={onDeleteAll}
                 disabled={busy}
               >
@@ -101,7 +101,7 @@ export function DeleteDialog({
             </>
           ) : (
             <button
-              className="flex w-full items-center justify-between rounded-lg bg-rose-600 px-4 py-3 text-left text-white hover:bg-rose-700 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-rose-300/70 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-800"
+              className="flex w-full items-center justify-between rounded-lg bg-gradient-to-r from-rose-500 to-rose-600 px-4 py-3 text-left text-white hover:brightness-110 disabled:opacity-60 focus:outline-none focus:ring-2 focus:ring-rose-200/70 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-slate-900"
               onClick={onDeleteToday ?? onDeleteAll}
               disabled={busy}
             >
