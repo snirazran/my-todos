@@ -191,3 +191,8 @@ body.dragging {
     --header-h: 4rem;
   }
 }
+
+.mask-fade-right {
+  mask-image: linear-gradient(to right, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+}

@@ -2,12 +2,12 @@ export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 export type WardrobeSlot = 'skin' | 'hat' | 'scarf' | 'hand_item';
 
 export type ItemDef = {
-  id: string; // stable id stored in DB
+  id: string;
   name: string;
-  slot: WardrobeSlot; // which Rive input this drives
+  slot: WardrobeSlot;
   rarity: Rarity;
-  riveIndex: number; // numeric value for that input
-  icon: string; // /public path
+  riveIndex: number;
+  icon: string; // Keep for fallback or other UI
   priceFlies?: number;
 };
 
@@ -28,92 +28,66 @@ export const rarityRank: Record<Rarity, number> = {
 };
 
 export const CATALOG: Readonly<ItemDef[]> = [
-  // Skins
+  // --- SKINS ---
   {
-    id: 'skin_pink',
-    name: 'Pink',
-    slot: 'skin',
-    rarity: 'common',
-    riveIndex: 1,
-    icon: '/skins/skin/skin1.png',
-    priceFlies: 150,
-  },
-  {
-    id: 'skin_blue',
-    name: 'Blue',
+    id: 'skin_teal',
+    name: 'Teal Frog',
     slot: 'skin',
     rarity: 'uncommon',
-    riveIndex: 2,
-    icon: '/skins/skin/skin2.png',
+    riveIndex: 1,
+    icon: '/skins/skin/skin1.png', // Placeholder path
     priceFlies: 400,
   },
   {
-    id: 'skin_red',
-    name: 'Red',
+    id: 'skin_pink',
+    name: 'Pink Frog',
     slot: 'skin',
     rarity: 'rare',
-    riveIndex: 3,
-    icon: '/skins/skin/skin3.png',
+    riveIndex: 2,
+    icon: '/skins/skin/skin3.png', // Placeholder path
     priceFlies: 900,
   },
-  {
-    id: 'skin_santa',
-    name: 'Santa',
-    slot: 'skin',
-    rarity: 'epic',
-    riveIndex: 4,
-    icon: '/skins/skin/skin4.png',
-    priceFlies: 1800,
-  },
-  {
-    id: 'skin_wizzard',
-    name: 'Wizzard',
-    slot: 'skin',
-    rarity: 'legendary',
-    riveIndex: 5,
-    icon: '/skins/skin/skin5.png',
-  },
 
-  // Hats
+  // --- HATS ---
   {
-    id: 'hat_cap',
-    name: 'Cap',
+    id: 'hat_wizard',
+    name: 'Wizard Hat',
     slot: 'hat',
-    rarity: 'common',
+    rarity: 'legendary',
     riveIndex: 1,
-    icon: '/skins/hat/hat1.png',
-    priceFlies: 120,
+    icon: '/skins/hat/hat2.png', // Placeholder path
+    priceFlies: 2500,
   },
   {
-    id: 'hat_crown',
-    name: 'Crown',
+    id: 'hat_santa',
+    name: 'Santa Hat',
     slot: 'hat',
     rarity: 'epic',
-    riveIndex: 3,
-    icon: '/skins/hat/hat2.png',
+    riveIndex: 2,
+    icon: '/skins/hat/hat2.png', // Placeholder path
     priceFlies: 1500,
   },
 
-  // Scarves
+  // --- SCARVES ---
   {
-    id: 'scarf_green',
-    name: 'Green Scarf',
+    id: 'scarf_red',
+    name: 'Red Scarf',
     slot: 'scarf',
-    rarity: 'uncommon',
+    rarity: 'common',
     riveIndex: 1,
-    icon: '/skins/scarf/scarf1.png',
-    priceFlies: 300,
+    icon: '/skins/scarf/scarf1.png', // Placeholder path
+    priceFlies: 250,
   },
 
-  // Hand items
+  // --- HAND ---
   {
-    id: 'hand_flower',
-    name: 'Flower',
+    id: 'hand_wand',
+    name: 'Wizard Wand',
     slot: 'hand_item',
-    rarity: 'rare',
-    riveIndex: 2,
-    icon: '/skins/hand/hand1.png',
-    priceFlies: 700,
+    rarity: 'legendary',
+    riveIndex: 3,
+    icon: '/skins/hand/hand1.png', // Placeholder path
+    priceFlies: 3000,
   },
 ];
 

@@ -12,12 +12,18 @@ export function useWardrobeIndices(enabled: boolean) {
 
   const eq = data?.wardrobe?.equipped ?? {};
 
+  const getIndex = (itemId?: string | null) => {
+    if (!itemId) return 0;
+    const item = byId[itemId];
+    return item ? item.riveIndex : 0;
+  };
+
   return {
     indices: {
-      skin: eq?.skin ? byId[eq.skin].riveIndex : 0,
-      hat: eq?.hat ? byId[eq.hat].riveIndex : 0,
-      scarf: eq?.scarf ? byId[eq.scarf].riveIndex : 0,
-      hand_item: eq?.hand_item ? byId[eq.hand_item].riveIndex : 0,
+      skin: getIndex(eq.skin),
+      hat: getIndex(eq.hat),
+      scarf: getIndex(eq.scarf),
+      hand_item: getIndex(eq.hand_item),
     },
     wardrobeData: data,
   };
