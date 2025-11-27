@@ -18,6 +18,8 @@ import { usePan } from './hooks/usePan';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import Fly from '../ui/fly';
 import { AddTaskButton } from '../ui/AddTaskButton';
+import BacklogBox from './BacklogBox';
+import BacklogTray from './BacklogTray';
 
 type RepeatChoice = 'this-week' | 'weekly';
 
@@ -54,13 +56,10 @@ export default function TaskBoard({
     setListRef,
     setCardRef,
     drag,
-    // setDrag,      <-- remove or ignore this
-    // setTargetDay, <-- remove or ignore this
-    // setTargetIndex, <-- remove or ignore this
     targetDay,
     targetIndex,
     onGrab,
-    endDrag, // 🟢 WE NEED TO USE THIS
+    endDrag,
     cancelDrag,
   } = useDragManager();
 
@@ -73,8 +72,16 @@ export default function TaskBoard({
   );
   const recomputeCanPanRef = useRef<() => void>();
 
+  // Backlog State
+  const [backlogOpen, setBacklogOpen] = useState(false);
+  const backlogBoxRef = useRef<HTMLDivElement>(null);
+  const [isDragOverBacklog, setIsDragOverBacklog] = useState(false);
+
   const centerColumnSmooth = (day: DisplayDay) => {
     const s = scrollerRef.current;
+    // If we target day 7 (backlog) but it's not in the DOM columns, do nothing or snap to end
+    if (day >= DAYS - 1) return;
+    
     const col = (document.querySelectorAll('[data-col="true"]')[day] ??
       null) as HTMLElement | null;
     if (!s || !col) return;
@@ -126,6 +133,29 @@ export default function TaskBoard({
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickText, setQuickText] = useState('');
 
+  // Detect drag over backlog box
+  useEffect(() => {
+    if (!drag?.active || !backlogBoxRef.current) {
+      setIsDragOverBacklog(false);
+      return;
+    }
+
+    // If we are already open, maybe we treat the whole tray as "Backlog"?
+    // For now, let's just use the box as the "Drop Target" regardless of open state
+    // Or if open, maybe we disable dropping on the box? 
+    // The prompt says: "drag a task i want that box to just show its opening animation"
+    
+    // Simple hit test
+    const r = backlogBoxRef.current.getBoundingClientRect();
+    const hit =
+      drag.x >= r.left &&
+      drag.x <= r.right &&
+      drag.y >= r.top &&
+      drag.y <= r.bottom;
+      
+    setIsDragOverBacklog(hit);
+  }, [drag?.x, drag?.y, drag?.active]);
+
   const commitDragReorder = useCallback(
     (toDay: DisplayDay, toIndex: number) => {
       if (!drag) return;
@@ -134,13 +164,29 @@ export default function TaskBoard({
 
       setWeek((prev) => {
         const next = prev.map((d) => d.slice());
+        
+        // Remove from source
         const [moved] = next[drag.fromDay].splice(drag.fromIndex, 1);
+        
+        // Insert into dest
         let insertIndex = toIndex;
         // Fix index if moving within same list downwards
         if (drag.fromDay === toDay && drag.fromIndex < toIndex) {
           insertIndex = Math.max(0, toIndex - 1);
         }
+        
+        // Safety for backlog array
+        if (!next[toDay]) next[toDay] = [];
+        
         next[toDay].splice(Math.min(insertIndex, next[toDay].length), 0, moved);
+
+        // If moved to backlog, update type
+        if (toDay === 7) {
+            moved.type = 'backlog';
+        } else if (drag.fromDay === 7) {
+            // If moved FROM backlog, revert to regular (unless it was weekly, but let's assume regular for now)
+            if (moved.type === 'backlog') moved.type = 'regular';
+        }
 
         Promise.all(
           drag.fromDay === toDay
@@ -156,24 +202,36 @@ export default function TaskBoard({
     [drag, saveDay, setWeek]
   );
 
-  // 🟢 UPDATED ONDROP FUNCTION
   const onDrop = useCallback(() => {
     if (!drag) return;
-    const toDay = (targetDay ?? drag.fromDay) as DisplayDay;
-    const toIndex = targetIndex ?? drag.fromIndex;
 
-    // 1. Commit changes first (while drag state exists)
-    centerColumnSmooth(toDay);
-    commitDragReorder(toDay, toIndex);
+    // Check Backlog Drop
+    let finalToDay = (targetDay ?? drag.fromDay) as DisplayDay;
+    let finalToIndex = targetIndex ?? drag.fromIndex;
 
-    // 2. Use endDrag() to clear state AND restore browser scrolling
+    // If hovering the box, force drop to backlog (Index 7)
+    if (isDragOverBacklog) {
+        finalToDay = 7 as DisplayDay;
+        finalToIndex = week[7]?.length || 0; // Append to end
+    }
+
+    // 1. Commit changes first
+    if (finalToDay < 7) {
+        centerColumnSmooth(finalToDay);
+    }
+    commitDragReorder(finalToDay, finalToIndex);
+
+    // 2. End drag
     endDrag();
+    setIsDragOverBacklog(false);
   }, [
     drag,
     targetDay,
     targetIndex,
+    isDragOverBacklog,
+    week,
     commitDragReorder,
-    endDrag, // <--- Dependency added
+    endDrag,
   ]);
 
   useEffect(() => {
@@ -209,7 +267,8 @@ export default function TaskBoard({
         }}
       >
         <div className="flex gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[220px] sm:pb-[180px] md:pb-[188px]">
-          {Array.from({ length: DAYS }, (_, day) => ({
+          {/* Render only 0..6 (Exclude Backlog Column 7) */}
+          {Array.from({ length: DAYS - 1 }, (_, day) => ({
             day: day as DisplayDay,
             key: `day-${day}`,
           })).map(({ day, key }) => (
@@ -240,13 +299,13 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination - Only show dots for actual days */}
       <div
         className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none"
         style={{ bottom: 'calc(env(safe-area-inset-bottom) + 112px)' }}
       >
         <div className="pointer-events-auto">
-          <PaginationDots count={DAYS} activeIndex={pageIndex} />
+          <PaginationDots count={DAYS - 1} activeIndex={Math.min(pageIndex, 6) as any} />
         </div>
       </div>
 
@@ -263,20 +322,44 @@ export default function TaskBoard({
         />
       )}
 
-      {/* GLOBAL BOTTOM ADD (trigger only) */}
-      <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 py-12 pointer-events-none sm:px-6 sm:py-5">
-        <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
-          <div className="rounded-[28px] bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/60 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
-            <AddTaskButton
-              onClick={() => {
-                setQuickText('');
-                setShowQuickAdd(true);
-              }}
-              disabled={!!drag?.active}
-            />
+      {/* GLOBAL BOTTOM AREA - Floating Toolbar */}
+      <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+20px)] pointer-events-none">
+        <div className="pointer-events-auto mx-auto w-full max-w-[400px] flex items-center gap-3">
+          
+          {/* Backlog Trigger (Left) */}
+          <div className="shrink-0">
+             <BacklogBox
+                count={week[7]?.length || 0}
+                isDragOver={isDragOverBacklog}
+                onClick={() => setBacklogOpen(true)}
+                forwardRef={backlogBoxRef}
+             />
           </div>
+
+          {/* Add Task Button (Main) */}
+          <div className="flex-1 min-w-0">
+             <div className="rounded-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/60 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
+                <AddTaskButton
+                  onClick={() => {
+                    setQuickText('');
+                    setShowQuickAdd(true);
+                  }}
+                  disabled={!!drag?.active}
+                />
+             </div>
+          </div>
+
         </div>
       </div>
+
+      {/* Backlog Tray Overlay */}
+      <BacklogTray
+        isOpen={backlogOpen}
+        onClose={() => setBacklogOpen(false)}
+        tasks={week[7] || []}
+        onGrab={onGrab}
+        setCardRef={setCardRef}
+      />
 
       <QuickAddSheet
         open={showQuickAdd}
