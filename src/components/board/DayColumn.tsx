@@ -24,24 +24,26 @@ export default function DayColumn({
     <section
       className={[
         'group relative flex flex-col overflow-visible',
-        'rounded-2xl bg-white/90 backdrop-blur-xl shadow-2xl',
-        'ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:ring-slate-700/70',
+        'rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl',
+        'border border-white/50 dark:border-slate-800/50 shadow-sm',
         appliedMax,
-        'p-2.5 md:p-3',
+        'p-3',
         'min-h-[100px]',
+        'transition-colors duration-300 hover:bg-white/90 dark:hover:bg-slate-900/80',
       ].join(' ')}
     >
-      <h2 className="mb-3 font-extrabold tracking-tight text-center text-transparent md:mb-4 bg-gradient-to-r from-purple-600 via-indigo-500 to-purple-600 bg-clip-text dark:from-purple-300 dark:via-indigo-300 dark:to-purple-200">
-        {title}
-      </h2>
+      <div className="flex items-center justify-between px-2 mb-4 pt-1">
+        <h2 className="text-lg font-black tracking-tight text-slate-800 dark:text-slate-100 uppercase">
+          {title}
+        </h2>
+        {/* Could add a badge here for count later */}
+      </div>
 
       <div
         ref={listRef}
         className={[
           'flex-1 pr-1 overflow-y-auto transition-colors rounded-xl',
           'no-scrollbar touch-auto overscroll-y-contain',
-          // a bit less internal padding now that the global bar exists
-
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}
       >

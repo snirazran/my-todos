@@ -75,7 +75,10 @@ export default function TaskBoard({
   // Backlog State
   const [backlogOpen, setBacklogOpen] = useState(false);
   const backlogBoxRef = useRef<HTMLDivElement>(null);
+  const backlogTrayRef = useRef<HTMLDivElement>(null);
   const [isDragOverBacklog, setIsDragOverBacklog] = useState(false);
+  const [backlogProximity, setBacklogProximity] = useState(0); // 0..1
+  const [trayCloseProgress, setTrayCloseProgress] = useState(0); // 0..1 (0=open, 1=closed)
 
   const centerColumnSmooth = (day: DisplayDay) => {
     const s = scrollerRef.current;
@@ -133,28 +136,81 @@ export default function TaskBoard({
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickText, setQuickText] = useState('');
 
+  // Derived state for masking targetDay (Placeholder Suppression)
+  let effectiveTargetDay = targetDay;
+  if (drag?.active && backlogOpen && backlogTrayRef.current) {
+     // If dragging within the visual bounds of the tray, suppress column placeholders
+     // The tray might be animating down (trayCloseProgress > 0).
+     // We consider it "covering" if we are below its current visual top.
+     
+     const trayHeight = backlogTrayRef.current.offsetHeight;
+     // Calculate visual top based on close progress (0=open, 1=closed/down)
+     const visualTrayTop = window.innerHeight - (trayHeight * (1 - trayCloseProgress));
+     
+     if (drag.y > visualTrayTop) {
+        effectiveTargetDay = null;
+     }
+  }
+
   // Detect drag over backlog box
   useEffect(() => {
+    // 1. Handle Tray Animation (Dragging FROM backlog)
+    if (drag?.active && backlogOpen && drag.fromDay === 7 && backlogTrayRef.current) {
+        const trayRect = backlogTrayRef.current.getBoundingClientRect();
+        const trayTop = trayRect.top;
+        
+        // Threshold: Start closing when above trayTop. Fully closed after 150px.
+        const EXIT_DIST = 200;
+        if (drag.y < trayTop) {
+            const distOut = trayTop - drag.y;
+            const progress = Math.min(1, distOut / EXIT_DIST);
+            setTrayCloseProgress(progress);
+        } else {
+            setTrayCloseProgress(0);
+        }
+        // Don't return here, we might still want proximity logic if we drag back near the box? 
+        // Actually, if tray is open, box proximity is less relevant, or maybe we want it to highlight if we drop back "into" the button?
+        // For simplicity, let's prioritize tray animation.
+        setIsDragOverBacklog(false); 
+        setBacklogProximity(0);
+        return;
+    } 
+    
+    // Reset tray progress if not dragging from backlog
+    setTrayCloseProgress(0);
+
+
+    // 2. Handle Box Proximity (Dragging TO backlog)
     if (!drag?.active || !backlogBoxRef.current) {
       setIsDragOverBacklog(false);
+      setBacklogProximity(0);
       return;
     }
 
-    // If we are already open, maybe we treat the whole tray as "Backlog"?
-    // For now, let's just use the box as the "Drop Target" regardless of open state
-    // Or if open, maybe we disable dropping on the box? 
-    // The prompt says: "drag a task i want that box to just show its opening animation"
-    
-    // Simple hit test
     const r = backlogBoxRef.current.getBoundingClientRect();
+    
+    // 1. Hit Test (Strict)
     const hit =
       drag.x >= r.left &&
       drag.x <= r.right &&
       drag.y >= r.top &&
       drag.y <= r.bottom;
-      
     setIsDragOverBacklog(hit);
-  }, [drag?.x, drag?.y, drag?.active]);
+
+    // 2. Proximity Calculation
+    // Center of the box
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    // Distance from pointer to center
+    const dist = Math.hypot(drag.x - cx, drag.y - cy);
+    
+    // Radius of influence (e.g., 200px)
+    const MAX_DIST = 200;
+    // Normalize 0..1 (1 is closest)
+    const prox = Math.max(0, 1 - dist / MAX_DIST);
+    setBacklogProximity(prox);
+
+  }, [drag?.x, drag?.y, drag?.active, backlogOpen, drag?.fromDay]);
 
   const commitDragReorder = useCallback(
     (toDay: DisplayDay, toIndex: number) => {
@@ -209,10 +265,38 @@ export default function TaskBoard({
     let finalToDay = (targetDay ?? drag.fromDay) as DisplayDay;
     let finalToIndex = targetIndex ?? drag.fromIndex;
 
-    // If hovering the box, force drop to backlog (Index 7)
+    // 1. If hovering the box, force drop to backlog (Index 7)
     if (isDragOverBacklog) {
         finalToDay = 7 as DisplayDay;
         finalToIndex = week[7]?.length || 0; // Append to end
+    } 
+    // 2. If hovering the tray (while open), force drop to backlog to avoid "ghost drop" onto background column
+    //    BUT only if we haven't dragged it "out" (trayCloseProgress < 1)
+    else if (backlogOpen && backlogTrayRef.current && trayCloseProgress < 0.9) {
+        const tr = backlogTrayRef.current.getBoundingClientRect();
+        // Only capture if we are physically over the tray (or what's left of it)
+        // Although with the animation, the tray moves down. 
+        // But conceptually, if the user is dragging "out", we want them to hit the columns.
+        if (
+            drag.x >= tr.left &&
+            drag.x <= tr.right &&
+            drag.y >= tr.top &&
+            drag.y <= tr.bottom
+        ) {
+            finalToDay = 7 as DisplayDay;
+            if (drag.fromDay === 7) {
+                finalToIndex = drag.fromIndex;
+            } else {
+                finalToIndex = week[7]?.length || 0;
+            }
+        }
+    }
+    // 3. If we dragged it OUT of the tray (trayCloseProgress >= 0.9), we implicitly "close" the tray logic for this drop.
+    //    So we let it fall through to the calculated `finalToDay` (which is based on column geometry).
+    
+    // If we dropped effectively "outside" (which means valid column drop), we should also close the backlog UI
+    if (backlogOpen && finalToDay !== 7) {
+        setBacklogOpen(false);
     }
 
     // 1. Commit changes first
@@ -224,12 +308,15 @@ export default function TaskBoard({
     // 2. End drag
     endDrag();
     setIsDragOverBacklog(false);
+    setTrayCloseProgress(0); // Reset
   }, [
     drag,
     targetDay,
     targetIndex,
     isDragOverBacklog,
     week,
+    backlogOpen, 
+    trayCloseProgress, // Added dependency
     commitDragReorder,
     endDrag,
   ]);
@@ -258,7 +345,7 @@ export default function TaskBoard({
         onPointerUp={endPan}
         className={[
           'no-scrollbar absolute inset-0 w-full h-full',
-          'overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x',
+          'flex flex-col items-start overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x', // 🟢 Added items-start
           snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth',
         ].join(' ')}
         style={{
@@ -266,7 +353,7 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[220px] sm:pb-[180px] md:pb-[188px]">
+        <div className="flex mx-auto gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[220px] sm:pb-[180px] md:pb-[188px]">
           {/* Render only 0..6 (Exclude Backlog Column 7) */}
           {Array.from({ length: DAYS - 1 }, (_, day) => ({
             day: day as DisplayDay,
@@ -287,7 +374,7 @@ export default function TaskBoard({
                   day={day}
                   items={week[day]}
                   drag={drag}
-                  targetDay={targetDay as DisplayDay | null}
+                  targetDay={effectiveTargetDay as DisplayDay | null}
                   targetIndex={targetIndex}
                   removeTask={removeTask}
                   onGrab={onGrab}
@@ -309,19 +396,6 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* Drag overlay */}
-      {drag?.active && (
-        <DragOverlay
-          x={drag.x}
-          y={drag.y}
-          dx={drag.dx}
-          dy={drag.dy}
-          width={drag.width}
-          height={drag.height}
-          text={drag.taskText}
-        />
-      )}
-
       {/* GLOBAL BOTTOM AREA - Floating Toolbar */}
       <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+20px)] pointer-events-none">
         <div className="pointer-events-auto mx-auto w-full max-w-[400px] flex items-center gap-3">
@@ -331,6 +405,8 @@ export default function TaskBoard({
              <BacklogBox
                 count={week[7]?.length || 0}
                 isDragOver={isDragOverBacklog}
+                isDragging={!!drag?.active}
+                proximity={backlogProximity}
                 onClick={() => setBacklogOpen(true)}
                 forwardRef={backlogBoxRef}
              />
@@ -359,6 +435,9 @@ export default function TaskBoard({
         tasks={week[7] || []}
         onGrab={onGrab}
         setCardRef={setCardRef}
+        drag={drag}
+        trayRef={backlogTrayRef}
+        closeProgress={trayCloseProgress}
       />
 
       <QuickAddSheet
@@ -379,6 +458,19 @@ export default function TaskBoard({
           setShowQuickAdd(false);
         }}
       />
+
+      {/* Drag overlay - Rendered LAST to ensure top z-index */}
+      {drag?.active && (
+        <DragOverlay
+          x={drag.x}
+          y={drag.y}
+          dx={drag.dx}
+          dy={drag.dy}
+          width={drag.width}
+          height={drag.height}
+          text={drag.taskText}
+        />
+      )}
 
       <style jsx global>{`
         @media (prefers-reduced-motion: reduce) {

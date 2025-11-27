@@ -20,7 +20,7 @@ export default function DragOverlay({
 }) {
   return (
     <div
-      className="fixed z-50 pointer-events-none"
+      className="fixed z-[100] pointer-events-none"
       style={{ left: `${x - dx}px`, top: `${y - dy}px`, width: `${width}px` }}
     >
       <div

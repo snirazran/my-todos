@@ -158,38 +158,40 @@ export default function TaskCard({
       // The timer above swaps this to 'none' when dragging starts.
       style={{ touchAction: 'pan-y' }}
       className={[
-        'group relative overflow-visible flex items-stretch gap-2 p-3 select-none rounded-xl cursor-grab transition',
-        'bg-white/90 dark:bg-slate-900/60 backdrop-blur',
-        'border border-slate-200/70 dark:border-slate-700/60 shadow-sm',
-        'mb-2',
-        menuOpen ? 'z-50 shadow-md' : '',
+        'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-2xl cursor-grab transition-all duration-300',
+        'bg-white dark:bg-slate-800/90 backdrop-blur-md',
+        'border border-slate-100 dark:border-slate-700/50',
+        'shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.08)]',
+        'hover:-translate-y-0.5 hover:border-slate-200 dark:hover:border-slate-600',
+        'mb-3',
+        menuOpen ? 'z-50 shadow-xl ring-2 ring-purple-500/20' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
       role="listitem"
       aria-grabbed={false}
     >
-      <span className="grid self-center mt-0 h-7 w-7 shrink-0 place-items-center">
-        <Fly size={26} x={-1} y={-4} />
-      </span>
+      <div className="grid self-center h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-50 dark:bg-slate-700/50 text-slate-400 group-hover:text-purple-500 transition-colors">
+        <Fly size={20} />
+      </div>
 
-      <div className="flex-1 min-w-0">
+      <div className="flex-1 min-w-0 flex flex-col justify-center">
         {isRepeating && (
-          <div className="mt-1 flex items-center gap-1.5">
+          <div className="mb-1 flex items-center gap-1.5">
             <span
               title="Repeats weekly"
-              className="inline-flex items-center gap-1 rounded-md border border-purple-200/60 bg-purple-50/80 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 shadow-sm dark:border-purple-300/40 dark:bg-purple-900/40 dark:text-purple-100 transition-colors group-hover:bg-purple-50"
+              className="inline-flex items-center gap-1 rounded-md bg-purple-50/80 px-1.5 py-0.5 text-[10px] font-bold text-purple-600 dark:bg-purple-900/40 dark:text-purple-200 transition-colors"
             >
-              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-              <span className="tracking-wide uppercase">Repeats</span>
+              <RotateCcw className="h-3 w-3" aria-hidden="true" />
+              <span className="tracking-wider uppercase">Weekly</span>
             </span>
           </div>
         )}
-        <div className="truncate text-[15px] leading-6 text-slate-900 dark:text-slate-50">
+        <div className="truncate text-[15px] font-medium leading-snug text-slate-700 dark:text-slate-100 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
           {task.text}
         </div>
       </div>
 
-      <div className="relative self-center ml-1 shrink-0">
+      <div className="relative self-center shrink-0 opacity-0 group-hover:opacity-100 transition-opacity focus-within:opacity-100">
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -199,12 +201,12 @@ export default function TaskCard({
           aria-label="Task actions"
           aria-expanded={menuOpen}
           className={[
-            'rounded-full p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition',
-            menuOpen ? 'bg-slate-200/80 dark:bg-slate-800/70' : '',
+            'rounded-full p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors',
+            menuOpen ? 'bg-slate-200/80 dark:bg-slate-800/70 opacity-100' : '',
           ].join(' ')}
           type="button"
         >
-          <EllipsisVertical className="w-4 h-4 text-slate-600 dark:text-slate-200" />
+          <EllipsisVertical className="w-4 h-4 text-slate-500 dark:text-slate-400" />
         </button>
       </div>
     </div>
