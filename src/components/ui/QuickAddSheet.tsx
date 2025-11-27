@@ -43,6 +43,7 @@ export default function QuickAddSheet({
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
   const [when, setWhen] = useState<WhenChoice>('pick');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // DISPLAY indices only (0..6). 7 ("Later") is handled via `when === 'later'`.
   const [pickedDays, setPickedDays] = useState<Array<Exclude<DisplayDay, 7>>>(
@@ -56,6 +57,7 @@ export default function QuickAddSheet({
       setWhen('pick');
       setPickedDays([todayDisplayIndex()]); // default to today (DISPLAY index)
       setRepeat(defaultRepeat);
+      setIsSubmitting(false);
     }
   }, [open, initialText, defaultRepeat]);
 
@@ -82,6 +84,7 @@ export default function QuickAddSheet({
     );
 
   const handleSubmit = async () => {
+    if (isSubmitting) return;
     const trimmed = text.trim();
     if (!trimmed) return;
 
@@ -93,11 +96,16 @@ export default function QuickAddSheet({
 
     if (apiDays.length === 0) return;
 
-    // Guard: if "Later", force non-repeating
-    const finalRepeat: RepeatChoice = when === 'later' ? 'this-week' : repeat;
+    setIsSubmitting(true);
+    try {
+      // Guard: if "Later", force non-repeating
+      const finalRepeat: RepeatChoice = when === 'later' ? 'this-week' : repeat;
 
-    await onSubmit({ text: trimmed, days: apiDays, repeat: finalRepeat });
-    onOpenChange(false);
+      await onSubmit({ text: trimmed, days: apiDays, repeat: finalRepeat });
+      onOpenChange(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   if (!open) return null;
@@ -114,7 +122,8 @@ export default function QuickAddSheet({
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder="New task?"
-            className="w-full h-11 px-3 mb-3 rounded-[14px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300"
+            disabled={isSubmitting}
+            className="w-full h-11 px-3 mb-3 rounded-[14px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50"
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -259,7 +268,7 @@ export default function QuickAddSheet({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={!text.trim()}
+              disabled={!text.trim() || isSubmitting}
               className={[
                 'h-11 rounded-full text-[15px] font-semibold',
                 'bg-gradient-to-b from-purple-500 via-indigo-500 to-pink-500 text-white',
@@ -270,7 +279,7 @@ export default function QuickAddSheet({
             >
               <span className="inline-flex items-center justify-center gap-2">
                 <Plus className="w-4 h-4" />
-                Add
+                {isSubmitting ? 'Adding...' : 'Add'}
               </span>
             </button>
 

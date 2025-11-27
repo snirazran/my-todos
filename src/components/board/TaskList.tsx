@@ -77,7 +77,7 @@ export default function TaskList({
     : 'regular';
 
   const handleDeleteToday = async () => {
-    if (!dialog) return;
+    if (!dialog || busy) return;
     setBusy(true);
     try {
       if (dialogVariant === 'weekly') {
@@ -100,7 +100,7 @@ export default function TaskList({
   };
 
   const handleDeleteAll = async () => {
-    if (!dialog) return;
+    if (!dialog || busy) return;
     setBusy(true);
     try {
       await removeTask(dialog.day, dialog.task.id);
