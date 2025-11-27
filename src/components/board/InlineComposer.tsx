@@ -54,21 +54,21 @@ export default function InlineComposer({
   };
 
   return (
-    <div className="px-3 py-3 rounded-2xl bg-emerald-50/60 dark:bg-emerald-900/30 ring-1 ring-emerald-600/15">
+    <div className="px-3 py-3 rounded-2xl bg-white/90 dark:bg-slate-900/70 ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-sm">
       <textarea
         ref={taRef}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder="Task name…"
+        placeholder="Task name?"
         rows={1}
         className={[
           'w-full resize-none overflow-hidden px-3 py-2',
           'text-base leading-5 md:text-sm md:leading-[1.25rem]',
           'min-h-[44px]',
-          'bg-white/90 rounded-xl border-0 ring-1 ring-emerald-700/20',
-          'placeholder:text-emerald-900/40 dark:placeholder:text-emerald-200/40',
-          'focus:ring-2 focus:ring-lime-400 outline-none',
-          'dark:bg-emerald-950/50 dark:text-emerald-50',
+          'bg-white/90 rounded-xl border-0 ring-1 ring-slate-200/80 dark:ring-slate-700/70',
+          'placeholder:text-slate-400 dark:placeholder:text-slate-400',
+          'focus:ring-2 focus:ring-purple-300 outline-none',
+          'text-slate-900 dark:bg-slate-900/70 dark:text-slate-50',
           'touch-manipulation',
         ].join(' ')}
         onInput={grow}
@@ -93,8 +93,8 @@ export default function InlineComposer({
             // tighter paddings on mobile, normal on md+
             'px-2.5 py-2 sm:px-3 sm:py-2',
             repeat === 'this-week'
-              ? 'ring-emerald-700/30 shadow bg-gradient-to-br from-emerald-500 to-lime-500 text-emerald-950'
-              : 'ring-emerald-700/15 bg-white/70 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100',
+              ? 'ring-purple-500/40 shadow bg-gradient-to-br from-purple-500 to-pink-500 text-white'
+              : 'ring-slate-200/80 bg-white/80 text-slate-900 dark:bg-slate-900/60 dark:text-slate-100 dark:ring-slate-700/70',
           ].join(' ')}
           aria-pressed={repeat === 'this-week'}
         >
@@ -116,8 +116,8 @@ export default function InlineComposer({
             'rounded-2xl ring-1 transition',
             'px-2.5 py-2 sm:px-3 sm:py-2',
             repeat === 'weekly'
-              ? 'ring-emerald-700/30 shadow bg-emerald-900/5 text-emerald-900 dark:bg-emerald-900/30 dark:text-emerald-100'
-              : 'ring-emerald-700/15 bg-white/70 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-100',
+              ? 'ring-purple-500/40 shadow bg-purple-100 text-purple-900 dark:bg-purple-900/40 dark:text-purple-100'
+              : 'ring-slate-200/80 bg-white/80 text-slate-900 dark:bg-slate-900/60 dark:text-slate-100 dark:ring-slate-700/70',
           ].join(' ')}
           aria-pressed={repeat === 'weekly'}
         >
@@ -140,8 +140,8 @@ export default function InlineComposer({
           disabled={disabled}
           onClick={add}
           className={[
-            'rounded-2xl ring-1 ring-emerald-700/30 shadow',
-            'bg-gradient-to-br from-emerald-500 to-lime-500 text-emerald-950',
+            'rounded-2xl ring-1 ring-purple-500/40 shadow',
+            'bg-gradient-to-br from-purple-500 to-pink-500 text-white',
             'px-3 py-2 text-sm font-semibold',
             'hover:brightness-105 disabled:opacity-60',
             'inline-flex items-center justify-center gap-2',
@@ -156,9 +156,9 @@ export default function InlineComposer({
           type="button"
           onClick={onCancel}
           className={[
-            'rounded-2xl ring-1 ring-emerald-700/10',
-            'bg-white/70 text-emerald-900',
-            'dark:bg-emerald-950/50 dark:text-emerald-100 dark:ring-emerald-500/10',
+            'rounded-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/70',
+            'bg-white/80 text-slate-800',
+            'dark:bg-slate-900/60 dark:text-slate-100',
             'px-3 py-2 text-sm font-medium',
             'inline-flex items-center justify-center gap-2',
           ].join(' ')}

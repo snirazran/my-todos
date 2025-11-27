@@ -266,7 +266,7 @@ export default function TaskBoard({
       {/* GLOBAL BOTTOM ADD (trigger only) */}
       <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 py-12 pointer-events-none sm:px-6 sm:py-5">
         <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
-          <div className="rounded-[28px] bg-white/75 dark:bg:white/8 backdrop-blur-2xl ring-1 ring-black/10 dark:ring-white/10 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
+          <div className="rounded-[28px] bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/60 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
             <AddTaskButton
               onClick={() => {
                 setQuickText('');

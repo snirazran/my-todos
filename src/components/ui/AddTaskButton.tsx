@@ -25,10 +25,10 @@ export function AddTaskButton({
       className={[
         'relative w-full h-12 rounded-full',
         'bg-white dark:bg-white/10 backdrop-blur-xl',
-        'text-emerald-900 dark:text-emerald-50 font-semibold tracking-[-0.01em]',
+        'text-slate-900 dark:text-white font-semibold tracking-[-0.01em]',
         'shadow-[0_1px_0_rgba(255,255,255,.7)_inset,0_4px_12px_rgba(0,0,0,.08)] ring-1 ring-black/10 dark:ring-white/10',
         'transition-transform duration-200 hover:shadow-[0_1px_0_rgba(255,255,255,.75)_inset,0_8px_18px_rgba(0,0,0,.12)] hover:bg-white',
-        'active:scale-[0.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-lime-300',
+        'active:scale-[0.995] focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300',
         disabled ? 'opacity-60 pointer-events-none' : '',
         className,
       ].join(' ')}

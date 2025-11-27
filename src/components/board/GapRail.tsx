@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import * as React from 'react';
 import { createPortal } from 'react-dom';
@@ -51,7 +51,7 @@ export default function GapRail({
     !overlayHidden && hover && rect
       ? createPortal(
           <div
-            // fixed so it’s out of parent stacking contexts
+            // fixed so it's out of parent stacking contexts
             style={{
               position: 'fixed',
               left: rect.left,
@@ -65,7 +65,7 @@ export default function GapRail({
             <div className="absolute inset-0 flex items-center justify-center">
               {/* left dashed vine */}
               <div className="flex-1">
-                <div className="w-full h-px text-emerald-500/80 dark:text-emerald-400/70">
+                <div className="w-full h-px text-purple-500/80 dark:text-purple-300/70">
                   <div
                     className="w-full h-[2px]"
                     style={{
@@ -78,7 +78,7 @@ export default function GapRail({
                 </div>
               </div>
 
-              {/* lily-pad “+” */}
+              {/* lily-pad ג€+ג€ */}
               <button
                 type="button"
                 title="Add task (ribbit!)"
@@ -89,14 +89,14 @@ export default function GapRail({
                 }}
                 className={[
                   'pointer-events-auto mx-1 h-8 w-8 grid place-items-center rounded-full',
-                  'ring-1 ring-emerald-300/60 dark:ring-emerald-900/40 shadow-sm',
+                  'ring-1 ring-purple-200/70 dark:ring-purple-800/50 shadow-sm',
                   'transition-transform duration-150',
                   disabled ? '' : 'hover:scale-[1.06] active:scale-[0.98]',
                 ].join(' ')}
                 style={{
                   background:
-                    'radial-gradient(120% 120% at 30% 30%, #34D399 0%, #10B981 55%, #059669 100%)',
-                  color: '#064E3B',
+                    'radial-gradient(120% 120% at 30% 30%, #c084fc 0%, #a855f7 55%, #7c3aed 100%)',
+                  color: '#3b1c77',
                 }}
                 disabled={disabled}
               >
@@ -107,7 +107,7 @@ export default function GapRail({
 
               {/* right dashed vine */}
               <div className="flex-1">
-                <div className="w-full h-px text-emerald-500/80 dark:text-emerald-400/70">
+                <div className="w-full h-px text-purple-500/80 dark:text-purple-300/70">
                   <div
                     className="w-full h-[2px]"
                     style={{
@@ -131,7 +131,7 @@ export default function GapRail({
                     width: 40,
                     height: 40,
                     boxShadow:
-                      '0 0 0 0 rgba(16,185,129,0.18), 0 0 0 8px rgba(16,185,129,0.08)',
+                      '0 0 0 0 rgba(124,58,237,0.2), 0 0 0 8px rgba(124,58,237,0.08)',
                     filter: 'blur(0.2px)',
                   }}
                 />
@@ -163,3 +163,4 @@ export default function GapRail({
     </div>
   );
 }
+

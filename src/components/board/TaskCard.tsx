@@ -159,8 +159,8 @@ export default function TaskCard({
       style={{ touchAction: 'pan-y' }}
       className={[
         'group relative overflow-visible flex items-stretch gap-2 p-3 select-none rounded-2xl cursor-grab transition',
-        'bg-white/85 dark:bg-emerald-900/40 backdrop-blur',
-        'border border-emerald-700/20 dark:border-emerald-300/15 shadow',
+        'bg-white/90 dark:bg-slate-900/60 backdrop-blur',
+        'border border-slate-200/70 dark:border-slate-700/60 shadow',
         'mb-2',
         menuOpen ? 'z-50 shadow-2xl' : '',
         hiddenWhileDragging ? 'opacity-0' : 'hover:shadow-md',
@@ -177,14 +177,14 @@ export default function TaskCard({
           <div className="mt-1 flex items-center gap-1.5">
             <span
               title="Repeats weekly"
-              className="inline-flex items-center gap-1 rounded-md border border-emerald-300/50 bg-emerald-50/80 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700 shadow-sm dark:border-emerald-400/30 dark:bg-emerald-900/40 dark:text-emerald-100 transition-colors group-hover:bg-emerald-50"
+              className="inline-flex items-center gap-1 rounded-md border border-purple-200/60 bg-purple-50/80 px-1.5 py-0.5 text-[11px] font-medium text-purple-700 shadow-sm dark:border-purple-300/40 dark:bg-purple-900/40 dark:text-purple-100 transition-colors group-hover:bg-purple-50"
             >
               <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
               <span className="tracking-wide uppercase">Repeats</span>
             </span>
           </div>
         )}
-        <div className="truncate text-[15px] leading-6 text-emerald-950 dark:text-emerald-50">
+        <div className="truncate text-[15px] leading-6 text-slate-900 dark:text-slate-50">
           {task.text}
         </div>
       </div>
@@ -199,12 +199,12 @@ export default function TaskCard({
           aria-label="Task actions"
           aria-expanded={menuOpen}
           className={[
-            'rounded-full p-1.5 hover:bg-emerald-100/60 dark:hover:bg-emerald-800/50 transition',
-            menuOpen ? 'bg-emerald-100/80 dark:bg-emerald-800/70' : '',
+            'rounded-full p-1.5 hover:bg-slate-100 dark:hover:bg-slate-800/60 transition',
+            menuOpen ? 'bg-slate-200/80 dark:bg-slate-800/70' : '',
           ].join(' ')}
           type="button"
         >
-          <EllipsisVertical className="w-4 h-4 text-emerald-700 dark:text-emerald-100" />
+          <EllipsisVertical className="w-4 h-4 text-slate-600 dark:text-slate-200" />
         </button>
       </div>
     </div>

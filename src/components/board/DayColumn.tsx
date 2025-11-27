@@ -25,13 +25,13 @@ export default function DayColumn({
       className={[
         'group relative flex flex-col overflow-visible',
         'rounded-[26px] bg-white/90 backdrop-blur-xl shadow-2xl',
-        'ring-1 ring-emerald-700/20 dark:bg-emerald-950/60 dark:ring-emerald-300/10',
+        'ring-1 ring-slate-200/80 dark:bg-slate-900/70 dark:ring-slate-700/70',
         appliedMax,
         'p-2.5 md:p-3',
         'min-h-[100px]',
       ].join(' ')}
     >
-      <h2 className="mb-3 font-extrabold tracking-tight text-center text-transparent md:mb-4 bg-gradient-to-r from-emerald-700 via-lime-600 to-emerald-700 bg-clip-text dark:from-emerald-300 dark:via-lime-300 dark:to-emerald-200">
+      <h2 className="mb-3 font-extrabold tracking-tight text-center text-transparent md:mb-4 bg-gradient-to-r from-purple-600 via-indigo-500 to-purple-600 bg-clip-text dark:from-purple-300 dark:via-indigo-300 dark:to-purple-200">
         {title}
       </h2>
 

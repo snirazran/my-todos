@@ -124,7 +124,7 @@ export default function TaskList({
   const renderPlaceholder = (k: string) => (
     <div
       key={k}
-      className="h-12 my-2 border-2 border-dashed rounded-2xl border-lime-400/70 bg-lime-50/40"
+      className="h-12 my-2 border-2 border-dashed rounded-2xl border-purple-300/70 bg-purple-50/40 dark:border-purple-300/40 dark:bg-purple-900/25"
     />
   );
 
@@ -222,12 +222,12 @@ export default function TaskList({
       {menu &&
         createPortal(
           <div
-            className="fixed z-[2000] w-44 max-w-[82vw] origin-top rounded-xl border border-emerald-200/80 bg-white shadow-xl dark:border-emerald-700/60 dark:bg-emerald-900"
+            className="fixed z-[2000] w-44 max-w-[82vw] origin-top rounded-xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-700/70 dark:bg-slate-900"
             style={{ top: menu.top, left: menu.left }}
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              className="flex w-full items-center justify-center gap-2 px-3 py-2 text-sm text-emerald-900 rounded-xl hover:bg-emerald-50 dark:text-emerald-50 dark:hover:bg-emerald-800/70"
+              className="flex w-full items-center justify-center gap-2 px-3 py-2 text-sm text-slate-800 rounded-xl hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800/70"
               onClick={() => {
                 setMenu(null);
                 if (menu) {

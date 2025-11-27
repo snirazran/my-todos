@@ -22,7 +22,7 @@ export default function ManageTasksPage() {
   );
   const [loading, setLoading] = useState(true);
 
-  /** Map API order (Sun..Sat, Later at index 7) → Display order */
+  /** Map API order (Sun..Sat, Later at index 7) -> Display order */
   const mapApiToDisplay = (apiWeek: Task[][]): Task[][] => {
     const out: Task[][] = Array.from({ length: DAYS }, () => []);
     // API days 0..6 (Sun..Sat)
@@ -54,7 +54,7 @@ export default function ManageTasksPage() {
     })();
   }, []);
 
-  /** Save order for one display column (maps → API day) */
+  /** Save order for one display column (maps -> API day) */
   const saveDay = async (displayDay: DisplayDay, tasks: Task[]) => {
     const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
     try {
@@ -71,7 +71,7 @@ export default function ManageTasksPage() {
     }
   };
 
-  /** Delete from one display column (maps → API day) */
+  /** Delete from one display column (maps -> API day) */
   const removeTask = async (displayDay: DisplayDay, id: string) => {
     try {
       await fetch('/api/tasks?view=board', {
@@ -91,7 +91,7 @@ export default function ManageTasksPage() {
     }
   };
 
-  /** Direct add from QuickAddSheet: days are API days (0..6) or -1 for “Later” */
+  /** Direct add from QuickAddSheet: days are API days (0..6) or -1 for "Later" */
   const onAddTask = async ({
     text,
     days,
@@ -124,17 +124,22 @@ export default function ManageTasksPage() {
   );
 
   if (loading) {
-    return <LoadingScreen message="Loading task board…" fullscreen />;
+    return <LoadingScreen message="Loading task board..." fullscreen />;
   }
 
   return (
     <main
-      className="relative overflow-hidden min-h-100svh pb-safe bg-gradient-to-br from-emerald-900 via-emerald-800 to-lime-900/90"
+      className="relative overflow-hidden min-h-100svh pb-safe bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900"
       style={{
         height: 'calc(100dvh - var(--header-h))',
         minHeight: 'calc(-webkit-fill-available - var(--header-h))',
       }}
     >
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute -left-24 top-[-12%] h-80 w-80 rounded-full bg-purple-300/25 blur-3xl dark:bg-purple-700/20" />
+        <div className="absolute right-[-14%] top-[6%] h-72 w-72 rounded-full bg-indigo-200/30 blur-3xl dark:bg-indigo-700/25" />
+      </div>
+
       <div className="absolute inset-0">
         <TaskBoard
           titles={titles}
