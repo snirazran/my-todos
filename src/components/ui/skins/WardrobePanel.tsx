@@ -160,26 +160,6 @@ export function WardrobePanel({
     }
   };
 
-  // Compute current equipped indices for the Frog preview
-  const equippedIndices = useMemo(() => {
-    // Default all slots to 0 to prevent Rive defaults (like Santa hat) from showing
-    const indices: Record<WardrobeSlot, number> = {
-      skin: 0,
-      hat: 0,
-      scarf: 0,
-      hand_item: 0
-    };
-
-    if (!data) return indices;
-    
-    for (const [slot, itemId] of Object.entries(data.wardrobe.equipped)) {
-      if (!itemId) continue;
-      const item = data.catalog.find(i => i.id === itemId);
-      if (item) indices[slot as WardrobeSlot] = item.riveIndex;
-    }
-    return indices;
-  }, [data]);
-
   // Computed lists
   const inventoryItems = useMemo(() => {
     if (!data) return [];
@@ -272,13 +252,12 @@ export function WardrobePanel({
                          <p className="text-lg font-black text-slate-400">Empty</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-3 min-[500px]:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 pb-20">
+                      <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-20">
                         {inventoryItems.map(item => (
                           <ItemCard
                             key={item.id}
                             item={item}
                             mode="inventory"
-                            equippedIndices={equippedIndices}
                             ownedCount={data?.wardrobe.inventory[item.id] ?? 0}
                             isEquipped={data?.wardrobe.equipped[item.slot] === item.id}
                             canAfford={true}
@@ -293,7 +272,7 @@ export function WardrobePanel({
 
                   {/* Shop Grid */}
                   <TabsContent value="shop" className="absolute inset-0 overflow-y-auto p-4 data-[state=inactive]:hidden">
-                     <div className="grid grid-cols-3 min-[500px]:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 pb-20">
+                     <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-20">
                         {shopItems.map(item => {
                           const count = data?.wardrobe.inventory[item.id] ?? 0;
                           return (
@@ -301,7 +280,6 @@ export function WardrobePanel({
                               key={item.id}
                               item={item}
                               mode="shop"
-                              equippedIndices={equippedIndices}
                               ownedCount={count}
                               isEquipped={false}
                               canAfford={balance >= (item.priceFlies ?? 0)}
