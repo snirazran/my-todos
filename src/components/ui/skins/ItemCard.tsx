@@ -136,23 +136,22 @@ export function ItemCard({
         {config.label}
       </div>
 
-      {/* Icon Container (Now Rive Frog) */}
+      {/* Icon Container (Static Image to prevent Safari Crash) */}
       <div className={cn(
-        "mt-5 mb-3 mx-auto w-full aspect-[1.2/1] rounded-2xl flex items-center justify-center relative overflow-hidden", // Increased margins and roundedness
+        "mt-5 mb-3 mx-auto w-full aspect-[1.2/1] rounded-2xl flex items-center justify-center relative overflow-hidden", 
         "bg-gradient-to-br shadow-inner", config.gradient
       )}>
         {/* Shine Effect */}
         <div className="absolute -inset-full top-0 block h-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine z-10 pointer-events-none" />
 
-                        {/* RIVE FROG PREVIEW */}
-                        <div className="absolute inset-0 flex items-end justify-center">
-                           <Frog 
-                             className="w-[130%] h-[130%] object-contain translate-y-[25%]" // Slightly reduced translate-y to move frog up
-                             indices={previewIndices}
-                             width={180}
-                             height={180}
-                           />
-                        </div>
+        {/* Static Item Image (Safe for Mobile/Safari) */}
+        <div className="absolute inset-0 flex items-end justify-center">
+           <img 
+             src={item.icon}
+             alt={item.name}
+             className="w-[80%] h-[80%] object-contain mb-2 drop-shadow-md transition-transform duration-300 group-hover:scale-110"
+           />
+        </div>
         
         {/* OWNED COUNT BADGE */}
         {ownedCount > 0 && (

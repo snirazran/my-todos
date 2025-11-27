@@ -34,7 +34,7 @@ export function FilterBar({
             key={cat}
             onClick={() => onChange(cat)}
             className={cn(
-              "flex shrink-0 items-center gap-2 px-5 py-3 rounded-2xl text-sm font-bold whitespace-nowrap transition-all border-[2px] shadow-sm",
+              "flex shrink-0 items-center gap-2 px-3 py-2 sm:px-5 sm:py-3 rounded-2xl text-xs sm:text-sm font-bold whitespace-nowrap transition-all border-[2px] shadow-sm",
               isActive
                 ? "bg-purple-600 border-purple-600 text-white shadow-purple-500/30 scale-105"
                 : "bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-purple-300 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-300"
