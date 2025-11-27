@@ -30,6 +30,9 @@ interface Task {
   id: string;
   text: string;
   completed: boolean;
+  type?: 'regular' | 'weekly' | 'backlog';
+  origin?: 'regular' | 'weekly' | 'backlog';
+  kind?: 'regular' | 'weekly' | 'backlog';
 }
 
 const demoTasks: Task[] = [
@@ -94,22 +97,12 @@ export default function Home() {
     const res = await fetch(`/api/tasks?date=${dateStr}`);
     const json = await res.json();
     setTasks(json.tasks ?? []);
-    await fetchWeeklyIds();
+    setWeeklyIds(new Set(json.weeklyIds ?? []));
   }, [session, dateStr]);
-
-  const fetchWeeklyIds = React.useCallback(async () => {
-    if (!session) return;
-    const dow = new Date().getDay();
-    const templ = await fetch(
-      `/api/tasks?view=board&day=${dow}`
-    ).then((r) => r.json());
-    setWeeklyIds(new Set(templ.map((t: any) => t.id)));
-  }, [session]);
 
   useEffect(() => {
     fetchBacklog();
-    fetchWeeklyIds();
-  }, [fetchBacklog, fetchWeeklyIds]);
+  }, [fetchBacklog]);
 
   /* -------- data load -------- */
   useEffect(() => {
@@ -123,6 +116,7 @@ export default function Home() {
         const res = await fetch(`/api/tasks?date=${dateStr}`);
         const json = await res.json();
         setTasks(json.tasks ?? []);
+        setWeeklyIds(new Set(json.weeklyIds ?? []));
       } finally {
         setLoading(false);
       }
@@ -357,7 +351,7 @@ export default function Home() {
             const res = await fetch(`/api/tasks?date=${dateStr}`);
             const json = await res.json();
             setTasks(json.tasks ?? []);
-            await fetchWeeklyIds();
+            setWeeklyIds(new Set(json.weeklyIds ?? []));
           } else {
             setGuestTasks((prev) => [
               ...prev,
