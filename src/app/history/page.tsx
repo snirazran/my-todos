@@ -35,12 +35,17 @@ interface DayRecord {
   tasks: HistoryTask[];
 }
 
+type FlyStatus = {
+  balance: number;
+};
+
 export default function History() {
   const { data: session, status } = useSession();
   const sessionLoading = status === 'loading';
   const [openWardrobe, setOpenWardrobe] = useState(false);
   const [history, setHistory] = useState<DayRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [flyBalance, setFlyBalance] = useState<number | undefined>(undefined);
 
   /* ---- frog animation shared state ---- */
   const frogRef = useRef<FrogHandle>(null);
@@ -57,6 +62,12 @@ export default function History() {
     visuallyDone,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
+  const applyFlyStatus = (incoming?: FlyStatus | null) => {
+    if (incoming && typeof incoming.balance === 'number') {
+      setFlyBalance(incoming.balance);
+    }
+  };
+
   /* ---- data load ---- */
   useEffect(() => {
     if (!session) {
@@ -69,6 +80,13 @@ export default function History() {
         const res = await fetch('/api/history');
         const data = await res.json();
         setHistory(data);
+
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const flyRes = await fetch(`/api/tasks?date=${today}`);
+        if (flyRes.ok) {
+          const flyJson = await flyRes.json();
+          applyFlyStatus(flyJson.flyStatus);
+        }
       } catch (e) {
         console.error('Failed to fetch history:', e);
       } finally {
@@ -120,11 +138,19 @@ export default function History() {
     );
     // server
     if (session) {
-      await fetch('/api/tasks', {
+      const res = await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date, taskId, completed }),
       });
+      if (res.ok) {
+        try {
+          const body = await res.json();
+          applyFlyStatus(body.flyStatus);
+        } catch {
+          /* ignore */
+        }
+      }
     }
   };
 
@@ -193,6 +219,7 @@ export default function History() {
             indices={indices}
             openWardrobe={openWardrobe}
             onOpenChange={setOpenWardrobe}
+            flyBalance={flyBalance}
           />
         </div>
 

@@ -17,7 +17,10 @@ const UserSchema = new Schema<UserDoc>(
     email: { type: String, required: true, lowercase: true, index: true },
     passwordHash: { type: String, required: true },
     createdAt: { type: Date, default: Date.now },
-    wardrobe: { type: Schema.Types.Mixed },
+    wardrobe: {
+      type: Schema.Types.Mixed,
+      default: () => ({ equipped: {}, inventory: {}, flies: 0 }),
+    },
     skins: { type: Schema.Types.Mixed },
   },
   { collection: 'users' }

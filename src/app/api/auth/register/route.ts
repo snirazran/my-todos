@@ -5,6 +5,10 @@ import { z } from 'zod';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 
+const pad = (n: number) => String(n).padStart(2, '0');
+const ymdLocal = (d: Date) =>
+  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
 /* ---------- schema & helpers ---------- */
 const schema = z.object({
   name: z.string().trim().min(2, 'Name must be at least 2 chars'),
@@ -62,6 +66,17 @@ export async function POST(req: NextRequest) {
       email,
       passwordHash: await hash(password, 12),
       createdAt: new Date(),
+      wardrobe: {
+        equipped: {},
+        inventory: {},
+        flies: 0,
+        flyDaily: {
+          date: ymdLocal(new Date()),
+          earned: 0,
+          taskIds: [],
+          limitNotified: false,
+        },
+      },
     });
 
     return json({ ok: true }, 201);

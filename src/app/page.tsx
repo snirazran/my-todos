@@ -35,6 +35,14 @@ interface Task {
   kind?: 'regular' | 'weekly' | 'backlog';
 }
 
+type FlyStatus = {
+  balance: number;
+  earnedToday: number;
+  limit: number;
+  limitHit: boolean;
+  justHitLimit?: boolean;
+};
+
 const demoTasks: Task[] = [
   { id: 'g1', text: 'Meditation', completed: true },
   { id: 'g2', text: 'Read a book', completed: true },
@@ -61,6 +69,12 @@ export default function Home() {
   const [quickText, setQuickText] = useState('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [weeklyIds, setWeeklyIds] = useState<Set<string>>(new Set());
+  const [flyStatus, setFlyStatus] = useState<FlyStatus>({
+    balance: 0,
+    earnedToday: 0,
+    limit: 15,
+    limitHit: false,
+  });
 
   const [laterThisWeek, setLaterThisWeek] = useState<
     { id: string; text: string }[]
@@ -78,6 +92,11 @@ export default function Home() {
     visuallyDone,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
+  const applyFlyStatus = useCallback((incoming?: FlyStatus | null) => {
+    if (!incoming) return;
+    setFlyStatus(incoming);
+  }, []);
+
   const fetchBacklog = useCallback(async () => {
     if (!session) return;
     const items = await fetch('/api/tasks?view=board&day=-1').then((r) =>
@@ -91,6 +110,7 @@ export default function Home() {
   const data = session ? tasks : guestTasks;
   const doneCount = data.filter((t) => t.completed).length;
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
+  const flyBalance = session ? flyStatus.balance : undefined;
 
   const refreshToday = useCallback(async () => {
     if (!session) return;
@@ -98,7 +118,8 @@ export default function Home() {
     const json = await res.json();
     setTasks(json.tasks ?? []);
     setWeeklyIds(new Set(json.weeklyIds ?? []));
-  }, [session, dateStr]);
+    applyFlyStatus(json.flyStatus);
+  }, [session, dateStr, applyFlyStatus]);
 
   useEffect(() => {
     fetchBacklog();
@@ -117,11 +138,12 @@ export default function Home() {
         const json = await res.json();
         setTasks(json.tasks ?? []);
         setWeeklyIds(new Set(json.weeklyIds ?? []));
+        applyFlyStatus(json.flyStatus);
       } finally {
         setLoading(false);
       }
     })();
-  }, [session, dateStr]);
+  }, [session, dateStr, applyFlyStatus]);
 
   /* -------- block manual scroll during cinematic -------- */
   useEffect(() => {
@@ -140,11 +162,19 @@ export default function Home() {
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, completed } : t))
       );
-      await fetch('/api/tasks', {
+      const res = await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: dateStr, taskId, completed }),
       });
+      if (res.ok) {
+        try {
+          const body = await res.json();
+          applyFlyStatus(body?.flyStatus);
+        } catch {
+          /* ignore json errors */
+        }
+      }
     } else {
       setGuestTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, completed } : t))
@@ -214,8 +244,9 @@ export default function Home() {
             indices={indices}
             openWardrobe={openWardrobe}
             onOpenChange={setOpenWardrobe}
+            flyBalance={flyBalance}
           />
-          <div className="relative z-0 -mt-2.5 w-full">
+          <div className="relative z-0 w-full mt-3">
             <ProgressCard rate={rate} done={doneCount} total={data.length} />
           </div>
         </div>
@@ -352,6 +383,7 @@ export default function Home() {
             const json = await res.json();
             setTasks(json.tasks ?? []);
             setWeeklyIds(new Set(json.weeklyIds ?? []));
+            applyFlyStatus(json.flyStatus);
           } else {
             setGuestTasks((prev) => [
               ...prev,

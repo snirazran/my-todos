@@ -7,14 +7,26 @@ import { authOptions } from '@/lib/authOptions';
 import { Types } from 'mongoose';
 import { v4 as uuid } from 'uuid';
 import connectMongo from '@/lib/mongoose';
+import UserModel, { type UserDoc } from '@/lib/models/User';
 import TaskModel, {
   type TaskDoc,
   type TaskType,
   type Weekday,
 } from '@/lib/models/Task';
+import type { DailyFlyProgress } from '@/lib/types/UserDoc';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
+type LeanUser = (UserDoc & { _id: Types.ObjectId }) | null;
+type FlyStatus = {
+  balance: number;
+  earnedToday: number;
+  limit: number;
+  limitHit: boolean;
+  justHitLimit?: boolean;
+};
+
+const DAILY_FLY_LIMIT = 15;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const isWeekday = (n: number): n is Weekday =>
@@ -64,6 +76,151 @@ function isBoardMode(req: NextRequest) {
     params.has('day') ||
     params.get('fullWeek') === '1'
   );
+}
+
+const initDailyFly = (date: string): DailyFlyProgress => ({
+  date,
+  earned: 0,
+  taskIds: [],
+  limitNotified: false,
+});
+
+function normalizeDailyFly(
+  today: string,
+  flyDaily?: DailyFlyProgress
+): DailyFlyProgress {
+  if (flyDaily?.date === today) {
+    return {
+      ...flyDaily,
+      taskIds: flyDaily.taskIds ?? [],
+      limitNotified: flyDaily.limitNotified ?? false,
+    };
+  }
+  return initDailyFly(today);
+}
+
+async function currentFlyStatus(userId: Types.ObjectId): Promise<FlyStatus> {
+  const today = ymdLocal(new Date());
+  const user = (await UserModel.findById(userId, { wardrobe: 1 }).lean()) as LeanUser;
+
+  if (!user) {
+    return {
+      balance: 0,
+      earnedToday: 0,
+      limit: DAILY_FLY_LIMIT,
+      limitHit: false,
+    };
+  }
+
+  const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
+  const daily = normalizeDailyFly(
+    today,
+    wardrobe.flyDaily as DailyFlyProgress | undefined
+  );
+
+  if (!user?.wardrobe || wardrobe.flyDaily?.date !== today) {
+    await UserModel.updateOne(
+      { _id: userId },
+      {
+        $set: {
+          'wardrobe.equipped': wardrobe.equipped ?? {},
+          'wardrobe.inventory': wardrobe.inventory ?? {},
+          'wardrobe.flies': wardrobe.flies ?? 0,
+          'wardrobe.flyDaily': daily,
+        },
+      }
+    );
+  }
+
+  return {
+    balance: wardrobe.flies ?? 0,
+    earnedToday: daily.earned,
+    limit: DAILY_FLY_LIMIT,
+    limitHit: daily.earned >= DAILY_FLY_LIMIT,
+  };
+}
+
+async function awardFlyForTask(
+  userId: Types.ObjectId,
+  taskId: string
+): Promise<{ awarded: boolean; flyStatus: FlyStatus }> {
+  const today = ymdLocal(new Date());
+  const user = (await UserModel.findById(userId, { wardrobe: 1 }).lean()) as LeanUser;
+
+  if (!user) {
+    return {
+      awarded: false,
+      flyStatus: {
+        balance: 0,
+        earnedToday: 0,
+        limit: DAILY_FLY_LIMIT,
+        limitHit: false,
+      },
+    };
+  }
+
+  const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
+  const daily = normalizeDailyFly(
+    today,
+    wardrobe.flyDaily as DailyFlyProgress | undefined
+  );
+  const alreadyRewarded = (daily.taskIds ?? []).includes(taskId);
+  const atLimit = daily.earned >= DAILY_FLY_LIMIT;
+  const limitNotified = daily.limitNotified ?? false;
+
+  if (alreadyRewarded || atLimit) {
+    if (atLimit && !limitNotified) {
+      await UserModel.updateOne(
+        { _id: user._id },
+        { $set: { 'wardrobe.flyDaily.limitNotified': true } }
+      );
+    }
+    return {
+      awarded: false,
+      flyStatus: {
+        balance: wardrobe.flies ?? 0,
+        earnedToday: daily.earned,
+        limit: DAILY_FLY_LIMIT,
+        limitHit: daily.earned >= DAILY_FLY_LIMIT,
+        justHitLimit: atLimit && !limitNotified ? true : undefined,
+      },
+    };
+  }
+
+  const nextEarned = daily.earned + 1;
+  const hitLimit = nextEarned >= DAILY_FLY_LIMIT;
+  const nextDaily: DailyFlyProgress = {
+    date: today,
+    earned: nextEarned,
+    taskIds: Array.from(new Set([...(daily.taskIds ?? []), taskId])),
+    limitNotified: limitNotified || hitLimit,
+  };
+  const nextBalance = (wardrobe.flies ?? 0) + 1;
+
+  const setFields: Record<string, any> = {
+    'wardrobe.flyDaily': nextDaily,
+  };
+  if (!user.wardrobe?.equipped) setFields['wardrobe.equipped'] = {};
+  if (!user.wardrobe?.inventory) setFields['wardrobe.inventory'] = {};
+
+  await UserModel.updateOne(
+    { _id: user._id },
+    {
+      $inc: { 'wardrobe.flies': 1 },
+      $set: setFields,
+    }
+  );
+
+  return {
+    awarded: true,
+    flyStatus: {
+      balance: nextBalance,
+      earnedToday: nextEarned,
+      limit: DAILY_FLY_LIMIT,
+      limitHit: hitLimit,
+      justHitLimit: hitLimit && !limitNotified ? true : undefined,
+    },
+  };
 }
 
 /* ====================================================================== */
@@ -208,6 +365,10 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   }
 
+  const alreadyCompletedForDate =
+    (doc.completedDates ?? []).includes(date) ||
+    (!!doc.completed && doc.type === 'regular');
+
   const update =
     completed === true
       ? { $addToSet: { completedDates: date } }
@@ -219,7 +380,15 @@ export async function PUT(req: NextRequest) {
   }
 
   await TaskModel.updateOne({ userId: uid, id: taskId }, update);
-  return NextResponse.json({ ok: true });
+
+  let flyStatus: FlyStatus | undefined;
+  if (completed && !alreadyCompletedForDate) {
+    ({ flyStatus } = await awardFlyForTask(uid, taskId));
+  } else {
+    flyStatus = await currentFlyStatus(uid);
+  }
+
+  return NextResponse.json({ ok: true, flyStatus });
 }
 
 /* ====================================================================== */
@@ -327,10 +496,13 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
         (a.order ?? 0) - (b.order ?? 0)
     );
 
+  const flyStatus = await currentFlyStatus(userId);
+
   return NextResponse.json({
     date,
     tasks: output,
     weeklyIds: Array.from(weeklyIdsForUI),
+    flyStatus,
   });
 }
 
