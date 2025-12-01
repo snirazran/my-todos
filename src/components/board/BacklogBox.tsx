@@ -10,7 +10,8 @@ interface Props {
   isDragging: boolean;
   proximity: number; // 0 to 1
   onClick: () => void;
-  forwardRef: React.Ref<HTMLDivElement>;
+  // FIX: Updated type from HTMLDivElement to HTMLButtonElement to match <motion.button>
+  forwardRef: React.Ref<HTMLButtonElement>;
 }
 
 export default function BacklogBox({
@@ -23,14 +24,14 @@ export default function BacklogBox({
 }: Props) {
   // Calculate scaling based on proximity: 1.0 -> 1.25
   // If just dragging but far, maybe slight bump to 1.05
-  const scale = isDragOver ? 1.25 : isDragging ? 1.05 + (proximity * 0.2) : 1;
+  const scale = isDragOver ? 1.25 : isDragging ? 1.05 + proximity * 0.2 : 1;
 
   return (
     <motion.button
       ref={forwardRef}
       onClick={onClick}
       aria-label="Backlog"
-      className="relative group outline-none"
+      className="relative outline-none group"
       animate={{
         scale: scale,
       }}
@@ -40,9 +41,9 @@ export default function BacklogBox({
       {/* Pulse Ring when dragging (far) */}
       {isDragging && !isDragOver && (
         <motion.div
-          className="absolute inset-0 rounded-full border-2 border-purple-400/50 dark:border-purple-500/50"
+          className="absolute inset-0 border-2 rounded-full border-purple-400/50 dark:border-purple-500/50"
           animate={{ scale: [1, 1.4], opacity: [0.6, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: "easeOut" }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
         />
       )}
 
