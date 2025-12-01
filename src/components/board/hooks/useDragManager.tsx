@@ -34,6 +34,10 @@ export function useDragManager() {
   const pxVelRef = useRef(0);
   const pxVelSmoothedRef = useRef(0);
 
+  // Refs to hold drag invariants to avoid effect dependencies
+  const dragActiveRef = useRef(false);
+  const dragFromDayRef = useRef<number>(0);
+
   // remember scroller inline styles so we can restore after drag
   const prevTouchAction = useRef<string>('');
   const prevSnapType = useRef<string>('');
@@ -86,6 +90,7 @@ export function useDragManager() {
     document.body.style.touchAction = '';
     document.documentElement.classList.remove('dragging');
     unlockScrollerAfterDrag();
+    dragActiveRef.current = false;
   }, []);
 
   const beginDragFromCard = useCallback(
@@ -110,6 +115,9 @@ export function useDragManager() {
       pxPrevRef.current = clientX;
       pxVelRef.current = 0;
       pxVelSmoothedRef.current = 0;
+
+      dragActiveRef.current = true;
+      dragFromDayRef.current = day;
 
       setDrag({
         active: true,
@@ -163,12 +171,13 @@ export function useDragManager() {
     setTargetIndex(null);
   }, [restoreGlobalInteraction]);
 
-  // movement + target computation
+  // Unified Loop: Event Tracking + Auto-Scroll + Target Detection
   useEffect(() => {
-    if (!drag) return;
+    if (!dragActiveRef.current) return;
 
+    // Event handlers just update refs
     const handleMove = (ev: PointerEvent | MouseEvent | TouchEvent) => {
-      if ((ev as any).cancelable) ev.preventDefault(); // keep UA from hijacking
+      if ((ev as any).cancelable) ev.preventDefault();
       // @ts-ignore
       const pt = 'touches' in ev ? ev.touches?.[0] : ev;
       const x = (pt?.clientX ?? 0) as number;
@@ -177,31 +186,106 @@ export function useDragManager() {
       pointerXRef.current = x;
       pointerYRef.current = y;
 
-      const instV = x - pxPrevRef.current;
-      pxPrevRef.current = x;
-      pxVelRef.current = instV;
+      // Velocity calc (keep it here or move to tick? Moving to tick is smoother for smoothing)
+      // But we need 'fresh' data for velocity. 
+      // Let's keep simple ref update here.
+    };
 
-      setDrag((d) => (d ? { ...d, x, y } : d));
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') cancelDrag();
+    };
 
-      // find column
+    window.addEventListener('pointermove', handleMove as any, { passive: false });
+    window.addEventListener('touchmove', handleMove as any, { passive: false });
+    window.addEventListener('keydown', handleKey);
+
+    // Animation Loop
+    let raf = 0;
+    const EDGE_X = 96,
+      EDGE_Y = 72,
+      VP_EDGE_Y = 80,
+      HYST = 10;
+    const MIN_V = 2,
+      MAX_V = 24;
+    const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
+    const easeCubic = (t: number) => t * t * t;
+    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+
+    const tick = () => {
+      if (!dragActiveRef.current) return;
+
+      const px = pointerXRef.current;
+      const py = pointerYRef.current;
+
+      // --- 1. Velocity Calculation ---
+      const instV = px - pxPrevRef.current;
+      pxPrevRef.current = px;
+      pxVelRef.current = instV; // basic instantaneous velocity
+
+      // --- 2. Update Drag State (Visuals) ---
+      setDrag((d) => {
+        if (!d) return null;
+        if (d.x === px && d.y === py) return d; // avoid render if no move
+        return { ...d, x: px, y: py };
+      });
+
+      // --- 3. Auto-Scroll Logic ---
+      const s = scrollerRef.current;
+      if (s) {
+        const rect = s.getBoundingClientRect();
+        const isNearBottom = py > window.innerHeight - 150; 
+        
+        let distFactor = 0, dir = 0;
+          
+        if (!isNearBottom) {
+          if (px > rect.right - EDGE_X) {
+            const d = px - (rect.right - EDGE_X);
+            if (d > HYST) {
+              distFactor = clamp((d - HYST) / (EDGE_X - HYST), 0, 1);
+              dir = +1;
+            }
+          } else if (px < rect.left + EDGE_X) {
+            const d = rect.left + EDGE_X - px;
+            if (d > HYST) {
+              distFactor = clamp((d - HYST) / (EDGE_X - HYST), 0, 1);
+              dir = -1;
+            }
+          }
+        }
+        
+        const velSmoothed = lerp(pxVelSmoothedRef.current, pxVelRef.current, 0.18);
+        pxVelSmoothedRef.current = velSmoothed;
+        const speedFactor = clamp(Math.abs(velSmoothed) / 20, 0, 1);
+        const combined = clamp(easeCubic(distFactor) * 0.85 + speedFactor * 0.35, 0, 1);
+        const vx = dir * (MIN_V + (MAX_V - MIN_V) * combined);
+        
+        if (dir !== 0) {
+            s.scrollLeft += vx;
+        }
+      }
+
+      // --- 4. Target Detection ---
+      // Find Column
       let newDay: number | null = null;
       for (let day = 0; day < DAYS; day++) {
         const col = slideRefs.current[day];
         if (!col) continue;
         const r = col.getBoundingClientRect();
-        if (x >= r.left && x <= r.right) {
+        // Use center-point check or strict bound?
+        // Using bounds is usually fine, but if we scrolled, bounds updated.
+        if (px >= r.left && px <= r.right) {
           newDay = day;
           break;
         }
       }
+      // Fallback: Closest Column
       if (newDay == null) {
-        let minDist = Infinity,
-          best: number | null = null;
+        let minDist = Infinity, best: number | null = null;
         for (let day = 0; day < DAYS; day++) {
           const col = slideRefs.current[day];
           if (!col) continue;
           const r = col.getBoundingClientRect();
-          const dist = x < r.left ? r.left - x : x - r.right;
+          const dist = px < r.left ? r.left - px : px - r.right;
           if (dist < minDist) {
             minDist = dist;
             best = day;
@@ -210,157 +294,86 @@ export function useDragManager() {
         newDay = best;
       }
 
-      // compute index (cards only)
-      let newIndex = 0;
-      if (newDay != null) {
-        const list = listRefs.current[newDay];
-        if (list) {
-          const cardEls = Array.from(
-            list.querySelectorAll<HTMLElement>('[data-card-id]')
-          );
-          if (cardEls.length === 0) newIndex = 0;
-          else {
-            let placed = false;
-            for (let i = 0; i < cardEls.length; i++) {
-              const cr = cardEls[i].getBoundingClientRect();
-              const mid = cr.top + cr.height / 2;
-              if (y < mid) {
-                newIndex = i;
-                placed = true;
-                break;
-              }
-            }
-            if (!placed) newIndex = cardEls.length;
-          }
-        }
-      }
-      setTargetDay(newDay);
-      setTargetIndex(newIndex);
-    };
-
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') cancelDrag();
-    };
-
-    window.addEventListener('pointermove', handleMove as any, {
-      passive: false,
-    });
-    window.addEventListener('touchmove', handleMove as any, { passive: false });
-    window.addEventListener('keydown', handleKey);
-    return () => {
-      window.removeEventListener('pointermove', handleMove as any);
-      window.removeEventListener('touchmove', handleMove as any);
-      window.removeEventListener('keydown', handleKey);
-    };
-  }, [drag, cancelDrag]);
-
-  // edge auto-scroll (unchanged)
-  useEffect(() => {
-    if (!drag) return;
-    const s = scrollerRef.current;
-    if (!s) return;
-
-    let raf = 0;
-    const EDGE_X = 96,
-      EDGE_Y = 72,
-      VP_EDGE_Y = 80,
-      HYST = 10;
-    const MIN_V = 2,
-      MAX_V = 24;
-    const clamp = (v: number, a: number, b: number) =>
-      Math.max(a, Math.min(b, v));
-    const easeCubic = (t: number) => t * t * t;
-    const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-
-    const tick = () => {
-      const px = pointerXRef.current;
-      const py = pointerYRef.current;
-
-      // horizontal autoscroll near edges (only if not near bottom)
-      const rect = s.getBoundingClientRect();
-      const isNearBottom = py > window.innerHeight - 150; // Disable H-scroll if near bottom buttons
-      
-      let distFactor = 0,
-        dir = 0;
-        
-      if (!isNearBottom) {
-        if (px > rect.right - EDGE_X) {
-          const d = px - (rect.right - EDGE_X);
-          if (d > HYST) {
-            distFactor = clamp((d - HYST) / (EDGE_X - HYST), 0, 1);
-            dir = +1;
-          }
-        } else if (px < rect.left + EDGE_X) {
-          const d = rect.left + EDGE_X - px;
-          if (d > HYST) {
-            distFactor = clamp((d - HYST) / (EDGE_X - HYST), 0, 1);
-            dir = -1;
-          }
-        }
-      }
-      
-      const inst = pxVelRef.current;
-      const velSmoothed = lerp(pxVelSmoothedRef.current, inst, 0.18);
-      pxVelSmoothedRef.current = velSmoothed;
-      const speedFactor = clamp(Math.abs(velSmoothed) / 20, 0, 1);
-      const combined = clamp(
-        easeCubic(distFactor) * 0.85 + speedFactor * 0.35,
-        0,
-        1
-      );
-      const vx = dir * (MIN_V + (MAX_V - MIN_V) * combined);
-      if (dir !== 0) s.scrollLeft += vx;
-
-      // vertical autoscroll inside the list (unchanged)
-      const dayForV = targetDay != null ? targetDay : drag.fromDay;
+      // Find Index (Vertical Auto-Scroll mixed in here usually, but let's separate index logic)
+      // First, Vertical Scroll:
+      const dayForV = newDay != null ? newDay : dragFromDayRef.current;
       const list = listRefs.current[dayForV];
+      
       if (list) {
         const lr = list.getBoundingClientRect();
-        let distY = 0,
-          dirY = 0;
+        let distY = 0, dirY = 0;
         if (py > lr.bottom - EDGE_Y) {
           const d = py - (lr.bottom - EDGE_Y);
           if (d > HYST) {
-            distY = clamp((d - HYST) / (EDGE_Y - HYST), 0, 1);
-            dirY = +1;
+             distY = clamp((d - HYST) / (EDGE_Y - HYST), 0, 1);
+             dirY = +1;
           }
         } else if (py < lr.top + EDGE_Y) {
           const d = lr.top + EDGE_Y - py;
           if (d > HYST) {
-            distY = clamp((d - HYST) / (EDGE_Y - HYST), 0, 1);
-            dirY = -1;
+             distY = clamp((d - HYST) / (EDGE_Y - HYST), 0, 1);
+             dirY = -1;
           }
         }
+        // Viewport edge check
         if (dirY === 0) {
-          const vpBottom = window.innerHeight,
-            vpTop = 0,
-            VP = VP_EDGE_Y;
-          if (py > vpBottom - VP) {
-            const d = py - (vpBottom - VP);
-            if (d > HYST) {
-              distY = clamp((d - HYST) / (VP - HYST), 0, 1);
-              dirY = +1;
-            }
-          } else if (py < vpTop + VP) {
-            const d = vpTop + VP - py;
-            if (d > HYST) {
-              distY = clamp((d - HYST) / (VP - HYST), 0, 1);
-              dirY = -1;
-            }
-          }
+           const vpBottom = window.innerHeight;
+           const vpTop = 0;
+           const VP = VP_EDGE_Y;
+           if (py > vpBottom - VP) {
+             const d = py - (vpBottom - VP);
+             if (d > HYST) {
+               distY = clamp((d - HYST) / (VP - HYST), 0, 1);
+               dirY = +1;
+             }
+           } else if (py < vpTop + VP) {
+             const d = vpTop + VP - py;
+             if (d > HYST) {
+               distY = clamp((d - HYST) / (VP - HYST), 0, 1);
+               dirY = -1;
+             }
+           }
         }
         if (dirY !== 0) {
-          const vy = dirY * (MIN_V + (MAX_V - MIN_V) * easeCubic(distY));
-          list.scrollTop += vy;
+           const vy = dirY * (MIN_V + (MAX_V - MIN_V) * easeCubic(distY));
+           list.scrollTop += vy;
         }
+
+        // Determine Index
+        let newIndex = 0;
+        const cardEls = Array.from(list.querySelectorAll<HTMLElement>('[data-card-id]'));
+        if (cardEls.length > 0) {
+           let placed = false;
+           // Optimization: Binary search could be better but linear is fine for <100 items
+           for (let i = 0; i < cardEls.length; i++) {
+             const cr = cardEls[i].getBoundingClientRect();
+             const mid = cr.top + cr.height / 2;
+             if (py < mid) {
+               newIndex = i;
+               placed = true;
+               break;
+             }
+           }
+           if (!placed) newIndex = cardEls.length;
+        }
+        
+        setTargetIndex(prev => prev === newIndex ? prev : newIndex);
       }
+
+      setTargetDay(prev => prev === newDay ? prev : newDay);
 
       raf = requestAnimationFrame(tick);
     };
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [drag, targetDay]);
+
+    return () => {
+      window.removeEventListener('pointermove', handleMove as any);
+      window.removeEventListener('touchmove', handleMove as any);
+      window.removeEventListener('keydown', handleKey);
+      cancelAnimationFrame(raf);
+    };
+  }, [drag?.active, cancelDrag]); // No 'drag' dependency, relies on dragActiveRef and Refs
 
   // safety nets
   useEffect(() => {
@@ -370,8 +383,7 @@ export function useDragManager() {
   }, [restoreGlobalInteraction]);
 
   useEffect(() => {
-    if (!drag?.active) return;
-
+    // Watch for external interruptions
     const abort = () => cancelDrag();
     const onVis = () => {
       if (document.hidden) cancelDrag();
@@ -388,7 +400,7 @@ export function useDragManager() {
       window.removeEventListener('pagehide', abort as any);
       document.removeEventListener('visibilitychange', onVis);
     };
-  }, [drag?.active, cancelDrag]);
+  }, [cancelDrag]); // Depend on cancelDrag which is stable
 
   return {
     scrollerRef,

@@ -4,13 +4,14 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import TaskCard from './TaskCard';
 import { Task, draggableIdFor, type DisplayDay, apiDayFromDisplay } from './helpers';
-import { DragState } from './hooks/useDragManager';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 
-export default function TaskList({
+export default React.memo(function TaskList({
   day,
   items,
-  drag,
+  isDragging,
+  dragFromDay,
+  dragFromIndex,
   targetDay,
   targetIndex,
   removeTask,
@@ -19,7 +20,9 @@ export default function TaskList({
 }: {
   day: DisplayDay;
   items: Task[];
-  drag: DragState | null;
+  isDragging: boolean;
+  dragFromDay?: number;
+  dragFromIndex?: number;
   targetDay: DisplayDay | null;
   targetIndex: number | null;
   removeTask: (day: DisplayDay, id: string) => Promise<void>;
@@ -47,10 +50,10 @@ export default function TaskList({
   }, [menu]);
 
   const placeholderAt =
-    drag && targetDay === day && targetIndex != null ? targetIndex : null;
+    isDragging && targetDay === day && targetIndex != null ? targetIndex : null;
 
-  const isSelfDrag = !!drag && drag.active && drag.fromDay === day;
-  const sourceIndex = isSelfDrag ? drag!.fromIndex : null;
+  const isSelfDrag = isDragging && dragFromDay === day;
+  const sourceIndex = isSelfDrag && dragFromIndex != null ? dragFromIndex : null;
 
   const variantFor = (t: Task): 'regular' | 'weekly' | 'backlog' => {
     if (t.type === 'weekly') return 'weekly';
@@ -260,4 +263,4 @@ export default function TaskList({
       />
     </>
   );
-}
+});

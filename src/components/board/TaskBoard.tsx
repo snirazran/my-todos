@@ -378,7 +378,9 @@ export default function TaskBoard({
                 <TaskList
                   day={day}
                   items={week[day]}
-                  drag={drag}
+                  isDragging={!!drag?.active}
+                  dragFromDay={drag?.fromDay}
+                  dragFromIndex={drag?.fromIndex}
                   targetDay={effectiveTargetDay as DisplayDay | null}
                   targetIndex={targetIndex}
                   removeTask={removeTask}
@@ -438,7 +440,7 @@ export default function TaskBoard({
         tasks={week[7] || []}
         onGrab={onGrab}
         setCardRef={setCardRef}
-        drag={drag}
+        activeDragId={drag?.active ? drag.taskId : null}
         trayRef={backlogTrayRef}
         closeProgress={trayCloseProgress}
         onRemove={(id) => removeTask(7 as DisplayDay, id)}

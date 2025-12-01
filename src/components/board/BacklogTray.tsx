@@ -4,7 +4,6 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
-import { DragState } from './hooks/useDragManager';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 
 interface Props {
@@ -13,19 +12,19 @@ interface Props {
   tasks: Task[];
   onGrab: (params: any) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
-  drag: DragState | null;
+  activeDragId: string | null;
   trayRef?: React.RefObject<HTMLDivElement>;
   closeProgress?: number; // 0 = fully open, 1 = fully closed
   onRemove?: (id: string) => void;
 }
 
-export default function BacklogTray({
+export default React.memo(function BacklogTray({
   isOpen,
   onClose,
   tasks,
   onGrab,
   setCardRef,
-  drag,
+  activeDragId,
   trayRef,
   closeProgress = 0,
   onRemove,
@@ -175,7 +174,7 @@ export default function BacklogTray({
                           return { id: t.id, top, left };
                         });
                       }}
-                      hiddenWhileDragging={!!drag?.active && drag.taskId === t.id}
+                      hiddenWhileDragging={activeDragId === t.id}
                       isRepeating={t.type === 'weekly'}
                       touchAction="pan-x"
                       onGrab={(payload) => {
@@ -238,4 +237,4 @@ export default function BacklogTray({
       )}
     </AnimatePresence>
   );
-}
+});
