@@ -373,7 +373,7 @@ export default function TaskBoard({
               <DayColumn
                 title={titles[day]}
                 listRef={setListRef(day)}
-                maxHeightClass="max-h-[73svh]"
+                maxHeightClass="max-h-[60svh] md:max-h-[73svh]"
               >
                 <TaskList
                   day={day}

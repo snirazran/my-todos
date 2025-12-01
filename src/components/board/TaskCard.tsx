@@ -41,7 +41,7 @@ export default function TaskCard({
 
   const MOVE_TOLERANCE = 8;
   const LONG_PRESS_DURATION = 230;
-  const defaultTouchAction = touchAction || 'pan-y';
+  const defaultTouchAction = touchAction || 'auto';
 
   const cleanupLP = useCallback(() => {
     if (longPressTimer.current) {
@@ -157,9 +157,9 @@ export default function TaskCard({
       data-card-id={dragId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
-      // Initial state: 'pan-y' allows you to scroll the list up/down.
+      // Initial state: 'auto' allows both vertical list scrolling and horizontal board scrolling.
       // The timer above swaps this to 'none' when dragging starts.
-      style={{ touchAction: defaultTouchAction }}
+      style={{ touchAction: defaultTouchAction, WebkitTapHighlightColor: 'transparent' }}
       className={[
         'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-2xl cursor-grab transition-all duration-300',
         'bg-white dark:bg-slate-800/90 backdrop-blur-md',
