@@ -4,6 +4,7 @@ import React from 'react';
 
 export default function DayColumn({
   title,
+  count,
   listRef,
   children,
   footer,
@@ -12,6 +13,7 @@ export default function DayColumn({
   compact = false,
 }: {
   title: string;
+  count?: number;
   listRef: (el: HTMLDivElement | null) => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
@@ -36,7 +38,11 @@ export default function DayColumn({
         <h2 className="text-lg font-black tracking-tight text-slate-800 dark:text-slate-100 uppercase">
           {title}
         </h2>
-        {/* Could add a badge here for count later */}
+        {(count !== undefined) && (
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+              {count}
+            </span>
+        )}
       </div>
 
       <div

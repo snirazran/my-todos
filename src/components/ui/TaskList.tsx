@@ -118,17 +118,17 @@ export default function TaskList({
     <>
       <div
         dir="ltr"
-        className="px-6 pt-6 pb-4 overflow-visible rounded-2xl bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
+        className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm"
       >
         {/* Header with Badge */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="flex items-center gap-3 text-xl font-bold md:text-2xl text-slate-900 dark:text-white">
+          <h2 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-slate-800 dark:text-slate-100">
             <CalendarCheck className="w-6 h-6 md:w-7 md:h-7 text-violet-500" />
             Your Tasks
           </h2>
           {tasks.length > 0 && (
-            <span className="px-3 py-1 text-xs font-bold rounded-full text-slate-500 bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700">
-              {tasks.length} Today
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+              {tasks.length}
             </span>
           )}
         </div>

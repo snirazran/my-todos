@@ -211,7 +211,7 @@ export default function Home() {
 
         {/* Guest Intro Banner */}
         {!session && (
-          <div className="relative p-6 mb-8 overflow-hidden text-center bg-white shadow-lg md:p-8 rounded-2xl dark:bg-slate-800">
+          <div className="relative p-6 mb-8 overflow-hidden text-center rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm md:p-8">
             <h2 className="mb-3 text-xl font-bold md:text-2xl text-slate-900 dark:text-white">
               There’s a frog with a rumbling belly! 🐸
             </h2>
@@ -253,12 +253,12 @@ export default function Home() {
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
             {/* 3. SEGMENTED CONTROL / TABS */}
-            <div className="flex self-start w-full p-1 bg-slate-200/50 dark:bg-slate-800/50 rounded-xl backdrop-blur-sm md:w-auto">
+            <div className="flex self-start w-full p-1 rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm md:w-auto">
               <button
                 onClick={() => setActiveTab('today')}
                 // Updated className to align text and badge
                 className={`
-        flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2
+        flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2
         ${
           activeTab === 'today'
             ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'

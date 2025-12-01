@@ -372,6 +372,7 @@ export default function TaskBoard({
             >
               <DayColumn
                 title={titles[day]}
+                count={week[day]?.length || 0}
                 listRef={setListRef(day)}
                 maxHeightClass="max-h-[60svh] md:max-h-[73svh]"
               >

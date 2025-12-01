@@ -13,10 +13,10 @@ export default function ProgressCard({ rate, done, total }: ProgressCardProps) {
   return (
     <div
       dir="ltr"
-      className="z-10 p-6 mb-6 rounded-2xl bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
+      className="z-10 p-6 mb-6 rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm"
     >
       <div className="flex items-center justify-between mb-4">
-        <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-900 dark:text-white">
+        <h2 className="flex items-center gap-2 text-xl font-black text-slate-900 dark:text-white">
           <Sparkles className="w-6 h-6 text-purple-500" />
           Your progress today
         </h2>

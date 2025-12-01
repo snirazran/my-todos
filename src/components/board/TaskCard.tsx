@@ -168,20 +168,19 @@ export default function TaskCard({
       onDragStart={(e) => e.preventDefault()}
       style={{ touchAction: defaultTouchAction, WebkitTapHighlightColor: 'transparent' }}
       className={[
-        'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-2xl cursor-grab transition-all duration-300',
+        'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl cursor-grab transition-all duration-300',
         'bg-white dark:bg-slate-800/90 backdrop-blur-md',
-        'border border-slate-100 dark:border-slate-700/50',
-        'shadow-[0_2px_8px_rgba(0,0,0,0.04)] hover:shadow-[0_6px_16px_rgba(0,0,0,0.08)]',
-        'hover:-translate-y-0.5 hover:border-slate-200 dark:hover:border-slate-600',
-        'mb-3',
+        'hover:bg-slate-50 dark:hover:bg-slate-800', // Hover bg instead of border
+        'shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md',
+        'mb-2', // reduced margin
         menuOpen ? 'z-50 shadow-xl ring-2 ring-purple-500/20' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
       role="listitem"
       aria-grabbed={false}
     >
-      <div className="grid self-center h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-50 dark:bg-slate-700/50 text-slate-400 group-hover:text-purple-500 transition-colors">
-        <Fly size={20} />
+      <div className="grid self-center shrink-0 place-items-center text-slate-400 group-hover:text-purple-500 transition-colors">
+        <Fly size={24} />
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col justify-center">

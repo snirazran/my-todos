@@ -81,17 +81,17 @@ export default function BacklogPanel({
     <div
       dir="ltr"
       // Added overflow-visible to allow menus to spill out if needed
-      className="px-6 pt-6 pb-4 overflow-visible rounded-2xl bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
+      className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h3 className="flex items-center gap-3 text-xl font-bold md:text-2xl text-slate-900 dark:text-white">
+        <h3 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-slate-800 dark:text-slate-100">
           <CalendarClock className="w-6 h-6 text-purple-500 md:w-7 md:h-7" />
           Later This Week
         </h3>
         {later.length > 0 && (
-          <span className="px-3 py-1 text-xs font-bold rounded-full text-slate-500 bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700">
-            {later.length} Tasks
+          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+            {later.length}
           </span>
         )}
       </div>
@@ -126,11 +126,10 @@ export default function BacklogPanel({
                   className={`
                     relative flex items-center gap-4 px-3 py-3.5 
                     transition-all duration-200 rounded-xl 
-                    border border-transparent hover:border-slate-200 dark:hover:border-slate-700
-                    hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
+                    border border-transparent hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
                     ${
                       isMenuOpen
-                        ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-md'
+                        ? 'bg-white dark:bg-slate-800 shadow-md'
                         : ''
                     }
                   `}
