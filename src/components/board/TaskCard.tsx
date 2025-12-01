@@ -122,8 +122,8 @@ export default function TaskCard({
         startPos.current = null;
 
         onGrab({
-          clientX: startPos.current?.x ?? e.clientX,
-          clientY: startPos.current?.y ?? e.clientY,
+          clientX: e.clientX, // Use e.clientX directly as startPos.current might be nullified
+          clientY: e.clientY, // Use e.clientY directly as startPos.current might be nullified
           pointerType: e.pointerType as 'mouse' | 'touch',
         });
 
