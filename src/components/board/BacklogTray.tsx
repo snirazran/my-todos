@@ -1,11 +1,11 @@
-'use client';
-
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
 import { DragState } from './hooks/useDragManager';
+import { DeleteDialog } from '@/components/ui/DeleteDialog';
 
 interface Props {
   isOpen: boolean;
@@ -16,6 +16,7 @@ interface Props {
   drag: DragState | null;
   trayRef?: React.RefObject<HTMLDivElement>;
   closeProgress?: number; // 0 = fully open, 1 = fully closed
+  onRemove?: (id: string) => void;
 }
 
 export default function BacklogTray({
@@ -27,7 +28,18 @@ export default function BacklogTray({
   drag,
   trayRef,
   closeProgress = 0,
+  onRemove,
 }: Props) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Menu & Dialog State
+  const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+  const [confirmItem, setConfirmItem] = useState<Task | null>(null);
+  const [busy, setBusy] = useState(false);
+
   // Close on Escape
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
@@ -36,6 +48,48 @@ export default function BacklogTray({
     window.addEventListener('keydown', handleKey);
     return () => window.removeEventListener('keydown', handleKey);
   }, [isOpen, onClose]);
+
+  // Close menu on click outside
+  useEffect(() => {
+    if (!menu) return;
+    const close = () => setMenu(null);
+    // Use capture to ensure we catch it before other stopPropagation calls might interfere, 
+    // or just standard bubbling. Standard is usually fine if we stopProp on the menu itself.
+    window.addEventListener('pointerdown', close);
+    return () => window.removeEventListener('pointerdown', close);
+  }, [menu]);
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    // Don't drag-scroll if clicking a button (context menu) or a task card (it handles its own drag)
+    const target = e.target as HTMLElement;
+    if (target.closest('button') || target.closest('[data-card-id]')) return;
+
+    setIsDragging(true);
+    startX.current = e.pageX - scrollRef.current.offsetLeft;
+    scrollLeft.current = scrollRef.current.scrollLeft;
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || !scrollRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.5; // Scroll-fast
+    scrollRef.current.scrollLeft = scrollLeft.current - walk;
+  };
+
+  const stopDragging = () => setIsDragging(false);
+
+  const handleDelete = async () => {
+    if (!confirmItem || !onRemove) return;
+    setBusy(true);
+    try {
+      await onRemove(confirmItem.id);
+    } finally {
+      setBusy(false);
+      setConfirmItem(null);
+    }
+  };
 
   return (
     <AnimatePresence>
@@ -82,7 +136,12 @@ export default function BacklogTray({
 
             {/* Horizontal Scroll Content */}
             <div
-              className="flex gap-4 p-4 overflow-x-auto overflow-y-visible min-h-[140px] items-center no-scrollbar"
+              ref={scrollRef}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={stopDragging}
+              onMouseLeave={stopDragging}
+              className="flex gap-4 p-4 overflow-x-auto overflow-y-visible min-h-[140px] items-center no-scrollbar touch-manipulation"
             >
               {tasks.length === 0 ? (
                 <div className="w-full text-center py-8 text-slate-400 text-sm italic">
@@ -91,22 +150,37 @@ export default function BacklogTray({
               ) : (
                 tasks.map((t, i) => (
                   <div key={t.id} className="w-[300px] shrink-0 relative">
-                     {/* 
-                        We wrap TaskCard. 
-                        Note: TaskCard expects to be in a list usually, but here it's horizontal.
-                        We need to ensure the DragManager can handle grabbing from here.
-                     */}
                     <TaskCard
                       innerRef={(el) => setCardRef(draggableIdFor(7, t.id), el)}
                       dragId={draggableIdFor(7, t.id)}
                       task={t}
-                      menuOpen={false} // Context menu might be tricky in horizontal layout, simplify for now
-                      onToggleMenu={() => {}}
+                      menuOpen={menu?.id === t.id}
+                      onToggleMenu={(rect) => {
+                        setMenu((prev) => {
+                          if (prev?.id === t.id) return null;
+                          const MENU_W = 176;
+                          const MENU_H = 60;
+                          const GAP = 8; // increased gap
+                          const MARGIN = 10;
+                          const vw = typeof window !== 'undefined' ? window.innerWidth : 480;
+                          const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+                          let left = rect.left + rect.width / 2 - MENU_W / 2;
+                          left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
+                          // Position below by default
+                          let top = rect.bottom + GAP + 8; // added +8 for lower positioning
+                          if (top + MENU_H > vh - MARGIN) {
+                            top = rect.top - MENU_H - GAP;
+                          }
+                          top = Math.max(MARGIN, Math.min(top, vh - MENU_H - MARGIN));
+                          return { id: t.id, top, left };
+                        });
+                      }}
                       hiddenWhileDragging={!!drag?.active && drag.taskId === t.id}
                       isRepeating={t.type === 'weekly'}
+                      touchAction="pan-x"
                       onGrab={(payload) => {
                         onGrab({
-                            day: 7, // 7 is our Backlog index
+                            day: 7,
                             index: i,
                             taskId: t.id,
                             taskText: t.text,
@@ -126,6 +200,40 @@ export default function BacklogTray({
               )}
             </div>
           </motion.div>
+
+          {/* Menu Portal */}
+          {menu &&
+            createPortal(
+              <div
+                className="fixed z-[2000] w-44 max-w-[82vw] origin-top rounded-xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-700/70 dark:bg-slate-900"
+                style={{ top: menu.top, left: menu.left }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  className="flex w-full items-center justify-center gap-2 px-3 py-2 text-sm text-slate-800 rounded-xl hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800/70"
+                  onClick={() => {
+                    setMenu(null);
+                    const t = tasks.find((it) => it.id === menu.id);
+                    if (t) setConfirmItem(t);
+                  }}
+                >
+                  Delete
+                </button>
+              </div>,
+              document.body
+            )}
+
+          {/* Delete Dialog */}
+          <DeleteDialog
+            open={!!confirmItem}
+            variant="backlog"
+            itemLabel={confirmItem?.text}
+            busy={busy}
+            onClose={() => {
+              if (!busy) setConfirmItem(null);
+            }}
+            onDeleteAll={handleDelete}
+          />
         </>
       )}
     </AnimatePresence>

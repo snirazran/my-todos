@@ -276,23 +276,29 @@ export function useDragManager() {
       const px = pointerXRef.current;
       const py = pointerYRef.current;
 
-      // horizontal autoscroll near edges
+      // horizontal autoscroll near edges (only if not near bottom)
       const rect = s.getBoundingClientRect();
+      const isNearBottom = py > window.innerHeight - 150; // Disable H-scroll if near bottom buttons
+      
       let distFactor = 0,
         dir = 0;
-      if (px > rect.right - EDGE_X) {
-        const d = px - (rect.right - EDGE_X);
-        if (d > HYST) {
-          distFactor = clamp((d - HYST) / (EDGE_X - HYST), 0, 1);
-          dir = +1;
-        }
-      } else if (px < rect.left + EDGE_X) {
-        const d = rect.left + EDGE_X - px;
-        if (d > HYST) {
-          distFactor = clamp((d - HYST) / (EDGE_X - HYST), 0, 1);
-          dir = -1;
+        
+      if (!isNearBottom) {
+        if (px > rect.right - EDGE_X) {
+          const d = px - (rect.right - EDGE_X);
+          if (d > HYST) {
+            distFactor = clamp((d - HYST) / (EDGE_X - HYST), 0, 1);
+            dir = +1;
+          }
+        } else if (px < rect.left + EDGE_X) {
+          const d = rect.left + EDGE_X - px;
+          if (d > HYST) {
+            distFactor = clamp((d - HYST) / (EDGE_X - HYST), 0, 1);
+            dir = -1;
+          }
         }
       }
+      
       const inst = pxVelRef.current;
       const velSmoothed = lerp(pxVelSmoothedRef.current, inst, 0.18);
       pxVelSmoothedRef.current = velSmoothed;

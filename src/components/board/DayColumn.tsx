@@ -7,7 +7,7 @@ export default function DayColumn({
   listRef,
   children,
   footer,
-  maxHeightClass = 'max-h-[74svh]', // ⬅ default a bit shorter
+  maxHeightClass = 'max-h-[65svh] md:max-h-[74svh]', // ⬅ default shorter on mobile
   /** Set true when a composer is open in this column to make it a bit shorter */
   compact = false,
 }: {
@@ -18,7 +18,7 @@ export default function DayColumn({
   maxHeightClass?: string;
   compact?: boolean;
 }) {
-  const appliedMax = compact ? 'max-h-[70svh]' : maxHeightClass;
+  const appliedMax = compact ? 'max-h-[60svh] md:max-h-[70svh]' : maxHeightClass;
 
   return (
     <section

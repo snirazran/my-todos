@@ -388,7 +388,7 @@ export default function TaskBoard({
 
       {/* Pagination - Only show dots for actual days */}
       <div
-        className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none bottom-[calc(env(safe-area-inset-bottom)+176px)] md:bottom-[calc(env(safe-area-inset-bottom)+112px)]"
+        className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none bottom-[calc(env(safe-area-inset-bottom)+152px)] md:bottom-[calc(env(safe-area-inset-bottom)+112px)]"
       >
         <div className="pointer-events-auto">
           <PaginationDots count={DAYS - 1} activeIndex={Math.min(pageIndex, 6) as any} />
@@ -437,6 +437,7 @@ export default function TaskBoard({
         drag={drag}
         trayRef={backlogTrayRef}
         closeProgress={trayCloseProgress}
+        onRemove={(id) => removeTask(7 as DisplayDay, id)}
       />
 
       <QuickAddSheet

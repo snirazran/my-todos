@@ -20,6 +20,8 @@ export default function TaskCard({
   innerRef,
   hiddenWhileDragging,
   isRepeating = false,
+  touchAction,
+  requireLongPress = false,
 }: {
   dragId: string;
   task: Task;
@@ -29,6 +31,8 @@ export default function TaskCard({
   onGrab: (params: OnGrabParams) => void;
   hiddenWhileDragging?: boolean;
   isRepeating?: boolean;
+  touchAction?: string;
+  requireLongPress?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -37,6 +41,7 @@ export default function TaskCard({
 
   const MOVE_TOLERANCE = 8;
   const LONG_PRESS_DURATION = 230;
+  const defaultTouchAction = touchAction || 'pan-y';
 
   const cleanupLP = useCallback(() => {
     if (longPressTimer.current) {
@@ -50,9 +55,9 @@ export default function TaskCard({
       el.removeEventListener('pointercancel', handlePointerUp as any);
 
       // Restore: allow vertical scrolling again after interaction ends
-      el.style.touchAction = 'pan-y';
+      el.style.touchAction = defaultTouchAction;
     }
-  }, []);
+  }, [defaultTouchAction]);
 
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
@@ -75,7 +80,8 @@ export default function TaskCard({
 
       pointerIdRef.current = e.pointerId;
 
-      if (e.pointerType === 'mouse') {
+      // If mouse and NOT requiring long press, grab immediately (default desktop behavior)
+      if (e.pointerType === 'mouse' && !requireLongPress) {
         onGrab({
           clientX: e.clientX,
           clientY: e.clientY,
@@ -84,6 +90,7 @@ export default function TaskCard({
         return;
       }
 
+      // Otherwise (Touch OR Mouse with requireLongPress), start long press timer
       startPos.current = { x: e.clientX, y: e.clientY };
       const el = cardRef.current;
       if (el) {
@@ -103,8 +110,6 @@ export default function TaskCard({
           try {
             el.setPointerCapture(pointerIdRef.current);
             // Fix: manually force "none" instantly.
-            // Do not wait for React to update classes.
-            // This stops the horizontal scroll on the parent from stealing the event.
             el.style.touchAction = 'none';
           } catch (err) {
             // ignore
@@ -114,18 +119,16 @@ export default function TaskCard({
         onGrab({
           clientX: startPos.current!.x,
           clientY: startPos.current!.y,
-          pointerType: 'touch',
+          pointerType: e.pointerType as 'mouse' | 'touch',
         });
 
-        // We don't fully cleanup here because we want to keep the drag going,
-        // but we clear the timer reference.
         if (longPressTimer.current) {
           clearTimeout(longPressTimer.current);
           longPressTimer.current = null;
         }
       }, LONG_PRESS_DURATION);
     },
-    [onGrab, handlePointerMove, handlePointerUp, cleanupLP]
+    [onGrab, handlePointerMove, handlePointerUp, cleanupLP, requireLongPress]
   );
 
   useEffect(() => {
@@ -156,7 +159,7 @@ export default function TaskCard({
       onDragStart={(e) => e.preventDefault()}
       // Initial state: 'pan-y' allows you to scroll the list up/down.
       // The timer above swaps this to 'none' when dragging starts.
-      style={{ touchAction: 'pan-y' }}
+      style={{ touchAction: defaultTouchAction }}
       className={[
         'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-2xl cursor-grab transition-all duration-300',
         'bg-white dark:bg-slate-800/90 backdrop-blur-md',
