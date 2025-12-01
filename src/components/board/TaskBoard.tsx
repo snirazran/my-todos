@@ -74,7 +74,8 @@ export default function TaskBoard({
 
   // Backlog State
   const [backlogOpen, setBacklogOpen] = useState(false);
-  const backlogBoxRef = useRef<HTMLDivElement>(null);
+  // FIX: changed from HTMLDivElement to HTMLButtonElement to match BacklogBox props
+  const backlogBoxRef = useRef<HTMLButtonElement>(null);
   const backlogTrayRef = useRef<HTMLDivElement>(null);
   const [isDragOverBacklog, setIsDragOverBacklog] = useState(false);
   const [backlogProximity, setBacklogProximity] = useState(0); // 0..1
@@ -84,7 +85,7 @@ export default function TaskBoard({
     const s = scrollerRef.current;
     // If we target day 7 (backlog) but it's not in the DOM columns, do nothing or snap to end
     if (day >= DAYS - 1) return;
-    
+
     const col = (document.querySelectorAll('[data-col="true"]')[day] ??
       null) as HTMLElement | null;
     if (!s || !col) return;
@@ -139,46 +140,51 @@ export default function TaskBoard({
   // Derived state for masking targetDay (Placeholder Suppression)
   let effectiveTargetDay = targetDay;
   if (drag?.active && backlogOpen && backlogTrayRef.current) {
-     // If dragging within the visual bounds of the tray, suppress column placeholders
-     // The tray might be animating down (trayCloseProgress > 0).
-     // We consider it "covering" if we are below its current visual top.
-     
-     const trayHeight = backlogTrayRef.current.offsetHeight;
-     // Calculate visual top based on close progress (0=open, 1=closed/down)
-     const visualTrayTop = window.innerHeight - (trayHeight * (1 - trayCloseProgress));
-     
-     if (drag.y > visualTrayTop) {
-        effectiveTargetDay = null;
-     }
+    // If dragging within the visual bounds of the tray, suppress column placeholders
+    // The tray might be animating down (trayCloseProgress > 0).
+    // We consider it "covering" if we are below its current visual top.
+
+    const trayHeight = backlogTrayRef.current.offsetHeight;
+    // Calculate visual top based on close progress (0=open, 1=closed/down)
+    const visualTrayTop =
+      window.innerHeight - trayHeight * (1 - trayCloseProgress);
+
+    if (drag.y > visualTrayTop) {
+      effectiveTargetDay = null;
+    }
   }
 
   // Detect drag over backlog box
   useEffect(() => {
     // 1. Handle Tray Animation (Dragging FROM backlog)
-    if (drag?.active && backlogOpen && drag.fromDay === 7 && backlogTrayRef.current) {
-        const trayRect = backlogTrayRef.current.getBoundingClientRect();
-        const trayTop = trayRect.top;
-        
-        // Threshold: Start closing when above trayTop. Fully closed after 150px.
-        const EXIT_DIST = 200;
-        if (drag.y < trayTop) {
-            const distOut = trayTop - drag.y;
-            const progress = Math.min(1, distOut / EXIT_DIST);
-            setTrayCloseProgress(progress);
-        } else {
-            setTrayCloseProgress(0);
-        }
-        // Don't return here, we might still want proximity logic if we drag back near the box? 
-        // Actually, if tray is open, box proximity is less relevant, or maybe we want it to highlight if we drop back "into" the button?
-        // For simplicity, let's prioritize tray animation.
-        setIsDragOverBacklog(false); 
-        setBacklogProximity(0);
-        return;
-    } 
-    
+    if (
+      drag?.active &&
+      backlogOpen &&
+      drag.fromDay === 7 &&
+      backlogTrayRef.current
+    ) {
+      const trayRect = backlogTrayRef.current.getBoundingClientRect();
+      const trayTop = trayRect.top;
+
+      // Threshold: Start closing when above trayTop. Fully closed after 150px.
+      const EXIT_DIST = 200;
+      if (drag.y < trayTop) {
+        const distOut = trayTop - drag.y;
+        const progress = Math.min(1, distOut / EXIT_DIST);
+        setTrayCloseProgress(progress);
+      } else {
+        setTrayCloseProgress(0);
+      }
+      // Don't return here, we might still want proximity logic if we drag back near the box?
+      // Actually, if tray is open, box proximity is less relevant, or maybe we want it to highlight if we drop back "into" the button?
+      // For simplicity, let's prioritize tray animation.
+      setIsDragOverBacklog(false);
+      setBacklogProximity(0);
+      return;
+    }
+
     // Reset tray progress if not dragging from backlog
     setTrayCloseProgress(0);
-
 
     // 2. Handle Box Proximity (Dragging TO backlog)
     if (!drag?.active || !backlogBoxRef.current) {
@@ -188,7 +194,7 @@ export default function TaskBoard({
     }
 
     const r = backlogBoxRef.current.getBoundingClientRect();
-    
+
     // 1. Hit Test (Strict)
     const hit =
       drag.x >= r.left &&
@@ -203,13 +209,12 @@ export default function TaskBoard({
     const cy = r.top + r.height / 2;
     // Distance from pointer to center
     const dist = Math.hypot(drag.x - cx, drag.y - cy);
-    
+
     // Radius of influence (e.g., 200px)
     const MAX_DIST = 200;
     // Normalize 0..1 (1 is closest)
     const prox = Math.max(0, 1 - dist / MAX_DIST);
     setBacklogProximity(prox);
-
   }, [drag?.x, drag?.y, drag?.active, backlogOpen, drag?.fromDay]);
 
   const commitDragReorder = useCallback(
@@ -220,28 +225,28 @@ export default function TaskBoard({
 
       setWeek((prev) => {
         const next = prev.map((d) => d.slice());
-        
+
         // Remove from source
         const [moved] = next[drag.fromDay].splice(drag.fromIndex, 1);
-        
+
         // Insert into dest
         let insertIndex = toIndex;
         // Fix index if moving within same list downwards
         if (drag.fromDay === toDay && drag.fromIndex < toIndex) {
           insertIndex = Math.max(0, toIndex - 1);
         }
-        
+
         // Safety for backlog array
         if (!next[toDay]) next[toDay] = [];
-        
+
         next[toDay].splice(Math.min(insertIndex, next[toDay].length), 0, moved);
 
         // If moved to backlog, update type
         if (toDay === 7) {
-            moved.type = 'backlog';
+          moved.type = 'backlog';
         } else if (drag.fromDay === 7) {
-            // If moved FROM backlog, revert to regular (unless it was weekly, but let's assume regular for now)
-            if (moved.type === 'backlog') moved.type = 'regular';
+          // If moved FROM backlog, revert to regular (unless it was weekly, but let's assume regular for now)
+          if (moved.type === 'backlog') moved.type = 'regular';
         }
 
         Promise.all(
@@ -267,41 +272,41 @@ export default function TaskBoard({
 
     // 1. If hovering the box, force drop to backlog (Index 7)
     if (isDragOverBacklog) {
-        finalToDay = 7 as DisplayDay;
-        finalToIndex = week[7]?.length || 0; // Append to end
-    } 
+      finalToDay = 7 as DisplayDay;
+      finalToIndex = week[7]?.length || 0; // Append to end
+    }
     // 2. If hovering the tray (while open), force drop to backlog to avoid "ghost drop" onto background column
     //    BUT only if we haven't dragged it "out" (trayCloseProgress < 1)
     else if (backlogOpen && backlogTrayRef.current && trayCloseProgress < 0.9) {
-        const tr = backlogTrayRef.current.getBoundingClientRect();
-        // Only capture if we are physically over the tray (or what's left of it)
-        // Although with the animation, the tray moves down. 
-        // But conceptually, if the user is dragging "out", we want them to hit the columns.
-        if (
-            drag.x >= tr.left &&
-            drag.x <= tr.right &&
-            drag.y >= tr.top &&
-            drag.y <= tr.bottom
-        ) {
-            finalToDay = 7 as DisplayDay;
-            if (drag.fromDay === 7) {
-                finalToIndex = drag.fromIndex;
-            } else {
-                finalToIndex = week[7]?.length || 0;
-            }
+      const tr = backlogTrayRef.current.getBoundingClientRect();
+      // Only capture if we are physically over the tray (or what's left of it)
+      // Although with the animation, the tray moves down.
+      // But conceptually, if the user is dragging "out", we want them to hit the columns.
+      if (
+        drag.x >= tr.left &&
+        drag.x <= tr.right &&
+        drag.y >= tr.top &&
+        drag.y <= tr.bottom
+      ) {
+        finalToDay = 7 as DisplayDay;
+        if (drag.fromDay === 7) {
+          finalToIndex = drag.fromIndex;
+        } else {
+          finalToIndex = week[7]?.length || 0;
         }
+      }
     }
     // 3. If we dragged it OUT of the tray (trayCloseProgress >= 0.9), we implicitly "close" the tray logic for this drop.
     //    So we let it fall through to the calculated `finalToDay` (which is based on column geometry).
-    
+
     // If we dropped effectively "outside" (which means valid column drop), we should also close the backlog UI
     if (backlogOpen && finalToDay !== 7) {
-        setBacklogOpen(false);
+      setBacklogOpen(false);
     }
 
     // 1. Commit changes first
     if (finalToDay < 7) {
-        centerColumnSmooth(finalToDay);
+      centerColumnSmooth(finalToDay);
     }
     commitDragReorder(finalToDay, finalToIndex);
 
@@ -315,7 +320,7 @@ export default function TaskBoard({
     targetIndex,
     isDragOverBacklog,
     week,
-    backlogOpen, 
+    backlogOpen,
     trayCloseProgress, // Added dependency
     commitDragReorder,
     endDrag,
@@ -387,43 +392,42 @@ export default function TaskBoard({
       </div>
 
       {/* Pagination - Only show dots for actual days */}
-      <div
-        className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none bottom-[calc(env(safe-area-inset-bottom)+152px)] md:bottom-[calc(env(safe-area-inset-bottom)+112px)]"
-      >
+      <div className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none bottom-[calc(env(safe-area-inset-bottom)+152px)] md:bottom-[calc(env(safe-area-inset-bottom)+112px)]">
         <div className="pointer-events-auto">
-          <PaginationDots count={DAYS - 1} activeIndex={Math.min(pageIndex, 6) as any} />
+          <PaginationDots
+            count={DAYS - 1}
+            activeIndex={Math.min(pageIndex, 6) as any}
+          />
         </div>
       </div>
 
       {/* GLOBAL BOTTOM AREA - Floating Toolbar */}
       <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+20px)] pointer-events-none">
         <div className="pointer-events-auto mx-auto w-full max-w-[400px] flex items-center gap-3">
-          
           {/* Backlog Trigger (Left) */}
           <div className="shrink-0">
-             <BacklogBox
-                count={week[7]?.length || 0}
-                isDragOver={isDragOverBacklog}
-                isDragging={!!drag?.active}
-                proximity={backlogProximity}
-                onClick={() => setBacklogOpen(true)}
-                forwardRef={backlogBoxRef}
-             />
+            <BacklogBox
+              count={week[7]?.length || 0}
+              isDragOver={isDragOverBacklog}
+              isDragging={!!drag?.active}
+              proximity={backlogProximity}
+              onClick={() => setBacklogOpen(true)}
+              forwardRef={backlogBoxRef}
+            />
           </div>
 
           {/* Add Task Button (Main) */}
           <div className="flex-1 min-w-0">
-             <div className="rounded-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/60 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
-                <AddTaskButton
-                  onClick={() => {
-                    setQuickText('');
-                    setShowQuickAdd(true);
-                  }}
-                  disabled={!!drag?.active}
-                />
-             </div>
+            <div className="rounded-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/60 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
+              <AddTaskButton
+                onClick={() => {
+                  setQuickText('');
+                  setShowQuickAdd(true);
+                }}
+                disabled={!!drag?.active}
+              />
+            </div>
           </div>
-
         </div>
       </div>
 
