@@ -29,7 +29,7 @@ export default function BacklogPanel({
     return () => window.removeEventListener('click', close);
   }, [menuFor]);
 
-  // Listen for other menus opening to auto-close this one (matching TaskList behavior)
+  // Listen for other menus opening to auto-close this one (syncs with TaskList)
   React.useEffect(() => {
     const closeIfOther = (e: Event) => {
       const id = (e as CustomEvent<{ id?: string }>).detail?.id;
@@ -80,7 +80,7 @@ export default function BacklogPanel({
   return (
     <div
       dir="ltr"
-      // Updated container styles to match TaskList (overflow-visible fixes clipping)
+      // Added overflow-visible to allow menus to spill out if needed
       className="px-6 pt-6 pb-4 overflow-visible rounded-2xl bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
     >
       {/* Header */}
@@ -112,11 +112,12 @@ export default function BacklogPanel({
             return (
               <div
                 key={t.id}
-                // Z-Index logic: Active menu item goes to z-50 to float above others
+                // IMPORTANT: Z-Index logic fixes the clipping/overlap issue
                 className={`group relative transition-all duration-200 ${
                   isMenuOpen ? 'z-50' : 'z-auto'
                 }`}
                 style={{
+                  // Ensure active menu item floats above subsequent items
                   zIndex: isMenuOpen ? 50 : 1,
                 }}
               >
