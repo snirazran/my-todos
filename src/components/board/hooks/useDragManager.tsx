@@ -61,28 +61,48 @@ export function useDragManager() {
 
   const lockScrollerForDrag = () => {
     const s = scrollerRef.current as HTMLDivElement | null;
-    if (!s) return;
-    // save
-    const st = s.style as any;
-    prevTouchAction.current = st.touchAction || '';
-    prevSnapType.current = st.scrollSnapType || '';
-    prevWebkitOverflow.current = st.webkitOverflowScrolling || '';
-    prevOverscroll.current = st.overscrollBehavior || '';
-    // lock
-    st.touchAction = 'none'; // block UA panning on both axes
-    st.scrollSnapType = 'none'; // avoid snap fights during drag
-    st.webkitOverflowScrolling = 'auto'; // iOS: disable momentum
-    st.overscrollBehavior = 'contain'; // avoid nav gestures / PTR
+    if (s) {
+      // save
+      const st = s.style as any;
+      prevTouchAction.current = st.touchAction || '';
+      prevSnapType.current = st.scrollSnapType || '';
+      prevWebkitOverflow.current = st.webkitOverflowScrolling || '';
+      prevOverscroll.current = st.overscrollBehavior || '';
+      // lock
+      st.touchAction = 'none'; // block UA panning on both axes
+      st.scrollSnapType = 'none'; // avoid snap fights during drag
+      st.webkitOverflowScrolling = 'auto'; // iOS: disable momentum
+      st.overscrollBehavior = 'contain'; // avoid nav gestures / PTR
+    }
+
+    // Lock all vertical lists to prevent browser scrolling from stealing the drag
+    listRefs.current.forEach((el) => {
+      if (el) {
+        el.style.overflowY = 'hidden';
+        el.style.touchAction = 'none';
+        el.style.overscrollBehavior = 'none';
+      }
+    });
   };
 
   const unlockScrollerAfterDrag = () => {
     const s = scrollerRef.current as HTMLDivElement | null;
-    if (!s) return;
-    const st = s.style as any;
-    st.touchAction = prevTouchAction.current || '';
-    st.scrollSnapType = prevSnapType.current || '';
-    st.webkitOverflowScrolling = prevWebkitOverflow.current || '';
-    st.overscrollBehavior = prevOverscroll.current || '';
+    if (s) {
+      const st = s.style as any;
+      st.touchAction = prevTouchAction.current || '';
+      st.scrollSnapType = prevSnapType.current || '';
+      st.webkitOverflowScrolling = prevWebkitOverflow.current || '';
+      st.overscrollBehavior = prevOverscroll.current || '';
+    }
+
+    // Unlock vertical lists
+    listRefs.current.forEach((el) => {
+      if (el) {
+        el.style.overflowY = '';
+        el.style.touchAction = '';
+        el.style.overscrollBehavior = '';
+      }
+    });
   };
 
   const restoreGlobalInteraction = useCallback(() => {

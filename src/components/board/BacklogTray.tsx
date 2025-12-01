@@ -48,6 +48,17 @@ export default React.memo(function BacklogTray({
     return () => window.removeEventListener('keydown', handleKey);
   }, [isOpen, onClose]);
 
+  // Lock scroll when dragging
+  useEffect(() => {
+    if (activeDragId && scrollRef.current) {
+      scrollRef.current.style.overflowX = 'hidden';
+      scrollRef.current.style.touchAction = 'none';
+    } else if (scrollRef.current) {
+      scrollRef.current.style.overflowX = 'auto';
+      scrollRef.current.style.touchAction = 'pan-x';
+    }
+  }, [activeDragId]);
+
   // Close menu on click outside
   useEffect(() => {
     if (!menu) return;
