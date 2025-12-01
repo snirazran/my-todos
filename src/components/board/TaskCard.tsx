@@ -111,14 +111,19 @@ export default function TaskCard({
             el.setPointerCapture(pointerIdRef.current);
             // Fix: manually force "none" instantly.
             el.style.touchAction = 'none';
+            // Stop listening for move cancel since we are now dragging
+            el.removeEventListener('pointermove', handlePointerMove as any);
           } catch (err) {
             // ignore
           }
         }
 
+        // Nullify startPos so even if a stray move fires, it won't cancel
+        startPos.current = null;
+
         onGrab({
-          clientX: startPos.current!.x,
-          clientY: startPos.current!.y,
+          clientX: startPos.current?.x ?? e.clientX,
+          clientY: startPos.current?.y ?? e.clientY,
           pointerType: e.pointerType as 'mouse' | 'touch',
         });
 
