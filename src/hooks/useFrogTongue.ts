@@ -88,17 +88,17 @@ export function useFrogTongue({
 
   const getMouthDoc = useCallback(() => {
     const p = frogRef.current?.getMouthPoint() ?? { x: 0, y: 0 };
-    const vv = window.visualViewport;
-    const offX = window.scrollX + Math.max(0, vv?.offsetLeft ?? 0);
-    const offY = window.scrollY + Math.max(0, vv?.offsetTop ?? 0);
+    // Use pageXOffset/pageYOffset for better PWA/mobile support
+    const offX = window.pageXOffset || document.documentElement.scrollLeft;
+    const offY = window.pageYOffset || document.documentElement.scrollTop;
     return { x: p.x + offX, y: p.y + offY + ORIGIN_Y_ADJ };
   }, [frogRef]);
 
   const getFlyDoc = useCallback((el: HTMLElement) => {
     const r = el.getBoundingClientRect();
-    const vv = window.visualViewport;
-    const offX = window.scrollX + Math.max(0, vv?.offsetLeft ?? 0);
-    const offY = window.scrollY + Math.max(0, vv?.offsetTop ?? 0);
+    // Use pageXOffset/pageYOffset for better PWA/mobile support
+    const offX = window.pageXOffset || document.documentElement.scrollLeft;
+    const offY = window.pageYOffset || document.documentElement.scrollTop;
     return { x: r.left + r.width / 2 + offX, y: r.top + r.height / 2 + offY };
   }, []);
 
