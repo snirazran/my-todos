@@ -39,6 +39,12 @@ export default function TaskCard({
   const startPos = useRef<{ x: number; y: number } | null>(null);
   const pointerIdRef = useRef<number | null>(null);
 
+  // Keep latest callbacks in refs to avoid effect re-runs
+  const onGrabRef = useRef(onGrab);
+  onGrabRef.current = onGrab;
+  const onToggleMenuRef = useRef(onToggleMenu);
+  onToggleMenuRef.current = onToggleMenu;
+
   const MOVE_TOLERANCE = 8;
   const LONG_PRESS_DURATION = 230;
   const defaultTouchAction = touchAction || 'auto';
@@ -59,6 +65,7 @@ export default function TaskCard({
     }
   }, [defaultTouchAction]);
 
+  // Stable handlers using Refs
   const handlePointerMove = useCallback(
     (e: PointerEvent) => {
       if (!startPos.current) return;
@@ -66,7 +73,7 @@ export default function TaskCard({
       const dy = Math.abs(e.clientY - startPos.current.y);
       if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) cleanupLP();
     },
-    [cleanupLP]
+    [cleanupLP] // cleanupLP depends on defaultTouchAction, but that is primitive string usually
   );
 
   const handlePointerUp = useCallback(() => cleanupLP(), [cleanupLP]);
@@ -80,9 +87,9 @@ export default function TaskCard({
 
       pointerIdRef.current = e.pointerId;
 
-      // If mouse and NOT requiring long press, grab immediately (default desktop behavior)
+      // If mouse and NOT requiring long press, grab immediately
       if (e.pointerType === 'mouse' && !requireLongPress) {
-        onGrab({
+        onGrabRef.current({
           clientX: e.clientX,
           clientY: e.clientY,
           pointerType: 'mouse',
@@ -90,7 +97,7 @@ export default function TaskCard({
         return;
       }
 
-      // Otherwise (Touch OR Mouse with requireLongPress), start long press timer
+      // Otherwise start long press timer
       startPos.current = { x: e.clientX, y: e.clientY };
       const el = cardRef.current;
       if (el) {
@@ -109,21 +116,18 @@ export default function TaskCard({
         if (el && pointerIdRef.current !== null) {
           try {
             el.setPointerCapture(pointerIdRef.current);
-            // Fix: manually force "none" instantly.
             el.style.touchAction = 'none';
-            // Stop listening for move cancel since we are now dragging
             el.removeEventListener('pointermove', handlePointerMove as any);
           } catch (err) {
             // ignore
           }
         }
 
-        // Nullify startPos so even if a stray move fires, it won't cancel
         startPos.current = null;
 
-        onGrab({
-          clientX: e.clientX, // Use e.clientX directly as startPos.current might be nullified
-          clientY: e.clientY, // Use e.clientY directly as startPos.current might be nullified
+        onGrabRef.current({
+          clientX: e.clientX,
+          clientY: e.clientY,
           pointerType: e.pointerType as 'mouse' | 'touch',
         });
 
@@ -133,7 +137,7 @@ export default function TaskCard({
         }
       }, LONG_PRESS_DURATION);
     },
-    [onGrab, handlePointerMove, handlePointerUp, cleanupLP, requireLongPress]
+    [handlePointerMove, handlePointerUp, requireLongPress] // Removed onGrab, cleanupLP dependencies
   );
 
   useEffect(() => {
@@ -146,7 +150,7 @@ export default function TaskCard({
       el.removeEventListener('pointerdown', handlePointerDown as any);
       cleanupLP();
     };
-  }, [handlePointerDown, cleanupLP]);
+  }, [handlePointerDown, cleanupLP]); // cleanupLP is stable if defaultTouchAction stable. handlePointerDown is stable now.
 
   const setRefs = useCallback(
     (el: HTMLDivElement | null) => {
@@ -162,8 +166,6 @@ export default function TaskCard({
       data-card-id={dragId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
-      // Initial state: 'auto' allows both vertical list scrolling and horizontal board scrolling.
-      // The timer above swaps this to 'none' when dragging starts.
       style={{ touchAction: defaultTouchAction, WebkitTapHighlightColor: 'transparent' }}
       className={[
         'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-2xl cursor-grab transition-all duration-300',
@@ -203,7 +205,7 @@ export default function TaskCard({
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onToggleMenu(e.currentTarget.getBoundingClientRect());
+            onToggleMenuRef.current(e.currentTarget.getBoundingClientRect());
           }}
           title="Task actions"
           aria-label="Task actions"

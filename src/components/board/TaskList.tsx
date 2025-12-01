@@ -152,8 +152,8 @@ export default React.memo(function TaskList({
     const isDraggedHere = isSelfDrag && sourceIndex === i;
 
     if (!isDraggedHere) {
-      const cardKey = `card-${day}-${i}-${t.id}`;
-      const wrapKey = `wrap-${day}-${i}-${t.id}`;
+      const cardKey = `card-${day}-${t.id}`;
+      const wrapKey = `wrap-${day}-${t.id}`;
       const afterKey = `ph-${day}-${visibleIndex + 1}`;
 
       rows.push(
