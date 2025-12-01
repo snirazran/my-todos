@@ -388,8 +388,7 @@ export default function TaskBoard({
 
       {/* Pagination - Only show dots for actual days */}
       <div
-        className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 112px)' }}
+        className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none bottom-[calc(env(safe-area-inset-bottom)+176px)] md:bottom-[calc(env(safe-area-inset-bottom)+112px)]"
       >
         <div className="pointer-events-auto">
           <PaginationDots count={DAYS - 1} activeIndex={Math.min(pageIndex, 6) as any} />
@@ -397,7 +396,7 @@ export default function TaskBoard({
       </div>
 
       {/* GLOBAL BOTTOM AREA - Floating Toolbar */}
-      <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+20px)] pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+20px)] pointer-events-none">
         <div className="pointer-events-auto mx-auto w-full max-w-[400px] flex items-center gap-3">
           
           {/* Backlog Trigger (Left) */}

@@ -1,0 +1,55 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { Home, History, LayoutDashboard, User } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+
+export default function MobileNav() {
+  const pathname = usePathname();
+  const { data: session } = useSession();
+
+  if (!session) return null;
+
+  const navItems = [
+    {
+      href: '/',
+      label: 'Today',
+      icon: Home,
+    },
+    {
+      href: '/manage-tasks',
+      label: 'Weekly',
+      icon: LayoutDashboard,
+    },
+    {
+      href: '/history',
+      label: 'History',
+      icon: History,
+    },
+  ];
+
+  return (
+    <nav className="fixed bottom-0 left-0 z-50 w-full bg-white/90 backdrop-blur-lg border-t border-slate-200 dark:bg-slate-900/90 dark:border-slate-800 md:hidden pb-[env(safe-area-inset-bottom)]">
+      <div className="grid grid-cols-3 h-16">
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const isActive = pathname === href;
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex flex-col items-center justify-center w-full h-full transition-colors ${
+                isActive
+                  ? 'text-violet-600 dark:text-violet-400'
+                  : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+              }`}
+            >
+              <Icon className={`w-6 h-6 mb-1 ${isActive ? 'fill-current/20' : ''}`} />
+              <span className="text-[10px] font-medium">{label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}

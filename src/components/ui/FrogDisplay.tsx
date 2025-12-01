@@ -32,7 +32,7 @@ export function FrogDisplay({
 }: Props) {
   return (
     // Added mb-12 to create the requested space from the tabs below
-    <div className={`${className} flex flex-col items-center mb-12 relative`}>
+    <div className={`${className} flex flex-col items-center mb-6 md:mb-12 relative`}>
       {/* 0. THE AURA (Surprise Element) 
           A subtle glowing spotlight behind the frog to frame it.
       */}

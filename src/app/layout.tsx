@@ -4,6 +4,7 @@ import { Poppins } from 'next/font/google';
 import './globals.css';
 import Providers from './providers';
 import SiteHeader from '@/components/ui/siteHeader';
+import MobileNav from '@/components/ui/MobileNav';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -50,6 +51,7 @@ export default function RootLayout({
         <Providers>
           <SiteHeader />
           {children}
+          <MobileNav />
         </Providers>
       </body>
     </html>

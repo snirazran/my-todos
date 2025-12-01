@@ -211,7 +211,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8">
+    <main className="min-h-screen p-4 pb-24 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8 md:pb-8">
       <div className="max-w-4xl mx-auto">
         <Header session={session} router={router} />
 
@@ -412,7 +412,7 @@ function Header({ session, router }: { session: any; router: any }) {
         </p>
       </div>
 
-      <div className="flex self-start gap-2 md:self-auto">
+      <div className="hidden gap-2 self-start md:flex md:self-auto">
         <Link
           href="/history"
           className="inline-flex items-center gap-2 px-6 py-3 font-medium transition bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"

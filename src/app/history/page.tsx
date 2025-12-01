@@ -187,7 +187,7 @@ export default function History() {
   return (
     <main
       dir="ltr"
-      className="min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8"
+      className="min-h-screen p-4 pb-24 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8 md:pb-8"
     >
       <div className="max-w-6xl mx-auto">
         {/* Header */}
@@ -202,7 +202,7 @@ export default function History() {
           </div>
           <Link
             href="/"
-            className="inline-flex items-center gap-2 px-6 py-3 font-medium transition-all duration-200 bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"
+            className="hidden md:inline-flex items-center gap-2 px-6 py-3 font-medium transition-all duration-200 bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"
           >
             <HistoryIcon className="w-5 h-5" />
             Back to Today

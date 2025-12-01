@@ -29,6 +29,7 @@ export default function BacklogBox({
     <motion.button
       ref={forwardRef}
       onClick={onClick}
+      aria-label="Backlog"
       className="relative group outline-none"
       animate={{
         scale: scale,
@@ -47,7 +48,7 @@ export default function BacklogBox({
 
       <div
         className={`
-          relative flex items-center justify-center w-12 h-12 rounded-full
+          relative flex items-center justify-center w-14 h-14 rounded-full
           bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl
           border transition-all duration-200
           shadow-[0_8px_20px_rgba(0,0,0,0.12)] dark:shadow-black/40
@@ -70,7 +71,7 @@ export default function BacklogBox({
               : 'text-slate-600 dark:text-slate-300'
           }`}
         >
-          <Layers size={20} strokeWidth={2.5} />
+          <Layers size={24} strokeWidth={2.5} />
         </div>
 
         {/* Count Badge */}
