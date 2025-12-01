@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
 import { Sparkles, Crown, Shirt, Hand, Ghost, Ribbon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -18,8 +18,8 @@ const CATEGORY_CONFIG: Record<
 > = {
   all: { label: 'All Items', icon: <Sparkles className="w-5 h-5" /> },
   hat: { label: 'Hats', icon: <Crown className="w-5 h-5" /> },
-  scarf: { label: 'Scarves', icon: <Ribbon className="w-5 h-5" /> }, // Ribbon works better for scarf visually
-  body: { label: 'Body', icon: <Shirt className="w-5 h-5" /> }, // Shirt works for body/skin
+  scarf: { label: 'Scarves', icon: <Ribbon className="w-5 h-5" /> },
+  body: { label: 'Body', icon: <Shirt className="w-5 h-5" /> },
   held: { label: 'Held', icon: <Hand className="w-5 h-5" /> },
   costume: { label: 'Costumes', icon: <Ghost className="w-5 h-5" /> },
 };
@@ -31,6 +31,14 @@ export function FilterBar({
   active: FilterCategory;
   onChange: (s: FilterCategory) => void;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Drag Logic Refs (No re-renders!)
+  const isDown = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+  const isDragging = useRef(false);
+
   const categories: FilterCategory[] = [
     'all',
     'hat',
@@ -40,27 +48,124 @@ export function FilterBar({
     'costume',
   ];
 
+  /* --- Mouse Event Handlers (Desktop Drag) --- */
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    if (!scrollRef.current) return;
+    isDown.current = true;
+    isDragging.current = false; // Reset drag status
+    startX.current = e.pageX - scrollRef.current.offsetLeft;
+    scrollLeft.current = scrollRef.current.scrollLeft;
+  };
+
+  const onMouseLeave = () => {
+    isDown.current = false;
+    isDragging.current = false;
+  };
+
+  const onMouseUp = () => {
+    isDown.current = false;
+    // We don't reset isDragging immediately here,
+    // so the onClick handler has time to check it.
+    setTimeout(() => {
+      isDragging.current = false;
+    }, 0);
+  };
+
+  const onMouseMove = (e: React.MouseEvent) => {
+    if (!isDown.current || !scrollRef.current) return;
+
+    e.preventDefault();
+    const x = e.pageX - scrollRef.current.offsetLeft;
+
+    // 1. Calculate distance moved
+    const walk = (x - startX.current) * 1; // 1:1 Speed (Fixed "Too Fast")
+
+    // 2. Threshold Check (Fixed "Can't Click")
+    // Only count as dragging if moved more than 5 pixels
+    if (Math.abs(x - startX.current) > 5) {
+      isDragging.current = true;
+      scrollRef.current.scrollLeft = scrollLeft.current - walk;
+    }
+  };
+
+  // Auto-scroll to active item on load
+  React.useEffect(() => {
+    if (scrollRef.current) {
+      const activeEl = scrollRef.current.querySelector('[data-active="true"]');
+      if (activeEl) {
+        activeEl.scrollIntoView({
+          behavior: 'smooth',
+          block: 'nearest',
+          inline: 'center',
+        });
+      }
+    }
+  }, [active]);
+
   return (
-    <div className="relative z-30 flex items-center w-full gap-3 px-6 pb-4 overflow-x-auto touch-pan-x">
-      {categories.map((cat) => {
-        const conf = CATEGORY_CONFIG[cat];
-        const isActive = active === cat;
-        return (
-          <button
-            key={cat}
-            onClick={() => onChange(cat)}
-            className={cn(
-              'flex shrink-0 items-center gap-2 px-5 py-3 rounded-2xl text-sm font-bold whitespace-nowrap transition-all border-[2px] shadow-sm',
-              isActive
-                ? 'bg-purple-600 border-purple-600 text-white shadow-purple-500/30 scale-105'
-                : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-purple-300 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-300'
-            )}
-          >
-            {conf.icon}
-            {conf.label}
-          </button>
-        );
-      })}
+    <div className="relative w-full group">
+      <div
+        ref={scrollRef}
+        // Bind Mouse Events
+        onMouseDown={onMouseDown}
+        onMouseLeave={onMouseLeave}
+        onMouseUp={onMouseUp}
+        onMouseMove={onMouseMove}
+        className={cn(
+          // Layout
+          'flex items-center gap-3 overflow-x-auto',
+          // Mobile Layout (Full Bleed)
+          '-mx-4 px-4 w-[calc(100%+2rem)] md:mx-0 md:px-0 md:w-full',
+          // Scroll & Interaction
+          'pb-2 touch-pan-x cursor-grab active:cursor-grabbing',
+          // Hide Scrollbars
+          'no-scrollbar'
+        )}
+        style={{
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
+        }}
+      >
+        <style jsx>{`
+          div::-webkit-scrollbar {
+            display: none;
+          }
+        `}</style>
+
+        {categories.map((cat) => {
+          const conf = CATEGORY_CONFIG[cat];
+          const isActive = active === cat;
+          return (
+            <button
+              key={cat}
+              data-active={isActive}
+              // The Click Guard
+              onClick={(e) => {
+                if (isDragging.current) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  return;
+                }
+                onChange(cat);
+              }}
+              className={cn(
+                'flex-none flex items-center gap-2 px-5 py-3 rounded-2xl transition-all duration-200 border-[2px] shadow-sm select-none',
+                'text-sm font-bold whitespace-nowrap',
+                isActive
+                  ? 'bg-purple-600 border-purple-600 text-white shadow-purple-500/30'
+                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-purple-300 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-300'
+              )}
+            >
+              {conf.icon}
+              {conf.label}
+            </button>
+          );
+        })}
+
+        {/* Spacer for mobile padding */}
+        <div className="flex-none w-2 md:hidden" />
+      </div>
     </div>
   );
 }

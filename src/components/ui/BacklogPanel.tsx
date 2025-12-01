@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { EllipsisVertical } from 'lucide-react';
+import { EllipsisVertical, CalendarClock } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 
@@ -20,6 +21,7 @@ export default function BacklogPanel({
   const [confirmId, setConfirmId] = React.useState<BacklogItem | null>(null);
   const [busy, setBusy] = React.useState(false);
 
+  // Close menu on outside click
   React.useEffect(() => {
     if (!menuFor) return;
     const close = () => setMenuFor(null);
@@ -27,6 +29,7 @@ export default function BacklogPanel({
     return () => window.removeEventListener('click', close);
   }, [menuFor]);
 
+  // Listen for other menus opening to auto-close this one (matching TaskList behavior)
   React.useEffect(() => {
     const closeIfOther = (e: Event) => {
       const id = (e as CustomEvent<{ id?: string }>).detail?.id;
@@ -34,12 +37,14 @@ export default function BacklogPanel({
     };
     window.addEventListener('task-menu-open', closeIfOther as EventListener);
     return () =>
-      window.removeEventListener('task-menu-open', closeIfOther as EventListener);
+      window.removeEventListener(
+        'task-menu-open',
+        closeIfOther as EventListener
+      );
   }, []);
 
   const addToday = async (item: BacklogItem) => {
     const dow = new Date().getDay();
-
     await fetch('/api/tasks?view=board', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -49,13 +54,11 @@ export default function BacklogPanel({
         repeat: 'this-week',
       }),
     });
-
     await fetch('/api/tasks?view=board', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ day: -1, taskId: item.id }),
     });
-
     await onRefreshToday();
     await onRefreshBacklog();
   };
@@ -74,73 +77,148 @@ export default function BacklogPanel({
     }
   };
 
-  if (later.length === 0) return null;
-
   return (
-    <>
-      <div className="p-4 mt-6 border border-dashed rounded-2xl border-slate-300/80 dark:border-slate-700/70 bg-white/80 backdrop-blur-xl shadow-[0_10px_30px_rgba(15,23,42,0.12)] dark:bg-slate-900/70">
-        <h3 className="mb-3 text-lg font-semibold text-slate-900 dark:text-white">
-          Later this week
+    <div
+      dir="ltr"
+      // Updated container styles to match TaskList (overflow-visible fixes clipping)
+      className="px-6 pt-6 pb-4 overflow-visible rounded-2xl bg-white/85 dark:bg-slate-900/75 backdrop-blur-xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_18px_40px_rgba(15,23,42,0.12)]"
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="flex items-center gap-3 text-xl font-bold md:text-2xl text-slate-900 dark:text-white">
+          <CalendarClock className="w-6 h-6 text-purple-500 md:w-7 md:h-7" />
+          Later This Week
         </h3>
+        {later.length > 0 && (
+          <span className="px-3 py-1 text-xs font-bold rounded-full text-slate-500 bg-slate-100 dark:bg-slate-800 ring-1 ring-slate-200 dark:ring-slate-700">
+            {later.length} Tasks
+          </span>
+        )}
+      </div>
 
-        <ul className="space-y-3">
-          {later.map((t) => (
-            <li
-              key={t.id}
-              className="flex items-center justify-between gap-3 rounded-xl bg-white/90 p-4 ring-1 ring-slate-200/80 transition hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(15,23,42,0.12)] dark:bg-slate-900/70 dark:ring-slate-800/70"
-            >
-              <div className="flex items-center gap-3">
-                <Fly size={28} y={-4} x={-2} />
-                <span className="text-lg font-medium text-slate-900 dark:text-slate-100">
-                  {t.text}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  className="rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 px-3 py-2 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(124,58,237,.28)] hover:brightness-110"
-                  onClick={() => addToday(t)}
-                  title="Add to today (one-time)"
+      <div className="pb-2 space-y-3 overflow-visible min-h-[100px]">
+        {later.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed text-slate-400 border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 rounded-xl">
+            <CalendarClock className="w-10 h-10 mb-3 opacity-20" />
+            <p className="text-sm font-medium">No tasks saved for later.</p>
+            <p className="mt-1 text-xs opacity-60">
+              Add tasks here to clear your plate for today.
+            </p>
+          </div>
+        ) : (
+          later.map((t, i) => {
+            const isMenuOpen = menuFor === t.id;
+
+            return (
+              <div
+                key={t.id}
+                // Z-Index logic: Active menu item goes to z-50 to float above others
+                className={`group relative transition-all duration-200 ${
+                  isMenuOpen ? 'z-50' : 'z-auto'
+                }`}
+                style={{
+                  zIndex: isMenuOpen ? 50 : 1,
+                }}
+              >
+                {/* Row */}
+                <div
+                  className={`
+                    relative flex items-center gap-4 px-3 py-3.5 
+                    transition-all duration-200 rounded-xl 
+                    border border-transparent hover:border-slate-200 dark:hover:border-slate-700
+                    hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
+                    ${
+                      isMenuOpen
+                        ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-md'
+                        : ''
+                    }
+                  `}
+                  style={{
+                    animation: `fadeInUp 0.4s ease-out ${i * 0.05}s forwards`,
+                    opacity: 0,
+                  }}
                 >
-                  Do today
-                </button>
-                <div className="relative">
-                  <button
-                    className="rounded-md p-2 hover:bg-slate-100 dark:hover:bg-slate-700"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      window.dispatchEvent(
-                        new CustomEvent('task-menu-open', {
-                          detail: { id: `backlog:${t.id}` },
-                        })
-                      );
-                      setMenuFor((prev) => (prev === t.id ? null : t.id));
-                    }}
-                    title="More actions"
-                    aria-label="More actions"
-                  >
-                    <EllipsisVertical className="w-5 h-5 text-slate-500" />
-                  </button>
-                  {menuFor === t.id && (
-                    <div
-                      className="absolute left-1/2 top-11 z-20 w-40 -translate-x-1/2 rounded-xl border border-slate-200/80 bg-white/95 shadow-lg backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/90"
-                      onClick={(e) => e.stopPropagation()}
+                  {/* Fly Icon */}
+                  <div className="flex items-center justify-center flex-shrink-0 w-7 h-7">
+                    <Fly
+                      size={24}
+                      className="text-purple-600 transition-all opacity-70 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                    />
+                  </div>
+
+                  {/* Text */}
+                  <span className="flex-1 text-base font-medium md:text-lg text-slate-700 dark:text-slate-200">
+                    {t.text}
+                  </span>
+
+                  {/* Actions */}
+                  <div className="relative flex items-center gap-2 shrink-0">
+                    {/* "Do Today!" Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        addToday(t);
+                      }}
+                      className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition-all rounded-lg shadow-sm shadow-indigo-500/20"
                     >
-                      <button
-                        className="flex w-full items-center justify-center px-3 py-2 text-sm font-medium text-slate-800 rounded-xl hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800/70"
-                        onClick={() => {
-                          setMenuFor(null);
-                          setConfirmId(t);
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
+                      Do Today!
+                    </button>
+
+                    {/* Menu Button */}
+                    <button
+                      className={`
+                        p-2 rounded-lg transition-colors
+                        ${
+                          isMenuOpen
+                            ? 'bg-slate-100 text-slate-900 dark:bg-slate-700 dark:text-white'
+                            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }
+                      `}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Dispatch event to close other menus
+                        window.dispatchEvent(
+                          new CustomEvent('task-menu-open', {
+                            detail: { id: `backlog:${t.id}` },
+                          })
+                        );
+                        setMenuFor((prev) => (prev === t.id ? null : t.id));
+                      }}
+                    >
+                      <EllipsisVertical className="w-5 h-5" />
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    <AnimatePresence>
+                      {isMenuOpen && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                          animate={{ opacity: 1, y: 0, scale: 1 }}
+                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                          transition={{ duration: 0.1 }}
+                          className="absolute right-0 top-full mt-2 z-[100] w-48 rounded-xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-700/70 dark:bg-slate-900 overflow-hidden"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="p-1">
+                            <button
+                              className="flex items-center justify-start w-full gap-2 px-3 py-2 text-sm font-medium text-red-600 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                              onClick={() => {
+                                setMenuFor(null);
+                                setConfirmId(t);
+                              }}
+                            >
+                              Delete Task
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
               </div>
-            </li>
-          ))}
-        </ul>
+            );
+          })
+        )}
       </div>
 
       {confirmId && (
@@ -158,6 +236,19 @@ export default function BacklogPanel({
           }}
         />
       )}
-    </>
+
+      <style jsx>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(15px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+    </div>
   );
 }

@@ -2,25 +2,18 @@
 
 import useSWR from 'swr';
 import { useMemo, useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Lock, Shirt, XCircle, X } from 'lucide-react';
+import { Lock, Shirt, X, ArrowLeft } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
-
-// Child Components
 import { ItemCard } from './ItemCard';
 import { FilterBar, FilterCategory } from './FilterBar';
 import { SortMenu, SortOrder } from './SortMenu';
 import { cn } from '@/lib/utils';
 
 /* ---------------- Types & Data ---------------- */
-
 type ApiData = {
   wardrobe: {
     equipped: Partial<Record<WardrobeSlot, string | null>>;
@@ -33,15 +26,14 @@ type ApiData = {
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 /* ---------------- Toast Component ---------------- */
-// Simple local toast for this panel
-function Notification({ 
-  message, 
-  type, 
-  onClose 
-}: { 
-  message: string | null; 
-  type: 'error' | 'success' | null; 
-  onClose: () => void 
+function Notification({
+  message,
+  type,
+  onClose,
+}: {
+  message: string | null;
+  type: 'error' | 'success' | null;
+  onClose: () => void;
 }) {
   useEffect(() => {
     if (message) {
@@ -53,18 +45,18 @@ function Notification({
   if (!message) return null;
 
   return (
-    <div className={cn(
-      "absolute top-4 left-1/2 -translate-x-1/2 z-[70] flex items-center gap-2 px-4 py-2 rounded-full shadow-xl text-sm font-bold animate-in fade-in slide-in-from-top-4 duration-200",
-      type === 'error' ? "bg-red-500 text-white" : "bg-emerald-500 text-white"
-    )}>
-      {type === 'error' && <XCircle className="w-4 h-4" />}
+    <div
+      className={cn(
+        'absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-2 rounded-full shadow-xl text-sm font-bold animate-in fade-in slide-in-from-top-4 duration-200 pointer-events-none whitespace-nowrap',
+        type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'
+      )}
+    >
       {message}
     </div>
   );
 }
 
 /* ---------------- Main Panel ---------------- */
-
 export function WardrobePanel({
   open,
   onOpenChange,
@@ -82,29 +74,32 @@ export function WardrobePanel({
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
   const [actionId, setActionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOrder>('rarity_desc');
-  
-  // Notification State
-  const [notif, setNotif] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
+  const [notif, setNotif] = useState<{
+    msg: string;
+    type: 'error' | 'success';
+  } | null>(null);
 
-  // Filter Logic
+  // --- Logic (Identical to previous) ---
   const getFilteredItems = (items: ItemDef[]) => {
     let result = items;
-    
     if (activeFilter !== 'all') {
       if (activeFilter === 'costume') {
-        // Costumes: Skin slot AND (Epic OR Legendary)
-        result = result.filter(i => i.slot === 'skin' && (i.rarity === 'epic' || i.rarity === 'legendary'));
+        result = result.filter(
+          (i) =>
+            i.slot === 'skin' &&
+            (i.rarity === 'epic' || i.rarity === 'legendary')
+        );
       } else if (activeFilter === 'body') {
-        // Body: Skin slot AND NOT (Epic OR Legendary)
-        result = result.filter(i => i.slot === 'skin' && i.rarity !== 'epic' && i.rarity !== 'legendary');
+        result = result.filter(
+          (i) =>
+            i.slot === 'skin' && i.rarity !== 'epic' && i.rarity !== 'legendary'
+        );
       } else if (activeFilter === 'held') {
-         result = result.filter(i => i.slot === 'hand_item');
+        result = result.filter((i) => i.slot === 'hand_item');
       } else {
-        // Direct mapping for hat, scarf
-        result = result.filter(i => i.slot === activeFilter);
+        result = result.filter((i) => i.slot === activeFilter);
       }
     }
-    
     return result.sort((a, b) => {
       switch (sortBy) {
         case 'rarity_asc':
@@ -121,29 +116,26 @@ export function WardrobePanel({
     });
   };
 
-  // Actions
   const toggleEquip = async (slot: WardrobeSlot, itemId: string) => {
     if (!data) return;
     const isEquipped = data.wardrobe.equipped[slot] === itemId;
     setActionId(itemId);
-    const res = await fetch('/api/skins/inventory', {
+    await fetch('/api/skins/inventory', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slot, itemId: isEquipped ? null : itemId }),
     });
     setActionId(null);
-    if (res.ok) mutate();
+    mutate();
   };
 
   const buyItem = async (item: ItemDef) => {
     const balance = data?.wardrobe?.flies ?? 0;
     const price = item.priceFlies ?? 0;
-
     if (balance < price) {
-      setNotif({ msg: "Not enough flies!", type: 'error' });
+      setNotif({ msg: 'Not enough flies!', type: 'error' });
       return;
     }
-
     setActionId(item.id);
     const res = await fetch('/api/skins/shop', {
       method: 'POST',
@@ -151,20 +143,18 @@ export function WardrobePanel({
       body: JSON.stringify({ itemId: item.id }),
     });
     setActionId(null);
-    
     if (res.ok) {
       mutate();
       setNotif({ msg: `Purchased ${item.name}!`, type: 'success' });
     } else {
-      setNotif({ msg: "Purchase failed.", type: 'error' });
+      setNotif({ msg: 'Purchase failed.', type: 'error' });
     }
   };
 
-  // Computed lists
   const inventoryItems = useMemo(() => {
     if (!data) return [];
     const ownedIds = Object.keys(data.wardrobe.inventory);
-    const owned = (data.catalog || []).filter(i => ownedIds.includes(i.id));
+    const owned = (data.catalog || []).filter((i) => ownedIds.includes(i.id));
     return getFilteredItems(owned);
   }, [data, activeFilter, sortBy]);
 
@@ -177,151 +167,189 @@ export function WardrobePanel({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!max-w-[900px] !w-[95vw] p-0 gap-0 !bg-slate-50 !dark:bg-slate-950 h-[85vh] md:h-auto md:max-h-[90vh] flex flex-col overflow-hidden !rounded-[36px] !border-4 !border-slate-200 !dark:border-slate-800 !shadow-2xl">
-        
-        {/* Notification Popup */}
-        <Notification 
-          message={notif?.msg ?? null} 
-          type={notif?.type ?? null} 
-          onClose={() => setNotif(null)} 
-        />
+      <DialogContent
+        className={cn(
+          // 1. Base Styles (Resetting defaults)
+          'fixed z-50 flex flex-col gap-0 bg-slate-50 dark:bg-slate-950 p-0 shadow-none outline-none overflow-hidden',
 
-        {/* Top Bar (Game Header) */}
-        <div className="px-6 pt-5 pb-4 bg-white dark:bg-slate-900 border-b-2 border-slate-200 dark:border-slate-800 shrink-0 z-20 shadow-sm relative">
-          <div className="flex items-center justify-between mb-6 gap-2">
-            <div>
-               <DialogTitle className="text-2xl md:text-4xl font-black tracking-tighter uppercase text-transparent bg-clip-text bg-gradient-to-br from-slate-800 to-slate-600 dark:from-white dark:to-slate-400 drop-shadow-sm">
-                 The Wardrobe
-               </DialogTitle>
-               <p className="text-xs md:text-sm font-bold text-slate-400 dark:text-slate-500 tracking-wide mt-0.5">
-                 Customize Your Companion
-               </p>
-            </div>
-            
+          // 2. MOBILE: FORCE FULL SCREEN (The Fix)
+          // We must explicitly set translate-x-0 and top-0 to override the centering logic
+          'top-0 left-0 translate-x-0 translate-y-0',
+          'w-full h-[100dvh] max-w-none',
+          'inset-0 border-none rounded-none',
+          'data-[state=open]:slide-in-from-bottom-full data-[state=open]:slide-in-from-top-0', // Optional: Makes it slide up like a sheet
+
+          // 3. DESKTOP: Restore Floating Modal Look
+          'md:top-[50%] md:left-[50%] md:-translate-x-1/2 md:-translate-y-1/2', // Re-apply centering
+          'md:w-[95vw] md:max-w-[900px] md:h-auto md:max-h-[90vh]',
+          'md:border-4 md:border-slate-200 md:dark:border-slate-800 md:rounded-[36px] md:shadow-2xl'
+        )}
+      >
+        {/* --- HEADER --- */}
+        <div className="relative z-20 px-4 py-3 bg-white border-b shrink-0 md:px-6 md:pt-5 md:pb-4 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Currency Badge */}
-              <div className="hidden min-[400px]:flex items-center gap-3 pl-2.5 pr-4 py-1.5 rounded-[18px] bg-slate-100/80 dark:bg-slate-800/80 border border-slate-200/50 dark:border-slate-700 shadow-inner backdrop-blur-sm">
-                 <div className="relative flex items-center justify-center bg-white rounded-full shadow-sm w-9 h-9 dark:bg-slate-700 ring-1 ring-black/5">
-                   <Fly size={24} y={-2} className="text-slate-600 dark:text-slate-300" />
-                 </div>
-                 <div className="flex flex-col justify-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider leading-none mb-0.5">
-                      Balance
-                    </span>
-                    <span className="text-xl font-black leading-none text-slate-700 dark:text-slate-200 tabular-nums">
-                      {balance.toLocaleString()}
-                    </span>
-                  </div>
+              {/* Mobile Back Button Look */}
+              <button
+                onClick={() => onOpenChange(false)}
+                className="flex items-center justify-center w-8 h-8 rounded-full md:hidden bg-slate-100 dark:bg-slate-800 text-slate-500"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </button>
+
+              <div>
+                <DialogTitle className="text-lg font-black tracking-tighter uppercase md:text-4xl text-slate-800 dark:text-white">
+                  The Wardrobe
+                </DialogTitle>
+                <p className="hidden md:block text-sm font-bold text-slate-400 dark:text-slate-500 tracking-wide mt-0.5">
+                  Customize Your Companion
+                </p>
               </div>
-              {/* Mobile Balance (Simple) */}
-              <div className="min-[400px]:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                 <Fly size={16} className="text-slate-600 dark:text-slate-300" />
-                 <span className="text-sm font-black text-slate-700 dark:text-slate-200">
-                    {balance.toLocaleString()}
-                 </span>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* Balance Badge */}
+              <div className="flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-center bg-white rounded-full shadow-sm dark:bg-slate-700 w-7 h-7 md:w-9 md:h-9">
+                  <Fly
+                    size={16}
+                    className="text-slate-600 dark:text-slate-300 md:w-6 md:h-6"
+                  />
+                </div>
+                <span className="text-sm font-black leading-none md:text-xl text-slate-700 dark:text-slate-200 tabular-nums">
+                  {balance.toLocaleString()}
+                </span>
               </div>
 
-              {/* Close Button */}
-              <button 
+              {/* Desktop Close Button */}
+              <button
                 onClick={() => onOpenChange(false)}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-700"
+                className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
               >
-                <X className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                <X className="w-5 h-5 text-slate-500" />
               </button>
             </div>
           </div>
-
-          {/* Main Navigation Tabs */}
-          <div className="flex gap-4">
-             <Tabs defaultValue={defaultTab} className="w-full flex flex-col h-full">
-                <div className="flex items-center justify-between gap-4">
-                  <TabsList className="flex-1 h-14 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-[20px] border-2 border-slate-200 dark:border-slate-700">
-                    <TabsTrigger value="inventory" className="flex-1 h-full rounded-xl text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md transition-all">
-                       Inventory
-                    </TabsTrigger>
-                    <TabsTrigger value="shop" className="flex-1 h-full rounded-xl text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md transition-all">
-                       Shop
-                    </TabsTrigger>
-                    <TabsTrigger value="trade" className="flex-1 h-full rounded-xl text-base font-black uppercase tracking-wide opacity-50 cursor-not-allowed">
-                       Trade
-                    </TabsTrigger>
-                  </TabsList>
-                  
-                  {/* Sort Button */}
-                  <SortMenu value={sortBy} onChange={setSortBy} />
-                </div>
-
-                {/* Filter Bar */}
-                <div className="mt-5 -mx-2">
-                  <FilterBar active={activeFilter} onChange={setActiveFilter} />
-                </div>
-
-                {/* Content Area - Game Grid */}
-                <div className="flex-1 min-h-0 md:min-h-[400px] relative mt-2 rounded-[24px] bg-slate-100/50 dark:bg-slate-900/50 border-2 border-slate-200/50 dark:border-slate-800/50 overflow-hidden">
-                  
-                  {/* Inventory Grid */}
-                  <TabsContent value="inventory" className="absolute inset-0 overflow-y-auto p-4 data-[state=inactive]:hidden">
-                    {inventoryItems.length === 0 ? (
-                      <div className="h-full flex flex-col items-center justify-center text-center opacity-50">
-                         <div className="w-24 h-24 bg-slate-200 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
-                            <Shirt className="w-10 h-10 text-slate-400" />
-                         </div>
-                         <p className="text-lg font-black text-slate-400">Empty</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-20">
-                        {inventoryItems.map(item => (
-                          <ItemCard
-                            key={item.id}
-                            item={item}
-                            mode="inventory"
-                            ownedCount={data?.wardrobe.inventory[item.id] ?? 0}
-                            isEquipped={data?.wardrobe.equipped[item.slot] === item.id}
-                            canAfford={true}
-                            actionLoading={actionId === item.id}
-                            onAction={() => toggleEquip(item.slot, item.id)}
-                            actionLabel={null}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </TabsContent>
-
-                  {/* Shop Grid */}
-                  <TabsContent value="shop" className="absolute inset-0 overflow-y-auto p-4 data-[state=inactive]:hidden">
-                     <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 pb-20">
-                        {shopItems.map(item => {
-                          const count = data?.wardrobe.inventory[item.id] ?? 0;
-                          return (
-                            <ItemCard
-                              key={item.id}
-                              item={item}
-                              mode="shop"
-                              ownedCount={count}
-                              isEquipped={false}
-                              canAfford={balance >= (item.priceFlies ?? 0)}
-                              actionLoading={actionId === item.id}
-                              onAction={() => buyItem(item)}
-                              actionLabel={null}
-                            />
-                          );
-                        })}
-                     </div>
-                  </TabsContent>
-
-                  {/* Trade Placeholder */}
-                  <TabsContent value="trade" className="absolute inset-0 flex items-center justify-center data-[state=inactive]:hidden">
-                    <div className="text-center space-y-2 opacity-60">
-                      <Lock className="w-12 h-12 mx-auto text-slate-400" />
-                      <h3 className="text-xl font-black text-slate-500">Locked</h3>
-                    </div>
-                  </TabsContent>
-
-                </div>
-             </Tabs>
-          </div>
         </div>
 
+        {/* --- MAIN CONTENT WRAPPER --- */}
+        <div className="flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-slate-950">
+          <Tabs defaultValue={defaultTab} className="flex flex-col h-full">
+            {/* Controls Area (Tabs + Filter) */}
+            <div className="px-4 pt-4 space-y-4 shrink-0 md:px-6 md:pt-5">
+              <div className="flex items-center justify-between gap-2 md:gap-4">
+                <TabsList className="flex-1 h-11 md:h-14 bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl md:rounded-[20px] border border-slate-200 dark:border-slate-700">
+                  <TabsTrigger
+                    value="inventory"
+                    className="flex-1 h-full rounded-lg md:rounded-xl text-xs md:text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"
+                  >
+                    Inventory
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="shop"
+                    className="flex-1 h-full rounded-lg md:rounded-xl text-xs md:text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"
+                  >
+                    Shop
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="trade"
+                    className="flex-1 h-full text-xs font-black tracking-wide uppercase rounded-lg opacity-50 cursor-not-allowed md:rounded-xl md:text-base"
+                  >
+                    Trade
+                  </TabsTrigger>
+                </TabsList>
+                <SortMenu value={sortBy} onChange={setSortBy} />
+              </div>
+
+              {/* UPDATED WRAPPER: Just a plain container, FilterBar handles the bleeding */}
+              <div className="w-full min-w-0">
+                <FilterBar active={activeFilter} onChange={setActiveFilter} />
+              </div>
+            </div>
+
+            {/* Content Area (Grid) 
+                Mobile: Expands to edges, no margin, no border radius
+                Desktop: Has margins, rounded corners
+            */}
+            <div
+              className="
+              flex-1 relative mt-4 overflow-hidden bg-slate-100/50 dark:bg-slate-900/50
+              /* Mobile Styles */
+              border-t border-slate-200 dark:border-slate-800 rounded-none
+              /* Desktop Styles */
+              md:mx-6 md:mb-6 md:rounded-[24px] md:border-2 md:border-slate-200/50 md:dark:border-slate-800/50
+            "
+            >
+              <TabsContent
+                value="inventory"
+                className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
+              >
+                {inventoryItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full opacity-50">
+                    <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-slate-200 dark:bg-slate-800">
+                      <Shirt className="w-8 h-8 md:w-10 md:h-10 text-slate-400" />
+                    </div>
+                    <p className="text-lg font-black text-slate-400">Empty</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                    {inventoryItems.map((item) => (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        mode="inventory"
+                        ownedCount={data?.wardrobe.inventory[item.id] ?? 0}
+                        isEquipped={
+                          data?.wardrobe.equipped[item.slot] === item.id
+                        }
+                        canAfford={true}
+                        actionLoading={actionId === item.id}
+                        onAction={() => toggleEquip(item.slot, item.id)}
+                        actionLabel={null}
+                      />
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent
+                value="shop"
+                className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
+              >
+                <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                  {shopItems.map((item) => {
+                    const count = data?.wardrobe.inventory[item.id] ?? 0;
+                    return (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        mode="shop"
+                        ownedCount={count}
+                        isEquipped={false}
+                        canAfford={balance >= (item.priceFlies ?? 0)}
+                        actionLoading={actionId === item.id}
+                        onAction={() => buyItem(item)}
+                        actionLabel={null}
+                      />
+                    );
+                  })}
+                </div>
+              </TabsContent>
+
+              <TabsContent
+                value="trade"
+                className="absolute inset-0 flex items-center justify-center data-[state=inactive]:hidden"
+              >
+                <div className="space-y-2 text-center opacity-60">
+                  <Lock className="w-10 h-10 mx-auto md:w-12 md:h-12 text-slate-400" />
+                  <h3 className="text-lg font-black md:text-xl text-slate-500">
+                    Locked
+                  </h3>
+                </div>
+              </TabsContent>
+            </div>
+          </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );

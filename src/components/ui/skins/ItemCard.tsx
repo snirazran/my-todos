@@ -5,11 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
-import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
+import type { ItemDef } from '@/lib/skins/catalog';
 import Frog from '@/components/ui/frog';
 
 /* ---------------- Visual Helpers ---------------- */
-
+// (Keep RARITY_CONFIG exactly as you had it - it was good)
 const RARITY_CONFIG: Record<
   ItemDef['rarity'],
   {
@@ -101,7 +101,6 @@ export function ItemCard({
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
 
-  // Construct preview indices: DEFAULT (0) + override with THIS item
   const previewIndices = {
     skin: 0,
     hat: 0,
@@ -113,30 +112,31 @@ export function ItemCard({
   return (
     <div
       onClick={(e) => {
-        // Make the whole card clickable for equipping in inventory
         if (mode === 'inventory' && !actionLoading) onAction();
       }}
+      // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
+      // Added min-h-[220px] to ensure card has presence even if image fails
       className={cn(
-        'group relative flex flex-col p-3.5 transition-shadow duration-300 rounded-[24px] border-[3px] overflow-hidden cursor-pointer', // Changed transition
+        'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl md:rounded-[24px] border-[3px] overflow-hidden cursor-pointer min-h-[200px] active:scale-[0.98]',
         config.border,
         config.bg,
         isEquipped
-          ? 'bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.6)]' // Equipped glow
-          : cn(config.shadow, config.hoverGlow), // Normal shadow + Hover glow
-        !isOwned && mode === 'shop' && !canAfford && ''
+          ? 'bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.4)]'
+          : cn(config.shadow, config.hoverGlow),
+        !isOwned && mode === 'shop' && !canAfford && 'opacity-80'
       )}
     >
-      {/* Selected Indicator (Equipped) - GREEN CHECK BADGE */}
+      {/* Selected Indicator */}
       {isEquipped && (
-        <div className="absolute top-2 right-2 z-30 bg-green-500 text-white rounded-full p-1.5 shadow-md animate-in zoom-in duration-300">
-          <Check className="w-3.5 h-3.5 stroke-[4]" />
+        <div className="absolute z-30 p-1 text-white duration-300 bg-green-500 rounded-full shadow-md top-2 right-2 animate-in zoom-in">
+          <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
         </div>
       )}
 
       {/* Rarity Tag */}
       <div
         className={cn(
-          'absolute top-0 left-0 px-2.5 py-1 rounded-br-2xl text-[10px] font-black uppercase tracking-wider border-b border-r z-20', // Slightly larger tag
+          'absolute top-0 left-0 px-2 py-1 md:px-2.5 rounded-br-2xl text-[9px] md:text-[10px] font-black uppercase tracking-wider border-b border-r z-20',
           config.bg,
           config.text,
           config.border
@@ -145,44 +145,41 @@ export function ItemCard({
         {config.label}
       </div>
 
-      {/* Icon Container (Now Rive Frog) */}
+      {/* Icon Container */}
       <div
         className={cn(
-          'mt-5 mb-3 mx-auto w-full aspect-[1.2/1] rounded-2xl flex items-center justify-center relative overflow-hidden', // Increased margins and roundedness
+          'mt-4 mb-2 md:mt-5 md:mb-3 mx-auto w-full aspect-[1.1/1] md:aspect-[1.2/1] rounded-xl md:rounded-2xl flex items-center justify-center relative overflow-hidden',
           'bg-gradient-to-br shadow-inner',
           config.gradient
         )}
       >
-        {/* Shine Effect */}
         <div className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine" />
 
-        {/* RIVE FROG PREVIEW */}
-        <div className="absolute inset-0 flex items-end justify-center">
+        <div className="absolute inset-0 z-10 flex items-end justify-center">
           <Frog
-            className="w-[130%] h-[130%] object-contain translate-y-[25%]" // Slightly reduced translate-y to move frog up
+            className="w-[125%] h-[125%] object-contain translate-y-[20%]"
             indices={previewIndices}
             width={180}
             height={180}
           />
         </div>
 
-        {/* OWNED COUNT BADGE */}
         {ownedCount > 0 && (
-          <div className="absolute bottom-1.5 right-1.5 bg-black/50 backdrop-blur-sm text-white text-[10px] font-bold px-2 py-0.5 rounded-lg shadow-sm border border-white/10 z-20">
+          <div className="absolute bottom-1 right-1 md:bottom-1.5 md:right-1.5 bg-black/50 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-md md:rounded-lg shadow-sm border border-white/10 z-20">
             x{ownedCount}
           </div>
         )}
       </div>
 
       {/* Name & Price */}
-      <div className="flex-1 flex flex-col items-center justify-end gap-1.5 pb-1.5">
-        <h4 className="w-full text-sm font-bold leading-tight text-center truncate text-slate-800 dark:text-slate-100">
+      <div className="flex-1 flex flex-col items-center justify-end gap-1 md:gap-1.5 pb-1">
+        <h4 className="w-full text-xs font-bold leading-tight text-center truncate md:text-sm text-slate-800 dark:text-slate-100">
           {item.name}
         </h4>
 
         {mode === 'shop' && (
-          <div className="flex items-center justify-center gap-1.5 text-sm font-black bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-full">
-            <Fly size={16} />
+          <div className="flex items-center justify-center gap-1 text-[10px] md:text-sm font-black bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-full">
+            <Fly size={14} className="md:w-4 md:h-4" />
             <span
               className={
                 canAfford
@@ -196,12 +193,12 @@ export function ItemCard({
         )}
       </div>
 
-      {/* Equip Badge (Inventory Mode) */}
-      <div className="w-3/4 mx-auto mt-1">
+      {/* Actions */}
+      <div className="w-full mx-auto mt-1 md:w-3/4">
         {mode === 'inventory' && (
           <div
             className={cn(
-              'h-8 w-full flex items-center justify-center rounded-lg text-xs font-black uppercase tracking-wide transition-colors', // Matched height and font to shop button
+              'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
               isEquipped
                 ? 'bg-green-600 text-white shadow-md'
                 : 'bg-white/50 dark:bg-black/20 text-slate-500 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 group-hover:text-purple-600'
@@ -211,12 +208,11 @@ export function ItemCard({
           </div>
         )}
 
-        {/* Buy Button (Shop Mode) */}
         {mode === 'shop' && (
           <Button
             size="sm"
             className={cn(
-              'h-8 w-full font-black rounded-lg text-xs uppercase tracking-wide shadow-md transition-all active:scale-95', // Increased height and font
+              'h-7 md:h-8 w-full font-black rounded-lg text-[10px] md:text-xs uppercase tracking-wide shadow-md transition-all active:scale-95',
               canAfford
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/30'
                 : 'bg-slate-200 text-slate-400 dark:bg-slate-800 cursor-not-allowed'
