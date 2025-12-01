@@ -221,14 +221,22 @@ export function useDragManager() {
 
     // Animation Loop
     let raf = 0;
-    const EDGE_X = 96,
-      EDGE_Y = 72,
-      VP_EDGE_Y = 80,
-      HYST = 10;
-    const MIN_V = 2,
-      MAX_V = 24;
+    
+    // Responsive constants
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+    
+    // Mobile needs larger edge zones and faster max speed because screen is smaller relative to finger
+    const EDGE_X = isMobile ? 120 : 96;
+    const EDGE_Y = 72;
+    const VP_EDGE_Y = 80;
+    const HYST = 10;
+    
+    const MIN_V = isMobile ? 4 : 2;
+    const MAX_V = isMobile ? 32 : 24;
+    
     const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
-    const easeCubic = (t: number) => t * t * t;
+    // Switch to Quadratic easing (t*t) for snappier response than Cubic (t*t*t)
+    const easeQuad = (t: number) => t * t; 
     const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
     const tick = () => {
@@ -240,12 +248,12 @@ export function useDragManager() {
       // --- 1. Velocity Calculation ---
       const instV = px - pxPrevRef.current;
       pxPrevRef.current = px;
-      pxVelRef.current = instV; // basic instantaneous velocity
+      pxVelRef.current = instV; 
 
       // --- 2. Update Drag State (Visuals) ---
       setDrag((d) => {
         if (!d) return null;
-        if (d.x === px && d.y === py) return d; // avoid render if no move
+        if (d.x === px && d.y === py) return d; 
         return { ...d, x: px, y: py };
       });
 
@@ -273,10 +281,18 @@ export function useDragManager() {
           }
         }
         
-        const velSmoothed = lerp(pxVelSmoothedRef.current, pxVelRef.current, 0.18);
+        // Less smoothing on mobile for "instant" feel
+        const smoothFactor = isMobile ? 0.3 : 0.18;
+        const velSmoothed = lerp(pxVelSmoothedRef.current, pxVelRef.current, smoothFactor);
         pxVelSmoothedRef.current = velSmoothed;
-        const speedFactor = clamp(Math.abs(velSmoothed) / 20, 0, 1);
-        const combined = clamp(easeCubic(distFactor) * 0.85 + speedFactor * 0.35, 0, 1);
+        
+        // Lower divisor means velocity has MORE impact on scroll speed
+        const velInfluenceDivisor = isMobile ? 12 : 20;
+        const speedFactor = clamp(Math.abs(velSmoothed) / velInfluenceDivisor, 0, 1);
+        
+        // Combine distance (easeQuad) and velocity
+        const combined = clamp(easeQuad(distFactor) * 0.85 + speedFactor * 0.35, 0, 1);
+        
         const vx = dir * (MIN_V + (MAX_V - MIN_V) * combined);
         
         if (dir !== 0) {
@@ -355,7 +371,7 @@ export function useDragManager() {
            }
         }
         if (dirY !== 0) {
-           const vy = dirY * (MIN_V + (MAX_V - MIN_V) * easeCubic(distY));
+           const vy = dirY * (MIN_V + (MAX_V - MIN_V) * easeQuad(distY));
            list.scrollTop += vy;
         }
 
