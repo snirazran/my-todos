@@ -91,6 +91,7 @@ export function ItemCard({
   actionLabel,
   actionLoading,
   mode,
+  selectedCount,
 }: {
   item: ItemDef;
   ownedCount: number;
@@ -99,7 +100,8 @@ export function ItemCard({
   onAction: () => void;
   actionLabel: React.ReactNode;
   actionLoading: boolean;
-  mode: 'inventory' | 'shop';
+  mode: 'inventory' | 'shop' | 'trade';
+  selectedCount?: number;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
@@ -124,12 +126,14 @@ export function ItemCard({
     }
   };
 
+  const isSelected = (selectedCount || 0) > 0;
+
   return (
     <motion.div
       animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}}
       transition={{ duration: 0.4 }}
       onClick={(e) => {
-        if (mode === 'inventory') handleAction();
+        if (mode === 'inventory' || mode === 'trade') handleAction();
       }}
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
@@ -137,7 +141,7 @@ export function ItemCard({
         'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl md:rounded-[24px] border-[3px] overflow-hidden cursor-pointer min-h-[200px] active:scale-[0.98]',
         config.border,
         config.bg,
-        isEquipped
+        (isEquipped || isSelected)
           ? 'bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.4)]'
           : cn(config.shadow, config.hoverGlow),
         !isOwned && mode === 'shop' && !canAfford && 'opacity-80'
@@ -154,6 +158,17 @@ export function ItemCard({
           >
             <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
           </motion.div>
+        )}
+        {/* Trade Selection Count */}
+        {mode === 'trade' && isSelected && (
+           <motion.div
+           initial={{ scale: 0, opacity: 0 }}
+           animate={{ scale: 1, opacity: 1 }}
+           exit={{ scale: 0, opacity: 0 }}
+           className="absolute z-30 px-2 py-0.5 text-white bg-indigo-500 rounded-full shadow-md top-2 right-2 text-[10px] font-black"
+         >
+           {selectedCount}
+         </motion.div>
         )}
       </AnimatePresence>
 
@@ -219,16 +234,23 @@ export function ItemCard({
 
       {/* Actions */}
       <div className="w-full mx-auto mt-1 md:w-3/4">
-        {mode === 'inventory' && (
+        {(mode === 'inventory' || mode === 'trade') && (
           <div
             className={cn(
               'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
               isEquipped
                 ? 'bg-green-600 text-white shadow-md'
-                : 'bg-white/50 dark:bg-black/20 text-slate-500 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 group-hover:text-purple-600'
+                : isSelected 
+                  ? 'bg-indigo-600 text-white shadow-md'
+                  : 'bg-white/50 dark:bg-black/20 text-slate-500 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 group-hover:text-purple-600'
             )}
           >
-            {actionLoading ? '...' : isEquipped ? 'EQUIPPED' : 'EQUIP'}
+            {actionLoading 
+              ? '...' 
+              : mode === 'trade' 
+                ? (isSelected ? 'SELECTED' : 'SELECT')
+                : (isEquipped ? 'EQUIPPED' : 'EQUIP')
+            }
           </div>
         )}
 

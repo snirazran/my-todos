@@ -2,14 +2,16 @@
 
 import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Sparkles, AlertCircle, Plus } from 'lucide-react';
+import { ArrowRight, Sparkles, AlertCircle, Plus, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ItemDef, Rarity, rarityRank } from '@/lib/skins/catalog';
 import { Button } from '@/components/ui/button';
 import confetti from 'canvas-confetti';
 import Frog from '@/components/ui/frog';
+import { ItemCard } from './ItemCard';
 
 /* ---------------- Visual Helpers ---------------- */
+// ... (Your existing RARITY_CONFIG remains exactly the same, keeping it hidden for brevity) ...
 const RARITY_CONFIG: Record<
   ItemDef['rarity'],
   {
@@ -172,9 +174,8 @@ export function TradePanel({
 
   // --- Render ---
   return (
-    // Main Container: Full height on desktop to prevent page scroll
-    <div className="relative w-full h-full flex flex-col md:grid md:grid-cols-12 md:gap-6 md:overflow-hidden">
-      
+    // Changed: Removed grid-cols-12. Used flex-col to stack Top (Contract) and Bottom (Inventory)
+    <div className="relative flex flex-col w-full h-full md:overflow-hidden bg-slate-50 dark:bg-black/20">
       {/* --- RESULT OVERLAY --- */}
       <AnimatePresence>
         {tradeResult && (
@@ -192,7 +193,11 @@ export function TradePanel({
               <div className="relative">
                 <motion.div
                   animate={{ rotate: 360 }}
-                  transition={{ duration: 10, repeat: Infinity, ease: 'linear' }}
+                  transition={{
+                    duration: 10,
+                    repeat: Infinity,
+                    ease: 'linear',
+                  }}
                   className="absolute inset-[-20px] bg-gradient-to-tr from-yellow-500/20 to-purple-500/20 rounded-full blur-xl"
                 />
                 <div className="relative flex items-center justify-center w-32 h-32 border bg-slate-800 rounded-2xl border-slate-700">
@@ -211,11 +216,22 @@ export function TradePanel({
                 </div>
               </div>
               <div>
-                <h2 className="mb-1 text-2xl font-black tracking-wide text-white uppercase">Trade Successful!</h2>
+                <h2 className="mb-1 text-2xl font-black tracking-wide text-white uppercase">
+                  Trade Successful!
+                </h2>
                 <p className="text-slate-400">You received:</p>
-                <p className={`text-xl font-bold mt-1 ${getRarityColor(tradeResult.rarity)}`}>{tradeResult.name}</p>
+                <p
+                  className={`text-xl font-bold mt-1 ${getRarityColor(
+                    tradeResult.rarity
+                  )}`}
+                >
+                  {tradeResult.name}
+                </p>
               </div>
-              <Button onClick={() => setTradeResult(null)} className="w-full font-bold bg-white text-slate-900 hover:bg-slate-200">
+              <Button
+                onClick={() => setTradeResult(null)}
+                className="w-full font-bold bg-white text-slate-900 hover:bg-slate-200"
+              >
                 Awesome
               </Button>
             </motion.div>
@@ -223,187 +239,185 @@ export function TradePanel({
         )}
       </AnimatePresence>
 
-      {/* --- LEFT PANEL: CONTRACT --- */}
-      <div className="md:col-span-5 lg:col-span-4 flex flex-col shrink-0 md:h-full md:overflow-hidden">
-        <div className="flex flex-col bg-white dark:bg-slate-900 rounded-xl md:rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden md:h-full">
-          
-          {/* Compact Header */}
-          <div className="px-4 py-3 md:p-5 border-b border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900">
-            <div className="flex justify-between items-center">
-              <h3 className="text-lg font-black uppercase text-slate-800 dark:text-white">Contract</h3>
-               <div className="text-xs font-bold text-slate-400">
-                {selectedIds.length}/10
-              </div>
-            </div>
-            <p className="text-xs text-slate-500 mt-1">
-              10 items <ArrowRight size={12} className="inline mx-0.5"/> 1 higher rarity
-            </p>
-          </div>
-
-          {/* Slots Grid */}
-          <div className="p-4 md:p-6 bg-slate-100/50 dark:bg-slate-950/30 flex-1 md:overflow-hidden md:flex md:flex-col">
-            <div className="grid grid-cols-5 gap-x-2 gap-y-5 md:gap-x-3 md:gap-y-6">
-              {Array.from({ length: 10 }).map((_, i) => {
-                const itemId = selectedIds[i];
-                const item = itemId ? catalog.find((c) => c.id === itemId) : null;
-                const config = item ? RARITY_CONFIG[item.rarity] : null;
-
-                return (
-                  <motion.button
-                    key={i}
-                    layout
-                    onClick={() => item && handleRemove(i)}
-                    className={cn(
-                      'aspect-square rounded-lg md:rounded-xl border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200',
-                      !item && 'border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/50',
-                      item && config && cn(config.border, config.bg, 'shadow-sm')
-                    )}
+      {/* --- TOP PANEL: CONTRACT --- */}
+      {/* shrink-0 ensures this panel takes only required space and doesn't squish */}
+      <div className="z-10 w-full shrink-0 md:p-6 md:pb-0">
+        <div className="flex flex-col overflow-hidden bg-white border-b shadow-sm dark:bg-slate-900 md:rounded-3xl md:border border-slate-200 dark:border-slate-800">
+          {/* Header & Stats */}
+          <div className="flex items-center justify-between px-4 py-3 border-b md:px-6 md:py-4 border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900">
+            <div>
+              <h3 className="flex items-center gap-2 text-lg font-black uppercase text-slate-800 dark:text-white">
+                Contract
+                {targetRarity && (
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded uppercase font-bold ${getRarityBg(
+                      targetRarity
+                    )}`}
                   >
-                    {item ? (
-                      <div className="relative w-full h-full p-1 flex items-center justify-center">
-                        <Frog
-                          className="w-full h-full object-contain"
-                          indices={{ skin: 0, hat: 0, scarf: 0, hand_item: 0, [item.slot]: item.riveIndex }}
-                          width={80}
-                          height={80}
-                        />
-                      </div>
-                    ) : (
-                      <span className="text-xs font-bold text-slate-300 dark:text-slate-700">{i + 1}</span>
-                    )}
-                  </motion.button>
-                );
-              })}
+                    {targetRarity} Only
+                  </span>
+                )}
+              </h3>
+              <p className="hidden md:block text-xs text-slate-500 mt-0.5">
+                Combine 10 items of the same rarity to receive 1 item of higher
+                rarity.
+              </p>
+            </div>
+            <div className="text-right">
+              <div className="text-xl font-black text-indigo-600 dark:text-indigo-400">
+                {selectedIds.length}
+                <span className="text-slate-300">/10</span>
+              </div>
             </div>
           </div>
 
-          {/* Footer Actions */}
-          <div className="p-4 md:p-5 border-t border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0 z-10 space-y-3">
-             {error && (
-              <div className="flex items-center gap-2 text-xs font-bold text-rose-500">
-                <AlertCircle size={14} /> {error}
+          <div className="flex flex-col md:flex-row">
+            {/* Slots Grid - Centered on desktop */}
+            <div className="flex justify-center flex-1 p-4 md:p-6 bg-slate-100/50 dark:bg-slate-950/30">
+              {/* Max width added to keep the boxes square and nice looking on wide screens */}
+              <div className="grid w-full grid-cols-5 gap-x-2 gap-y-3 md:gap-x-4 md:gap-y-4 md:max-w-2xl">
+                {Array.from({ length: 10 }).map((_, i) => {
+                  const itemId = selectedIds[i];
+                  const item = itemId
+                    ? catalog.find((c) => c.id === itemId)
+                    : null;
+                  const config = item ? RARITY_CONFIG[item.rarity] : null;
+
+                  return (
+                    <motion.button
+                      key={i}
+                      layout
+                      onClick={() => item && handleRemove(i)}
+                      className={cn(
+                        'aspect-square rounded-lg md:rounded-xl border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200',
+                        !item &&
+                          'border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/50',
+                        item &&
+                          config &&
+                          cn(config.border, config.bg, 'shadow-sm')
+                      )}
+                    >
+                      {item ? (
+                        <div className="relative flex items-center justify-center w-full h-full p-1">
+                          <Frog
+                            className="object-contain w-full h-full"
+                            indices={{
+                              skin: 0,
+                              hat: 0,
+                              scarf: 0,
+                              hand_item: 0,
+                              [item.slot]: item.riveIndex,
+                            }}
+                            width={80}
+                            height={80}
+                          />
+                          {/* Hover to remove indicator */}
+                          <div className="absolute inset-0 flex items-center justify-center transition-opacity opacity-0 bg-red-500/10 hover:opacity-100">
+                            <span className="text-xs font-bold text-red-500">
+                              REMOVE
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xs font-bold text-slate-300 dark:text-slate-700">
+                          {i + 1}
+                        </span>
+                      )}
+                    </motion.button>
+                  );
+                })}
               </div>
-            )}
-            
-            <div className="flex gap-2">
-              {selectedIds.length > 0 && (
-                 <Button variant="outline" size="icon" onClick={handleClear} className="shrink-0 border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 h-12 w-12">
-                   <span className="sr-only">Clear</span>
-                   <span className="font-bold text-lg">×</span>
-                 </Button>
+            </div>
+
+            {/* Actions Side/Bottom Panel */}
+            <div className="flex flex-col justify-center p-4 space-y-3 bg-white border-t md:p-6 md:border-t-0 md:border-l border-slate-100 dark:border-slate-800 dark:bg-slate-900 shrink-0 md:w-64">
+              {error && (
+                <div className="flex items-center gap-2 mb-2 text-xs font-bold text-rose-500">
+                  <AlertCircle size={14} /> {error}
+                </div>
               )}
-              <Button
-                disabled={selectedIds.length !== 10 || isTrading}
-                onClick={handleConfirmTrade}
-                className={cn(
-                  'flex-1 h-12 font-black uppercase tracking-wider transition-all',
-                  selectedIds.length === 10
-                    ? 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                    : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
+
+              <div className="flex gap-2 md:space-y-3 md:flex-col">
+                {selectedIds.length > 0 && (
+                  <Button
+                    variant="outline"
+                    onClick={handleClear}
+                    className="h-12 shrink-0 border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 md:w-full"
+                  >
+                    Clear
+                  </Button>
                 )}
-              >
-                {isTrading ? (
-                  <Sparkles className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  'Trade Up'
-                )}
-              </Button>
+                <Button
+                  disabled={selectedIds.length !== 10 || isTrading}
+                  onClick={handleConfirmTrade}
+                  className={cn(
+                    'flex-1 h-12 md:h-16 font-black uppercase tracking-wider transition-all md:w-full md:text-lg',
+                    selectedIds.length === 10
+                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-xl shadow-indigo-500/30 ring-1 ring-indigo-400/30'
+                      : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
+                  )}
+                >
+                  {isTrading ? (
+                    <Sparkles className="w-5 h-5 mr-2 animate-spin" />
+                  ) : (
+                    <>
+                      Trade Up <ArrowUp size={20} className="ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="text-[10px] text-center text-slate-400 hidden md:block">
+                Select 10 items from your inventory below to fill the contract.
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* --- RIGHT PANEL: INVENTORY --- */}
-      <div className="md:col-span-7 lg:col-span-8 flex flex-col min-h-0 mt-4 md:mt-0 h-full md:overflow-hidden">
-         {/* Minimal Header / Rarity Indicator (Only if active) */}
-         {targetRarity && (
-            <div className="flex items-center gap-2 mb-2 px-1 shrink-0">
-               <span className="text-xs font-bold text-slate-400">Inventory Locked:</span>
-               <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${getRarityBg(targetRarity)}`}>
-                  {targetRarity}
-               </span>
-            </div>
-         )}
+      {/* --- BOTTOM PANEL: INVENTORY --- */}
+      {/* flex-1 ensures this fills the remaining height */}
+      <div className="flex flex-col flex-1 w-full min-h-0 md:px-6 md:pb-6 md:pt-4">
+        {/* Inventory Header */}
+        <div className="flex items-center justify-between px-4 mb-3 md:px-0 shrink-0">
+          <h3 className="text-sm font-bold tracking-wider uppercase text-slate-500">
+            Your Inventory
+          </h3>
+          {!availableItems.length && (
+            <span className="text-xs text-slate-400">
+              No tradeable items found
+            </span>
+          )}
+        </div>
 
-        {/* Scrollable Area */}
-        <div className="flex-1 overflow-y-auto p-2 pb-24 md:pb-2 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
-           {availableItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-slate-400 text-sm border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50">
-              No items available.
+          {/* Scrollable Area */}
+        <div className="flex-1 px-4 pb-24 overflow-y-auto md:px-0 md:pb-0 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+          {availableItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-sm border-2 border-dashed text-slate-400 border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50">
+              <p>Your wardrobe is empty (or filtered out).</p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+            // Updated grid to match WardrobePanel for consistent item size
+            <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-4">
               {availableItems.map((item) => {
                 const owned = inventory[item.id] || 0;
                 const selected = selectedCounts[item.id] || 0;
                 const remaining = owned - selected;
                 const isDimmed = remaining === 0;
-                const config = RARITY_CONFIG[item.rarity];
-                const isSelected = selected > 0;
 
                 return (
-                  <motion.button
-                    key={item.id}
-                    disabled={isDimmed}
-                    onClick={() => handleSelect(item)}
-                    whileTap={!isDimmed ? { scale: 0.95 } : {}}
-                    className={cn(
-                      'group relative flex flex-col p-2 transition-all duration-200 rounded-xl border-2 text-left overflow-hidden bg-white dark:bg-slate-900',
-                      config.border,
-                      isDimmed ? 'opacity-40 grayscale cursor-not-allowed' : 'hover:shadow-md cursor-pointer',
-                      // Highlight border if selected but still available
-                      isSelected && !isDimmed && 'ring-2 ring-indigo-500 ring-offset-1 ring-offset-white dark:ring-offset-slate-950'
-                    )}
-                  >
-                    {/* Selection Badge (Top Right) */}
-                    <AnimatePresence>
-                      {isSelected && (
-                         <motion.div
-                           initial={{ scale: 0 }} animate={{ scale: 1 }}
-                           className="absolute top-1 right-1 z-30 bg-indigo-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm"
-                         >
-                           {selected}/{owned}
-                         </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Rarity Label (Top Left) */}
-                    <div className={cn("text-[9px] font-black uppercase tracking-wider mb-1 opacity-70", config.text)}>
-                      {config.label}
-                    </div>
-
-                    {/* Image */}
-                    <div className={cn(
-                        "w-full aspect-square rounded-lg flex items-center justify-center relative overflow-hidden mb-2",
-                        "bg-gradient-to-br shadow-inner",
-                        config.gradient
-                    )}>
-                        <div className="absolute inset-0 p-1 flex items-center justify-center">
-                           <Frog
-                              className="w-full h-full object-contain drop-shadow-sm"
-                              indices={{ skin: 0, hat: 0, scarf: 0, hand_item: 0, [item.slot]: item.riveIndex }}
-                              width={100}
-                              height={100}
-                           />
-                        </div>
-                        {/* Plus overlay if can add more */}
-                        {!isDimmed && isSelected && (
-                           <div className="absolute inset-0 flex items-center justify-center bg-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Plus className="text-indigo-600 w-6 h-6 drop-shadow-md" strokeWidth={3} />
-                           </div>
-                        )}
-                    </div>
-
-                    {/* Name */}
-                    <div className="mt-auto">
-                       <h4 className="text-[10px] md:text-xs font-bold leading-tight text-slate-700 dark:text-slate-200 truncate">
-                         {item.name}
-                       </h4>
-                       <div className="text-[9px] font-medium text-slate-400 mt-0.5">
-                          x{remaining} left
-                       </div>
-                    </div>
-                  </motion.button>
+                  <div key={item.id} className={isDimmed ? 'opacity-50 grayscale pointer-events-none' : ''}>
+                    <ItemCard
+                      item={item}
+                      mode="trade"
+                      ownedCount={owned}
+                      isEquipped={false} // We don't show equipped status in trade, or maybe we should? Keeping it false for now as per logic
+                      canAfford={true}
+                      actionLoading={false}
+                      selectedCount={selected}
+                      onAction={() => handleSelect(item)}
+                      actionLabel={null}
+                    />
+                  </div>
                 );
               })}
             </div>
@@ -417,22 +431,34 @@ export function TradePanel({
 // --- Helpers ---
 function getRarityColor(rarity: Rarity) {
   switch (rarity) {
-    case 'common': return 'text-slate-500';
-    case 'uncommon': return 'text-emerald-500';
-    case 'rare': return 'text-blue-500';
-    case 'epic': return 'text-purple-500';
-    case 'legendary': return 'text-amber-500';
-    default: return 'text-slate-500';
+    case 'common':
+      return 'text-slate-500';
+    case 'uncommon':
+      return 'text-emerald-500';
+    case 'rare':
+      return 'text-blue-500';
+    case 'epic':
+      return 'text-purple-500';
+    case 'legendary':
+      return 'text-amber-500';
+    default:
+      return 'text-slate-500';
   }
 }
 
 function getRarityBg(rarity: Rarity) {
   switch (rarity) {
-    case 'common': return 'bg-slate-100 text-slate-600';
-    case 'uncommon': return 'bg-emerald-100 text-emerald-700';
-    case 'rare': return 'bg-blue-100 text-blue-700';
-    case 'epic': return 'bg-purple-100 text-purple-700';
-    case 'legendary': return 'bg-amber-100 text-amber-700';
-    default: return 'bg-slate-100';
+    case 'common':
+      return 'bg-slate-100 text-slate-600';
+    case 'uncommon':
+      return 'bg-emerald-100 text-emerald-700';
+    case 'rare':
+      return 'bg-blue-100 text-blue-700';
+    case 'epic':
+      return 'bg-purple-100 text-purple-700';
+    case 'legendary':
+      return 'bg-amber-100 text-amber-700';
+    default:
+      return 'bg-slate-100';
   }
 }

@@ -76,6 +76,7 @@ export function WardrobePanel({
     fetcher
   );
 
+  const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
   const [actionId, setActionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOrder>('rarity_desc');
@@ -287,7 +288,7 @@ export function WardrobePanel({
 
         {/* --- MAIN CONTENT WRAPPER --- */}
         <div className="flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-slate-950">
-          <Tabs defaultValue={defaultTab} className="flex flex-col h-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
             {/* Controls Area (Tabs + Filter) */}
             <div className="px-4 pt-4 space-y-4 shrink-0 md:px-6 md:pt-5">
               <div className="flex items-center justify-between gap-2 md:gap-4">
@@ -315,9 +316,11 @@ export function WardrobePanel({
               </div>
 
               {/* UPDATED WRAPPER: Just a plain container, FilterBar handles the bleeding */}
-              <div className="w-full min-w-0">
-                <FilterBar active={activeFilter} onChange={setActiveFilter} />
-              </div>
+              {activeTab !== 'trade' && (
+                <div className="w-full min-w-0">
+                  <FilterBar active={activeFilter} onChange={setActiveFilter} />
+                </div>
+              )}
             </div>
 
             {/* Content Area (Grid) 
