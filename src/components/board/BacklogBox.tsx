@@ -10,7 +10,7 @@ interface Props {
   isDragging: boolean;
   proximity: number; // 0 to 1
   onClick: () => void;
-  // FIX: Updated type from HTMLDivElement to HTMLButtonElement to match <motion.button>
+  // ✅ FIX: Explicitly typed for Button to match <motion.button>
   forwardRef: React.Ref<HTMLButtonElement>;
 }
 
@@ -22,8 +22,7 @@ export default function BacklogBox({
   onClick,
   forwardRef,
 }: Props) {
-  // Calculate scaling based on proximity: 1.0 -> 1.25
-  // If just dragging but far, maybe slight bump to 1.05
+  // Calculate scaling based on proximity
   const scale = isDragOver ? 1.25 : isDragging ? 1.05 + proximity * 0.2 : 1;
 
   return (
