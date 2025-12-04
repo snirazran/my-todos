@@ -1,12 +1,13 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { ItemDef } from '@/lib/skins/catalog';
 import Frog from '@/components/ui/frog';
+import { motion, AnimatePresence } from 'framer-motion';
 
 /* ---------------- Visual Helpers ---------------- */
 // (Keep RARITY_CONFIG exactly as you had it - it was good)
@@ -79,6 +80,8 @@ const RARITY_CONFIG: Record<
   },
 };
 
+const MotionButton = motion(Button);
+
 export function ItemCard({
   item,
   ownedCount,
@@ -100,6 +103,7 @@ export function ItemCard({
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
+  const [shake, setShake] = useState(false);
 
   const previewIndices = {
     skin: 0,
@@ -109,10 +113,23 @@ export function ItemCard({
     [item.slot]: item.riveIndex,
   };
 
+  const handleAction = () => {
+    if (mode === 'shop' && !canAfford) {
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+    if (!actionLoading) {
+      onAction();
+    }
+  };
+
   return (
-    <div
+    <motion.div
+      animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}}
+      transition={{ duration: 0.4 }}
       onClick={(e) => {
-        if (mode === 'inventory' && !actionLoading) onAction();
+        if (mode === 'inventory') handleAction();
       }}
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
@@ -127,11 +144,18 @@ export function ItemCard({
       )}
     >
       {/* Selected Indicator */}
-      {isEquipped && (
-        <div className="absolute z-30 p-1 text-white duration-300 bg-green-500 rounded-full shadow-md top-2 right-2 animate-in zoom-in">
-          <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
-        </div>
-      )}
+      <AnimatePresence>
+        {isEquipped && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            className="absolute z-30 p-1 text-white bg-green-500 rounded-full shadow-md top-2 right-2"
+          >
+            <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Rarity Tag */}
       <div
@@ -209,24 +233,46 @@ export function ItemCard({
         )}
 
         {mode === 'shop' && (
-          <Button
+          <MotionButton
             size="sm"
+            // Remove disabled attribute to allow click events for shake animation
+            // We handle the logic in handleAction
             className={cn(
-              'h-7 md:h-8 w-full font-black rounded-lg text-[10px] md:text-xs uppercase tracking-wide shadow-md transition-all active:scale-95',
+              'h-7 md:h-8 w-full font-black rounded-lg text-[10px] md:text-xs uppercase tracking-wide shadow-md overflow-hidden relative',
               canAfford
                 ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/30'
-                : 'bg-slate-200 text-slate-400 dark:bg-slate-800 cursor-not-allowed'
+                : 'bg-slate-200 text-slate-400 dark:bg-slate-800'
             )}
-            disabled={actionLoading || !canAfford}
             onClick={(e) => {
               e.stopPropagation();
-              onAction();
+              handleAction();
             }}
+            whileTap={canAfford ? { scale: 0.95 } : {}}
           >
-            {actionLoading ? '...' : 'Buy'}
-          </Button>
+            <AnimatePresence mode='wait'>
+              {actionLoading ? (
+                <motion.div
+                  key="loading"
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -20, opacity: 0 }}
+                >
+                  ...
+                </motion.div>
+              ) : (
+                <motion.span
+                  key="buy"
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -20, opacity: 0 }}
+                >
+                  Buy
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </MotionButton>
         )}
       </div>
-    </div>
+    </motion.div>
   );
 }

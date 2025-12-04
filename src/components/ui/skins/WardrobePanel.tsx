@@ -12,6 +12,9 @@ import { ItemCard } from './ItemCard';
 import { FilterBar, FilterCategory } from './FilterBar';
 import { SortMenu, SortOrder } from './SortMenu';
 import { cn } from '@/lib/utils';
+import confetti from 'canvas-confetti';
+import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 
 /* ---------------- Types & Data ---------------- */
 type ApiData = {
@@ -78,6 +81,7 @@ export function WardrobePanel({
     msg: string;
     type: 'error' | 'success';
   } | null>(null);
+  const [shakeBalance, setShakeBalance] = useState(false);
 
   // --- Logic (Identical to previous) ---
   const getFilteredItems = (items: ItemDef[]) => {
@@ -130,24 +134,61 @@ export function WardrobePanel({
   };
 
   const buyItem = async (item: ItemDef) => {
-    const balance = data?.wardrobe?.flies ?? 0;
+    if (!data) return;
+    const balance = data.wardrobe.flies ?? 0;
     const price = item.priceFlies ?? 0;
     if (balance < price) {
       setNotif({ msg: 'Not enough flies!', type: 'error' });
+      setShakeBalance(true);
+      setTimeout(() => setShakeBalance(false), 500);
       return;
     }
-    setActionId(item.id);
-    const res = await fetch('/api/skins/shop', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ itemId: item.id }),
+
+    // Optimistic Update
+    const currentCount = data.wardrobe.inventory[item.id] ?? 0;
+    const newData: ApiData = {
+      ...data,
+      wardrobe: {
+        ...data.wardrobe,
+        flies: balance - price,
+        inventory: {
+          ...data.wardrobe.inventory,
+          [item.id]: currentCount + 1,
+        },
+      },
+    };
+    mutate(newData, false);
+    
+    // Trigger confetti for instant gratification
+    confetti({
+      particleCount: 40,
+      spread: 70,
+      origin: { y: 0.6 },
+      zIndex: 9999,
+      colors: ['#a78bfa', '#4ade80', '#facc15'], // Purple, Green, Yellow
     });
-    setActionId(null);
-    if (res.ok) {
-      mutate();
-      setNotif({ msg: `Purchased ${item.name}!`, type: 'success' });
-    } else {
+
+    setActionId(item.id);
+    try {
+      const res = await fetch('/api/skins/shop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: item.id }),
+      });
+
+      if (res.ok) {
+        setNotif({ msg: `Purchased ${item.name}!`, type: 'success' });
+        // Trigger a real fetch to confirm
+        mutate();
+      } else {
+        throw new Error('Failed');
+      }
+    } catch (e) {
+      // Revert on error
       setNotif({ msg: 'Purchase failed.', type: 'error' });
+      mutate(); // re-fetch true data
+    } finally {
+      setActionId(null);
     }
   };
 
@@ -209,17 +250,27 @@ export function WardrobePanel({
 
             <div className="flex items-center gap-3">
               {/* Balance Badge */}
-              <div className="flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+              <motion.div
+                animate={shakeBalance ? { x: [-5, 5, -5, 5, 0] } : {}}
+                transition={{ duration: 0.4 }}
+                className={cn(
+                  'flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full transition-colors duration-300',
+                  shakeBalance
+                    ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-800'
+                    : 'bg-slate-100 border-slate-200 dark:bg-slate-800 dark:border-slate-700'
+                )}
+              >
                 <div className="flex items-center justify-center bg-white rounded-full shadow-sm dark:bg-slate-700 w-7 h-7 md:w-9 md:h-9">
                   <Fly
                     size={16}
                     className="text-slate-600 dark:text-slate-300 md:w-6 md:h-6"
                   />
                 </div>
-                <span className="text-sm font-black leading-none md:text-xl text-slate-700 dark:text-slate-200 tabular-nums">
-                  {balance.toLocaleString()}
-                </span>
-              </div>
+                <AnimatedNumber
+                  value={balance}
+                  className="text-sm font-black leading-none md:text-xl text-slate-700 dark:text-slate-200 tabular-nums"
+                />
+              </motion.div>
 
               {/* Desktop Close Button */}
               <button

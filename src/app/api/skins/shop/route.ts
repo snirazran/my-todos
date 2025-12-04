@@ -42,15 +42,28 @@ export async function POST(req: NextRequest) {
     return json({ ok: true });
   }
 
-  // For now: allow only one copy per item to keep UX simple
-  if ((user.wardrobe.inventory?.[itemId] ?? 0) > 0) {
-    return json({ ok: true, message: 'Already owned' });
-  }
+  // Check balance
+  const price = byId[itemId].priceFlies ?? 0;
 
-  await UserModel.updateOne(
-    { _id: user._id },
-    { $inc: { [`wardrobe.inventory.${itemId}`]: 1 } }
+  // Transaction: Atomic check-and-update to prevent race conditions
+  // We match the user AND ensure they have enough flies in the same query.
+  const result = await UserModel.updateOne(
+    {
+      _id: user._id,
+      'wardrobe.flies': { $gte: price },
+    },
+    {
+      $inc: {
+        [`wardrobe.inventory.${itemId}`]: 1,
+        'wardrobe.flies': -price,
+      },
+    }
   );
+
+  if (result.modifiedCount === 0) {
+    // Either user not found (unlikely) or not enough flies
+    return json({ error: 'Not enough flies' }, 400);
+  }
 
   return json({ ok: true });
 }
