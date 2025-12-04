@@ -3,7 +3,12 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
-import { CATALOG, RARITY_ORDER, rarityRank, ItemDef } from '@/lib/skins/catalog';
+import {
+  CATALOG,
+  RARITY_ORDER,
+  rarityRank,
+  ItemDef,
+} from '@/lib/skins/catalog';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,7 +32,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const inventory = user.wardrobe.inventory || {};
+    // FIX 1: Use optional chaining (?.) here
+    // If wardrobe is undefined, inventory becomes {}
+    const inventory = user.wardrobe?.inventory || {};
 
     // 1. Validate ownership and get definitions
     const inputItems: ItemDef[] = [];
@@ -46,6 +53,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Check ownership
+    // If user.wardrobe was undefined above, inventory is empty,
+    // so this check will fail correctly (0 < count)
     for (const [id, count] of Object.entries(countsToDeduct)) {
       if ((inventory[id] || 0) < count) {
         return NextResponse.json(
@@ -75,8 +84,11 @@ export async function POST(req: NextRequest) {
 
     // 3. Determine Next Tier
     const currentRankIndex = RARITY_ORDER.indexOf(firstRarity);
-    if (currentRankIndex === -1 || currentRankIndex >= RARITY_ORDER.length - 1) {
-       return NextResponse.json(
+    if (
+      currentRankIndex === -1 ||
+      currentRankIndex >= RARITY_ORDER.length - 1
+    ) {
+      return NextResponse.json(
         { error: 'Invalid rarity tier for trade up.' },
         { status: 400 }
       );
@@ -85,38 +97,43 @@ export async function POST(req: NextRequest) {
 
     // 4. Select Reward
     const possibleRewards = CATALOG.filter((i) => i.rarity === nextRarity);
-    
+
     if (possibleRewards.length === 0) {
-       return NextResponse.json(
+      return NextResponse.json(
         { error: `No items found for rarity ${nextRarity}` },
         { status: 500 }
       );
     }
 
-    const reward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)];
+    const reward =
+      possibleRewards[Math.floor(Math.random() * possibleRewards.length)];
 
     // 5. Execute Trade (Atomic-ish via Document save)
     // Deduct items
     for (const [id, count] of Object.entries(countsToDeduct)) {
-      user.wardrobe.inventory[id] -= count;
-      if (user.wardrobe.inventory[id] <= 0) {
-        delete user.wardrobe.inventory[id];
+      // FIX 2: Use non-null assertion (!)
+      // We know wardrobe exists because the ownership check passed
+      user.wardrobe!.inventory[id] -= count;
+
+      if (user.wardrobe!.inventory[id] <= 0) {
+        delete user.wardrobe!.inventory[id];
       }
     }
 
     // Add reward
-    user.wardrobe.inventory[reward.id] = (user.wardrobe.inventory[reward.id] || 0) + 1;
+    // FIX 3: Use non-null assertion (!) here as well
+    user.wardrobe!.inventory[reward.id] =
+      (user.wardrobe!.inventory[reward.id] || 0) + 1;
 
     // Mark modified because we are mutating the mixed type map directly
     user.markModified('wardrobe.inventory');
     await user.save();
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       reward,
-      consumed: itemIds 
+      consumed: itemIds,
     });
-
   } catch (error) {
     console.error('Trade error:', error);
     return NextResponse.json(
