@@ -241,8 +241,8 @@ export function TradePanel({
           </div>
 
           {/* Slots Grid */}
-          <div className="p-4 md:p-6 bg-slate-100/50 dark:bg-slate-950/30 flex-1 md:overflow-hidden md:flex md:flex-col md:justify-center">
-            <div className="grid grid-cols-5 gap-x-2 gap-y-5 md:gap-3 md:content-center">
+          <div className="p-4 md:p-6 bg-slate-100/50 dark:bg-slate-950/30 flex-1 md:overflow-hidden md:flex md:flex-col">
+            <div className="grid grid-cols-5 gap-x-2 gap-y-5 md:gap-x-3 md:gap-y-6">
               {Array.from({ length: 10 }).map((_, i) => {
                 const itemId = selectedIds[i];
                 const item = itemId ? catalog.find((c) => c.id === itemId) : null;

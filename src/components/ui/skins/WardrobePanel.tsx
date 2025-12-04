@@ -224,7 +224,7 @@ export function WardrobePanel({
 
           // 3. DESKTOP: Restore Floating Modal Look
           'md:top-[50%] md:left-[50%] md:-translate-x-1/2 md:-translate-y-1/2', // Re-apply centering
-          'md:w-[95vw] md:max-w-[900px] md:h-auto md:max-h-[90vh]',
+          'md:w-[95vw] md:max-w-[900px] md:h-[85vh] md:max-h-[90vh]',
           'md:border-4 md:border-slate-200 md:dark:border-slate-800 md:rounded-[36px] md:shadow-2xl'
         )}
       >
