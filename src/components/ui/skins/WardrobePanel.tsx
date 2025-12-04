@@ -16,6 +16,8 @@ import confetti from 'canvas-confetti';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 
+import { TradePanel } from './TradePanel';
+
 /* ---------------- Types & Data ---------------- */
 type ApiData = {
   wardrobe: {
@@ -304,7 +306,7 @@ export function WardrobePanel({
                   </TabsTrigger>
                   <TabsTrigger
                     value="trade"
-                    className="flex-1 h-full text-xs font-black tracking-wide uppercase rounded-lg opacity-50 cursor-not-allowed md:rounded-xl md:text-base"
+                    className="flex-1 h-full rounded-lg md:rounded-xl text-xs md:text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"
                   >
                     Trade
                   </TabsTrigger>
@@ -389,14 +391,15 @@ export function WardrobePanel({
 
               <TabsContent
                 value="trade"
-                className="absolute inset-0 flex items-center justify-center data-[state=inactive]:hidden"
+                className="absolute inset-0 overflow-hidden data-[state=inactive]:hidden"
               >
-                <div className="space-y-2 text-center opacity-60">
-                  <Lock className="w-10 h-10 mx-auto md:w-12 md:h-12 text-slate-400" />
-                  <h3 className="text-lg font-black md:text-xl text-slate-500">
-                    Locked
-                  </h3>
-                </div>
+                {data && (
+                  <TradePanel 
+                    inventory={data.wardrobe.inventory}
+                    catalog={data.catalog}
+                    onTradeSuccess={() => mutate()}
+                  />
+                )}
               </TabsContent>
             </div>
           </Tabs>
