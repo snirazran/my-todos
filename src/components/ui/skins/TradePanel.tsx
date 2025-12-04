@@ -351,12 +351,17 @@ export function TradePanel({
                   disabled={selectedIds.length !== 10 || isTrading}
                   onClick={handleConfirmTrade}
                   className={cn(
-                    'flex-1 h-12 md:h-16 font-black uppercase tracking-wider transition-all md:w-full md:text-lg',
+                    'group relative flex-1 h-12 md:h-20 font-black uppercase tracking-wider transition-all md:w-full md:text-xl overflow-hidden', // Added group and overflow-hidden
                     selectedIds.length === 10
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-xl shadow-indigo-500/30 ring-1 ring-indigo-400/30'
+                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-2xl shadow-indigo-500/50 ring-1 ring-indigo-400/30' // Stronger shadow
                       : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
                   )}
                 >
+                  {/* Shine effect */}
+                  {selectedIds.length === 10 && ( // Only show shine if button is active
+                    <span className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine" />
+                  )}
+
                   {isTrading ? (
                     <Sparkles className="w-5 h-5 mr-2 animate-spin" />
                   ) : (
