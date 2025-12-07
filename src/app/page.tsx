@@ -84,6 +84,8 @@ export default function Home() {
   // UI State for Tabs
   const [activeTab, setActiveTab] = useState<'today' | 'backlog'>('today');
 
+  const [isAnimating, setIsAnimating] = useState(false);
+
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
   const {
     vp,
@@ -177,9 +179,12 @@ export default function Home() {
 
       // 2. Delayed sort (triggers slide animation)
       if (completed) {
+        setIsAnimating(true);
         setTimeout(() => {
           setTasks((prev) => sortTasks(prev));
-        }, 600);
+          // Wait for Framer Motion spring to settle (approx 400ms)
+          setTimeout(() => setIsAnimating(false), 400);
+        }, 250);
       } else {
         // If unchecking, maybe sort immediately or same delay?
         // Let's do same delay for consistency, or immediate?
@@ -205,19 +210,17 @@ export default function Home() {
           t.id === taskId ? { ...t, completed } : t
         );
         if (completed) {
-          // We can't use setTimeout nicely inside the setter if we want to batch updates
-          // But we can just use another setter outside.
-          // However, here we are inside the function scope.
-          // Let's replicate the logic:
           return toggled; // Return unsorted first
         }
         return sortTasks(toggled);
       });
 
       if (completed) {
+        setIsAnimating(true);
         setTimeout(() => {
           setGuestTasks((prev) => sortTasks(prev));
-        }, 600);
+          setTimeout(() => setIsAnimating(false), 400);
+        }, 250);
       }
     }
   };
@@ -225,7 +228,7 @@ export default function Home() {
   const { indices } = useWardrobeIndices(!!session);
 
   const handleToggle = async (taskId: string, explicitCompleted?: boolean) => {
-    if (cinematic || grab) return;
+    if (cinematic || grab || isAnimating) return;
     const task = data.find((t) => t.id === taskId);
     if (!task) return;
     const completed =
