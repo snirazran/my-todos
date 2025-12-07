@@ -454,6 +454,7 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
   const tasks: TaskDoc[] = await TaskModel.find(
     {
       userId,
+      deletedAt: { $exists: false },
       $or: [
         { type: 'weekly', dayOfWeek: dow },
         { type: 'regular', date },
@@ -559,6 +560,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
     const docs: TaskDoc[] = await Task.find(
       {
         userId: uid,
+        deletedAt: { $exists: false },
         $or: [
           { type: 'weekly', dayOfWeek: dayNum },
           { type: 'regular', date: weekDates[dayNum] },
@@ -607,6 +609,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
     const docs: TaskDoc[] = await Task.find(
       {
         userId: uid,
+        deletedAt: { $exists: false },
         $or: [
           { type: 'weekly', dayOfWeek: d },
           { type: 'regular', date: weekDates[d] },
@@ -896,8 +899,11 @@ async function handleBoardDelete(
     return NextResponse.json({ ok: true });
   }
 
-  // weekly: remove the weekly template entry
-  await Task.deleteOne({ userId: uid, type: 'weekly', id: taskId });
+  // weekly: soft delete so history is preserved
+  await Task.updateOne(
+    { userId: uid, type: 'weekly', id: taskId },
+    { $set: { deletedAt: new Date() } }
+  );
 
   // also remove any future one-time clones with the same id (safety)
   const today = ymdLocal(new Date());

@@ -1,23 +1,19 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { format } from 'date-fns';
 import { useSession } from 'next-auth/react';
-import { motion } from 'framer-motion';
-import {
-  Calendar,
-  History as HistoryIcon,
-  TrendingUp,
-  CheckCircle2,
-} from 'lucide-react';
+import { ArrowLeft, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { subDays, startOfToday, format, startOfYesterday } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
 
-import { type FrogHandle } from '@/components/ui/frog';
-import Fly from '@/components/ui/fly';
-import StatCard from '@/components/ui/StatCard';
-import ProgressBadge from '@/components/ui/ProgressBadge';
-import HistoryTaskList, { HistoryTask } from '@/components/ui/HistoryTaskList';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import HistoryStats from '@/components/history/HistoryStats';
+import HistoryFilter, { DateRangeOption } from '@/components/history/HistoryFilter';
+import HistoryList from '@/components/history/HistoryList';
+import { Button } from '@/components/ui/button';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
+import { type FrogHandle } from '@/components/ui/frog';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import {
   HIT_AT,
@@ -26,31 +22,29 @@ import {
   TONGUE_STROKE,
   useFrogTongue,
 } from '@/hooks/useFrogTongue';
-import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 const FLY_PX = 24;
 
-interface DayRecord {
-  date: string; // 'YYYY-MM-DD'
-  tasks: HistoryTask[];
-}
-
-type FlyStatus = {
-  balance: number;
-};
-
-export default function History() {
+export default function HistoryPage() {
   const { data: session, status } = useSession();
-  const sessionLoading = status === 'loading';
-  const [openWardrobe, setOpenWardrobe] = useState(false);
-  const [history, setHistory] = useState<DayRecord[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [flyBalance, setFlyBalance] = useState<number | undefined>(undefined);
+  const [filter, setFilter] = useState<DateRangeOption>('7d');
+  
+  // Custom date range state
+  const [customFrom, setCustomFrom] = useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
+  const [customTo, setCustomTo] = useState<string>(format(subDays(new Date(), 1), 'yyyy-MM-dd')); // Default to yesterday
 
-  /* ---- frog animation shared state ---- */
+  const [historyData, setHistoryData] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  /* ---- Frog Animation State ---- */
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
+  const [openWardrobe, setOpenWardrobe] = useState(false);
+  const [flyBalance, setFlyBalance] = useState<number | undefined>(undefined);
+  
+  const { indices } = useWardrobeIndices(!!session);
+
   const {
     vp,
     cinematic,
@@ -62,48 +56,7 @@ export default function History() {
     visuallyDone,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
-  const applyFlyStatus = (incoming?: FlyStatus | null) => {
-    if (incoming && typeof incoming.balance === 'number') {
-      setFlyBalance(incoming.balance);
-    }
-  };
-
-  /* ---- data load ---- */
-  useEffect(() => {
-    if (!session) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    (async () => {
-      try {
-        const res = await fetch('/api/history');
-        const data = await res.json();
-        setHistory(data);
-
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const flyRes = await fetch(`/api/tasks?date=${today}`);
-        if (flyRes.ok) {
-          const flyJson = await flyRes.json();
-          applyFlyStatus(flyJson.flyStatus);
-        }
-      } catch (e) {
-        console.error('Failed to fetch history:', e);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [session]);
-
-  const totalDays = history.length;
-  const totalTasks = history.reduce((a, d) => a + d.tasks.length, 0);
-  const completedTasks = history.reduce(
-    (a, d) => a + d.tasks.filter((t) => t.completed).length,
-    0
-  );
-  const overallCompletionRate =
-    totalTasks > 0 ? (completedTasks / totalTasks) * 100 : 0;
-
+  // Prevent scrolling during cinematic
   useEffect(() => {
     if (!cinematic) return;
     const stop = (e: Event) => e.preventDefault();
@@ -115,191 +68,307 @@ export default function History() {
     };
   }, [cinematic]);
 
-  const { indices } = useWardrobeIndices(!!session);
-
-  /* ---- persist toggle for a specific date ---- */
-  const persistTask = async (
-    date: string,
-    taskId: string,
-    completed: boolean
-  ) => {
-    // optimistic local change
-    setHistory((prev) =>
-      prev.map((day) =>
-        day.date !== date
-          ? day
-          : {
-              ...day,
-              tasks: day.tasks.map((t) =>
-                t.id === taskId ? { ...t, completed } : t
-              ),
-            }
-      )
-    );
-    // server
-    if (session) {
-      const res = await fetch('/api/tasks', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, taskId, completed }),
-      });
-      if (res.ok) {
-        try {
-          const body = await res.json();
-          applyFlyStatus(body.flyStatus);
-        } catch {
-          /* ignore */
-        }
-      }
-    }
-  };
-
-  /* ---- main toggle ---- */
-  /* ---- main toggle (delegated to shared hook) ---- */
-  const handleToggle = async (
-    date: string,
-    taskId: string,
-    explicit?: boolean
-  ) => {
-    if (cinematic || grab) return;
-    const day = history.find((d) => d.date === date);
-    if (!day) return;
-    const task = day.tasks.find((t) => t.id === taskId);
-    if (!task) return;
-
-    const completed = explicit !== undefined ? explicit : !task.completed;
-    if (!completed) {
-      persistTask(date, taskId, false);
+  // Initial Data Fetch (Balance + History)
+  useEffect(() => {
+    if (status === 'loading') return;
+    if (!session) {
+      setLoading(false);
       return;
     }
 
-    await triggerTongue({
-      key: `${date}::${taskId}`,
-      completed,
-      onPersist: () => persistTask(date, taskId, true),
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        // 1. Fetch Fly Balance
+        const todayStr = format(startOfToday(), 'yyyy-MM-dd');
+        const flyRes = await fetch(`/api/tasks?date=${todayStr}`);
+        if (flyRes.ok) {
+           const flyJson = await flyRes.json();
+           if (flyJson.flyStatus?.balance !== undefined) {
+              setFlyBalance(flyJson.flyStatus.balance);
+           }
+        }
+
+        // 2. Fetch History
+        const today = startOfToday();
+        let fromDate = new Date();
+        let toDate = subDays(today, 1); // Always end yesterday by default for standard filters
+
+        // Determine dates based on filter
+        switch (filter) {
+          case '7d':
+            fromDate = subDays(today, 7); 
+            break;
+          case '30d':
+            fromDate = subDays(today, 30);
+            break;
+          case 'yesterday':
+            fromDate = startOfYesterday();
+            toDate = startOfYesterday();
+            break;
+          case 'custom':
+            // Use user selected dates
+            if (customFrom) fromDate = new Date(customFrom);
+            if (customTo) toDate = new Date(customTo);
+            break;
+        }
+
+        const fromStr = format(fromDate, 'yyyy-MM-dd');
+        const toStr = format(toDate, 'yyyy-MM-dd');
+
+        const res = await fetch(`/api/history?from=${fromStr}&to=${toStr}`);
+        if (!res.ok) throw new Error('Failed to fetch');
+        
+        const data = await res.json();
+        setHistoryData(data);
+      } catch (error) {
+        console.error("History fetch error", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [filter, session, status, customFrom, customTo]);
+
+  // Updated stats calculation (combined view)
+  const stats = useMemo(() => {
+    let total = 0;
+    let completed = 0;
+
+    historyData.forEach((day) => {
+      day.tasks.forEach((t: any) => {
+        total++;
+        if (t.completed) completed++;
+      });
     });
+
+    return {
+      total,
+      completed,
+      completionRate: total > 0 ? (completed / total) * 100 : 0,
+    };
+  }, [historyData]);
+
+  // Handler for task toggling
+  const handleToggleTask = async (taskId: string, date: string, currentStatus: boolean) => {
+     if (cinematic || grab) return; // Prevent interaction during animation
+
+     const performUpdate = async () => {
+       // 1. Optimistic Update
+       const newStatus = !currentStatus;
+       
+       setHistoryData(prevData => prevData.map(day => {
+          if (day.date !== date) return day;
+          return {
+             ...day,
+             tasks: day.tasks.map((t: any) => {
+                if (t.id === taskId) {
+                   return { ...t, completed: newStatus };
+                }
+                return t;
+             })
+          };
+       }));
+
+       // 2. API Call
+       try {
+          const res = await fetch('/api/tasks', {
+             method: 'PUT',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify({
+                taskId,
+                date,
+                completed: newStatus
+             })
+          });
+
+          if (!res.ok) {
+             throw new Error("Failed to update task");
+          }
+          
+          // Update fly balance if returned
+          const data = await res.json();
+          if (data.flyStatus?.balance !== undefined) {
+             setFlyBalance(data.flyStatus.balance);
+          }
+
+       } catch (error) {
+          console.error("Failed to persist task toggle", error);
+          // Revert on error
+          setHistoryData(prevData => prevData.map(day => {
+             if (day.date !== date) return day;
+             return {
+                ...day,
+                tasks: day.tasks.map((t: any) => {
+                   if (t.id === taskId) {
+                      return { ...t, completed: currentStatus }; // Revert to old status
+                   }
+                   return t;
+                })
+             };
+          }));
+       }
+     };
+
+     // If marking as complete, trigger tongue first
+     if (!currentStatus) {
+        const uniqueKey = `${date}::${taskId}`;
+        await triggerTongue({
+           key: uniqueKey,
+           completed: true,
+           onPersist: performUpdate
+        });
+     } else {
+        // Marking as incomplete, just do it
+        await performUpdate();
+     }
   };
 
-  if (sessionLoading || loading) {
-    return <LoadingScreen message="Loading your history..." />;
-  }
+  // Initial Data Fetch (Balance + History)
 
   return (
-    <main
-      dir="ltr"
-      className="min-h-screen p-4 pb-24 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 md:p-8 md:pb-8"
-    >
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex flex-col items-start justify-between gap-4 mb-8 md:flex-row md:items-center">
-          <div>
-            <h1 className="mb-2 text-4xl font-bold text-slate-900 dark:text-white md:text-5xl">
+    <main className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
+      <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
               Task History
             </h1>
-            <p className="text-lg text-slate-600 dark:text-slate-400">
-              Last 30 days
+            <p className="text-slate-500 dark:text-slate-400">
+              Review your past accomplishments and habits.
             </p>
           </div>
-          <Link
-            href="/"
-            className="hidden md:inline-flex items-center gap-2 px-6 py-3 font-medium transition-all duration-200 bg-white shadow-md rounded-xl text-slate-700 hover:shadow-lg dark:bg-slate-800 dark:text-slate-200"
-          >
-            <HistoryIcon className="w-5 h-5" />
-            Back to Today
-          </Link>
+          
+          <div className="flex items-center gap-3">
+             <Link href="/">
+                <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+                   <ArrowLeft className="w-4 h-4" />
+                   Back to Board
+                </Button>
+             </Link>
+          </div>
         </div>
 
-        {/* Frog + KPIs */}
-        <div className="flex flex-col items-center w-full">
-          <FrogDisplay
-            frogRef={frogRef}
-            frogBoxRef={frogBoxRef}
-            mouthOpen={!!grab}
-            mouthOffset={{ y: -4 }}
-            indices={indices}
-            openWardrobe={openWardrobe}
-            onOpenChange={setOpenWardrobe}
-            flyBalance={flyBalance}
-          />
-        </div>
-
-        <div className="-mt-2.5 mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
-          <StatCard
-            icon={<Calendar className="w-8 h-8 text-blue-500" />}
-            value={totalDays}
-            label="Days recorded"
-          />
-          <StatCard
-            icon={<CheckCircle2 className="w-8 h-8 text-green-500" />}
-            value={completedTasks}
-            label="Tasks completed"
-          />
-          <StatCard
-            icon={<TrendingUp className="w-8 h-8 text-purple-500" />}
-            value={`${Math.round(overallCompletionRate)}%`}
-            label="Overall completion"
-          />
-        </div>
-
-        {/* History list */}
-        <div className="space-y-4">
-          {history.map((day, i) => {
-            const completedCount = day.tasks.filter((t) => t.completed).length;
-            const pct = day.tasks.length
-              ? Math.round((completedCount / day.tasks.length) * 100)
-              : 0;
-            return (
-              <div
-                key={day.date}
-                className="p-6 transition-shadow duration-200 bg-white shadow-md rounded-xl hover:shadow-lg dark:bg-slate-800"
-                style={{
-                  animation: `fadeInUp 0.5s ease-out ${i * 0.05}s`,
-                  animationFillMode: 'both',
-                }}
-              >
-                <div className="flex flex-col items-start justify-between gap-4 mb-4 md:flex-row md:items-center">
-                  <div>
-                    <h2 className="text-xl font-semibold text-slate-900 dark:text-white">
-                      {format(new Date(day.date), 'EEEE, MMMM d')}
-                    </h2>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">
-                      {completedCount} / {day.tasks.length} tasks completed
-                    </p>
-                  </div>
-                  {day.tasks.length > 0 && <ProgressBadge pct={pct} />}
-                </div>
-
-                <HistoryTaskList
-                  date={day.date}
-                  tasks={day.tasks}
-                  toggle={handleToggle}
-                  visuallyCompleted={visuallyDone}
-                  renderBullet={(key: string, task: HistoryTask) => (
-                    <Fly
-                      ref={(el) => {
-                        flyRefs.current[key] = el;
-                      }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleToggle(day.date, task.id, true);
-                      }}
-                      size={30}
-                      y={-6}
-                      x={-4}
-                    />
-                  )}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+           {/* Left Column: Frog & Stats */}
+           <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-8">
+              {/* Frog Display */}
+              <div className="flex flex-col items-center w-full">
+                <FrogDisplay
+                  frogRef={frogRef}
+                  frogBoxRef={frogBoxRef}
+                  mouthOpen={!!grab}
+                  mouthOffset={{ y: -4 }}
+                  indices={indices}
+                  openWardrobe={openWardrobe}
+                  onOpenChange={setOpenWardrobe}
+                  flyBalance={flyBalance}
                 />
               </div>
-            );
-          })}
+
+              {/* Stats Section (Vertical Stack on Desktop) */}
+              <HistoryStats 
+                 data={stats} 
+                 className="grid-cols-1 md:grid-cols-3 lg:grid-cols-1 mb-0"
+              />
+           </div>
+
+           {/* Right Column: Filters & List */}
+           <div className="lg:col-span-8 space-y-6">
+              {/* Controls Container */}
+              <div className="flex flex-col gap-4">
+                 {/* Filter Tabs */}
+                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-2 z-20 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md py-2 -mx-2 px-2 md:static md:bg-transparent md:p-0">
+                    <HistoryFilter value={filter} onChange={setFilter} />
+                    
+                    {/* Context Label (Only show if not custom) */}
+                    {filter !== 'custom' && (
+                       <div className="hidden md:flex items-center text-sm text-slate-400 gap-2">
+                          <CalendarIcon className="w-4 h-4" />
+                          <span>
+                             {filter === 'yesterday' 
+                                ? 'Yesterday' 
+                                : filter === '7d' 
+                                   ? 'Last 7 Days (Excl. Today)' 
+                                   : 'Last 30 Days (Excl. Today)'}
+                          </span>
+                       </div>
+                    )}
+                 </div>
+
+                 {/* Custom Date Pickers (Animated Expansion) */}
+                 <AnimatePresence>
+                   {filter === 'custom' && (
+                     <motion.div
+                       initial={{ height: 0, opacity: 0 }}
+                       animate={{ height: 'auto', opacity: 1 }}
+                       exit={{ height: 0, opacity: 0 }}
+                       className="overflow-hidden"
+                     >
+                       <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                         <div className="flex items-center gap-2 w-full sm:w-auto">
+                           <label className="text-sm font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">From:</label>
+                           <input
+                             type="date"
+                             value={customFrom}
+                             onChange={(e) => setCustomFrom(e.target.value)}
+                             className="w-full sm:w-auto px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                           />
+                         </div>
+                         <div className="hidden sm:block text-slate-400">→</div>
+                         <div className="flex items-center gap-2 w-full sm:w-auto">
+                           <label className="text-sm font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">To:</label>
+                           <input
+                             type="date"
+                             value={customTo}
+                             onChange={(e) => setCustomTo(e.target.value)}
+                             className="w-full sm:w-auto px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                           />
+                         </div>
+                       </div>
+                     </motion.div>
+                   )}
+                 </AnimatePresence>
+              </div>
+
+              {/* Main List */}
+              <div className="relative min-h-[400px]">
+                 {loading ? (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-slate-900/50 z-10 backdrop-blur-sm rounded-xl">
+                       <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                    </div>
+                 ) : null}
+                 
+                 <HistoryList 
+                    history={historyData} 
+                    onToggleTask={handleToggleTask} 
+                    setFlyRef={(key, el) => { flyRefs.current[key] = el; }}
+                    visuallyCompleted={visuallyDone}
+                 />
+              </div>
+           </div>
         </div>
+
+      </div>
+      
+      {/* Mobile Floating Action Button for Back */}
+      
+      {/* Mobile Floating Action Button for Back */}
+      <div className="md:hidden fixed bottom-6 right-6 z-50">
+        <Link href="/">
+           <Button className="rounded-full w-12 h-12 shadow-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:scale-105 transition-transform">
+              <ArrowLeft className="w-6 h-6" />
+           </Button>
+        </Link>
       </div>
 
-      {/* SVG overlay – same as Home */}
+      {/* SVG Tongue Overlay */}
       {grab && (
         <svg
           key={grab.startAt}
-          className="fixed inset-0 z-40 pointer-events-none"
+          className="fixed inset-0 z-50 pointer-events-none"
           width={vp.w}
           height={vp.h}
           viewBox={`0 0 ${vp.w} ${vp.h}`}
@@ -346,19 +415,6 @@ export default function History() {
           )}
         </svg>
       )}
-
-      <style jsx>{`
-        @keyframes fadeInUp {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </main>
   );
 }

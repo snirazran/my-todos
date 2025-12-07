@@ -12,7 +12,7 @@ const ymdLocal = (d: Date) =>
   `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
 /* ---------- GET  /api/history ---------- */
-export async function GET(_req: NextRequest) {
+export async function GET(req: NextRequest) {
   /* auth */
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -23,23 +23,54 @@ export async function GET(_req: NextRequest) {
   try {
     await connectMongo();
 
-    // Build date list for last 30 days (today included)
-    const today = new Date();
-    const dates: string[] = [];
-    for (let i = 0; i < 30; i++) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
-      dates.push(ymdLocal(d));
+    // Parse query params or default to 30 days
+    const url = new URL(req.url);
+    const fromParam = url.searchParams.get('from');
+    const toParam = url.searchParams.get('to');
+
+    let endDate = new Date();
+    if (toParam) {
+      endDate = new Date(toParam);
+    }
+    
+    // Default to 30 days ago if no 'from' is provided
+    let startDate = new Date();
+    if (fromParam) {
+      startDate = new Date(fromParam);
+    } else {
+      startDate.setDate(endDate.getDate() - 30);
     }
 
-    const cutoff = dates[dates.length - 1];
+    // Normalize to midnight for consistent comparisons
+    // Note: ymdLocal handles the string format, but for the loop we want Date objects
+    
+    const dates: string[] = [];
+    const loopDate = new Date(endDate);
+    
+    // Generate dates from End to Start (descending) to match existing order preference, 
+    // or we can sort later. Let's loop naturally.
+    // Actually, the original loop was "last 30 days" (descending effectively?). 
+    // Let's just generate the array of YYYY-MM-DD strings in the range.
+    
+    // We'll iterate from endDate down to startDate to keep the 'descending' nature
+    // or we can just sort at the end.
+    
+    const curr = new Date(endDate);
+    while (curr >= startDate) {
+      dates.push(ymdLocal(curr));
+      curr.setDate(curr.getDate() - 1);
+    }
+
+    const cutoff = ymdLocal(startDate);
+    const endStr = ymdLocal(endDate);
 
     // Fetch tasks needed to render history
+    // For regular tasks: date >= cutoff AND date <= endStr
     const tasks = await TaskModel.find(
       {
         userId,
         $or: [
-          { type: 'regular', date: { $gte: cutoff } },
+          { type: 'regular', date: { $gte: cutoff, $lte: endStr } },
           { type: 'weekly' },
         ],
       },
@@ -53,6 +84,8 @@ export async function GET(_req: NextRequest) {
         completed: 1,
         completedDates: 1,
         suppressedDates: 1,
+        createdAt: 1,
+        deletedAt: 1,
       }
     )
       .lean<TaskDoc[]>()
@@ -63,6 +96,7 @@ export async function GET(_req: NextRequest) {
       text: string;
       order: number;
       completed: boolean;
+      type: 'weekly' | 'regular'; // Added type for UI filtering/badges
     };
 
     const byDate: Record<string, HistoryTask[]> = {};
@@ -73,9 +107,28 @@ export async function GET(_req: NextRequest) {
 
       const dayTasks = tasks
         .filter((t: TaskDoc) => {
-          if (t.type === 'regular') return t.date === date;
-          if (t.type === 'weekly') return t.dayOfWeek === dow;
-          return false;
+          // 1. Check if task matches the day (Regular vs Weekly)
+          let matchesDay = false;
+          if (t.type === 'regular') matchesDay = t.date === date;
+          else if (t.type === 'weekly') matchesDay = t.dayOfWeek === dow;
+          
+          if (!matchesDay) return false;
+
+          // 2. Check Lifespan (Creation)
+          // If createdAt is available, ensure the task existed on 'date'
+          if (t.createdAt) {
+             const createdYMD = ymdLocal(t.createdAt);
+             if (createdYMD > date) return false;
+          }
+
+          // 3. Check Lifespan (Deletion)
+          // If deletedAt is available, ensure it wasn't deleted BEFORE 'date'
+          if (t.deletedAt) {
+             const deletedYMD = ymdLocal(t.deletedAt);
+             if (deletedYMD < date) return false;
+          }
+
+          return true;
         })
         .filter((t: TaskDoc) => !(t.suppressedDates ?? []).includes(date))
         .map(
@@ -86,8 +139,15 @@ export async function GET(_req: NextRequest) {
             completed:
               (t.completedDates ?? []).includes(date) ||
               (!!t.completed && t.type === 'regular'),
+            type: t.type as 'weekly' | 'regular',
           })
         )
+        // Only include completed tasks in history? 
+        // The prompt says "view tasks i did in the past".
+        // The original code returned *all* tasks for that day and checked 'completed'.
+        // To be a true history of "what I did", we usually only show completed ones,
+        // OR we show everything to show what was missed.
+        // The original code included everything. Let's keep it that way but maybe the UI filters it.
         .sort((a: HistoryTask, b: HistoryTask) => a.order - b.order);
 
       if (dayTasks.length) {

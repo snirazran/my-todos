@@ -18,6 +18,7 @@ export interface TaskDoc {
   weekStart?: string;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt?: Date;
 }
 
 const TaskSchema = new Schema<TaskDoc>(
@@ -35,6 +36,7 @@ const TaskSchema = new Schema<TaskDoc>(
     weekStart: { type: String },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
+    deletedAt: { type: Date },
   },
   {
     collection: 'tasks',
