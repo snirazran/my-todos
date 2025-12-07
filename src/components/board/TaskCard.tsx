@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import React, { useRef, useCallback, useEffect } from 'react';
-import { RotateCcw, EllipsisVertical } from 'lucide-react';
+import { RotateCcw, EllipsisVertical, CheckCircle2 } from 'lucide-react';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
 
@@ -166,7 +166,10 @@ export default function TaskCard({
       data-card-id={dragId}
       draggable={false}
       onDragStart={(e) => e.preventDefault()}
-      style={{ touchAction: defaultTouchAction, WebkitTapHighlightColor: 'transparent' }}
+      style={{
+        touchAction: defaultTouchAction,
+        WebkitTapHighlightColor: 'transparent',
+      }}
       className={[
         'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl cursor-grab transition-all duration-300',
         'bg-white dark:bg-slate-800/90 backdrop-blur-md',
@@ -180,7 +183,11 @@ export default function TaskCard({
       aria-grabbed={false}
     >
       <div className="grid self-center shrink-0 place-items-center text-slate-400 group-hover:text-purple-500 transition-colors">
-        <Fly size={24} />
+        {task.completed ? (
+          <CheckCircle2 className="w-6 h-6 text-green-500" />
+        ) : (
+          <Fly size={24} />
+        )}
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col justify-center">
@@ -195,7 +202,13 @@ export default function TaskCard({
             </span>
           </div>
         )}
-        <div className="truncate text-[15px] font-medium leading-snug text-slate-700 dark:text-slate-100 group-hover:text-slate-900 dark:group-hover:text-white transition-colors">
+        <div
+          className={`truncate text-[15px] font-medium leading-snug transition-colors ${
+            task.completed
+              ? 'text-slate-400 line-through dark:text-slate-500'
+              : 'text-slate-700 dark:text-slate-100 group-hover:text-slate-900 dark:group-hover:text-white'
+          }`}
+        >
           {task.text}
         </div>
       </div>

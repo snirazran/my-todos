@@ -144,26 +144,32 @@ export default function TaskList({
             </div>
           )}
 
-          {tasks.map((task, i) => {
-            const isDone = task.completed || vSet.has(task.id);
-            const isMenuOpen = menuFor === task.id;
+          <AnimatePresence initial={false} mode="popLayout">
+            {tasks.map((task, i) => {
+              const isDone = task.completed || vSet.has(task.id);
+              const isMenuOpen = menuFor === task.id;
 
-            return (
-              <div
-                key={task.id}
-                // IMPORTANT: Z-Index logic here fixes the clipping/overlap issue
-                className={`group relative transition-all duration-200 ${
-                  isMenuOpen ? 'z-50' : 'z-auto'
-                }`}
-                style={{
-                  // Ensure active menu item stays on top of subsequent items
-                  zIndex: isMenuOpen ? 50 : 1,
-                }}
-              >
-                {/* Row */}
-                <div
-                  onClick={() => toggle(task.id)}
-                  className={`
+              return (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  transition={{
+                    layout: { type: 'spring', stiffness: 300, damping: 30 },
+                  }}
+                  key={task.id}
+                  // IMPORTANT: Z-Index logic here fixes the clipping/overlap issue
+                  className={`group relative ${isMenuOpen ? 'z-50' : 'z-auto'}`}
+                  style={{
+                    // Ensure active menu item stays on top of subsequent items
+                    zIndex: isMenuOpen ? 50 : 1,
+                  }}
+                >
+                  {/* Row */}
+                  <div
+                    onClick={() => toggle(task.id)}
+                    className={`
                     relative flex items-center gap-4 px-3 py-3.5 
                     transition-all duration-200 cursor-pointer rounded-xl 
                     border border-transparent hover:border-slate-200 dark:hover:border-slate-700
@@ -174,80 +180,78 @@ export default function TaskList({
                         : ''
                     }
                   `}
-                  style={{
-                    touchAction: 'pan-y',
-                    animation: `fadeInUp 0.4s ease-out ${i * 0.05}s forwards`,
-                    opacity: 0,
-                  }}
-                >
-                  {/* Bullet with animated swap */}
-                  <div className="relative flex-shrink-0 w-7 h-7">
-                    <AnimatePresence initial={false}>
-                      {!isDone ? (
-                        <motion.div
-                          key="fly"
-                          className="absolute inset-0"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          transition={{ duration: 0.18 }}
-                        >
-                          {renderBullet ? (
-                            renderBullet(task, false)
-                          ) : (
+                    style={{
+                      touchAction: 'pan-y',
+                    }}
+                  >
+                    {/* Bullet with animated swap */}
+                    <div className="relative flex-shrink-0 w-7 h-7">
+                      <AnimatePresence initial={false}>
+                        {!isDone ? (
+                          <motion.div
+                            key="fly"
+                            className="absolute inset-0"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.18 }}
+                          >
+                            {renderBullet ? (
+                              renderBullet(task, false)
+                            ) : (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggle(task.id, true);
+                                }}
+                                className="flex items-center justify-center w-full h-full transition-colors text-slate-300 hover:text-violet-500"
+                              >
+                                <Circle className="w-6 h-6" />
+                              </button>
+                            )}
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="check"
+                            className="absolute inset-0"
+                            initial={{ opacity: 0, scale: 0.6 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.6 }}
+                            transition={{
+                              type: 'spring',
+                              stiffness: 400,
+                              damping: 25,
+                            }}
+                          >
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toggle(task.id, true);
+                                toggle(task.id, false);
                               }}
-                              className="flex items-center justify-center w-full h-full transition-colors text-slate-300 hover:text-violet-500"
                             >
-                              <Circle className="w-6 h-6" />
+                              <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
                             </button>
-                          )}
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="check"
-                          className="absolute inset-0"
-                          initial={{ opacity: 0, scale: 0.6 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.6 }}
-                          transition={{
-                            type: 'spring',
-                            stiffness: 400,
-                            damping: 25,
-                          }}
-                        >
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggle(task.id, false);
-                            }}
-                          >
-                            <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
-                          </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
 
-                  <motion.span
-                    className="flex-1 text-base font-medium md:text-lg"
-                    animate={{
-                      color: isDone ? 'rgb(148 163 184)' : 'rgb(30 41 59)', // slate-400 vs slate-800
-                      textDecorationLine: isDone ? 'line-through' : 'none',
-                      opacity: isDone ? 0.8 : 1,
-                    }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    {task.text}
-                  </motion.span>
+                    <motion.span
+                      className="flex-1 text-base font-medium md:text-lg"
+                      animate={{
+                        color: isDone ? 'rgb(148 163 184)' : 'rgb(30 41 59)', // slate-400 vs slate-800
+                        textDecorationLine: isDone ? 'line-through' : 'none',
+                        opacity: isDone ? 0.8 : 1,
+                      }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {task.text}
+                    </motion.span>
 
-                  {/* Actions */}
-                  <div className="relative shrink-0">
-                    <button
-                      className={`
+                    {/* Actions */}
+                    <div className="relative shrink-0">
+                      <button
+                        className={`
                         p-2 rounded-lg transition-colors
                         ${
                           isMenuOpen
@@ -255,58 +259,59 @@ export default function TaskList({
                             : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'
                         }
                       `}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        // Dispatch event to close other menus
-                        window.dispatchEvent(
-                          new CustomEvent('task-menu-open', {
-                            detail: { id: `task:${task.id}` },
-                          })
-                        );
-                        setMenuFor((prev) =>
-                          prev === task.id ? null : task.id
-                        );
-                      }}
-                    >
-                      <EllipsisVertical className="w-5 h-5" />
-                    </button>
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          // Dispatch event to close other menus
+                          window.dispatchEvent(
+                            new CustomEvent('task-menu-open', {
+                              detail: { id: `task:${task.id}` },
+                            })
+                          );
+                          setMenuFor((prev) =>
+                            prev === task.id ? null : task.id
+                          );
+                        }}
+                      >
+                        <EllipsisVertical className="w-5 h-5" />
+                      </button>
 
-                    {/* Dropdown Menu */}
-                    <AnimatePresence>
-                      {isMenuOpen && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                          transition={{ duration: 0.1 }}
-                          className="absolute right-0 top-full mt-2 z-[100] w-48 rounded-xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-700/70 dark:bg-slate-900 overflow-hidden"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="p-1">
-                            <button
-                              className="flex items-center justify-start w-full gap-2 px-3 py-2 text-sm font-medium text-red-600 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
-                              onClick={() => {
-                                setMenuFor(null);
-                                setDialog({
-                                  task,
-                                  kind: taskKind(task) as
-                                    | 'regular'
-                                    | 'weekly'
-                                    | 'backlog',
-                                });
-                              }}
-                            >
-                              Delete Task
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                      {/* Dropdown Menu */}
+                      <AnimatePresence>
+                        {isMenuOpen && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                            transition={{ duration: 0.1 }}
+                            className="absolute right-0 top-full mt-2 z-[100] w-48 rounded-xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-700/70 dark:bg-slate-900 overflow-hidden"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="p-1">
+                              <button
+                                className="flex items-center justify-start w-full gap-2 px-3 py-2 text-sm font-medium text-red-600 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                                onClick={() => {
+                                  setMenuFor(null);
+                                  setDialog({
+                                    task,
+                                    kind: taskKind(task) as
+                                      | 'regular'
+                                      | 'weekly'
+                                      | 'backlog',
+                                  });
+                                }}
+                              >
+                                Delete Task
+                              </button>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
                   </div>
-                </div>
-              </div>
-            );
-          })}
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
 
           <div className={tasks.length ? 'mt-8' : 'mt-6'}>
             <AddTaskButton

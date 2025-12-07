@@ -30,6 +30,7 @@ interface Task {
   id: string;
   text: string;
   completed: boolean;
+  order?: number;
   type?: 'regular' | 'weekly' | 'backlog';
   origin?: 'regular' | 'weekly' | 'backlog';
   kind?: 'regular' | 'weekly' | 'backlog';
@@ -44,14 +45,15 @@ type FlyStatus = {
 };
 
 const demoTasks: Task[] = [
-  { id: 'g1', text: 'Meditation', completed: true },
-  { id: 'g2', text: 'Read a book', completed: true },
-  { id: 'g3', text: 'Walk 5,000 steps', completed: true },
-  { id: 'g4', text: 'Drink 2 liters of water', completed: true },
+  { id: 'g1', text: 'Meditation', completed: true, order: 1 },
+  { id: 'g2', text: 'Read a book', completed: true, order: 2 },
+  { id: 'g3', text: 'Walk 5,000 steps', completed: true, order: 3 },
+  { id: 'g4', text: 'Drink 2 liters of water', completed: true, order: 4 },
   {
     id: 'g5',
     text: 'Check there is no monster under the bed',
     completed: false,
+    order: 5,
   },
 ];
 
@@ -157,11 +159,34 @@ export default function Home() {
     };
   }, [cinematic]);
 
+  const sortTasks = (ts: Task[]) => {
+    return [...ts].sort((a, b) => {
+      if (!!a.completed !== !!b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
+  };
+
   const persistTask = async (taskId: string, completed: boolean) => {
     if (session) {
+      // 1. Immediate toggle (updates UI icon)
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, completed } : t))
       );
+
+      // 2. Delayed sort (triggers slide animation)
+      if (completed) {
+        setTimeout(() => {
+          setTasks((prev) => sortTasks(prev));
+        }, 600);
+      } else {
+        // If unchecking, maybe sort immediately or same delay?
+        // Let's do same delay for consistency, or immediate?
+        // Usually unchecking moves it up. Immediate feels more responsive for undo.
+        setTasks((prev) => sortTasks(prev));
+      }
+
       const res = await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -174,9 +199,26 @@ export default function Home() {
         } catch {}
       }
     } else {
-      setGuestTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, completed } : t))
-      );
+      // Guest logic
+      setGuestTasks((prev) => {
+        const toggled = prev.map((t) =>
+          t.id === taskId ? { ...t, completed } : t
+        );
+        if (completed) {
+          // We can't use setTimeout nicely inside the setter if we want to batch updates
+          // But we can just use another setter outside.
+          // However, here we are inside the function scope.
+          // Let's replicate the logic:
+          return toggled; // Return unsorted first
+        }
+        return sortTasks(toggled);
+      });
+
+      if (completed) {
+        setTimeout(() => {
+          setGuestTasks((prev) => sortTasks(prev));
+        }, 600);
+      }
     }
   };
 

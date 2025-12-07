@@ -6,6 +6,7 @@ export type Task = {
   order: number;
   /** provided by /api/tasks?view=board */
   type?: 'weekly' | 'regular' | 'backlog';
+  completed?: boolean;
 };
 
 // Display has 7 weekday columns + 1 “Later” column at index 7

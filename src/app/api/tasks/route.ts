@@ -491,10 +491,12 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
         (!!t.completed && t.type === 'regular'),
       origin: t.type as Origin,
     }))
-    .sort(
-      (a: { order?: number }, b: { order?: number }) =>
-        (a.order ?? 0) - (b.order ?? 0)
-    );
+    .sort((a, b) => {
+      if (!!a.completed !== !!b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
 
   const flyStatus = await currentFlyStatus(userId);
 
@@ -523,20 +525,26 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
     if (dayNum === -1) {
       const later: TaskDoc[] = await Task.find(
         { userId: uid, type: 'backlog', weekStart },
-        { id: 1, text: 1, order: 1, type: 1, _id: 0 }
+        { id: 1, text: 1, order: 1, type: 1, completed: 1, _id: 0 }
       )
         .sort({ order: 1 })
         .lean<TaskDoc[]>()
         .exec();
 
-      const out: BoardItem[] = later.map(
-        ({ id, text, order, type }: TaskDoc) => ({
-          id,
-          text,
-          order,
-          type,
-        })
-      );
+      const out: BoardItem[] & { completed?: boolean } = later
+        .map((t: TaskDoc) => ({
+          id: t.id,
+          text: t.text,
+          order: t.order,
+          type: t.type,
+          completed: !!t.completed,
+        }))
+        .sort((a, b) => {
+          if (!!a.completed !== !!b.completed) {
+            return a.completed ? 1 : -1;
+          }
+          return (a.order ?? 0) - (b.order ?? 0);
+        });
       return NextResponse.json(out);
     }
 
@@ -556,23 +564,44 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
           { type: 'regular', date: weekDates[dayNum] },
         ],
       },
-      { id: 1, text: 1, order: 1, type: 1, _id: 0 }
+      {
+        id: 1,
+        text: 1,
+        order: 1,
+        type: 1,
+        completed: 1,
+        completedDates: 1,
+        _id: 0,
+      }
     )
       .sort({ order: 1 })
       .lean<TaskDoc[]>()
       .exec();
 
-    const out: BoardItem[] = docs.map(({ id, text, order, type }: TaskDoc) => ({
-      id,
-      text,
-      order,
-      type,
-    }));
+    const out: BoardItem[] & { completed?: boolean } = docs
+      .map((t: TaskDoc) => ({
+        id: t.id,
+        text: t.text,
+        order: t.order,
+        type: t.type,
+        completed:
+          (t.completedDates ?? []).includes(weekDates[dayNum]) ||
+          (!!t.completed && t.type === 'regular'),
+      }))
+      .sort((a, b) => {
+        if (!!a.completed !== !!b.completed) {
+          return a.completed ? 1 : -1;
+        }
+        return (a.order ?? 0) - (b.order ?? 0);
+      });
     return NextResponse.json(out);
   }
 
   // Full week fetch (Sun..Sat + Later)
-  const week: BoardItem[][] = Array.from({ length: 8 }, () => []);
+  const week: (BoardItem & { completed?: boolean })[][] = Array.from(
+    { length: 8 },
+    () => []
+  );
 
   for (let d: Weekday = 0; d <= 6; d = (d + 1) as Weekday) {
     const docs: TaskDoc[] = await Task.find(
@@ -583,34 +612,60 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
           { type: 'regular', date: weekDates[d] },
         ],
       },
-      { id: 1, text: 1, order: 1, type: 1, _id: 0 }
+      {
+        id: 1,
+        text: 1,
+        order: 1,
+        type: 1,
+        completed: 1,
+        completedDates: 1,
+        _id: 0,
+      }
     )
       .sort({ order: 1 })
       .lean<TaskDoc[]>()
       .exec();
 
-    week[d] = docs.map(({ id, text, order, type }: TaskDoc) => ({
-      id,
-      text,
-      order,
-      type,
-    }));
+    week[d] = docs
+      .map((t: TaskDoc) => ({
+        id: t.id,
+        text: t.text,
+        order: t.order,
+        type: t.type,
+        completed:
+          (t.completedDates ?? []).includes(weekDates[d]) ||
+          (!!t.completed && t.type === 'regular'),
+      }))
+      .sort((a, b) => {
+        if (!!a.completed !== !!b.completed) {
+          return a.completed ? 1 : -1;
+        }
+        return (a.order ?? 0) - (b.order ?? 0);
+      });
   }
 
   const backlogDocs: TaskDoc[] = await Task.find(
     { userId: uid, type: 'backlog', weekStart },
-    { id: 1, text: 1, order: 1, type: 1, _id: 0 }
+    { id: 1, text: 1, order: 1, type: 1, completed: 1, _id: 0 }
   )
     .sort({ order: 1 })
     .lean<TaskDoc[]>()
     .exec();
 
-  week[7] = backlogDocs.map(({ id, text, order, type }: TaskDoc) => ({
-    id,
-    text,
-    order,
-    type,
-  }));
+  week[7] = backlogDocs
+    .map((t: TaskDoc) => ({
+      id: t.id,
+      text: t.text,
+      order: t.order,
+      type: t.type,
+      completed: !!t.completed,
+    }))
+    .sort((a, b) => {
+      if (!!a.completed !== !!b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      return (a.order ?? 0) - (b.order ?? 0);
+    });
 
   return NextResponse.json(week);
 }
