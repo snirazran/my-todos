@@ -48,7 +48,7 @@ export default function HistoryList({ history, onToggleTask, setFlyRef, visually
             transition={{ delay: groupIndex * 0.1 }}
             className="space-y-3"
           >
-            <div className="flex items-end justify-between px-1 sticky top-[4.5rem] md:top-0 z-10 bg-slate-50/95 dark:bg-slate-900/95 backdrop-blur-sm py-2 border-b border-slate-100 dark:border-slate-800 md:border-none md:bg-transparent md:backdrop-filter-none">
+            <div className="flex items-end justify-between px-1 py-2">
                <div>
                   <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">
                     {dateLabel}

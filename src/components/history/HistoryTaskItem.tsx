@@ -32,9 +32,9 @@ export default function HistoryTaskItem({
   const isWeekly = type === 'weekly';
   const [isHovered, setIsHovered] = useState(false);
   
-  // If eaten by frog, hide the fly immediately (before the real completion update comes in)
-  // We can use opacity-0.
-  const showFly = !completed && !isEaten;
+  // Combine real completion status with visual "eaten" state
+  // to ensure smooth transition (Fly disappears -> Check appears)
+  const displayedCompleted = completed || isEaten;
 
   const handleClick = () => {
     if (onToggle && date) {
@@ -62,7 +62,7 @@ export default function HistoryTaskItem({
       {/* Icon */}
       <div className="relative shrink-0 transition-transform duration-200 flex items-center justify-center w-7 h-7">
         <AnimatePresence initial={false}>
-          {completed ? (
+          {displayedCompleted ? (
             <motion.div
               key="completed"
               className="absolute inset-0 flex items-center justify-center"
@@ -77,9 +77,9 @@ export default function HistoryTaskItem({
             <motion.div
               ref={setFlyRef}
               key="pending"
-              className={cn("absolute inset-0 flex items-center justify-center transition-opacity duration-200", isEaten ? "opacity-0" : "opacity-100")}
+              className="absolute inset-0 flex items-center justify-center"
               initial={{ opacity: 0 }}
-              animate={{ opacity: isEaten ? 0 : 1 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.18 }}
             >
@@ -108,7 +108,7 @@ export default function HistoryTaskItem({
         <span
           className={cn(
             "truncate text-[15px] font-medium leading-snug transition-colors",
-            completed
+            displayedCompleted
               ? "text-slate-400 dark:text-slate-500 line-through decoration-slate-400 dark:decoration-slate-600" 
               : "text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white"
           )}
