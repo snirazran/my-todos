@@ -4,6 +4,20 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Mail, Lock, Loader2, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
+
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import Frog from '@/components/ui/frog';
 
 /* tiny helper */
 const mailRx = /^[\w-.]+@([\w-]+\.)+[\w-]{2,}$/;
@@ -59,62 +73,133 @@ export default function LoginPage() {
 
   /* -------------- UI -------------- */
   return (
-    <main className="flex items-center justify-center min-h-screen p-4 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="w-full max-w-[32rem] p-10 bg-white shadow-2xl dark:bg-slate-800 rounded-3xl">
-        <h1 className="mb-8 text-3xl font-extrabold tracking-tight text-center text-slate-900 dark:text-white">
-          Sign in
-        </h1>
+    <main className="relative flex items-center justify-center w-full overflow-hidden bg-slate-50 dark:bg-slate-900 h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)]">
+      {/* ─── Animated Background ─── */}
+      <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-100/40 via-transparent to-transparent dark:from-violet-900/20 opacity-70" />
+        <div
+          className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+          style={{
+            backgroundImage: 'radial-gradient(#64748b 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+          }}
+        />
+      </div>
 
-        {errs.server && (
-          <p className="mb-6 text-base font-medium text-center text-red-600">
-            {errs.server}
-          </p>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* email */}
-          <div>
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-5 py-3 text-lg border rounded-xl focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-white"
+      <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
+        {/* ─── The Peeking Frog ─── */}
+        <motion.div
+          initial={{ y: -50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{
+            delay: 0.2,
+            type: 'spring',
+            stiffness: 120,
+            damping: 15,
+          }}
+          className="relative z-20 pointer-events-none -mb-9"
+        >
+          <div className="relative w-48 h-48">
+            <Frog
+              width={192}
+              height={192}
+              indices={{ skin: 0, hat: 0, scarf: 0, hand_item: 0 }}
             />
-            {errs.email && <FieldError msg={errs.email} />}
           </div>
+        </motion.div>
 
-          {/* password */}
-          <div>
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-5 py-3 text-lg border rounded-xl focus:ring-2 focus:ring-purple-500 dark:bg-slate-700 dark:text-white"
-            />
-            {errs.password && <FieldError msg={errs.password} />}
-          </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.5, type: 'spring', stiffness: 100 }}
+          className="w-full"
+        >
+          <Card className="relative z-10 pt-12 shadow-2xl border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl">
+            <CardHeader className="pt-2 pb-2 text-center">
+              <CardTitle className="text-xl">Welcome back</CardTitle>
+            </CardHeader>
 
-          {/* submit */}
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full py-3 text-lg font-semibold text-white transition bg-violet-600 rounded-xl hover:bg-purple-700 disabled:opacity-50"
-          >
-            {submitting ? 'Loading…' : 'Sign in'}
-          </button>
-        </form>
+            <CardContent className="space-y-4">
+              {errs.server && (
+                <div className="p-3 text-xs font-medium text-center text-red-600 border border-red-100 rounded-md bg-red-50 dark:bg-red-900/20 dark:border-red-900/30 animate-pulse">
+                  {errs.server}
+                </div>
+              )}
 
-        <p className="mt-8 text-base text-center text-slate-600 dark:text-slate-400">
-          Don&apos;t have an account?{' '}
-          <Link
-            href="/register"
-            className="font-semibold text-purple-600 hover:underline"
-          >
-            Sign up here
-          </Link>
-        </p>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* email */}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <div className="relative group">
+                    <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="name@example.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`h-10 pl-10 transition-all focus:scale-[1.01] ${
+                        errs.email
+                          ? 'border-red-500 focus-visible:ring-red-500'
+                          : ''
+                      }`}
+                    />
+                  </div>
+                  {errs.email && <FieldError msg={errs.email} />}
+                </div>
+
+                {/* password */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                  </div>
+                  <div className="relative group">
+                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className={`h-10 pl-10 transition-all focus:scale-[1.01] ${
+                        errs.password
+                          ? 'border-red-500 focus-visible:ring-red-500'
+                          : ''
+                      }`}
+                    />
+                  </div>
+                  {errs.password && <FieldError msg={errs.password} />}
+                </div>
+
+                <Button
+                  type="submit"
+                  className="w-full h-11 bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-500/25 transition-all hover:scale-[1.02]"
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Signing in...
+                    </>
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              </form>
+            </CardContent>
+            <CardFooter className="flex justify-center pt-4 pb-4 border-t border-slate-100/50 dark:border-slate-800/50">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Don&apos;t have an account?{' '}
+                <Link
+                  href="/register"
+                  className="font-medium transition-colors text-violet-600 hover:text-violet-500 hover:underline"
+                >
+                  Sign up
+                </Link>
+              </p>
+            </CardFooter>
+          </Card>
+        </motion.div>
       </div>
     </main>
   );
@@ -122,5 +207,9 @@ export default function LoginPage() {
 
 /* small helper component */
 function FieldError({ msg }: { msg: string }) {
-  return <p className="mt-1 text-sm font-medium text-red-600">{msg}</p>;
+  return (
+    <p className="text-xs font-medium text-red-600 animate-in slide-in-from-left-1">
+      {msg}
+    </p>
+  );
 }
