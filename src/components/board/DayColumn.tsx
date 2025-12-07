@@ -20,7 +20,14 @@ export default function DayColumn({
   maxHeightClass?: string;
   compact?: boolean;
 }) {
-  const appliedMax = compact ? 'max-h-[60svh] md:max-h-[70svh]' : maxHeightClass;
+  const appliedMax = compact
+    ? 'max-h-[60svh] md:max-h-[70svh]'
+    : maxHeightClass;
+
+  // Split "Sunday 7/12" into name and date
+  const match = title.match(/^(.*) (\d+\/\d+)$/);
+  const displayName = match ? match[1] : title;
+  const displayDate = match ? match[2] : null;
 
   return (
     <section
@@ -35,13 +42,18 @@ export default function DayColumn({
       ].join(' ')}
     >
       <div className="flex items-center justify-between px-2 mb-4 pt-1">
-        <h2 className="text-lg font-black tracking-tight text-slate-800 dark:text-slate-100 uppercase">
-          {title}
-        </h2>
-        {(count !== undefined) && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
-              {count}
+        <h2 className="text-lg font-black tracking-tight text-slate-800 dark:text-slate-100 uppercase flex items-baseline gap-2">
+          {displayName}
+          {displayDate && (
+            <span className="text-sm font-bold text-slate-400 dark:text-slate-500">
+              {displayDate}
             </span>
+          )}
+        </h2>
+        {count !== undefined && (
+          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+            {count}
+          </span>
         )}
       </div>
 

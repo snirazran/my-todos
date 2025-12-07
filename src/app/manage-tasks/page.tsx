@@ -115,13 +115,26 @@ export default function ManageTasksPage() {
   };
 
   /** Titles in display order */
-  const titles = useMemo(
-    () =>
-      Array.from({ length: DAYS }, (_, i) =>
-        i === 7 ? EXTRA : labelForDisplayDay(i as Exclude<DisplayDay, 7>)
-      ),
-    []
-  );
+  const titles = useMemo(() => {
+    const today = new Date();
+    // Reset to Sunday (0) of current week
+    const start = new Date(today);
+    start.setDate(today.getDate() - today.getDay());
+
+    return Array.from({ length: DAYS }, (_, i) => {
+      if (i === 7) return EXTRA;
+      const displayDay = i as Exclude<DisplayDay, 7>;
+      const apiDay = apiDayFromDisplay(displayDay);
+
+      const d = new Date(start);
+      d.setDate(start.getDate() + apiDay);
+
+      const dayName = labelForDisplayDay(displayDay);
+      // Format d/M
+      const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
+      return `${dayName} ${dateStr}`;
+    });
+  }, []);
 
   if (loading) {
     return <LoadingScreen message="Loading task board..." fullscreen />;
