@@ -154,6 +154,29 @@ export default function TaskBoard({
     }
   }
 
+  // --- Clamp Target Index Logic ---
+  // If we are targeting a regular day (0..6), we must not allow the targetIndex
+  // to exceed the index of the first completed task.
+  let clampedTargetIndex = targetIndex;
+
+  if (
+    effectiveTargetDay !== null &&
+    effectiveTargetDay < 7 &&
+    week[effectiveTargetDay]
+  ) {
+    const list = week[effectiveTargetDay];
+    const firstCompleted = list.findIndex((t) => t.completed);
+    if (firstCompleted !== -1 && targetIndex !== null) {
+      // If dragging from same column, the "gap" means we effectively have one less item
+      // before the completed block.
+      // So the limit should be (firstCompleted - 1).
+      // If dragging from another column, the limit is firstCompleted (insert before it).
+      const isSelfDrag = drag?.fromDay === effectiveTargetDay;
+      const limit = isSelfDrag ? Math.max(0, firstCompleted - 1) : firstCompleted;
+      clampedTargetIndex = Math.min(targetIndex, limit);
+    }
+  }
+
   // Detect drag over backlog box
   useEffect(() => {
     // 1. Handle Tray Animation (Dragging FROM backlog)
@@ -230,11 +253,10 @@ export default function TaskBoard({
         const [moved] = next[drag.fromDay].splice(drag.fromIndex, 1);
 
         // Insert into dest
-        let insertIndex = toIndex;
-        // Fix index if moving within same list downwards
-        if (drag.fromDay === toDay && drag.fromIndex < toIndex) {
-          insertIndex = Math.max(0, toIndex - 1);
-        }
+        // Logic simplification: The `toIndex` from useDragManager corresponds
+        // to the insertion index in the *reduced* list (current visual state).
+        // So we don't need to adjust by -1 even when dragging downwards.
+        const insertIndex = toIndex;
 
         // Safety for backlog array
         if (!next[toDay]) next[toDay] = [];
@@ -298,6 +320,19 @@ export default function TaskBoard({
     }
     // 3. If we dragged it OUT of the tray (trayCloseProgress >= 0.9), we implicitly "close" the tray logic for this drop.
     //    So we let it fall through to the calculated `finalToDay` (which is based on column geometry).
+
+    // Clamp drop index if dropping into a regular column (to avoid mixing with completed tasks)
+    if (finalToDay < 7 && week[finalToDay]) {
+      const list = week[finalToDay];
+      const firstCompleted = list.findIndex((t) => t.completed);
+      if (firstCompleted !== -1) {
+        const isSelfDrag = drag.fromDay === finalToDay;
+        const limit = isSelfDrag
+          ? Math.max(0, firstCompleted - 1)
+          : firstCompleted;
+        finalToIndex = Math.min(finalToIndex, limit);
+      }
+    }
 
     // If we dropped effectively "outside" (which means valid column drop), we should also close the backlog UI
     if (backlogOpen && finalToDay !== 7) {
@@ -383,7 +418,7 @@ export default function TaskBoard({
                   dragFromDay={drag?.fromDay}
                   dragFromIndex={drag?.fromIndex}
                   targetDay={effectiveTargetDay as DisplayDay | null}
-                  targetIndex={targetIndex}
+                  targetIndex={clampedTargetIndex}
                   removeTask={removeTask}
                   onGrab={onGrab}
                   setCardRef={setCardRef}

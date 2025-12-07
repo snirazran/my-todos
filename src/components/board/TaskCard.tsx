@@ -80,6 +80,7 @@ export default function TaskCard({
 
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
+      if (task.completed) return;
       if (e.button !== 0 || !e.isPrimary) return;
 
       const target = e.target as HTMLElement;
@@ -137,7 +138,7 @@ export default function TaskCard({
         }
       }, LONG_PRESS_DURATION);
     },
-    [handlePointerMove, handlePointerUp, requireLongPress] // Removed onGrab, cleanupLP dependencies
+    [handlePointerMove, handlePointerUp, requireLongPress, task.completed] // Removed onGrab, cleanupLP dependencies
   );
 
   useEffect(() => {
@@ -171,7 +172,8 @@ export default function TaskCard({
         WebkitTapHighlightColor: 'transparent',
       }}
       className={[
-        'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl cursor-grab transition-all duration-300',
+        'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl transition-all duration-300',
+        task.completed ? 'cursor-default' : 'cursor-grab',
         'bg-white dark:bg-slate-800/90 backdrop-blur-md',
         'hover:bg-slate-50 dark:hover:bg-slate-800', // Hover bg instead of border
         'shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md',
