@@ -129,23 +129,31 @@ const GiftRive = () => {
 
 // UPDATED: High Performance CSS Rays
 const RotatingRays = ({ colorClass }: { colorClass: string }) => (
-  <div className="absolute inset-0 z-0 flex items-center justify-center overflow-hidden pointer-events-none">
-    {/* 1. We use a Conic Gradient instead of SVG. It renders much faster on GPU.
-            2. We scale to 150vmax to ensure the square container covers the screen corners when rotating.
-            3. `will-change-transform` ensures the browser promotes this to a layer.
-         */}
+  <div
+    className="absolute inset-0 z-0 flex items-center justify-center overflow-hidden pointer-events-none"
+    style={{
+      // Mask applied to the static container, so the center fade doesn't wobble
+      // and the viewport edges are handled cleanly.
+      maskImage:
+        'radial-gradient(circle at center, transparent 0px, transparent 80px, black 200px)',
+      WebkitMaskImage:
+        'radial-gradient(circle at center, transparent 0px, transparent 80px, black 200px)',
+    }}
+  >
+    {/* 1. Conic Gradient for rays.
+        2. Massive size (400vmax) to ensuring corners never peek into the viewport.
+        3. `will-change-transform` for performance.
+     */}
     <div
       className={cn(
-        'w-[150vmax] h-[150vmax] animate-[spin_60s_linear_infinite] will-change-transform',
-        colorClass // This applies the text-color which 'currentColor' uses below
+        'animate-[spin_60s_linear_infinite] will-change-transform flex-none',
+        colorClass
       )}
       style={{
-        // Creates alternating stripes of Transparent and CurrentColor
+        width: '250vmax',
+        height: '250vmax',
         background:
           'repeating-conic-gradient(from 0deg, transparent 0deg 15deg, currentColor 15deg 30deg)',
-        // Softens the center so you don't see a hard pixelated point behind the card
-        maskImage: 'radial-gradient(circle, transparent 5%, black 40%)',
-        WebkitMaskImage: 'radial-gradient(circle, transparent 5%, black 40%)',
       }}
     />
   </div>
