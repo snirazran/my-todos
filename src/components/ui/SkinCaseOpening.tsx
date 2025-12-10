@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { X, Loader2, Sparkles } from 'lucide-react';
 import Frog from '@/components/ui/frog';
 import { CATALOG, ItemDef, Rarity } from '@/lib/skins/catalog';
@@ -196,22 +196,22 @@ export default function SkinCaseOpening({
   };
 
   // Shake variants
-  const shakeVariants = {
+  const shakeVariants: Variants = {
       idle: { rotate: 0, scale: 1 },
       shaking: {
           rotate: [0, -5, 5, -10, 10, -5, 5, 0],
           scale: [1, 1.1, 1.1, 1.2, 1.2, 1.1, 1],
-          transition: { duration: 1.5, ease: [0.42, 0, 0.58, 1] }
+          transition: { duration: 1.5, ease: "easeInOut" }
       },
       revealed: { scale: 0, opacity: 0 }
   };
 
-  const backdropVariants = {
+  const backdropVariants: Variants = {
       hidden: { opacity: 0 },
       visible: { opacity: 1 }
   };
 
-  const cardVariants = {
+  const cardVariants: Variants = {
       hidden: { opacity: 0, y: 50, scale: 0.8 },
       visible: { 
           opacity: 1, 
