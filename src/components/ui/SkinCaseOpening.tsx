@@ -1,65 +1,91 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { X, Loader2, Sparkles } from 'lucide-react';
 import Frog from '@/components/ui/frog';
 import { CATALOG, ItemDef, Rarity } from '@/lib/skins/catalog';
-import confetti from 'canvas-confetti';
+// REMOVED: import confetti from 'canvas-confetti';
 import { cn } from '@/lib/utils';
 import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
 
 // --- Configuration ---
-const TOTAL_ITEMS = 60; // Keep for weighting logic if needed, or simplify
+// REMOVED: const TOTAL_ITEMS = 60; (Unused)
 
-// --- Rarity Visuals (High Fidelity) ---
-const RARITY_STYLES: Record<Rarity, {
+// --- Rarity Visuals ---
+const RARITY_CONFIG: Record<
+  Rarity,
+  {
     border: string;
     bg: string;
     text: string;
-    strip: string;
-    shadow: string;
     glow: string;
-}> = {
+    label: string;
+    gradient: string;
+    shadow: string;
+    rays: string;
+    button: string;
+  }
+> = {
   common: {
     border: 'border-slate-300 dark:border-slate-600',
-    bg: 'bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-900',
+    bg: 'bg-slate-50 dark:bg-slate-800',
     text: 'text-slate-600 dark:text-slate-400',
-    strip: 'bg-slate-400',
-    shadow: 'shadow-slate-500/20',
-    glow: 'shadow-[0_0_30px_-5px_rgba(148,163,184,0.3)]'
+    glow: 'shadow-slate-500/20',
+    label: 'Common',
+    gradient:
+      'from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900',
+    shadow: 'shadow-xl shadow-slate-900/10',
+    rays: 'text-slate-400/20',
+    button: 'bg-white text-slate-900 hover:bg-slate-50',
   },
   uncommon: {
     border: 'border-emerald-400',
-    bg: 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950/40 dark:to-emerald-900/40',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/40',
     text: 'text-emerald-700 dark:text-emerald-400',
-    strip: 'bg-emerald-500',
-    shadow: 'shadow-emerald-500/30',
-    glow: 'shadow-[0_0_30px_-5px_rgba(16,185,129,0.4)]'
+    glow: 'shadow-emerald-500/30',
+    label: 'Uncommon',
+    gradient:
+      'from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-950/40',
+    shadow: 'shadow-xl shadow-emerald-900/10',
+    rays: 'text-emerald-500/20',
+    button: 'bg-emerald-500 text-white hover:bg-emerald-400',
   },
   rare: {
     border: 'border-sky-400',
-    bg: 'bg-gradient-to-br from-sky-50 to-sky-100 dark:from-sky-950/40 dark:to-sky-900/40',
+    bg: 'bg-sky-50 dark:bg-sky-950/40',
     text: 'text-sky-700 dark:text-sky-400',
-    strip: 'bg-sky-500',
-    shadow: 'shadow-sky-500/30',
-    glow: 'shadow-[0_0_40px_-5px_rgba(14,165,233,0.5)]'
+    glow: 'shadow-sky-500/40',
+    label: 'Rare',
+    gradient: 'from-sky-100 to-sky-50 dark:from-sky-900/40 dark:to-sky-950/40',
+    shadow: 'shadow-xl shadow-sky-900/10',
+    rays: 'text-sky-500/30',
+    button: 'bg-sky-500 text-white hover:bg-sky-400',
   },
   epic: {
     border: 'border-violet-400',
-    bg: 'bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-950/40 dark:to-violet-900/40',
+    bg: 'bg-violet-50 dark:bg-violet-950/40',
     text: 'text-violet-700 dark:text-violet-400',
-    strip: 'bg-violet-500',
-    shadow: 'shadow-violet-500/40',
-    glow: 'shadow-[0_0_50px_-5px_rgba(139,92,246,0.6)]'
+    glow: 'shadow-violet-500/50',
+    label: 'Epic',
+    gradient:
+      'from-violet-100 to-violet-50 dark:from-violet-900/40 dark:to-violet-950/40',
+    shadow: 'shadow-2xl shadow-violet-900/20',
+    rays: 'text-violet-500/40',
+    button: 'bg-violet-600 text-white hover:bg-violet-500',
   },
   legendary: {
     border: 'border-amber-400',
-    bg: 'bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950/40 dark:to-amber-900/40',
+    bg: 'bg-amber-50 dark:bg-amber-950/40',
     text: 'text-amber-700 dark:text-amber-400',
-    strip: 'bg-amber-500',
-    shadow: 'shadow-amber-500/50',
-    glow: 'shadow-[0_0_60px_-5px_rgba(245,158,11,0.7)]'
+    glow: 'shadow-amber-500/60',
+    label: 'Legendary',
+    gradient:
+      'from-amber-100 to-amber-50 dark:from-amber-900/40 dark:to-amber-950/40',
+    shadow: 'shadow-2xl shadow-amber-900/30',
+    rays: 'text-amber-500/50',
+    button:
+      'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:brightness-110',
   },
 };
 
@@ -74,30 +100,56 @@ const rollRarity = (weights: Record<Rarity, number>): Rarity => {
   return 'common';
 };
 
-const getRandomItem = (weights: Record<Rarity, number>, catalog: Record<Rarity, ItemDef[]>): ItemDef => {
+const getRandomItem = (
+  weights: Record<Rarity, number>,
+  catalog: Record<Rarity, ItemDef[]>
+): ItemDef => {
   let rarity = rollRarity(weights);
   while (catalog[rarity].length === 0) {
     if (rarity === 'legendary') rarity = 'epic';
     else if (rarity === 'epic') rarity = 'rare';
     else if (rarity === 'rare') rarity = 'uncommon';
     else if (rarity === 'uncommon') rarity = 'common';
-    else break; 
+    else break;
   }
   const pool = catalog[rarity];
   return pool[Math.floor(Math.random() * pool.length)];
 };
 
-// --- Rive Gift Component ---
+// --- Components ---
 const GiftRive = () => {
-    const { RiveComponent } = useRive({
-        src: '/idle_gift.riv',
-        stateMachines: 'State Machine 1',
-        autoplay: true,
-        layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
-    });
-    return <RiveComponent className="w-full h-full" />;
+  const { RiveComponent } = useRive({
+    src: '/idle_gift.riv',
+    stateMachines: 'State Machine 1',
+    autoplay: true,
+    layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
+  });
+  return <RiveComponent className="w-full h-full" />;
 };
 
+// UPDATED: High Performance CSS Rays
+const RotatingRays = ({ colorClass }: { colorClass: string }) => (
+  <div className="absolute inset-0 z-0 flex items-center justify-center overflow-hidden pointer-events-none">
+    {/* 1. We use a Conic Gradient instead of SVG. It renders much faster on GPU.
+            2. We scale to 150vmax to ensure the square container covers the screen corners when rotating.
+            3. `will-change-transform` ensures the browser promotes this to a layer.
+         */}
+    <div
+      className={cn(
+        'w-[150vmax] h-[150vmax] animate-[spin_60s_linear_infinite] will-change-transform',
+        colorClass // This applies the text-color which 'currentColor' uses below
+      )}
+      style={{
+        // Creates alternating stripes of Transparent and CurrentColor
+        background:
+          'repeating-conic-gradient(from 0deg, transparent 0deg 15deg, currentColor 15deg 30deg)',
+        // Softens the center so you don't see a hard pixelated point behind the card
+        maskImage: 'radial-gradient(circle, transparent 5%, black 40%)',
+        WebkitMaskImage: 'radial-gradient(circle, transparent 5%, black 40%)',
+      }}
+    />
+  </div>
+);
 
 export default function SkinCaseOpening({
   onClose,
@@ -106,268 +158,288 @@ export default function SkinCaseOpening({
   onClose: () => void;
   onWin?: (item: ItemDef) => void;
 }) {
-  // --- State ---
   const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
   const [prize, setPrize] = useState<ItemDef | null>(null);
   const [claiming, setClaiming] = useState(false);
-  
-  // --- Initialization ---
+
   useEffect(() => {
-    // Determine prize immediately but don't show it
     const catalogByRarity: Record<Rarity, ItemDef[]> = {
-      common: [], uncommon: [], rare: [], epic: [], legendary: []
+      common: [],
+      uncommon: [],
+      rare: [],
+      epic: [],
+      legendary: [],
     };
-    CATALOG.forEach(item => {
-        if(catalogByRarity[item.rarity]) catalogByRarity[item.rarity].push(item);
+    CATALOG.forEach((item) => {
+      if (catalogByRarity[item.rarity]) catalogByRarity[item.rarity].push(item);
     });
 
     const WIN_WEIGHTS: Record<Rarity, number> = {
-      common: 0.60, uncommon: 0.25, rare: 0.10, epic: 0.04, legendary: 0.01
+      common: 0.6,
+      uncommon: 0.25,
+      rare: 0.1,
+      epic: 0.04,
+      legendary: 0.01,
     };
-    
+
     setPrize(getRandomItem(WIN_WEIGHTS, catalogByRarity));
   }, []);
 
   const handleOpen = () => {
-      if (phase !== 'idle' || !prize) return;
-      setPhase('shaking');
+    if (phase !== 'idle' || !prize) return;
+    setPhase('shaking');
 
-      // Play shake animation (managed by CSS/Framer), then explode
-      setTimeout(() => {
-          setPhase('revealed');
-          triggerConfetti(prize.rarity);
-      }, 1500);
-  };
-
-  const triggerConfetti = (rarity: Rarity) => {
-      const colors = {
-          common: ['#94a3b8', '#cbd5e1'],
-          uncommon: ['#34d399', '#10b981'],
-          rare: ['#38bdf8', '#0ea5e9'],
-          epic: ['#a78bfa', '#8b5cf6'],
-          legendary: ['#fbbf24', '#f59e0b']
-      };
-
-      const duration = 3000;
-      const end = Date.now() + duration;
-
-      (function frame() {
-        confetti({
-            particleCount: 5,
-            angle: 60,
-            spread: 55,
-            origin: { x: 0 },
-            colors: colors[rarity]
-        });
-        confetti({
-            particleCount: 5,
-            angle: 120,
-            spread: 55,
-            origin: { x: 1 },
-            colors: colors[rarity]
-        });
-
-        if (Date.now() < end) {
-            requestAnimationFrame(frame);
-        }
-      }());
+    // Removed triggerConfetti call here
+    setTimeout(() => {
+      setPhase('revealed');
+    }, 1500);
   };
 
   const handleClaim = async () => {
     if (claiming || !prize) return;
     setClaiming(true);
-
     try {
       await fetch('/api/skins/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemId: prize.id }),
       });
-
       if (onWin) onWin(prize);
       onClose();
     } catch (err) {
-      console.error('Failed to claim skin', err);
-      // Optional: Show error state
+      console.error(err);
       onClose();
     } finally {
       setClaiming(false);
     }
   };
 
-  // Shake variants
   const shakeVariants: Variants = {
-      idle: { rotate: 0, scale: 1 },
-      shaking: {
-          rotate: [0, -5, 5, -10, 10, -5, 5, 0],
-          scale: [1, 1.1, 1.1, 1.2, 1.2, 1.1, 1],
-          transition: { duration: 1.5, ease: "easeInOut" }
-      },
-      revealed: { scale: 0, opacity: 0 }
-  };
-
-  const backdropVariants: Variants = {
-      hidden: { opacity: 0 },
-      visible: { opacity: 1 }
+    idle: { rotate: 0, scale: 1 },
+    shaking: {
+      rotate: [0, -5, 5, -10, 10, -5, 5, 0],
+      scale: [1, 1.1, 1.1, 1.2, 1.2, 1.1, 1],
+      transition: { duration: 1.5, ease: 'easeInOut' },
+    },
+    revealed: { scale: 0, opacity: 0 },
   };
 
   const cardVariants: Variants = {
-      hidden: { opacity: 0, y: 50, scale: 0.8 },
-      visible: { 
-          opacity: 1, 
-          y: 0, 
-          scale: 1,
-          transition: { 
-              type: "spring",
-              stiffness: 300,
-              damping: 20,
-              delay: 0.2 
-          }
-      }
+    hidden: { opacity: 0, scale: 0.5, rotateY: 90 },
+    visible: {
+      opacity: 1,
+      scale: 1,
+      rotateY: 0,
+      transition: {
+        type: 'spring',
+        stiffness: 260,
+        damping: 20,
+        delay: 0.1,
+      },
+    },
   };
 
-  if (!prize) return null; // Or loading state
-
-  const style = RARITY_STYLES[prize.rarity];
+  if (!prize) return null;
+  const config = RARITY_CONFIG[prize.rarity];
 
   return (
-    <motion.div 
-        variants={backdropVariants}
-        initial="hidden"
-        animate="visible"
-        exit="hidden"
-        className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/90 backdrop-blur-xl p-4"
-    >
-        {/* Close Button (Only in revealed state to prevent accidental closing during suspense) */}
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
+      {/* Background Backdrop - Reduced blur for performance */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
+      />
+
+      {/* Dynamic God Rays for Reveal */}
+      <AnimatePresence>
         {phase === 'revealed' && (
-            <button 
-                onClick={onClose}
-                className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 text-white transition-colors"
-            >
-                <X className="w-6 h-6" />
-            </button>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-0 flex items-center justify-center"
+          >
+            <RotatingRays colorClass={config.rays} />
+            <div
+              className={cn(
+                'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80'
+              )}
+            />
+          </motion.div>
         )}
+      </AnimatePresence>
 
-        {/* --- Phase 1: The Gift --- */}
+      {/* Close Button */}
+      {phase === 'revealed' && (
+        <button
+          onClick={onClose}
+          className="absolute z-50 p-3 transition-all rounded-full top-4 right-4 md:top-8 md:right-8 bg-black/20 hover:bg-black/40 text-white/70 hover:text-white backdrop-blur-md"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      )}
+
+      {/* Main Content */}
+      <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
         <AnimatePresence mode="wait">
-            {phase !== 'revealed' && (
-                <motion.div 
-                    key="gift-container"
-                    className="flex flex-col items-center justify-center w-full max-w-md cursor-pointer"
-                    onClick={handleOpen}
-                    initial={{ scale: 0.8, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 1.5, opacity: 0, filter: 'blur(10px)' }}
+          {/* --- GIFT PHASE --- */}
+          {phase !== 'revealed' && (
+            <motion.div
+              key="gift"
+              className="flex flex-col items-center cursor-pointer"
+              onClick={handleOpen}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{
+                scale: 1.5,
+                opacity: 0,
+                filter: 'blur(20px)',
+                transition: { duration: 0.5 },
+              }}
+            >
+              <motion.div
+                variants={shakeVariants}
+                animate={phase}
+                className="relative w-72 h-72 md:w-96 md:h-96"
+              >
+                <div className="absolute inset-10 bg-amber-400/30 blur-[60px] rounded-full animate-pulse" />
+                <GiftRive />
+              </motion.div>
+
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0, transition: { delay: 0.3 } }}
+                className="mt-4 space-y-2 text-center"
+              >
+                <h2 className="text-4xl font-black text-white uppercase tracking-widest drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
+                  {phase === 'shaking' ? 'Unwrapping...' : 'Mystery Gift'}
+                </h2>
+                <p className="text-lg font-bold tracking-wide text-slate-300">
+                  {phase === 'shaking'
+                    ? 'Something cool is inside!'
+                    : 'Tap to Reveal'}
+                </p>
+              </motion.div>
+            </motion.div>
+          )}
+
+          {/* --- REVEAL PHASE --- */}
+          {phase === 'revealed' && (
+            <motion.div
+              key="card"
+              className="flex flex-col items-center w-full"
+              variants={cardVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              {/* 3D Card Container */}
+              <div
+                className={cn(
+                  'relative flex flex-col items-center p-1 rounded-[32px] bg-gradient-to-br shadow-2xl transition-all duration-500',
+                  config.border,
+                  config.glow
+                )}
+                style={{
+                  transformStyle: 'preserve-3d',
+                  perspective: '1000px',
+                }}
+              >
+                {/* Inner Card Card */}
+                <div
+                  className={cn(
+                    'relative flex flex-col w-[280px] h-[380px] md:w-[320px] md:h-[440px] rounded-[28px] overflow-hidden border-[4px]',
+                    config.bg,
+                    config.border
+                  )}
                 >
-                    <motion.div
-                        variants={shakeVariants}
-                        animate={phase}
-                        className="w-64 h-64 md:w-80 md:h-80 relative"
-                    >
-                         {/* Glow behind gift */}
-                         <div className="absolute inset-0 bg-amber-400/20 blur-[60px] rounded-full animate-pulse" />
-                         <GiftRive />
-                    </motion.div>
+                  {/* Top Badge */}
+                  <div
+                    className={cn(
+                      'absolute top-4 left-0 px-4 py-1.5 rounded-r-xl text-xs font-black uppercase tracking-widest shadow-sm z-20 border-y border-r',
+                      config.bg,
+                      config.text,
+                      config.border
+                    )}
+                  >
+                    {config.label}
+                  </div>
 
-                    <motion.div 
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0, transition: { delay: 0.5 } }}
-                        className="text-center mt-8 space-y-2"
-                    >
-                        <h2 className="text-3xl md:text-4xl font-black text-white uppercase tracking-widest drop-shadow-lg">
-                            {phase === 'shaking' ? 'Opening...' : 'Mystery Gift'}
-                        </h2>
-                        <p className="text-slate-300 font-medium text-lg">
-                            {phase === 'shaking' ? 'Good luck!' : 'Tap to open your reward'}
-                        </p>
-                    </motion.div>
-                </motion.div>
-            )}
+                  {/* Main Frog Display */}
+                  <div
+                    className={cn(
+                      'flex-1 m-3 rounded-[20px] relative overflow-hidden flex items-center justify-center',
+                      'bg-gradient-to-b shadow-inner',
+                      config.gradient
+                    )}
+                  >
+                    {/* Background Pattern/Glow */}
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/40 to-transparent opacity-60" />
 
-            {/* --- Phase 2: The Reveal --- */}
-            {phase === 'revealed' && (
-                <motion.div 
-                    key="reveal-container"
-                    className="relative w-full max-w-lg"
-                    variants={cardVariants}
-                    initial="hidden"
-                    animate="visible"
-                >
-                    {/* Main Card */}
-                    <div className={cn(
-                        "relative bg-white dark:bg-slate-900 rounded-[32px] overflow-hidden shadow-2xl border-2",
-                        style.border,
-                        style.glow
-                    )}>
-                        
-                        {/* Header / Background Glow */}
-                        <div className={cn("absolute top-0 left-0 right-0 h-48 opacity-20 z-0", style.bg)} />
-                        <div className={cn("absolute top-0 inset-x-0 h-2", style.strip)} />
-
-                        {/* Content */}
-                        <div className="relative z-10 flex flex-col items-center p-8 pt-12">
-                            
-                            {/* Rarity Badge */}
-                            <motion.div 
-                                initial={{ scale: 0, rotate: -10 }}
-                                animate={{ scale: 1, rotate: 0 }}
-                                className={cn(
-                                    "px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-[0.2em] shadow-sm mb-6 border bg-white dark:bg-slate-950",
-                                    style.border,
-                                    style.text
-                                )}
-                            >
-                                {prize.rarity}
-                            </motion.div>
-
-                            {/* Frog Preview - Wearing the item */}
-                            <div className="w-56 h-56 md:w-64 md:h-64 mb-6 relative group">
-                                <div className={cn("absolute inset-4 rounded-full blur-2xl opacity-40 group-hover:opacity-60 transition-opacity", style.bg)} />
-                                <Frog 
-                                    width={256} height={256}
-                                    indices={{
-                                        skin: prize.slot === 'skin' ? prize.riveIndex : 0,
-                                        hat: prize.slot === 'hat' ? prize.riveIndex : 0,
-                                        scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
-                                        hand_item: prize.slot === 'hand_item' ? prize.riveIndex : 0,
-                                    }}
-                                />
-                            </div>
-
-                            {/* Text Info */}
-                            <h3 className="text-3xl font-black text-slate-900 dark:text-white text-center mb-2">
-                                {prize.name}
-                            </h3>
-                            <p className="text-slate-500 dark:text-slate-400 text-center mb-8 max-w-[80%]">
-                                You found a new {prize.slot.replace('_', ' ')}!
-                            </p>
-
-                            {/* Actions */}
-                            <button
-                                onClick={handleClaim}
-                                disabled={claiming}
-                                className={cn(
-                                    "w-full py-4 rounded-2xl font-bold text-lg text-white shadow-lg hover:shadow-xl hover:-translate-y-1 active:scale-95 transition-all flex items-center justify-center gap-2",
-                                    style.strip
-                                )}
-                            >
-                                {claiming ? (
-                                    <>
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                        Saving...
-                                    </>
-                                ) : (
-                                    <>
-                                        <Sparkles className="w-5 h-5" />
-                                        Claim Reward
-                                    </>
-                                )}
-                            </button>
-                        </div>
+                    {/* Frog */}
+                    <div className="relative z-10 flex items-end justify-center w-full h-full pb-4">
+                      <Frog
+                        className="w-[140%] h-[140%] object-contain translate-y-[5%]"
+                        indices={{
+                          skin: prize.slot === 'skin' ? prize.riveIndex : 0,
+                          hat: prize.slot === 'hat' ? prize.riveIndex : 0,
+                          scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
+                          hand_item:
+                            prize.slot === 'hand_item' ? prize.riveIndex : 0,
+                        }}
+                        width={280}
+                        height={280}
+                      />
                     </div>
-                </motion.div>
-            )}
+                  </div>
+
+                  {/* Footer Info */}
+                  <div className="flex flex-col items-center justify-center h-24 p-4 border-t bg-white/50 dark:bg-black/20 backdrop-blur-sm border-black/5 dark:border-white/5">
+                    <h3 className="mb-1 text-2xl font-black leading-none text-center text-slate-800 dark:text-white">
+                      {prize.name}
+                    </h3>
+                    <p className="text-sm font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
+                      {prize.slot.replace('_', ' ')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Claim Button */}
+              <motion.button
+                initial={{ opacity: 0, y: 40 }}
+                animate={{
+                  opacity: 1,
+                  y: 0,
+                  transition: { delay: 0.5, type: 'spring' },
+                }}
+                onClick={handleClaim}
+                disabled={claiming}
+                className={cn(
+                  'group relative mt-10 w-full max-w-[280px] py-4 rounded-2xl font-black text-lg shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transition-all active:scale-95 flex items-center justify-center gap-3 overflow-hidden',
+                  config.button
+                )}
+              >
+                {/* Shimmer Effect */}
+                <div className="absolute inset-0 z-10 -translate-x-full group-hover:animate-shine bg-gradient-to-r from-transparent via-white/30 to-transparent" />
+
+                {claiming ? (
+                  <>
+                    <Loader2 className="relative z-20 w-5 h-5 animate-spin" />
+                    <span className="relative z-20">Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="relative z-20 w-5 h-5" />
+                    <span className="relative z-20">Claim Reward</span>
+                  </>
+                )}
+              </motion.button>
+            </motion.div>
+          )}
         </AnimatePresence>
-    </motion.div>
+      </div>
+    </div>
   );
 }
