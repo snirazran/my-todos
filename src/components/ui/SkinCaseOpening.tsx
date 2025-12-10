@@ -375,30 +375,32 @@ export default function SkinCaseOpening({
                   </div>
 
                   {/* Main Frog Display */}
-                  <div
-                    className={cn(
-                      'flex-1 m-3 rounded-[20px] relative overflow-hidden flex items-center justify-center',
-                      'bg-gradient-to-b shadow-inner',
-                      config.gradient
-                    )}
-                  >
-                    {/* Background Pattern/Glow */}
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/40 to-transparent opacity-60" />
+                  <div className="flex-1 w-full flex items-center justify-center p-3">
+                    <div
+                      className={cn(
+                        'w-full aspect-square rounded-[20px] relative overflow-hidden flex items-center justify-center',
+                        'bg-gradient-to-b shadow-inner',
+                        config.gradient
+                      )}
+                    >
+                      {/* Background Pattern/Glow */}
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/40 to-transparent opacity-60" />
 
-                    {/* Frog */}
-                    <div className="relative z-10 flex items-end justify-center w-full h-full pb-4">
-                      <Frog
-                        className="w-[140%] h-[140%] object-contain translate-y-[5%]"
-                        indices={{
-                          skin: prize.slot === 'skin' ? prize.riveIndex : 0,
-                          hat: prize.slot === 'hat' ? prize.riveIndex : 0,
-                          scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
-                          hand_item:
-                            prize.slot === 'hand_item' ? prize.riveIndex : 0,
-                        }}
-                        width={280}
-                        height={280}
-                      />
+                      {/* Frog */}
+                      <div className="relative z-10 flex items-end justify-center w-full h-full">
+                        <Frog
+                          className="w-[125%] h-[125%] object-contain translate-y-[10%]"
+                          indices={{
+                            skin: prize.slot === 'skin' ? prize.riveIndex : 0,
+                            hat: prize.slot === 'hat' ? prize.riveIndex : 0,
+                            scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
+                            hand_item:
+                              prize.slot === 'hand_item' ? prize.riveIndex : 0,
+                          }}
+                          width={280}
+                          height={280}
+                        />
+                      </div>
                     </div>
                   </div>
 
