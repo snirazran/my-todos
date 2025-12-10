@@ -103,3 +103,41 @@ export async function PUT(req: NextRequest) {
   );
   return json({ ok: true });
 }
+
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
+
+  let body: { itemId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: 'Invalid JSON' }, 400);
+  }
+
+  const itemId = body.itemId;
+  if (!itemId || !byId[itemId]) return json({ error: 'Unknown itemId' }, 400);
+
+  await connectMongo();
+  const user = (await UserModel.findOne({
+    email: session.user.email,
+  }).lean()) as LeanUser | null;
+  if (!user) return json({ error: 'User not found' }, 404);
+
+  // Initialize wardrobe if missing, or update
+  if (!user.wardrobe) {
+    const init: UserWardrobe = {
+      equipped: {},
+      inventory: { [itemId]: 1 },
+      flies: 0,
+    };
+    await UserModel.updateOne({ _id: user._id }, { $set: { wardrobe: init } });
+  } else {
+    await UserModel.updateOne(
+      { _id: user._id },
+      { $inc: { [`wardrobe.inventory.${itemId}`]: 1 } }
+    );
+  }
+
+  return json({ ok: true });
+}

@@ -1,5 +1,3 @@
-'use client';
-
 import {
   CheckCircle2,
   Circle,
@@ -10,6 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import React, { useState } from 'react';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
+import SkinCaseOpening from './SkinCaseOpening';
 
 interface Task {
   id: string;
@@ -54,6 +53,7 @@ export default function TaskList({
     task: Task;
     kind: 'regular' | 'weekly' | 'backlog';
   } | null>(null);
+  const [isOpeningCase, setIsOpeningCase] = useState(false);
 
   React.useEffect(() => {
     if (!menuFor) return;
@@ -322,12 +322,22 @@ export default function TaskList({
       </div>
 
       {showConfetti && (
-        <div className="p-6 mt-6 text-center text-white shadow-lg rounded-2xl bg-gradient-to-r from-violet-500 to-purple-500 animate-pulse">
+        <div
+          onClick={() => setIsOpeningCase(true)}
+          className="p-6 mt-6 text-center text-white shadow-lg cursor-pointer rounded-2xl bg-gradient-to-r from-violet-500 to-purple-500 animate-pulse hover:scale-105 transition-transform"
+        >
           <h3 className="mb-2 text-2xl font-bold">🎉 All Clear! 🎉</h3>
           <p className="text-lg opacity-90">
-            You've finished everything for today.
+            You've finished everything for today. Click for a reward!
           </p>
         </div>
+      )}
+
+      {isOpeningCase && (
+        <SkinCaseOpening
+          onClose={() => setIsOpeningCase(false)}
+          onWin={(item) => console.log('Won:', item)}
+        />
       )}
 
       <DeleteDialog
@@ -363,3 +373,4 @@ export default function TaskList({
     </>
   );
 }
+
