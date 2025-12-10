@@ -389,7 +389,7 @@ export default function SkinCaseOpening({
                       {/* Frog */}
                       <div className="relative z-10 flex items-end justify-center w-full h-full">
                         <Frog
-                          className="w-[125%] h-[125%] object-contain translate-y-[10%]"
+                          className="w-[125%] h-[125%] shrink-0 object-contain translate-y-[10%]"
                           indices={{
                             skin: prize.slot === 'skin' ? prize.riveIndex : 0,
                             hat: prize.slot === 'hat' ? prize.riveIndex : 0,
@@ -397,8 +397,8 @@ export default function SkinCaseOpening({
                             hand_item:
                               prize.slot === 'hand_item' ? prize.riveIndex : 0,
                           }}
-                          width={280}
-                          height={280}
+                          width={320}
+                          height={320}
                         />
                       </div>
                     </div>
