@@ -1,18 +1,18 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence, Variants } from 'framer-motion';
-import { X, Loader2, Sparkles } from 'lucide-react';
-import Frog from '@/components/ui/frog';
-import { CATALOG, ItemDef, Rarity } from '@/lib/skins/catalog';
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Check } from 'lucide-react';
+import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
-import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
+import type { ItemDef } from '@/lib/skins/catalog';
+import Frog from '@/components/ui/frog';
+import { motion, AnimatePresence } from 'framer-motion';
 
-// --- Configuration ---
-
-// --- Rarity Visuals ---
+/* ---------------- Visual Helpers ---------------- */
+// (Keep RARITY_CONFIG exactly as you had it - it was good)
 const RARITY_CONFIG: Record<
-  Rarity,
+  ItemDef['rarity'],
   {
     border: string;
     bg: string;
@@ -21,424 +21,283 @@ const RARITY_CONFIG: Record<
     label: string;
     gradient: string;
     shadow: string;
-    rays: string;
-    button: string;
+    hoverGlow: string;
   }
 > = {
   common: {
-    border: 'border-slate-300 dark:border-slate-600',
-    bg: 'bg-slate-50 dark:bg-slate-800',
+    border: 'border-slate-400 dark:border-slate-600',
+    bg: 'bg-slate-100 dark:bg-slate-800',
     text: 'text-slate-600 dark:text-slate-400',
-    glow: 'shadow-slate-500/20',
+    glow: 'shadow-none',
     label: 'Common',
     gradient:
       'from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900',
-    shadow: 'shadow-xl shadow-slate-900/10',
-    rays: 'text-slate-400/20',
-    button: 'bg-white text-slate-900 hover:bg-slate-50',
+    shadow: 'shadow-slate-400/10',
+    hoverGlow: 'hover:shadow-[0_0_20px_rgba(148,163,184,0.5)]',
   },
   uncommon: {
-    border: 'border-emerald-400',
-    bg: 'bg-emerald-50 dark:bg-emerald-950/40',
+    border: 'border-emerald-500',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/30',
     text: 'text-emerald-700 dark:text-emerald-400',
-    glow: 'shadow-emerald-500/30',
+    glow: 'shadow-emerald-500/10',
     label: 'Uncommon',
     gradient:
       'from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-950/40',
-    shadow: 'shadow-xl shadow-emerald-900/10',
-    rays: 'text-emerald-500/20',
-    button: 'bg-emerald-500 text-white hover:bg-emerald-400',
+    shadow: 'shadow-emerald-500/15',
+    hoverGlow: 'hover:shadow-[0_0_20px_rgba(16,185,129,0.5)]',
   },
   rare: {
-    border: 'border-sky-400',
-    bg: 'bg-sky-50 dark:bg-sky-950/40',
+    border: 'border-sky-500',
+    bg: 'bg-sky-50 dark:bg-sky-950/30',
     text: 'text-sky-700 dark:text-sky-400',
-    glow: 'shadow-sky-500/40',
+    glow: 'shadow-sky-500/10',
     label: 'Rare',
     gradient: 'from-sky-100 to-sky-50 dark:from-sky-900/40 dark:to-sky-950/40',
-    shadow: 'shadow-xl shadow-sky-900/10',
-    rays: 'text-sky-500/30',
-    button: 'bg-sky-500 text-white hover:bg-sky-400',
+    shadow: 'shadow-sky-500/15',
+    hoverGlow: 'hover:shadow-[0_0_20px_rgba(14,165,233,0.5)]',
   },
   epic: {
-    border: 'border-violet-400',
-    bg: 'bg-violet-50 dark:bg-violet-950/40',
+    border: 'border-violet-500',
+    bg: 'bg-violet-50 dark:bg-violet-950/30',
     text: 'text-violet-700 dark:text-violet-400',
-    glow: 'shadow-violet-500/50',
+    glow: 'shadow-violet-500/15',
     label: 'Epic',
     gradient:
       'from-violet-100 to-violet-50 dark:from-violet-900/40 dark:to-violet-950/40',
-    shadow: 'shadow-2xl shadow-violet-900/20',
-    rays: 'text-violet-500/40',
-    button: 'bg-violet-600 text-white hover:bg-violet-500',
+    shadow: 'shadow-violet-500/20',
+    hoverGlow: 'hover:shadow-[0_0_20px_rgba(139,92,246,0.5)]',
   },
   legendary: {
-    border: 'border-amber-400',
-    bg: 'bg-amber-50 dark:bg-amber-950/40',
+    border: 'border-amber-500',
+    bg: 'bg-amber-50 dark:bg-amber-950/30',
     text: 'text-amber-700 dark:text-amber-400',
-    glow: 'shadow-amber-500/60',
+    glow: 'shadow-amber-500/20',
     label: 'Legendary',
     gradient:
       'from-amber-100 to-amber-50 dark:from-amber-900/40 dark:to-amber-950/40',
-    shadow: 'shadow-2xl shadow-amber-900/30',
-    rays: 'text-amber-500/50',
-    button:
-      'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:brightness-110',
+    shadow: 'shadow-amber-500/25',
+    hoverGlow: 'hover:shadow-[0_0_20px_rgba(245,158,11,0.5)]',
   },
 };
 
-// --- Utils ---
-const rollRarity = (weights: Record<Rarity, number>): Rarity => {
-  const rand = Math.random();
-  let cumulative = 0;
-  for (const [rarity, weight] of Object.entries(weights)) {
-    cumulative += weight;
-    if (rand < cumulative) return rarity as Rarity;
-  }
-  return 'common';
-};
+const MotionButton = motion(Button);
 
-const getRandomItem = (
-  weights: Record<Rarity, number>,
-  catalog: Record<Rarity, ItemDef[]>
-): ItemDef => {
-  let rarity = rollRarity(weights);
-  while (catalog[rarity].length === 0) {
-    if (rarity === 'legendary') rarity = 'epic';
-    else if (rarity === 'epic') rarity = 'rare';
-    else if (rarity === 'rare') rarity = 'uncommon';
-    else if (rarity === 'uncommon') rarity = 'common';
-    else break;
-  }
-  const pool = catalog[rarity];
-  return pool[Math.floor(Math.random() * pool.length)];
-};
-
-// --- Components ---
-const GiftRive = () => {
-  const { RiveComponent } = useRive({
-    src: '/idle_gift.riv',
-    stateMachines: 'State Machine 1',
-    autoplay: true,
-    layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
-  });
-  return <RiveComponent className="w-full h-full" />;
-};
-
-const RotatingRays = ({ colorClass }: { colorClass: string }) => (
-  <div
-    className="absolute inset-0 z-0 flex items-center justify-center overflow-hidden pointer-events-none"
-    style={{
-      maskImage:
-        'radial-gradient(circle at center, transparent 0px, transparent 80px, black 200px)',
-      WebkitMaskImage:
-        'radial-gradient(circle at center, transparent 0px, transparent 80px, black 200px)',
-    }}
-  >
-    <div
-      className={cn(
-        'animate-[spin_60s_linear_infinite] will-change-transform flex-none',
-        colorClass
-      )}
-      style={{
-        width: '250vmax',
-        height: '250vmax',
-        background:
-          'repeating-conic-gradient(from 0deg, transparent 0deg 15deg, currentColor 15deg 30deg)',
-      }}
-    />
-  </div>
-);
-
-export default function SkinCaseOpening({
-  onClose,
-  onWin,
+export function ItemCard({
+  item,
+  ownedCount,
+  isEquipped,
+  canAfford,
+  onAction,
+  actionLabel,
+  actionLoading,
+  mode,
+  selectedCount,
 }: {
-  onClose: () => void;
-  onWin?: (item: ItemDef) => void;
+  item: ItemDef;
+  ownedCount: number;
+  isEquipped: boolean;
+  canAfford: boolean;
+  onAction: () => void;
+  actionLabel: React.ReactNode;
+  actionLoading: boolean;
+  mode: 'inventory' | 'shop' | 'trade';
+  selectedCount?: number;
 }) {
-  const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
-  const [prize, setPrize] = useState<ItemDef | null>(null);
-  const [claiming, setClaiming] = useState(false);
+  const config = RARITY_CONFIG[item.rarity];
+  const isOwned = ownedCount > 0;
+  const [shake, setShake] = useState(false);
 
-  useEffect(() => {
-    const catalogByRarity: Record<Rarity, ItemDef[]> = {
-      common: [],
-      uncommon: [],
-      rare: [],
-      epic: [],
-      legendary: [],
-    };
-    CATALOG.forEach((item) => {
-      if (catalogByRarity[item.rarity]) catalogByRarity[item.rarity].push(item);
-    });
-
-    const WIN_WEIGHTS: Record<Rarity, number> = {
-      common: 0.6,
-      uncommon: 0.25,
-      rare: 0.1,
-      epic: 0.04,
-      legendary: 0.01,
-    };
-
-    setPrize(getRandomItem(WIN_WEIGHTS, catalogByRarity));
-  }, []);
-
-  const handleOpen = () => {
-    if (phase !== 'idle' || !prize) return;
-    setPhase('shaking');
-
-    setTimeout(() => {
-      setPhase('revealed');
-    }, 1500);
+  const previewIndices = {
+    skin: 0,
+    hat: 0,
+    scarf: 0,
+    hand_item: 0,
+    [item.slot]: item.riveIndex,
   };
 
-  const handleClaim = async () => {
-    if (claiming || !prize) return;
-    setClaiming(true);
-    try {
-      await fetch('/api/skins/inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: prize.id }),
-      });
-      if (onWin) onWin(prize);
-      onClose();
-    } catch (err) {
-      console.error(err);
-      onClose();
-    } finally {
-      setClaiming(false);
+  const handleAction = () => {
+    if (mode === 'shop' && !canAfford) {
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      return;
+    }
+    if (!actionLoading) {
+      onAction();
     }
   };
 
-  const shakeVariants: Variants = {
-    idle: { rotate: 0, scale: 1 },
-    shaking: {
-      rotate: [0, -5, 5, -10, 10, -5, 5, 0],
-      scale: [1, 1.1, 1.1, 1.2, 1.2, 1.1, 1],
-      transition: { duration: 1.5, ease: 'easeInOut' },
-    },
-    revealed: { scale: 0, opacity: 0 },
-  };
-
-  const cardVariants: Variants = {
-    hidden: { opacity: 0, scale: 0.5, rotateY: 90 },
-    visible: {
-      opacity: 1,
-      scale: 1,
-      rotateY: 0,
-      transition: {
-        type: 'spring',
-        stiffness: 260,
-        damping: 20,
-        delay: 0.1,
-      },
-    },
-  };
-
-  if (!prize) return null;
-  const config = RARITY_CONFIG[prize.rarity];
+  const isSelected = (selectedCount || 0) > 0;
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
-      {/* Background Backdrop */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
-      />
-
-      {/* Dynamic God Rays for Reveal */}
+    <motion.div
+      animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}}
+      transition={{ duration: 0.4 }}
+      onClick={(e) => {
+        if (mode === 'inventory' || mode === 'trade') handleAction();
+      }}
+      // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
+      // Added min-h-[220px] to ensure card has presence even if image fails
+      className={cn(
+        'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl md:rounded-[24px] border-[3px] overflow-hidden cursor-pointer min-h-[200px] active:scale-[0.98]',
+        config.border,
+        config.bg,
+        isEquipped || isSelected
+          ? 'bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.4)]'
+          : cn(config.shadow, config.hoverGlow),
+        !isOwned && mode === 'shop' && !canAfford && 'opacity-80'
+      )}
+    >
+      {/* Selected Indicator */}
       <AnimatePresence>
-        {phase === 'revealed' && (
+        {isEquipped && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="absolute inset-0 z-0 flex items-center justify-center"
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            className="absolute z-30 p-1 text-white bg-green-500 rounded-full shadow-md top-2 right-2"
           >
-            <RotatingRays colorClass={config.rays} />
-            <div
-              className={cn(
-                'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80'
-              )}
-            />
+            <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
+          </motion.div>
+        )}
+        {/* Trade Selection Count */}
+        {mode === 'trade' && isSelected && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            className="absolute z-30 px-2 py-0.5 text-white bg-indigo-500 rounded-full shadow-md top-2 right-2 text-[10px] font-black"
+          >
+            {selectedCount}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Close Button */}
-      {phase === 'idle' && (
-        <button
-          onClick={onClose}
-          className="absolute z-50 p-3 transition-all rounded-full top-4 right-4 md:top-8 md:right-8 bg-black/20 hover:bg-black/40 text-white/70 hover:text-white backdrop-blur-md"
-        >
-          <X className="w-6 h-6" />
-        </button>
-      )}
-
-      {/* Main Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
-        <AnimatePresence mode="wait">
-          {/* --- GIFT PHASE --- */}
-          {phase !== 'revealed' && (
-            <motion.div
-              key="gift"
-              className="flex flex-col items-center cursor-pointer"
-              onClick={handleOpen}
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{
-                scale: 1.5,
-                opacity: 0,
-                filter: 'blur(20px)',
-                transition: { duration: 0.5 },
-              }}
-            >
-              <motion.div
-                variants={shakeVariants}
-                animate={phase}
-                className="relative w-72 h-72 md:w-96 md:h-96"
-              >
-                <div className="absolute inset-10 bg-amber-400/30 blur-[60px] rounded-full animate-pulse" />
-                <GiftRive />
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0, transition: { delay: 0.3 } }}
-                className="mt-4 space-y-2 text-center"
-              >
-                <h2 className="text-4xl font-black text-white uppercase tracking-widest drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
-                  {phase === 'shaking' ? 'Unwrapping...' : 'Tap to Unwrap'}
-                </h2>
-                {phase === 'idle' && (
-                  <p className="text-lg font-bold tracking-wide text-slate-300">
-                    Mystery Gift
-                  </p>
-                )}
-              </motion.div>
-            </motion.div>
-          )}
-
-          {/* --- REVEAL PHASE --- */}
-          {phase === 'revealed' && (
-            <motion.div
-              key="card"
-              className="flex flex-col items-center w-full"
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-            >
-              {/* 3D Card Container */}
-              <div
-                className={cn(
-                  'relative flex flex-col items-center p-1 rounded-[32px] bg-gradient-to-br shadow-2xl transition-all duration-500',
-                  config.border,
-                  config.glow
-                )}
-                style={{
-                  transformStyle: 'preserve-3d',
-                  perspective: '1000px',
-                }}
-              >
-                <div
-                  className={cn(
-                    'relative flex flex-col w-[280px] md:w-[320px] h-auto rounded-[28px] overflow-hidden border-[4px]',
-                    config.bg,
-                    config.border
-                  )}
-                >
-                  {/* Top Badge */}
-                  <div
-                    className={cn(
-                      'absolute top-4 left-0 px-4 py-1.5 rounded-r-xl text-xs font-black uppercase tracking-widest shadow-sm z-20 border-y border-r',
-                      config.bg,
-                      config.text,
-                      config.border
-                    )}
-                  >
-                    {config.label}
-                  </div>
-
-                  {/* Main Frog Display */}
-                  <div className="flex items-center justify-center flex-1 w-full p-3 mt-4">
-                    <div
-                      className={cn(
-                        'w-full aspect-[1.1/1] md:aspect-[1.2/1] rounded-[20px] relative overflow-hidden flex items-center justify-center',
-                        'bg-gradient-to-b shadow-inner',
-                        config.gradient
-                      )}
-                    >
-                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/40 to-transparent opacity-60" />
-
-                      <div className="relative z-10 flex items-end justify-center w-full h-full">
-                        <Frog
-                          // THE CHANGE IS HERE:
-                          // Changed md:translate-y-[20%] to md:translate-y-[5%]
-                          // This pushes it down less on desktop, making it appear higher up.
-                          className="w-[125%] h-[125%] shrink-0 object-contain translate-y-[10%] md:translate-y-[5%]"
-                          indices={{
-                            skin: prize.slot === 'skin' ? prize.riveIndex : 0,
-                            hat: prize.slot === 'hat' ? prize.riveIndex : 0,
-                            scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
-                            hand_item:
-                              prize.slot === 'hand_item' ? prize.riveIndex : 0,
-                          }}
-                          width={320}
-                          height={320}
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Footer Info */}
-                  <div className="flex flex-col items-center justify-center h-24 p-4 border-t bg-white/50 dark:bg-black/20 backdrop-blur-sm border-black/5 dark:border-white/5">
-                    <h3 className="mb-1 text-2xl font-black leading-none text-center text-slate-800 dark:text-white">
-                      {prize.name}
-                    </h3>
-                    <p className="text-sm font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
-                      {prize.slot.replace('_', ' ')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Claim Button */}
-              <motion.button
-                initial={{ opacity: 0, y: 40 }}
-                animate={{
-                  opacity: 1,
-                  y: 0,
-                  transition: { delay: 0.5, type: 'spring' },
-                }}
-                onClick={handleClaim}
-                disabled={claiming}
-                className={cn(
-                  'group relative mt-10 w-full max-w-[280px] py-4 rounded-2xl font-black text-lg shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transition-all active:scale-95 flex items-center justify-center gap-3 overflow-hidden',
-                  config.button
-                )}
-              >
-                <div className="absolute inset-0 z-10 -translate-x-full group-hover:animate-shine bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-
-                {claiming ? (
-                  <>
-                    <Loader2 className="relative z-20 w-5 h-5 animate-spin" />
-                    <span className="relative z-20">Claiming...</span>
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="relative z-20 w-5 h-5" />
-                    <span className="relative z-20">Claim Reward</span>
-                  </>
-                )}
-              </motion.button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Rarity Tag */}
+      <div
+        className={cn(
+          'absolute top-0 left-0 px-2 py-1 md:px-2.5 rounded-br-2xl text-[9px] md:text-[10px] font-black uppercase tracking-wider border-b border-r z-20',
+          config.bg,
+          config.text,
+          config.border
+        )}
+      >
+        {config.label}
       </div>
-    </div>
+
+      {/* Icon Container */}
+      <div
+        className={cn(
+          'mt-4 mb-2 md:mt-5 md:mb-3 mx-auto w-full aspect-[1.1/1] md:aspect-[1.2/1] rounded-xl md:rounded-2xl flex items-center justify-center relative overflow-hidden',
+          'bg-gradient-to-br shadow-inner',
+          config.gradient
+        )}
+      >
+        <div className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine" />
+
+        <div className="absolute inset-0 z-10 flex items-end justify-center">
+          <Frog
+            className="w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[20%]"
+            indices={previewIndices}
+            width={180}
+            height={180}
+          />
+        </div>
+
+        {ownedCount > 0 && (
+          <div className="absolute bottom-1 right-1 md:bottom-1.5 md:right-1.5 bg-black/50 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-md md:rounded-lg shadow-sm border border-white/10 z-20">
+            x{ownedCount}
+          </div>
+        )}
+      </div>
+
+      {/* Name & Price */}
+      <div className="flex-1 flex flex-col items-center justify-end gap-1 md:gap-1.5 pb-1">
+        <h4 className="w-full text-xs font-bold leading-tight text-center truncate md:text-sm text-slate-800 dark:text-slate-100">
+          {item.name}
+        </h4>
+
+        {mode === 'shop' && (
+          <div className="flex items-center justify-center gap-1 text-[10px] md:text-sm font-black bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-full">
+            <Fly size={14} className="md:w-4 md:h-4" />
+            <span
+              className={
+                canAfford
+                  ? 'text-slate-800 dark:text-slate-200'
+                  : 'text-red-500'
+              }
+            >
+              {item.priceFlies}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="w-full mx-auto mt-1 md:w-3/4">
+        {(mode === 'inventory' || mode === 'trade') && (
+          <div
+            className={cn(
+              'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
+              isEquipped
+                ? 'bg-green-600 text-white shadow-md'
+                : isSelected
+                ? 'bg-indigo-600 text-white shadow-md'
+                : 'bg-white/50 dark:bg-black/20 text-slate-500 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 group-hover:text-purple-600'
+            )}
+          >
+            {actionLoading
+              ? '...'
+              : mode === 'trade'
+              ? isSelected
+                ? 'SELECTED'
+                : 'SELECT'
+              : isEquipped
+              ? 'EQUIPPED'
+              : 'EQUIP'}
+          </div>
+        )}
+
+        {mode === 'shop' && (
+          <MotionButton
+            size="sm"
+            // Remove disabled attribute to allow click events for shake animation
+            // We handle the logic in handleAction
+            className={cn(
+              'h-7 md:h-8 w-full font-black rounded-lg text-[10px] md:text-xs uppercase tracking-wide shadow-md overflow-hidden relative',
+              canAfford
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/30'
+                : 'bg-slate-200 text-slate-400 dark:bg-slate-800'
+            )}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleAction();
+            }}
+            whileTap={canAfford ? { scale: 0.95 } : {}}
+          >
+            <AnimatePresence mode="wait">
+              {actionLoading ? (
+                <motion.div
+                  key="loading"
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -20, opacity: 0 }}
+                >
+                  ...
+                </motion.div>
+              ) : (
+                <motion.span
+                  key="buy"
+                  initial={{ y: 20, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -20, opacity: 0 }}
+                >
+                  Buy
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </MotionButton>
+        )}
+      </div>
+    </motion.div>
   );
 }
