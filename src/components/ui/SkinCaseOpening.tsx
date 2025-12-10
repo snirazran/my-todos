@@ -201,7 +201,7 @@ export default function SkinCaseOpening({
       shaking: {
           rotate: [0, -5, 5, -10, 10, -5, 5, 0],
           scale: [1, 1.1, 1.1, 1.2, 1.2, 1.1, 1],
-          transition: { duration: 1.5, ease: "easeInOut" }
+          transition: { duration: 1.5, ease: [0.42, 0, 0.58, 1] }
       },
       revealed: { scale: 0, opacity: 0 }
   };
