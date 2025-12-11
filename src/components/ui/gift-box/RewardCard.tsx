@@ -43,12 +43,10 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
       scale: 1,
       rotateY: 0,
       transition: {
-        // --- THE FIX ---
-        // Instead of 'spring' (physics), we use a custom bezier curve.
-        // This curve "pops" past 1 (overshoots) and settles, looking like a spring
-        // but stable for the canvas.
-        ease: [0.34, 1.56, 0.64, 1],
-        duration: 0.6,
+        type: 'spring',
+        stiffness: 300,
+        damping: 20,
+        mass: 0.8,
         delay: 0.1,
       },
     },
@@ -139,37 +137,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                   }}
                 />
 
-                {/* 2. Anamorphic Lens Flare */}
-                <motion.div
-                  key="flare-h"
-                  animate={
-                    showContent
-                      ? { scaleX: 5, opacity: 0 }
-                      : { scaleX: [1, 1.5, 1], opacity: [0.8, 1, 0.8] }
-                  }
-                  transition={
-                    showContent
-                      ? { duration: 0.3 }
-                      : { duration: 3, repeat: Infinity, ease: 'easeInOut' }
-                  }
-                  className="absolute w-32 h-[2px] bg-white blur-[2px] shadow-[0_0_20px_10px_rgba(255,255,255,0.4)]"
-                />
 
-                {/* 3. Central Star */}
-                <motion.div
-                  key="star"
-                  animate={
-                    showContent
-                      ? { scale: 5, opacity: 0 }
-                      : { scale: [1, 1.2, 1], rotate: [0, 45, 0] }
-                  }
-                  transition={
-                    showContent
-                      ? { duration: 0.4 }
-                      : { duration: 4, repeat: Infinity, ease: 'easeInOut' }
-                  }
-                  className="absolute w-8 h-8 bg-white rotate-45 blur-md shadow-[0_0_40px_rgba(255,255,255,0.8)]"
-                />
               </div>
 
               {/* === LAYER 2: ACTUAL CONTENT (Bottom Aligned for Gift, Centered for Frog) === */}
@@ -239,14 +207,17 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
         initial="hidden"
         animate={showContent ? 'visible' : 'hidden'}
         variants={{
-          hidden: { opacity: 0, y: 40 },
+          hidden: { opacity: 0, y: 40, scale: 0.9 },
           visible: {
             opacity: 1,
             y: 0,
+            scale: 1,
             transition: {
               delay: 0.2,
-              ease: [0.34, 1.56, 0.64, 1],
-              duration: 0.6,
+              type: 'spring',
+              stiffness: 300,
+              damping: 20,
+              mass: 0.8,
             },
           },
         }}
