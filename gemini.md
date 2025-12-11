@@ -31,5 +31,3 @@ The application is a daily todo tracker with a focus on a rich user experience, 
 - **Frog Customization (Skins):** Collect and equip various frog skins, adding a unique gamified element to task completion. Skins are categorized into common, uncommon, rare, epic, and legendary tiers.
 - **Rich Animations:** Smooth and engaging animations throughout the application, including Rive animations for the frog character and confetti effects for achievements.
 - **Internationalization:** Support for multiple languages (e.g., English, Hebrew).
-
-## Gemini CLI Specific Instructions

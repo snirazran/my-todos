@@ -8,7 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import React, { useState } from 'react';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
-import SkinCaseOpening from './SkinCaseOpening';
+import GiftBoxOpening from './gift-box/GiftBoxOpening';
 import GiftBox from './GiftBox';
 
 interface Task {
@@ -329,7 +329,7 @@ export default function TaskList({
       )}
 
       {isOpeningCase && (
-        <SkinCaseOpening
+        <GiftBoxOpening
           onClose={() => setIsOpeningCase(false)}
           onWin={(item) => console.log('Won:', item)}
         />
