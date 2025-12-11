@@ -16,6 +16,7 @@ import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { RewardPopup } from '@/components/ui/gift-box/RewardPopup';
 import {
   useFrogTongue,
   HIT_AT,
@@ -86,6 +87,9 @@ export default function Home() {
 
   const [isAnimating, setIsAnimating] = useState(false);
 
+  // Reward State
+  const [showReward, setShowReward] = useState(false);
+
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
   const {
     vp,
@@ -117,6 +121,12 @@ export default function Home() {
   const doneCount = data.filter((t) => t.completed).length;
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
   const flyBalance = session ? flyStatus.balance : undefined;
+
+  useEffect(() => {
+    if (rate === 100 && data.length > 0) {
+      setShowReward(true);
+    }
+  }, [rate, data.length]);
 
   const refreshToday = useCallback(async () => {
     if (!session) return;
@@ -499,6 +509,7 @@ export default function Home() {
           fetchBacklog();
         }}
       />
+      <RewardPopup show={showReward} onClose={() => setShowReward(false)} />
     </main>
   );
 }
