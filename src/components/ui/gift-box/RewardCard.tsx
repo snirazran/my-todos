@@ -23,8 +23,16 @@ const GLOW_COLORS = {
 
 export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
+  const [isExiting, setIsExiting] = useState(false);
   const config = RARITY_CONFIG[prize.rarity];
   const glowColor = GLOW_COLORS[prize.rarity];
+
+  const handleClaimClick = () => {
+    // Optimistically unmount heavy Rive components to ensure smooth exit animation
+    setIsExiting(true);
+    // Use a tiny timeout to ensure the render cycle clears the canvas before the heavy exit animation starts
+    setTimeout(onClaim, 10);
+  };
 
   const cardVariants: Variants = {
     hidden: { opacity: 0, scale: 0.5, rotateY: 90 },
@@ -97,7 +105,6 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
 
               {/* === LAYER 1: CINEMATIC EFFECTS (Centered) === */}
               <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
-                
                 {/* 1. Rotating God Rays */}
                 <motion.div
                   key="rays"
@@ -125,25 +132,27 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                   style={{
                     background:
                       'repeating-conic-gradient(from 0deg, transparent 0deg, transparent 15deg, currentColor 15deg, currentColor 20deg, transparent 20deg)',
-                    maskImage: 'radial-gradient(circle, black 30%, transparent 70%)',
-                    WebkitMaskImage: 'radial-gradient(circle, black 30%, transparent 70%)',
+                    maskImage:
+                      'radial-gradient(circle, black 30%, transparent 70%)',
+                    WebkitMaskImage:
+                      'radial-gradient(circle, black 30%, transparent 70%)',
                   }}
                 />
 
                 {/* 2. Anamorphic Lens Flare */}
                 <motion.div
-                   key="flare-h"
-                   animate={
-                     showContent
-                       ? { scaleX: 5, opacity: 0 }
-                       : { scaleX: [1, 1.5, 1], opacity: [0.8, 1, 0.8] }
-                   }
-                   transition={
-                     showContent
-                       ? { duration: 0.3 }
-                       : { duration: 3, repeat: Infinity, ease: 'easeInOut' }
-                   }
-                   className="absolute w-32 h-[2px] bg-white blur-[2px] shadow-[0_0_20px_10px_rgba(255,255,255,0.4)]"
+                  key="flare-h"
+                  animate={
+                    showContent
+                      ? { scaleX: 5, opacity: 0 }
+                      : { scaleX: [1, 1.5, 1], opacity: [0.8, 1, 0.8] }
+                  }
+                  transition={
+                    showContent
+                      ? { duration: 0.3 }
+                      : { duration: 3, repeat: Infinity, ease: 'easeInOut' }
+                  }
+                  className="absolute w-32 h-[2px] bg-white blur-[2px] shadow-[0_0_20px_10px_rgba(255,255,255,0.4)]"
                 />
 
                 {/* 3. Central Star */}
@@ -156,8 +165,8 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                   }
                   transition={
                     showContent
-                       ? { duration: 0.4 }
-                       : { duration: 4, repeat: Infinity, ease: 'easeInOut' }
+                      ? { duration: 0.4 }
+                      : { duration: 4, repeat: Infinity, ease: 'easeInOut' }
                   }
                   className="absolute w-8 h-8 bg-white rotate-45 blur-md shadow-[0_0_40px_rgba(255,255,255,0.8)]"
                 />
@@ -169,34 +178,36 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                   <motion.div
                     initial={{ opacity: 0, scale: 0.5, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
-                    transition={{ 
-                      type: 'spring', 
-                      damping: 12, 
-                      stiffness: 200, 
-                      delay: 0.1 
+                    transition={{
+                      type: 'spring',
+                      damping: 12,
+                      stiffness: 200,
+                      delay: 0.1,
                     }}
                     className={cn(
-                      "relative w-full h-full flex justify-center",
-                      prize.slot === 'container' ? "items-end" : "items-center"
+                      'relative w-full h-full flex justify-center',
+                      prize.slot === 'container' ? 'items-end' : 'items-center'
                     )}
                   >
                     {prize.slot === 'container' ? (
                       <div className="h-[90%] w-auto aspect-[282/381] mb-2 drop-shadow-2xl">
-                        <GiftRive className="w-full h-full" />
+                        {!isExiting && <GiftRive className="w-full h-full" />}
                       </div>
                     ) : (
-                      <Frog
-                        className="object-contain translate-y-2"
-                        indices={{
-                          skin: prize.slot === 'skin' ? prize.riveIndex : 0,
-                          hat: prize.slot === 'hat' ? prize.riveIndex : 0,
-                          scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
-                          hand_item:
-                            prize.slot === 'hand_item' ? prize.riveIndex : 0,
-                        }}
-                        width={300}
-                        height={300}
-                      />
+                      !isExiting && (
+                        <Frog
+                          className="object-contain translate-y-2"
+                          indices={{
+                            skin: prize.slot === 'skin' ? prize.riveIndex : 0,
+                            hat: prize.slot === 'hat' ? prize.riveIndex : 0,
+                            scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
+                            hand_item:
+                              prize.slot === 'hand_item' ? prize.riveIndex : 0,
+                          }}
+                          width={300}
+                          height={300}
+                        />
+                      )
                     )}
                   </motion.div>
                 )}
@@ -235,7 +246,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
             transition: { delay: 0.5, type: 'spring' },
           },
         }}
-        onClick={onClaim}
+        onClick={handleClaimClick}
         disabled={claiming}
         className={cn(
           'group relative mt-10 w-full max-w-[280px] py-4 rounded-2xl font-black text-lg shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transition-all active:scale-95 flex items-center justify-center gap-3 overflow-hidden',
