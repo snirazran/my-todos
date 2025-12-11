@@ -248,7 +248,11 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
           visible: {
             opacity: 1,
             y: 0,
-            transition: { delay: 0.2, type: 'spring' },
+            transition: {
+              delay: 0.2,
+              ease: [0.34, 1.56, 0.64, 1],
+              duration: 0.6,
+            },
           },
         }}
         onClick={handleClaimClick}
