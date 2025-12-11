@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, Variants } from 'framer-motion';
 import { Loader2, Sparkles } from 'lucide-react';
 import Frog from '@/components/ui/frog';
@@ -14,6 +14,7 @@ type RewardCardProps = {
 };
 
 export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
+  const [showContent, setShowContent] = useState(false);
   const config = RARITY_CONFIG[prize.rarity];
 
   const cardVariants: Variants = {
@@ -41,6 +42,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
       variants={cardVariants}
       initial="hidden"
       animate="visible"
+      onAnimationComplete={() => setShowContent(true)}
     >
       {/* 3D Card Container */}
       <div
@@ -89,21 +91,23 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                    Because we removed the spring physics, Rive can now load 
                    instantly without glitching.
                 */}
-                {prize.slot === 'container' ? (
-                  <GiftRive width={230} height={230} />
-                ) : (
-                  <Frog
-                    className="object-contain translate-y-[5%] md:translate-y-0"
-                    indices={{
-                      skin: prize.slot === 'skin' ? prize.riveIndex : 0,
-                      hat: prize.slot === 'hat' ? prize.riveIndex : 0,
-                      scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
-                      hand_item:
-                        prize.slot === 'hand_item' ? prize.riveIndex : 0,
-                    }}
-                    width={230}
-                    height={230}
-                  />
+                {showContent && (
+                  prize.slot === 'container' ? (
+                    <GiftRive width={230} height={230} />
+                  ) : (
+                    <Frog
+                      className="object-contain translate-y-[5%] md:translate-y-0"
+                      indices={{
+                        skin: prize.slot === 'skin' ? prize.riveIndex : 0,
+                        hat: prize.slot === 'hat' ? prize.riveIndex : 0,
+                        scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
+                        hand_item:
+                          prize.slot === 'hand_item' ? prize.riveIndex : 0,
+                      }}
+                      width={230}
+                      height={230}
+                    />
+                  )
                 )}
               </div>
             </div>
