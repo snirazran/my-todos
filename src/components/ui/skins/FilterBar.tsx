@@ -1,11 +1,20 @@
 'use client';
 
 import React, { useRef } from 'react';
-import { Sparkles, Crown, Shirt, Hand, Ghost, Ribbon } from 'lucide-react';
+import {
+  Sparkles,
+  Crown,
+  Shirt,
+  Hand,
+  Ghost,
+  Ribbon,
+  Gift,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type FilterCategory =
   | 'all'
+  | 'container'
   | 'hat'
   | 'scarf'
   | 'body'
@@ -17,6 +26,7 @@ const CATEGORY_CONFIG: Record<
   { label: string; icon: React.ReactNode }
 > = {
   all: { label: 'All Items', icon: <Sparkles className="w-5 h-5" /> },
+  container: { label: 'Gift Boxes', icon: <Gift className="w-5 h-5" /> },
   hat: { label: 'Hats', icon: <Crown className="w-5 h-5" /> },
   scarf: { label: 'Scarves', icon: <Ribbon className="w-5 h-5" /> },
   body: { label: 'Body', icon: <Shirt className="w-5 h-5" /> },
@@ -41,6 +51,7 @@ export function FilterBar({
 
   const categories: FilterCategory[] = [
     'all',
+    'container',
     'hat',
     'scarf',
     'body',

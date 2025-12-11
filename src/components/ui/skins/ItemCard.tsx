@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import type { ItemDef } from '@/lib/skins/catalog';
 import Frog from '@/components/ui/frog';
 import { motion, AnimatePresence } from 'framer-motion';
+import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 
 /* ---------------- Visual Helpers ---------------- */
 // (Keep RARITY_CONFIG exactly as you had it - it was good)
@@ -196,11 +197,9 @@ export function ItemCard({
 
         <div className="absolute inset-0 z-10 flex items-end justify-center">
           {item.slot === 'container' ? (
-            <img
-              src={item.icon}
-              alt={item.name}
-              className="object-contain w-2/3 h-2/3 mb-4 drop-shadow-xl"
-            />
+            <div className="w-[85%] h-[85%] mb-4 drop-shadow-xl">
+              <GiftRive />
+            </div>
           ) : (
             <Frog
               className="w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[20%]"

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { ItemDef } from '@/lib/skins/catalog';
@@ -24,6 +25,11 @@ export default function GiftBoxOpening({
   const [prize, setPrize] = useState<ItemDef | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [loadingText, setLoadingText] = useState(FUNNY_SENTENCES[0]);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Handle opening logic
   const handleOpen = async () => {
@@ -79,8 +85,10 @@ export default function GiftBoxOpening({
 
   const config = prize ? RARITY_CONFIG[prize.rarity] : RARITY_CONFIG.common;
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden pointer-events-auto">
       {/* Background Backdrop */}
       <motion.div
         initial={{ opacity: 0 }}
@@ -142,6 +150,7 @@ export default function GiftBoxOpening({
           )}
         </AnimatePresence>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
