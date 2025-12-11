@@ -23,9 +23,12 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
       scale: 1,
       rotateY: 0,
       transition: {
-        type: 'spring',
-        stiffness: 260,
-        damping: 20,
+        // --- THE FIX ---
+        // Instead of 'spring' (physics), we use a custom bezier curve.
+        // This curve "pops" past 1 (overshoots) and settles, looking like a spring
+        // but stable for the canvas.
+        ease: [0.34, 1.56, 0.64, 1],
+        duration: 0.6,
         delay: 0.1,
       },
     },
@@ -81,7 +84,11 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/40 to-transparent opacity-60" />
 
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
+              <div className="absolute z-10 -translate-x-1/2 bottom-6 left-1/2">
+                {/* We removed the "Placeholder" logic entirely.
+                   Because we removed the spring physics, Rive can now load 
+                   instantly without glitching.
+                */}
                 {prize.slot === 'container' ? (
                   <GiftRive width={230} height={230} />
                 ) : (
@@ -114,7 +121,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
         </div>
       </div>
 
-      {/* Claim Button */}
+      {/* Claim Button - We can keep spring here as it doesn't contain Rive */}
       <motion.button
         initial={{ opacity: 0, y: 40 }}
         animate={{

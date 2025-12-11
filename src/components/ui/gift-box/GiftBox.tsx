@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { motion, Variants } from 'framer-motion';
 import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
-
 import { cn } from '@/lib/utils';
 
+// --- FIXED: Removed all delay logic, just simple rendering ---
 export const GiftRive = ({
   width,
   height,
@@ -13,14 +13,6 @@ export const GiftRive = ({
   height?: number;
   className?: string;
 }) => {
-  const [shouldRender, setShouldRender] = useState(false);
-
-  useEffect(() => {
-    // Increase delay to ensure spring animation settles before measuring layout
-    const timer = setTimeout(() => setShouldRender(true), 500);
-    return () => clearTimeout(timer);
-  }, []);
-
   const { RiveComponent } = useRive({
     src: '/idle_gift.riv',
     stateMachines: 'State Machine 1',
@@ -34,15 +26,12 @@ export const GiftRive = ({
       style={{
         width: width ?? '100%',
         height: height ?? '100%',
-        display: 'block',
-        overflow: 'hidden',
+        display: 'block', // Ensures no inline alignment issues
       }}
     >
-      {shouldRender && (
-        <RiveComponent
-          style={{ width: '100%', height: '100%', display: 'block' }}
-        />
-      )}
+      <RiveComponent
+        style={{ width: '100%', height: '100%', display: 'block' }}
+      />
     </div>
   );
 };
