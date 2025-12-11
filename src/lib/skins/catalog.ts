@@ -1,5 +1,5 @@
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-export type WardrobeSlot = 'skin' | 'hat' | 'scarf' | 'hand_item';
+export type WardrobeSlot = 'skin' | 'hat' | 'scarf' | 'hand_item' | 'container';
 
 export type ItemDef = {
   id: string;
@@ -88,6 +88,17 @@ export const CATALOG: Readonly<ItemDef[]> = [
     riveIndex: 3,
     icon: '/skins/hand/hand1.png', // Placeholder path
     priceFlies: 3000,
+  },
+
+  // --- CONTAINERS ---
+  {
+    id: 'gift_box_1',
+    name: 'Mystery Gift Box',
+    slot: 'container',
+    rarity: 'rare',
+    riveIndex: 0,
+    icon: '/skins/container/gift.png',
+    priceFlies: 500,
   },
 ];
 

@@ -1,80 +1,83 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
-import { CATALOG, ItemDef, Rarity } from '@/lib/skins/catalog';
+import { ItemDef } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 import { RARITY_CONFIG } from './constants';
-import { getRandomItem } from './utils';
 import { RotatingRays } from './RotatingRays';
 import { GiftBox } from './GiftBox';
 import { RewardCard } from './RewardCard';
+import { FUNNY_SENTENCES } from './funnySentences';
 
 export default function GiftBoxOpening({
   onClose,
   onWin,
+  giftBoxId = 'gift_box_1',
 }: {
   onClose: () => void;
   onWin?: (item: ItemDef) => void;
+  giftBoxId?: string;
 }) {
   const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
   const [prize, setPrize] = useState<ItemDef | null>(null);
   const [claiming, setClaiming] = useState(false);
+  const [loadingText, setLoadingText] = useState(FUNNY_SENTENCES[0]);
 
-  useEffect(() => {
-    const catalogByRarity: Record<Rarity, ItemDef[]> = {
-      common: [],
-      uncommon: [],
-      rare: [],
-      epic: [],
-      legendary: [],
-    };
-    CATALOG.forEach((item) => {
-      if (catalogByRarity[item.rarity]) catalogByRarity[item.rarity].push(item);
-    });
-
-    const WIN_WEIGHTS: Record<Rarity, number> = {
-      common: 0.6,
-      uncommon: 0.25,
-      rare: 0.1,
-      epic: 0.04,
-      legendary: 0.01,
-    };
-
-    setPrize(getRandomItem(WIN_WEIGHTS, catalogByRarity));
-  }, []);
-
-  const handleOpen = () => {
-    if (phase !== 'idle' || !prize) return;
+  // Handle opening logic
+  const handleOpen = async () => {
+    if (phase !== 'idle') return;
     setPhase('shaking');
 
-    setTimeout(() => {
-      setPhase('revealed');
-    }, 1500);
-  };
+    // Cycle funny sentences
+    const interval = setInterval(() => {
+      setLoadingText(
+        FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)]
+      );
+    }, 800);
 
-  const handleClaim = async () => {
-    if (claiming || !prize) return;
-    setClaiming(true);
     try {
-      await fetch('/api/skins/inventory', {
+      // 1. Minimum animation time promise
+      const animationPromise = new Promise((resolve) =>
+        setTimeout(resolve, 3000)
+      );
+
+      // 2. API call promise
+      const apiPromise = fetch('/api/skins/open-gift', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: prize.id }),
+        body: JSON.stringify({ giftBoxId }),
+      }).then((res) => {
+        if (!res.ok) throw new Error('Failed to open gift');
+        return res.json();
       });
-      if (onWin) onWin(prize);
-      onClose();
+
+      // Wait for both
+      const [_, data] = await Promise.all([animationPromise, apiPromise]);
+
+      if (data.prize) {
+        setPrize(data.prize);
+        if (onWin) onWin(data.prize); // Notify parent immediately or on claim?
+        setPhase('revealed');
+      } else {
+        throw new Error('No prize returned');
+      }
     } catch (err) {
       console.error(err);
-      onClose();
+      onClose(); // Close on error
     } finally {
-      setClaiming(false);
+      clearInterval(interval);
     }
   };
 
-  if (!prize) return null;
-  const config = RARITY_CONFIG[prize.rarity];
+  const handleClaim = () => {
+    // Prize is already in inventory from the open-gift API call
+    // Just close the modal
+    onClose();
+  };
+
+  const config = prize ? RARITY_CONFIG[prize.rarity] : RARITY_CONFIG.common;
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
@@ -88,7 +91,7 @@ export default function GiftBoxOpening({
 
       {/* Dynamic God Rays for Reveal */}
       <AnimatePresence>
-        {phase === 'revealed' && (
+        {phase === 'revealed' && prize && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -120,11 +123,16 @@ export default function GiftBoxOpening({
         <AnimatePresence mode="wait">
           {/* --- GIFT PHASE --- */}
           {phase !== 'revealed' && (
-            <GiftBox key="gift" phase={phase} onOpen={handleOpen} />
+            <GiftBox
+              key="gift"
+              phase={phase}
+              onOpen={handleOpen}
+              loadingText={loadingText}
+            />
           )}
 
           {/* --- REVEAL PHASE --- */}
-          {phase === 'revealed' && (
+          {phase === 'revealed' && prize && (
             <RewardCard
               key="card"
               prize={prize}

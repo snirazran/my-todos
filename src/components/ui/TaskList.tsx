@@ -5,11 +5,14 @@ import {
   CalendarCheck,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
-import GiftBoxOpening from './gift-box/GiftBoxOpening';
-import GiftBox from './GiftBox';
+import { RewardCard } from './gift-box/RewardCard';
+import { RotatingRays } from './gift-box/RotatingRays';
+import { byId } from '@/lib/skins/catalog';
+import { RARITY_CONFIG } from './gift-box/constants';
+import { cn } from '@/lib/utils';
 
 interface Task {
   id: string;
@@ -54,7 +57,33 @@ export default function TaskList({
     task: Task;
     kind: 'regular' | 'weekly' | 'backlog';
   } | null>(null);
-  const [isOpeningCase, setIsOpeningCase] = useState(false);
+
+  // Reward Popup State
+  const [showRewardPopup, setShowRewardPopup] = useState(false);
+  const [claimingReward, setClaimingReward] = useState(false);
+
+  useEffect(() => {
+    if (showConfetti) {
+      setShowRewardPopup(true);
+    }
+  }, [showConfetti]);
+
+  const handleClaimReward = async () => {
+    setClaimingReward(true);
+    try {
+      await fetch('/api/skins/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ itemId: 'gift_box_1' }),
+      });
+      setShowRewardPopup(false);
+    } catch (e) {
+      console.error(e);
+      setShowRewardPopup(false);
+    } finally {
+      setClaimingReward(false);
+    }
+  };
 
   React.useEffect(() => {
     if (!menuFor) return;
@@ -114,6 +143,12 @@ export default function TaskList({
   const dialogVariant: 'regular' | 'weekly' | 'backlog' = dialog
     ? taskKind(dialog.task)
     : 'regular';
+
+  // Gift Box Item
+  const giftBoxItem = byId['gift_box_1'];
+  const giftConfig = giftBoxItem
+    ? RARITY_CONFIG[giftBoxItem.rarity]
+    : RARITY_CONFIG.common;
 
   return (
     <>
@@ -322,18 +357,57 @@ export default function TaskList({
         </div>
       </div>
 
-      {showConfetti && (
-        <div className="flex justify-center mt-8 mb-4">
-          <GiftBox onClick={() => setIsOpeningCase(true)} />
-        </div>
-      )}
+      {/* --- REWARD POPUP OVERLAY --- */}
+      <AnimatePresence>
+        {showRewardPopup && giftBoxItem && (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden">
+            {/* Backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
+              onClick={() => {
+                /* Optional: prevent close on backdrop? Or handleClaimReward? */
+              }}
+            />
 
-      {isOpeningCase && (
-        <GiftBoxOpening
-          onClose={() => setIsOpeningCase(false)}
-          onWin={(item) => console.log('Won:', item)}
-        />
-      )}
+            {/* Rays - Full Screen */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-0 flex items-center justify-center pointer-events-none"
+            >
+              <RotatingRays colorClass={giftConfig.rays} />
+              <div
+                className={cn(
+                  'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80'
+                )}
+              />
+            </motion.div>
+
+            {/* Content */}
+            <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
+              <div className="relative z-10 w-full">
+                <div className="mb-8 text-center">
+                  <h2 className="text-3xl font-black text-white uppercase tracking-widest drop-shadow-md">
+                    Tasks Complete!
+                  </h2>
+                  <p className="mt-2 text-lg font-bold text-slate-300">
+                    You earned a reward
+                  </p>
+                </div>
+                <RewardCard
+                  prize={giftBoxItem}
+                  claiming={claimingReward}
+                  onClaim={handleClaimReward}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
 
       <DeleteDialog
         open={!!dialog}

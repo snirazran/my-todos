@@ -1,0 +1,15 @@
+export const FUNNY_SENTENCES = [
+  "Summoning the Frog God...",
+  "Polishing the shiny bits...",
+  "Checking for flies...",
+  "Untying the ribbon...",
+  "Reticulating splines...",
+  "Asking the frog nicely...",
+  "Consulting the oracle...",
+  "Shaking the box...",
+  "Measuring twice, cutting once...",
+  "Loading pixels...",
+  "Feeding the hamsters...",
+  "Compressing the magic...",
+  "Decorating the interior...",
+];

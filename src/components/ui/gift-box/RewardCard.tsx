@@ -5,6 +5,7 @@ import Frog from '@/components/ui/frog';
 import { ItemDef } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 import { RARITY_CONFIG } from './constants';
+import { GiftRive } from './GiftBox';
 
 type RewardCardProps = {
   prize: ItemDef;
@@ -81,17 +82,24 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/40 to-transparent opacity-60" />
 
               <div className="relative z-10 flex items-end justify-center w-full h-full">
-                <Frog
-                  className="w-[125%] h-[125%] object-contain translate-y-[5%] md:translate-y-0"
-                  indices={{
-                    skin: prize.slot === 'skin' ? prize.riveIndex : 0,
-                    hat: prize.slot === 'hat' ? prize.riveIndex : 0,
-                    scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
-                    hand_item: prize.slot === 'hand_item' ? prize.riveIndex : 0,
-                  }}
-                  width={250}
-                  height={250}
-                />
+                {prize.slot === 'container' ? (
+                  <div className="mb-6 drop-shadow-2xl">
+                    <GiftRive width={250} height={250} />
+                  </div>
+                ) : (
+                  <Frog
+                    className="object-contain translate-y-[5%] md:translate-y-0"
+                    indices={{
+                      skin: prize.slot === 'skin' ? prize.riveIndex : 0,
+                      hat: prize.slot === 'hat' ? prize.riveIndex : 0,
+                      scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
+                      hand_item:
+                        prize.slot === 'hand_item' ? prize.riveIndex : 0,
+                    }}
+                    width={250}
+                    height={250}
+                  />
+                )}
               </div>
             </div>
           </div>

@@ -2,22 +2,39 @@ import React from 'react';
 import { motion, Variants } from 'framer-motion';
 import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
 
-const GiftRive = () => {
+export const GiftRive = ({
+  width,
+  height,
+}: {
+  width?: number;
+  height?: number;
+}) => {
   const { RiveComponent } = useRive({
     src: '/idle_gift.riv',
     stateMachines: 'State Machine 1',
     autoplay: true,
     layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
   });
-  return <RiveComponent className="w-full h-full" />;
+  return (
+    <div
+      style={{
+        width: width ?? '100%',
+        height: height ?? '100%',
+        display: 'block',
+      }}
+    >
+      <RiveComponent className="w-full h-full" />
+    </div>
+  );
 };
 
 type GiftBoxProps = {
   phase: 'idle' | 'shaking' | 'revealed';
   onOpen: () => void;
+  loadingText?: string;
 };
 
-export const GiftBox = ({ phase, onOpen }: GiftBoxProps) => {
+export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
   const shakeVariants: Variants = {
     idle: { rotate: 0, scale: 1 },
     shaking: {
@@ -57,7 +74,9 @@ export const GiftBox = ({ phase, onOpen }: GiftBoxProps) => {
         className="mt-4 space-y-2 text-center"
       >
         <h2 className="text-4xl font-black text-white uppercase tracking-widest drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
-          {phase === 'shaking' ? 'Unwrapping...' : 'Tap to Unwrap'}
+          {phase === 'shaking'
+            ? loadingText || 'Unwrapping...'
+            : 'Tap to Unwrap'}
         </h2>
         {phase === 'idle' && (
           <p className="text-lg font-bold tracking-wide text-slate-300">

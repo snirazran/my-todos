@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 
 import { TradePanel } from './TradePanel';
+import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 
 /* ---------------- Types & Data ---------------- */
 type ApiData = {
@@ -85,6 +86,7 @@ export function WardrobePanel({
     type: 'error' | 'success';
   } | null>(null);
   const [shakeBalance, setShakeBalance] = useState(false);
+  const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
 
   // --- Logic (Identical to previous) ---
   const getFilteredItems = (items: ItemDef[]) => {
@@ -134,6 +136,14 @@ export function WardrobePanel({
     });
     setActionId(null);
     mutate();
+  };
+
+  const handleItemAction = (item: ItemDef) => {
+    if (item.slot === 'container') {
+      setOpeningGiftId(item.id);
+    } else {
+      toggleEquip(item.slot, item.id);
+    }
   };
 
   const buyItem = async (item: ItemDef) => {
@@ -210,9 +220,10 @@ export function WardrobePanel({
   const balance = data?.wardrobe?.flies ?? 0;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent
+          className={cn(
           // 1. Base Styles (Resetting defaults)
           'fixed z-50 flex flex-col gap-0 bg-slate-50 dark:bg-slate-950 p-0 shadow-none outline-none overflow-hidden',
 
@@ -360,7 +371,7 @@ export function WardrobePanel({
                         }
                         canAfford={true}
                         actionLoading={actionId === item.id}
-                        onAction={() => toggleEquip(item.slot, item.id)}
+                        onAction={() => handleItemAction(item)}
                         actionLabel={null}
                       />
                     ))}
@@ -409,5 +420,21 @@ export function WardrobePanel({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* --- Gift Opening Overlay --- */}
+    {openingGiftId && (
+      <GiftBoxOpening
+        giftBoxId={openingGiftId}
+        onClose={() => {
+          setOpeningGiftId(null);
+          mutate(); // Refresh inventory to show prize
+        }}
+        onWin={(item) => {
+          setNotif({ msg: `You won: ${item.name}!`, type: 'success' });
+          // Note: Inventory refresh happens in onClose
+        }}
+      />
+    )}
+    </>
   );
 }

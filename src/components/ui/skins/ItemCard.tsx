@@ -195,12 +195,20 @@ export function ItemCard({
         <div className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine" />
 
         <div className="absolute inset-0 z-10 flex items-end justify-center">
-          <Frog
-            className="w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[20%]"
-            indices={previewIndices}
-            width={180}
-            height={180}
-          />
+          {item.slot === 'container' ? (
+            <img
+              src={item.icon}
+              alt={item.name}
+              className="object-contain w-2/3 h-2/3 mb-4 drop-shadow-xl"
+            />
+          ) : (
+            <Frog
+              className="w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[20%]"
+              indices={previewIndices}
+              width={180}
+              height={180}
+            />
+          )}
         </div>
 
         {ownedCount > 0 && (
@@ -251,6 +259,8 @@ export function ItemCard({
               ? isSelected
                 ? 'SELECTED'
                 : 'SELECT'
+              : item.slot === 'container'
+              ? 'OPEN'
               : isEquipped
               ? 'EQUIPPED'
               : 'EQUIP'}
