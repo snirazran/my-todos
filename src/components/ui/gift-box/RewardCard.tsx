@@ -23,15 +23,17 @@ const GLOW_COLORS = {
 
 export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
-  const [isExiting, setIsExiting] = useState(false);
+  const [localClaiming, setLocalClaiming] = useState(false);
   const config = RARITY_CONFIG[prize.rarity];
   const glowColor = GLOW_COLORS[prize.rarity];
 
   const handleClaimClick = () => {
-    // Optimistically unmount heavy Rive components to ensure smooth exit animation
-    setIsExiting(true);
-    // Use a tiny timeout to ensure the render cycle clears the canvas before the heavy exit animation starts
-    setTimeout(onClaim, 10);
+    setLocalClaiming(true);
+    // Simulate a small delay for the claiming process so the user sees the "Claiming..." state
+    // and the popup stays open for a moment with the content visible.
+    setTimeout(() => {
+      onClaim();
+    }, 200);
   };
 
   const cardVariants: Variants = {
@@ -51,6 +53,8 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
       },
     },
   };
+
+  const isProcessing = claiming || localClaiming;
 
   return (
     <motion.div
@@ -191,23 +195,21 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                   >
                     {prize.slot === 'container' ? (
                       <div className="h-[90%] w-auto aspect-[282/381] mb-2 drop-shadow-2xl">
-                        {!isExiting && <GiftRive className="w-full h-full" />}
+                        <GiftRive className="w-full h-full" />
                       </div>
                     ) : (
-                      !isExiting && (
-                        <Frog
-                          className="object-contain translate-y-2"
-                          indices={{
-                            skin: prize.slot === 'skin' ? prize.riveIndex : 0,
-                            hat: prize.slot === 'hat' ? prize.riveIndex : 0,
-                            scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
-                            hand_item:
-                              prize.slot === 'hand_item' ? prize.riveIndex : 0,
-                          }}
-                          width={300}
-                          height={300}
-                        />
-                      )
+                      <Frog
+                        className="object-contain translate-y-2"
+                        indices={{
+                          skin: prize.slot === 'skin' ? prize.riveIndex : 0,
+                          hat: prize.slot === 'hat' ? prize.riveIndex : 0,
+                          scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
+                          hand_item:
+                            prize.slot === 'hand_item' ? prize.riveIndex : 0,
+                        }}
+                        width={300}
+                        height={300}
+                      />
                     )}
                   </motion.div>
                 )}
@@ -238,16 +240,19 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
 
       {/* Claim Button - We can keep spring here as it doesn't contain Rive */}
       <motion.button
+        layout
+        initial="hidden"
+        animate={showContent ? 'visible' : 'hidden'}
         variants={{
           hidden: { opacity: 0, y: 40 },
           visible: {
             opacity: 1,
             y: 0,
-            transition: { delay: 0.5, type: 'spring' },
+            transition: { delay: 0.2, type: 'spring' },
           },
         }}
         onClick={handleClaimClick}
-        disabled={claiming}
+        disabled={isProcessing}
         className={cn(
           'group relative mt-10 w-full max-w-[280px] py-4 rounded-2xl font-black text-lg shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transition-all active:scale-95 flex items-center justify-center gap-3 overflow-hidden',
           config.button
@@ -255,7 +260,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
       >
         <div className="absolute inset-0 z-10 -translate-x-full group-hover:animate-shine bg-gradient-to-r from-transparent via-white/30 to-transparent" />
 
-        {claiming ? (
+        {isProcessing ? (
           <>
             <Loader2 className="relative z-20 w-5 h-5 animate-spin" />
             <span className="relative z-20">Claiming...</span>
