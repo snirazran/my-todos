@@ -72,10 +72,6 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
           config.border,
           config.glow
         )}
-        style={{
-          transformStyle: 'preserve-3d',
-          perspective: '1000px',
-        }}
       >
         <div
           className={cn(
@@ -180,7 +176,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
               <div className="absolute inset-0 z-30 flex justify-center pointer-events-none">
                 {showContent && (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                    initial={{ opacity: 0, scale: 0.9, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     transition={{
                       type: 'spring',
@@ -240,7 +236,6 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
 
       {/* Claim Button - We can keep spring here as it doesn't contain Rive */}
       <motion.button
-        layout
         initial="hidden"
         animate={showContent ? 'visible' : 'hidden'}
         variants={{
