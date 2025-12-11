@@ -136,8 +136,6 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                       'radial-gradient(circle, black 30%, transparent 70%)',
                   }}
                 />
-
-
               </div>
 
               {/* === LAYER 2: ACTUAL CONTENT (Bottom Aligned for Gift, Centered for Frog) === */}
@@ -203,27 +201,13 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
       </div>
 
       {/* Claim Button - Simplified animation for better performance */}
-      <motion.button
-        initial="hidden"
-        animate={showContent ? 'visible' : 'hidden'}
-        variants={{
-          hidden: { opacity: 0, y: 20, scale: 0.95 },
-          visible: {
-            opacity: 1,
-            y: 0,
-            scale: 1,
-            transition: {
-              delay: 0.2,
-              duration: 0.4,
-              ease: 'easeOut',
-            },
-          },
-        }}
+      <button
         onClick={handleClaimClick}
-        disabled={isProcessing}
+        disabled={isProcessing || !showContent}
         className={cn(
-          'group relative mt-10 w-full max-w-[280px] py-4 rounded-2xl font-black text-lg shadow-xl transition-all active:scale-95 hover:brightness-110 flex items-center justify-center gap-3 overflow-hidden',
-          config.button
+          'group relative mt-10 w-full max-w-[280px] py-4 rounded-2xl font-black text-lg shadow-xl transition-all duration-500 active:scale-95 hover:brightness-110 flex items-center justify-center gap-3 overflow-hidden',
+          config.button,
+          showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
         )}
       >
         {isProcessing ? (
@@ -237,7 +221,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
             <span className="relative z-20">Claim Reward</span>
           </>
         )}
-      </motion.button>
+      </button>
     </motion.div>
   );
 };
