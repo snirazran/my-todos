@@ -84,7 +84,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
               <div className="relative z-10 flex items-end justify-center w-full h-full">
                 {prize.slot === 'container' ? (
                   <div className="mb-6 shrink-0">
-                    <GiftRive width={200} height={200} />
+                    <GiftRive width={230} height={230} />
                   </div>
                 ) : (
                   <Frog
@@ -96,8 +96,8 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                       hand_item:
                         prize.slot === 'hand_item' ? prize.riveIndex : 0,
                     }}
-                    width={200}
-                    height={200}
+                    width={230}
+                    height={230}
                   />
                 )}
               </div>
