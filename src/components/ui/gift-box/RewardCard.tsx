@@ -81,11 +81,9 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/40 to-transparent opacity-60" />
 
-              <div className="relative z-10 flex items-end justify-center w-full h-full">
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-10">
                 {prize.slot === 'container' ? (
-                  <div className="mb-6 shrink-0">
-                    <GiftRive width={230} height={230} />
-                  </div>
+                  <GiftRive width={230} height={230} />
                 ) : (
                   <Frog
                     className="object-contain translate-y-[5%] md:translate-y-0"
