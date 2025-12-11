@@ -13,9 +13,18 @@ type RewardCardProps = {
   onClaim: () => void;
 };
 
+const GLOW_COLORS = {
+  common: 'bg-slate-400',
+  uncommon: 'bg-emerald-400',
+  rare: 'bg-sky-400',
+  epic: 'bg-violet-400',
+  legendary: 'bg-amber-400',
+};
+
 export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
   const config = RARITY_CONFIG[prize.rarity];
+  const glowColor = GLOW_COLORS[prize.rarity];
 
   const cardVariants: Variants = {
     hidden: { opacity: 0, scale: 0.5, rotateY: 90 },
@@ -86,42 +95,130 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/40 to-transparent opacity-60" />
 
-              <div className="absolute z-10 -translate-x-1/2 bottom-6 left-1/2">
-                {/* We removed the "Placeholder" logic entirely.
-                   Because we removed the spring physics, Rive can now load 
-                   instantly without glitching.
-                */}
+              <div className="absolute z-10 -translate-x-1/2 bottom-6 left-1/2 w-full flex justify-center items-center h-full pointer-events-none">
+                {/* === CINEMATIC GOD RAYS REVEAL === */}
+                
+                {/* 1. Rotating God Rays (Sharp, Premium Light Beams) */}
+                <motion.div
+                  key="rays"
+                  animate={
+                    showContent
+                      ? { opacity: 0, scale: 2, rotate: 180 }
+                      : { rotate: 360 }
+                  }
+                  transition={
+                    showContent
+                      ? { duration: 0.5, ease: 'easeIn' }
+                      : { duration: 20, repeat: Infinity, ease: 'linear' }
+                  }
+                  className={cn(
+                    'absolute w-[600px] h-[600px] opacity-40 mix-blend-plus-lighter',
+                    // Mapping rarity to TEXT colors so 'currentColor' works in the gradient
+                    {
+                      'text-slate-400': prize.rarity === 'common',
+                      'text-emerald-500': prize.rarity === 'uncommon',
+                      'text-sky-500': prize.rarity === 'rare',
+                      'text-violet-500': prize.rarity === 'epic',
+                      'text-amber-500': prize.rarity === 'legendary',
+                    }
+                  )}
+                  style={{
+                    background:
+                      'repeating-conic-gradient(from 0deg, transparent 0deg, transparent 15deg, currentColor 15deg, currentColor 20deg, transparent 20deg)',
+                    maskImage: 'radial-gradient(circle, black 30%, transparent 70%)',
+                    WebkitMaskImage: 'radial-gradient(circle, black 30%, transparent 70%)',
+                  }}
+                />
+
+                {/* 2. Anamorphic Lens Flare (Horizontal Streak) */}
+                <motion.div
+                   key="flare-h"
+                   animate={
+                     showContent
+                       ? { scaleX: 5, opacity: 0 }
+                       : { scaleX: [1, 1.5, 1], opacity: [0.8, 1, 0.8] }
+                   }
+                   transition={
+                     showContent
+                       ? { duration: 0.3 }
+                       : { duration: 3, repeat: Infinity, ease: 'easeInOut' }
+                   }
+                   className="absolute w-32 h-[2px] bg-white blur-[2px] shadow-[0_0_20px_10px_rgba(255,255,255,0.4)]"
+                />
+
+                {/* 3. Central Star/Flash (The Anchor) */}
+                <motion.div
+                  key="star"
+                  animate={
+                    showContent
+                      ? { scale: 5, opacity: 0 }
+                      : { scale: [1, 1.2, 1], rotate: [0, 45, 0] }
+                  }
+                  transition={
+                    showContent
+                       ? { duration: 0.4 }
+                       : { duration: 4, repeat: Infinity, ease: 'easeInOut' }
+                  }
+                  className="absolute w-8 h-8 bg-white rotate-45 blur-md shadow-[0_0_40px_rgba(255,255,255,0.8)]"
+                />
+
+                {/* === ACTUAL CONTENT REVEAL === */}
                 {showContent && (
-                  prize.slot === 'container' ? (
-                    <GiftRive width={230} height={230} />
-                  ) : (
-                    <Frog
-                      className="object-contain translate-y-[5%] md:translate-y-0"
-                      indices={{
-                        skin: prize.slot === 'skin' ? prize.riveIndex : 0,
-                        hat: prize.slot === 'hat' ? prize.riveIndex : 0,
-                        scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
-                        hand_item:
-                          prize.slot === 'hand_item' ? prize.riveIndex : 0,
-                      }}
-                      width={230}
-                      height={230}
-                    />
-                  )
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.5, y: 20 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    transition={{ 
+                      type: 'spring', 
+                      damping: 12, 
+                      stiffness: 200, 
+                      delay: 0.1 
+                    }}
+                    className="relative z-30 w-full h-full flex items-center justify-center"
+                  >
+                    {prize.slot === 'container' ? (
+                      <div className="w-[85%] h-[85%] drop-shadow-2xl">
+                        <GiftRive className="w-full h-full" />
+                      </div>
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center overflow-visible">
+                        <Frog
+                          className="w-[115%] h-[115%] object-contain translate-y-[5%]"
+                          indices={{
+                            skin: prize.slot === 'skin' ? prize.riveIndex : 0,
+                            hat: prize.slot === 'hat' ? prize.riveIndex : 0,
+                            scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
+                            hand_item:
+                              prize.slot === 'hand_item' ? prize.riveIndex : 0,
+                          }}
+                          width={300}
+                          height={300}
+                        />
+                      </div>
+                    )}
+                  </motion.div>
                 )}
               </div>
             </div>
           </div>
 
           {/* Footer Info */}
-          <div className="flex flex-col items-center justify-center h-24 p-4 border-t bg-white/50 dark:bg-black/20 backdrop-blur-sm border-black/5 dark:border-white/5">
+          <motion.div
+            initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+            animate={
+              showContent
+                ? { opacity: 1, y: 0, filter: 'blur(0px)' }
+                : { opacity: 0, y: 10, filter: 'blur(4px)' }
+            }
+            transition={{ duration: 0.5, delay: 0.2, ease: 'easeOut' }}
+            className="flex flex-col items-center justify-center h-24 p-4 border-t bg-white/50 dark:bg-black/20 backdrop-blur-sm border-black/5 dark:border-white/5"
+          >
             <h3 className="mb-1 text-2xl font-black leading-none text-center text-slate-800 dark:text-white">
               {prize.name}
             </h3>
             <p className="text-sm font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
               {prize.slot.replace('_', ' ')}
             </p>
-          </div>
+          </motion.div>
         </div>
       </div>
 
