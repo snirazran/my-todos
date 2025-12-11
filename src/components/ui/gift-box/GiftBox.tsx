@@ -16,8 +16,8 @@ export const GiftRive = ({
   const [shouldRender, setShouldRender] = useState(false);
 
   useEffect(() => {
-    // Delay rendering slightly to allow parent layout/animations to settle
-    const timer = setTimeout(() => setShouldRender(true), 100);
+    // Increase delay to ensure spring animation settles before measuring layout
+    const timer = setTimeout(() => setShouldRender(true), 500);
     return () => clearTimeout(timer);
   }, []);
 
@@ -35,9 +35,14 @@ export const GiftRive = ({
         width: width ?? '100%',
         height: height ?? '100%',
         display: 'block',
+        overflow: 'hidden',
       }}
     >
-      {shouldRender && <RiveComponent className="w-full h-full" />}
+      {shouldRender && (
+        <RiveComponent
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
+      )}
     </div>
   );
 };
