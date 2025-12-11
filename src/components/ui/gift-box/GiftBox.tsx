@@ -3,8 +3,11 @@ import { motion, Variants } from 'framer-motion';
 import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
 import { cn } from '@/lib/utils';
 
+// Define layout outside component to maintain reference stability
+const RIVE_LAYOUT = new Layout({ fit: Fit.Contain, alignment: Alignment.Center });
+
 // --- FIXED: Removed all delay logic, just simple rendering ---
-export const GiftRive = ({
+export const GiftRive = React.memo(({
   width,
   height,
   className,
@@ -17,7 +20,7 @@ export const GiftRive = ({
     src: '/idle_gift.riv',
     stateMachines: 'State Machine 1',
     autoplay: true,
-    layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
+    layout: RIVE_LAYOUT,
   });
 
   return (
@@ -34,7 +37,10 @@ export const GiftRive = ({
       />
     </div>
   );
-};
+});
+
+// Display name for debugging
+GiftRive.displayName = 'GiftRive';
 
 type GiftBoxProps = {
   phase: 'idle' | 'shaking' | 'revealed';
