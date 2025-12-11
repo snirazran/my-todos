@@ -88,13 +88,16 @@ export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
         className="mt-4 space-y-2 text-center"
       >
         <h2 className="text-4xl font-black text-white uppercase tracking-widest drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
-          {phase === 'shaking'
-            ? loadingText || 'Unwrapping...'
-            : 'Tap to Unwrap'}
+          {phase === 'shaking' ? 'UNWRAPPING...' : 'TAP TO UNWRAP'}
         </h2>
         {phase === 'idle' && (
           <p className="text-lg font-bold tracking-wide text-slate-300">
             Mystery Gift
+          </p>
+        )}
+        {phase === 'shaking' && (
+          <p className="text-base font-bold text-slate-300 animate-pulse min-h-[1.5em]">
+            {loadingText}
           </p>
         )}
       </motion.div>
