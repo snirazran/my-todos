@@ -78,7 +78,6 @@ export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
         animate={phase}
         className="relative w-72 h-72 md:w-96 md:h-96"
       >
-        <div className="absolute inset-10 bg-amber-400/30 blur-[60px] rounded-full animate-pulse" />
         <GiftRive />
       </motion.div>
 
@@ -87,7 +86,7 @@ export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
         animate={{ opacity: 1, y: 0, transition: { delay: 0.3 } }}
         className="mt-4 space-y-2 text-center"
       >
-        <h2 className="text-4xl font-black text-white uppercase tracking-widest drop-shadow-[0_4px_10px_rgba(0,0,0,0.5)]">
+        <h2 className="text-4xl font-black text-white uppercase tracking-widest">
           {phase === 'shaking' ? 'UNWRAPPING...' : 'TAP TO UNWRAP'}
         </h2>
         {phase === 'idle' && (

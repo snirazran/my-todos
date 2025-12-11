@@ -158,7 +158,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                     )}
                   >
                     {prize.slot === 'container' ? (
-                      <div className="h-[90%] w-auto aspect-[282/381] mb-2 drop-shadow-2xl">
+                      <div className="h-[90%] w-auto aspect-[282/381] mb-2">
                         <GiftRive className="w-full h-full" />
                       </div>
                     ) : (
@@ -202,34 +202,30 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
         </div>
       </div>
 
-      {/* Claim Button - We can keep spring here as it doesn't contain Rive */}
+      {/* Claim Button - Simplified animation for better performance */}
       <motion.button
         initial="hidden"
         animate={showContent ? 'visible' : 'hidden'}
         variants={{
-          hidden: { opacity: 0, y: 40, scale: 0.9 },
+          hidden: { opacity: 0, y: 20, scale: 0.95 },
           visible: {
             opacity: 1,
             y: 0,
             scale: 1,
             transition: {
               delay: 0.2,
-              type: 'spring',
-              stiffness: 300,
-              damping: 20,
-              mass: 0.8,
+              duration: 0.4,
+              ease: 'easeOut',
             },
           },
         }}
         onClick={handleClaimClick}
         disabled={isProcessing}
         className={cn(
-          'group relative mt-10 w-full max-w-[280px] py-4 rounded-2xl font-black text-lg shadow-[0_10px_30px_-10px_rgba(0,0,0,0.5)] transition-all active:scale-95 flex items-center justify-center gap-3 overflow-hidden',
+          'group relative mt-10 w-full max-w-[280px] py-4 rounded-2xl font-black text-lg shadow-xl transition-all active:scale-95 hover:brightness-110 flex items-center justify-center gap-3 overflow-hidden',
           config.button
         )}
       >
-        <div className="absolute inset-0 z-10 -translate-x-full group-hover:animate-shine bg-gradient-to-r from-transparent via-white/30 to-transparent" />
-
         {isProcessing ? (
           <>
             <Loader2 className="relative z-20 w-5 h-5 animate-spin" />
