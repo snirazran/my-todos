@@ -1,29 +1,43 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, Variants } from 'framer-motion';
 import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
+
+import { cn } from '@/lib/utils';
 
 export const GiftRive = ({
   width,
   height,
+  className,
 }: {
   width?: number;
   height?: number;
+  className?: string;
 }) => {
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    // Delay rendering slightly to allow parent layout/animations to settle
+    const timer = setTimeout(() => setShouldRender(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
   const { RiveComponent } = useRive({
     src: '/idle_gift.riv',
     stateMachines: 'State Machine 1',
     autoplay: true,
     layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
   });
+
   return (
     <div
+      className={className}
       style={{
         width: width ?? '100%',
         height: height ?? '100%',
         display: 'block',
       }}
     >
-      <RiveComponent className="w-full h-full" />
+      {shouldRender && <RiveComponent className="w-full h-full" />}
     </div>
   );
 };
