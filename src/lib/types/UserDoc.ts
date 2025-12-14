@@ -4,6 +4,7 @@ import type { WardrobeSlot } from '@/lib/skins/catalog';
 export type DailyFlyProgress = {
   date: string; // YYYY-MM-DD (local)
   earned: number;
+  giftsEarned?: number; // Explicit count of gifts earned today
   taskIds?: string[]; // task ids that already rewarded today
   limitNotified?: boolean; // whether we already surfaced the limit banner today
 };

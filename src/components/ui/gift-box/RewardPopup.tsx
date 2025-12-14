@@ -36,20 +36,9 @@ export function RewardPopup({ show, onClose }: RewardPopupProps) {
     : RARITY_CONFIG.common;
 
   const handleClaimReward = async () => {
-    setClaiming(true);
-    try {
-      await fetch('/api/skins/inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: 'gift_box_1' }),
-      });
-      onClose();
-    } catch (e) {
-      console.error(e);
-      onClose();
-    } finally {
-      setClaiming(false);
-    }
+    // The gift is already awarded by the task completion logic (backend).
+    // We just close the popup to acknowledge.
+    onClose();
   };
 
   const handleBackdropClick = () => {
@@ -97,10 +86,10 @@ export function RewardPopup({ show, onClose }: RewardPopupProps) {
             >
               <div className="mb-8 text-center">
                 <h2 className="text-3xl font-black text-white uppercase tracking-widest drop-shadow-md">
-                  Tasks Complete!
+                  Milestone Reached!
                 </h2>
                 <p className="mt-2 text-lg font-bold text-slate-300">
-                  You earned a reward
+                  You earned a gift box
                 </p>
               </div>
               <RewardCard

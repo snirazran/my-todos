@@ -21,6 +21,7 @@ type LeanUser = (UserDoc & { _id: Types.ObjectId }) | null;
 type FlyStatus = {
   balance: number;
   earnedToday: number;
+  giftsEarnedToday: number;
   limit: number;
   limitHit: boolean;
   justHitLimit?: boolean;
@@ -81,6 +82,7 @@ function isBoardMode(req: NextRequest) {
 const initDailyFly = (date: string): DailyFlyProgress => ({
   date,
   earned: 0,
+  giftsEarned: 0,
   taskIds: [],
   limitNotified: false,
 });
@@ -92,6 +94,7 @@ function normalizeDailyFly(
   if (flyDaily?.date === today) {
     return {
       ...flyDaily,
+      giftsEarned: flyDaily.giftsEarned ?? 0,
       taskIds: flyDaily.taskIds ?? [],
       limitNotified: flyDaily.limitNotified ?? false,
     };
@@ -107,6 +110,7 @@ async function currentFlyStatus(userId: Types.ObjectId): Promise<FlyStatus> {
     return {
       balance: 0,
       earnedToday: 0,
+      giftsEarnedToday: 0,
       limit: DAILY_FLY_LIMIT,
       limitHit: false,
     };
@@ -135,6 +139,7 @@ async function currentFlyStatus(userId: Types.ObjectId): Promise<FlyStatus> {
   return {
     balance: wardrobe.flies ?? 0,
     earnedToday: daily.earned,
+    giftsEarnedToday: daily.giftsEarned ?? 0,
     limit: DAILY_FLY_LIMIT,
     limitHit: daily.earned >= DAILY_FLY_LIMIT,
   };
@@ -153,6 +158,7 @@ async function awardFlyForTask(
       flyStatus: {
         balance: 0,
         earnedToday: 0,
+        giftsEarnedToday: 0,
         limit: DAILY_FLY_LIMIT,
         limitHit: false,
       },
@@ -180,6 +186,7 @@ async function awardFlyForTask(
       flyStatus: {
         balance: wardrobe.flies ?? 0,
         earnedToday: daily.earned,
+        giftsEarnedToday: daily.giftsEarned ?? 0,
         limit: DAILY_FLY_LIMIT,
         limitHit: daily.earned >= DAILY_FLY_LIMIT,
         justHitLimit: atLimit && !limitNotified ? true : undefined,
@@ -189,9 +196,43 @@ async function awardFlyForTask(
 
   const nextEarned = daily.earned + 1;
   const hitLimit = nextEarned >= DAILY_FLY_LIMIT;
+  
+  // --- Dynamic Gift Logic ---
+  const dow = dowLocalFromYMD(today);
+  const potentialTasks = await TaskModel.find({
+    userId,
+    deletedAt: { $exists: false },
+    $or: [
+      { type: 'weekly', dayOfWeek: dow },
+      { type: 'regular', date: today },
+    ],
+  }, { suppressedDates: 1 }).lean<TaskDoc[]>();
+
+  const activeTaskCount = potentialTasks.filter(
+    (t: TaskDoc) => !(t.suppressedDates ?? []).includes(today)
+  ).length;
+
+  let milestones: number[] = [];
+  if (activeTaskCount > 0) {
+      if (activeTaskCount <= 3) {
+          milestones = Array.from({length: activeTaskCount}, (_, i) => i + 1);
+      } else {
+          milestones = [
+              Math.ceil(activeTaskCount * 0.33),
+              Math.ceil(activeTaskCount * 0.66),
+              activeTaskCount
+          ];
+      }
+  }
+  milestones = [...new Set(milestones)];
+
+  const awardedGift = milestones.includes(nextEarned);
+  const nextGiftsEarned = (daily.giftsEarned ?? 0) + (awardedGift ? 1 : 0);
+
   const nextDaily: DailyFlyProgress = {
     date: today,
     earned: nextEarned,
+    giftsEarned: nextGiftsEarned,
     taskIds: Array.from(new Set([...(daily.taskIds ?? []), taskId])),
     limitNotified: limitNotified || hitLimit,
   };
@@ -203,10 +244,18 @@ async function awardFlyForTask(
   if (!user.wardrobe?.equipped) setFields['wardrobe.equipped'] = {};
   if (!user.wardrobe?.inventory) setFields['wardrobe.inventory'] = {};
 
+  const incFields: Record<string, number> = {
+    'wardrobe.flies': 1,
+  };
+
+  if (awardedGift) {
+    incFields['wardrobe.inventory.gift_box_1'] = 1;
+  }
+
   await UserModel.updateOne(
     { _id: user._id },
     {
-      $inc: { 'wardrobe.flies': 1 },
+      $inc: incFields,
       $set: setFields,
     }
   );
@@ -216,6 +265,7 @@ async function awardFlyForTask(
     flyStatus: {
       balance: nextBalance,
       earnedToday: nextEarned,
+      giftsEarnedToday: nextGiftsEarned,
       limit: DAILY_FLY_LIMIT,
       limitHit: hitLimit,
       justHitLimit: hitLimit && !limitNotified ? true : undefined,
