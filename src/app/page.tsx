@@ -40,7 +40,6 @@ interface Task {
 type FlyStatus = {
   balance: number;
   earnedToday: number;
-  giftsEarnedToday: number;
   limit: number;
   limitHit: boolean;
   justHitLimit?: boolean;
@@ -76,7 +75,6 @@ export default function Home() {
   const [flyStatus, setFlyStatus] = useState<FlyStatus>({
     balance: 0,
     earnedToday: 0,
-    giftsEarnedToday: 0,
     limit: 15,
     limitHit: false,
   });
@@ -124,7 +122,11 @@ export default function Home() {
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
   const flyBalance = session ? flyStatus.balance : undefined;
 
-
+  useEffect(() => {
+    if (rate === 100 && data.length > 0) {
+      setShowReward(true);
+    }
+  }, [rate, data.length]);
 
   const refreshToday = useCallback(async () => {
     if (!session) return;
@@ -208,11 +210,7 @@ export default function Home() {
       if (res.ok) {
         try {
           const body = await res.json();
-          const newFlyStatus = body?.flyStatus;
-          if (newFlyStatus && newFlyStatus.giftsEarnedToday > flyStatus.giftsEarnedToday) {
-             setShowReward(true);
-          }
-          applyFlyStatus(newFlyStatus);
+          applyFlyStatus(body?.flyStatus);
         } catch {}
       }
     } else {
@@ -300,12 +298,7 @@ export default function Home() {
               flyBalance={flyBalance}
             />
             <div className="w-full">
-              <ProgressCard 
-                rate={rate} 
-                done={doneCount} 
-                total={data.length} 
-                earnedToday={flyStatus.earnedToday}
-              />
+              <ProgressCard rate={rate} done={doneCount} total={data.length} />
             </div>
           </div>
 
