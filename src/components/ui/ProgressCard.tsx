@@ -1,122 +1,199 @@
 'use client';
 
-import React from 'react';
-import { Sparkles, Check } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Check, Lock, Trophy, Zap, Target } from 'lucide-react';
 import Image from 'next/image';
 
 interface ProgressCardProps {
   rate: number;
   done: number;
   total: number;
-  giftsClaimed: number; // <--- NEW PROP
+  giftsClaimed: number;
 }
 
 export default function ProgressCard({
   rate,
   done,
   total,
-  giftsClaimed = 0, // Default to 0
+  giftsClaimed = 0,
 }: ProgressCardProps) {
   const safeTotal = Math.max(1, total);
 
   // === LOGIC ===
-  const getMilestones = (t: number) => {
-    if (t === 0) return [];
+  const milestones = useMemo(() => {
+    if (total === 0) return [];
     let giftsAllowed = 3;
-    if (t <= 2) giftsAllowed = 1;
-    else if (t <= 5) giftsAllowed = 2;
+    if (total <= 2) giftsAllowed = 1;
+    else if (total <= 5) giftsAllowed = 2;
     else giftsAllowed = 3;
 
     const results: number[] = [];
     for (let i = 1; i <= giftsAllowed; i++) {
-      results.push(Math.round((i * t) / giftsAllowed));
+      results.push(Math.round((i * total) / giftsAllowed));
     }
     return Array.from(new Set(results)).sort((a, b) => a - b);
-  };
+  }, [total]);
 
-  const milestones = getMilestones(total);
+  // Identify next milestone
+  const nextMilestoneIndex = milestones.findIndex((m) => done < m);
+  const nextMilestoneValue =
+    nextMilestoneIndex !== -1 ? milestones[nextMilestoneIndex] : null;
+  const tasksToNext = nextMilestoneValue ? nextMilestoneValue - done : 0;
+  const remaining = total - done;
+
+  // === TEXT LOGIC ===
+  let title = 'Daily Progress';
+  let subtitle = 'Start completing tasks';
+  let icon = <Target className="w-5 h-5 text-slate-400" />;
+
+  if (total === 0) {
+    title = 'Ready to Start?';
+    subtitle = 'Add tasks to earn rewards!';
+  } else if (done === total) {
+    if (total < 3) {
+      title = 'Daily Goal Met!';
+      subtitle = 'Tip: Add 3+ tasks for a 2nd gift!';
+    } else if (total >= 3 && total < 6) {
+      title = 'Great Work!';
+      subtitle = 'Tip: Add 6+ tasks for a 3rd gift!';
+    } else {
+      title = 'All Clear!';
+      subtitle = 'You cleared the board. Amazing!';
+    }
+    icon = <Trophy className="w-5 h-5 text-yellow-500" fill="currentColor" />;
+  } else if (nextMilestoneValue) {
+    title = tasksToNext === 1 ? 'Loot In Sight!' : 'Keep Going!';
+    subtitle =
+      tasksToNext === 1
+        ? 'Just 1 task to your next reward.'
+        : `${tasksToNext} tasks to the next reward.`;
+    icon = <Zap className="w-5 h-5 text-amber-500" fill="currentColor" />;
+  } else {
+    // Finished gifts but tasks remain
+    title = 'Finishing Move!';
+    subtitle = `${remaining} tasks left. You got this!`;
+    icon = <Target className="w-5 h-5 text-blue-500" />;
+  }
 
   return (
     <div
       dir="ltr"
-      className="z-10 p-6 mb-6 rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm"
+      className="relative z-10 p-5 mb-6 rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm overflow-visible"
     >
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="flex items-center gap-2 text-xl font-black text-slate-900 dark:text-white">
-          <Sparkles className="w-6 h-6 text-purple-500" />
-          Your progress today
-        </h2>
-        <span className="text-3xl font-bold text-slate-900 dark:text-white">
-          {Math.round(rate)}%
-        </span>
+      {/* Top Row: Info & Stats */}
+      <div className="flex items-start justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-11 h-11 rounded-xl bg-white dark:bg-slate-800 shadow-sm border border-slate-100 dark:border-slate-700 shrink-0">
+            {icon}
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white leading-tight">
+              {title}
+            </h2>
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mt-0.5">
+              {subtitle}
+            </p>
+          </div>
+        </div>
+        
+        {/* Right Side Stats */}
+        <div className="text-right">
+          <div className="flex items-baseline justify-end gap-1">
+            <span className="text-2xl font-black text-slate-900 dark:text-white">
+              {done}
+            </span>
+            <span className="text-sm font-bold text-slate-400 dark:text-slate-500">
+              / {total}
+            </span>
+          </div>
+          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+            Tasks Done
+          </p>
+        </div>
       </div>
 
-      <div className="relative w-full h-12 mt-8 overflow-visible select-none">
-        {/* Track Background */}
-        <div className="absolute left-0 w-full h-3 -translate-y-1/2 rounded-full top-1/2 bg-slate-200 dark:bg-slate-700" />
+      {/* Progress Bar Container */}
+      <div className="relative h-10 mt-2 select-none flex items-center">
+        {/* Track */}
+        <div className="absolute left-0 w-full h-3 rounded-full bg-slate-200 dark:bg-slate-800 border border-slate-100 dark:border-slate-700" />
 
-        {/* Track Fill */}
+        {/* Fill */}
         <div
-          className="absolute top-1/2 left-0 h-3 -translate-y-1/2 rounded-full transition-all duration-500 ease-out bg-gradient-to-r from-purple-500 via-indigo-500 to-pink-500 shadow-[0_0_12px_rgba(124,58,237,0.45)]"
+          className="absolute left-0 h-3 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 shadow-[0_0_10px_rgba(168,85,247,0.4)] transition-all duration-700 ease-out"
           style={{ width: `${Math.min(100, Math.max(0, rate))}%` }}
         />
 
-        {/* Gifts Overlay */}
-        <div className="absolute top-0 left-0 z-50 w-full h-full pointer-events-none">
+        {/* Milestones */}
+        <div className="absolute inset-0 pointer-events-none">
           {milestones.map((milestoneTaskIndex, index) => {
-            // LOGIC UPDATE:
-            // 1. A gift is "reached" if we have done enough tasks.
             const isReached = done >= milestoneTaskIndex;
-
-            // 2. A gift is "claimed" (green check) if the index (0, 1, or 2) is less than the count of gifts we have in the DB.
             const isClaimed = index < giftsClaimed;
+            const isNextTarget =
+              !isReached && milestoneTaskIndex === nextMilestoneValue;
 
-            // Calculate percentage position
+            // Position
             const pct = (milestoneTaskIndex / safeTotal) * 100;
             const leftPos = `${pct}%`;
 
             return (
               <div
                 key={milestoneTaskIndex}
-                className="absolute flex items-center justify-center w-10 h-10 transition-all duration-500 -translate-y-1/2 pointer-events-auto top-1/2"
-                style={{ left: leftPos, transform: 'translate(-50%, -50%)' }}
+                className="absolute top-1/2 -translate-y-1/2 flex items-center justify-center w-10 h-10"
+                style={{
+                  left: leftPos,
+                  transform: 'translate(-50%, -50%)',
+                }}
               >
-                <div className="relative flex items-center justify-center w-full h-full group">
-                  <div
-                    className={`transition-all duration-500 w-full h-full flex items-center justify-center ${
-                      isReached
-                        ? 'scale-125 drop-shadow-lg brightness-110'
-                        : 'scale-90 opacity-50 grayscale'
-                    }`}
-                  >
+                {/* 1. CLAIMED: Check Badge */}
+                {isClaimed && (
+                  <div className="z-10 flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white shadow-md ring-2 ring-white dark:ring-slate-900">
+                    <Check className="w-3.5 h-3.5" strokeWidth={4} />
+                  </div>
+                )}
+
+                {/* 2. NEXT TARGET: Bouncing Gift */}
+                {isNextTarget && !isClaimed && (
+                  <div className="z-20 relative w-11 h-11 pointer-events-auto drop-shadow-xl filter animate-bounce">
+                    {/* Tooltip hint */}
+                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap bg-slate-900 text-white text-[10px] font-bold px-2 py-0.5 rounded opacity-0 animate-[fadeIn_0.5s_ease-out_1s_forwards]">
+                      Goal
+                    </div>
                     <Image
                       src="/gift1.png"
                       alt={`Reward at task ${milestoneTaskIndex}`}
-                      width={40}
-                      height={40}
+                      width={44}
+                      height={44}
                       className="object-contain"
                       priority
                     />
                   </div>
+                )}
 
-                  {/* Render Checkmark ONLY if specifically claimed in DB */}
-                  {isClaimed && (
-                    <div className="absolute -bottom-1 -right-1 bg-green-500 text-white rounded-full p-0.5 border-2 border-white dark:border-slate-900 shadow-sm z-10">
-                      <Check className="w-2.5 h-2.5" strokeWidth={4} />
-                    </div>
-                  )}
-                </div>
+                {/* 3. FUTURE / LOCKED: Lock Node */}
+                {!isClaimed && !isNextTarget && (
+                  <div className="z-10 flex items-center justify-center w-6 h-6 rounded-full bg-slate-300 dark:bg-slate-700 ring-2 ring-white dark:ring-slate-900 shadow-inner">
+                    {isReached ? (
+                       <div className="w-2.5 h-2.5 bg-yellow-400 rounded-full animate-pulse" />
+                    ) : (
+                       <Lock className="w-3 h-3 text-slate-500 dark:text-slate-400" />
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       </div>
-
-      <p className="mt-6 text-sm font-medium text-center text-slate-600 dark:text-slate-400">
-        Completed{' '}
-        <span className="font-bold text-slate-900 dark:text-white">{done}</span>{' '}
-        of {total} tasks
-      </p>
+      
+      {/* Footer Stats (Remaining) */}
+      <div className="flex justify-between items-center text-[11px] font-bold text-slate-400 dark:text-slate-500 mt-1">
+         <span>{Math.round(rate)}% Complete</span>
+         {remaining > 0 ? (
+           <span>{remaining} Remaining</span>
+         ) : (
+           <span className="text-green-500">Completed</span>
+         )}
+      </div>
     </div>
   );
 }
