@@ -1,14 +1,27 @@
-// lib/types/UserDoc.ts
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 
 export type DailyFlyProgress = {
-  date: string; // YYYY-MM-DD (local)
+  date: string;
   earned: number;
-  taskIds?: string[]; // task ids that already rewarded today
-  limitNotified?: boolean; // whether we already surfaced the limit banner today
+  taskIds?: string[];
+  limitNotified?: boolean;
 };
 
-/** New multi-slot wardrobe */
+// --- UPDATED STATISTICS TYPES ---
+export type DailyStats = {
+  date: string;
+  dailyTasksCount: number;
+  dailyMilestoneGifts: number;
+  completedTaskIds: string[];
+  // [NEW] Tracks the task count when the last gift was claimed
+  taskCountAtLastGift: number;
+};
+
+export type UserStatistics = {
+  daily: DailyStats;
+};
+// ---------------------------
+
 export type UserWardrobe = {
   equipped: Partial<Record<WardrobeSlot, string | null>>;
   inventory: Record<string, number>;
@@ -16,7 +29,6 @@ export type UserWardrobe = {
   flyDaily?: DailyFlyProgress;
 };
 
-/** (legacy) single-slot skins – keep temporarily for migration only */
 export type UserSkins = {
   equippedId: string | null;
   inventory: Record<string, number>;
@@ -29,10 +41,7 @@ export type UserDoc = {
   email: string;
   passwordHash: string;
   createdAt: Date;
-
-  /** NEW field used by the updated API/UI */
   wardrobe?: UserWardrobe;
-
-  /** LEGACY field; remove after data migration */
   skins?: UserSkins;
+  statistics?: UserStatistics;
 };

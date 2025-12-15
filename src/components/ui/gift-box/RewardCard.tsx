@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, Variants } from 'framer-motion';
 import { Loader2, Sparkles } from 'lucide-react';
 import Frog from '@/components/ui/frog';
@@ -27,13 +27,22 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
   const config = RARITY_CONFIG[prize.rarity];
   const glowColor = GLOW_COLORS[prize.rarity];
 
+  useEffect(() => {
+    // If the parent says we are done claiming, reset our local loading state
+    if (!claiming) {
+      setLocalClaiming(false);
+    }
+  }, [claiming]);
+
   const handleClaimClick = () => {
-    setLocalClaiming(true);
-    // Simulate a small delay for the claiming process so the user sees the "Claiming..." state
-    // and the popup stays open for a moment with the content visible.
+    setLocalClaiming(true); // 1. You turn this ON
+
+    // 2. You wait 200ms and call the parent
     setTimeout(() => {
       onClaim();
     }, 200);
+
+    // 3. ❌ MISSING: You never setLocalClaiming(false) here or anywhere else.
   };
 
   const cardVariants: Variants = {
@@ -207,7 +216,9 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
         className={cn(
           'group relative mt-10 w-full max-w-[280px] py-4 rounded-2xl font-black text-lg shadow-xl transition-all duration-500 active:scale-95 hover:brightness-110 flex items-center justify-center gap-3 overflow-hidden',
           config.button,
-          showContent ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'
+          showContent
+            ? 'opacity-100 translate-y-0'
+            : 'opacity-0 translate-y-4 pointer-events-none'
         )}
       >
         {isProcessing ? (

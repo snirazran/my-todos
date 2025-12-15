@@ -66,12 +66,15 @@ export default function TaskList({
       const id = (e as CustomEvent<{ id?: string }>).detail?.id;
       setMenuFor((curr) => (curr && curr !== id ? null : curr));
     };
+
     window.addEventListener('task-menu-open', closeIfOther as EventListener);
-    return () =>
+
+    return () => {
       window.removeEventListener(
         'task-menu-open',
         closeIfOther as EventListener
       );
+    };
   }, []);
 
   const taskKind = (t: Task) => {
@@ -111,6 +114,29 @@ export default function TaskList({
   const dialogVariant: 'regular' | 'weekly' | 'backlog' = dialog
     ? taskKind(dialog.task)
     : 'regular';
+
+  // --- NEW: Intercept toggle to update statistics ---
+  const handleTaskToggle = (task: Task, forceState?: boolean) => {
+    // Determine if we are completing the task (either explicitly true, or implicitly toggling from false)
+    const isCompleting =
+      forceState === true || (forceState === undefined && !task.completed);
+
+    if (isCompleting) {
+      // Fire and forget the stats update
+      fetch('/api/statistics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'complete_task',
+          taskId: task.id,
+        }),
+      }).catch((err) => console.error('Failed to update stats', err));
+    }
+
+    // Call the original prop to update UI
+    toggle(task.id, forceState);
+  };
+  // -------------------------------------------------
 
   return (
     <>
@@ -157,16 +183,15 @@ export default function TaskList({
                     layout: { type: 'spring', stiffness: 300, damping: 30 },
                   }}
                   key={task.id}
-                  // IMPORTANT: Z-Index logic here fixes the clipping/overlap issue
                   className={`group relative ${isMenuOpen ? 'z-50' : 'z-auto'}`}
                   style={{
-                    // Ensure active menu item stays on top of subsequent items
                     zIndex: isMenuOpen ? 50 : 1,
                   }}
                 >
                   {/* Row */}
                   <div
-                    onClick={() => toggle(task.id)}
+                    // UPDATED: Use handleTaskToggle instead of toggle directly
+                    onClick={() => handleTaskToggle(task)}
                     className={`
                     relative flex items-center gap-4 px-3 py-3.5 
                     transition-all duration-200 cursor-pointer rounded-xl 
@@ -200,7 +225,8 @@ export default function TaskList({
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  toggle(task.id, true);
+                                  // UPDATED: Use handleTaskToggle with true
+                                  handleTaskToggle(task, true);
                                 }}
                                 className="flex items-center justify-center w-full h-full transition-colors text-slate-300 hover:text-violet-500"
                               >
@@ -224,7 +250,8 @@ export default function TaskList({
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                toggle(task.id, false);
+                                // UPDATED: Use handleTaskToggle with false (undo)
+                                handleTaskToggle(task, false);
                               }}
                             >
                               <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
@@ -237,7 +264,7 @@ export default function TaskList({
                     <motion.span
                       className="flex-1 text-base font-medium md:text-lg"
                       animate={{
-                        color: isDone ? 'rgb(148 163 184)' : 'rgb(30 41 59)', // slate-400 vs slate-800
+                        color: isDone ? 'rgb(148 163 184)' : 'rgb(30 41 59)',
                         textDecorationLine: isDone ? 'line-through' : 'none',
                         opacity: isDone ? 0.8 : 1,
                       }}
@@ -259,7 +286,6 @@ export default function TaskList({
                       `}
                         onClick={(e) => {
                           e.stopPropagation();
-                          // Dispatch event to close other menus
                           window.dispatchEvent(
                             new CustomEvent('task-menu-open', {
                               detail: { id: `task:${task.id}` },

@@ -1,15 +1,8 @@
+// lib/models/User.ts
 import mongoose, { Schema, type Model } from 'mongoose';
-import type { UserSkins, UserWardrobe } from '@/lib/types/UserDoc';
+import type { UserDoc } from '@/lib/types/UserDoc';
 
-export interface UserDoc {
-  _id?: mongoose.Types.ObjectId;
-  name: string;
-  email: string;
-  passwordHash: string;
-  createdAt: Date;
-  wardrobe?: UserWardrobe;
-  skins?: UserSkins;
-}
+export type { UserDoc };
 
 const UserSchema = new Schema<UserDoc>(
   {
@@ -22,12 +15,26 @@ const UserSchema = new Schema<UserDoc>(
       default: () => ({ equipped: {}, inventory: {}, flies: 0 }),
     },
     skins: { type: Schema.Types.Mixed },
+
+    statistics: {
+      daily: {
+        date: { type: String, default: '' },
+        dailyTasksCount: { type: Number, default: 0 },
+        dailyMilestoneGifts: { type: Number, default: 0 },
+        completedTaskIds: { type: [String], default: [] },
+        // This is the new field that was missing
+        taskCountAtLastGift: { type: Number, default: 0 },
+      },
+    },
   },
   { collection: 'users' }
 );
 
-const UserModel: Model<UserDoc> =
-  (mongoose.models.User as Model<UserDoc>) ||
-  mongoose.model<UserDoc>('User', UserSchema);
+// FIX: Delete the model if it exists to force a recompile with new fields
+if (mongoose.models.User) {
+  delete mongoose.models.User;
+}
+
+const UserModel: Model<UserDoc> = mongoose.model<UserDoc>('User', UserSchema);
 
 export default UserModel;

@@ -101,7 +101,9 @@ function normalizeDailyFly(
 
 async function currentFlyStatus(userId: Types.ObjectId): Promise<FlyStatus> {
   const today = ymdLocal(new Date());
-  const user = (await UserModel.findById(userId, { wardrobe: 1 }).lean()) as LeanUser;
+  const user = (await UserModel.findById(userId, {
+    wardrobe: 1,
+  }).lean()) as LeanUser;
 
   if (!user) {
     return {
@@ -145,7 +147,9 @@ async function awardFlyForTask(
   taskId: string
 ): Promise<{ awarded: boolean; flyStatus: FlyStatus }> {
   const today = ymdLocal(new Date());
-  const user = (await UserModel.findById(userId, { wardrobe: 1 }).lean()) as LeanUser;
+  const user = (await UserModel.findById(userId, {
+    wardrobe: 1,
+  }).lean()) as LeanUser;
 
   if (!user) {
     return {
@@ -501,11 +505,24 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
 
   const flyStatus = await currentFlyStatus(userId);
 
+  // === NEW: FETCH GIFT COUNT ===
+  // We match the 'writer' logic from /api/statistics which uses ISO String
+  const todayISO = new Date().toISOString().split('T')[0];
+  const userForStats = (await UserModel.findById(userId, {
+    statistics: 1,
+  }).lean()) as LeanUser;
+
+  let dailyGiftCount = 0;
+  if (userForStats?.statistics?.daily?.date === todayISO) {
+    dailyGiftCount = userForStats.statistics.daily.dailyMilestoneGifts ?? 0;
+  }
+
   return NextResponse.json({
     date,
     tasks: output,
     weeklyIds: Array.from(weeklyIdsForUI),
     flyStatus,
+    dailyGiftCount, // <--- Return to frontend
   });
 }
 

@@ -58,13 +58,34 @@ const demoTasks: Task[] = [
   },
 ];
 
+// === NEW HELPER: Calculate where the gifts should occur ===
+// === NEW HELPER: Calculate where the gifts should occur ===
+function getMilestones(totalTasks: number): number[] {
+  if (totalTasks === 0) return [];
+
+  // Determine how many gifts allowed based on task load
+  let giftsAllowed = 3;
+
+  // Updated to match ProgressCard:
+  if (totalTasks <= 2) giftsAllowed = 1; // 1-2 tasks -> 1 gift
+  else if (totalTasks <= 5) giftsAllowed = 2; // 3-5 tasks -> 2 gifts
+  else giftsAllowed = 3; // 6+ tasks -> 3 gifts!
+
+  // Calculate specific task indices
+  const milestones: number[] = [];
+  for (let i = 1; i <= giftsAllowed; i++) {
+    milestones.push(Math.round((i * totalTasks) / giftsAllowed));
+  }
+
+  return Array.from(new Set(milestones));
+}
 export default function Home() {
   const { data: session, status } = useSession();
   const sessionLoading = status === 'loading';
   const router = useRouter();
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
-
+  const isInitialLoad = useRef(true);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [openWardrobe, setOpenWardrobe] = useState(false);
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
@@ -78,16 +99,16 @@ export default function Home() {
     limit: 15,
     limitHit: false,
   });
+
+  const [dailyGiftCount, setDailyGiftCount] = useState(0);
+  const [lastGiftTaskCount, setLastGiftTaskCount] = useState(0);
+
   const [laterThisWeek, setLaterThisWeek] = useState<
     { id: string; text: string }[]
   >([]);
 
-  // UI State for Tabs
   const [activeTab, setActiveTab] = useState<'today' | 'backlog'>('today');
-
   const [isAnimating, setIsAnimating] = useState(false);
-
-  // Reward State
   const [showReward, setShowReward] = useState(false);
 
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
@@ -119,14 +140,40 @@ export default function Home() {
   const dateStr = format(today, 'yyyy-MM-dd');
   const data = session ? tasks : guestTasks;
   const doneCount = data.filter((t) => t.completed).length;
+  // Note: We don't rely purely on 'rate' anymore for triggering, but we keep it for the progress bar
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
   const flyBalance = session ? flyStatus.balance : undefined;
 
+  // === UPDATED TRIGGER LOGIC ===
   useEffect(() => {
-    if (rate === 100 && data.length > 0) {
+    // 1. SAFETY LOCK: Don't do anything while loading
+    if (loading) return;
+
+    // 2. SAFETY LOCK: If this is the very first time data loaded,
+    // simply "acknowledge" the current state but DO NOT trigger the popup.
+    if (isInitialLoad.current) {
+      isInitialLoad.current = false;
+      return;
+    }
+
+    // 1. Calculate milestones
+    const milestones = getMilestones(data.length);
+
+    // 2. Determine target
+    const nextMilestoneTarget = milestones[dailyGiftCount];
+
+    // 3. Trigger Condition
+    if (
+      data.length > 0 &&
+      !showReward &&
+      dailyGiftCount < 3 &&
+      nextMilestoneTarget !== undefined &&
+      doneCount >= nextMilestoneTarget
+    ) {
       setShowReward(true);
     }
-  }, [rate, data.length]);
+    // IMPORTANT: Add 'loading' to the dependency array
+  }, [doneCount, data.length, dailyGiftCount, showReward, loading]);
 
   const refreshToday = useCallback(async () => {
     if (!session) return;
@@ -135,6 +182,9 @@ export default function Home() {
     setTasks(json.tasks ?? []);
     setWeeklyIds(new Set(json.weeklyIds ?? []));
     applyFlyStatus(json.flyStatus);
+
+    setDailyGiftCount(json.dailyGiftCount || 0);
+    setLastGiftTaskCount(json.taskCountAtLastGift || 0);
   }, [session, dateStr, applyFlyStatus]);
 
   useEffect(() => {
@@ -154,6 +204,9 @@ export default function Home() {
         setTasks(json.tasks ?? []);
         setWeeklyIds(new Set(json.weeklyIds ?? []));
         applyFlyStatus(json.flyStatus);
+
+        setDailyGiftCount(json.dailyGiftCount || 0);
+        setLastGiftTaskCount(json.taskCountAtLastGift || 0);
       } finally {
         setLoading(false);
       }
@@ -182,23 +235,17 @@ export default function Home() {
 
   const persistTask = async (taskId: string, completed: boolean) => {
     if (session) {
-      // 1. Immediate toggle (updates UI icon)
       setTasks((prev) =>
         prev.map((t) => (t.id === taskId ? { ...t, completed } : t))
       );
 
-      // 2. Delayed sort (triggers slide animation)
       if (completed) {
         setIsAnimating(true);
         setTimeout(() => {
           setTasks((prev) => sortTasks(prev));
-          // Wait for Framer Motion spring to settle (approx 400ms)
           setTimeout(() => setIsAnimating(false), 400);
         }, 250);
       } else {
-        // If unchecking, maybe sort immediately or same delay?
-        // Let's do same delay for consistency, or immediate?
-        // Usually unchecking moves it up. Immediate feels more responsive for undo.
         setTasks((prev) => sortTasks(prev));
       }
 
@@ -214,13 +261,12 @@ export default function Home() {
         } catch {}
       }
     } else {
-      // Guest logic
       setGuestTasks((prev) => {
         const toggled = prev.map((t) =>
           t.id === taskId ? { ...t, completed } : t
         );
         if (completed) {
-          return toggled; // Return unsorted first
+          return toggled;
         }
         return sortTasks(toggled);
       });
@@ -260,11 +306,9 @@ export default function Home() {
 
   return (
     <main className="min-h-screen pb-24 md:pb-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
-      {/* 1. Header (Date Info) */}
       <div className="px-4 py-6 mx-auto max-w-7xl md:px-8">
         <Header session={session} router={router} />
 
-        {/* Guest Intro Banner */}
         {!session && (
           <div className="relative p-6 mb-8 overflow-hidden text-center rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm md:p-8">
             <h2 className="mb-3 text-xl font-bold md:text-2xl text-slate-900 dark:text-white">
@@ -282,10 +326,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 2. THE GRID LAYOUT */}
         <div className="relative grid items-start grid-cols-1 gap-8 lg:grid-cols-12">
-          {/* LEFT COLUMN: Sticky Frog & Progress (Desktop: 4 cols) */}
-          {/* On Mobile: Shows at top */}
           <div className="z-10 flex flex-col gap-6 lg:col-span-4 lg:sticky lg:top-8">
             <FrogDisplay
               frogRef={frogRef}
@@ -298,20 +339,22 @@ export default function Home() {
               flyBalance={flyBalance}
             />
             <div className="w-full">
-              <ProgressCard rate={rate} done={doneCount} total={data.length} />
+              <ProgressCard
+                rate={rate}
+                done={doneCount}
+                total={data.length}
+                giftsClaimed={dailyGiftCount}
+              />
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Tasks & Backlog (Desktop: 8 cols) */}
           <div
             className="flex flex-col gap-6 lg:col-span-8"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
-            {/* 3. SEGMENTED CONTROL / TABS */}
             <div className="flex self-start w-full p-1 rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm md:w-auto">
               <button
                 onClick={() => setActiveTab('today')}
-                // Updated className to align text and badge
                 className={`
         flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2
         ${
@@ -322,7 +365,6 @@ export default function Home() {
       `}
               >
                 Today
-                {/* Added Badge Logic */}
                 {data.length > 0 && (
                   <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px]">
                     {data.length}
@@ -349,7 +391,6 @@ export default function Home() {
               </button>
             </div>
 
-            {/* 4. CONTENT AREA (Animate Switch) */}
             <div className="min-h-[400px]">
               {activeTab === 'today' ? (
                 <motion.div
@@ -430,7 +471,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* SVG Tongue Overlay (Keep exactly as is) */}
+      {/* SVG Tongue Overlay */}
       {grab && (
         <svg
           key={grab.startAt}
@@ -493,13 +534,15 @@ export default function Home() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, days, repeat }),
           });
-          // Refresh logic
           if (session) {
             const res = await fetch(`/api/tasks?date=${dateStr}`);
             const json = await res.json();
             setTasks(json.tasks ?? []);
             setWeeklyIds(new Set(json.weeklyIds ?? []));
             applyFlyStatus(json.flyStatus);
+
+            setDailyGiftCount(json.dailyGiftCount || 0);
+            setLastGiftTaskCount(json.taskCountAtLastGift || 0);
           } else {
             setGuestTasks((prev) => [
               ...prev,
@@ -509,12 +552,23 @@ export default function Home() {
           fetchBacklog();
         }}
       />
-      <RewardPopup show={showReward} onClose={() => setShowReward(false)} />
+
+      <RewardPopup
+        show={showReward}
+        onClose={(claimed) => {
+          setShowReward(false);
+          if (claimed) {
+            setDailyGiftCount((prev) => prev + 1);
+          }
+          refreshToday();
+        }}
+        dailyGiftCount={dailyGiftCount}
+      />
     </main>
   );
 }
 
-// Compact Header (Hides links on mobile since you have MobileNav)
+// Compact Header
 function Header({ session, router }: { session: any; router: any }) {
   return (
     <div className="flex flex-col gap-4 mb-4 md:mb-6 md:flex-row md:items-center md:justify-between">
@@ -528,7 +582,6 @@ function Header({ session, router }: { session: any; router: any }) {
         </p>
       </div>
 
-      {/* Hidden on mobile (block md:flex) because MobileNav exists */}
       <div className="self-start hidden gap-2 md:flex md:self-auto">
         <Link
           href="/history"
