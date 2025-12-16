@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, Variants } from 'framer-motion';
-import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
+import { useRive, useStateMachineInput, Layout, Fit, Alignment } from '@rive-app/react-canvas';
 import { cn } from '@/lib/utils';
 
 // Define layout outside component to maintain reference stability
@@ -11,17 +11,31 @@ export const GiftRive = React.memo(({
   width,
   height,
   className,
+  triggerOpen,
 }: {
   width?: number;
   height?: number;
   className?: string;
+  triggerOpen?: boolean;
 }) => {
-  const { RiveComponent } = useRive({
+  const { rive, RiveComponent } = useRive({
     src: '/idle_gift.riv',
     stateMachines: 'State Machine 1',
     autoplay: true,
     layout: RIVE_LAYOUT,
   });
+
+  const startOpenInput = useStateMachineInput(rive, 'State Machine 1', 'start_box_open');
+
+  useEffect(() => {
+    if (triggerOpen && startOpenInput) {
+      // Delay the Rive animation to let the CSS/Framer shake finish (1.5s)
+      const timer = setTimeout(() => {
+        startOpenInput.fire();
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [triggerOpen, startOpenInput]);
 
   return (
     <div
@@ -78,7 +92,7 @@ export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
         animate={phase}
         className="relative w-72 h-72 md:w-96 md:h-96"
       >
-        <GiftRive />
+        <GiftRive triggerOpen={phase === 'shaking'} />
       </motion.div>
 
       <motion.div
