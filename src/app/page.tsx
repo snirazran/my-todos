@@ -337,6 +337,11 @@ export default function Home() {
               openWardrobe={openWardrobe}
               onOpenChange={setOpenWardrobe}
               flyBalance={flyBalance}
+              rate={rate}
+              done={doneCount}
+              total={data.length}
+              giftsClaimed={dailyGiftCount}
+              isCatching={cinematic}
             />
             <div className="w-full">
               <ProgressCard

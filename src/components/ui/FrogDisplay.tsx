@@ -6,6 +6,7 @@ import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
 import { Shirt, Sparkles } from 'lucide-react';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
+import { FrogSpeechBubble } from './FrogSpeechBubble';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle>;
@@ -17,6 +18,11 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   className?: string;
   flyBalance?: number;
+  rate?: number;
+  done?: number;
+  total?: number;
+  giftsClaimed?: number;
+  isCatching?: boolean;
 };
 
 export function FrogDisplay({
@@ -29,6 +35,11 @@ export function FrogDisplay({
   onOpenChange,
   className = '',
   flyBalance,
+  rate,
+  done,
+  total,
+  giftsClaimed,
+  isCatching,
 }: Props) {
   return (
     // Added mb-12 to create the requested space from the tabs below
@@ -38,7 +49,6 @@ export function FrogDisplay({
       */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-64 bg-violet-500/10 dark:bg-violet-400/10 blur-[60px] rounded-full pointer-events-none z-0" />
 
-      {/* 1. THE FROG (Z-Index 20) */}
       <div
         ref={frogBoxRef}
         className="relative z-20 transition-transform duration-500 -translate-y-3.5 pointer-events-none "
@@ -51,6 +61,16 @@ export function FrogDisplay({
             indices={indices}
           />
         </div>
+        {/* SPEECH BUBBLE - NOW INSIDE FROG'S CONTAINER */}
+        {typeof rate === 'number' && typeof done === 'number' && typeof total === 'number' && typeof giftsClaimed === 'number' && (
+          <FrogSpeechBubble
+            rate={rate}
+            done={done}
+            total={total}
+            giftsClaimed={giftsClaimed}
+            isCatching={isCatching}
+          />
+        )}
       </div>
 
       {/* 2. THE CONTROL DECK 
