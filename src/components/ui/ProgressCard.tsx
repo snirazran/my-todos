@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo } from 'react';
-import { Lock, CheckCircle2, Sparkles } from 'lucide-react';
+import { Lock, CheckCircle2, Sparkles, CalendarDays } from 'lucide-react';
 import Image from 'next/image';
 
 interface ProgressCardProps {
@@ -19,6 +19,21 @@ export default function ProgressCard({
 }: ProgressCardProps) {
   // === LOGIC: REWARD TRACK ===
   const slots = useMemo(() => {
+    // 1. Calculate targets for all 3 slots first
+    const targets = [0, 1, 2].map((i) => {
+      if (total === 0) return 0;
+      let giftsAllowedBasedOnTotal = 3;
+      if (total <= 2) giftsAllowedBasedOnTotal = 1;
+      else if (total <= 5) giftsAllowedBasedOnTotal = 2;
+      else if (total >= 6) giftsAllowedBasedOnTotal = 3;
+      else giftsAllowedBasedOnTotal = 3;
+
+      if (i >= giftsAllowedBasedOnTotal) return 9999;
+
+      return Math.round(((i + 1) * total) / giftsAllowedBasedOnTotal);
+    });
+
+    // 2. Map to slot objects with status and percentage
     return [0, 1, 2].map((i) => {
       let isLocked = false;
       let unlockRequirement = 0;
@@ -35,32 +50,23 @@ export default function ProgressCard({
       }
 
       if (isLocked) {
-        return { status: 'LOCKED', req: unlockRequirement };
+        return {
+          status: 'LOCKED',
+          req: unlockRequirement,
+          percent: 0,
+          current: 0,
+          total: 0,
+        };
       }
 
-      const getTargetTaskCountForSlot = (
-        slotIndex: number,
-        currentTotal: number
-      ) => {
-        if (currentTotal === 0) return 0;
-        let giftsAllowedBasedOnTotal = 3;
-        if (currentTotal <= 2) giftsAllowedBasedOnTotal = 1;
-        else if (currentTotal <= 5) giftsAllowedBasedOnTotal = 2;
-        else if (currentTotal >= 6) giftsAllowedBasedOnTotal = 3;
-        else giftsAllowedBasedOnTotal = 3;
+      const targetTaskCount = targets[i];
+      const prevTarget = i === 0 ? 0 : targets[i - 1];
 
-        if (slotIndex >= giftsAllowedBasedOnTotal) return 9999;
-
-        const milestoneResults: number[] = [];
-        for (let j = 1; j <= giftsAllowedBasedOnTotal; j++) {
-          milestoneResults.push(
-            Math.round((j * currentTotal) / giftsAllowedBasedOnTotal)
-          );
-        }
-        return milestoneResults[slotIndex];
-      };
-
-      const targetTaskCount = getTargetTaskCountForSlot(i, total);
+      // Calculate progress for THIS specific slot
+      const range = targetTaskCount - prevTarget;
+      const progressInSlot = Math.max(0, done - prevTarget);
+      const cappedProgress = Math.min(range, progressInSlot);
+      const percentage = range > 0 ? (cappedProgress / range) * 100 : 100;
 
       const isClaimed = i < giftsClaimed;
       const isReady = !isClaimed && done >= targetTaskCount;
@@ -68,6 +74,9 @@ export default function ProgressCard({
       return {
         status: isClaimed ? 'CLAIMED' : isReady ? 'READY' : 'PENDING',
         target: targetTaskCount,
+        percent: percentage,
+        current: cappedProgress,
+        total: range,
       };
     });
   }, [total, done, giftsClaimed]);
@@ -79,10 +88,12 @@ export default function ProgressCard({
   // === DYNAMIC STATUS MESSAGE ===
   const statusMessage = useMemo(() => {
     if (allDoneForToday) return 'All rewards & tasks complete! Great job.';
-        if (allGiftsClaimed && !allTasksDone) {
-            const remainingTasks = total - done;
-            return `You're doing great! Just ${remainingTasks} ${remainingTasks === 1 ? 'task' : 'tasks'} left to complete.`;
-        }
+    if (allGiftsClaimed && !allTasksDone) {
+      const remainingTasks = total - done;
+      return `You're doing great! Just ${remainingTasks} ${
+        remainingTasks === 1 ? 'task' : 'tasks'
+      } left to complete.`;
+    }
     if (total === 0) return 'Add your first task to start tracking!';
     const readySlot = slots.find((s) => s.status === 'READY');
     if (readySlot) return 'You have a gift ready to open!';
@@ -142,11 +153,17 @@ export default function ProgressCard({
                 .slice(0, idx)
                 .every((s) => s.status === 'CLAIMED' || s.status === 'READY');
 
+            // For circular progress
+            const radius = 18;
+            const circumference = 2 * Math.PI * radius;
+            const strokeDashoffset =
+              circumference - (slot.percent / 100) * circumference;
+
             return (
               <div
                 key={idx}
                 className={`
-                  relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-300 overflow-hidden
+                  relative flex flex-col items-center justify-center p-2 rounded-xl border transition-all duration-300 overflow-hidden min-h-[90px]
                   ${
                     slot.status === 'LOCKED'
                       ? 'bg-slate-100/50 dark:bg-slate-800/50 border-dashed border-slate-300 dark:border-slate-700 opacity-70'
@@ -160,34 +177,65 @@ export default function ProgressCard({
                   }
                 `}
               >
-                {/* Icon */}
-                <div className="relative z-10 flex items-center justify-center">
+                {/* Icon Container */}
+                <div className="relative z-10 flex items-center justify-center w-12 h-12 mb-1">
                   {slot.status === 'LOCKED' ? (
-                    <Lock className="w-4 h-4 text-slate-400" />
+                    <Lock className="w-5 h-5 text-slate-400" />
                   ) : slot.status === 'CLAIMED' ? (
-                    <CheckCircle2 className="w-6 h-6 text-green-500" />
+                    <CheckCircle2 className="w-8 h-8 text-green-500" />
                   ) : (
-                    <div
-                      className={`relative w-8 h-8 ${
-                        slot.status === 'READY'
-                          ? 'animate-bounce drop-shadow-lg'
-                          : ''
-                      }`}
-                    >
-                      <Image
-                        src="/gift1.png"
-                        alt="Gift"
-                        width={32}
-                        height={32}
-                        className="object-contain"
-                      />
-                    </div>
+                    <>
+                      {/* Circular Progress (Only for PENDING/READY) */}
+                      {slot.status === 'PENDING' && (
+                        <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none">
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r={radius}
+                            className="stroke-slate-200 dark:stroke-slate-700"
+                            strokeWidth="3"
+                            fill="none"
+                          />
+                          <circle
+                            cx="24"
+                            cy="24"
+                            r={radius}
+                            className="transition-all duration-700 ease-out stroke-purple-500"
+                            strokeWidth="3"
+                            fill="none"
+                            strokeLinecap="round"
+                            style={{
+                              strokeDasharray: circumference,
+                              strokeDashoffset: strokeDashoffset,
+                            }}
+                          />
+                        </svg>
+                      )}
+
+                      <div
+                        className={`relative z-10 ${
+                          slot.status === 'READY'
+                            ? 'w-10 h-10 animate-bounce drop-shadow-lg'
+                            : 'w-7 h-7'
+                        }`}
+                      >
+                        <Image
+                          src="/gift1.png"
+                          alt="Gift"
+                          width={40}
+                          height={40}
+                          className={`object-contain ${
+                            slot.status === 'PENDING' ? 'opacity-90' : ''
+                          }`}
+                        />
+                      </div>
+                    </>
                   )}
                 </div>
 
                 {/* Status Text */}
                 <span
-                  className={`text-[9px] font-bold uppercase mt-1 text-center leading-tight relative z-10
+                  className={`text-[9px] font-bold uppercase text-center leading-tight relative z-10
                   ${
                     slot.status === 'LOCKED'
                       ? 'text-slate-400'
@@ -210,9 +258,15 @@ export default function ProgressCard({
                   ) : slot.status === 'CLAIMED' ? (
                     'Collected'
                   ) : slot.status === 'READY' ? (
-                    'Unlocked'
+                    'Open Now!'
                   ) : (
-                    <>{pendingLeft} More</>
+                    /* Show explicit progress for pending items */
+                    <div className="flex flex-col items-center">
+                      <span className="text-[10px] tabular-nums tracking-wide">
+                        {slot.current} / {slot.total}
+                      </span>
+                      <span className="text-[8px] opacity-70">Completed</span>
+                    </div>
                   )}
                 </span>
               </div>
@@ -220,15 +274,46 @@ export default function ProgressCard({
           })}
         </div>
       ) : allTasksDone ? (
-        <div className="flex items-center gap-3 px-3 py-2 mb-4 border border-yellow-100 rounded-xl bg-gradient-to-r from-yellow-50/50 to-orange-50/50 dark:from-yellow-900/10 dark:to-orange-900/10 dark:border-yellow-900/20">
-          <Sparkles className="w-4 h-4 text-yellow-500 dark:text-yellow-400 shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-bold truncate text-slate-700 dark:text-slate-200">
-              All rewards collected!
-            </p>
-            <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 leading-none">
-              Resets tomorrow
-            </p>
+        <div className="relative p-4 mb-4 overflow-hidden border border-indigo-100 rounded-xl dark:border-indigo-500/30 bg-gradient-to-br from-indigo-50/50 via-white to-purple-50/50 dark:from-slate-900 dark:via-slate-800 dark:to-indigo-950/30 group">
+          <div className="relative z-10 flex flex-col gap-3">
+            {/* Header Badge */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center w-5 h-5 text-green-600 bg-green-100 rounded-full dark:bg-green-900/50 dark:text-green-400">
+                <CheckCircle2 className="w-3 h-3" />
+              </div>
+              <span className="text-xs font-bold tracking-wider text-green-700 uppercase dark:text-green-400">
+                All Daily Rewards Claimed
+              </span>
+            </div>
+
+            {/* Actionable Content */}
+            <div className="flex items-start gap-3 pl-1">
+              <div className="p-2 text-indigo-500 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-100 dark:border-slate-700 shrink-0">
+                <CalendarDays className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-bold text-slate-800 dark:text-slate-100">
+                  Plan Ahead for Tomorrow
+                </h4>
+                <p className="mt-1 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+                  Set up your tasks now to get a head start. <br />
+                  <span className="font-semibold text-indigo-600 dark:text-indigo-400">
+                    Future You
+                  </span>{' '}
+                  deserves those easy wins (and gifts)!
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Decorative Background Icon */}
+          <div className="absolute transition-transform duration-700 transform -bottom-2 -right-2 opacity-5 rotate-12 group-hover:rotate-6 group-hover:scale-110">
+            <Image
+              src="/gift1.png"
+              width={80}
+              height={80}
+              alt="Gift Decoration"
+            />
           </div>
         </div>
       ) : null}
