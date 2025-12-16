@@ -1,57 +1,72 @@
 import React, { useState, useEffect } from 'react';
 import { motion, Variants } from 'framer-motion';
-import { useRive, useStateMachineInput, Layout, Fit, Alignment } from '@rive-app/react-canvas';
+import {
+  useRive,
+  useStateMachineInput,
+  Layout,
+  Fit,
+  Alignment,
+} from '@rive-app/react-canvas';
 import { cn } from '@/lib/utils';
 
 // Define layout outside component to maintain reference stability
-const RIVE_LAYOUT = new Layout({ fit: Fit.Contain, alignment: Alignment.Center });
+const RIVE_LAYOUT = new Layout({
+  fit: Fit.Contain,
+  alignment: Alignment.Center,
+});
 
 // --- FIXED: Removed all delay logic, just simple rendering ---
-export const GiftRive = React.memo(({
-  width,
-  height,
-  className,
-  triggerOpen,
-}: {
-  width?: number;
-  height?: number;
-  className?: string;
-  triggerOpen?: boolean;
-}) => {
-  const { rive, RiveComponent } = useRive({
-    src: '/idle_gift.riv',
-    stateMachines: 'State Machine 1',
-    autoplay: true,
-    layout: RIVE_LAYOUT,
-  });
+export const GiftRive = React.memo(
+  ({
+    width,
+    height,
+    className,
+    triggerOpen,
+  }: {
+    width?: number;
+    height?: number;
+    className?: string;
+    triggerOpen?: boolean;
+  }) => {
+    const { rive, RiveComponent } = useRive({
+      src: '/idle_gift.riv',
+      stateMachines: 'State Machine 1',
+      autoplay: true,
+      layout: RIVE_LAYOUT,
+    });
 
-  const startOpenInput = useStateMachineInput(rive, 'State Machine 1', 'start_box_open');
+    const startOpenInput = useStateMachineInput(
+      rive,
+      'State Machine 1',
+      'start_box_open'
+    );
 
-  useEffect(() => {
-    if (triggerOpen && startOpenInput) {
-      // Delay the Rive animation to let the CSS/Framer shake finish (1.5s)
-      const timer = setTimeout(() => {
-        startOpenInput.fire();
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [triggerOpen, startOpenInput]);
+    useEffect(() => {
+      if (triggerOpen && startOpenInput) {
+        // Delay the Rive animation to let the CSS/Framer shake finish (1.5s)
+        const timer = setTimeout(() => {
+          startOpenInput.fire();
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
+    }, [triggerOpen, startOpenInput]);
 
-  return (
-    <div
-      className={className}
-      style={{
-        width: width ?? '100%',
-        height: height ?? '100%',
-        display: 'block', // Ensures no inline alignment issues
-      }}
-    >
-      <RiveComponent
-        style={{ width: '100%', height: '100%', display: 'block' }}
-      />
-    </div>
-  );
-});
+    return (
+      <div
+        className={className}
+        style={{
+          width: width ?? '100%',
+          height: height ?? '100%',
+          display: 'block', // Ensures no inline alignment issues
+        }}
+      >
+        <RiveComponent
+          style={{ width: '100%', height: '100%', display: 'block' }}
+        />
+      </div>
+    );
+  }
+);
 
 // Display name for debugging
 GiftRive.displayName = 'GiftRive';
@@ -90,7 +105,7 @@ export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
       <motion.div
         variants={shakeVariants}
         animate={phase}
-        className="relative w-72 h-72 md:w-96 md:h-96"
+        className="relative w-[450px] h-[450px] md:w-[500px] md:h-[500px]"
       >
         <GiftRive triggerOpen={phase === 'shaking'} />
       </motion.div>
@@ -100,7 +115,7 @@ export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
         animate={{ opacity: 1, y: 0, transition: { delay: 0.3 } }}
         className="mt-4 space-y-2 text-center"
       >
-        <h2 className="text-4xl font-black text-white uppercase tracking-widest">
+        <h2 className="text-4xl font-black tracking-widest text-white uppercase">
           {phase === 'shaking' ? 'UNWRAPPING...' : 'TAP TO UNWRAP'}
         </h2>
         {phase === 'idle' && (

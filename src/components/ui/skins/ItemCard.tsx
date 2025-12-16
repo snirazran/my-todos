@@ -197,7 +197,7 @@ export function ItemCard({
 
         <div className="absolute inset-0 z-10 flex items-end justify-center">
           {item.slot === 'container' ? (
-            <div className="w-[85%] h-[85%] mb-4 drop-shadow-xl">
+            <div className="w-[110%] h-[110%] mb-2 drop-shadow-xl">
               <GiftRive />
             </div>
           ) : (

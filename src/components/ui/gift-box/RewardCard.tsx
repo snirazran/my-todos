@@ -165,7 +165,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                     )}
                   >
                     {prize.slot === 'container' ? (
-                      <div className="h-[90%] w-auto aspect-[282/381] mb-2">
+                      <div className="h-[120%] w-auto aspect-[282/381] mb-2">
                         <GiftRive className="w-full h-full" />
                       </div>
                     ) : (
