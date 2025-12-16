@@ -47,7 +47,7 @@ export default function ProgressCard({
         <div className="relative w-full h-3 mb-4 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
           <div
             className="absolute top-0 left-0 h-full transition-all duration-700 ease-out rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
-            style={{ width: `${Math.max(5, rate)}%` }}
+            style={{ width: `${rate}%` }}
           />
         </div>
 
