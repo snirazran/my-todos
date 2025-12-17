@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { EllipsisVertical, CalendarClock } from 'lucide-react';
+import { EllipsisVertical, CalendarClock, Plus } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
@@ -149,9 +149,10 @@ export default function BacklogPanel({
                         e.stopPropagation();
                         addToday(t);
                       }}
-                      className="px-3 py-1.5 text-xs font-bold text-white bg-indigo-500 hover:bg-indigo-600 active:scale-95 transition-all rounded-lg shadow-sm shadow-indigo-500/20"
+                      className="group/btn flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 active:scale-95 transition-all rounded-full shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40"
                     >
-                      Do Today!
+                      <Plus className="w-3.5 h-3.5 transition-transform group-hover/btn:rotate-90" />
+                      <span>Do Today!</span>
                     </button>
 
                     {/* Menu Button */}

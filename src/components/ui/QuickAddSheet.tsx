@@ -16,6 +16,7 @@ import {
   Plus,
   X,
 } from 'lucide-react';
+import Fly from '@/components/ui/fly';
 
 type RepeatChoice = 'this-week' | 'weekly';
 type WhenChoice = 'pick' | 'later';
@@ -267,22 +268,30 @@ export default function QuickAddSheet({
           )}
 
           {/* Actions */}
-          <div className="grid grid-cols-2 gap-2 mt-3">
+          <div className="grid grid-cols-2 gap-3 mt-4">
             <button
               type="button"
               onClick={handleSubmit}
               disabled={!text.trim() || isSubmitting}
               className={[
-                'h-11 rounded-full text-[15px] font-semibold',
-                'bg-gradient-to-b from-purple-500 via-indigo-500 to-pink-500 text-white',
-                'shadow-[0_10px_24px_rgba(124,58,237,.35)] ring-1 ring-purple-500/40',
-                'hover:brightness-105 active:scale-[0.995]',
-                'disabled:opacity-60',
+                'relative h-12 rounded-full text-[15px] font-bold overflow-hidden transition-all',
+                'bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 text-white',
+                'shadow-[0_10px_25px_-4px_rgba(99,102,241,0.4)] ring-1 ring-white/20',
+                'hover:brightness-105 hover:shadow-[0_12px_30px_-4px_rgba(99,102,241,0.5)] active:scale-[0.985]',
+                'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
               ].join(' ')}
             >
-              <span className="inline-flex items-center justify-center gap-2">
-                <Plus className="w-4 h-4" />
-                {isSubmitting ? 'Adding...' : 'Add'}
+              <span className="absolute inset-0 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                {isSubmitting ? (
+                  'Adding...'
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4 stroke-[3]" />
+                    <span>Add Task</span>
+                    <Fly size={24} x={-1} y={-3} />
+                  </>
+                )}
               </span>
             </button>
 
@@ -290,10 +299,10 @@ export default function QuickAddSheet({
               type="button"
               onClick={() => onOpenChange(false)}
               className={[
-                'h-11 rounded-full text-[15px] font-medium',
-                'bg-white/85 dark:bg-slate-900/70 text-slate-800 dark:text-white',
-                'ring-1 ring-slate-200/80 dark:ring-slate-800/70',
-                'hover:bg-white active:scale-[0.995]',
+                'h-12 rounded-full text-[15px] font-semibold transition-all',
+                'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300',
+                'hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-[0.985]',
+                'ring-1 ring-slate-200 dark:ring-slate-700',
               ].join(' ')}
             >
               <span className="inline-flex items-center justify-center gap-2">
