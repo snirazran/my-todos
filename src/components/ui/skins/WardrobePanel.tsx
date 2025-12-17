@@ -45,7 +45,7 @@ export function WardrobePanel({
   onOpenChange: (v: boolean) => void;
   defaultTab?: 'inventory' | 'shop' | 'trade';
 }) {
-  const { data, mutate, unseenItems, markItemSeen } = useInventory(); // shared hook
+  const { data, mutate, unseenItems, markItemSeen, markAllSeen } = useInventory(); // shared hook
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
@@ -60,6 +60,24 @@ export function WardrobePanel({
   } | null>(null);
   const [shakeBalance, setShakeBalance] = useState(false);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
+
+  // Handle Mark Seen on Close
+  const prevOpen = React.useRef(open);
+  useEffect(() => {
+    if (prevOpen.current && !open) {
+      markAllSeen();
+    }
+    prevOpen.current = open;
+  }, [open, markAllSeen]);
+
+  // Handle Mark Seen on Tab Change (Leaving Inventory)
+  const prevTab = React.useRef(activeTab);
+  useEffect(() => {
+    if (prevTab.current === 'inventory' && activeTab !== 'inventory') {
+      markAllSeen();
+    }
+    prevTab.current = activeTab;
+  }, [activeTab, markAllSeen]);
 
   // Filter change handler to mark category as visited
   const handleFilterChange = (cat: FilterCategory) => {
@@ -258,10 +276,10 @@ export function WardrobePanel({
           'inset-0 border-none rounded-none',
           'data-[state=open]:slide-in-from-bottom-full data-[state=open]:slide-in-from-top-0',
 
-          // LARGE DESKTOP (>=1024px): Floating Modal Look
-          'lg:top-[50%] lg:left-[50%] lg:-translate-x-1/2 lg:-translate-y-1/2',
-          'lg:w-[95vw] lg:max-w-[1200px] lg:h-[90vh] lg:max-h-[95vh]',
-          'lg:border-4 lg:border-slate-200 lg:dark:border-slate-800 lg:rounded-[36px] lg:shadow-2xl',
+          // LARGE DESKTOP (>=1024px) AND TALL (>=800px): Floating Modal Look
+          'lg:[@media(min-height:800px)]:top-[50%] lg:[@media(min-height:800px)]:left-[50%] lg:[@media(min-height:800px)]:-translate-x-1/2 lg:[@media(min-height:800px)]:-translate-y-1/2',
+          'lg:[@media(min-height:800px)]:w-[95vw] lg:[@media(min-height:800px)]:max-w-[1200px] lg:[@media(min-height:800px)]:h-[90vh] lg:[@media(min-height:800px)]:max-h-[95vh]',
+          'lg:[@media(min-height:800px)]:border-4 lg:[@media(min-height:800px)]:border-slate-200 lg:[@media(min-height:800px)]:dark:border-slate-800 lg:[@media(min-height:800px)]:rounded-[36px] lg:[@media(min-height:800px)]:shadow-2xl',
         )}
       >
         {/* --- HEADER --- */}
