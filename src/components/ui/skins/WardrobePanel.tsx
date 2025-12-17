@@ -246,14 +246,20 @@ export function WardrobePanel({
         <DialogContent
           className={cn(
           // ... (keep existing classes)
-          'fixed z-50 flex flex-col gap-0 bg-slate-50 dark:bg-slate-950 p-0 shadow-none outline-none overflow-hidden',
+          'fixed z-50 flex flex-col gap-0 bg-slate-50 dark:bg-slate-950 p-0 sm:p-0 shadow-none outline-none overflow-hidden',
           'top-0 left-0 translate-x-0 translate-y-0',
           'w-full h-[100dvh] max-w-none',
           'inset-0 border-none rounded-none',
           'data-[state=open]:slide-in-from-bottom-full data-[state=open]:slide-in-from-top-0',
+          // 3. DESKTOP: Restore Floating Modal Look (with short-screen fallback)
           'md:top-[50%] md:left-[50%] md:-translate-x-1/2 md:-translate-y-1/2',
           'md:w-[95vw] md:max-w-[900px] md:h-[85vh] md:max-h-[90vh]',
-          'md:border-4 md:border-slate-200 md:dark:border-slate-800 md:rounded-[36px] md:shadow-2xl'
+          'md:border-4 md:border-slate-200 md:dark:border-slate-800 md:rounded-[36px] md:shadow-2xl',
+
+          // 4. DESKTOP SHORT SCREENS (Laptops < 800px height): Force Full Screen
+          'md:[@media(max-height:800px)]:top-0 md:[@media(max-height:800px)]:left-0 md:[@media(max-height:800px)]:translate-x-0 md:[@media(max-height:800px)]:translate-y-0',
+          'md:[@media(max-height:800px)]:w-full md:[@media(max-height:800px)]:h-[100dvh] md:[@media(max-height:800px)]:max-w-none md:[@media(max-height:800px)]:max-h-none',
+          'md:[@media(max-height:800px)]:border-none md:[@media(max-height:800px)]:rounded-none md:[@media(max-height:800px)]:shadow-none'
         )}
       >
         {/* --- HEADER --- */}
