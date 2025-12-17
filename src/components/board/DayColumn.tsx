@@ -11,6 +11,7 @@ export default function DayColumn({
   maxHeightClass = 'max-h-[65svh] md:max-h-[74svh]', // ⬅ default shorter on mobile
   /** Set true when a composer is open in this column to make it a bit shorter */
   compact = false,
+  isToday = false,
 }: {
   title: string;
   count?: number;
@@ -19,6 +20,7 @@ export default function DayColumn({
   footer?: React.ReactNode;
   maxHeightClass?: string;
   compact?: boolean;
+  isToday?: boolean;
 }) {
   const appliedMax = compact
     ? 'max-h-[60svh] md:max-h-[70svh]'
@@ -43,7 +45,13 @@ export default function DayColumn({
     >
       <div className="flex items-center justify-between px-2 mb-4 pt-1">
         <h2 className="text-lg font-black tracking-tight text-slate-800 dark:text-slate-100 uppercase flex items-baseline gap-2">
-          {displayName}
+          {isToday ? (
+            <span className="relative z-0 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-indigo-200/50 to-purple-200/50 dark:from-indigo-900/50 dark:to-purple-900/50">
+              {displayName}
+            </span>
+          ) : (
+            displayName
+          )}
           {displayDate && (
             <span className="text-sm font-bold text-slate-400 dark:text-slate-500">
               {displayDate}

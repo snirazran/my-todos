@@ -69,6 +69,22 @@ function getWeekDates(start = sundayOf()) {
   });
   return { weekStart, weekDates };
 }
+function getRollingWeekDates(start = sundayOf()) {
+  const { weekStart, weekDates } = getWeekDates(start);
+  const today = ymdLocal(new Date());
+
+  const rollingDates = weekDates.map((date) => {
+    if (date < today) {
+      const [y, m, d] = date.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      dt.setDate(dt.getDate() + 7);
+      return ymdLocal(dt);
+    }
+    return date;
+  });
+
+  return { weekStart, weekDates: rollingDates };
+}
 function isBoardMode(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   return (
@@ -272,7 +288,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { weekStart, weekDates } = getWeekDates();
+  const { weekStart, weekDates } = getRollingWeekDates();
   const now = new Date();
 
   if (repeat === 'weekly') {
@@ -531,7 +547,7 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
 /* ====================================================================== */
 async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
   const Task = TaskModel;
-  const { weekStart, weekDates } = getWeekDates();
+  const { weekStart, weekDates } = getRollingWeekDates();
 
   const dayParam = req.nextUrl.searchParams.get('day');
 
@@ -703,7 +719,7 @@ async function handleBoardPut(
   }
 
   const now = new Date();
-  const { weekStart, weekDates } = getWeekDates();
+  const { weekStart, weekDates } = getRollingWeekDates();
 
   // Reorder/update the Later bucket
   if (day === -1) {

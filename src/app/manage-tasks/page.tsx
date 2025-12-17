@@ -10,6 +10,7 @@ import {
   labelForDisplayDay,
   apiDayFromDisplay,
   displayDayFromApi,
+  todayDisplayIndex, // Import todayDisplayIndex
   type ApiDay,
   type DisplayDay,
 } from '@/components/board/helpers';
@@ -21,6 +22,7 @@ export default function ManageTasksPage() {
     Array.from({ length: DAYS }, () => [])
   );
   const [loading, setLoading] = useState(true);
+  const todayIdx = useMemo(() => todayDisplayIndex(), []); // Calculate todayDisplayIndex once
 
   /** Map API order (Sun..Sat, Later at index 7) -> Display order */
   const mapApiToDisplay = (apiWeek: Task[][]): Task[][] => {
@@ -117,6 +119,8 @@ export default function ManageTasksPage() {
   /** Titles in display order */
   const titles = useMemo(() => {
     const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to midnight for comparison
+
     // Reset to Sunday (0) of current week
     const start = new Date(today);
     start.setDate(today.getDate() - today.getDay());
@@ -128,6 +132,11 @@ export default function ManageTasksPage() {
 
       const d = new Date(start);
       d.setDate(start.getDate() + apiDay);
+
+      // Rolling logic: if date < today, it's next week
+      if (d < today) {
+        d.setDate(d.getDate() + 7);
+      }
 
       const dayName = labelForDisplayDay(displayDay);
       // Format d/M
@@ -164,6 +173,7 @@ export default function ManageTasksPage() {
             /* no-op: QuickAddSheet path is used */
           }}
           onQuickAdd={onAddTask}
+          todayDisplayIndex={todayIdx} // Pass todayIdx as a prop
         />
       </div>
 

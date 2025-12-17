@@ -5,7 +5,6 @@ import { usePathname } from 'next/navigation';
 import {
   Task,
   DAYS,
-  todayDisplayIndex,
   type DisplayDay,
   type ApiDay,
 } from './helpers';
@@ -31,6 +30,7 @@ export default function TaskBoard({
   removeTask,
   onRequestAdd,
   onQuickAdd,
+  todayDisplayIndex,
 }: {
   titles: string[];
   week: Task[][];
@@ -48,6 +48,7 @@ export default function TaskBoard({
     days: ApiDay[];
     repeat: RepeatChoice;
   }) => Promise<void> | void;
+  todayDisplayIndex: Exclude<DisplayDay, 7>;
 }) {
   const pathname = usePathname();
   const {
@@ -68,7 +69,7 @@ export default function TaskBoard({
   }, [pathname, cancelDrag]);
 
   const [pageIndex, setPageIndex] = useState<DisplayDay>(
-    todayDisplayIndex() as DisplayDay
+    todayDisplayIndex as DisplayDay
   );
   const recomputeCanPanRef = useRef<() => void>();
 
@@ -97,7 +98,7 @@ export default function TaskBoard({
 
   useEffect(() => {
     const s = scrollerRef.current;
-    const t = todayDisplayIndex() as DisplayDay;
+    const t = todayDisplayIndex as DisplayDay;
     const col = (document.querySelectorAll('[data-col="true"]')[t] ??
       null) as HTMLElement | null;
     if (!s || !col) return;
@@ -410,6 +411,7 @@ export default function TaskBoard({
                 count={week[day]?.length || 0}
                 listRef={setListRef(day)}
                 maxHeightClass="max-h-[60svh] md:max-h-[73svh]"
+                isToday={day === todayDisplayIndex}
               >
                 <TaskList
                   day={day}
