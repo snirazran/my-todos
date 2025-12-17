@@ -48,9 +48,28 @@ export default function QuickAddSheet({
   const [when, setWhen] = useState<WhenChoice>('pick');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     setMounted(true);
+    
+    // Track visual viewport to handle mobile keyboard
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      const handleVisualViewportChange = () => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        // Calculate how much the keyboard is covering
+        const offset = window.innerHeight - vv.height;
+        setKeyboardHeight(Math.max(0, offset));
+      };
+
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+      return () => {
+        window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
+      };
+    }
   }, []);
 
   // DISPLAY indices only (0..6). 7 ("Later") is handled via `when === 'later'`.
@@ -139,7 +158,8 @@ export default function QuickAddSheet({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[1000] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none"
+            className="fixed left-0 right-0 z-[1000] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none transition-[bottom] duration-200"
+            style={{ bottom: keyboardHeight }}
           >
             <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
               <div className="rounded-[28px] bg-white/95 dark:bg-slate-950/90 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_24px_48px_rgba(15,23,42,0.25)] p-4">
