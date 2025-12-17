@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Calendar, History, Layers } from 'lucide-react';
+import { Calendar, History, LayoutDashboard } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 import { signIn, useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -607,7 +607,7 @@ function Header({ session, router }: { session: any; router: any }) {
           }
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition bg-white rounded-lg shadow-sm text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200"
         >
-          <Layers className="w-4 h-4" />
+          <LayoutDashboard className="w-4 h-4" />
           <span>Weekly Tasks</span>
         </button>
       </div>

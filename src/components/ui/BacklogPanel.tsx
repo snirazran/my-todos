@@ -98,7 +98,7 @@ export default function BacklogPanel({
 
       <div className="pb-2 space-y-3 overflow-visible min-h-[100px]">
         {later.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed text-slate-400 border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 rounded-xl">
+          <div className="flex flex-col items-center justify-center py-10 px-4 text-center border-2 border-dashed text-slate-400 border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 rounded-xl">
             <CalendarClock className="w-10 h-10 mb-3 opacity-20" />
             <p className="text-sm font-medium">No tasks saved yet.</p>
             <p className="mt-1 text-xs opacity-60">

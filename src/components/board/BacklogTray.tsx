@@ -130,10 +130,10 @@ export default React.memo(function BacklogTray({
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800/50">
               <div>
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">
-                  Later This Week
+                  Saved Tasks
                 </h3>
                 <p className="text-xs text-slate-500 font-medium">
-                  Drag tasks here to save them for later. Drag out to schedule.
+                  Tasks you're not sure when to do. Drag in to save, drag out to schedule.
                 </p>
               </div>
               <button
