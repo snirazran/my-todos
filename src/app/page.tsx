@@ -14,6 +14,7 @@ import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
+import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -309,7 +310,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen pb-24 md:pb-8 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+    <main className="min-h-screen pb-48 md:pb-32 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       <div className="px-4 py-6 mx-auto max-w-7xl md:px-8">
         <Header session={session} router={router} />
 
@@ -400,7 +401,7 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="min-h-[400px]">
+            <div className="min-h-[400px] pb-20">
               {activeTab === 'today' ? (
                 <motion.div
                   initial={{ opacity: 0, x: -10 }}
@@ -574,6 +575,21 @@ export default function Home() {
         }}
         dailyGiftCount={dailyGiftCount}
       />
+
+      {/* Floating Add Task Button - Home Page Version */}
+      <div className="fixed bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+20px)] pointer-events-none">
+        <div className="pointer-events-auto mx-auto w-full max-w-[400px]">
+          <div className="rounded-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/60 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
+            <AddTaskButton
+              onClick={() => {
+                setQuickText('');
+                setShowQuickAdd(true);
+              }}
+              label="Add a task"
+            />
+          </div>
+        </div>
+      </div>
     </main>
   );
 }

@@ -316,12 +316,6 @@ export default function TaskList({
               );
             })}
           </AnimatePresence>
-
-          <div className={tasks.length ? 'mt-8' : 'mt-6'}>
-            <AddTaskButton
-              onClick={() => onAddRequested('', null, { preselectToday: true })}
-            />
-          </div>
         </div>
       </div>
 
