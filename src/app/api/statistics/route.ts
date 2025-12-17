@@ -48,6 +48,8 @@ export async function POST(req: NextRequest) {
   // ACTION: CLAIM GIFT
   // ==========================================================
   if (body.action === 'claim_gift') {
+    const giftId = 'gift_box_1';
+
     if (isNewDay) {
       updateQuery = {
         $set: {
@@ -59,6 +61,8 @@ export async function POST(req: NextRequest) {
             taskCountAtLastGift: 0,
           },
         },
+        $inc: { [`wardrobe.inventory.${giftId}`]: 1 },
+        $addToSet: { 'wardrobe.unseenItems': giftId },
       };
     } else {
       // Rule 1: Max 3 gifts
@@ -67,7 +71,6 @@ export async function POST(req: NextRequest) {
       }
 
       // Rule 2: Must have done NEW work
-      // If your current count (e.g. 5) is same as when you last got a gift (e.g. 5), deny it.
       const lastCount = currentStats.taskCountAtLastGift || 0;
       if (currentStats.dailyTasksCount <= lastCount) {
         return json({ error: 'No new tasks completed since last reward' }, 403);
@@ -75,10 +78,14 @@ export async function POST(req: NextRequest) {
 
       // Grant Gift + Update High Water Mark
       updateQuery = {
-        $inc: { 'statistics.daily.dailyMilestoneGifts': 1 },
+        $inc: { 
+          'statistics.daily.dailyMilestoneGifts': 1,
+          [`wardrobe.inventory.${giftId}`]: 1 
+        },
         $set: {
           'statistics.daily.taskCountAtLastGift': currentStats.dailyTasksCount,
         },
+        $addToSet: { 'wardrobe.unseenItems': giftId },
       };
     }
   }

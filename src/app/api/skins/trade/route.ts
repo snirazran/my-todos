@@ -125,8 +125,17 @@ export async function POST(req: NextRequest) {
     user.wardrobe!.inventory[reward.id] =
       (user.wardrobe!.inventory[reward.id] || 0) + 1;
 
+    // Add to unseen items
+    if (!user.wardrobe!.unseenItems) {
+      user.wardrobe!.unseenItems = [];
+    }
+    if (!user.wardrobe!.unseenItems.includes(reward.id)) {
+      user.wardrobe!.unseenItems.push(reward.id);
+    }
+
     // Mark modified because we are mutating the mixed type map directly
     user.markModified('wardrobe.inventory');
+    user.markModified('wardrobe.unseenItems'); // Make sure Mongoose knows unseenItems changed
     await user.save();
 
     return NextResponse.json({

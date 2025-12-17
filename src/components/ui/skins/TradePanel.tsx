@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, Sparkles, AlertCircle, Plus, ArrowUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -10,8 +11,12 @@ import confetti from 'canvas-confetti';
 import Frog from '@/components/ui/frog';
 import { ItemCard } from './ItemCard';
 
+// Import from gift-box for the reward UI
+import { RewardCard } from '@/components/ui/gift-box/RewardCard';
+import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
+import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from '@/components/ui/gift-box/constants';
+
 /* ---------------- Visual Helpers ---------------- */
-// ... (Your existing RARITY_CONFIG remains exactly the same, keeping it hidden for brevity) ...
 const RARITY_CONFIG: Record<
   ItemDef['rarity'],
   {
@@ -84,12 +89,14 @@ const RARITY_CONFIG: Record<
 type TradePanelProps = {
   inventory: Record<string, number>;
   catalog: ItemDef[];
+  unseenItems: string[];
   onTradeSuccess?: () => void;
 };
 
 export function TradePanel({
   inventory,
   catalog,
+  unseenItems,
   onTradeSuccess,
 }: TradePanelProps) {
   // --- State ---
@@ -97,6 +104,11 @@ export function TradePanel({
   const [isTrading, setIsTrading] = useState(false);
   const [tradeResult, setTradeResult] = useState<ItemDef | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // --- Derived ---
   const targetRarity = useMemo(() => {
@@ -172,72 +184,54 @@ export function TradePanel({
     }
   };
 
+  const handleClaimReward = () => {
+    setTradeResult(null);
+  };
+
   // --- Render ---
   return (
     // Changed: Removed grid-cols-12. Used flex-col to stack Top (Contract) and Bottom (Inventory)
     <div className="relative flex flex-col w-full h-full md:overflow-hidden bg-slate-50 dark:bg-black/20">
       {/* --- RESULT OVERLAY --- */}
-      <AnimatePresence>
-        {tradeResult && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          >
+      {mounted && tradeResult && 
+        createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden pointer-events-auto">
+            {/* Background Backdrop */}
             <motion.div
-              initial={{ scale: 0.5, y: 50 }}
-              animate={{ scale: 1, y: 0 }}
-              className="flex flex-col items-center w-full max-w-sm gap-6 p-8 text-center border-2 shadow-2xl bg-slate-900 border-yellow-500/50 rounded-3xl shadow-yellow-500/20"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
+            />
+
+            {/* Dynamic God Rays for Reveal */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 z-0 flex items-center justify-center"
             >
-              <div className="relative">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 10,
-                    repeat: Infinity,
-                    ease: 'linear',
-                  }}
-                  className="absolute inset-[-20px] bg-gradient-to-tr from-yellow-500/20 to-purple-500/20 rounded-full blur-xl"
-                />
-                <div className="relative flex items-center justify-center w-32 h-32 border bg-slate-800 rounded-2xl border-slate-700">
-                  <Frog
-                    className="w-[125%] h-[125%] object-contain translate-y-[10%]"
-                    indices={{
-                      skin: 0,
-                      hat: 0,
-                      scarf: 0,
-                      hand_item: 0,
-                      [tradeResult.slot]: tradeResult.riveIndex,
-                    }}
-                    width={180}
-                    height={180}
-                  />
-                </div>
-              </div>
-              <div>
-                <h2 className="mb-1 text-2xl font-black tracking-wide text-white uppercase">
-                  Trade Successful!
-                </h2>
-                <p className="text-slate-400">You received:</p>
-                <p
-                  className={`text-xl font-bold mt-1 ${getRarityColor(
-                    tradeResult.rarity
-                  )}`}
-                >
-                  {tradeResult.name}
-                </p>
-              </div>
-              <Button
-                onClick={() => setTradeResult(null)}
-                className="w-full font-bold bg-white text-slate-900 hover:bg-slate-200"
-              >
-                Awesome
-              </Button>
+              <RotatingRays colorClass={GIFT_RARITY_CONFIG[tradeResult.rarity].rays} />
+              <div
+                className={cn(
+                  'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80'
+                )}
+              />
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+            {/* Main Content */}
+            <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
+              <RewardCard
+                key="card"
+                prize={tradeResult}
+                claiming={false}
+                onClaim={handleClaimReward}
+              />
+            </div>
+          </div>,
+          document.body
+        )
+      }
 
       {/* --- TOP PANEL: CONTRACT --- */}
       {/* shrink-0 ensures this panel takes only required space and doesn't squish */}
@@ -421,6 +415,7 @@ export function TradePanel({
                       selectedCount={selected}
                       onAction={() => handleSelect(item)}
                       actionLabel={null}
+                      isNew={unseenItems.includes(item.id)}
                     />
                   </div>
                 );

@@ -71,12 +71,6 @@ export function RewardPopup({
         return;
       }
 
-      await fetch('/api/skins/inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemId: giftId }),
-      });
-
       // This will set 'show' to false immediately
       onClose(true);
     } catch (e) {

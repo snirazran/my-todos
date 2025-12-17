@@ -68,10 +68,12 @@ export function WardrobePanel({
   }, [open, markAllSeen]);
 
   // Handle Mark Seen on Tab Change (Leaving Inventory)
+  const prevTab = React.useRef(activeTab);
   useEffect(() => {
-    if (activeTab !== 'inventory') {
+    if (prevTab.current === 'inventory' && activeTab !== 'inventory') {
       markAllSeen();
     }
+    prevTab.current = activeTab;
   }, [activeTab, markAllSeen]);
 
   // Compute Badges
@@ -323,9 +325,6 @@ export function WardrobePanel({
                     className="flex-1 h-full rounded-lg md:rounded-xl text-xs md:text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all relative"
                   >
                     Inventory
-                    {unseenItems.length > 0 && (
-                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                    )}
                   </TabsTrigger>
                   <TabsTrigger
                     value="shop"
@@ -433,6 +432,7 @@ export function WardrobePanel({
                   <TradePanel 
                     inventory={data.wardrobe.inventory}
                     catalog={data.catalog}
+                    unseenItems={unseenItems}
                     onTradeSuccess={() => mutate()}
                   />
                 )}

@@ -18,6 +18,7 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { RewardPopup } from '@/components/ui/gift-box/RewardPopup';
+import { mutate } from 'swr';
 import {
   useFrogTongue,
   HIT_AT,
@@ -567,6 +568,7 @@ export default function Home() {
           setShowReward(false);
           if (claimed) {
             setDailyGiftCount((prev) => prev + 1);
+            mutate('/api/skins/inventory');
           }
           refreshToday();
         }}
