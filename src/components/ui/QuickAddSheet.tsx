@@ -159,7 +159,7 @@ export default function QuickAddSheet({
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed left-0 right-0 z-[1000] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none transition-[bottom] duration-200"
-            style={{ bottom: keyboardHeight }}
+            style={{ bottom: keyboardHeight * 0.8 }}
           >
             <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
               <div className="rounded-[28px] bg-white/95 dark:bg-slate-950/90 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_24px_48px_rgba(15,23,42,0.25)] p-4">
