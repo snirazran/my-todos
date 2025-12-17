@@ -87,7 +87,7 @@ export default function BacklogPanel({
       <div className="flex items-center justify-between mb-6">
         <h3 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-slate-800 dark:text-slate-100">
           <CalendarClock className="w-6 h-6 text-purple-500 md:w-7 md:h-7" />
-          Later This Week
+          Saved Tasks
         </h3>
         {later.length > 0 && (
           <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
@@ -100,9 +100,10 @@ export default function BacklogPanel({
         {later.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed text-slate-400 border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 rounded-xl">
             <CalendarClock className="w-10 h-10 mb-3 opacity-20" />
-            <p className="text-sm font-medium">No tasks saved for later.</p>
+            <p className="text-sm font-medium">No tasks saved yet.</p>
             <p className="mt-1 text-xs opacity-60">
-              Add tasks here to clear your plate for today.
+              When you&apos;re unsure about the "when", save tasks here. You can
+              add them to your day whenever you&apos;re ready!
             </p>
           </div>
         ) : (
@@ -127,11 +128,7 @@ export default function BacklogPanel({
                     relative flex items-center gap-4 px-3 py-3.5 
                     transition-all duration-200 rounded-xl 
                     border border-transparent hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
-                    ${
-                      isMenuOpen
-                        ? 'bg-white dark:bg-slate-800 shadow-md'
-                        : ''
-                    }
+                    ${isMenuOpen ? 'bg-white dark:bg-slate-800 shadow-md' : ''}
                   `}
                   style={{
                     animation: `fadeInUp 0.4s ease-out ${i * 0.05}s forwards`,

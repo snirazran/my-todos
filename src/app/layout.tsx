@@ -24,7 +24,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'My Daily Tasks',
+  title: 'Weekly Tasks',
   description: 'Track your daily tasks',
 };
 

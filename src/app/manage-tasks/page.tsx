@@ -15,7 +15,7 @@ import {
   type DisplayDay,
 } from '@/components/board/helpers';
 
-const EXTRA = 'Later this week';
+const EXTRA = 'Maybe Today';
 
 export default function ManageTasksPage() {
   const [week, setWeek] = useState<Task[][]>(
@@ -146,7 +146,7 @@ export default function ManageTasksPage() {
   }, []);
 
   if (loading) {
-    return <LoadingScreen message="Loading task board..." fullscreen />;
+    return <LoadingScreen message="Loading weekly tasks..." fullscreen />;
   }
 
   return (

@@ -391,7 +391,7 @@ export default function Home() {
         }
       `}
               >
-                Later
+                Saved Tasks
                 {laterThisWeek.length > 0 && (
                   <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px]">
                     {laterThisWeek.length}
@@ -608,7 +608,7 @@ function Header({ session, router }: { session: any; router: any }) {
           className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition bg-white rounded-lg shadow-sm text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200"
         >
           <Layers className="w-4 h-4" />
-          <span>Manage Board</span>
+          <span>Weekly Tasks</span>
         </button>
       </div>
     </div>

@@ -176,7 +176,7 @@ export default function QuickAddSheet({
                 ].join(' ')}
               >
                 <CalendarCheck className="w-4 h-4" />
-                Later
+                I don&apos;t know when
               </button>
             </div>
           </div>
@@ -220,7 +220,9 @@ export default function QuickAddSheet({
                     isLater ? 'opacity-50 pointer-events-none' : '',
                   ].join(' ')}
                   aria-disabled={isLater}
-                  title={isLater ? 'Repeat is not available for Later' : undefined}
+                  title={
+                    isLater ? 'Repeat is not available for Later' : undefined
+                  }
                 >
                   <RotateCcw className="w-4 h-4 text-purple-700/80 dark:text-purple-200" />
                   <span className="text-[13px] font-medium text-slate-700 dark:text-white">
@@ -231,7 +233,9 @@ export default function QuickAddSheet({
                     role="switch"
                     aria-checked={repeatsOn}
                     onClick={() =>
-                      setRepeat((r) => (r === 'weekly' ? 'this-week' : 'weekly'))
+                      setRepeat((r) =>
+                        r === 'weekly' ? 'this-week' : 'weekly'
+                      )
                     }
                     data-on={repeatsOn}
                     className={[
@@ -257,8 +261,7 @@ export default function QuickAddSheet({
             <div className="mt-2 flex items-start gap-2 rounded-xl bg-purple-50/75 dark:bg-purple-900/30 ring-1 ring-purple-300/40 p-2.5 text-[13px] text-purple-900/90 dark:text-purple-100/90">
               <Info className="w-4 h-4 mt-0.5 shrink-0" />
               <span>
-                Saved to <span className="font-medium">Later this week</span>.
-                Drag it onto a specific day whenever you're ready.
+                Not sure when? We&apos;ll keep it in your <span className="font-medium">Saved Tasks</span> for later.
               </span>
             </div>
           )}
