@@ -205,7 +205,7 @@ export default function TaskCard({
           </div>
         )}
         <div
-          className={`truncate text-[15px] font-medium leading-snug transition-colors ${
+          className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-snug transition-colors ${
             task.completed
               ? 'text-slate-400 line-through dark:text-slate-500'
               : 'text-slate-700 dark:text-slate-100 group-hover:text-slate-900 dark:group-hover:text-white'

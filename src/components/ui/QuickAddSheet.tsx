@@ -185,8 +185,9 @@ export default function QuickAddSheet({
                     autoFocus
                     spellCheck={false}
                     autoComplete="off"
+                    maxLength={45}
                     style={{ direction: 'ltr', textAlign: 'left' }}
-                    className="w-full h-12 px-4 mb-3 rounded-[16px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50 text-lg font-medium text-left"
+                    className="w-full h-12 px-4 mb-1 rounded-[16px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50 text-lg font-medium text-left"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -196,6 +197,11 @@ export default function QuickAddSheet({
                     }}
                     inputMode="text"
                   />
+                  <div className="flex justify-end px-2 mb-2">
+                    <span className={`text-[10px] font-bold ${text.length >= 40 ? 'text-rose-500' : 'text-slate-400'}`}>
+                      {text.length}/45
+                    </span>
+                  </div>
                 </div>
 
                 {/* Segmented control */}
