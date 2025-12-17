@@ -1,13 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Home, History, LayoutDashboard, User } from 'lucide-react';
+import { usePathname, useRouter } from 'next/navigation';
+import { Home, History, LayoutDashboard, Shirt } from 'lucide-react';
 import { useSession } from 'next-auth/react';
+import { useUIStore } from '@/lib/uiStore';
 
 export default function MobileNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const { data: session } = useSession();
+  const { openWardrobe } = useUIStore();
 
   if (!session) return null;
 
@@ -27,25 +30,60 @@ export default function MobileNav() {
       label: 'History',
       icon: History,
     },
+    {
+      label: 'Inventory',
+      icon: Shirt,
+      onClick: () => {
+        router.push('/');
+        // Small timeout to allow navigation to happen if needed, though state update is instant
+        // But since we are likely already mounted or will mount, setting state is fine.
+        openWardrobe();
+      },
+      isActive: false, // Inventory is a modal, not a page
+    },
   ];
 
   return (
     <nav className="fixed bottom-0 left-0 z-50 w-full bg-white/90 backdrop-blur-lg border-t border-slate-200 dark:bg-slate-900/90 dark:border-slate-800 md:hidden pb-[env(safe-area-inset-bottom)]">
-      <div className="grid grid-cols-3 h-16">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const isActive = pathname === href;
+      <div className="grid grid-cols-4 h-16">
+        {navItems.map((item) => {
+          const isActive = item.href ? pathname === item.href : item.isActive;
+          const Icon = item.icon;
+          
+          const content = (
+            <>
+              <Icon className={`w-6 h-6 mb-1 ${isActive ? 'fill-current/20' : ''}`} />
+              <span className="text-[10px] font-medium">{item.label}</span>
+            </>
+          );
+
+          if (item.onClick) {
+            return (
+              <button
+                key={item.label}
+                onClick={item.onClick}
+                className={`flex flex-col items-center justify-center w-full h-full transition-colors ${
+                  isActive
+                    ? 'text-violet-600 dark:text-violet-400'
+                    : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                }`}
+              >
+                {content}
+              </button>
+            );
+          }
+
           return (
             <Link
-              key={href}
-              href={href}
+              key={item.href}
+              href={item.href!}
               className={`flex flex-col items-center justify-center w-full h-full transition-colors ${
                 isActive
                   ? 'text-violet-600 dark:text-violet-400'
                   : 'text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
               }`}
             >
-              <Icon className={`w-6 h-6 mb-1 ${isActive ? 'fill-current/20' : ''}`} />
-              <span className="text-[10px] font-medium">{label}</span>
+              {content}
             </Link>
           );
         })}

@@ -8,6 +8,7 @@ import { Calendar, History, Layers } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 import { signIn, useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUIStore } from '@/lib/uiStore';
 import { type FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import ProgressCard from '@/components/ui/ProgressCard';
@@ -63,21 +64,23 @@ const demoTasks: Task[] = [
 function getMilestones(totalTasks: number): number[] {
   if (totalTasks === 0) return [];
 
-  // Determine how many gifts allowed based on task load
-  let giftsAllowed = 3;
-
-  // Updated to match ProgressCard:
-  if (totalTasks <= 2) giftsAllowed = 1; // 1-2 tasks -> 1 gift
-  else if (totalTasks <= 5) giftsAllowed = 2; // 3-5 tasks -> 2 gifts
-  else giftsAllowed = 3; // 6+ tasks -> 3 gifts!
-
-  // Calculate specific task indices
-  const milestones: number[] = [];
-  for (let i = 1; i <= giftsAllowed; i++) {
-    milestones.push(Math.round((i * totalTasks) / giftsAllowed));
+  // 1-3 tasks -> 1 gift at the end
+  if (totalTasks <= 3) {
+    return [totalTasks];
   }
 
-  return Array.from(new Set(milestones));
+  // 4-5 tasks -> 2 gifts: at task 2 and at the end
+  if (totalTasks <= 5) {
+    return [2, totalTasks];
+  }
+
+  // 6+ tasks -> 3 gifts spread out
+  const milestones: number[] = [];
+  milestones.push(Math.round(totalTasks / 3));
+  milestones.push(Math.round((totalTasks * 2) / 3));
+  milestones.push(totalTasks);
+
+  return Array.from(new Set(milestones)).sort((a, b) => a - b);
 }
 export default function Home() {
   const { data: session, status } = useSession();
@@ -87,7 +90,7 @@ export default function Home() {
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
   const isInitialLoad = useRef(true);
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [openWardrobe, setOpenWardrobe] = useState(false);
+  const { isWardrobeOpen, setWardrobeOpen } = useUIStore();
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
   const [loading, setLoading] = useState(true);
   const [quickText, setQuickText] = useState('');
@@ -334,8 +337,8 @@ export default function Home() {
               mouthOpen={!!grab}
               mouthOffset={{ y: -4 }}
               indices={indices}
-              openWardrobe={openWardrobe}
-              onOpenChange={setOpenWardrobe}
+              openWardrobe={isWardrobeOpen}
+              onOpenChange={setWardrobeOpen}
               flyBalance={flyBalance}
               rate={rate}
               done={doneCount}
