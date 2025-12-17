@@ -53,7 +53,7 @@ export default function QuickAddSheet({
 
   useEffect(() => {
     setMounted(true);
-    
+
     // Track visual viewport to handle mobile keyboard
     if (typeof window !== 'undefined' && window.visualViewport) {
       const handleVisualViewportChange = () => {
@@ -64,11 +64,23 @@ export default function QuickAddSheet({
         setKeyboardHeight(Math.max(0, offset));
       };
 
-      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
-      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+      window.visualViewport.addEventListener(
+        'resize',
+        handleVisualViewportChange
+      );
+      window.visualViewport.addEventListener(
+        'scroll',
+        handleVisualViewportChange
+      );
       return () => {
-        window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
-        window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
+        window.visualViewport?.removeEventListener(
+          'resize',
+          handleVisualViewportChange
+        );
+        window.visualViewport?.removeEventListener(
+          'scroll',
+          handleVisualViewportChange
+        );
       };
     }
   }, []);
@@ -163,7 +175,7 @@ export default function QuickAddSheet({
             onClick={() => onOpenChange(false)}
             className="fixed inset-0 z-[999] bg-slate-950/20 backdrop-blur-[2px]"
           />
-          
+
           <motion.div
             initial={{ y: '100%', opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -198,7 +210,11 @@ export default function QuickAddSheet({
                     inputMode="text"
                   />
                   <div className="flex justify-end px-2 mb-2">
-                    <span className={`text-[10px] font-bold ${text.length >= 40 ? 'text-rose-500' : 'text-slate-400'}`}>
+                    <span
+                      className={`text-[10px] font-bold ${
+                        text.length >= 40 ? 'text-rose-500' : 'text-slate-400'
+                      }`}
+                    >
                       {text.length}/45
                     </span>
                   </div>
@@ -245,7 +261,7 @@ export default function QuickAddSheet({
                       ].join(' ')}
                     >
                       <CalendarCheck className="w-4 h-4" />
-                      Saved Tasks
+                      I'll decide later
                     </button>
                   </div>
                 </div>
@@ -290,7 +306,9 @@ export default function QuickAddSheet({
                         ].join(' ')}
                         aria-disabled={isLater}
                         title={
-                          isLater ? 'Repeat is not available for Later' : undefined
+                          isLater
+                            ? 'Repeat is not available for Later'
+                            : undefined
                         }
                       >
                         <RotateCcw className="w-4 h-4 text-purple-700/80 dark:text-purple-200" />
@@ -330,7 +348,8 @@ export default function QuickAddSheet({
                   <div className="mt-2 flex items-start gap-2 rounded-xl bg-purple-50/75 dark:bg-purple-900/30 ring-1 ring-purple-300/40 p-3 text-[13px] text-purple-900/90 dark:text-purple-100/90">
                     <Info className="w-4 h-4 mt-0.5 shrink-0 text-purple-600 dark:text-purple-400" />
                     <span>
-                      Not sure when? We&apos;ll keep it in your <span className="font-bold">Saved Tasks</span> for later.
+                      Not sure when? We&apos;ll keep it in your{' '}
+                      <span className="font-bold">Saved Tasks</span> for later.
                     </span>
                   </div>
                 )}
@@ -349,7 +368,7 @@ export default function QuickAddSheet({
                       'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
                     ].join(' ')}
                   >
-                    <span className="absolute inset-0 bg-gradient-to-b from-white/25 to-transparent pointer-events-none" />
+                    <span className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/25 to-transparent" />
                     <span className="relative z-10 flex items-center justify-center gap-2">
                       {isSubmitting ? (
                         'Adding...'
@@ -388,4 +407,3 @@ export default function QuickAddSheet({
     document.body
   );
 }
-
