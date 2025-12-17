@@ -50,7 +50,7 @@ export function WardrobePanel({
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
   const [visitedCategories, setVisitedCategories] = useState<Set<FilterCategory>>(
-    new Set(['all'])
+    new Set<FilterCategory>(['all'])
   );
   const [actionId, setActionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOrder>('rarity_desc');
