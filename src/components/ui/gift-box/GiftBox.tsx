@@ -46,7 +46,7 @@ export const GiftRive = React.memo(
         // Delay the Rive animation to let the CSS/Framer shake finish (1.5s)
         const timer = setTimeout(() => {
           startOpenInput.fire();
-        }, 1500);
+        }, 500);
         return () => clearTimeout(timer);
       }
     }, [triggerOpen, startOpenInput]);
@@ -78,16 +78,6 @@ type GiftBoxProps = {
 };
 
 export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
-  const shakeVariants: Variants = {
-    idle: { rotate: 0, scale: 1 },
-    shaking: {
-      rotate: [0, -5, 5, -10, 10, -5, 5, 0],
-      scale: [1, 1.1, 1.1, 1.2, 1.2, 1.1, 1],
-      transition: { duration: 1.5, ease: 'easeInOut' },
-    },
-    revealed: { scale: 0, opacity: 0 },
-  };
-
   return (
     <motion.div
       key="gift"
@@ -103,7 +93,6 @@ export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
       }}
     >
       <motion.div
-        variants={shakeVariants}
         animate={phase}
         className="relative w-[450px] h-[450px] md:w-[500px] md:h-[500px]"
       >

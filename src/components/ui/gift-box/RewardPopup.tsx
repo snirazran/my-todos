@@ -119,7 +119,7 @@ export function RewardPopup({
           </motion.div>
 
           {/* Content */}
-          <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
+          <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6 -translate-y-24">
             <motion.div
               key="modal-content"
               initial={{ opacity: 0, scale: 0.9 }}

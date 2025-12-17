@@ -41,7 +41,7 @@ export default function GiftBoxOpening({
       setLoadingText(
         FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)]
       );
-    }, 800);
+    }, 2000);
 
     try {
       // 1. Minimum animation time promise
@@ -127,7 +127,7 @@ export default function GiftBoxOpening({
       )}
 
       {/* Main Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
+      <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6 -translate-y-24">
         <AnimatePresence mode="wait">
           {/* --- GIFT PHASE --- */}
           {phase !== 'revealed' && (
