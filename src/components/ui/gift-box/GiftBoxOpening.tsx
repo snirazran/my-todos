@@ -46,7 +46,7 @@ export default function GiftBoxOpening({
     try {
       // 1. Minimum animation time promise
       const animationPromise = new Promise((resolve) =>
-        setTimeout(resolve, 3000)
+        setTimeout(resolve, 2000)
       );
 
       // 2. API call promise
