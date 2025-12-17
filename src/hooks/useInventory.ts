@@ -48,6 +48,30 @@ export function useInventory(active: boolean = true) {
     mutate(); // Re-validate to be sure
   };
 
+  const markItemSeen = async (itemId: string) => {
+    if (!data?.wardrobe.unseenItems?.includes(itemId)) return;
+
+    // Optimistic update: remove just this item
+    mutate(
+      {
+        ...data,
+        wardrobe: {
+          ...data.wardrobe,
+          unseenItems: data.wardrobe.unseenItems.filter((id) => id !== itemId),
+        },
+      },
+      false
+    );
+
+    await fetch('/api/skins/inventory', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'markOneSeen', itemId }),
+    });
+
+    mutate();
+  };
+
   return {
     data,
     mutate,
@@ -56,5 +80,6 @@ export function useInventory(active: boolean = true) {
     unseenItems: data?.wardrobe.unseenItems ?? [],
     unseenCount: (data?.wardrobe.unseenItems ?? []).length,
     markAllSeen,
+    markItemSeen,
   };
 }

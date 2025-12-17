@@ -45,10 +45,13 @@ export function WardrobePanel({
   onOpenChange: (v: boolean) => void;
   defaultTab?: 'inventory' | 'shop' | 'trade';
 }) {
-  const { data, mutate, unseenItems, markAllSeen } = useInventory(); // shared hook
+  const { data, mutate, unseenItems, markItemSeen } = useInventory(); // shared hook
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
+  const [visitedCategories, setVisitedCategories] = useState<Set<FilterCategory>>(
+    new Set(['all'])
+  );
   const [actionId, setActionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOrder>('rarity_desc');
   const [notif, setNotif] = useState<{
@@ -58,23 +61,11 @@ export function WardrobePanel({
   const [shakeBalance, setShakeBalance] = useState(false);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
 
-  // Handle Mark Seen on Close
-  const prevOpen = React.useRef(open);
-  useEffect(() => {
-    if (prevOpen.current && !open) {
-      markAllSeen();
-    }
-    prevOpen.current = open;
-  }, [open, markAllSeen]);
-
-  // Handle Mark Seen on Tab Change (Leaving Inventory)
-  const prevTab = React.useRef(activeTab);
-  useEffect(() => {
-    if (prevTab.current === 'inventory' && activeTab !== 'inventory') {
-      markAllSeen();
-    }
-    prevTab.current = activeTab;
-  }, [activeTab, markAllSeen]);
+  // Filter change handler to mark category as visited
+  const handleFilterChange = (cat: FilterCategory) => {
+    setActiveFilter(cat);
+    setVisitedCategories((prev) => new Set(prev).add(cat));
+  };
 
   // Compute Badges
   const filterBadges = useMemo(() => {
@@ -96,12 +87,22 @@ export function WardrobePanel({
       }
 
       if (cat) {
-        counts[cat] = (counts[cat] ?? 0) + 1;
+        // Only count if not visited (except 'all', which aggregates everything)
+        // Actually, user wants dot removal on click.
+        // So if cat is in visitedCategories, count is 0 (or hidden).
+        if (!visitedCategories.has(cat)) {
+          counts[cat] = (counts[cat] ?? 0) + 1;
+        }
       }
-      counts['all'] = (counts['all'] ?? 0) + 1;
+      // 'all' badge logic: maybe strictly sum of visible badges? 
+      // Or just total unseen? Usually 'all' shows total unseen.
+      // If we want 'all' dot to clear when clicked, we check visitedCategories.has('all')
+      if (!visitedCategories.has('all')) {
+        counts['all'] = (counts['all'] ?? 0) + 1;
+      }
     });
     return counts;
-  }, [data, unseenItems]);
+  }, [data, unseenItems, visitedCategories]);
 
   // --- Logic (Identical to previous) ---
   const getFilteredItems = (items: ItemDef[]) => {
@@ -155,6 +156,11 @@ export function WardrobePanel({
   };
 
   const handleItemAction = (item: ItemDef) => {
+    // Mark as seen immediately when interacting (equipping or opening)
+    if (unseenItems.includes(item.id)) {
+      markItemSeen(item.id);
+    }
+
     if (item.slot === 'container') {
       setOpeningGiftId(item.id);
     } else {
@@ -349,7 +355,7 @@ export function WardrobePanel({
                 <div className="w-full min-w-0">
                   <FilterBar 
                     active={activeFilter} 
-                    onChange={setActiveFilter}
+                    onChange={handleFilterChange}
                     badges={filterBadges} // NEW
                   />
                 </div>

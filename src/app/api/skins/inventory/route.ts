@@ -108,24 +108,32 @@ export async function PATCH(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
 
-  let body: { action?: string };
+  let body: { action?: string; itemId?: string };
   try {
     body = await req.json();
   } catch {
     return json({ error: 'Invalid JSON' }, 400);
   }
 
-  if (body.action !== 'markSeen') {
-    return json({ error: 'Unknown action' }, 400);
+  await connectMongo();
+
+  if (body.action === 'markOneSeen' && body.itemId) {
+    await UserModel.updateOne(
+      { email: session.user.email },
+      { $pull: { 'wardrobe.unseenItems': body.itemId } }
+    );
+    return json({ ok: true });
   }
 
-  await connectMongo();
-  await UserModel.updateOne(
-    { email: session.user.email },
-    { $set: { 'wardrobe.unseenItems': [] } }
-  );
+  if (body.action === 'markSeen') {
+    await UserModel.updateOne(
+      { email: session.user.email },
+      { $set: { 'wardrobe.unseenItems': [] } }
+    );
+    return json({ ok: true });
+  }
 
-  return json({ ok: true });
+  return json({ error: 'Unknown action' }, 400);
 }export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
