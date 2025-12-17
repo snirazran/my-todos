@@ -190,7 +190,7 @@ export function TradePanel({
 
   // --- Render ---
   return (
-    <div className="relative flex flex-col w-full h-full overflow-y-auto bg-slate-50 dark:bg-black/20">
+    <div className="relative flex flex-col lg:flex-row w-full h-full overflow-y-auto lg:overflow-hidden bg-slate-50 dark:bg-black/20">
       {/* --- RESULT OVERLAY --- */}
       {mounted && tradeResult && 
         createPortal(
@@ -232,14 +232,60 @@ export function TradePanel({
         )
       }
 
-      {/* --- TOP PANEL: CONTRACT --- */}
-      {/* shrink-0 ensures this panel takes only required space and doesn't squish */}
-      <div className="z-10 w-full shrink-0 md:p-4 md:pb-0">
-        <div className="flex flex-col overflow-hidden bg-white border-b shadow-sm dark:bg-slate-900 md:rounded-3xl md:border border-slate-200 dark:border-slate-800">
-          {/* Header & Stats */}
-          <div className="flex items-center justify-between px-4 py-3 border-b md:px-6 md:py-4 border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900">
+      {/* --- INVENTORY (Main View - Order 1) --- */}
+      <div className="flex-1 flex flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto order-1 bg-slate-50 dark:bg-black/20 lg:bg-transparent">
+        <div className="flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4 shrink-0">
+          <h3 className="text-sm font-bold tracking-wider uppercase text-slate-500">
+            Your Inventory
+          </h3>
+          {!availableItems.length && (
+            <span className="text-xs text-slate-400">
+              No tradeable items found
+            </span>
+          )}
+        </div>
+
+        <div className="px-4 pb-96 lg:pb-6 lg:px-6">
+          {availableItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 md:h-64 text-sm border-2 border-dashed text-slate-400 border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50">
+              <p>Your wardrobe is empty (or filtered out).</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-3 gap-3 md:gap-4 pb-4">
+              {availableItems.map((item) => {
+                const owned = inventory[item.id] || 0;
+                const selected = selectedCounts[item.id] || 0;
+                const remaining = owned - selected;
+                const isDimmed = remaining === 0;
+
+                return (
+                  <div key={item.id} className={isDimmed ? 'opacity-50 grayscale pointer-events-none' : ''}>
+                    <ItemCard
+                      item={item}
+                      mode="trade"
+                      ownedCount={owned}
+                      isEquipped={false}
+                      canAfford={true}
+                      actionLoading={false}
+                      selectedCount={selected}
+                      onAction={() => handleSelect(item)}
+                      actionLabel={null}
+                      isNew={unseenItems.includes(item.id)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* --- CONTRACT (Side/Bottom Dock - Order 2) --- */}
+      <div className="fixed bottom-0 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto shrink-0 z-20 order-2 lg:w-[320px] xl:w-[360px] bg-white dark:bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] lg:shadow-[-4px_0_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
             <div>
-              <h3 className="flex items-center gap-2 text-lg font-black uppercase text-slate-800 dark:text-white">
+              <h3 className="flex items-center gap-2 text-base md:text-lg font-black uppercase text-slate-800 dark:text-white">
                 Contract
                 {targetRarity && (
                   <span
@@ -251,24 +297,19 @@ export function TradePanel({
                   </span>
                 )}
               </h3>
-              <p className="hidden md:block text-xs text-slate-500 mt-0.5">
-                Combine 10 items of the same rarity to receive 1 item of higher
-                rarity.
-              </p>
             </div>
             <div className="text-right">
-              <div className="text-xl font-black text-indigo-600 dark:text-indigo-400">
+              <div className="text-lg md:text-xl font-black text-indigo-600 dark:text-indigo-400">
                 {selectedIds.length}
                 <span className="text-slate-300">/10</span>
               </div>
             </div>
-          </div>
+        </div>
 
-          <div className="flex flex-col md:flex-row">
-            {/* Slots Grid - Centered on desktop */}
-            <div className="flex justify-center flex-1 p-4 md:p-6 bg-slate-100/50 dark:bg-slate-950/30">
-              {/* Max width added to keep the boxes square and nice looking on wide screens */}
-              <div className="grid w-full grid-cols-5 gap-x-2 gap-y-2 md:gap-x-3 md:gap-y-3 md:max-w-lg">
+        {/* Scrollable Content (Sidebar) or Fixed (Bottom Bar) */}
+        <div className="flex-1 p-4 flex flex-col pointer-events-auto w-full max-w-md mx-auto lg:max-w-none lg:mx-0 lg:overflow-y-auto">
+           {/* Grid */}
+           <div className="grid grid-cols-5 gap-2 md:gap-3 mb-4">
                 {Array.from({ length: 10 }).map((_, i) => {
                   const itemId = selectedIds[i];
                   const item = itemId
@@ -282,16 +323,16 @@ export function TradePanel({
                       layout
                       onClick={() => item && handleRemove(i)}
                       className={cn(
-                        'aspect-square rounded-lg md:rounded-xl border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200',
+                        'aspect-square rounded-lg border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200',
                         !item &&
-                          'border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800/50',
+                          'border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50',
                         item &&
                           config &&
                           cn(config.border, config.bg, 'shadow-sm')
                       )}
                     >
                       {item ? (
-                        <div className="relative flex items-center justify-center w-full h-full p-1">
+                        <div className="relative flex items-center justify-center w-full h-full p-0.5">
                           <Frog
                             className="object-contain w-full h-full"
                             indices={{
@@ -304,38 +345,30 @@ export function TradePanel({
                             width={80}
                             height={80}
                           />
-                          {/* Hover to remove indicator */}
-                          <div className="absolute inset-0 flex items-center justify-center transition-opacity opacity-0 bg-red-500/10 hover:opacity-100">
-                            <span className="text-xs font-bold text-red-500">
-                              REMOVE
-                            </span>
-                          </div>
                         </div>
                       ) : (
-                        <span className="text-xs font-bold text-slate-300 dark:text-slate-700">
+                        <span className="text-[10px] font-bold text-slate-300 dark:text-slate-700">
                           {i + 1}
                         </span>
                       )}
                     </motion.button>
                   );
                 })}
-              </div>
-            </div>
-
-            {/* Actions Side/Bottom Panel */}
-            <div className="flex flex-col justify-center p-4 space-y-3 bg-white border-t md:p-6 md:border-t-0 md:border-l border-slate-100 dark:border-slate-800 dark:bg-slate-900 shrink-0 md:w-64">
-              {error && (
-                <div className="flex items-center gap-2 mb-2 text-xs font-bold text-rose-500">
+           </div>
+           
+           <div className="mt-auto">
+             {error && (
+                <div className="flex items-center gap-2 mb-2 text-xs font-bold text-rose-500 justify-center">
                   <AlertCircle size={14} /> {error}
                 </div>
               )}
 
-              <div className="flex gap-2 md:space-y-3 md:flex-col">
+             <div className="flex gap-2">
                 {selectedIds.length > 0 && (
                   <Button
                     variant="outline"
                     onClick={handleClear}
-                    className="h-12 shrink-0 border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 md:w-full"
+                    className="h-12 shrink-0 border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 px-3"
                   >
                     Clear
                   </Button>
@@ -344,14 +377,13 @@ export function TradePanel({
                   disabled={selectedIds.length !== 10 || isTrading}
                   onClick={handleConfirmTrade}
                   className={cn(
-                    'group relative flex-1 h-12 md:h-20 font-black uppercase tracking-wider transition-all md:w-full md:text-xl overflow-hidden', // Added group and overflow-hidden
+                    'group relative flex-1 h-12 md:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm md:text-base',
                     selectedIds.length === 10
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-2xl shadow-indigo-500/50 ring-1 ring-indigo-400/30' // Stronger shadow
+                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/30'
                       : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
                   )}
                 >
-                  {/* Shine effect */}
-                  {selectedIds.length === 10 && ( // Only show shine if button is active
+                  {selectedIds.length === 10 && (
                     <span className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine" />
                   )}
 
@@ -359,67 +391,15 @@ export function TradePanel({
                     <Sparkles className="w-5 h-5 mr-2 animate-spin" />
                   ) : (
                     <>
-                      Trade Up <ArrowUp size={20} className="ml-2" />
+                      Trade Up <ArrowUp size={18} className="ml-2" />
                     </>
                   )}
                 </Button>
-              </div>
-              <p className="text-[10px] text-center text-slate-400 hidden md:block">
-                Select 10 items from your inventory below to fill the contract.
+             </div>
+             <p className="text-[10px] text-center text-slate-400 mt-2">
+                Combine 10 items to upgrade rarity.
               </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* --- BOTTOM PANEL: INVENTORY --- */}
-      <div className="flex flex-col w-full md:px-6 md:pb-6 md:pt-4">
-        {/* Inventory Header */}
-        <div className="flex items-center justify-between px-4 mb-3 md:px-0 shrink-0">
-          <h3 className="text-sm font-bold tracking-wider uppercase text-slate-500">
-            Your Inventory
-          </h3>
-          {!availableItems.length && (
-            <span className="text-xs text-slate-400">
-              No tradeable items found
-            </span>
-          )}
-        </div>
-
-          {/* Scrollable Area */}
-        <div className="px-4 pb-24 md:px-0 md:pb-0">
-          {availableItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-sm border-2 border-dashed text-slate-400 border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50">
-              <p>Your wardrobe is empty (or filtered out).</p>
-            </div>
-          ) : (
-            // Updated grid to match WardrobePanel for consistent item size
-            <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-4">
-              {availableItems.map((item) => {
-                const owned = inventory[item.id] || 0;
-                const selected = selectedCounts[item.id] || 0;
-                const remaining = owned - selected;
-                const isDimmed = remaining === 0;
-
-                return (
-                  <div key={item.id} className={isDimmed ? 'opacity-50 grayscale pointer-events-none' : ''}>
-                    <ItemCard
-                      item={item}
-                      mode="trade"
-                      ownedCount={owned}
-                      isEquipped={false} // We don't show equipped status in trade, or maybe we should? Keeping it false for now as per logic
-                      canAfford={true}
-                      actionLoading={false}
-                      selectedCount={selected}
-                      onAction={() => handleSelect(item)}
-                      actionLabel={null}
-                      isNew={unseenItems.includes(item.id)}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
+           </div>
         </div>
       </div>
     </div>

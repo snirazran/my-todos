@@ -141,7 +141,7 @@ export function ItemCard({
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
       className={cn(
-        'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl md:rounded-[24px] border-[3px] overflow-hidden cursor-pointer min-h-[200px] active:scale-[0.98] w-full max-w-[240px] mx-auto',
+        'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl md:rounded-[24px] border-[3px] overflow-hidden cursor-pointer active:scale-[0.98] w-full max-w-[240px] mx-auto',
         config.border,
         config.bg,
         isEquipped
@@ -213,7 +213,7 @@ export function ItemCard({
             </div>
           ) : (
             <Frog
-              className="w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[20%] md:[@media(max-height:800px)]:translate-y-[10%]"
+              className="w-[125%] h-[125%] object-contain translate-y-[20%] md:translate-y-[10%]"
               indices={previewIndices}
               width={180}
               height={180}
