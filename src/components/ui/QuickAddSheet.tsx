@@ -53,7 +53,24 @@ export default function QuickAddSheet({
 
   useEffect(() => {
     setMounted(true);
-    // ... rest of keyboard logic
+    
+    // Track visual viewport to handle mobile keyboard
+    if (typeof window !== 'undefined' && window.visualViewport) {
+      const handleVisualViewportChange = () => {
+        const vv = window.visualViewport;
+        if (!vv) return;
+        // Calculate how much the keyboard is covering
+        const offset = window.innerHeight - vv.height;
+        setKeyboardHeight(Math.max(0, offset));
+      };
+
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+      return () => {
+        window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
+      };
+    }
   }, []);
 
   // Handle manual focus with a slight delay
@@ -158,24 +175,28 @@ export default function QuickAddSheet({
             <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
               <div className="rounded-[28px] bg-white/95 dark:bg-slate-950/90 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_24px_48px_rgba(15,23,42,0.25)] p-4">
                 {/* Input */}
-                <input
-                  ref={inputRef}
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  placeholder="New task?"
-                  disabled={isSubmitting}
-                  dir="ltr"
-                  style={{ direction: 'ltr', textAlign: 'left' }}
-                  className="w-full h-12 px-4 mb-3 rounded-[16px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50 text-lg font-medium text-left"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSubmit();
-                    }
-                    if (e.key === 'Escape') onOpenChange(false);
-                  }}
-                  inputMode="text"
-                />
+                <div dir="ltr" className="w-full">
+                  <input
+                    ref={inputRef}
+                    value={text}
+                    onChange={(e) => setText(e.target.value)}
+                    placeholder="New task?"
+                    disabled={isSubmitting}
+                    autoFocus
+                    spellCheck={false}
+                    autoComplete="off"
+                    style={{ direction: 'ltr', textAlign: 'left' }}
+                    className="w-full h-12 px-4 mb-3 rounded-[16px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50 text-lg font-medium text-left"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSubmit();
+                      }
+                      if (e.key === 'Escape') onOpenChange(false);
+                    }}
+                    inputMode="text"
+                  />
+                </div>
 
                 {/* Segmented control */}
                 <div className="mb-3">
