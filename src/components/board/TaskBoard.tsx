@@ -442,7 +442,7 @@ export default function TaskBoard({
       </div>
 
       {/* GLOBAL BOTTOM AREA - Floating Toolbar */}
-      <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+20px)] pointer-events-none">
+      <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+80px)] pointer-events-none">
         <div className="pointer-events-auto mx-auto w-full max-w-[400px] flex items-center gap-3">
           {/* Backlog Trigger (Left) */}
           <div className="shrink-0">
