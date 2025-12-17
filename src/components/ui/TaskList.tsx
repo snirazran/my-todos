@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import React, { useState } from 'react';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
+import TaskMenu from '../board/TaskMenu';
 
 interface Task {
   id: string;
@@ -47,24 +48,17 @@ export default function TaskList({
   const vSet = visuallyCompleted ?? new Set<string>();
 
   const [busy, setBusy] = useState(false);
-  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [dialog, setDialog] = useState<{
     task: Task;
     kind: 'regular' | 'weekly' | 'backlog';
   } | null>(null);
 
-  React.useEffect(() => {
-    if (!menuFor) return;
-    const close = () => setMenuFor(null);
-    window.addEventListener('click', close);
-    return () => window.removeEventListener('click', close);
-  }, [menuFor]);
-
   // Listen for other menus opening to auto-close this one
   React.useEffect(() => {
     const closeIfOther = (e: Event) => {
       const id = (e as CustomEvent<{ id?: string }>).detail?.id;
-      setMenuFor((curr) => (curr && curr !== id ? null : curr));
+      setMenu((curr) => (curr && curr.id !== id ? null : curr));
     };
 
     window.addEventListener('task-menu-open', closeIfOther as EventListener);
@@ -92,7 +86,7 @@ export default function TaskList({
     try {
       await onDeleteToday(taskId);
       setDialog(null);
-      setMenuFor(null);
+      setMenu(null);
     } finally {
       setBusy(false);
     }
@@ -105,7 +99,7 @@ export default function TaskList({
     try {
       await onDeleteFromWeek(taskId);
       setDialog(null);
-      setMenuFor(null);
+      setMenu(null);
     } finally {
       setBusy(false);
     }
@@ -171,7 +165,7 @@ export default function TaskList({
           <AnimatePresence initial={false} mode="popLayout">
             {tasks.map((task, i) => {
               const isDone = task.completed || vSet.has(task.id);
-              const isMenuOpen = menuFor === task.id;
+              const isMenuOpen = menu?.id === task.id;
 
               return (
                 <motion.div
@@ -286,50 +280,36 @@ export default function TaskList({
                       `}
                         onClick={(e) => {
                           e.stopPropagation();
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          const id = `task:${task.id}`;
                           window.dispatchEvent(
                             new CustomEvent('task-menu-open', {
-                              detail: { id: `task:${task.id}` },
+                              detail: { id },
                             })
                           );
-                          setMenuFor((prev) =>
-                            prev === task.id ? null : task.id
-                          );
+                          
+                          setMenu((prev) => {
+                            if (prev?.id === task.id) return null;
+                            const MENU_W = 160;
+                            const MENU_H = 48; // One item
+                            const GAP = 8;
+                            const MARGIN = 10;
+                            const vw = window.innerWidth;
+                            const vh = window.innerHeight;
+                            
+                            let left = rect.left + rect.width / 2 - MENU_W / 2;
+                            left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
+                            
+                            let top = rect.bottom + GAP;
+                            if (top + MENU_H > vh - MARGIN) {
+                              top = rect.top - MENU_H - GAP;
+                            }
+                            return { id: task.id, top, left };
+                          });
                         }}
                       >
                         <EllipsisVertical className="w-5 h-5" />
                       </button>
-
-                      {/* Dropdown Menu */}
-                      <AnimatePresence>
-                        {isMenuOpen && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                            transition={{ duration: 0.1 }}
-                            className="absolute right-0 top-full mt-2 z-[100] w-48 rounded-xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-700/70 dark:bg-slate-900 overflow-hidden"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <div className="p-1">
-                              <button
-                                className="flex items-center justify-start w-full gap-2 px-3 py-2 text-sm font-medium text-red-600 transition-colors rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
-                                onClick={() => {
-                                  setMenuFor(null);
-                                  setDialog({
-                                    task,
-                                    kind: taskKind(task) as
-                                      | 'regular'
-                                      | 'weekly'
-                                      | 'backlog',
-                                  });
-                                }}
-                              >
-                                Delete Task
-                              </button>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
                     </div>
                   </div>
                 </motion.div>
@@ -344,6 +324,23 @@ export default function TaskList({
           </div>
         </div>
       </div>
+
+      <TaskMenu
+        menu={menu}
+        onClose={() => setMenu(null)}
+        onDelete={() => {
+          if (menu) {
+            const t = tasks.find((it) => it.id === menu.id);
+            if (t) {
+              setDialog({
+                task: t,
+                kind: taskKind(t) as 'regular' | 'weekly' | 'backlog',
+              });
+            }
+          }
+          setMenu(null);
+        }}
+      />
 
       <DeleteDialog
         open={!!dialog}

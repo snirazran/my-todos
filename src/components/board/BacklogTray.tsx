@@ -1,9 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
+import TaskMenu from './TaskMenu';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 
 interface Props {
@@ -58,16 +58,6 @@ export default React.memo(function BacklogTray({
       scrollRef.current.style.touchAction = 'pan-x';
     }
   }, [activeDragId]);
-
-  // Close menu on click outside
-  useEffect(() => {
-    if (!menu) return;
-    const close = () => setMenu(null);
-    // Use capture to ensure we catch it before other stopPropagation calls might interfere, 
-    // or just standard bubbling. Standard is usually fine if we stopProp on the menu itself.
-    window.addEventListener('pointerdown', close);
-    return () => window.removeEventListener('pointerdown', close);
-  }, [menu]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!scrollRef.current) return;
@@ -168,7 +158,7 @@ export default React.memo(function BacklogTray({
                       onToggleMenu={(rect) => {
                         setMenu((prev) => {
                           if (prev?.id === t.id) return null;
-                          const MENU_W = 176;
+                          const MENU_W = 160;
                           const MENU_H = 60;
                           const GAP = 8; // increased gap
                           const MARGIN = 10;
@@ -211,27 +201,17 @@ export default React.memo(function BacklogTray({
             </div>
           </motion.div>
 
-          {/* Menu Portal */}
-          {menu &&
-            createPortal(
-              <div
-                className="fixed z-[2000] w-44 max-w-[82vw] origin-top rounded-xl border border-slate-200/80 bg-white shadow-xl dark:border-slate-700/70 dark:bg-slate-900"
-                style={{ top: menu.top, left: menu.left }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <button
-                  className="flex w-full items-center justify-center gap-2 px-3 py-2 text-sm text-slate-800 rounded-xl hover:bg-slate-50 dark:text-slate-100 dark:hover:bg-slate-800/70"
-                  onClick={() => {
-                    setMenu(null);
-                    const t = tasks.find((it) => it.id === menu.id);
-                    if (t) setConfirmItem(t);
-                  }}
-                >
-                  Delete
-                </button>
-              </div>,
-              document.body
-            )}
+          <TaskMenu
+            menu={menu}
+            onClose={() => setMenu(null)}
+            onDelete={() => {
+              if (menu) {
+                const t = tasks.find((it) => it.id === menu.id);
+                if (t) setConfirmItem(t);
+              }
+              setMenu(null);
+            }}
+          />
 
           {/* Delete Dialog */}
           <DeleteDialog
