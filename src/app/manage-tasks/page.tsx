@@ -158,7 +158,6 @@ export default function ManageTasksPage() {
       }}
     >
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute -left-24 top-[-12%] h-80 w-80 rounded-full bg-purple-300/25 blur-3xl dark:bg-purple-700/20" />
         <div className="absolute right-[-14%] top-[6%] h-72 w-72 rounded-full bg-indigo-200/30 blur-3xl dark:bg-indigo-700/25" />
       </div>
 
