@@ -25,6 +25,7 @@ export type UserStatistics = {
 export type UserWardrobe = {
   equipped: Partial<Record<WardrobeSlot, string | null>>;
   inventory: Record<string, number>;
+  unseenItems?: string[];
   flies: number;
   flyDaily?: DailyFlyProgress;
 };

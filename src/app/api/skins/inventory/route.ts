@@ -32,7 +32,7 @@ async function ensureWardrobe(email: string) {
       nextEquipped[slot] = null;
     }
   }
-  const next: UserWardrobe = { ...current, equipped: nextEquipped };
+  const next: UserWardrobe = { ...current, equipped: nextEquipped, unseenItems: current.unseenItems ?? [] };
 
   if (
     !user.wardrobe ||
@@ -104,7 +104,29 @@ export async function PUT(req: NextRequest) {
   return json({ ok: true });
 }
 
-export async function POST(req: NextRequest) {
+export async function PATCH(req: NextRequest) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
+
+  let body: { action?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return json({ error: 'Invalid JSON' }, 400);
+  }
+
+  if (body.action !== 'markSeen') {
+    return json({ error: 'Unknown action' }, 400);
+  }
+
+  await connectMongo();
+  await UserModel.updateOne(
+    { email: session.user.email },
+    { $set: { 'wardrobe.unseenItems': [] } }
+  );
+
+  return json({ ok: true });
+}export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
 
@@ -129,13 +151,19 @@ export async function POST(req: NextRequest) {
     const init: UserWardrobe = {
       equipped: {},
       inventory: { [itemId]: 1 },
+      unseenItems: [itemId],
       flies: 0,
     };
     await UserModel.updateOne({ _id: user._id }, { $set: { wardrobe: init } });
   } else {
+    const update: any = {
+      $inc: { [`wardrobe.inventory.${itemId}`]: 1 },
+      $addToSet: { 'wardrobe.unseenItems': itemId }
+    };
+
     await UserModel.updateOne(
       { _id: user._id },
-      { $inc: { [`wardrobe.inventory.${itemId}`]: 1 } }
+      update
     );
   }
 

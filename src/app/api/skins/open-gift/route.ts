@@ -90,14 +90,17 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. Atomic swap: decrement box, increment prize
+  const update: any = {
+    $inc: { 
+        [`wardrobe.inventory.${giftBoxId}`]: -1,
+        [`wardrobe.inventory.${prize.id}`]: 1
+    },
+    $addToSet: { 'wardrobe.unseenItems': prize.id }
+  };
+
   await UserModel.updateOne(
     { _id: user._id },
-    { 
-        $inc: { 
-            [`wardrobe.inventory.${giftBoxId}`]: -1,
-            [`wardrobe.inventory.${prize.id}`]: 1
-        } 
-    }
+    update
   );
 
   return json({ ok: true, prize });

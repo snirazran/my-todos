@@ -7,6 +7,7 @@ import { Shirt, Sparkles } from 'lucide-react';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
+import { useInventory } from '@/hooks/useInventory';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle>;
@@ -41,6 +42,8 @@ export function FrogDisplay({
   giftsClaimed,
   isCatching,
 }: Props) {
+  const { unseenCount } = useInventory();
+
   return (
     // Added mb-12 to create the requested space from the tabs below
     <div className={`${className} flex flex-col items-center mb-6 md:mb-12 relative`}>
@@ -131,6 +134,11 @@ export function FrogDisplay({
                 >
                   <div className="absolute inset-0 bg-violet-50 dark:bg-violet-900/20 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
                   <Shirt className="relative w-6 h-6 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
+                  {unseenCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-in zoom-in duration-300 shadow-sm z-20">
+                      {unseenCount > 9 ? '9+' : unseenCount}
+                    </span>
+                  )}
                 </button>      </div>
 
       <WardrobePanel open={openWardrobe} onOpenChange={onOpenChange} />

@@ -93,6 +93,7 @@ export function ItemCard({
   actionLoading,
   mode,
   selectedCount,
+  isNew,
 }: {
   item: ItemDef;
   ownedCount: number;
@@ -103,6 +104,7 @@ export function ItemCard({
   actionLoading: boolean;
   mode: 'inventory' | 'shop' | 'trade';
   selectedCount?: number;
+  isNew?: boolean;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
@@ -148,6 +150,13 @@ export function ItemCard({
         !isOwned && mode === 'shop' && !canAfford && 'opacity-80'
       )}
     >
+      {/* NEW Badge */}
+      {isNew && (
+        <div className="absolute top-0 right-0 z-40 px-2 py-1 text-[9px] font-black text-white bg-red-500 rounded-bl-xl shadow-sm animate-pulse">
+          NEW
+        </div>
+      )}
+
       {/* Selected Indicator */}
       <AnimatePresence>
         {isEquipped && (

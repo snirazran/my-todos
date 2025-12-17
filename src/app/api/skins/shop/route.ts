@@ -47,17 +47,20 @@ export async function POST(req: NextRequest) {
 
   // Transaction: Atomic check-and-update to prevent race conditions
   // We match the user AND ensure they have enough flies in the same query.
+  const update: any = {
+    $inc: {
+      [`wardrobe.inventory.${itemId}`]: 1,
+      'wardrobe.flies': -price,
+    },
+    $addToSet: { 'wardrobe.unseenItems': itemId }
+  };
+
   const result = await UserModel.updateOne(
     {
       _id: user._id,
       'wardrobe.flies': { $gte: price },
     },
-    {
-      $inc: {
-        [`wardrobe.inventory.${itemId}`]: 1,
-        'wardrobe.flies': -price,
-      },
-    }
+    update
   );
 
   if (result.modifiedCount === 0) {

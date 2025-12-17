@@ -1,7 +1,6 @@
-'use client';
-
-import useSWR from 'swr';
+import { useInventory } from '@/hooks/useInventory';
 import { useMemo, useState, useEffect } from 'react';
+import React from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Lock, Shirt, X, ArrowLeft } from 'lucide-react';
@@ -20,47 +19,21 @@ import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 
 /* ---------------- Types & Data ---------------- */
+// Remove ApiData and fetcher as they are in useInventory now (or types are imported/inferred)
+// But ApiData is used locally? Typescript might infer.
+// Let's keep ApiData type definition if it's used elsewhere, but useInventory returns typed data.
 type ApiData = {
   wardrobe: {
     equipped: Partial<Record<WardrobeSlot, string | null>>;
     inventory: Record<string, number>;
+    unseenItems?: string[];
     flies: number;
   };
   catalog: ItemDef[];
 };
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
-
 /* ---------------- Toast Component ---------------- */
-function Notification({
-  message,
-  type,
-  onClose,
-}: {
-  message: string | null;
-  type: 'error' | 'success' | null;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    if (message) {
-      const t = setTimeout(onClose, 2000);
-      return () => clearTimeout(t);
-    }
-  }, [message, onClose]);
-
-  if (!message) return null;
-
-  return (
-    <div
-      className={cn(
-        'absolute top-4 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-2 px-4 py-2 rounded-full shadow-xl text-sm font-bold animate-in fade-in slide-in-from-top-4 duration-200 pointer-events-none whitespace-nowrap',
-        type === 'error' ? 'bg-red-500 text-white' : 'bg-emerald-500 text-white'
-      )}
-    >
-      {message}
-    </div>
-  );
-}
+// ... (keep Notification)
 
 /* ---------------- Main Panel ---------------- */
 export function WardrobePanel({
@@ -72,10 +45,7 @@ export function WardrobePanel({
   onOpenChange: (v: boolean) => void;
   defaultTab?: 'inventory' | 'shop' | 'trade';
 }) {
-  const { data, mutate } = useSWR<ApiData>(
-    open ? '/api/skins/inventory' : null,
-    fetcher
-  );
+  const { data, mutate, unseenItems, markAllSeen } = useInventory(); // shared hook
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
@@ -88,8 +58,52 @@ export function WardrobePanel({
   const [shakeBalance, setShakeBalance] = useState(false);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
 
+  // Handle Mark Seen on Close
+  const prevOpen = React.useRef(open);
+  useEffect(() => {
+    if (prevOpen.current && !open) {
+      markAllSeen();
+    }
+    prevOpen.current = open;
+  }, [open, markAllSeen]);
+
+  // Handle Mark Seen on Tab Change (Leaving Inventory)
+  useEffect(() => {
+    if (activeTab !== 'inventory') {
+      markAllSeen();
+    }
+  }, [activeTab, markAllSeen]);
+
+  // Compute Badges
+  const filterBadges = useMemo(() => {
+    if (!data || !unseenItems.length) return {};
+    const counts: Partial<Record<FilterCategory, number>> = {};
+    
+    unseenItems.forEach((id) => {
+      const item = data.catalog.find((i) => i.id === id);
+      if (!item) return;
+
+      let cat: FilterCategory | null = null;
+      if (item.slot === 'container') cat = 'container';
+      else if (item.slot === 'hat') cat = 'hat';
+      else if (item.slot === 'scarf') cat = 'scarf';
+      else if (item.slot === 'hand_item') cat = 'held';
+      else if (item.slot === 'skin') {
+        if (item.rarity === 'epic' || item.rarity === 'legendary') cat = 'costume';
+        else cat = 'body';
+      }
+
+      if (cat) {
+        counts[cat] = (counts[cat] ?? 0) + 1;
+      }
+      counts['all'] = (counts['all'] ?? 0) + 1;
+    });
+    return counts;
+  }, [data, unseenItems]);
+
   // --- Logic (Identical to previous) ---
   const getFilteredItems = (items: ItemDef[]) => {
+    // ... (logic remains same)
     let result = items;
     if (activeFilter !== 'all') {
       if (activeFilter === 'costume') {
@@ -168,6 +182,11 @@ export function WardrobePanel({
           ...data.wardrobe.inventory,
           [item.id]: currentCount + 1,
         },
+        // Optimistically add to unseen items? User said "remove the new from the items ive seen" if I go to shop.
+        // Actually, logic is simpler: let the API handle the addition to unseen. 
+        // We re-fetch or rely on API response.
+        // But for smoothness, we might want to manually add it to unseen here if we want immediate feedback?
+        // Let's rely on mutate() below which fetches real data.
       },
     };
     mutate(newData, false);
@@ -224,18 +243,13 @@ export function WardrobePanel({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent
           className={cn(
-          // 1. Base Styles (Resetting defaults)
+          // ... (keep existing classes)
           'fixed z-50 flex flex-col gap-0 bg-slate-50 dark:bg-slate-950 p-0 shadow-none outline-none overflow-hidden',
-
-          // 2. MOBILE: FORCE FULL SCREEN (The Fix)
-          // We must explicitly set translate-x-0 and top-0 to override the centering logic
           'top-0 left-0 translate-x-0 translate-y-0',
           'w-full h-[100dvh] max-w-none',
           'inset-0 border-none rounded-none',
-          'data-[state=open]:slide-in-from-bottom-full data-[state=open]:slide-in-from-top-0', // Optional: Makes it slide up like a sheet
-
-          // 3. DESKTOP: Restore Floating Modal Look
-          'md:top-[50%] md:left-[50%] md:-translate-x-1/2 md:-translate-y-1/2', // Re-apply centering
+          'data-[state=open]:slide-in-from-bottom-full data-[state=open]:slide-in-from-top-0',
+          'md:top-[50%] md:left-[50%] md:-translate-x-1/2 md:-translate-y-1/2',
           'md:w-[95vw] md:max-w-[900px] md:h-[85vh] md:max-h-[90vh]',
           'md:border-4 md:border-slate-200 md:dark:border-slate-800 md:rounded-[36px] md:shadow-2xl'
         )}
@@ -306,9 +320,12 @@ export function WardrobePanel({
                 <TabsList className="flex-1 h-11 md:h-14 bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl md:rounded-[20px] border border-slate-200 dark:border-slate-700">
                   <TabsTrigger
                     value="inventory"
-                    className="flex-1 h-full rounded-lg md:rounded-xl text-xs md:text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"
+                    className="flex-1 h-full rounded-lg md:rounded-xl text-xs md:text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all relative"
                   >
                     Inventory
+                    {unseenItems.length > 0 && (
+                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    )}
                   </TabsTrigger>
                   <TabsTrigger
                     value="shop"
@@ -329,7 +346,11 @@ export function WardrobePanel({
               {/* UPDATED WRAPPER: Just a plain container, FilterBar handles the bleeding */}
               {activeTab !== 'trade' && (
                 <div className="w-full min-w-0">
-                  <FilterBar active={activeFilter} onChange={setActiveFilter} />
+                  <FilterBar 
+                    active={activeFilter} 
+                    onChange={setActiveFilter}
+                    badges={filterBadges} // NEW
+                  />
                 </div>
               )}
             </div>
@@ -373,6 +394,7 @@ export function WardrobePanel({
                         actionLoading={actionId === item.id}
                         onAction={() => handleItemAction(item)}
                         actionLabel={null}
+                        isNew={unseenItems.includes(item.id)} // NEW
                       />
                     ))}
                   </div>

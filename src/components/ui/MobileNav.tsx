@@ -5,12 +5,14 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Home, History, LayoutDashboard, Shirt } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useUIStore } from '@/lib/uiStore';
+import { useInventory } from '@/hooks/useInventory';
 
 export default function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
   const { openWardrobe } = useUIStore();
+  const { unseenCount } = useInventory();
 
   if (!session) return null;
 
@@ -52,7 +54,14 @@ export default function MobileNav() {
           
           const content = (
             <>
-              <Icon className={`w-6 h-6 mb-1 ${isActive ? 'fill-current/20' : ''}`} />
+              <div className="relative">
+                <Icon className={`w-6 h-6 mb-1 ${isActive ? 'fill-current/20' : ''}`} />
+                {item.label === 'Inventory' && unseenCount > 0 && (
+                  <span className="absolute -top-1 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full border-2 border-white dark:border-slate-900 animate-in zoom-in duration-300 shadow-sm">
+                    {unseenCount > 9 ? '9+' : unseenCount}
+                  </span>
+                )}
+              </div>
               <span className="text-[10px] font-medium">{item.label}</span>
             </>
           );

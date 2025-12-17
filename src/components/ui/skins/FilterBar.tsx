@@ -37,9 +37,11 @@ const CATEGORY_CONFIG: Record<
 export function FilterBar({
   active,
   onChange,
+  badges,
 }: {
   active: FilterCategory;
   onChange: (s: FilterCategory) => void;
+  badges?: Partial<Record<FilterCategory, number>>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -147,6 +149,8 @@ export function FilterBar({
         {categories.map((cat) => {
           const conf = CATEGORY_CONFIG[cat];
           const isActive = active === cat;
+          const badgeCount = badges?.[cat] ?? 0;
+          
           return (
             <button
               key={cat}
@@ -161,7 +165,7 @@ export function FilterBar({
                 onChange(cat);
               }}
               className={cn(
-                'flex-none flex items-center gap-2 px-5 py-3 rounded-2xl transition-all duration-200 border-[2px] shadow-sm select-none',
+                'relative flex-none flex items-center gap-2 px-5 py-3 rounded-2xl transition-all duration-200 border-[2px] shadow-sm select-none',
                 'text-sm font-bold whitespace-nowrap',
                 isActive
                   ? 'bg-purple-600 border-purple-600 text-white shadow-purple-500/30'
@@ -170,6 +174,11 @@ export function FilterBar({
             >
               {conf.icon}
               {conf.label}
+              {badgeCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full border-2 border-white dark:border-slate-800 shadow-sm animate-in zoom-in">
+                  {badgeCount}
+                </span>
+              )}
             </button>
           );
         })}
