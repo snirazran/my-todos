@@ -144,19 +144,14 @@ export function ItemCard({
         'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl md:rounded-[24px] border-[3px] overflow-hidden cursor-pointer min-h-[200px] active:scale-[0.98]',
         config.border,
         config.bg,
-        isEquipped || isSelected
-          ? 'bg-green-50 dark:bg-green-900/20 border-green-500 dark:border-green-500 shadow-[0_0_15px_rgba(34,197,94,0.4)]'
+        isEquipped
+          ? cn(config.shadow)
+          : isSelected
+          ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-500 dark:border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)]'
           : cn(config.shadow, config.hoverGlow),
         !isOwned && mode === 'shop' && !canAfford && 'opacity-80'
       )}
     >
-      {/* NEW Badge */}
-      {isNew && (
-        <div className="absolute top-0 right-0 z-40 px-2 py-1 text-[9px] font-black text-white bg-red-500 rounded-bl-xl shadow-sm animate-pulse">
-          NEW
-        </div>
-      )}
-
       {/* Selected Indicator */}
       <AnimatePresence>
         {isEquipped && (
@@ -164,7 +159,7 @@ export function ItemCard({
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            className="absolute z-30 p-1 text-white bg-green-500 rounded-full shadow-md top-2 right-2"
+            className="absolute z-30 p-1 text-white bg-green-500 rounded-full shadow-md top-1.5 right-1.5"
           >
             <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
           </motion.div>
@@ -203,6 +198,13 @@ export function ItemCard({
         )}
       >
         <div className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine" />
+
+        {/* NEW Badge (Moved) */}
+        {isNew && (
+          <div className="absolute top-0 left-0 z-50 px-2 py-1 text-[9px] font-black text-white bg-red-500 rounded-br-xl shadow-sm animate-pulse">
+            NEW
+          </div>
+        )}
 
         <div className="absolute inset-0 z-10 flex items-end justify-center">
           {item.slot === 'container' ? (
