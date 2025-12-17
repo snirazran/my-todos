@@ -190,8 +190,7 @@ export function TradePanel({
 
   // --- Render ---
   return (
-    // Changed: Removed grid-cols-12. Used flex-col to stack Top (Contract) and Bottom (Inventory)
-    <div className="relative flex flex-col w-full h-full md:overflow-hidden bg-slate-50 dark:bg-black/20">
+    <div className="relative flex flex-col w-full h-full overflow-y-auto bg-slate-50 dark:bg-black/20">
       {/* --- RESULT OVERLAY --- */}
       {mounted && tradeResult && 
         createPortal(
@@ -235,7 +234,7 @@ export function TradePanel({
 
       {/* --- TOP PANEL: CONTRACT --- */}
       {/* shrink-0 ensures this panel takes only required space and doesn't squish */}
-      <div className="z-10 w-full shrink-0 md:p-6 md:pb-0">
+      <div className="z-10 w-full shrink-0 md:p-4 md:pb-0">
         <div className="flex flex-col overflow-hidden bg-white border-b shadow-sm dark:bg-slate-900 md:rounded-3xl md:border border-slate-200 dark:border-slate-800">
           {/* Header & Stats */}
           <div className="flex items-center justify-between px-4 py-3 border-b md:px-6 md:py-4 border-slate-100 dark:border-slate-800 shrink-0 bg-slate-50/50 dark:bg-slate-900">
@@ -269,7 +268,7 @@ export function TradePanel({
             {/* Slots Grid - Centered on desktop */}
             <div className="flex justify-center flex-1 p-4 md:p-6 bg-slate-100/50 dark:bg-slate-950/30">
               {/* Max width added to keep the boxes square and nice looking on wide screens */}
-              <div className="grid w-full grid-cols-5 gap-x-2 gap-y-3 md:gap-x-4 md:gap-y-4 md:max-w-2xl">
+              <div className="grid w-full grid-cols-5 gap-x-2 gap-y-2 md:gap-x-3 md:gap-y-3 md:max-w-lg">
                 {Array.from({ length: 10 }).map((_, i) => {
                   const itemId = selectedIds[i];
                   const item = itemId
@@ -374,8 +373,7 @@ export function TradePanel({
       </div>
 
       {/* --- BOTTOM PANEL: INVENTORY --- */}
-      {/* flex-1 ensures this fills the remaining height */}
-      <div className="flex flex-col flex-1 w-full min-h-0 md:px-6 md:pb-6 md:pt-4">
+      <div className="flex flex-col w-full md:px-6 md:pb-6 md:pt-4">
         {/* Inventory Header */}
         <div className="flex items-center justify-between px-4 mb-3 md:px-0 shrink-0">
           <h3 className="text-sm font-bold tracking-wider uppercase text-slate-500">
@@ -389,7 +387,7 @@ export function TradePanel({
         </div>
 
           {/* Scrollable Area */}
-        <div className="flex-1 px-4 pb-24 overflow-y-auto md:px-0 md:pb-0 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+        <div className="px-4 pb-24 md:px-0 md:pb-0">
           {availableItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-sm border-2 border-dashed text-slate-400 border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50">
               <p>Your wardrobe is empty (or filtered out).</p>
