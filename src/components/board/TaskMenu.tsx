@@ -24,14 +24,21 @@ export default function TaskMenu({ menu, onClose, onDelete }: TaskMenuProps) {
       }
     };
 
+    const handleScroll = () => {
+      onClose();
+    };
+
     // Use capture phase (third argument 'true') to detect clicks even if 
     // propagation is stopped by other elements (like the BacklogTray).
     window.addEventListener('mousedown', handleClickOutside, true);
     window.addEventListener('touchstart', handleClickOutside, true);
+    // Close on scroll to keep the menu attached to its trigger
+    window.addEventListener('scroll', handleScroll, true);
 
     return () => {
       window.removeEventListener('mousedown', handleClickOutside, true);
       window.removeEventListener('touchstart', handleClickOutside, true);
+      window.removeEventListener('scroll', handleScroll, true);
     };
   }, [menu, onClose]);
 
