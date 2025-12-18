@@ -127,7 +127,7 @@ export default function GiftBoxOpening({
       )}
 
       {/* Main Content */}
-      <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6 -translate-y-24">
+      <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
         <AnimatePresence mode="wait">
           {/* --- GIFT PHASE --- */}
           {phase !== 'revealed' && (

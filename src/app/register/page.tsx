@@ -87,81 +87,90 @@ export default function RegisterPage() {
 
   /* ───────── UI ───────── */
   return (
-    <main className="relative flex items-center justify-center w-full overflow-hidden bg-slate-50 dark:bg-slate-900 h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)]">
-      {/* ─── Animated Background ─── */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-violet-100/40 via-transparent to-transparent dark:from-violet-900/20 opacity-70" />
-        <div
-          className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
-          style={{
-            backgroundImage: 'radial-gradient(#64748b 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
-          }}
-        />
-      </div>
+    <main className="relative flex items-center justify-center w-full min-h-screen p-4 pb-24 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 md:pb-40">
+      {/* ─── Decorative Blobs ─── */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-violet-500/10 dark:bg-violet-400/5 blur-[100px] rounded-full pointer-events-none z-0" />
 
       <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
         {/* ─── The Peeking Frog ─── */}
         <motion.div
-          initial={{ y: -50, opacity: 0 }}
+          initial={{ y: 20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{
-            delay: 0.2,
+            delay: 0.1,
             type: 'spring',
-            stiffness: 120,
-            damping: 15,
+            stiffness: 100,
+            damping: 20,
           }}
-          className="relative z-20 point er-events-none -mb-9"
+          className="relative z-20 -mb-12 pointer-events-none"
         >
-          <div className="relative w-48 h-48 ">
+          <div className="relative">
             <Frog
-              width={192}
-              height={192}
+              width={260}
+              height={260}
               indices={{ skin: 0, hat: 0, scarf: 0, hand_item: 0 }}
             />
           </div>
         </motion.div>
 
         <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.5, type: 'spring', stiffness: 100 }}
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           className="w-full"
         >
-          <Card className="relative z-10 pt-12 shadow-2xl border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl">
-            <CardHeader className="pt-2 pb-2 text-center">
-              <CardTitle className="text-xl">Create an account</CardTitle>
+          <Card className="overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-white/50 dark:border-slate-800/50 bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl rounded-[32px] pt-12">
+            <CardHeader className="pt-2 pb-6 text-center">
+              <CardTitle className="text-3xl font-black tracking-tighter uppercase text-slate-800 dark:text-white">
+                Create Account
+              </CardTitle>
+              <p className="text-sm font-bold tracking-wide text-slate-400 dark:text-slate-500">
+                FEED ME! *please*
+              </p>
             </CardHeader>
 
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-5">
               {serverErr && (
-                <div className="p-3 text-xs font-medium text-center text-red-600 border border-red-100 rounded-md bg-red-50 dark:bg-red-900/20 dark:border-red-900/30 animate-pulse">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="p-3 text-[11px] font-black uppercase tracking-wider text-center text-red-500 border border-red-200/50 rounded-2xl bg-red-50/50 dark:bg-red-900/20 dark:border-red-900/30"
+                >
                   {serverErr}
-                </div>
+                </motion.div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-3">
+              <form onSubmit={handleSubmit} className="space-y-4">
                 {/* Full Name */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="name">Full Name</Label>
+                  <Label
+                    htmlFor="name"
+                    className="text-[10px] uppercase font-black tracking-[0.15em] text-slate-400 dark:text-slate-500 ml-1"
+                  >
+                    Full Name
+                  </Label>
                   <div className="relative group">
-                    <User className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
                     <Input
                       id="name"
                       placeholder="John Doe"
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="h-10 pl-10 transition-all focus:scale-[1.01]"
+                      className="transition-all h-11 pl-11 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800 focus:ring-violet-500/20 focus:border-violet-500/50"
                     />
+                    <User className="absolute left-4 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors z-10" />
                   </div>
                 </div>
 
                 {/* Email */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="email">Email</Label>
+                  <Label
+                    htmlFor="email"
+                    className="text-[10px] uppercase font-black tracking-[0.15em] text-slate-400 dark:text-slate-500 ml-1"
+                  >
+                    Email
+                  </Label>
                   <div className="relative group">
-                    <Mail className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
                     <Input
                       id="email"
                       type="email"
@@ -169,16 +178,21 @@ export default function RegisterPage() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="h-10 pl-10 transition-all focus:scale-[1.01]"
+                      className="transition-all h-11 pl-11 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800 focus:ring-violet-500/20 focus:border-violet-500/50"
                     />
+                    <Mail className="absolute left-4 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors z-10" />
                   </div>
                 </div>
 
                 {/* Password */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="password">Password</Label>
+                  <Label
+                    htmlFor="password"
+                    className="text-[10px] uppercase font-black tracking-[0.15em] text-slate-400 dark:text-slate-500 ml-1"
+                  >
+                    Password
+                  </Label>
                   <div className="relative group">
-                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
                     <Input
                       id="password"
                       type={showPw ? 'text' : 'password'}
@@ -186,12 +200,13 @@ export default function RegisterPage() {
                       required
                       value={pw}
                       onChange={(e) => setPw(e.target.value)}
-                      className="h-10 pl-10 pr-10 transition-all focus:scale-[1.01]"
+                      className="transition-all h-11 pl-11 pr-11 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800 focus:ring-violet-500/20 focus:border-violet-500/50"
                     />
+                    <Lock className="absolute left-4 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors z-10" />
                     <button
                       type="button"
                       onClick={toggle1}
-                      className="absolute inset-y-0 right-0 flex items-center justify-center w-10 transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      className="absolute inset-y-0 right-0 z-10 flex items-center justify-center w-10 transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                       tabIndex={-1}
                     >
                       {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -201,9 +216,13 @@ export default function RegisterPage() {
 
                 {/* Confirm Password */}
                 <div className="space-y-1.5">
-                  <Label htmlFor="confirm-password">Confirm Password</Label>
+                  <Label
+                    htmlFor="confirm-password"
+                    className="text-[10px] uppercase font-black tracking-[0.15em] text-slate-400 dark:text-slate-500 ml-1"
+                  >
+                    Confirm Password
+                  </Label>
                   <div className="relative group">
-                    <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors" />
                     <Input
                       id="confirm-password"
                       type={showPw2 ? 'text' : 'password'}
@@ -211,12 +230,13 @@ export default function RegisterPage() {
                       required
                       value={pw2}
                       onChange={(e) => setPw2(e.target.value)}
-                      className="h-10 pl-10 pr-10 transition-all focus:scale-[1.01]"
+                      className="transition-all h-11 pl-11 pr-11 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800 focus:ring-violet-500/20 focus:border-violet-500/50"
                     />
+                    <Lock className="absolute left-4 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors z-10" />
                     <button
                       type="button"
                       onClick={toggle2}
-                      className="absolute inset-y-0 right-0 flex items-center justify-center w-10 transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+                      className="absolute inset-y-0 right-0 z-10 flex items-center justify-center w-10 transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                       tabIndex={-1}
                     >
                       {showPw2 ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -226,26 +246,24 @@ export default function RegisterPage() {
 
                 <Button
                   type="submit"
-                  className="w-full h-11 bg-violet-600 hover:bg-violet-700 text-white mt-2 shadow-lg shadow-violet-500/25 transition-all hover:scale-[1.02]"
+                  className="w-full h-12 mt-2 bg-violet-600 hover:bg-violet-700 text-white font-black uppercase tracking-[0.1em] rounded-2xl shadow-lg shadow-violet-500/25 transition-all active:scale-[0.98]"
                   disabled={submitting}
                 >
                   {submitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Creating account...
-                    </>
+                    <Loader2 className="w-5 h-5 animate-spin" />
                   ) : (
                     'Sign Up'
                   )}
                 </Button>
               </form>
             </CardContent>
-            <CardFooter className="flex justify-center pt-4 pb-4 border-t border-slate-100/50 dark:border-slate-800/50">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+
+            <CardFooter className="flex flex-col gap-4 py-6 border-t bg-slate-50/50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800/50">
+              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Already have an account?{' '}
                 <Link
                   href="/login"
-                  className="font-medium transition-colors text-violet-600 hover:text-violet-500 hover:underline"
+                  className="ml-1 text-violet-600 dark:text-violet-400 hover:underline decoration-2 underline-offset-4"
                 >
                   Sign in
                 </Link>
