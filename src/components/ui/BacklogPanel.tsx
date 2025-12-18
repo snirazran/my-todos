@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { EllipsisVertical, CalendarClock, Plus } from 'lucide-react';
+import { EllipsisVertical, CalendarClock, Plus, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
@@ -21,6 +21,7 @@ export default function BacklogPanel({
   const [menu, setMenu] = React.useState<{ id: string; top: number; left: number } | null>(null);
   const [confirmId, setConfirmId] = React.useState<BacklogItem | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [processingIds, setProcessingIds] = React.useState<Set<string>>(new Set());
 
   // Listen for other menus opening to auto-close this one (syncs with TaskList)
   React.useEffect(() => {
@@ -37,23 +38,34 @@ export default function BacklogPanel({
   }, []);
 
   const addToday = async (item: BacklogItem) => {
-    const dow = new Date().getDay();
-    await fetch('/api/tasks?view=board', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: item.text,
-        days: [dow],
-        repeat: 'this-week',
-      }),
-    });
-    await fetch('/api/tasks?view=board', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ day: -1, taskId: item.id }),
-    });
-    await onRefreshToday();
-    await onRefreshBacklog();
+    if (processingIds.has(item.id)) return;
+    setProcessingIds((prev) => new Set(prev).add(item.id));
+
+    try {
+      const dow = new Date().getDay();
+      await fetch('/api/tasks?view=board', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: item.text,
+          days: [dow],
+          repeat: 'this-week',
+        }),
+      });
+      await fetch('/api/tasks?view=board', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ day: -1, taskId: item.id }),
+      });
+      await onRefreshToday();
+      await onRefreshBacklog();
+    } finally {
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
+    }
   };
 
   const removeLater = async (taskId: string) => {
@@ -149,9 +161,14 @@ export default function BacklogPanel({
                         e.stopPropagation();
                         addToday(t);
                       }}
-                      className="group/btn flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 active:scale-95 transition-all rounded-full shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40"
+                      disabled={processingIds.has(t.id)}
+                      className="group/btn flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 active:scale-95 transition-all rounded-full shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40 disabled:opacity-50 disabled:pointer-events-none"
                     >
-                      <Plus className="w-3.5 h-3.5 transition-transform group-hover/btn:rotate-90" />
+                      {processingIds.has(t.id) ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <Plus className="w-3.5 h-3.5 transition-transform group-hover/btn:rotate-90" />
+                      )}
                       <span>Do Today!</span>
                     </button>
 

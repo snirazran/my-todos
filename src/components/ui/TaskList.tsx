@@ -29,6 +29,7 @@ export default function TaskList({
   weeklyIds = new Set<string>(),
   onDeleteToday,
   onDeleteFromWeek,
+  onDoLater,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -44,6 +45,7 @@ export default function TaskList({
   weeklyIds?: Set<string>;
   onDeleteToday: (taskId: string) => Promise<void> | void;
   onDeleteFromWeek: (taskId: string) => Promise<void> | void;
+  onDoLater?: (taskId: string) => Promise<void> | void;
 }) {
   const vSet = visuallyCompleted ?? new Set<string>();
 
@@ -291,7 +293,7 @@ export default function TaskList({
                           setMenu((prev) => {
                             if (prev?.id === task.id) return null;
                             const MENU_W = 160;
-                            const MENU_H = 48; // One item
+                            const MENU_H = 80; // Two items
                             const GAP = 8;
                             const MARGIN = 10;
                             const vw = window.innerWidth;
@@ -322,6 +324,15 @@ export default function TaskList({
       <TaskMenu
         menu={menu}
         onClose={() => setMenu(null)}
+        isDone={menu ? (tasks.find(t => t.id === menu.id)?.completed || vSet.has(menu.id)) : false}
+        onDoLater={
+          onDoLater
+            ? () => {
+                if (menu) onDoLater(menu.id);
+                setMenu(null);
+              }
+            : undefined
+        }
         onDelete={() => {
           if (menu) {
             const t = tasks.find((it) => it.id === menu.id);

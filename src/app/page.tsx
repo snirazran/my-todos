@@ -454,6 +454,33 @@ export default function Home() {
                       });
                       await refreshToday();
                     }}
+                    onDoLater={async (taskId) => {
+                      const task = tasks.find((t) => t.id === taskId);
+                      if (!task) return;
+
+                      // 1. Add to backlog
+                      await fetch('/api/tasks?view=board', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          text: task.text,
+                          repeat: 'backlog',
+                        }),
+                      });
+
+                      // 2. Remove from today
+                      // Use the same logic as onDeleteToday/onDeleteFromWeek
+                      // If it's weekly, it needs to be suppressed
+                      await fetch('/api/tasks', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ date: dateStr, taskId }),
+                      });
+
+                      // 3. Refresh
+                      await refreshToday();
+                      await fetchBacklog();
+                    }}
                   />
                 </motion.div>
               ) : (

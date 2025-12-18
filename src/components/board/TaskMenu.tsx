@@ -3,15 +3,17 @@
 import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Clock } from 'lucide-react';
 
 interface TaskMenuProps {
   menu: { id: string; top: number; left: number } | null;
   onClose: () => void;
   onDelete: () => void;
+  onDoLater?: () => void;
+  isDone?: boolean;
 }
 
-export default function TaskMenu({ menu, onClose, onDelete }: TaskMenuProps) {
+export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone }: TaskMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -32,7 +34,6 @@ export default function TaskMenu({ menu, onClose, onDelete }: TaskMenuProps) {
     // propagation is stopped by other elements (like the BacklogTray).
     window.addEventListener('mousedown', handleClickOutside, true);
     window.addEventListener('touchstart', handleClickOutside, true);
-    // Close on scroll to keep the menu attached to its trigger
     window.addEventListener('scroll', handleScroll, true);
 
     return () => {
@@ -59,6 +60,18 @@ export default function TaskMenu({ menu, onClose, onDelete }: TaskMenuProps) {
           style={{ top: menu.top, left: menu.left }}
           onClick={(e) => e.stopPropagation()}
         >
+          {onDoLater && !isDone && (
+            <button
+              onClick={() => {
+                onDoLater();
+                onClose();
+              }}
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Clock className="h-4 w-4 text-violet-500" />
+              Do Later
+            </button>
+          )}
           <button
             onClick={() => {
               onDelete();

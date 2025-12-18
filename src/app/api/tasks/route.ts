@@ -269,14 +269,16 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const text = String(body?.text ?? '').trim();
   const rawDays: number[] = Array.isArray(body?.days) ? body.days : [];
-  const repeat: 'weekly' | 'this-week' =
+  const repeat: 'weekly' | 'this-week' | 'backlog' =
+    body?.repeat === 'backlog' ? 'backlog' :
     body?.repeat === 'this-week' ? 'this-week' : 'weekly';
 
   if (!text) {
     return NextResponse.json({ error: 'text is required' }, { status: 400 });
   }
 
-  const days = rawDays
+  // If repeat is backlog, we automatically target d = -1
+  const days = repeat === 'backlog' ? [-1] : rawDays
     .map(Number)
     .filter(Number.isInteger)
     .filter((d) => d === -1 || isWeekday(d));
