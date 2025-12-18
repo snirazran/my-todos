@@ -127,10 +127,12 @@ export default function GiftBoxOpening({
       )}
 
       {/* Main Content */}
-      <div className={cn(
-        "relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6 transition-transform duration-500",
-        phase !== 'revealed' && "-translate-y-28"
-      )}>
+      <div
+        className={cn(
+          'relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6 transition-transform duration-500',
+          phase !== 'revealed' && '-translate-y-20'
+        )}
+      >
         <AnimatePresence mode="wait">
           {/* --- GIFT PHASE --- */}
           {phase !== 'revealed' && (
