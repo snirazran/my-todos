@@ -61,32 +61,29 @@ export default function HistoryTaskItem({
     >
       {/* Icon */}
       <div className="relative shrink-0 transition-transform duration-200 flex items-center justify-center w-7 h-7">
-        <AnimatePresence initial={false}>
-          {displayedCompleted ? (
-            <motion.div
-              key="completed"
-              className="absolute inset-0 flex items-center justify-center"
-              initial={{ opacity: 0, scale: 0.6 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.6 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-            >
-              <CheckCircle2 className="w-5 h-5 text-green-500" />
-            </motion.div>
-          ) : (
-            <motion.div
-              ref={setFlyRef}
-              key="pending"
-              className="absolute inset-0 flex items-center justify-center"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-            >
-              <Fly size={24} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        <motion.div
+          className="absolute inset-0 flex items-center justify-center"
+          initial={false}
+          animate={{
+            opacity: displayedCompleted ? 1 : 0,
+            scale: displayedCompleted ? 1 : 0.6,
+          }}
+          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+          style={{ pointerEvents: displayedCompleted ? 'auto' : 'none' }}
+        >
+          <CheckCircle2 className="w-5 h-5 text-green-500" />
+        </motion.div>
+
+        <motion.div
+          ref={setFlyRef}
+          className="absolute inset-0 flex items-center justify-center"
+          initial={false}
+          animate={{ opacity: displayedCompleted ? 0 : 1 }}
+          transition={{ duration: 0.18 }}
+          style={{ pointerEvents: displayedCompleted ? 'none' : 'auto' }}
+        >
+          <Fly size={24} paused={displayedCompleted} />
+        </motion.div>
       </div>
 
       {/* Content */}

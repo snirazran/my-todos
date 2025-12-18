@@ -9,10 +9,11 @@ type FlyProps = {
   className?: string;
   y?: number;
   x?: number;
+  paused?: boolean;
 };
 
 const Fly = forwardRef<HTMLDivElement, FlyProps>(
-  ({ onClick, size = 30, className, x = 0, y = 0 }, ref) => {
+  ({ onClick, size = 30, className, x = 0, y = 0, paused = false }, ref) => {
     // 1) Memoize options so Rive isn't re-created on parent re-renders
     const riveOptions = useMemo(
       () => ({
@@ -28,10 +29,15 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
 
     const { RiveComponent, rive } = useRive(riveOptions);
 
-    // 2) If something paused it, ensure it's playing
+    // 2) Control play/pause based on prop
     useEffect(() => {
-      if (rive && rive.isPaused) rive.play();
-    }, [rive]);
+      if (!rive) return;
+      if (paused) {
+        rive.pause();
+      } else if (rive.isPaused) {
+        rive.play();
+      }
+    }, [rive, paused]);
 
     // 3) On click, run parent handler and re-assert play (belt & suspenders)
     const handleClick = useCallback(

@@ -184,12 +184,22 @@ export default function TaskCard({
       role="listitem"
       aria-grabbed={false}
     >
-      <div className="grid self-center shrink-0 place-items-center text-slate-400 group-hover:text-purple-500 transition-colors">
-        {task.completed ? (
+      <div className="grid self-center shrink-0 place-items-center text-slate-400 group-hover:text-purple-500 transition-colors relative h-6 w-6">
+        <div
+          className={`absolute inset-0 transition-opacity duration-200 ${
+            task.completed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          }`}
+        >
+          <Fly size={24} paused={task.completed} />
+        </div>
+
+        <div
+          className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+            task.completed ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
+        >
           <CheckCircle2 className="w-6 h-6 text-green-500" />
-        ) : (
-          <Fly size={24} />
-        )}
+        </div>
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col justify-center">
