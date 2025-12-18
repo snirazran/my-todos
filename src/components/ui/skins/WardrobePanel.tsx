@@ -160,7 +160,7 @@ export function WardrobePanel({
   };
 
   const toggleEquip = async (slot: WardrobeSlot, itemId: string) => {
-    if (!data) return;
+    if (!data?.wardrobe?.equipped) return;
     const isEquipped = data.wardrobe.equipped[slot] === itemId;
     setActionId(itemId);
     await fetch('/api/skins/inventory', {
@@ -186,7 +186,7 @@ export function WardrobePanel({
   };
 
   const buyItem = async (item: ItemDef, e?: React.MouseEvent) => {
-    if (!data) return;
+    if (!data?.wardrobe) return;
     const balance = data.wardrobe.flies ?? 0;
     const price = item.priceFlies ?? 0;
     if (balance < price) {
@@ -255,15 +255,17 @@ export function WardrobePanel({
   };
 
   const inventoryItems = useMemo(() => {
-    if (!data) return [];
-    const ownedIds = Object.keys(data.wardrobe.inventory);
+    if (!data?.wardrobe?.inventory) return [];
+    const ownedIds = Object.keys(data.wardrobe.inventory).filter(
+      (id) => (data.wardrobe.inventory[id] ?? 0) > 0
+    );
     const owned = (data.catalog || []).filter((i) => ownedIds.includes(i.id));
     return getFilteredItems(owned);
   }, [data, activeFilter, sortBy]);
 
   const shopItems = useMemo(() => {
-    if (!data) return [];
-    return getFilteredItems(data.catalog || []);
+    if (!data?.catalog) return [];
+    return getFilteredItems(data.catalog);
   }, [data, activeFilter, sortBy]);
 
   const balance = data?.wardrobe?.flies ?? 0;
@@ -415,9 +417,9 @@ export function WardrobePanel({
                         key={item.id}
                         item={item}
                         mode="inventory"
-                        ownedCount={data?.wardrobe.inventory[item.id] ?? 0}
+                        ownedCount={data?.wardrobe?.inventory?.[item.id] ?? 0}
                         isEquipped={
-                          data?.wardrobe.equipped[item.slot] === item.id
+                          data?.wardrobe?.equipped?.[item.slot] === item.id
                         }
                         canAfford={true}
                         actionLoading={actionId === item.id}
@@ -436,7 +438,7 @@ export function WardrobePanel({
               >
                 <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
                   {shopItems.map((item) => {
-                    const count = data?.wardrobe.inventory[item.id] ?? 0;
+                    const count = data?.wardrobe?.inventory?.[item.id] ?? 0;
                     return (
                       <ItemCard
                         key={item.id}
@@ -458,7 +460,7 @@ export function WardrobePanel({
                 value="trade"
                 className="absolute inset-0 overflow-hidden data-[state=inactive]:hidden"
               >
-                {data && (
+                {data?.wardrobe?.inventory && data.catalog && (
                   <TradePanel 
                     inventory={data.wardrobe.inventory}
                     catalog={data.catalog}
