@@ -203,15 +203,25 @@ export default function TaskCard({
       </div>
 
       <div className="flex-1 min-w-0 flex flex-col justify-center">
-        {isRepeating && (
-          <div className="mb-1 flex items-center gap-1.5">
-            <span
-              title="Repeats weekly"
-              className="inline-flex items-center gap-1 rounded-md bg-purple-50/80 px-1.5 py-0.5 text-[10px] font-bold text-purple-600 dark:bg-purple-900/40 dark:text-purple-200 transition-colors"
-            >
-              <RotateCcw className="h-3 w-3" aria-hidden="true" />
-              <span className="tracking-wider uppercase">Weekly</span>
-            </span>
+        {(isRepeating || (task.tags && task.tags.length > 0)) && (
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            {isRepeating && (
+              <span
+                title="Repeats weekly"
+                className="inline-flex items-center gap-1 rounded-md bg-purple-50/80 px-1.5 py-0.5 text-[10px] font-bold text-purple-600 dark:bg-purple-900/40 dark:text-purple-200 transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                <span className="tracking-wider uppercase">Weekly</span>
+              </span>
+            )}
+            {task.tags?.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center gap-1 rounded-md bg-indigo-50/80 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 transition-colors border border-indigo-100 dark:border-indigo-800/50"
+              >
+                <span className="tracking-wide uppercase">{tag}</span>
+              </span>
+            ))}
           </div>
         )}
         <div

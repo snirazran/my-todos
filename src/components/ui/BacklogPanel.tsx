@@ -7,7 +7,7 @@ import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TaskMenu from '../board/TaskMenu';
 
-type BacklogItem = { id: string; text: string };
+type BacklogItem = { id: string; text: string; tags?: string[] };
 
 export default function BacklogPanel({
   later,
@@ -149,9 +149,23 @@ export default function BacklogPanel({
                   </div>
 
                   {/* Text */}
-                  <span className="flex-1 text-base font-medium md:text-lg text-slate-700 dark:text-slate-200">
-                    {t.text}
-                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="block text-base font-medium md:text-lg text-slate-700 dark:text-slate-200">
+                      {t.text}
+                    </span>
+                    {t.tags && t.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {t.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border border-indigo-100 dark:border-indigo-800/50"
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
 
                   {/* Actions */}
                   <div className="relative flex items-center gap-2 shrink-0">

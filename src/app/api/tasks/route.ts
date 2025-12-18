@@ -269,6 +269,8 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const text = String(body?.text ?? '').trim();
   const rawDays: number[] = Array.isArray(body?.days) ? body.days : [];
+  const tags: string[] = Array.isArray(body?.tags) ? body.tags.map(String) : [];
+  console.log('Creating task with tags:', tags);
   const repeat: 'weekly' | 'this-week' | 'backlog' =
     body?.repeat === 'backlog' ? 'backlog' :
     body?.repeat === 'this-week' ? 'this-week' : 'weekly';
@@ -313,6 +315,7 @@ export async function POST(req: NextRequest) {
         dayOfWeek,
         createdAt: now,
         updatedAt: now,
+        tags,
       });
     }
     return NextResponse.json({ ok: true });
@@ -333,6 +336,7 @@ export async function POST(req: NextRequest) {
         completed: false,
         createdAt: now,
         updatedAt: now,
+        tags,
       });
     } else {
       const weekday = d as Weekday;
@@ -348,6 +352,7 @@ export async function POST(req: NextRequest) {
         completed: false,
         createdAt: now,
         updatedAt: now,
+        tags,
       });
     }
   }
@@ -490,6 +495,7 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
       completed: 1,
       completedDates: 1,
       suppressedDates: 1,
+      tags: 1,
     }
   )
     .sort({ order: 1 })
@@ -513,6 +519,7 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
         (t.completedDates ?? []).includes(date) ||
         (!!t.completed && t.type === 'regular'),
       origin: t.type as Origin,
+      tags: t.tags ?? [],
     }))
     .sort((a, b) => {
       if (!!a.completed !== !!b.completed) {
@@ -561,19 +568,20 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
     if (dayNum === -1) {
       const later: TaskDoc[] = await Task.find(
         { userId: uid, type: 'backlog', weekStart },
-        { id: 1, text: 1, order: 1, type: 1, completed: 1, _id: 0 }
+        { id: 1, text: 1, order: 1, type: 1, completed: 1, tags: 1, _id: 0 }
       )
         .sort({ order: 1 })
         .lean<TaskDoc[]>()
         .exec();
 
-      const out: BoardItem[] & { completed?: boolean } = later
+      const out: BoardItem[] & { completed?: boolean; tags?: string[] } = later
         .map((t: TaskDoc) => ({
           id: t.id,
           text: t.text,
           order: t.order,
           type: t.type,
           completed: !!t.completed,
+          tags: t.tags ?? [],
         }))
         .sort((a, b) => {
           if (!!a.completed !== !!b.completed) {
@@ -608,6 +616,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
         type: 1,
         completed: 1,
         completedDates: 1,
+        tags: 1,
         _id: 0,
       }
     )
@@ -615,7 +624,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
       .lean<TaskDoc[]>()
       .exec();
 
-    const out: BoardItem[] & { completed?: boolean } = docs
+    const out: BoardItem[] & { completed?: boolean; tags?: string[] } = docs
       .map((t: TaskDoc) => ({
         id: t.id,
         text: t.text,
@@ -624,6 +633,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
         completed:
           (t.completedDates ?? []).includes(weekDates[dayNum]) ||
           (!!t.completed && t.type === 'regular'),
+        tags: t.tags ?? [],
       }))
       .sort((a, b) => {
         if (!!a.completed !== !!b.completed) {
@@ -657,6 +667,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
         type: 1,
         completed: 1,
         completedDates: 1,
+        tags: 1,
         _id: 0,
       }
     )
@@ -673,6 +684,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
         completed:
           (t.completedDates ?? []).includes(weekDates[d]) ||
           (!!t.completed && t.type === 'regular'),
+        tags: t.tags ?? [],
       }))
       .sort((a, b) => {
         if (!!a.completed !== !!b.completed) {
@@ -684,7 +696,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
 
   const backlogDocs: TaskDoc[] = await Task.find(
     { userId: uid, type: 'backlog', weekStart },
-    { id: 1, text: 1, order: 1, type: 1, completed: 1, _id: 0 }
+    { id: 1, text: 1, order: 1, type: 1, completed: 1, tags: 1, _id: 0 }
   )
     .sort({ order: 1 })
     .lean<TaskDoc[]>()
@@ -697,6 +709,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
       order: t.order,
       type: t.type,
       completed: !!t.completed,
+      tags: t.tags ?? [],
     }))
     .sort((a, b) => {
       if (!!a.completed !== !!b.completed) {

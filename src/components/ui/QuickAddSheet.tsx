@@ -16,6 +16,7 @@ import {
   Info,
   Plus,
   X,
+  Tag,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -31,6 +32,7 @@ type Props = Readonly<{
     /** API days: 0..6 (Sun..Sat), -1 for "Later" */
     days: ApiDay[];
     repeat: RepeatChoice;
+    tags: string[];
   }) => Promise<void> | void;
   initialText?: string;
   defaultRepeat?: RepeatChoice;
@@ -46,6 +48,8 @@ export default function QuickAddSheet({
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
   const [when, setWhen] = useState<WhenChoice>('pick');
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -107,6 +111,8 @@ export default function QuickAddSheet({
       setWhen('pick');
       setPickedDays([todayDisplayIndex()]); // default to today (DISPLAY index)
       setRepeat(defaultRepeat);
+      setTags([]);
+      setTagInput('');
       setIsSubmitting(false);
     }
   }, [open, initialText, defaultRepeat]);
@@ -133,6 +139,18 @@ export default function QuickAddSheet({
       prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d]
     );
 
+  const handleAddTag = () => {
+    const trimmed = tagInput.trim();
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags((prev) => [...prev, trimmed]);
+      setTagInput('');
+    }
+  };
+
+  const removeTag = (tag: string) => {
+    setTags((prev) => prev.filter((t) => t !== tag));
+  };
+
   const handleSubmit = async () => {
     if (isSubmitting) return;
     const trimmed = text.trim();
@@ -151,7 +169,7 @@ export default function QuickAddSheet({
       // Guard: if "Later", force non-repeating
       const finalRepeat: RepeatChoice = when === 'later' ? 'this-week' : repeat;
 
-      await onSubmit({ text: trimmed, days: apiDays, repeat: finalRepeat });
+      await onSubmit({ text: trimmed, days: apiDays, repeat: finalRepeat, tags });
       onOpenChange(false);
     } finally {
       setIsSubmitting(false);
@@ -209,7 +227,50 @@ export default function QuickAddSheet({
                     }}
                     inputMode="text"
                   />
-                  <div className="flex justify-end px-2 mb-2">
+                  <div className="flex justify-between px-2 mb-2 items-start">
+                     {/* Tags Section */}
+                     <div className="flex flex-wrap items-center gap-1.5 max-w-[80%]">
+                      {tags.map((tag) => (
+                        <span
+                          key={tag}
+                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200 text-[10px] font-bold uppercase tracking-wider border border-indigo-200 dark:border-indigo-800"
+                        >
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => removeTag(tag)}
+                            className="hover:text-indigo-900 dark:hover:text-white"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </span>
+                      ))}
+                      <div className="relative flex items-center">
+                        <Tag className="absolute left-1.5 w-3 h-3 text-slate-400" />
+                        <input
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleAddTag();
+                            }
+                          }}
+                          placeholder="Add tag..."
+                          className="h-6 pl-5 pr-2 w-24 rounded-md bg-transparent text-[11px] font-medium text-slate-600 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-300 placeholder:text-slate-400"
+                        />
+                        {tagInput && (
+                          <button
+                            type="button"
+                            onClick={handleAddTag}
+                            className="absolute right-0.5 p-0.5 text-purple-600 hover:bg-purple-100 rounded"
+                          >
+                            <Plus className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
                     <span
                       className={`text-[10px] font-bold ${
                         text.length >= 40 ? 'text-rose-500' : 'text-slate-400'

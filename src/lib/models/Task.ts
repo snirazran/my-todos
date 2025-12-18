@@ -19,6 +19,7 @@ export interface TaskDoc {
   createdAt: Date;
   updatedAt: Date;
   deletedAt?: Date;
+  tags?: string[];
 }
 
 const TaskSchema = new Schema<TaskDoc>(
@@ -37,6 +38,7 @@ const TaskSchema = new Schema<TaskDoc>(
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now },
     deletedAt: { type: Date },
+    tags: { type: [String], default: [] },
   },
   {
     collection: 'tasks',
@@ -45,6 +47,10 @@ const TaskSchema = new Schema<TaskDoc>(
 );
 
 TaskSchema.index({ userId: 1, id: 1 });
+
+if (process.env.NODE_ENV === 'development') {
+  delete mongoose.models.Task;
+}
 
 const TaskModel: Model<TaskDoc> =
   (mongoose.models.Task as Model<TaskDoc>) ||

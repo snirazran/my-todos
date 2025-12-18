@@ -38,6 +38,7 @@ interface Task {
   type?: 'regular' | 'weekly' | 'backlog';
   origin?: 'regular' | 'weekly' | 'backlog';
   kind?: 'regular' | 'weekly' | 'backlog';
+  tags?: string[];
 }
 
 type FlyStatus = {
@@ -138,7 +139,9 @@ export default function Home() {
     const items = await fetch('/api/tasks?view=board&day=-1').then((r) =>
       r.json()
     );
-    setLaterThisWeek(items.map((t: any) => ({ id: t.id, text: t.text })));
+    setLaterThisWeek(
+      items.map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
+    );
   }, [session]);
 
   const today = new Date();
@@ -565,11 +568,11 @@ export default function Home() {
         onOpenChange={setShowQuickAdd}
         initialText={quickText}
         defaultRepeat="this-week"
-        onSubmit={async ({ text, days, repeat }) => {
+        onSubmit={async ({ text, days, repeat, tags }) => {
           await fetch('/api/tasks?view=board', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, days, repeat }),
+            body: JSON.stringify({ text, days, repeat, tags }),
           });
           if (session) {
             const res = await fetch(`/api/tasks?date=${dateStr}`);
@@ -583,7 +586,7 @@ export default function Home() {
           } else {
             setGuestTasks((prev) => [
               ...prev,
-              { id: crypto.randomUUID(), text, completed: false },
+              { id: crypto.randomUUID(), text, completed: false, tags },
             ]);
           }
           fetchBacklog();

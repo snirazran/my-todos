@@ -47,6 +47,7 @@ export default function TaskBoard({
     text: string;
     days: ApiDay[];
     repeat: RepeatChoice;
+    tags: string[];
   }) => Promise<void> | void;
   todayDisplayIndex: Exclude<DisplayDay, 7>;
 }) {
@@ -489,12 +490,13 @@ export default function TaskBoard({
         onOpenChange={setShowQuickAdd}
         initialText={quickText}
         defaultRepeat="this-week"
-        onSubmit={async ({ text, days, repeat }) => {
+        onSubmit={async ({ text, days, repeat, tags }) => {
           if (onQuickAdd) {
             await onQuickAdd({
               text,
               days,
               repeat: repeat as RepeatChoice,
+              tags,
             });
           } else {
             onRequestAdd(null, text, null, repeat as RepeatChoice);

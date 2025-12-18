@@ -17,6 +17,7 @@ interface Task {
   type?: 'regular' | 'weekly' | 'backlog';
   origin?: 'regular' | 'weekly' | 'backlog';
   kind?: 'regular' | 'weekly' | 'backlog';
+  tags?: string[];
 }
 
 export default function TaskList({
@@ -257,17 +258,31 @@ export default function TaskList({
                       </AnimatePresence>
                     </div>
 
-                    <motion.span
-                      className="flex-1 text-base font-medium md:text-lg"
-                      animate={{
-                        color: isDone ? 'rgb(148 163 184)' : 'rgb(30 41 59)',
-                        textDecorationLine: isDone ? 'line-through' : 'none',
-                        opacity: isDone ? 0.8 : 1,
-                      }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {task.text}
-                    </motion.span>
+                    <div className="flex-1 min-w-0">
+                      <motion.span
+                        className="block text-base font-medium md:text-lg"
+                        animate={{
+                          color: isDone ? 'rgb(148 163 184)' : 'rgb(30 41 59)',
+                          textDecorationLine: isDone ? 'line-through' : 'none',
+                          opacity: isDone ? 0.8 : 1,
+                        }}
+                        transition={{ duration: 0.2 }}
+                      >
+                        {task.text}
+                      </motion.span>
+                      {task.tags && task.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {task.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border border-indigo-100 dark:border-indigo-800/50"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
 
                     {/* Actions */}
                     <div className="relative shrink-0">

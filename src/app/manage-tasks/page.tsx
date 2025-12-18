@@ -98,16 +98,18 @@ export default function ManageTasksPage() {
     text,
     days,
     repeat,
+    tags,
   }: {
     text: string;
     // -1 = Later, 0..6 = Sun..Sat (API days)
     days: (-1 | 0 | 1 | 2 | 3 | 4 | 5 | 6)[];
     repeat: 'this-week' | 'weekly';
+    tags: string[];
   }) => {
     await fetch('/api/tasks?view=board', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, days, repeat }),
+      body: JSON.stringify({ text, days, repeat, tags }),
     });
 
     const data = (await fetch('/api/tasks?view=board').then((r) =>
