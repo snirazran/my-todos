@@ -99,7 +99,7 @@ export function ItemCard({
   ownedCount: number;
   isEquipped: boolean;
   canAfford: boolean;
-  onAction: () => void;
+  onAction: (e?: React.MouseEvent) => void;
   actionLabel: React.ReactNode;
   actionLoading: boolean;
   mode: 'inventory' | 'shop' | 'trade';
@@ -118,14 +118,14 @@ export function ItemCard({
     [item.slot]: item.riveIndex,
   };
 
-  const handleAction = () => {
+  const handleAction = (e?: React.MouseEvent) => {
     if (mode === 'shop' && !canAfford) {
       setShake(true);
       setTimeout(() => setShake(false), 500);
       return;
     }
     if (!actionLoading) {
-      onAction();
+      onAction(e);
     }
   };
 
@@ -136,7 +136,7 @@ export function ItemCard({
       animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}}
       transition={{ duration: 0.4 }}
       onClick={(e) => {
-        if (mode === 'inventory' || mode === 'trade') handleAction();
+        if (mode === 'inventory' || mode === 'trade') handleAction(e);
       }}
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
@@ -290,7 +290,7 @@ export function ItemCard({
             )}
             onClick={(e) => {
               e.stopPropagation();
-              handleAction();
+              handleAction(e);
             }}
             whileTap={canAfford ? { scale: 0.95 } : {}}
           >

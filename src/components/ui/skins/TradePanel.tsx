@@ -86,11 +86,16 @@ const RARITY_CONFIG: Record<
   },
 };
 
+import { FilterCategory } from './FilterBar';
+import { SortOrder } from './SortMenu';
+
 type TradePanelProps = {
   inventory: Record<string, number>;
   catalog: ItemDef[];
   unseenItems: string[];
   onTradeSuccess?: () => void;
+  activeFilter?: FilterCategory;
+  sortBy?: SortOrder;
 };
 
 export function TradePanel({
@@ -98,6 +103,8 @@ export function TradePanel({
   catalog,
   unseenItems,
   onTradeSuccess,
+  activeFilter = 'all',
+  sortBy = 'rarity_desc',
 }: TradePanelProps) {
   // --- State ---
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -119,15 +126,43 @@ export function TradePanel({
 
   const availableItems = useMemo(() => {
     const ownedIds = Object.keys(inventory);
-    return catalog
-      .filter((item) => {
-        if (!ownedIds.includes(item.id)) return false;
-        if (targetRarity && item.rarity !== targetRarity) return false;
-        if (!targetRarity && item.rarity === 'legendary') return false;
-        return true;
-      })
-      .sort((a, b) => rarityRank[a.rarity] - rarityRank[b.rarity]);
-  }, [inventory, catalog, targetRarity]);
+    let result = catalog.filter((item) => {
+      if (!ownedIds.includes(item.id)) return false;
+      if (item.slot === 'container') return false; // NEW: Skip gifts
+      if (targetRarity && item.rarity !== targetRarity) return false;
+      if (!targetRarity && item.rarity === 'legendary') return false;
+      
+      // Apply activeFilter
+      if (activeFilter !== 'all') {
+        if (activeFilter === 'costume') {
+          if (item.slot !== 'skin' || (item.rarity !== 'epic' && item.rarity !== 'legendary')) return false;
+        } else if (activeFilter === 'body') {
+          if (item.slot !== 'skin' || (item.rarity === 'epic' || item.rarity === 'legendary')) return false;
+        } else if (activeFilter === 'held') {
+          if (item.slot !== 'hand_item') return false;
+        } else {
+          if (item.slot !== activeFilter) return false;
+        }
+      }
+      return true;
+    });
+
+    // Apply sortBy
+    return result.sort((a, b) => {
+      switch (sortBy) {
+        case 'rarity_asc':
+          return rarityRank[a.rarity] - rarityRank[b.rarity];
+        case 'rarity_desc':
+          return rarityRank[b.rarity] - rarityRank[a.rarity];
+        case 'price_asc':
+          return (a.priceFlies ?? 0) - (b.priceFlies ?? 0);
+        case 'price_desc':
+          return (b.priceFlies ?? 0) - (a.priceFlies ?? 0);
+        default:
+          return 0;
+      }
+    });
+  }, [inventory, catalog, targetRarity, activeFilter, sortBy]);
 
   const selectedCounts = useMemo(() => {
     const counts: Record<string, number> = {};

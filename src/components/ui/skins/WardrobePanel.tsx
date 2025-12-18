@@ -185,7 +185,7 @@ export function WardrobePanel({
     }
   };
 
-  const buyItem = async (item: ItemDef) => {
+  const buyItem = async (item: ItemDef, e?: React.MouseEvent) => {
     if (!data) return;
     const balance = data.wardrobe.flies ?? 0;
     const price = item.priceFlies ?? 0;
@@ -217,10 +217,15 @@ export function WardrobePanel({
     mutate(newData, false);
     
     // Trigger confetti for instant gratification
+    const origin = e ? {
+      x: e.clientX / window.innerWidth,
+      y: e.clientY / window.innerHeight
+    } : { y: 0.6 };
+
     confetti({
       particleCount: 40,
       spread: 70,
-      origin: { y: 0.6 },
+      origin,
       zIndex: 9999,
       colors: ['#a78bfa', '#4ade80', '#facc15'], // Purple, Green, Yellow
     });
@@ -441,7 +446,7 @@ export function WardrobePanel({
                         isEquipped={false}
                         canAfford={balance >= (item.priceFlies ?? 0)}
                         actionLoading={actionId === item.id}
-                        onAction={() => buyItem(item)}
+                        onAction={(e) => buyItem(item, e)}
                         actionLabel={null}
                       />
                     );
@@ -459,6 +464,8 @@ export function WardrobePanel({
                     catalog={data.catalog}
                     unseenItems={unseenItems}
                     onTradeSuccess={() => mutate()}
+                    activeFilter={activeFilter}
+                    sortBy={sortBy}
                   />
                 )}
               </TabsContent>
