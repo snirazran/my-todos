@@ -25,14 +25,14 @@ export function useInventory(active: boolean = true) {
 
   const markAllSeen = async () => {
     // If no data or no unseen items, skip
-    if (!data?.wardrobe.unseenItems?.length) return;
+    if (!data?.wardrobe?.unseenItems?.length) return;
 
     // Optimistic update
     mutate(
       {
         ...data,
         wardrobe: {
-          ...data.wardrobe,
+          ...data.wardrobe!,
           unseenItems: [],
         },
       },
@@ -49,15 +49,15 @@ export function useInventory(active: boolean = true) {
   };
 
   const markItemSeen = async (itemId: string) => {
-    if (!data?.wardrobe.unseenItems?.includes(itemId)) return;
+    if (!data?.wardrobe?.unseenItems?.includes(itemId)) return;
 
     // Optimistic update: remove just this item
     mutate(
       {
         ...data,
         wardrobe: {
-          ...data.wardrobe,
-          unseenItems: data.wardrobe.unseenItems.filter((id) => id !== itemId),
+          ...data.wardrobe!,
+          unseenItems: data.wardrobe!.unseenItems!.filter((id) => id !== itemId),
         },
       },
       false
@@ -77,8 +77,8 @@ export function useInventory(active: boolean = true) {
     mutate,
     isLoading,
     error,
-    unseenItems: data?.wardrobe.unseenItems ?? [],
-    unseenCount: (data?.wardrobe.unseenItems ?? []).length,
+    unseenItems: data?.wardrobe?.unseenItems ?? [],
+    unseenCount: (data?.wardrobe?.unseenItems ?? []).length,
     markAllSeen,
     markItemSeen,
   };

@@ -1,6 +1,7 @@
 import { useInventory } from '@/hooks/useInventory';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
+import { useSession } from 'next-auth/react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Lock, Shirt, X, ArrowLeft } from 'lucide-react';
@@ -32,9 +33,6 @@ type ApiData = {
   catalog: ItemDef[];
 };
 
-/* ---------------- Toast Component ---------------- */
-// ... (keep Notification)
-
 /* ---------------- Main Panel ---------------- */
 export function WardrobePanel({
   open,
@@ -45,7 +43,8 @@ export function WardrobePanel({
   onOpenChange: (v: boolean) => void;
   defaultTab?: 'inventory' | 'shop' | 'trade';
 }) {
-  const { data, mutate, unseenItems, markItemSeen, markAllSeen } = useInventory(); // shared hook
+  const { data: session } = useSession();
+  const { data, mutate, unseenItems, markItemSeen, markAllSeen } = useInventory(!!session); // shared hook
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');

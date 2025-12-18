@@ -8,6 +8,7 @@ import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { useInventory } from '@/hooks/useInventory';
+import { useSession } from 'next-auth/react';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle>;
@@ -42,7 +43,8 @@ export function FrogDisplay({
   giftsClaimed,
   isCatching,
 }: Props) {
-  const { unseenCount } = useInventory();
+  const { data: session } = useSession();
+  const { unseenCount } = useInventory(!!session);
 
   return (
     // Added mb-12 to create the requested space from the tabs below

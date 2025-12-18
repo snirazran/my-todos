@@ -12,7 +12,7 @@ export default function MobileNav() {
   const router = useRouter();
   const { data: session } = useSession();
   const { openWardrobe } = useUIStore();
-  const { unseenCount } = useInventory();
+  const { unseenCount } = useInventory(!!session);
 
   if (!session) return null;
 
