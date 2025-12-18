@@ -73,7 +73,7 @@ export default function LoginPage() {
 
   /* -------------- UI -------------- */
   return (
-    <main className="relative flex items-center justify-center w-full min-h-screen p-4 pb-24 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900 md:pb-40">
+    <main className="relative flex items-center justify-center w-full h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] p-4 pb-32 md:pb-60 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       {/* ─── Decorative Blobs ─── */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-violet-500/10 dark:bg-violet-400/5 blur-[100px] rounded-full pointer-events-none z-0" />
 
@@ -88,12 +88,12 @@ export default function LoginPage() {
             stiffness: 100,
             damping: 20,
           }}
-          className="relative z-20 -mb-12 pointer-events-none"
+          className="relative z-20 -mb-10 pointer-events-none"
         >
           <div className="relative">
             <Frog
-              width={260}
-              height={260}
+              width={240}
+              height={240}
               indices={{ skin: 0, hat: 0, scarf: 0, hand_item: 0 }}
             />
           </div>
