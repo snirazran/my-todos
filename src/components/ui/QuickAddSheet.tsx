@@ -129,15 +129,6 @@ export default function QuickAddSheet({
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (open) {
-      const timer = setTimeout(() => {
-        inputRef.current?.focus();
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [open]);
-
   // Indices
   const [pickedDays, setPickedDays] = useState<Array<Exclude<DisplayDay, 7>>>(
     []
@@ -290,7 +281,6 @@ export default function QuickAddSheet({
                     onChange={(e) => setText(e.target.value)}
                     placeholder="New task?"
                     disabled={isSubmitting}
-                    autoFocus
                     spellCheck={false}
                     autoComplete="off"
                     maxLength={45}
