@@ -78,6 +78,9 @@ const TAG_COLORS = [
   { name: 'Pink', value: '#f472b6', bg: 'bg-pink-500', text: 'text-pink-950' },
 ];
 
+const TAG_MAX_LENGTH = 20;
+const MAX_SAVED_TAGS = 15;
+
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function QuickAddSheet({
@@ -161,6 +164,11 @@ export default function QuickAddSheet({
         setShowColorPicker(false);
     } else {
         // New tag
+        if (savedTags.length >= MAX_SAVED_TAGS) {
+            // Should ideally show a toast or message, but for now just don't open picker
+            return;
+        }
+
         if (showColorPicker) {
             // If picker is ALREADY open, save it
              createAndSaveTag();
@@ -174,6 +182,8 @@ export default function QuickAddSheet({
   const createAndSaveTag = async () => {
     const trimmed = tagInput.trim();
     if (!trimmed) return;
+
+    if (savedTags.length >= MAX_SAVED_TAGS) return;
 
     // Optimistic update? No, let's wait for safety or just assume success.
     try {
@@ -292,7 +302,7 @@ export default function QuickAddSheet({
 
                   {/* Selected Tags Display (Inline) */}
                   {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 px-1 mb-2">
+                    <div className="flex flex-wrap gap-1.5 px-1 mb-3 mt-2">
                        {tags.map((tag) => {
                         const color = getTagColor(tag);
                         return (
@@ -326,7 +336,7 @@ export default function QuickAddSheet({
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between px-1 mb-3">
+                  <div className="flex items-center justify-between px-1 mb-4 mt-1">
                     <button
                         type="button"
                         onClick={() => {
@@ -383,14 +393,16 @@ export default function QuickAddSheet({
                                                 handleAddTag();
                                             }
                                         }}
+                                        maxLength={TAG_MAX_LENGTH}
                                         placeholder="Type to create or filter..."
-                                        className="w-full h-10 pl-9 pr-2 rounded-xl bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-white ring-1 ring-slate-200 dark:ring-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 placeholder:text-slate-400"
+                                        className="w-full h-10 pl-9 pr-2 rounded-xl bg-white dark:bg-slate-800 text-base md:text-sm font-medium text-slate-900 dark:text-white ring-1 ring-slate-200 dark:ring-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 placeholder:text-slate-400"
                                     />
                                     {tagInput && (
                                         <button
                                             type="button"
                                             onClick={handleAddTag}
-                                            className="absolute right-1.5 p-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-200"
+                                            disabled={!savedTags.find(t => t.name.toLowerCase() === tagInput.trim().toLowerCase()) && savedTags.length >= MAX_SAVED_TAGS}
+                                            className="absolute right-1.5 p-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-200 disabled:opacity-50 disabled:grayscale"
                                         >
                                             {showColorPicker ? <Palette className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                                         </button>
@@ -437,7 +449,9 @@ export default function QuickAddSheet({
                                 {savedTags.length > 0 && (
                                     <div>
                                         <div className="flex items-center justify-between mb-2">
-                                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saved Tags</span>
+                                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                                Saved Tags <span className={savedTags.length >= MAX_SAVED_TAGS ? "text-red-500" : ""}>({savedTags.length}/{MAX_SAVED_TAGS})</span>
+                                            </span>
                                             <button
                                                 type="button"
                                                 onClick={() => setManageTagsMode(!manageTagsMode)}
@@ -457,8 +471,11 @@ export default function QuickAddSheet({
                                                     <button
                                                         key={st.id}
                                                         type="button"
-                                                        onClick={() => {
-                                                            if (manageTagsMode) return;
+                                                        onClick={(e) => {
+                                                            if (manageTagsMode) {
+                                                                deleteSavedTag(st.id, st.name, e);
+                                                                return;
+                                                            }
                                                             if (isSelected) removeTag(st.name);
                                                             else setTags((prev) => [...prev, st.name]);
                                                         }}

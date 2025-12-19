@@ -31,11 +31,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Name and color required' }, { status: 400 });
   }
 
+  const trimmedName = name.trim();
+  if (trimmedName.length > 20) {
+    return NextResponse.json({ error: 'Tag name too long (max 20 chars)' }, { status: 400 });
+  }
+
   await connectMongo();
+  
+  const user = await UserModel.findById(session.user.id, { tags: 1 }).lean();
+  if (user?.tags && user.tags.length >= 15) {
+    return NextResponse.json({ error: 'Tag limit reached (max 15)' }, { status: 400 });
+  }
   
   const newTag = {
     id: uuid(),
-    name: name.trim(),
+    name: trimmedName,
     color,
   };
 
