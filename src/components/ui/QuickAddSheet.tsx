@@ -217,7 +217,7 @@ export default function QuickAddSheet({
                     autoComplete="off"
                     maxLength={45}
                     style={{ direction: 'ltr', textAlign: 'left' }}
-                    className="w-full h-12 px-4 mb-1 rounded-[16px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50 text-lg font-medium text-left"
+                    className="w-full h-12 px-4 mb-1 rounded-[16px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50 text-base md:text-lg font-medium text-left"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -257,7 +257,7 @@ export default function QuickAddSheet({
                             }
                           }}
                           placeholder="Add tag..."
-                          className="h-6 pl-5 pr-2 w-24 rounded-md bg-transparent text-[11px] font-medium text-slate-600 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-300 placeholder:text-slate-400"
+                          className="h-6 pl-5 pr-2 w-24 rounded-md bg-transparent text-base md:text-[11px] font-medium text-slate-600 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-300 placeholder:text-slate-400"
                         />
                         {tagInput && (
                           <button
