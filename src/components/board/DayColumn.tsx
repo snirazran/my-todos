@@ -60,7 +60,7 @@ export default function DayColumn({
         </h2>
         {count !== undefined && (
         <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
-          {tasks.length}
+          {count}
         </span>
         )}
       </div>
