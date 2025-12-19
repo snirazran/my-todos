@@ -99,23 +99,23 @@ export default function ProgressCard({
                   {/* Status & Bar Container */}
                   <div className="w-full px-1 mt-auto text-center">
                     {isClaimed ? (
-                      <span className="text-[10px] font-bold text-green-600 dark:text-green-400">
+                      <span className="text-[11px] font-bold text-green-600 dark:text-green-400">
                         Collected
                       </span>
                     ) : isReady ? (
-                      <span className="text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase animate-pulse">
+                      <span className="text-[11px] font-black text-purple-600 dark:text-purple-400 uppercase animate-pulse">
                         Open!
                       </span>
                     ) : (
                       <div className="flex flex-col w-full gap-1">
                         {/* Text Label */}
                         {isLocked ? (
-                          <span className="text-[9px] font-bold text-slate-400 leading-tight">
+                          <span className="text-[10px] font-bold text-slate-400 leading-tight">
                             Add +{slot.neededToUnlock} task
                             {slot.neededToUnlock > 1 ? 's' : ''}
                           </span>
                         ) : (
-                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 leading-tight">
+                          <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300 leading-tight">
                             {slot.tasksLeft} left
                           </span>
                         )}

@@ -308,7 +308,7 @@ export default function QuickAddSheet({
                         return (
                           <span
                             key={tag}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-colors shadow-sm"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border transition-colors shadow-sm"
                             style={
                               color
                                 ? {
@@ -359,7 +359,7 @@ export default function QuickAddSheet({
                         {isTagPanelOpen ? 'Close Tags' : 'Add Tags'}
                     </button>
                      <span
-                      className={`text-[10px] font-bold ${
+                      className={`text-[11px] font-bold ${
                         text.length >= 40 ? 'text-rose-500' : 'text-slate-400'
                       }`}
                     >
@@ -480,7 +480,7 @@ export default function QuickAddSheet({
                                                             else setTags((prev) => [...prev, st.name]);
                                                         }}
                                                         className={`
-                                                            relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all
+                                                            relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold uppercase tracking-wider transition-all
                                                             border
                                                             ${
                                                             isSelected

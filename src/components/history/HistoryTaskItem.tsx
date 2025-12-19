@@ -93,7 +93,7 @@ export default function HistoryTaskItem({
           <div className="flex items-center">
             <span
               title="Repeats weekly"
-              className="inline-flex items-center gap-1 rounded-md bg-purple-50/80 px-1.5 py-0.5 text-[10px] font-bold text-purple-600 dark:bg-purple-900/40 dark:text-purple-200 transition-colors"
+              className="inline-flex items-center gap-1 rounded-md bg-purple-50/80 px-2 py-0.5 text-[11px] font-bold text-purple-600 dark:bg-purple-900/40 dark:text-purple-200 transition-colors"
             >
               <RotateCcw className="h-3 w-3" aria-hidden="true" />
               <span className="tracking-wider uppercase">Weekly</span>

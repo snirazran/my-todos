@@ -159,7 +159,7 @@ export default function TaskList({
             Your Tasks
           </h2>
           {tasks.length > 0 && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
               {tasks.length}
             </span>
           )}
@@ -288,7 +288,7 @@ export default function TaskList({
                             return (
                               <span
                                 key={tag}
-                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
+                                className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
                                   !color
                                     ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
                                     : ''
