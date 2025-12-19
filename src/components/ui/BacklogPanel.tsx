@@ -55,26 +55,27 @@ export default function BacklogPanel({
     setProcessingIds((prev) => new Set(prev).add(item.id));
     setExitAction({ id: item.id, type: 'today' });
 
-    // Wait for animation
-    await new Promise((resolve) => setTimeout(resolve, 400));
-
     try {
       const dow = new Date().getDay();
-      await fetch('/api/tasks?view=board', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: item.text,
-          days: [dow],
-          repeat: 'this-week',
-          tags: item.tags,
+      // Start API calls immediately
+      await Promise.all([
+        fetch('/api/tasks?view=board', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+            text: item.text,
+            days: [dow],
+            repeat: 'this-week',
+            tags: item.tags,
+            }),
         }),
-      });
-      await fetch('/api/tasks?view=board', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day: -1, taskId: item.id }),
-      });
+        fetch('/api/tasks?view=board', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ day: -1, taskId: item.id }),
+        })
+      ]);
+      
       await onRefreshToday();
       await onRefreshBacklog();
     } finally {
@@ -126,8 +127,7 @@ export default function BacklogPanel({
             <CalendarClock className="w-10 h-10 mb-3 opacity-20" />
             <p className="text-sm font-medium">No tasks saved yet.</p>
             <p className="mt-1 text-xs opacity-60">
-              When you&apos;re unsure about the "when", save tasks here. You can
-              add them to your day whenever you&apos;re ready!
+              Save tasks for later and add them when you&apos;re ready!
             </p>
           </div>
         ) : (
@@ -141,15 +141,19 @@ export default function BacklogPanel({
                   layout
                   key={t.id}
                   initial={{ opacity: 0, y: 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={
+                  animate={
                     isExiting
                       ? {
                           opacity: 0,
-                          y: -200, // Fly UP
+                          x: -200, // Fly LEFT
                           scale: 0.8,
                           transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
                         }
+                      : { opacity: 1, x: 0, y: 0 }
+                  }
+                  exit={
+                    isExiting
+                      ? { opacity: 0 } // Already animated out
                       : { opacity: 0, scale: 0.95 }
                   }
                   transition={{ delay: i * 0.05 }}

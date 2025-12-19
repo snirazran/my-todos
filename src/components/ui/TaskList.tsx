@@ -187,15 +187,19 @@ export default function TaskList({
                 <motion.div
                   layout
                   initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={
+                  animate={
                     isExitingLater
                       ? {
                           opacity: 0,
-                          y: 200, // Drop down
+                          x: 200, // Fly RIGHT
                           scale: 0.8,
                           transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
                         }
+                      : { opacity: 1, x: 0, y: 0 }
+                  }
+                  exit={
+                    isExitingLater
+                      ? { opacity: 0 } // Already animated out
                       : { opacity: 0, scale: 0.95 }
                   }
                   transition={{
@@ -385,11 +389,11 @@ export default function TaskList({
                   const id = menu.id;
                   setMenu(null);
                   setExitAction({ id, type: 'later' });
-                  // Wait for animation to finish
+                  onDoLater(id);
+                  // Allow animation to play before resetting (though component might unmount first)
                   setTimeout(() => {
-                    onDoLater(id);
                     setExitAction(null);
-                  }, 400);
+                  }, 500);
                 }
               }
             : undefined
