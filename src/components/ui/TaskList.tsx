@@ -63,6 +63,7 @@ export default function TaskList({
 
   const [busy, setBusy] = useState(false);
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+  const [exitAction, setExitAction] = useState<{ id: string; type: 'later' } | null>(null);
   const [dialog, setDialog] = useState<{
     task: Task;
     kind: 'regular' | 'weekly' | 'backlog';
@@ -180,20 +181,30 @@ export default function TaskList({
             {tasks.map((task, i) => {
               const isDone = task.completed || vSet.has(task.id);
               const isMenuOpen = menu?.id === task.id;
+              const isExitingLater = exitAction?.id === task.id && exitAction.type === 'later';
 
               return (
                 <motion.div
                   layout
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
+                  exit={
+                    isExitingLater
+                      ? {
+                          opacity: 0,
+                          y: 200, // Drop down
+                          scale: 0.8,
+                          transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
+                        }
+                      : { opacity: 0, scale: 0.95 }
+                  }
                   transition={{
                     layout: { type: 'spring', stiffness: 300, damping: 30 },
                   }}
                   key={task.id}
                   className={`group relative ${isMenuOpen ? 'z-50' : 'z-auto'}`}
                   style={{
-                    zIndex: isMenuOpen ? 50 : 1,
+                    zIndex: isMenuOpen ? 50 : isExitingLater ? 0 : 1, // Ensure exiting task is behind others or handled correctly
                   }}
                 >
                   {/* Row */}
@@ -370,8 +381,16 @@ export default function TaskList({
         onDoLater={
           onDoLater
             ? () => {
-                if (menu) onDoLater(menu.id);
-                setMenu(null);
+                if (menu) {
+                  const id = menu.id;
+                  setMenu(null);
+                  setExitAction({ id, type: 'later' });
+                  // Wait for animation to finish
+                  setTimeout(() => {
+                    onDoLater(id);
+                    setExitAction(null);
+                  }, 400);
+                }
               }
             : undefined
         }

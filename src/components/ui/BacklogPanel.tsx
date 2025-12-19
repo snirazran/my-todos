@@ -23,6 +23,7 @@ export default function BacklogPanel({
   const [confirmId, setConfirmId] = React.useState<BacklogItem | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [processingIds, setProcessingIds] = React.useState<Set<string>>(new Set());
+  const [exitAction, setExitAction] = React.useState<{ id: string; type: 'today' } | null>(null);
 
   // Fetch Tags for colors
   const { data: tagsData } = useSWR('/api/tags', (url) =>
@@ -52,6 +53,10 @@ export default function BacklogPanel({
   const addToday = async (item: BacklogItem) => {
     if (processingIds.has(item.id)) return;
     setProcessingIds((prev) => new Set(prev).add(item.id));
+    setExitAction({ id: item.id, type: 'today' });
+
+    // Wait for animation
+    await new Promise((resolve) => setTimeout(resolve, 400));
 
     try {
       const dow = new Date().getDay();
@@ -78,6 +83,7 @@ export default function BacklogPanel({
         next.delete(item.id);
         return next;
       });
+      setExitAction(null);
     }
   };
 
@@ -125,34 +131,46 @@ export default function BacklogPanel({
             </p>
           </div>
         ) : (
-          later.map((t, i) => {
-            const isMenuOpen = menu?.id === t.id;
+          <AnimatePresence mode="popLayout">
+            {later.map((t, i) => {
+              const isMenuOpen = menu?.id === t.id;
+              const isExiting = exitAction?.id === t.id;
 
-            return (
-              <div
-                key={t.id}
-                // IMPORTANT: Z-Index logic fixes the clipping/overlap issue
-                className={`group relative transition-all duration-200 ${
-                  isMenuOpen ? 'z-50' : 'z-auto'
-                }`}
-                style={{
-                  // Ensure active menu item floats above subsequent items
-                  zIndex: isMenuOpen ? 50 : 1,
-                }}
-              >
-                {/* Row */}
-                <div
-                  className={`
-                    relative flex items-center gap-4 px-3 py-3.5 
-                    transition-all duration-200 rounded-xl 
-                    border border-transparent hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
-                    ${isMenuOpen ? 'bg-white dark:bg-slate-800 shadow-md' : ''}
-                  `}
+              return (
+                <motion.div
+                  layout
+                  key={t.id}
+                  initial={{ opacity: 0, y: 15 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={
+                    isExiting
+                      ? {
+                          opacity: 0,
+                          y: -200, // Fly UP
+                          scale: 0.8,
+                          transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
+                        }
+                      : { opacity: 0, scale: 0.95 }
+                  }
+                  transition={{ delay: i * 0.05 }}
+                  // IMPORTANT: Z-Index logic fixes the clipping/overlap issue
+                  className={`group relative ${
+                    isMenuOpen ? 'z-50' : isExiting ? 'z-0' : 'z-auto'
+                  }`}
                   style={{
-                    animation: `fadeInUp 0.4s ease-out ${i * 0.05}s forwards`,
-                    opacity: 0,
+                    // Ensure active menu item floats above subsequent items
+                    zIndex: isMenuOpen ? 50 : isExiting ? 0 : 1,
                   }}
                 >
+                  {/* Row */}
+                  <div
+                    className={`
+                      relative flex items-center gap-4 px-3 py-3.5 
+                      transition-all duration-200 rounded-xl 
+                      border border-transparent hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
+                      ${isMenuOpen ? 'bg-white dark:bg-slate-800 shadow-md' : ''}
+                    `}
+                  >
                   {/* Fly Icon */}
                   <div className="flex items-center justify-center flex-shrink-0 w-7 h-7">
                     <Fly
@@ -260,11 +278,12 @@ export default function BacklogPanel({
                     </button>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             );
-          })
-        )}
-      </div>
+          })}
+        </AnimatePresence>
+      )}
+    </div>
 
       <TaskMenu
         menu={menu}
