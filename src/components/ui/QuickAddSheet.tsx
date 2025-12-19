@@ -61,7 +61,12 @@ const TAG_COLORS = [
     bg: 'bg-yellow-400',
     text: 'text-yellow-950',
   },
-  { name: 'Green', value: '#4ade80', bg: 'bg-green-500', text: 'text-green-950' },
+  {
+    name: 'Green',
+    value: '#4ade80',
+    bg: 'bg-green-500',
+    text: 'text-green-950',
+  },
   { name: 'Teal', value: '#2dd4bf', bg: 'bg-teal-400', text: 'text-teal-950' },
   { name: 'Blue', value: '#60a5fa', bg: 'bg-blue-500', text: 'text-blue-950' },
   {
@@ -131,11 +136,23 @@ export default function QuickAddSheet({
         const offset = window.innerHeight - vv.height;
         setKeyboardHeight(Math.max(0, offset));
       };
-      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
-      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
+      window.visualViewport.addEventListener(
+        'resize',
+        handleVisualViewportChange
+      );
+      window.visualViewport.addEventListener(
+        'scroll',
+        handleVisualViewportChange
+      );
       return () => {
-        window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
-        window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
+        window.visualViewport?.removeEventListener(
+          'resize',
+          handleVisualViewportChange
+        );
+        window.visualViewport?.removeEventListener(
+          'scroll',
+          handleVisualViewportChange
+        );
       };
     }
   }, []);
@@ -150,7 +167,9 @@ export default function QuickAddSheet({
   }, [open]);
 
   // Indices
-  const [pickedDays, setPickedDays] = useState<Array<Exclude<DisplayDay, 7>>>([]);
+  const [pickedDays, setPickedDays] = useState<Array<Exclude<DisplayDay, 7>>>(
+    []
+  );
 
   useEffect(() => {
     if (open) {
@@ -336,10 +355,16 @@ export default function QuickAddSheet({
                                 : undefined
                             }
                           >
-                             {!color && (
-                               <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800 flex items-center gap-1 h-full w-full absolute inset-0 rounded-md px-2 opacity-10 pointer-events-none" />
-                             )}
-                             {!color ? <span className="text-indigo-700 dark:text-indigo-300 relative z-10">{tag}</span> : tag}
+                            {!color && (
+                              <span className="absolute inset-0 flex items-center w-full h-full gap-1 px-2 text-indigo-700 border-indigo-200 rounded-md pointer-events-none bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-200 dark:border-indigo-800 opacity-10" />
+                            )}
+                            {!color ? (
+                              <span className="relative z-10 text-indigo-700 dark:text-indigo-300">
+                                {tag}
+                              </span>
+                            ) : (
+                              tag
+                            )}
                             <button
                               type="button"
                               onClick={() => removeTag(tag)}
@@ -350,7 +375,7 @@ export default function QuickAddSheet({
                           </span>
                         );
                       })}
-                      
+
                       <div className="relative flex items-center group">
                         <Tag className="absolute left-1.5 w-3 h-3 text-slate-400 group-focus-within:text-purple-500 transition-colors" />
                         <input
@@ -393,7 +418,7 @@ export default function QuickAddSheet({
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
                           exit={{ opacity: 0, height: 0 }}
-                          className="flex items-center gap-2 overflow-hidden p-1 -m-1"
+                          className="flex items-center gap-2 p-1 -m-1 overflow-hidden"
                         >
                           <div className="flex gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
                             {TAG_COLORS.map((c) => (
@@ -401,7 +426,9 @@ export default function QuickAddSheet({
                                 key={c.name}
                                 type="button"
                                 onClick={() => setNewTagColor(c.value)}
-                                className={`w-5 h-5 rounded-full ${c.bg} ring-2 ring-offset-1 ring-offset-slate-100 dark:ring-offset-slate-800 transition-all ${
+                                className={`w-5 h-5 rounded-full ${
+                                  c.bg
+                                } ring-2 ring-offset-1 ring-offset-slate-100 dark:ring-offset-slate-800 transition-all ${
                                   newTagColor === c.value
                                     ? 'ring-slate-400 scale-110'
                                     : 'ring-transparent hover:scale-110'
@@ -429,7 +456,7 @@ export default function QuickAddSheet({
                         exit={{ opacity: 0, height: 0 }}
                         className="flex items-center gap-2 mt-1"
                       >
-                        <div className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar py-2 -my-1">
+                        <div className="flex-1 py-2 -my-1 overflow-x-auto overflow-y-hidden no-scrollbar">
                           <div className="flex gap-1.5 px-1">
                             {savedTags.map((st) => {
                               const isSelected = tags.includes(st.name);
@@ -440,8 +467,7 @@ export default function QuickAddSheet({
                                   onClick={() => {
                                     if (manageTagsMode) return;
                                     if (isSelected) removeTag(st.name);
-                                    else
-                                      setTags((prev) => [...prev, st.name]);
+                                    else setTags((prev) => [...prev, st.name]);
                                   }}
                                   className={`
                                     relative flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all

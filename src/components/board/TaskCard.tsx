@@ -22,6 +22,7 @@ export default function TaskCard({
   isRepeating = false,
   touchAction,
   requireLongPress = false,
+  userTags,
 }: {
   dragId: string;
   task: Task;
