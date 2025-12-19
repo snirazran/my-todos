@@ -102,28 +102,8 @@ export default function QuickAddSheet({
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[5].value); // Default blue
   const [manageTagsMode, setManageTagsMode] = useState(false);
-  const [showTagsList, setShowTagsList] = useState(false);
-  const tagContainerRef = React.useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (
-        tagContainerRef.current &&
-        !tagContainerRef.current.contains(event.target as Node)
-      ) {
-        setShowTagsList(false);
-      }
-    };
-
-    if (showTagsList) {
-      document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
-    };
-  }, [showTagsList]);
+  const [isTagPanelOpen, setIsTagPanelOpen] = useState(false);
+  const tagInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -145,14 +125,11 @@ export default function QuickAddSheet({
       setIsSubmitting(false);
       setShowColorPicker(false);
       setManageTagsMode(false);
+      setIsTagPanelOpen(false);
     }
   }, [open, initialText, defaultRepeat]);
-
-  useEffect(() => {
-    if (open && when === 'pick' && pickedDays.length === 0) {
-      setPickedDays([todayDisplayIndex()]);
-    }
-  }, [open, when, pickedDays.length]);
+  
+  // ... rest of useEffects
 
   const dayLabels = useMemo(
     () =>
@@ -170,10 +147,27 @@ export default function QuickAddSheet({
 
   const handleAddTag = () => {
     const trimmed = tagInput.trim();
-    if (trimmed && !tags.includes(trimmed)) {
-      setTags((prev) => [...prev, trimmed]);
-      setTagInput('');
-      setShowColorPicker(false);
+    if (!trimmed) return;
+
+    // Check if tag exists
+    const existing = savedTags.find(t => t.name.toLowerCase() === trimmed.toLowerCase());
+
+    if (existing) {
+        // Select existing if not already selected
+        if (!tags.includes(existing.name)) {
+             setTags(prev => [...prev, existing.name]);
+        }
+        setTagInput('');
+        setShowColorPicker(false);
+    } else {
+        // New tag
+        if (showColorPicker) {
+            // If picker is ALREADY open, save it
+             createAndSaveTag();
+        } else {
+            // Open picker
+            setShowColorPicker(true);
+        }
     }
   };
 
@@ -199,11 +193,13 @@ export default function QuickAddSheet({
     }
   };
 
-  const deleteSavedTag = async (id: string, e: React.MouseEvent) => {
+  const deleteSavedTag = async (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
     try {
       await fetch(`/api/tags?id=${id}`, { method: 'DELETE' });
       mutate('/api/tags');
+      // Also remove from currently selected tags if present
+      setTags((prev) => prev.filter((t) => t !== name));
     } catch (error) {
       console.error('Failed to delete tag', error);
     }
@@ -294,13 +290,10 @@ export default function QuickAddSheet({
                     }}
                   />
 
-                  <div
-                    ref={tagContainerRef}
-                    className="flex flex-col gap-2 px-2 mb-2"
-                  >
-                    {/* Selected Tags & Input */}
-                    <div className="flex flex-wrap items-center gap-1.5 w-full">
-                      {tags.map((tag) => {
+                  {/* Selected Tags Display (Inline) */}
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 px-1 mb-2">
+                       {tags.map((tag) => {
                         const color = getTagColor(tag);
                         return (
                           <span
@@ -316,171 +309,194 @@ export default function QuickAddSheet({
                                 : undefined
                             }
                           >
-                            {!color && (
-                              <span className="absolute inset-0 flex items-center w-full h-full gap-1 px-2 text-indigo-700 border-indigo-200 rounded-md pointer-events-none bg-indigo-50 dark:bg-indigo-900/30 dark:text-indigo-200 dark:border-indigo-800 opacity-10" />
-                            )}
-                            {!color ? (
-                              <span className="relative z-10 text-indigo-700 dark:text-indigo-300">
-                                {tag}
-                              </span>
-                            ) : (
-                              tag
-                            )}
+                             {!color && (
+                               <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800 flex items-center gap-1 h-full w-full absolute inset-0 rounded-md px-2 opacity-10 pointer-events-none" />
+                             )}
+                             {!color ? <span className="text-indigo-700 dark:text-indigo-300 relative z-10">{tag}</span> : tag}
                             <button
                               type="button"
                               onClick={() => removeTag(tag)}
-                              className="relative z-10 hover:opacity-70"
+                              className="relative z-10 hover:opacity-70 p-0.5"
                             >
                               <X className="w-3 h-3" />
                             </button>
                           </span>
                         );
                       })}
-
-                      <div className="relative flex items-center group">
-                        <Tag className="absolute left-1.5 w-3 h-3 text-slate-400 group-focus-within:text-purple-500 transition-colors" />
-                        <input
-                          value={tagInput}
-                          onFocus={() => setShowTagsList(true)}
-                          onChange={(e) => {
-                            setTagInput(e.target.value);
-                            setShowColorPicker(false);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              if (showColorPicker) {
-                                createAndSaveTag();
-                              } else {
-                                handleAddTag();
-                              }
-                            }
-                          }}
-                          placeholder="Add tag..."
-                          className="h-6 pl-5 pr-2 min-w-[80px] w-auto max-w-[150px] rounded-md bg-transparent text-base md:text-[11px] font-medium text-slate-600 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-300 placeholder:text-slate-400 transition-all"
-                        />
-                        {tagInput && !showColorPicker && (
-                          <button
-                            type="button"
-                            onClick={() => setShowColorPicker(true)}
-                            className="absolute right-0.5 p-0.5 text-slate-400 hover:text-purple-600 hover:bg-purple-100 rounded"
-                            title="Create & Color"
-                          >
-                            <Palette className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
                     </div>
+                  )}
 
-                    {/* Color Picker for New Tag */}
-                    <AnimatePresence>
-                      {showColorPicker && tagInput && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          className="flex items-center gap-2 p-1 -m-1 overflow-hidden"
-                        >
-                          <div className="flex gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
-                            {TAG_COLORS.map((c) => (
-                              <button
-                                key={c.name}
-                                type="button"
-                                onClick={() => setNewTagColor(c.value)}
-                                className={`w-5 h-5 rounded-full ${
-                                  c.bg
-                                } ring-2 ring-offset-1 ring-offset-slate-100 dark:ring-offset-slate-800 transition-all ${
-                                  newTagColor === c.value
-                                    ? 'ring-slate-400 scale-110'
-                                    : 'ring-transparent hover:scale-110'
-                                }`}
-                                title={c.name}
-                              />
-                            ))}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={createAndSaveTag}
-                            className="px-2 py-1 text-[10px] font-bold text-white bg-purple-600 rounded-md shadow-sm hover:bg-purple-700"
-                          >
-                            Save
-                          </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Saved Tags Horizontal List */}
-                    {savedTags.length > 0 && showTagsList && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="flex items-center gap-2 mt-1"
-                      >
-                        <div className="flex-1 py-2 -my-1 overflow-x-auto overflow-y-hidden no-scrollbar">
-                          <div className="flex gap-1.5 px-1">
-                            {savedTags.map((st) => {
-                              const isSelected = tags.includes(st.name);
-                              return (
-                                <button
-                                  key={st.id}
-                                  type="button"
-                                  onClick={() => {
-                                    if (manageTagsMode) return;
-                                    if (isSelected) removeTag(st.name);
-                                    else setTags((prev) => [...prev, st.name]);
-                                  }}
-                                  className={`
-                                    relative flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all
-                                    border
-                                    ${
-                                      isSelected
-                                        ? 'ring-1 ring-offset-1 ring-offset-white dark:ring-offset-slate-900'
-                                        : 'hover:opacity-80'
-                                    }
-                                  `}
-                                  style={{
-                                    backgroundColor: `${st.color}20`,
-                                    color: st.color,
-                                    borderColor: `${st.color}40`,
-                                    boxShadow: isSelected
-                                      ? `0 0 0 1px ${st.color}`
-                                      : 'none',
-                                  }}
-                                >
-                                  {st.name}
-                                  {manageTagsMode && (
-                                    <div
-                                      onClick={(e) => deleteSavedTag(st.id, e)}
-                                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm hover:scale-110"
-                                    >
-                                      <X className="w-2 h-2" />
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => setManageTagsMode(!manageTagsMode)}
-                          className={`p-1.5 rounded-md transition-colors ${
-                            manageTagsMode
-                              ? 'bg-red-100 text-red-600'
-                              : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
-                          }`}
-                          title="Manage Tags"
-                        >
-                          {manageTagsMode ? (
-                            <X className="w-3.5 h-3.5" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </motion.div>
-                    )}
+                  <div className="flex items-center justify-between px-1 mb-3">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setIsTagPanelOpen(!isTagPanelOpen);
+                            // Auto-focus input when opening
+                            if (!isTagPanelOpen) {
+                                setTimeout(() => tagInputRef.current?.focus(), 100);
+                            }
+                        }}
+                        className={`
+                            inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-bold transition-all
+                            border
+                            ${isTagPanelOpen 
+                                ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-800' 
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-800 dark:hover:bg-slate-800'
+                            }
+                        `}
+                    >
+                        <Tag className="w-3.5 h-3.5" />
+                        {isTagPanelOpen ? 'Close Tags' : 'Add Tags'}
+                    </button>
+                     <span
+                      className={`text-[10px] font-bold ${
+                        text.length >= 40 ? 'text-rose-500' : 'text-slate-400'
+                      }`}
+                    >
+                      {text.length}/45
+                    </span>
                   </div>
+
+                  {/* Tag Management Panel */}
+                  <AnimatePresence>
+                    {isTagPanelOpen && (
+                        <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="overflow-hidden"
+                        >
+                            <div className="p-3 mb-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                                {/* Tag Input */}
+                                <div className="relative flex items-center mb-3">
+                                    <Tag className="absolute left-2.5 w-4 h-4 text-slate-400" />
+                                    <input
+                                        ref={tagInputRef}
+                                        value={tagInput}
+                                        onChange={(e) => {
+                                            setTagInput(e.target.value);
+                                            setShowColorPicker(false);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleAddTag();
+                                            }
+                                        }}
+                                        placeholder="Type to create or filter..."
+                                        className="w-full h-10 pl-9 pr-2 rounded-xl bg-white dark:bg-slate-800 text-sm font-medium text-slate-900 dark:text-white ring-1 ring-slate-200 dark:ring-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 placeholder:text-slate-400"
+                                    />
+                                    {tagInput && (
+                                        <button
+                                            type="button"
+                                            onClick={handleAddTag}
+                                            className="absolute right-1.5 p-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-200"
+                                        >
+                                            {showColorPicker ? <Palette className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Color Picker (Conditionally shown) */}
+                                <AnimatePresence>
+                                    {showColorPicker && (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: -10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, y: -10 }}
+                                            className="mb-3 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700"
+                                        >
+                                            <div className="text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
+                                            <div className="flex gap-2 flex-wrap">
+                                                {TAG_COLORS.map((c) => (
+                                                <button
+                                                    key={c.name}
+                                                    type="button"
+                                                    onClick={() => setNewTagColor(c.value)}
+                                                    className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-800 transition-all ${
+                                                    newTagColor === c.value
+                                                        ? 'ring-slate-400 scale-110'
+                                                        : 'ring-transparent'
+                                                    }`}
+                                                    title={c.name}
+                                                />
+                                                ))}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={createAndSaveTag}
+                                                className="w-full mt-3 py-2 text-xs font-bold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 active:scale-95 transition-transform"
+                                            >
+                                                Save Tag
+                                            </button>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+
+                                {/* Available Tags (Wrap layout for mobile) */}
+                                {savedTags.length > 0 && (
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Saved Tags</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setManageTagsMode(!manageTagsMode)}
+                                                className={`text-[11px] font-bold px-2 py-0.5 rounded transition-colors ${
+                                                    manageTagsMode ? 'bg-red-100 text-red-600' : 'text-slate-400 hover:text-slate-600'
+                                                }`}
+                                            >
+                                                {manageTagsMode ? 'Done' : 'Manage'}
+                                            </button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {savedTags
+                                                .filter(st => !tagInput || st.name.toLowerCase().includes(tagInput.toLowerCase()))
+                                                .map((st) => {
+                                                const isSelected = tags.includes(st.name);
+                                                return (
+                                                    <button
+                                                        key={st.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (manageTagsMode) return;
+                                                            if (isSelected) removeTag(st.name);
+                                                            else setTags((prev) => [...prev, st.name]);
+                                                        }}
+                                                        className={`
+                                                            relative flex items-center gap-1.5 px-3 py-2 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all
+                                                            border
+                                                            ${
+                                                            isSelected
+                                                                ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900'
+                                                                : 'hover:opacity-80 opacity-70 bg-white dark:bg-slate-800'
+                                                            }
+                                                        `}
+                                                        style={{
+                                                            backgroundColor: isSelected ? `${st.color}20` : undefined,
+                                                            color: st.color,
+                                                            borderColor: isSelected ? `${st.color}40` : `${st.color}20`,
+                                                            boxShadow: isSelected ? `0 0 0 1px ${st.color}` : 'none',
+                                                        }}
+                                                    >
+                                                        {st.name}
+                                                        {manageTagsMode && (
+                                                            <div
+                                                            onClick={(e) => deleteSavedTag(st.id, st.name, e)}
+                                                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 shadow-sm hover:scale-110 z-10"
+                                                            >
+                                                                <X className="w-2.5 h-2.5" />
+                                                            </div>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
 
                 {/* Segmented control */}
