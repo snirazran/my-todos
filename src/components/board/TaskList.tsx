@@ -18,6 +18,7 @@ export default React.memo(function TaskList({
   removeTask,
   onGrab,
   setCardRef,
+  userTags,
 }: {
   day: DisplayDay;
   items: Task[];
