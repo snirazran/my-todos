@@ -645,10 +645,8 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
   }
 
   // Full week fetch (Sun..Sat + Later)
-  const week: (BoardItem & { completed?: boolean })[][] = Array.from(
-    { length: 8 },
-    () => []
-  );
+  const week: (BoardItem & { completed?: boolean; tags?: string[] })[][] =
+    Array.from({ length: 8 }, () => []);
 
   for (let d: Weekday = 0; d <= 6; d = (d + 1) as Weekday) {
     const docs: TaskDoc[] = await Task.find(
@@ -723,7 +721,7 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
 
 async function handleBoardPut(
   uid: Types.ObjectId,
-  body: { day: number; tasks: Array<{ id: string; text?: string }> }
+  body: { day: number; tasks: Array<{ id: string; text?: string; tags?: string[] }> }
 ) {
   const { day, tasks } = body;
   if (!Number.isInteger(day) || (day !== -1 && !isWeekday(day))) {
@@ -753,10 +751,10 @@ async function handleBoardPut(
       id: { $nin: ids },
     });
 
-    // Fetch any existing docs (any type) to preserve text
+    // Fetch any existing docs (any type) to preserve text and tags
     const docs: TaskDoc[] = await TaskModel.find(
       { userId: uid, id: { $in: ids } },
-      { id: 1, text: 1, type: 1 }
+      { id: 1, text: 1, type: 1, tags: 1 }
     )
       .lean<TaskDoc[]>()
       .exec();
@@ -768,9 +766,19 @@ async function handleBoardPut(
         t.text ?? '',
       ])
     );
+    // Prefer Request tags (client is truth); fall back to DB
+    const tagsFromReq = new Map(
+      (tasks as Array<{ id: string; tags?: string[] }>).map((t) => [
+        t.id,
+        t.tags,
+      ])
+    );
     const textById = new Map<string, string>();
+    const tagsById = new Map<string, string[]>();
+
     for (const d of docs) {
       textById.set(d.id, d.text ?? '');
+      tagsById.set(d.id, d.tags ?? []);
     }
 
     // Upsert backlog entries in the given order
@@ -782,6 +790,7 @@ async function handleBoardPut(
             $set: {
               order: i + 1,
               text: textById.get(id) ?? textFromReq.get(id) ?? '',
+              tags: tagsFromReq.get(id) ?? tagsById.get(id) ?? [],
               weekStart,
               updatedAt: now,
             },
@@ -811,7 +820,7 @@ async function handleBoardPut(
 
   // Reorder/update a weekday column
   const weekday: Weekday = day as Weekday;
-  const batch = tasks as Array<{ id: string; text?: string }>;
+  const batch = tasks as Array<{ id: string; text?: string; tags?: string[] }>;
   const ids = batch.map((t) => t.id);
 
   // Remove one-time (regular) not present anymore
@@ -822,34 +831,53 @@ async function handleBoardPut(
     id: { $nin: ids },
   });
 
-  // Get current types/text for all involved ids
+  // Get current types/text/tags for all involved ids
   const docs: TaskDoc[] = await TaskModel.find(
     { userId: uid, id: { $in: ids } },
-    { id: 1, type: 1, text: 1 }
+    { id: 1, type: 1, text: 1, tags: 1 }
   )
     .lean<TaskDoc[]>()
     .exec();
 
   const typeById = new Map(docs.map((d) => [d.id, d.type]));
   const textById = new Map(docs.map((d) => [d.id, d.text]));
+  const tagsById = new Map(docs.map((d) => [d.id, d.tags ?? []]));
 
   await Promise.all(
     batch.map((t, i) => {
       const ttype = typeById.get(t.id);
       const textFromReq = t.text ?? textById.get(t.id) ?? '';
+      // Prioritize request tags (from client state) -> fallback to DB -> fallback to empty
+      const tags = t.tags ?? tagsById.get(t.id) ?? [];
 
       if (ttype === 'weekly') {
         // just move/renumber the weekly item
         return TaskModel.updateOne(
           { userId: uid, type: 'weekly', id: t.id },
-          { $set: { dayOfWeek: weekday, order: i + 1, updatedAt: now } }
+          // Ensure we update tags if they differ or are missing in DB
+          {
+            $set: {
+              dayOfWeek: weekday,
+              order: i + 1,
+              updatedAt: now,
+              tags,
+            },
+          }
         );
       }
       if (ttype === 'regular') {
         // move/renumber inside this week
         return TaskModel.updateOne(
           { userId: uid, type: 'regular', id: t.id },
-          { $set: { date: weekDates[weekday], order: i + 1, updatedAt: now } }
+          // Ensure we update tags
+          {
+            $set: {
+              date: weekDates[weekday],
+              order: i + 1,
+              updatedAt: now,
+              tags,
+            },
+          }
         );
       }
       if (ttype === 'backlog') {
@@ -866,6 +894,7 @@ async function handleBoardPut(
             {
               $set: {
                 text: textFromReq,
+                tags,
                 date: weekDates[weekday],
                 order: i + 1,
                 completed: false,
@@ -888,6 +917,7 @@ async function handleBoardPut(
         {
           $set: {
             text: textFromReq,
+            tags,
             date: weekDates[weekday],
             order: i + 1,
             completed: false,

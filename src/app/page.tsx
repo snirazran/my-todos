@@ -468,6 +468,7 @@ export default function Home() {
                         body: JSON.stringify({
                           text: task.text,
                           repeat: 'backlog',
+                          tags: task.tags,
                         }),
                       });
 

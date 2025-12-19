@@ -50,6 +50,7 @@ export default function BacklogPanel({
           text: item.text,
           days: [dow],
           repeat: 'this-week',
+          tags: item.tags,
         }),
       });
       await fetch('/api/tasks?view=board', {
