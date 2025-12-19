@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TaskMenu from '../board/TaskMenu';
+import useSWR from 'swr';
 
 type BacklogItem = { id: string; text: string; tags?: string[] };
 
@@ -22,6 +23,17 @@ export default function BacklogPanel({
   const [confirmId, setConfirmId] = React.useState<BacklogItem | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [processingIds, setProcessingIds] = React.useState<Set<string>>(new Set());
+
+  // Fetch Tags for colors
+  const { data: tagsData } = useSWR('/api/tags', (url) =>
+    fetch(url).then((r) => r.json())
+  );
+  const userTags: { id: string; name: string; color: string }[] =
+    tagsData?.tags || [];
+
+  const getTagColor = (tagName: string) => {
+    return userTags.find((t) => t.name === tagName)?.color;
+  };
 
   // Listen for other menus opening to auto-close this one (syncs with TaskList)
   React.useEffect(() => {
@@ -156,14 +168,30 @@ export default function BacklogPanel({
                     </span>
                     {t.tags && t.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-1">
-                        {t.tags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border border-indigo-100 dark:border-indigo-800/50"
-                          >
-                            {tag}
-                          </span>
-                        ))}
+                        {t.tags.map((tag) => {
+                          const color = getTagColor(tag);
+                          return (
+                            <span
+                              key={tag}
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
+                                !color
+                                  ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
+                                  : ''
+                              }`}
+                              style={
+                                color
+                                  ? {
+                                      backgroundColor: `${color}20`,
+                                      color: color,
+                                      borderColor: `${color}40`,
+                                    }
+                                  : undefined
+                              }
+                            >
+                              {tag}
+                            </span>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

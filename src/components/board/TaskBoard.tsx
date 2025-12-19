@@ -490,6 +490,7 @@ export default function TaskBoard({
         trayRef={backlogTrayRef}
         closeProgress={trayCloseProgress}
         onRemove={(id) => removeTask(7 as DisplayDay, id)}
+        userTags={userTags}
       />
 
       <QuickAddSheet

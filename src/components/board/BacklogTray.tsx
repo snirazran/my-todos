@@ -5,6 +5,7 @@ import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
+import useSWR from 'swr';
 
 interface Props {
   isOpen: boolean;
@@ -16,6 +17,7 @@ interface Props {
   trayRef?: React.RefObject<HTMLDivElement>;
   closeProgress?: number; // 0 = fully open, 1 = fully closed
   onRemove?: (id: string) => void;
+  userTags?: { id: string; name: string; color: string }[];
 }
 
 export default React.memo(function BacklogTray({
@@ -28,6 +30,7 @@ export default React.memo(function BacklogTray({
   trayRef,
   closeProgress = 0,
   onRemove,
+  userTags = [],
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
@@ -154,6 +157,7 @@ export default React.memo(function BacklogTray({
                       innerRef={(el) => setCardRef(draggableIdFor(7, t.id), el)}
                       dragId={draggableIdFor(7, t.id)}
                       task={t}
+                      userTags={userTags}
                       menuOpen={menu?.id === t.id}
                       onToggleMenu={(rect) => {
                         setMenu((prev) => {

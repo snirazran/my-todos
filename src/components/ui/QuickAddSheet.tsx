@@ -106,6 +106,7 @@ export default function QuickAddSheet({
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[5].value); // Default blue
   const [manageTagsMode, setManageTagsMode] = useState(false);
   const [isTagPanelOpen, setIsTagPanelOpen] = useState(false);
+  const [isTagActionPending, setIsTagActionPending] = useState(false);
   const tagInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -129,6 +130,7 @@ export default function QuickAddSheet({
       setShowColorPicker(false);
       setManageTagsMode(false);
       setIsTagPanelOpen(false);
+      setIsTagActionPending(false);
     }
   }, [open, initialText, defaultRepeat]);
   
@@ -149,6 +151,7 @@ export default function QuickAddSheet({
     );
 
   const handleAddTag = () => {
+    if (isTagActionPending) return;
     const trimmed = tagInput.trim();
     if (!trimmed) return;
 
@@ -180,12 +183,13 @@ export default function QuickAddSheet({
   };
 
   const createAndSaveTag = async () => {
+    if (isTagActionPending) return;
     const trimmed = tagInput.trim();
     if (!trimmed) return;
 
     if (savedTags.length >= MAX_SAVED_TAGS) return;
 
-    // Optimistic update? No, let's wait for safety or just assume success.
+    setIsTagActionPending(true);
     try {
       await fetch('/api/tags', {
         method: 'POST',
@@ -200,11 +204,16 @@ export default function QuickAddSheet({
       setShowColorPicker(false);
     } catch (e) {
       console.error('Failed to save tag', e);
+    } finally {
+        setIsTagActionPending(false);
     }
   };
 
   const deleteSavedTag = async (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    if (isTagActionPending) return;
+
+    setIsTagActionPending(true);
     try {
       await fetch(`/api/tags?id=${id}`, { method: 'DELETE' });
       mutate('/api/tags');
@@ -212,6 +221,8 @@ export default function QuickAddSheet({
       setTags((prev) => prev.filter((t) => t !== name));
     } catch (error) {
       console.error('Failed to delete tag', error);
+    } finally {
+        setIsTagActionPending(false);
     }
   };
 
@@ -437,9 +448,10 @@ export default function QuickAddSheet({
                                             <button
                                                 type="button"
                                                 onClick={createAndSaveTag}
-                                                className="w-full mt-3 py-2 text-xs font-bold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 active:scale-95 transition-transform"
+                                                disabled={isTagActionPending}
+                                                className="w-full mt-3 py-2 text-xs font-bold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
                                             >
-                                                Save Tag
+                                                {isTagActionPending ? 'Saving...' : 'Save Tag'}
                                             </button>
                                         </motion.div>
                                     )}
@@ -455,6 +467,7 @@ export default function QuickAddSheet({
                                             <button
                                                 type="button"
                                                 onClick={() => setManageTagsMode(!manageTagsMode)}
+                                                disabled={isTagActionPending}
                                                 className={`text-[11px] font-bold px-2 py-0.5 rounded transition-colors ${
                                                     manageTagsMode ? 'bg-red-100 text-red-600' : 'text-slate-400 hover:text-slate-600'
                                                 }`}
@@ -471,6 +484,7 @@ export default function QuickAddSheet({
                                                     <button
                                                         key={st.id}
                                                         type="button"
+                                                        disabled={isTagActionPending}
                                                         onClick={(e) => {
                                                             if (manageTagsMode) {
                                                                 deleteSavedTag(st.id, st.name, e);
@@ -481,7 +495,7 @@ export default function QuickAddSheet({
                                                         }}
                                                         className={`
                                                             relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold uppercase tracking-wider transition-all
-                                                            border
+                                                            border disabled:opacity-50 disabled:cursor-not-allowed
                                                             ${
                                                             isSelected
                                                                 ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900'
