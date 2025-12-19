@@ -76,7 +76,7 @@ export default function BacklogBox({
 
         {/* Count Badge */}
         {count > 0 && (
-          <div className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full shadow-sm ring-2 ring-white dark:ring-slate-900">
+          <div className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1 text-[11px] font-bold text-white bg-rose-500 rounded-full shadow-sm ring-2 ring-white dark:ring-slate-900">
             {count}
           </div>
         )}
