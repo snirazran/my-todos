@@ -38,6 +38,7 @@ export default React.memo(function TaskList({
     rectGetter: () => DOMRect;
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
+  userTags?: { id: string; name: string; color: string }[];
 }) {
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay } | null>(null);
@@ -201,6 +202,7 @@ export default React.memo(function TaskList({
             }}
             hiddenWhileDragging={false}
             isRepeating={t.type === 'weekly'}
+            userTags={userTags}
           />
         </div>
       );

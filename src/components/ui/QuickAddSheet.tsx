@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import useSWR, { mutate } from 'swr';
 import {
   todayDisplayIndex,
   apiDayFromDisplay,
@@ -17,6 +18,8 @@ import {
   Plus,
   X,
   Tag,
+  Palette,
+  Trash2,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -38,6 +41,40 @@ type Props = Readonly<{
   defaultRepeat?: RepeatChoice;
 }>;
 
+type SavedTag = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+const TAG_COLORS = [
+  { name: 'Red', value: '#f87171', bg: 'bg-red-500', text: 'text-red-950' },
+  {
+    name: 'Orange',
+    value: '#fb923c',
+    bg: 'bg-orange-500',
+    text: 'text-orange-950',
+  },
+  {
+    name: 'Yellow',
+    value: '#facc15',
+    bg: 'bg-yellow-400',
+    text: 'text-yellow-950',
+  },
+  { name: 'Green', value: '#4ade80', bg: 'bg-green-500', text: 'text-green-950' },
+  { name: 'Teal', value: '#2dd4bf', bg: 'bg-teal-400', text: 'text-teal-950' },
+  { name: 'Blue', value: '#60a5fa', bg: 'bg-blue-500', text: 'text-blue-950' },
+  {
+    name: 'Purple',
+    value: '#c084fc',
+    bg: 'bg-purple-500',
+    text: 'text-purple-950',
+  },
+  { name: 'Pink', value: '#f472b6', bg: 'bg-pink-500', text: 'text-pink-950' },
+];
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
 export default function QuickAddSheet({
   open,
   onOpenChange,
@@ -55,80 +92,90 @@ export default function QuickAddSheet({
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
+  // Tag Management State
+  const { data: tagsData } = useSWR(open ? '/api/tags' : null, fetcher);
+  const savedTags: SavedTag[] = tagsData?.tags || [];
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[5].value); // Default blue
+  const [manageTagsMode, setManageTagsMode] = useState(false);
+  const [showTagsList, setShowTagsList] = useState(false);
+  const tagContainerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
+      if (
+        tagContainerRef.current &&
+        !tagContainerRef.current.contains(event.target as Node)
+      ) {
+        setShowTagsList(false);
+      }
+    };
+
+    if (showTagsList) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+    };
+  }, [showTagsList]);
+
   useEffect(() => {
     setMounted(true);
-
-    // Track visual viewport to handle mobile keyboard
+    // ... viewport logic
     if (typeof window !== 'undefined' && window.visualViewport) {
       const handleVisualViewportChange = () => {
         const vv = window.visualViewport;
         if (!vv) return;
-        // Calculate how much the keyboard is covering
         const offset = window.innerHeight - vv.height;
         setKeyboardHeight(Math.max(0, offset));
       };
-
-      window.visualViewport.addEventListener(
-        'resize',
-        handleVisualViewportChange
-      );
-      window.visualViewport.addEventListener(
-        'scroll',
-        handleVisualViewportChange
-      );
+      window.visualViewport.addEventListener('resize', handleVisualViewportChange);
+      window.visualViewport.addEventListener('scroll', handleVisualViewportChange);
       return () => {
-        window.visualViewport?.removeEventListener(
-          'resize',
-          handleVisualViewportChange
-        );
-        window.visualViewport?.removeEventListener(
-          'scroll',
-          handleVisualViewportChange
-        );
+        window.visualViewport?.removeEventListener('resize', handleVisualViewportChange);
+        window.visualViewport?.removeEventListener('scroll', handleVisualViewportChange);
       };
     }
   }, []);
 
-  // Handle manual focus with a slight delay
   useEffect(() => {
     if (open) {
       const timer = setTimeout(() => {
         inputRef.current?.focus();
-      }, 150); // Wait for animation to settle
+      }, 150);
       return () => clearTimeout(timer);
     }
   }, [open]);
 
-  // DISPLAY indices only (0..6). 7 ("Later") is handled via `when === 'later'`.
-  const [pickedDays, setPickedDays] = useState<Array<Exclude<DisplayDay, 7>>>(
-    []
-  );
+  // Indices
+  const [pickedDays, setPickedDays] = useState<Array<Exclude<DisplayDay, 7>>>([]);
 
-  // Reset every time the sheet opens
   useEffect(() => {
     if (open) {
       setText(initialText);
       setWhen('pick');
-      setPickedDays([todayDisplayIndex()]); // default to today (DISPLAY index)
+      setPickedDays([todayDisplayIndex()]);
       setRepeat(defaultRepeat);
       setTags([]);
       setTagInput('');
       setIsSubmitting(false);
+      setShowColorPicker(false);
+      setManageTagsMode(false);
     }
   }, [open, initialText, defaultRepeat]);
 
-  // Safety: ensure at least one day is selected in "pick" mode
   useEffect(() => {
     if (open && when === 'pick' && pickedDays.length === 0) {
       setPickedDays([todayDisplayIndex()]);
     }
   }, [open, when, pickedDays.length]);
 
-  // Labels that respect WEEK_START config via helpers
   const dayLabels = useMemo(
     () =>
       Array.from({ length: 7 }, (_, d) => {
-        const full = labelForDisplayDay(d as Exclude<DisplayDay, 7>); // e.g., "Sunday"
+        const full = labelForDisplayDay(d as Exclude<DisplayDay, 7>);
         return { short: full.slice(0, 2), title: full };
       }),
     []
@@ -144,6 +191,39 @@ export default function QuickAddSheet({
     if (trimmed && !tags.includes(trimmed)) {
       setTags((prev) => [...prev, trimmed]);
       setTagInput('');
+      setShowColorPicker(false);
+    }
+  };
+
+  const createAndSaveTag = async () => {
+    const trimmed = tagInput.trim();
+    if (!trimmed) return;
+
+    // Optimistic update? No, let's wait for safety or just assume success.
+    try {
+      await fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed, color: newTagColor }),
+      });
+      mutate('/api/tags'); // Refresh list
+      if (!tags.includes(trimmed)) {
+        setTags((prev) => [...prev, trimmed]);
+      }
+      setTagInput('');
+      setShowColorPicker(false);
+    } catch (e) {
+      console.error('Failed to save tag', e);
+    }
+  };
+
+  const deleteSavedTag = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/tags?id=${id}`, { method: 'DELETE' });
+      mutate('/api/tags');
+    } catch (error) {
+      console.error('Failed to delete tag', error);
     }
   };
 
@@ -151,12 +231,18 @@ export default function QuickAddSheet({
     setTags((prev) => prev.filter((t) => t !== tag));
   };
 
+  const getTagColor = (tagName: string) => {
+    const found = savedTags.find(
+      (t) => t.name.toLowerCase() === tagName.toLowerCase()
+    );
+    return found ? found.color : undefined;
+  };
+
   const handleSubmit = async () => {
     if (isSubmitting) return;
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    // Convert DISPLAY -> API days
     const apiDays: ApiDay[] =
       when === 'later'
         ? [-1]
@@ -166,10 +252,13 @@ export default function QuickAddSheet({
 
     setIsSubmitting(true);
     try {
-      // Guard: if "Later", force non-repeating
       const finalRepeat: RepeatChoice = when === 'later' ? 'this-week' : repeat;
-
-      await onSubmit({ text: trimmed, days: apiDays, repeat: finalRepeat, tags });
+      await onSubmit({
+        text: trimmed,
+        days: apiDays,
+        repeat: finalRepeat,
+        tags,
+      });
       onOpenChange(false);
     } finally {
       setIsSubmitting(false);
@@ -185,7 +274,6 @@ export default function QuickAddSheet({
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -204,7 +292,7 @@ export default function QuickAddSheet({
           >
             <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
               <div className="rounded-[28px] bg-white/95 dark:bg-slate-950/90 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_24px_48px_rgba(15,23,42,0.25)] p-4">
-                {/* Input */}
+                {/* Input Area */}
                 <div dir="ltr" className="w-full">
                   <input
                     ref={inputRef}
@@ -216,8 +304,7 @@ export default function QuickAddSheet({
                     spellCheck={false}
                     autoComplete="off"
                     maxLength={45}
-                    style={{ direction: 'ltr', textAlign: 'left' }}
-                    className="w-full h-12 px-4 mb-1 rounded-[16px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50 text-base md:text-lg font-medium text-left"
+                    className="w-full h-12 px-4 mb-1 rounded-[16px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50 text-lg font-medium text-left"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -225,59 +312,187 @@ export default function QuickAddSheet({
                       }
                       if (e.key === 'Escape') onOpenChange(false);
                     }}
-                    inputMode="text"
                   />
-                  <div className="flex justify-between px-2 mb-2 items-start">
-                     {/* Tags Section */}
-                     <div className="flex flex-wrap items-center gap-1.5 max-w-[80%]">
-                      {tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200 text-[10px] font-bold uppercase tracking-wider border border-indigo-200 dark:border-indigo-800"
-                        >
-                          {tag}
-                          <button
-                            type="button"
-                            onClick={() => removeTag(tag)}
-                            className="hover:text-indigo-900 dark:hover:text-white"
+
+                  <div
+                    ref={tagContainerRef}
+                    className="flex flex-col gap-2 px-2 mb-2"
+                  >
+                    {/* Selected Tags & Input */}
+                    <div className="flex flex-wrap items-center gap-1.5 w-full">
+                      {tags.map((tag) => {
+                        const color = getTagColor(tag);
+                        return (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider border transition-colors shadow-sm"
+                            style={
+                              color
+                                ? {
+                                    backgroundColor: `${color}20`,
+                                    color: color,
+                                    borderColor: `${color}40`,
+                                  }
+                                : undefined
+                            }
                           >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </span>
-                      ))}
-                      <div className="relative flex items-center">
-                        <Tag className="absolute left-1.5 w-3 h-3 text-slate-400" />
+                             {!color && (
+                               <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800 flex items-center gap-1 h-full w-full absolute inset-0 rounded-md px-2 opacity-10 pointer-events-none" />
+                             )}
+                             {!color ? <span className="text-indigo-700 dark:text-indigo-300 relative z-10">{tag}</span> : tag}
+                            <button
+                              type="button"
+                              onClick={() => removeTag(tag)}
+                              className="relative z-10 hover:opacity-70"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        );
+                      })}
+                      
+                      <div className="relative flex items-center group">
+                        <Tag className="absolute left-1.5 w-3 h-3 text-slate-400 group-focus-within:text-purple-500 transition-colors" />
                         <input
                           value={tagInput}
-                          onChange={(e) => setTagInput(e.target.value)}
+                          onFocus={() => setShowTagsList(true)}
+                          onChange={(e) => {
+                            setTagInput(e.target.value);
+                            setShowColorPicker(false);
+                          }}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' && !e.shiftKey) {
                               e.preventDefault();
-                              handleAddTag();
+                              if (showColorPicker) {
+                                createAndSaveTag();
+                              } else {
+                                handleAddTag();
+                              }
                             }
                           }}
                           placeholder="Add tag..."
-                          className="h-6 pl-5 pr-2 w-24 rounded-md bg-transparent text-base md:text-[11px] font-medium text-slate-600 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-300 placeholder:text-slate-400"
+                          className="h-6 pl-5 pr-2 min-w-[80px] w-auto max-w-[150px] rounded-md bg-transparent text-base md:text-[11px] font-medium text-slate-600 dark:text-slate-300 focus:bg-slate-100 dark:focus:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-purple-300 placeholder:text-slate-400 transition-all"
                         />
-                        {tagInput && (
+                        {tagInput && !showColorPicker && (
                           <button
                             type="button"
-                            onClick={handleAddTag}
-                            className="absolute right-0.5 p-0.5 text-purple-600 hover:bg-purple-100 rounded"
+                            onClick={() => setShowColorPicker(true)}
+                            className="absolute right-0.5 p-0.5 text-slate-400 hover:text-purple-600 hover:bg-purple-100 rounded"
+                            title="Create & Color"
                           >
-                            <Plus className="w-3 h-3" />
+                            <Palette className="w-3 h-3" />
                           </button>
                         )}
                       </div>
                     </div>
 
-                    <span
-                      className={`text-[10px] font-bold ${
-                        text.length >= 40 ? 'text-rose-500' : 'text-slate-400'
-                      }`}
-                    >
-                      {text.length}/45
-                    </span>
+                    {/* Color Picker for New Tag */}
+                    <AnimatePresence>
+                      {showColorPicker && tagInput && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="flex items-center gap-2 overflow-hidden p-1 -m-1"
+                        >
+                          <div className="flex gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
+                            {TAG_COLORS.map((c) => (
+                              <button
+                                key={c.name}
+                                type="button"
+                                onClick={() => setNewTagColor(c.value)}
+                                className={`w-5 h-5 rounded-full ${c.bg} ring-2 ring-offset-1 ring-offset-slate-100 dark:ring-offset-slate-800 transition-all ${
+                                  newTagColor === c.value
+                                    ? 'ring-slate-400 scale-110'
+                                    : 'ring-transparent hover:scale-110'
+                                }`}
+                                title={c.name}
+                              />
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={createAndSaveTag}
+                            className="px-2 py-1 text-[10px] font-bold text-white bg-purple-600 rounded-md shadow-sm hover:bg-purple-700"
+                          >
+                            Save
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Saved Tags Horizontal List */}
+                    {savedTags.length > 0 && showTagsList && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="flex items-center gap-2 mt-1"
+                      >
+                        <div className="flex-1 overflow-x-auto overflow-y-hidden no-scrollbar py-2 -my-1">
+                          <div className="flex gap-1.5 px-1">
+                            {savedTags.map((st) => {
+                              const isSelected = tags.includes(st.name);
+                              return (
+                                <button
+                                  key={st.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (manageTagsMode) return;
+                                    if (isSelected) removeTag(st.name);
+                                    else
+                                      setTags((prev) => [...prev, st.name]);
+                                  }}
+                                  className={`
+                                    relative flex-shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all
+                                    border
+                                    ${
+                                      isSelected
+                                        ? 'ring-1 ring-offset-1 ring-offset-white dark:ring-offset-slate-900'
+                                        : 'hover:opacity-80'
+                                    }
+                                  `}
+                                  style={{
+                                    backgroundColor: `${st.color}20`,
+                                    color: st.color,
+                                    borderColor: `${st.color}40`,
+                                    boxShadow: isSelected
+                                      ? `0 0 0 1px ${st.color}`
+                                      : 'none',
+                                  }}
+                                >
+                                  {st.name}
+                                  {manageTagsMode && (
+                                    <div
+                                      onClick={(e) => deleteSavedTag(st.id, e)}
+                                      className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 shadow-sm hover:scale-110"
+                                    >
+                                      <X className="w-2 h-2" />
+                                    </div>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setManageTagsMode(!manageTagsMode)}
+                          className={`p-1.5 rounded-md transition-colors ${
+                            manageTagsMode
+                              ? 'bg-red-100 text-red-600'
+                              : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                          title="Manage Tags"
+                        >
+                          {manageTagsMode ? (
+                            <X className="w-3.5 h-3.5" />
+                          ) : (
+                            <Trash2 className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </motion.div>
+                    )}
                   </div>
                 </div>
 

@@ -26,6 +26,16 @@ const UserSchema = new Schema<UserDoc>(
         taskCountAtLastGift: { type: Number, default: 0 },
       },
     },
+    tags: {
+      type: [
+        {
+          id: { type: String, required: true },
+          name: { type: String, required: true },
+          color: { type: String, required: true },
+        },
+      ],
+      default: [],
+    },
   },
   { collection: 'users' }
 );

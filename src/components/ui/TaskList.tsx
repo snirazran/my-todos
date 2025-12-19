@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useState } from 'react';
+import useSWR from 'swr';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import TaskMenu from '../board/TaskMenu';
@@ -48,6 +49,16 @@ export default function TaskList({
   onDeleteFromWeek: (taskId: string) => Promise<void> | void;
   onDoLater?: (taskId: string) => Promise<void> | void;
 }) {
+  const { data: tagsData } = useSWR('/api/tags', (url) =>
+    fetch(url).then((r) => r.json())
+  );
+  const userTags: { id: string; name: string; color: string }[] =
+    tagsData?.tags || [];
+
+  const getTagColor = (tagName: string) => {
+    return userTags.find((t) => t.name === tagName)?.color;
+  };
+
   const vSet = visuallyCompleted ?? new Set<string>();
 
   const [busy, setBusy] = useState(false);
@@ -272,14 +283,30 @@ export default function TaskList({
                       </motion.span>
                       {task.tags && task.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {task.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border border-indigo-100 dark:border-indigo-800/50"
-                            >
-                              {tag}
-                            </span>
-                          ))}
+                          {task.tags.map((tag) => {
+                            const color = getTagColor(tag);
+                            return (
+                              <span
+                                key={tag}
+                                className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
+                                  !color
+                                    ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
+                                    : ''
+                                }`}
+                                style={
+                                  color
+                                    ? {
+                                        backgroundColor: `${color}20`,
+                                        color: color,
+                                        borderColor: `${color}40`,
+                                      }
+                                    : undefined
+                                }
+                              >
+                                {tag}
+                              </span>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

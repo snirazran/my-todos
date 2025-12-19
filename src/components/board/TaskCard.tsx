@@ -33,11 +33,16 @@ export default function TaskCard({
   isRepeating?: boolean;
   touchAction?: string;
   requireLongPress?: boolean;
+  userTags?: { id: string; name: string; color: string }[];
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const startPos = useRef<{ x: number; y: number } | null>(null);
   const pointerIdRef = useRef<number | null>(null);
+
+  const getTagColor = (tagName: string) => {
+    return userTags?.find((t) => t.name === tagName)?.color;
+  };
 
   // Keep latest callbacks in refs to avoid effect re-runs
   const onGrabRef = useRef(onGrab);
@@ -214,14 +219,30 @@ export default function TaskCard({
                 <span className="tracking-wider uppercase">Weekly</span>
               </span>
             )}
-            {task.tags?.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center gap-1 rounded-md bg-indigo-50/80 px-1.5 py-0.5 text-[10px] font-bold text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 transition-colors border border-indigo-100 dark:border-indigo-800/50"
-              >
-                <span className="tracking-wide uppercase">{tag}</span>
-              </span>
-            ))}
+            {task.tags?.map((tag) => {
+              const color = getTagColor(tag);
+              return (
+                <span
+                  key={tag}
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wider uppercase transition-colors border shadow-sm"
+                  style={
+                    color
+                      ? {
+                          backgroundColor: `${color}20`,
+                          color: color,
+                          borderColor: `${color}40`,
+                        }
+                      : undefined
+                  }
+                >
+                  {/* Fallback styling if no color found */}
+                  {!color && (
+                    <span className="absolute inset-0 w-full h-full border rounded-md opacity-10 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50 pointer-events-none" />
+                  )}
+                  <span className={!color ? "text-indigo-600 dark:text-indigo-200 z-10 relative" : ""}>{tag}</span>
+                </span>
+              );
+            })}
           </div>
         )}
         <div

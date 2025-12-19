@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import useSWR from 'swr';
 import {
   Task,
   DAYS,
@@ -64,6 +65,11 @@ export default function TaskBoard({
     endDrag,
     cancelDrag,
   } = useDragManager();
+
+  const { data: tagsData } = useSWR('/api/tags', (url) =>
+    fetch(url).then((r) => r.json())
+  );
+  const userTags = tagsData?.tags || [];
 
   useEffect(() => {
     cancelDrag();
@@ -425,6 +431,7 @@ export default function TaskBoard({
                   removeTask={removeTask}
                   onGrab={onGrab}
                   setCardRef={setCardRef}
+                  userTags={userTags}
                 />
               </DayColumn>
             </div>

@@ -22,6 +22,12 @@ export type UserStatistics = {
 };
 // ---------------------------
 
+export type UserTag = {
+  id: string;
+  name: string;
+  color: string;
+};
+
 export type UserWardrobe = {
   equipped: Partial<Record<WardrobeSlot, string | null>>;
   inventory: Record<string, number>;
@@ -45,4 +51,5 @@ export type UserDoc = {
   wardrobe?: UserWardrobe;
   skins?: UserSkins;
   statistics?: UserStatistics;
+  tags?: UserTag[];
 };
