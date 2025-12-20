@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import useSWR, { mutate } from 'swr';
-import { Tag, Palette, Plus, X } from 'lucide-react';
+import { Tag, Palette, Plus, X, Loader2 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const TAG_COLORS = [
@@ -42,7 +42,9 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[5].value);
   const [manageTagsMode, setManageTagsMode] = useState(false);
-  const [isTagActionPending, setIsTagActionPending] = useState(false);
+  
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+
   const tagInputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus input when opening
@@ -52,8 +54,14 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
     }
   }, [open]);
 
+  const filteredTags = useMemo(() => {
+    if (!tagInput) return savedTags;
+    const lower = tagInput.toLowerCase();
+    return savedTags.filter(st => st.name.toLowerCase().includes(lower));
+  }, [savedTags, tagInput]);
+
   const handleAddTag = () => {
-    if (isTagActionPending) return;
+    if (isCreatingTag) return;
     const trimmed = tagInput.trim();
     if (!trimmed) return;
 
@@ -82,13 +90,13 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
   };
 
   const createAndSaveTag = async () => {
-    if (isTagActionPending) return;
+    if (isCreatingTag) return;
     const trimmed = tagInput.trim();
     if (!trimmed) return;
 
     if (savedTags.length >= MAX_SAVED_TAGS) return;
 
-    setIsTagActionPending(true);
+    setIsCreatingTag(true);
     try {
       const res = await fetch('/api/tags', {
         method: 'POST',
@@ -102,31 +110,39 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
       if (data.tag && !selectedTags.includes(data.tag.id)) {
         onTagsChange([...selectedTags, data.tag.id]);
       }
-      setTagInput('');
       setShowColorPicker(false);
+      setTagInput('');
     } catch (e) {
       console.error('Failed to save tag', e);
     } finally {
-        setIsTagActionPending(false);
+        setIsCreatingTag(false);
     }
   };
 
   const deleteSavedTag = async (id: string, name: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isTagActionPending) return;
 
-    setIsTagActionPending(true);
+    // Optimistic Update
+    const updatedTags = savedTags.filter(t => t.id !== id);
+    
+    // 1. Update SWR cache immediately
+    mutate('/api/tags', { tags: updatedTags }, false);
+
+    // 2. Remove from currently selected tags immediately
+    if (selectedTags.includes(id)) {
+        onTagsChange(selectedTags.filter((tId) => tId !== id));
+    }
+    
+    // 3. Notify app
+    window.dispatchEvent(new Event('tags-updated'));
+
     try {
       await fetch(`/api/tags?id=${id}`, { method: 'DELETE' });
+      // Re-validate to sync with server
       mutate('/api/tags');
-      // Remove from selected if present
-      onTagsChange(selectedTags.filter((tId) => tId !== id));
-      
-      window.dispatchEvent(new Event('tags-updated'));
     } catch (error) {
       console.error('Failed to delete tag', error);
-    } finally {
-        setIsTagActionPending(false);
+      mutate('/api/tags'); // Revert on error
     }
   };
 
@@ -180,10 +196,10 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                 <AnimatePresence>
                     {showColorPicker && (
                         <motion.div
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -10 }}
-                            className="mb-3 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700"
+                            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                            animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
+                            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                            className="overflow-hidden p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700"
                         >
                             <div className="text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
                             <div className="flex gap-2 flex-wrap">
@@ -204,10 +220,10 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                             <button
                                 type="button"
                                 onClick={createAndSaveTag}
-                                disabled={isTagActionPending}
+                                disabled={isCreatingTag}
                                 className="w-full mt-3 py-2 text-xs font-bold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
                             >
-                                {isTagActionPending ? 'Saving...' : 'Save Tag'}
+                                {isCreatingTag ? 'Saving...' : 'Save Tag'}
                             </button>
                         </motion.div>
                     )}
@@ -223,7 +239,6 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                             <button
                                 type="button"
                                 onClick={() => setManageTagsMode(!manageTagsMode)}
-                                disabled={isTagActionPending}
                                 className={`text-[11px] font-bold px-2 py-0.5 rounded transition-colors ${
                                     manageTagsMode ? 'bg-red-100 text-red-600' : 'text-slate-400 hover:text-slate-600'
                                 }`}
@@ -232,15 +247,14 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                             </button>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                            {savedTags
-                                .filter(st => !tagInput || st.name.toLowerCase().includes(tagInput.toLowerCase()))
-                                .map((st) => {
+                          <AnimatePresence>
+                            {filteredTags.map((st) => {
                                 const isSelected = selectedTags.includes(st.id);
                                 return (
-                                    <button
+                                    <motion.button
+                                        exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
                                         key={st.id}
                                         type="button"
-                                        disabled={isTagActionPending}
                                         onClick={(e) => {
                                             if (manageTagsMode) {
                                                 deleteSavedTag(st.id, st.name, e);
@@ -274,9 +288,10 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                                 <X className="w-2.5 h-2.5" />
                                             </div>
                                         )}
-                                    </button>
+                                    </motion.button>
                                 );
                             })}
+                          </AnimatePresence>
                         </div>
                     </div>
                 )}
