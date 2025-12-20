@@ -446,32 +446,34 @@ export default function QuickAddSheet({
                                             initial={{ opacity: 0, height: 0, marginBottom: 0 }}
                                             animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
                                             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                                            className="overflow-hidden p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700"
+                                            className="overflow-hidden"
                                         >
-                                            <div className="text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
-                                            <div className="flex gap-2 flex-wrap">
-                                                {TAG_COLORS.map((c) => (
+                                            <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
+                                                <div className="text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
+                                                <div className="flex gap-2 flex-wrap">
+                                                    {TAG_COLORS.map((c) => (
+                                                    <button
+                                                        key={c.name}
+                                                        type="button"
+                                                        onClick={() => setNewTagColor(c.value)}
+                                                        className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-800 transition-all ${
+                                                        newTagColor === c.value
+                                                            ? 'ring-slate-400 scale-110'
+                                                            : 'ring-transparent'
+                                                        }`}
+                                                        title={c.name}
+                                                    />
+                                                    ))}
+                                                </div>
                                                 <button
-                                                    key={c.name}
                                                     type="button"
-                                                    onClick={() => setNewTagColor(c.value)}
-                                                    className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-800 transition-all ${
-                                                    newTagColor === c.value
-                                                        ? 'ring-slate-400 scale-110'
-                                                        : 'ring-transparent'
-                                                    }`}
-                                                    title={c.name}
-                                                />
-                                                ))}
+                                                    onClick={createAndSaveTag}
+                                                    disabled={isCreatingTag}
+                                                    className="w-full mt-3 py-2 text-xs font-bold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
+                                                >
+                                                    {isCreatingTag ? 'Saving...' : 'Save Tag'}
+                                                </button>
                                             </div>
-                                            <button
-                                                type="button"
-                                                onClick={createAndSaveTag}
-                                                disabled={isCreatingTag}
-                                                className="w-full mt-3 py-2 text-xs font-bold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
-                                            >
-                                                {isCreatingTag ? 'Saving...' : 'Save Tag'}
-                                            </button>
                                         </motion.div>
                                     )}
                                 </AnimatePresence>
