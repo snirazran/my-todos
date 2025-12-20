@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/authOptions';
 import { Types } from 'mongoose';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
+import TaskModel from '@/lib/models/Task';
 import { v4 as uuid } from 'uuid';
 
 export const dynamic = 'force-dynamic';
@@ -72,10 +73,30 @@ export async function DELETE(req: NextRequest) {
 
   await connectMongo();
 
-  await UserModel.updateOne(
-    { _id: session.user.id },
-    { $pull: { tags: { id } } }
-  );
+  // Find the tag to get its name (for legacy cleanup)
+  const user = await UserModel.findById(session.user.id, { tags: 1 }).lean();
+  const tagToRemove = user?.tags?.find((t: any) => t.id === id);
+
+  const pullQuery: any = { tags: id };
+  if (tagToRemove?.name) {
+    // If we found the tag name, also try to pull it (legacy tasks might have stored name)
+    // We use $in to match either ID or Name
+    pullQuery.tags = { $in: [id, tagToRemove.name] };
+  }
+
+  // Run updates in parallel for better performance
+  await Promise.all([
+    // 1. Remove this tag (ID or Name) from all tasks belonging to this user
+    TaskModel.updateMany(
+      { userId: session.user.id },
+      { $pull: { tags: { $in: [id, tagToRemove?.name].filter(Boolean) } } }
+    ),
+    // 2. Remove the tag definition from the user
+    UserModel.updateOne(
+      { _id: session.user.id },
+      { $pull: { tags: { id } } }
+    )
+  ]);
 
   return NextResponse.json({ ok: true });
 }

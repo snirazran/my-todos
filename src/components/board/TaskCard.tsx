@@ -41,8 +41,12 @@ export default function TaskCard({
   const startPos = useRef<{ x: number; y: number } | null>(null);
   const pointerIdRef = useRef<number | null>(null);
 
-  const getTagColor = (tagName: string) => {
-    return userTags?.find((t) => t.name === tagName)?.color;
+  const getTagDetails = (tagIdentifier: string) => {
+    // Try to find by ID first
+    const byId = userTags?.find((t) => t.id === tagIdentifier);
+    if (byId) return byId;
+    // Fallback: try to find by Name
+    return userTags?.find((t) => t.name === tagIdentifier);
   };
 
   // Keep latest callbacks in refs to avoid effect re-runs
@@ -220,11 +224,16 @@ export default function TaskCard({
                 <span className="tracking-wider uppercase">Weekly</span>
               </span>
             )}
-            {task.tags?.map((tag) => {
-              const color = getTagColor(tag);
+            {task.tags?.map((tagId) => {
+              const tagDetails = getTagDetails(tagId);
+              if (!tagDetails) return null;
+
+              const color = tagDetails.color;
+              const name = tagDetails.name;
+
               return (
                 <span
-                  key={tag}
+                  key={tagId}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wider uppercase transition-colors border shadow-sm"
                   style={
                     color
@@ -240,7 +249,7 @@ export default function TaskCard({
                   {!color && (
                     <span className="absolute inset-0 w-full h-full border rounded-md opacity-10 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50 pointer-events-none" />
                   )}
-                  <span className={!color ? "text-indigo-600 dark:text-indigo-200 z-10 relative" : ""}>{tag}</span>
+                  <span className={!color ? "text-indigo-600 dark:text-indigo-200 z-10 relative" : ""}>{name}</span>
                 </span>
               );
             })}

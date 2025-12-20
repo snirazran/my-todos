@@ -32,193 +32,395 @@ export default function BacklogPanel({
   const userTags: { id: string; name: string; color: string }[] =
     tagsData?.tags || [];
 
-  const getTagColor = (tagName: string) => {
-    return userTags.find((t) => t.name === tagName)?.color;
-  };
+    const getTagDetails = (tagIdentifier: string) => {
 
-  // Listen for other menus opening to auto-close this one (syncs with TaskList)
-  React.useEffect(() => {
-    const closeIfOther = (e: Event) => {
-      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
-      setMenu((curr) => (curr && curr.id !== id ? null : curr));
+      // Try to find by ID first
+
+      const byId = userTags.find((t) => t.id === tagIdentifier);
+
+      if (byId) return byId;
+
+      // Fallback: try to find by Name
+
+      return userTags.find((t) => t.name === tagIdentifier);
+
     };
-    window.addEventListener('task-menu-open', closeIfOther as EventListener);
-    return () =>
-      window.removeEventListener(
-        'task-menu-open',
-        closeIfOther as EventListener
-      );
-  }, []);
 
-  const addToday = async (item: BacklogItem) => {
-    if (processingIds.has(item.id)) return;
-    setProcessingIds((prev) => new Set(prev).add(item.id));
-    setExitAction({ id: item.id, type: 'today' });
+  
 
-    try {
-      const dow = new Date().getDay();
-      // Start API calls immediately
-      await Promise.all([
-        fetch('/api/tasks?view=board', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-            text: item.text,
-            days: [dow],
-            repeat: 'this-week',
-            tags: item.tags,
-            }),
-        }),
-        fetch('/api/tasks?view=board', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ day: -1, taskId: item.id }),
-        })
-      ]);
-      
-      await onRefreshToday();
-      await onRefreshBacklog();
-    } finally {
-      setProcessingIds((prev) => {
-        const next = new Set(prev);
-        next.delete(item.id);
-        return next;
-      });
-      setExitAction(null);
-    }
-  };
+    // Listen for other menus opening to auto-close this one (syncs with TaskList)
 
-  const removeLater = async (taskId: string) => {
-    setBusy(true);
-    try {
-      await fetch('/api/tasks?view=board', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day: -1, taskId }),
-      });
-      await onRefreshBacklog();
-    } finally {
-      setBusy(false);
-    }
-  };
+    React.useEffect(() => {
 
-  return (
-    <div
-      dir="ltr"
-      // Added overflow-visible to allow menus to spill out if needed
-      className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-slate-800 dark:text-slate-100">
-          <CalendarClock className="w-6 h-6 text-purple-500 md:w-7 md:h-7" />
-          Saved Tasks
-        </h3>
-        {later.length > 0 && (
-          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
-            {later.length}
-          </span>
-        )}
-      </div>
+      const closeIfOther = (e: Event) => {
 
-      <div className="pb-2 space-y-3 overflow-visible min-h-[100px]">
-        {later.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 px-4 text-center border-2 border-dashed text-slate-400 border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 rounded-xl">
-            <CalendarClock className="w-10 h-10 mb-3 opacity-20" />
-            <p className="text-sm font-medium">No tasks saved yet.</p>
-            <p className="mt-1 text-xs opacity-60">
-              Save tasks for later and add them when you&apos;re ready!
-            </p>
-          </div>
-        ) : (
-          <AnimatePresence mode="popLayout">
-            {later.map((t, i) => {
-              const isMenuOpen = menu?.id === t.id;
-              const isExiting = exitAction?.id === t.id;
+        const id = (e as CustomEvent<{ id?: string }>).detail?.id;
 
-              return (
-                <motion.div
-                  layout
-                  key={t.id}
-                  initial={{ opacity: 0, y: 15 }}
-                  animate={
-                    isExiting
-                      ? {
-                          opacity: 0,
-                          x: -200, // Fly LEFT
-                          scale: 0.8,
-                          transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
-                        }
-                      : { opacity: 1, x: 0, y: 0 }
-                  }
-                  exit={
-                    isExiting
-                      ? { opacity: 0 } // Already animated out
-                      : { opacity: 0, scale: 0.95 }
-                  }
-                  transition={{ delay: i * 0.05 }}
-                  // IMPORTANT: Z-Index logic fixes the clipping/overlap issue
-                  className={`group relative ${
-                    isMenuOpen ? 'z-50' : isExiting ? 'z-0' : 'z-auto'
-                  }`}
-                  style={{
-                    // Ensure active menu item floats above subsequent items
-                    zIndex: isMenuOpen ? 50 : isExiting ? 0 : 1,
-                  }}
-                >
-                  {/* Row */}
-                  <div
-                    className={`
-                      relative flex items-center gap-4 px-3 py-3.5 
-                      transition-all duration-200 rounded-xl 
-                      border border-transparent hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
-                      ${isMenuOpen ? 'bg-white dark:bg-slate-800 shadow-md' : ''}
-                    `}
+        setMenu((curr) => (curr && curr.id !== id ? null : curr));
+
+      };
+
+      window.addEventListener('task-menu-open', closeIfOther as EventListener);
+
+      return () =>
+
+        window.removeEventListener(
+
+          'task-menu-open',
+
+          closeIfOther as EventListener
+
+        );
+
+    }, []);
+
+  
+
+    const addToday = async (item: BacklogItem) => {
+
+      if (processingIds.has(item.id)) return;
+
+      setProcessingIds((prev) => new Set(prev).add(item.id));
+
+      setExitAction({ id: item.id, type: 'today' });
+
+  
+
+      try {
+
+        const dow = new Date().getDay();
+
+        // Start API calls immediately
+
+        await Promise.all([
+
+          fetch('/api/tasks?view=board', {
+
+              method: 'POST',
+
+              headers: { 'Content-Type': 'application/json' },
+
+              body: JSON.stringify({
+
+              text: item.text,
+
+              days: [dow],
+
+              repeat: 'this-week',
+
+              tags: item.tags,
+
+              }),
+
+          }),
+
+          fetch('/api/tasks?view=board', {
+
+              method: 'DELETE',
+
+              headers: { 'Content-Type': 'application/json' },
+
+              body: JSON.stringify({ day: -1, taskId: item.id }),
+
+          })
+
+        ]);
+
+        
+
+        await onRefreshToday();
+
+        await onRefreshBacklog();
+
+      } finally {
+
+        setProcessingIds((prev) => {
+
+          const next = new Set(prev);
+
+          next.delete(item.id);
+
+          return next;
+
+        });
+
+        setExitAction(null);
+
+      }
+
+    };
+
+  
+
+    const removeLater = async (taskId: string) => {
+
+      setBusy(true);
+
+      try {
+
+        await fetch('/api/tasks?view=board', {
+
+          method: 'DELETE',
+
+          headers: { 'Content-Type': 'application/json' },
+
+          body: JSON.stringify({ day: -1, taskId }),
+
+        });
+
+        await onRefreshBacklog();
+
+      } finally {
+
+        setBusy(false);
+
+      }
+
+    };
+
+  
+
+    return (
+
+      <div
+
+        dir="ltr"
+
+        // Added overflow-visible to allow menus to spill out if needed
+
+        className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm"
+
+      >
+
+        {/* Header */}
+
+        <div className="flex items-center justify-between mb-6">
+
+          <h3 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-slate-800 dark:text-slate-100">
+
+            <CalendarClock className="w-6 h-6 text-purple-500 md:w-7 md:h-7" />
+
+            Saved Tasks
+
+          </h3>
+
+          {later.length > 0 && (
+
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+
+              {later.length}
+
+            </span>
+
+          )}
+
+        </div>
+
+  
+
+        <div className="pb-2 space-y-3 overflow-visible min-h-[100px]">
+
+          {later.length === 0 ? (
+
+            <div className="flex flex-col items-center justify-center py-10 px-4 text-center border-2 border-dashed text-slate-400 border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 rounded-xl">
+
+              <CalendarClock className="w-10 h-10 mb-3 opacity-20" />
+
+              <p className="text-sm font-medium">No tasks saved yet.</p>
+
+              <p className="mt-1 text-xs opacity-60">
+
+                Save tasks for later and add them when you&apos;re ready!
+
+              </p>
+
+            </div>
+
+          ) : (
+
+            <AnimatePresence mode="popLayout">
+
+              {later.map((t, i) => {
+
+                const isMenuOpen = menu?.id === t.id;
+
+                const isExiting = exitAction?.id === t.id;
+
+  
+
+                return (
+
+                  <motion.div
+
+                    layout
+
+                    key={t.id}
+
+                    initial={{ opacity: 0, y: 15 }}
+
+                    animate={
+
+                      isExiting
+
+                        ? {
+
+                            opacity: 0,
+
+                            x: -200, // Fly LEFT
+
+                            scale: 0.8,
+
+                            transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] }
+
+                          }
+
+                        : { opacity: 1, x: 0, y: 0 }
+
+                    }
+
+                    exit={
+
+                      isExiting
+
+                        ? { opacity: 0 } // Already animated out
+
+                        : { opacity: 0, scale: 0.95 }
+
+                    }
+
+                    transition={{ delay: i * 0.05 }}
+
+                    // IMPORTANT: Z-Index logic fixes the clipping/overlap issue
+
+                    className={`group relative ${
+
+                      isMenuOpen ? 'z-50' : isExiting ? 'z-0' : 'z-auto'
+
+                    }`}
+
+                    style={{
+
+                      // Ensure active menu item floats above subsequent items
+
+                      zIndex: isMenuOpen ? 50 : isExiting ? 0 : 1,
+
+                    }}
+
                   >
-                  {/* Fly Icon */}
-                  <div className="flex items-center justify-center flex-shrink-0 w-7 h-7">
-                    <Fly
-                      size={24}
-                      className="text-purple-600 transition-all opacity-70 grayscale group-hover:grayscale-0 group-hover:opacity-100"
-                    />
-                  </div>
 
-                  {/* Text */}
-                  <div className="flex-1 min-w-0">
-                    <span className="block text-base font-medium md:text-lg text-slate-700 dark:text-slate-200">
-                      {t.text}
-                    </span>
-                    {t.tags && t.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {t.tags.map((tag) => {
-                          const color = getTagColor(tag);
-                          return (
-                            <span
-                              key={tag}
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
-                                !color
-                                  ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
-                                  : ''
-                              }`}
-                              style={
-                                color
-                                  ? {
-                                      backgroundColor: `${color}20`,
-                                      color: color,
-                                      borderColor: `${color}40`,
-                                    }
-                                  : undefined
-                              }
-                            >
-                              {tag}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
+                    {/* Row */}
 
-                  {/* Actions */}
+                    <div
+
+                      className={`
+
+                        relative flex items-center gap-4 px-3 py-3.5 
+
+                        transition-all duration-200 rounded-xl 
+
+                        border border-transparent hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
+
+                        ${isMenuOpen ? 'bg-white dark:bg-slate-800 shadow-md' : ''}
+
+                      `}
+
+                    >
+
+                    {/* Fly Icon */}
+
+                    <div className="flex items-center justify-center flex-shrink-0 w-7 h-7">
+
+                      <Fly
+
+                        size={24}
+
+                        className="text-purple-600 transition-all opacity-70 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+
+                      />
+
+                    </div>
+
+  
+
+                    {/* Text */}
+
+                    <div className="flex-1 min-w-0">
+
+                      <span className="block text-base font-medium md:text-lg text-slate-700 dark:text-slate-200">
+
+                        {t.text}
+
+                      </span>
+
+                      {t.tags && t.tags.length > 0 && (
+
+                                              <div className="flex flex-wrap gap-1 mt-1">
+
+                                                {t.tags.map((tagId) => {
+
+                                                  const tagDetails = getTagDetails(tagId);
+
+                                                  if (!tagDetails) return null;
+
+                        
+
+                                                  const color = tagDetails.color;
+
+                                                  const name = tagDetails.name;
+
+                                                  
+
+                                                  return (
+
+                                                    <span
+
+                                                      key={tagId}
+
+                                                      className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
+
+                                                        !color
+
+                                                          ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
+
+                                                          : ''
+
+                                                      }`}
+
+                                                      style={
+
+                                                        color
+
+                                                          ? {
+
+                                                              backgroundColor: `${color}20`,
+
+                                                              color: color,
+
+                                                              borderColor: `${color}40`,
+
+                                                            }
+
+                                                          : undefined
+
+                                                      }
+
+                                                    >
+
+                                                      {name}
+
+                                                    </span>
+
+                                                  );
+
+                                                })}
+
+                                              </div>
+
+                      )}
+
+                    </div>
+
+                    {/* Actions */}
                   <div className="relative flex items-center gap-2 shrink-0">
                     {/* "Do Today!" Button */}
                     <button

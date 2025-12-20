@@ -41,19 +41,29 @@ export default function ManageTasksPage() {
     return out;
   };
 
+  const fetchWeek = async () => {
+    try {
+      const res = await fetch('/api/tasks?view=board');
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      const data = (await res.json()) as Task[][];
+      if (Array.isArray(data)) setWeek(mapApiToDisplay(data));
+    } catch (err) {
+      console.error('Failed to fetch weekly tasks:', err);
+    }
+  };
+
   useEffect(() => {
     (async () => {
-      try {
-        const res = await fetch('/api/tasks?view=board');
-        if (!res.ok) throw new Error(`status ${res.status}`);
-        const data = (await res.json()) as Task[][];
-        if (Array.isArray(data)) setWeek(mapApiToDisplay(data));
-      } catch (err) {
-        console.error('Failed to fetch weekly tasks:', err);
-      } finally {
-        setLoading(false);
-      }
+      setLoading(true);
+      await fetchWeek();
+      setLoading(false);
     })();
+  }, []);
+
+  // Listen for global tag updates
+  useEffect(() => {
+    window.addEventListener('tags-updated', fetchWeek);
+    return () => window.removeEventListener('tags-updated', fetchWeek);
   }, []);
 
   /** Save order for one display column (maps -> API day) */

@@ -232,6 +232,16 @@ export default function Home() {
     };
   }, [cinematic]);
 
+  // Listen for global tag updates
+  useEffect(() => {
+    const handleTagsUpdated = () => {
+      refreshToday();
+      fetchBacklog();
+    };
+    window.addEventListener('tags-updated', handleTagsUpdated);
+    return () => window.removeEventListener('tags-updated', handleTagsUpdated);
+  }, [refreshToday, fetchBacklog]);
+
   const sortTasks = (ts: Task[]) => {
     return [...ts].sort((a, b) => {
       if (!!a.completed !== !!b.completed) {

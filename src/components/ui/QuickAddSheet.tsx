@@ -160,8 +160,8 @@ export default function QuickAddSheet({
 
     if (existing) {
         // Select existing if not already selected
-        if (!tags.includes(existing.name)) {
-             setTags(prev => [...prev, existing.name]);
+        if (!tags.includes(existing.id)) {
+             setTags(prev => [...prev, existing.id]);
         }
         setTagInput('');
         setShowColorPicker(false);
@@ -191,14 +191,17 @@ export default function QuickAddSheet({
 
     setIsTagActionPending(true);
     try {
-      await fetch('/api/tags', {
+      const res = await fetch('/api/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: trimmed, color: newTagColor }),
       });
+      const data = await res.json();
+
       mutate('/api/tags'); // Refresh list
-      if (!tags.includes(trimmed)) {
-        setTags((prev) => [...prev, trimmed]);
+      
+      if (data.tag && !tags.includes(data.tag.id)) {
+        setTags((prev) => [...prev, data.tag.id]);
       }
       setTagInput('');
       setShowColorPicker(false);
@@ -218,7 +221,10 @@ export default function QuickAddSheet({
       await fetch(`/api/tags?id=${id}`, { method: 'DELETE' });
       mutate('/api/tags');
       // Also remove from currently selected tags if present
-      setTags((prev) => prev.filter((t) => t !== name));
+      setTags((prev) => prev.filter((tId) => tId !== id));
+      
+      // Notify other components (like task lists) to refresh because tasks might have been modified
+      window.dispatchEvent(new Event('tags-updated'));
     } catch (error) {
       console.error('Failed to delete tag', error);
     } finally {
@@ -226,15 +232,12 @@ export default function QuickAddSheet({
     }
   };
 
-  const removeTag = (tag: string) => {
-    setTags((prev) => prev.filter((t) => t !== tag));
+  const removeTag = (tagId: string) => {
+    setTags((prev) => prev.filter((t) => t !== tagId));
   };
 
-  const getTagColor = (tagName: string) => {
-    const found = savedTags.find(
-      (t) => t.name.toLowerCase() === tagName.toLowerCase()
-    );
-    return found ? found.color : undefined;
+  const getTagDetails = (tagId: string) => {
+    return savedTags.find((t) => t.id === tagId);
   };
 
   const handleSubmit = async () => {
@@ -314,11 +317,14 @@ export default function QuickAddSheet({
                   {/* Selected Tags Display (Inline) */}
                   {tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 px-1 mb-3 mt-2">
-                       {tags.map((tag) => {
-                        const color = getTagColor(tag);
+                       {tags.map((tagId) => {
+                        const tag = getTagDetails(tagId);
+                        const color = tag?.color;
+                        const name = tag?.name || 'Unknown';
+                        
                         return (
                           <span
-                            key={tag}
+                            key={tagId}
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border transition-colors shadow-sm"
                             style={
                               color
@@ -333,10 +339,10 @@ export default function QuickAddSheet({
                              {!color && (
                                <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800 flex items-center gap-1 h-full w-full absolute inset-0 rounded-md px-2 opacity-10 pointer-events-none" />
                              )}
-                             {!color ? <span className="text-indigo-700 dark:text-indigo-300 relative z-10">{tag}</span> : tag}
+                             {!color ? <span className="text-indigo-700 dark:text-indigo-300 relative z-10">{name}</span> : name}
                             <button
                               type="button"
-                              onClick={() => removeTag(tag)}
+                              onClick={() => removeTag(tagId)}
                               className="relative z-10 hover:opacity-70 p-0.5"
                             >
                               <X className="w-3 h-3" />
@@ -479,7 +485,7 @@ export default function QuickAddSheet({
                                             {savedTags
                                                 .filter(st => !tagInput || st.name.toLowerCase().includes(tagInput.toLowerCase()))
                                                 .map((st) => {
-                                                const isSelected = tags.includes(st.name);
+                                                const isSelected = tags.includes(st.id);
                                                 return (
                                                     <button
                                                         key={st.id}
@@ -490,8 +496,8 @@ export default function QuickAddSheet({
                                                                 deleteSavedTag(st.id, st.name, e);
                                                                 return;
                                                             }
-                                                            if (isSelected) removeTag(st.name);
-                                                            else setTags((prev) => [...prev, st.name]);
+                                                            if (isSelected) removeTag(st.id);
+                                                            else setTags((prev) => [...prev, st.id]);
                                                         }}
                                                         className={`
                                                             relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold uppercase tracking-wider transition-all

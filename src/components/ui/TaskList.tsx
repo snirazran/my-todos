@@ -55,8 +55,12 @@ export default function TaskList({
   const userTags: { id: string; name: string; color: string }[] =
     tagsData?.tags || [];
 
-  const getTagColor = (tagName: string) => {
-    return userTags.find((t) => t.name === tagName)?.color;
+  const getTagDetails = (tagIdentifier: string) => {
+    // Try to find by ID first
+    const byId = userTags.find((t) => t.id === tagIdentifier);
+    if (byId) return byId;
+    // Fallback: try to find by Name
+    return userTags.find((t) => t.name === tagIdentifier);
   };
 
   const vSet = visuallyCompleted ?? new Set<string>();
@@ -297,33 +301,37 @@ export default function TaskList({
                         {task.text}
                       </motion.span>
                       {task.tags && task.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {task.tags.map((tag) => {
-                            const color = getTagColor(tag);
-                            return (
-                              <span
-                                key={tag}
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
-                                  !color
-                                    ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
-                                    : ''
-                                }`}
-                                style={
-                                  color
-                                    ? {
-                                        backgroundColor: `${color}20`,
-                                        color: color,
-                                        borderColor: `${color}40`,
-                                      }
-                                    : undefined
-                                }
-                              >
-                                {tag}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      )}
+                                                  <div className="flex flex-wrap gap-1 mt-1">
+                                                    {task.tags.map((tagId) => {
+                                                      const tagDetails = getTagDetails(tagId);
+                                                      if (!tagDetails) return null; // Don't show raw ID if tag is deleted
+                                                      
+                                                      const color = tagDetails.color;
+                                                      const name = tagDetails.name;
+                                                      
+                                                      return (
+                                                        <span
+                                                          key={tagId}
+                                                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
+                                                            !color
+                                                              ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
+                                                              : ''
+                                                          }`}
+                                                          style={
+                                                            color
+                                                              ? {
+                                                                  backgroundColor: `${color}20`,
+                                                                  color: color,
+                                                                  borderColor: `${color}40`,
+                                                                }
+                                                              : undefined
+                                                          }
+                                                        >
+                                                          {name}
+                                                        </span>
+                                                      );
+                                                    })}
+                                                  </div>                      )}
                     </div>
 
                     {/* Actions */}
