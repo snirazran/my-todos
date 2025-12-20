@@ -116,6 +116,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'today' | 'backlog'>('today');
   const [isAnimating, setIsAnimating] = useState(false);
   const [showReward, setShowReward] = useState(false);
+  const pendingIds = useRef(new Set<string>());
 
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -140,7 +141,9 @@ export default function Home() {
       r.json()
     );
     setLaterThisWeek(
-      items.map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
+      items
+        .filter((t: any) => !pendingIds.current.has(t.id))
+        .map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
     );
   }, [session]);
 
@@ -187,7 +190,7 @@ export default function Home() {
     if (!session) return;
     const res = await fetch(`/api/tasks?date=${dateStr}`);
     const json = await res.json();
-    setTasks(json.tasks ?? []);
+    setTasks((json.tasks ?? []).filter((t: Task) => !pendingIds.current.has(t.id)));
     setWeeklyIds(new Set(json.weeklyIds ?? []));
     applyFlyStatus(json.flyStatus);
 
@@ -209,7 +212,7 @@ export default function Home() {
       try {
         const res = await fetch(`/api/tasks?date=${dateStr}`);
         const json = await res.json();
-        setTasks(json.tasks ?? []);
+        setTasks((json.tasks ?? []).filter((t: Task) => !pendingIds.current.has(t.id)));
         setWeeklyIds(new Set(json.weeklyIds ?? []));
         applyFlyStatus(json.flyStatus);
 
@@ -471,6 +474,9 @@ export default function Home() {
                       const task = tasks.find((t) => t.id === taskId);
                       if (!task) return;
 
+                      // Mark pending
+                      pendingIds.current.add(taskId);
+
                       // Optimistic Update
                       setTasks((prev) => prev.filter((t) => t.id !== taskId));
                       setLaterThisWeek((prev) => [
@@ -498,6 +504,9 @@ export default function Home() {
 
                       // Parallel Refresh
                       await Promise.all([refreshToday(), fetchBacklog()]);
+                      
+                      // Cleanup pending (optional, mostly for safety)
+                      pendingIds.current.delete(taskId);
                     }}
                   />
                 </motion.div>
@@ -514,6 +523,9 @@ export default function Home() {
                       onRefreshToday={refreshToday}
                       onRefreshBacklog={fetchBacklog}
                       onMoveToToday={async (item) => {
+                        // Mark pending
+                        pendingIds.current.add(item.id);
+
                         // Optimistic Update
                         setLaterThisWeek((prev) => prev.filter((t) => t.id !== item.id));
                         setTasks((prev) => [
@@ -550,6 +562,9 @@ export default function Home() {
 
                         // Parallel Refresh
                         await Promise.all([refreshToday(), fetchBacklog()]);
+                        
+                        // Cleanup pending
+                        pendingIds.current.delete(item.id);
                       }}
                     />
                   ) : (
