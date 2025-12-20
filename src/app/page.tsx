@@ -583,7 +583,7 @@ export default function Home() {
       {grab && (
         <svg
           key={grab.startAt}
-          className="fixed inset-0 z-50 pointer-events-none"
+          className="fixed inset-0 z-40 pointer-events-none"
           width={vp.w}
           height={vp.h}
           viewBox={`0 0 ${vp.w} ${vp.h}`}
