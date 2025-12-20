@@ -23,7 +23,7 @@ export function AddTaskButton({
       onClick={onClick}
       disabled={disabled}
       className={[
-        'relative w-full h-12 rounded-full',
+        'relative h-12 rounded-full px-6 md:w-full',
         'bg-white dark:bg-white/10 backdrop-blur-xl',
         'text-slate-900 dark:text-white font-semibold tracking-[-0.01em]',
         'shadow-[0_1px_0_rgba(255,255,255,.7)_inset,0_4px_12px_rgba(0,0,0,.08)] ring-1 ring-black/10 dark:ring-white/10',

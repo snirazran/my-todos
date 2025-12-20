@@ -56,7 +56,7 @@ export default function HistoryStats({ data, className }: { data: StatData; clas
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.1 }}
-          className="min-w-[140px] flex-1 snap-center"
+          className="min-w-[140px] flex-1 snap-center last:mr-4"
         >
           <Card className="border-none shadow-sm hover:shadow-md transition-shadow bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm h-full">
             <CardContent className="p-3 md:p-4 flex flex-col justify-between h-full gap-2 md:gap-3">

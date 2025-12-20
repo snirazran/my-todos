@@ -676,8 +676,8 @@ export default function Home() {
 
       {/* Floating Add Task Button - Home Page Version */}
       <div className="fixed bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+80px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[400px]">
-          <div className="rounded-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/60 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
+        <div className="pointer-events-auto mx-auto w-full max-w-[400px] flex md:block justify-center">
+          <div className="md:w-full rounded-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/60 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
             <AddTaskButton
               onClick={() => {
                 setQuickText('');
