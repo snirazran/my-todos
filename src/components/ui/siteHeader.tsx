@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { Sparkles, LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 export default function SiteHeader() {
   const { data: session, status } = useSession();
@@ -28,32 +29,35 @@ export default function SiteHeader() {
           />
         </Link>
 
-        {/* ───────── Auth button ───────── */}
-        <div className="flex items-center gap-2">
-          {status === 'loading' ? (
-             <Button variant="ghost" disabled size="sm">
-               ...
-             </Button>
-          ) : session ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => signOut()}
-              className="gap-2 font-medium"
-            >
-              <LogOut className="w-4 h-4" />
-              <span className="hidden sm:inline">Sign out</span>
-            </Button>
-          ) : (
-            <Button
-              onClick={() => signIn()}
-              className="gap-2 font-medium bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-500/20"
-              size="sm"
-            >
-              <LogIn className="w-4 h-4" />
-              Sign in
-            </Button>
-          )}
+        {/* ───────── Right side actions ───────── */}
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          <div className="flex items-center gap-2">
+            {status === 'loading' ? (
+               <Button variant="ghost" disabled size="sm">
+                 ...
+               </Button>
+            ) : session ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => signOut()}
+                className="gap-2 font-medium"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="hidden sm:inline">Sign out</span>
+              </Button>
+            ) : (
+              <Button
+                onClick={() => signIn()}
+                className="gap-2 font-medium bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-500/20"
+                size="sm"
+              >
+                <LogIn className="w-4 h-4" />
+                Sign in
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 

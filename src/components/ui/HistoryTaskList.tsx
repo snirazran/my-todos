@@ -81,20 +81,12 @@ export default function HistoryTaskList({
 
               {/* label */}
               <motion.span
-                className="text-sm md:text-base"
-                animate={
+                className={`text-sm md:text-base transition-colors duration-200 ${
                   isDone
-                    ? {
-                        color: 'rgb(148 163 184)',
-                        textDecorationColor: 'rgb(148 163 184)',
-                      }
-                    : { color: 'rgb(15 23 42)' }
-                }
+                    ? 'text-slate-400 line-through dark:text-slate-500'
+                    : 'text-slate-900 dark:text-slate-100'
+                }`}
                 transition={{ duration: 0.18 }}
-                style={{
-                  textDecoration: isDone ? 'line-through' : 'none',
-                  textDecorationThickness: isDone ? 2 : undefined,
-                }}
               >
                 {task.text}
               </motion.span>

@@ -327,10 +327,12 @@ export default function TaskList({
 
                     <div className="flex-1 min-w-0">
                       <motion.span
-                        className="block text-base font-medium md:text-lg"
+                        className={`block text-base font-medium md:text-lg transition-colors duration-200 ${
+                          isDone
+                            ? 'text-slate-400 line-through dark:text-slate-500'
+                            : 'text-slate-800 dark:text-slate-100'
+                        }`}
                         animate={{
-                          color: isDone ? 'rgb(148 163 184)' : 'rgb(30 41 59)',
-                          textDecorationLine: isDone ? 'line-through' : 'none',
                           opacity: isDone ? 0.8 : 1,
                         }}
                         transition={{ duration: 0.2 }}

@@ -41,69 +41,130 @@ export default function HistoryStats({ data, className }: { data: StatData; clas
      },
   ];
 
-  return (
-    <div className={cn(
-      // Mobile: Horizontal Scroll
-      "flex overflow-x-auto pb-2 -mx-4 px-4 snap-x snap-mandatory no-scrollbar",
-      // Desktop: Grid
-      "md:grid md:grid-cols-3 md:overflow-visible md:pb-0 md:mx-0 md:px-0 md:gap-3",
-      "mb-6 gap-3", 
-      className
-    )}>
-      {stats.map((stat, i) => (
-        <motion.div
-          key={stat.label}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: i * 0.1 }}
-          className="min-w-[140px] flex-1 snap-center last:mr-4"
-        >
-          <Card className="border-none shadow-sm hover:shadow-md transition-shadow bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm h-full">
-            <CardContent className="p-3 md:p-4 flex flex-col justify-between h-full gap-2 md:gap-3">
-              <div className="flex justify-between items-start">
-                <div className={cn("p-1.5 md:p-2 rounded-lg", stat.bg)}>
-                  <stat.icon className={cn("w-4 h-4 md:w-5 md:h-5", stat.color)} />
-                </div>
-                {/* Mini Bar Chart / Visual */}
-                {stat.label === "Completion Rate" && (
-                  <div className="h-7 w-7 md:h-8 md:w-8 relative flex items-center justify-center">
-                     <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
-                        <path
-                          className="text-slate-100 dark:text-slate-700"
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <motion.path
-                          className={stat.color}
-                          initial={{ pathLength: 0 }}
-                          animate={{ pathLength: data.completionRate / 100 }}
-                          transition={{ duration: 1, ease: "easeOut" }}
-                          d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                          strokeDasharray="100, 100"
-                        />
-                     </svg>
+      return (
+
+        <div className={cn(
+
+          "flex overflow-x-auto gap-2 pb-2 -mx-4 px-4 snap-x no-scrollbar md:grid md:grid-cols-3 md:gap-4 md:pb-0 md:mx-0 md:px-0 mb-6",
+
+          className
+
+        )}>
+
+          {stats.map((stat, i) => (
+
+            <motion.div
+
+              key={stat.label}
+
+              initial={{ opacity: 0, y: 20 }}
+
+              animate={{ opacity: 1, y: 0 }}
+
+              transition={{ delay: i * 0.1 }}
+
+              className="flex-1 min-w-[125px] md:min-w-0 snap-center flex"
+
+            >
+
+              <Card className="border-none shadow-sm hover:shadow-md transition-shadow bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm w-full">
+
+                <CardContent className="p-2 md:p-4 flex flex-row md:flex-col items-center md:items-start gap-2.5 md:gap-3 h-full">
+
+                  <div className={cn("p-1.5 md:p-2 rounded-lg shrink-0", stat.bg)}>
+
+                    <stat.icon className={cn("w-4 h-4 md:w-5 md:h-5", stat.color)} />
+
                   </div>
-                )}
-              </div>
-              <div>
-                <div className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white">
-                  {typeof stat.value === 'number' ? (
-                     <AnimatedNumber value={stat.value} />
-                  ) : stat.value}
-                </div>
-                <p className="text-[10px] md:text-xs text-slate-500 dark:text-slate-400 font-medium truncate">
-                  {stat.label}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      ))}
-    </div>
-  );
-}
+
+                  
+
+                  <div className="min-w-0 flex-1 md:flex-none">
+
+                    <div className="text-sm md:text-2xl font-bold text-slate-900 dark:text-white truncate">
+
+                      {typeof stat.value === 'number' ? (
+
+                         <AnimatedNumber value={stat.value} />
+
+                      ) : stat.value}
+
+                    </div>
+
+                    <p className="text-[9px] md:text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider truncate">
+
+                      {stat.label}
+
+                    </p>
+
+                  </div>
+
+    
+
+                  {/* Mini Chart - Hidden on mobile for extreme efficiency */}
+
+                  {stat.label === "Completion Rate" && (
+
+                    <div className="hidden md:flex h-8 w-8 relative items-center justify-center shrink-0">
+
+                       <svg className="w-full h-full -rotate-90" viewBox="0 0 36 36">
+
+                          <path
+
+                            className="text-slate-100 dark:text-slate-700"
+
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+
+                            fill="none"
+
+                            stroke="currentColor"
+
+                            strokeWidth="4"
+
+                          />
+
+                          <motion.path
+
+                            className={stat.color}
+
+                            initial={{ pathLength: 0 }}
+
+                            animate={{ pathLength: data.completionRate / 100 }}
+
+                            transition={{ duration: 1, ease: "easeOut" }}
+
+                            d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+
+                            fill="none"
+
+                            stroke="currentColor"
+
+                            strokeWidth="4"
+
+                            strokeDasharray="100, 100"
+
+                          />
+
+                       </svg>
+
+                    </div>
+
+                  )}
+
+                </CardContent>
+
+              </Card>
+
+            </motion.div>
+
+          ))}
+
+        </div>
+
+      );
+
+    }
+
+    
+
+  
