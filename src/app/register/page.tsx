@@ -87,7 +87,7 @@ export default function RegisterPage() {
 
   /* ───────── UI ───────── */
   return (
-    <main className="relative flex items-center justify-center w-full h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] p-4 pb-32 md:pb-60 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-black">
+    <main className="relative flex items-center justify-center w-full h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] p-4 pb-32 md:pb-60 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
       {/* ─── Decorative Blobs ─── */}
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-violet-500/10 dark:bg-violet-400/5 blur-[100px] rounded-full pointer-events-none z-0" />
 
@@ -119,7 +119,7 @@ export default function RegisterPage() {
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           className="w-full"
         >
-          <Card className="overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-white/50 dark:border-white/10 bg-white/80 dark:bg-black/70 backdrop-blur-2xl rounded-[32px] pt-12">
+          <Card className="overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-white/50 dark:border-slate-800/50 bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl rounded-[32px] pt-12">
             <CardHeader className="pt-2 pb-6 text-center">
               <CardTitle className="text-3xl font-black tracking-tighter uppercase text-slate-800 dark:text-white">
                 Create Account
@@ -156,7 +156,7 @@ export default function RegisterPage() {
                       required
                       value={name}
                       onChange={(e) => setName(e.target.value)}
-                      className="transition-all h-11 pl-11 rounded-2xl bg-slate-100/50 dark:bg-white/5 border-slate-200/50 dark:border-white/10 focus:ring-violet-500/20 focus:border-violet-500/50"
+                      className="transition-all h-11 pl-11 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800 focus:ring-violet-500/20 focus:border-violet-500/50"
                     />
                     <User className="absolute left-4 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors z-10" />
                   </div>
@@ -178,7 +178,7 @@ export default function RegisterPage() {
                       required
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className="transition-all h-11 pl-11 rounded-2xl bg-slate-100/50 dark:bg-white/5 border-slate-200/50 dark:border-white/10 focus:ring-violet-500/20 focus:border-violet-500/50"
+                      className="transition-all h-11 pl-11 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800 focus:ring-violet-500/20 focus:border-violet-500/50"
                     />
                     <Mail className="absolute left-4 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors z-10" />
                   </div>
@@ -200,7 +200,7 @@ export default function RegisterPage() {
                       required
                       value={pw}
                       onChange={(e) => setPw(e.target.value)}
-                      className="transition-all h-11 pl-11 pr-11 rounded-2xl bg-slate-100/50 dark:bg-white/5 border-slate-200/50 dark:border-white/10 focus:ring-violet-500/20 focus:border-violet-500/50"
+                      className="transition-all h-11 pl-11 pr-11 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800 focus:ring-violet-500/20 focus:border-violet-500/50"
                     />
                     <Lock className="absolute left-4 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors z-10" />
                     <button
@@ -230,7 +230,7 @@ export default function RegisterPage() {
                       required
                       value={pw2}
                       onChange={(e) => setPw2(e.target.value)}
-                      className="transition-all h-11 pl-11 pr-11 rounded-2xl bg-slate-100/50 dark:bg-white/5 border-slate-200/50 dark:border-white/10 focus:ring-violet-500/20 focus:border-violet-500/50"
+                      className="transition-all h-11 pl-11 pr-11 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800 focus:ring-violet-500/20 focus:border-violet-500/50"
                     />
                     <Lock className="absolute left-4 top-3.5 h-4 w-4 text-slate-400 group-focus-within:text-violet-500 transition-colors z-10" />
                     <button
@@ -258,7 +258,7 @@ export default function RegisterPage() {
               </form>
             </CardContent>
 
-            <CardFooter className="flex flex-col gap-4 py-6 border-t bg-slate-50/50 dark:bg-white/5 border-slate-100 dark:border-white/10">
+            <CardFooter className="flex flex-col gap-4 py-6 border-t bg-slate-50/50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800/50">
               <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Already have an account?{' '}
                 <Link

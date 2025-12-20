@@ -46,7 +46,7 @@ export default function MobileNav() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 z-50 w-full bg-white/90 backdrop-blur-lg border-t border-slate-200 dark:bg-black/90 dark:border-white/10 md:hidden pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed bottom-0 left-0 z-50 w-full bg-white/90 backdrop-blur-lg border-t border-slate-200 dark:bg-slate-900/90 dark:border-slate-800 md:hidden pb-[env(safe-area-inset-bottom)]">
       <div className="grid grid-cols-4 h-16">
         {navItems.map((item) => {
           const isActive = item.href ? pathname === item.href : item.isActive;

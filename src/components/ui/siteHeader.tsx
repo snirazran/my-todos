@@ -13,7 +13,7 @@ export default function SiteHeader() {
   // Fixed height so pages can reserve space (mobile/desktop)
   // mobile: h-14 (=3.5rem), md: h-16 (=4rem)
   return (
-    <header className="sticky top-0 z-50 w-full h-14 md:h-16 backdrop-blur-md border-b border-slate-200/50 dark:border-white/10 bg-white/70 dark:bg-black/70">
+    <header className="sticky top-0 z-50 w-full h-14 md:h-16 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-800/50 bg-white/70 dark:bg-slate-950/70">
       <div className="flex items-center justify-between h-full gap-4 px-6 py-3 mx-auto max-w-7xl md:px-10">
         {/* ───────── Logo ───────── */}
         <Link
