@@ -16,6 +16,8 @@ export type HistoryTaskItemProps = {
   onToggle?: (id: string, date: string, currentStatus: boolean) => void;
   setFlyRef?: (el: HTMLDivElement | null) => void;
   isEaten?: boolean;
+  tags?: string[];
+  userTags?: { id: string; name: string; color: string }[];
 };
 
 export default function HistoryTaskItem({
@@ -28,9 +30,17 @@ export default function HistoryTaskItem({
   onToggle,
   setFlyRef,
   isEaten = false,
+  tags,
+  userTags,
 }: HistoryTaskItemProps) {
   const isWeekly = type === 'weekly';
   const [isHovered, setIsHovered] = useState(false);
+  
+  const getTagDetails = (tagIdentifier: string) => {
+    const byId = userTags?.find((t) => t.id === tagIdentifier);
+    if (byId) return byId;
+    return userTags?.find((t) => t.name === tagIdentifier);
+  };
   
   // Combine real completion status with visual "eaten" state
   // to ensure smooth transition (Fly disappears -> Check appears)
@@ -88,16 +98,46 @@ export default function HistoryTaskItem({
 
       {/* Content */}
       <div className="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
-        {/* Weekly Tag - Matches TaskCard.tsx style */}
-        {isWeekly && (
-          <div className="flex items-center">
-            <span
-              title="Repeats weekly"
-              className="inline-flex items-center gap-1 rounded-md bg-purple-50/80 px-2 py-0.5 text-[11px] font-bold text-purple-600 dark:bg-purple-900/40 dark:text-purple-200 transition-colors"
-            >
-              <RotateCcw className="h-3 w-3" aria-hidden="true" />
-              <span className="tracking-wider uppercase">Weekly</span>
-            </span>
+        {/* Tags Row */}
+        {(isWeekly || (tags && tags.length > 0)) && (
+          <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+            {isWeekly && (
+              <span
+                title="Repeats weekly"
+                className="inline-flex items-center gap-1 rounded-md bg-purple-50/80 px-2 py-0.5 text-[11px] font-bold text-purple-600 dark:bg-purple-900/40 dark:text-purple-200 transition-colors"
+              >
+                <RotateCcw className="h-3 w-3" aria-hidden="true" />
+                <span className="tracking-wider uppercase">Weekly</span>
+              </span>
+            )}
+            {tags?.map((tagId) => {
+              const tagDetails = getTagDetails(tagId);
+              if (!tagDetails) return null;
+
+              const color = tagDetails.color;
+              const name = tagDetails.name;
+
+              return (
+                <span
+                  key={tagId}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wider uppercase transition-colors border shadow-sm"
+                  style={
+                    color
+                      ? {
+                          backgroundColor: `${color}20`,
+                          color: color,
+                          borderColor: `${color}40`,
+                        }
+                      : undefined
+                  }
+                >
+                  {!color && (
+                    <span className="absolute inset-0 w-full h-full border rounded-md opacity-10 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50 pointer-events-none" />
+                  )}
+                  <span className={!color ? "text-indigo-600 dark:text-indigo-200 z-10 relative" : ""}>{name}</span>
+                </span>
+              );
+            })}
           </div>
         )}
 

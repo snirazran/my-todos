@@ -4,6 +4,7 @@ import React from 'react';
 import { format, isToday, isYesterday } from 'date-fns';
 import HistoryTaskItem, { HistoryTaskItemProps } from './HistoryTaskItem';
 import { motion } from 'framer-motion';
+import useSWR from 'swr';
 
 type DailyGroup = {
   date: string;
@@ -18,6 +19,12 @@ type HistoryListProps = {
 };
 
 export default function HistoryList({ history, onToggleTask, setFlyRef, visuallyCompleted }: HistoryListProps) {
+  const { data: tagsData } = useSWR('/api/tags', (url) =>
+    fetch(url).then((r) => r.json())
+  );
+  const userTags: { id: string; name: string; color: string }[] =
+    tagsData?.tags || [];
+
   if (!history || history.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center opacity-60">
@@ -74,6 +81,7 @@ export default function HistoryList({ history, onToggleTask, setFlyRef, visually
                     onToggle={onToggleTask}
                     setFlyRef={(el) => setFlyRef?.(uniqueKey, el)}
                     isEaten={visuallyCompleted?.has(uniqueKey)}
+                    userTags={userTags} // Pass userTags
                   />
                 );
               })}

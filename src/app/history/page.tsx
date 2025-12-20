@@ -3,9 +3,10 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Calendar as CalendarIcon, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar as CalendarIcon, Loader2, Tag } from 'lucide-react';
 import { subDays, startOfToday, format, startOfYesterday } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
+import useSWR from 'swr';
 
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import HistoryStats from '@/components/history/HistoryStats';
@@ -28,6 +29,7 @@ const FLY_PX = 24;
 export default function HistoryPage() {
   const { data: session, status } = useSession();
   const [filter, setFilter] = useState<DateRangeOption>('7d');
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   
   // Custom date range state
   const [customFrom, setCustomFrom] = useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
@@ -35,6 +37,9 @@ export default function HistoryPage() {
 
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { data: tagsData } = useSWR('/api/tags', (url) => fetch(url).then((r) => r.json()));
+  const availableTags: { id: string; name: string; color: string }[] = tagsData?.tags || [];
 
   /* ---- Frog Animation State ---- */
   const frogRef = useRef<FrogHandle>(null);
@@ -127,12 +132,21 @@ export default function HistoryPage() {
     fetchData();
   }, [filter, session, status, customFrom, customTo]);
 
+  // Filter history data by tag
+  const filteredHistory = useMemo(() => {
+    if (!selectedTagId) return historyData;
+    return historyData.map(day => ({
+      ...day,
+      tasks: day.tasks.filter((t: any) => t.tags?.includes(selectedTagId))
+    })).filter(day => day.tasks.length > 0);
+  }, [historyData, selectedTagId]);
+
   // Updated stats calculation (combined view)
   const stats = useMemo(() => {
     let total = 0;
     let completed = 0;
 
-    historyData.forEach((day) => {
+    filteredHistory.forEach((day) => {
       day.tasks.forEach((t: any) => {
         total++;
         if (t.completed) completed++;
@@ -144,7 +158,7 @@ export default function HistoryPage() {
       completed,
       completionRate: total > 0 ? (completed / total) * 100 : 0,
     };
-  }, [historyData]);
+  }, [filteredHistory]);
 
   // Handler for task toggling
   const handleToggleTask = async (taskId: string, date: string, currentStatus: boolean) => {
@@ -225,7 +239,7 @@ export default function HistoryPage() {
 
   return (
     <main className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
-      <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-8">
+      <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-4 md:space-y-8">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
@@ -247,9 +261,9 @@ export default function HistoryPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8 items-start">
            {/* Left Column: Frog & Stats */}
-           <div className="lg:col-span-4 space-y-6 lg:sticky lg:top-8">
+           <div className="lg:col-span-4 space-y-4 lg:space-y-6 lg:sticky lg:top-8">
               {/* Frog Display */}
               <div className="flex flex-col items-center w-full">
                 <FrogDisplay
@@ -272,11 +286,11 @@ export default function HistoryPage() {
            </div>
 
            {/* Right Column: Filters & List */}
-           <div className="lg:col-span-8 space-y-6">
+           <div className="lg:col-span-8 space-y-4 lg:space-y-6">
               {/* Controls Container */}
-              <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
                  {/* Filter Tabs */}
-                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sticky top-2 z-20 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md py-2 -mx-2 px-2 md:static md:bg-transparent md:p-0">
+                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sticky top-2 z-20 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md py-2 -mx-2 px-2 md:static md:bg-transparent md:p-0">
                     <HistoryFilter value={filter} onChange={setFilter} />
                     
                     {/* Context Label (Only show if not custom) */}
@@ -325,6 +339,43 @@ export default function HistoryPage() {
                      </motion.div>
                    )}
                  </AnimatePresence>
+
+                 {/* Tag Filter */}
+                 {availableTags.length > 0 && (
+                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar p-1 pb-2 -mx-1 px-1">
+                       <button
+                          onClick={() => setSelectedTagId(null)}
+                          className={`
+                             whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all border
+                             ${!selectedTagId 
+                                ? 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-slate-900 dark:border-white' 
+                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}
+                          `}
+                       >
+                          All Tags
+                       </button>
+                       {availableTags.map(tag => (
+                          <button
+                             key={tag.id}
+                             onClick={() => setSelectedTagId(selectedTagId === tag.id ? null : tag.id)}
+                             className={`
+                                whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5
+                                ${selectedTagId === tag.id 
+                                   ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900' 
+                                   : 'opacity-70 hover:opacity-100 bg-white dark:bg-slate-800'}
+                             `}
+                             style={{
+                                backgroundColor: selectedTagId === tag.id ? `${tag.color}20` : undefined,
+                                color: tag.color,
+                                borderColor: selectedTagId === tag.id ? `${tag.color}40` : `${tag.color}20`,
+                                boxShadow: selectedTagId === tag.id ? `0 0 0 1px ${tag.color}` : 'none',
+                             }}
+                          >
+                             {tag.name}
+                          </button>
+                       ))}
+                    </div>
+                 )}
               </div>
 
               {/* Main List */}
@@ -336,7 +387,7 @@ export default function HistoryPage() {
                  ) : null}
                  
                  <HistoryList 
-                    history={historyData} 
+                    history={filteredHistory} 
                     onToggleTask={handleToggleTask} 
                     setFlyRef={(key, el) => { flyRefs.current[key] = el; }}
                     visuallyCompleted={visuallyDone}
