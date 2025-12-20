@@ -8,12 +8,28 @@ interface LoadingScreenProps {
   subtext?: string;
 }
 
-function RingLoader() {
+function ThemeMorphLoader() {
   return (
-    <div className="relative flex items-center justify-center w-16 h-16 drop-shadow-sm">
-      <div className="absolute inset-0 rounded-full bg-[conic-gradient(#7c3aed,#6366f1,#7c3aed)] animate-spin" />
-      <div className="absolute inset-[4px] rounded-full bg-white/90 dark:bg-slate-950" />
-      <div className="absolute inset-[10px] rounded-full bg-indigo-100/60 dark:bg-indigo-900/50 blur-[1px]" />
+    <div className="relative flex items-center justify-center w-24 h-24">
+      {/* The Morphing Shape */}
+      <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 shadow-xl shadow-purple-500/30 animate-[morph-spin_2s_ease-in-out_infinite]" />
+
+      <style jsx>{`
+        @keyframes morph-spin {
+          0% {
+            border-radius: 12px; /* rounded-xl (Task Card shape) */
+            transform: rotate(0deg);
+          }
+          50% {
+            border-radius: 50%; /* Circle (Button/Avatar shape) */
+            transform: rotate(180deg) scale(0.75); /* Shrink slightly */
+          }
+          100% {
+            border-radius: 12px;
+            transform: rotate(360deg);
+          }
+        }
+      `}</style>
     </div>
   );
 }
@@ -26,20 +42,21 @@ export function LoadingScreen({
   return (
     <div
       className={`relative overflow-hidden ${
-        fullscreen ? 'min-h-screen' : 'py-12'
+        fullscreen ? 'min-h-[calc(100dvh-3.5rem)] md:min-h-[calc(100dvh-4rem)]' : 'py-12'
       } flex items-center justify-center`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900" />
-      <div className="absolute inset-0 opacity-50 bg-[radial-gradient(circle_at_20%_20%,rgba(124,58,237,0.16),transparent_32%),radial-gradient(circle_at_75%_15%,rgba(99,102,241,0.14),transparent_30%),radial-gradient(circle_at_45%_80%,rgba(236,72,153,0.12),transparent_28%)]" />
+      {/* Cleaner, lighter background */}
+      <div className="absolute inset-0 bg-slate-50/50 dark:bg-slate-950/50" />
+      
       <div className="relative flex items-center justify-center w-full px-4">
-        <div className="inline-flex flex-col items-center gap-4 px-6 py-6 rounded-2xl bg-white/85 dark:bg-slate-900/80 backdrop-blur-2xl shadow-[0_20px_60px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/80 dark:ring-slate-800/70 min-w-[220px]">
-          <RingLoader />
+        <div className="flex flex-col items-center gap-4">
+          <ThemeMorphLoader />
           <div className="text-center space-y-1">
-            <p className="text-base font-semibold text-slate-900 dark:text-white">
+            <p className="text-lg font-bold text-slate-700 dark:text-slate-200 tracking-tight">
               {message}
             </p>
             {subtext ? (
-              <p className="text-sm text-slate-600 dark:text-slate-300">
+              <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
                 {subtext}
               </p>
             ) : null}
@@ -53,7 +70,7 @@ export function LoadingScreen({
 export function InlineSpinner({ label }: { label?: string }) {
   return (
     <span className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">
-      <span className="w-4 h-4 rounded-full border-2 border-purple-500/70 border-t-transparent animate-spin" />
+      <span className="w-4 h-4 rounded-full border-2 border-slate-400/70 border-t-transparent animate-spin" />
       {label && <span>{label}</span>}
     </span>
   );

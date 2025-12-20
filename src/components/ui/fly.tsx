@@ -10,10 +10,11 @@ type FlyProps = {
   y?: number;
   x?: number;
   paused?: boolean;
+  onLoad?: () => void;
 };
 
 const Fly = forwardRef<HTMLDivElement, FlyProps>(
-  ({ onClick, size = 30, className, x = 0, y = 0, paused = false }, ref) => {
+  ({ onClick, size = 30, className, x = 0, y = 0, paused = false, onLoad }, ref) => {
     // 1) Memoize options so Rive isn't re-created on parent re-renders
     const riveOptions = useMemo(
       () => ({
@@ -23,8 +24,9 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
         animations: ['Wings', 'Body'],
         autoplay: true,
         layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
+        onLoad: onLoad,
       }),
-      []
+      [onLoad]
     );
 
     const { RiveComponent, rive } = useRive(riveOptions);
