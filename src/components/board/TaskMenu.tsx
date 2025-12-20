@@ -20,33 +20,6 @@ interface TaskMenuProps {
 export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second' }: TaskMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!menu) return;
-
-    const handleClickOutside = (e: MouseEvent | TouchEvent) => {
-      // Check if the click is outside the menu
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-
-    const handleScroll = () => {
-      onClose();
-    };
-
-    // Use capture phase (third argument 'true') to detect clicks even if 
-    // propagation is stopped by other elements (like the BacklogTray).
-    window.addEventListener('mousedown', handleClickOutside, true);
-    window.addEventListener('touchstart', handleClickOutside, true);
-    window.addEventListener('scroll', handleScroll, true);
-
-    return () => {
-      window.removeEventListener('mousedown', handleClickOutside, true);
-      window.removeEventListener('touchstart', handleClickOutside, true);
-      window.removeEventListener('scroll', handleScroll, true);
-    };
-  }, [menu, onClose]);
-
   // We portal to document.body
   // Ensure document is available (client-side)
   if (typeof document === 'undefined') return null;
@@ -54,16 +27,36 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
   return createPortal(
     <AnimatePresence>
       {menu && (
-        <motion.div
-          ref={menuRef}
-          initial={{ opacity: 0, scale: 0.95, y: -4 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: -4 }}
-          transition={{ duration: 0.15, ease: 'easeOut' }}
-          className="fixed z-[9999] min-w-[160px] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5 ring-1 ring-black/5 backdrop-blur-sm"
-          style={{ top: menu.top, left: menu.left }}
-          onClick={(e) => e.stopPropagation()}
-        >
+        <>
+          {/* Transparent backdrop to catch outside clicks */}
+          <div 
+            className="fixed inset-0 z-[9998] bg-transparent touch-none" 
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onClose();
+            }}
+            onPointerDown={(e) => {
+               // Capture pointer events to ensure we get the click even on touch devices
+               // that might be handling gestures
+               e.stopPropagation(); 
+            }}
+          />
+          <motion.div
+            ref={menuRef}
+            initial={{ opacity: 0, scale: 0.95, y: -4 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -4 }}
+            transition={{ duration: 0.15, ease: 'easeOut' }}
+            className="fixed z-[9999] min-w-[160px] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5 ring-1 ring-black/5 backdrop-blur-sm"
+            style={{ top: menu.top, left: menu.left }}
+            onClick={(e) => e.stopPropagation()}
+          >
           {addTagsPosition === 'first' && onAddTags && (
              <button
               onClick={() => {
@@ -113,6 +106,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             Delete Task
           </button>
         </motion.div>
+        </>
       )}
     </AnimatePresence>,
     document.body
