@@ -437,10 +437,6 @@ export default function TaskList({
                   setMenu(null);
                   setExitAction({ id, type: 'later' });
                   onDoLater(id);
-                  // Allow animation to play before resetting (though component might unmount first)
-                  setTimeout(() => {
-                    setExitAction(null);
-                  }, 500);
                 }
               }
             : undefined

@@ -238,23 +238,21 @@ export default function BacklogPanel({
 
         await onRefreshBacklog();
 
-      } finally {
+            } finally {
 
-        setProcessingIds((prev) => {
+              setProcessingIds((prev) => {
 
-          const next = new Set(prev);
+                const next = new Set(prev);
 
-          next.delete(item.id);
+                next.delete(item.id);
 
-          return next;
+                return next;
 
-        });
+              });
 
-        setExitAction(null);
+            }
 
-      }
-
-    };
+          };
 
   
 
