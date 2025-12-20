@@ -331,7 +331,7 @@ export default function Home() {
         <Header session={session} router={router} />
 
         {!session && (
-          <div className="relative p-6 mb-8 overflow-hidden text-center rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm md:p-8">
+          <div className="relative p-6 mb-6 overflow-hidden text-center rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm md:p-8">
             <h2 className="mb-3 text-xl font-bold md:text-2xl text-slate-900 dark:text-white">
               There’s a frog with a rumbling belly! 🐸
             </h2>
@@ -347,8 +347,8 @@ export default function Home() {
           </div>
         )}
 
-        <div className="relative grid items-start grid-cols-1 gap-8 lg:grid-cols-12">
-          <div className="z-10 flex flex-col gap-6 lg:col-span-4 lg:sticky lg:top-8">
+        <div className="relative grid items-start grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-8">
+          <div className="z-10 flex flex-col gap-4 lg:col-span-4 lg:sticky lg:top-8 lg:gap-6">
             <FrogDisplay
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
@@ -375,7 +375,7 @@ export default function Home() {
           </div>
 
           <div
-            className="flex flex-col gap-6 lg:col-span-8"
+            className="flex flex-col gap-4 lg:col-span-8 lg:gap-6"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
             <div className="flex self-start w-full p-1 rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm md:w-auto">
@@ -695,7 +695,7 @@ export default function Home() {
 // Compact Header
 function Header({ session, router }: { session: any; router: any }) {
   return (
-    <div className="flex flex-col gap-4 mb-4 md:mb-6 md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-4 mb-2 md:mb-6 md:flex-row md:items-center md:justify-between">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white md:text-5xl">
           {format(new Date(), 'EEEE')}
