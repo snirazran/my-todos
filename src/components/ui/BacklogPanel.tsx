@@ -323,6 +323,7 @@ export default function BacklogPanel({
 
                       {t.tags && t.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
+                          <AnimatePresence mode="popLayout">
                           {t.tags.map((tagId) => {
                             const tagDetails = getTagDetails(tagId);
 
@@ -333,7 +334,12 @@ export default function BacklogPanel({
                             const name = tagDetails.name;
 
                             return (
-                              <span
+                              <motion.span
+                                layout
+                                initial={{ opacity: 0, scale: 0.8 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0 }}
+                                transition={{ duration: 0.2 }}
                                 key={tagId}
                                 className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
                                   !color
@@ -353,9 +359,10 @@ export default function BacklogPanel({
                                 }
                               >
                                 {name}
-                              </span>
+                              </motion.span>
                             );
                           })}
+                          </AnimatePresence>
                         </div>
                       )}
                     </div>

@@ -2,6 +2,7 @@
 
 import React, { useRef, useCallback, useEffect } from 'react';
 import { RotateCcw, EllipsisVertical, CheckCircle2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
 
@@ -224,6 +225,7 @@ export default function TaskCard({
                 <span className="tracking-wider uppercase">Weekly</span>
               </span>
             )}
+            <AnimatePresence mode="popLayout">
             {task.tags?.map((tagId) => {
               const tagDetails = getTagDetails(tagId);
               if (!tagDetails) return null;
@@ -232,7 +234,12 @@ export default function TaskCard({
               const name = tagDetails.name;
 
               return (
-                <span
+                <motion.span
+                  layout
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0 }}
+                  transition={{ duration: 0.2 }}
                   key={tagId}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wider uppercase transition-colors border shadow-sm"
                   style={
@@ -250,9 +257,10 @@ export default function TaskCard({
                     <span className="absolute inset-0 w-full h-full border rounded-md opacity-10 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50 pointer-events-none" />
                   )}
                   <span className={!color ? "text-indigo-600 dark:text-indigo-200 z-10 relative" : ""}>{name}</span>
-                </span>
+                </motion.span>
               );
             })}
+            </AnimatePresence>
           </div>
         )}
         <div
