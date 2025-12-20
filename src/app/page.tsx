@@ -471,29 +471,33 @@ export default function Home() {
                       const task = tasks.find((t) => t.id === taskId);
                       if (!task) return;
 
-                      // 1. Add to backlog
-                      await fetch('/api/tasks?view=board', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          text: task.text,
-                          repeat: 'backlog',
-                          tags: task.tags,
+                      // Optimistic Update
+                      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+                      setLaterThisWeek((prev) => [
+                        ...prev,
+                        { id: taskId, text: task.text, tags: task.tags },
+                      ]);
+
+                      // Parallel API calls
+                      await Promise.all([
+                        fetch('/api/tasks?view=board', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            text: task.text,
+                            repeat: 'backlog',
+                            tags: task.tags,
+                          }),
                         }),
-                      });
+                        fetch('/api/tasks', {
+                          method: 'DELETE',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ date: dateStr, taskId }),
+                        }),
+                      ]);
 
-                      // 2. Remove from today
-                      // Use the same logic as onDeleteToday/onDeleteFromWeek
-                      // If it's weekly, it needs to be suppressed
-                      await fetch('/api/tasks', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ date: dateStr, taskId }),
-                      });
-
-                      // 3. Refresh
-                      await refreshToday();
-                      await fetchBacklog();
+                      // Parallel Refresh
+                      await Promise.all([refreshToday(), fetchBacklog()]);
                     }}
                   />
                 </motion.div>
@@ -509,6 +513,44 @@ export default function Home() {
                       later={laterThisWeek}
                       onRefreshToday={refreshToday}
                       onRefreshBacklog={fetchBacklog}
+                      onMoveToToday={async (item) => {
+                        // Optimistic Update
+                        setLaterThisWeek((prev) => prev.filter((t) => t.id !== item.id));
+                        setTasks((prev) => [
+                          ...prev,
+                          {
+                            id: item.id, // Temp ID until refresh
+                            text: item.text,
+                            completed: false,
+                            tags: item.tags,
+                            type: 'regular',
+                          },
+                        ]);
+
+                        const dow = new Date().getDay();
+
+                        // Parallel API Calls
+                        await Promise.all([
+                          fetch('/api/tasks?view=board', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              text: item.text,
+                              days: [dow],
+                              repeat: 'this-week',
+                              tags: item.tags,
+                            }),
+                          }),
+                          fetch('/api/tasks?view=board', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ day: -1, taskId: item.id }),
+                          }),
+                        ]);
+
+                        // Parallel Refresh
+                        await Promise.all([refreshToday(), fetchBacklog()]);
+                      }}
                     />
                   ) : (
                     <div className="p-8 text-center text-slate-500 bg-white/50 rounded-2xl dark:bg-slate-800/50">

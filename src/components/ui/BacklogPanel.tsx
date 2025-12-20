@@ -24,12 +24,16 @@ export default function BacklogPanel({
   onRefreshToday,
 
   onRefreshBacklog,
+
+  onMoveToToday,
 }: {
   later: BacklogItem[];
 
   onRefreshToday: () => Promise<void> | void;
 
   onRefreshBacklog: () => Promise<void> | void;
+
+  onMoveToToday?: (item: BacklogItem) => Promise<void> | void;
 }) {
   const [menu, setMenu] = React.useState<{
     id: string;
@@ -146,6 +150,11 @@ export default function BacklogPanel({
     setExitAction({ id: item.id, type: 'today' });
 
     try {
+      if (onMoveToToday) {
+        await onMoveToToday(item);
+        return;
+      }
+
       const dow = new Date().getDay();
 
       // Start API calls immediately
