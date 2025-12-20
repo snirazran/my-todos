@@ -468,6 +468,7 @@ export default function TaskBoard({
           <div className="flex-1 min-w-0">
             <div className="rounded-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/60 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
               <AddTaskButton
+                className="w-full"
                 onClick={() => {
                   setQuickText('');
                   setShowQuickAdd(true);
