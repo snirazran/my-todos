@@ -46,7 +46,7 @@ export default function RootLayout({
         ].join(' ')}
       >
         {/* Global, fixed background that paints under mobile URL/search bars */}
-        <div className="fixed inset-0 -z-10 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 [background-attachment:fixed]" />
+        <div className="fixed inset-0 -z-10 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-black dark:to-black [background-attachment:fixed]" />
 
         <Providers>
           <SiteHeader />
