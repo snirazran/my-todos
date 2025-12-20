@@ -102,12 +102,12 @@ export default React.memo(function BacklogTray({
       if (!item) return;
 
       try {
-          await fetch('/api/tasks?view=board', {
+          await fetch('/api/tasks', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              day: -1, 
-              tasks: [{ id: taskId, text: item.text, tags: newTags }] 
+              taskId: taskId,
+              tags: newTags
             }),
           });
           
@@ -174,8 +174,16 @@ export default React.memo(function BacklogTray({
                   No tasks for later. Drop some here!
                 </div>
               ) : (
-                tasks.map((t, i) => (
-                  <div key={t.id} className="w-[300px] shrink-0 relative">
+                <AnimatePresence mode="popLayout">
+                {tasks.map((t, i) => (
+                  <motion.div
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                    key={t.id}
+                    className="w-[300px] shrink-0 relative"
+                  >
                     <TaskCard
                       innerRef={(el) => setCardRef(draggableIdFor(7, t.id), el)}
                       dragId={draggableIdFor(7, t.id)}
@@ -222,8 +230,9 @@ export default React.memo(function BacklogTray({
                         })
                       }}
                     />
-                  </div>
-                ))
+                  </motion.div>
+                ))}
+                </AnimatePresence>
               )}
             </div>
           </motion.div>
