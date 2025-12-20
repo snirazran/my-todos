@@ -375,11 +375,11 @@ export async function PUT(req: NextRequest) {
     return handleBoardPut(uid, body);
   }
 
-  // Daily toggle
-  const { date, taskId, completed } = body ?? {};
-  if (!date || !taskId || typeof completed !== 'boolean') {
+  // Daily toggle or update tags
+  const { date, taskId, completed, tags } = body ?? {};
+  if ((!date && !tags) || !taskId) {
     return NextResponse.json(
-      { error: 'date, taskId and completed(boolean) are required' },
+      { error: 'taskId and (date+completed OR tags) are required' },
       { status: 400 }
     );
   }
@@ -390,6 +390,17 @@ export async function PUT(req: NextRequest) {
   }).lean<TaskDoc>();
   if (!doc) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+  }
+
+  if (tags) {
+      // Just update tags
+      await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: { tags } });
+      return NextResponse.json({ ok: true });
+  }
+
+  // Ensure completed is boolean if provided (for daily toggle)
+  if (typeof completed !== 'boolean') {
+      return NextResponse.json({ error: 'completed must be boolean' }, { status: 400 });
   }
 
   const alreadyCompletedForDate =

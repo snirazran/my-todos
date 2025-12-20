@@ -10,6 +10,7 @@ import useSWR from 'swr';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import TaskMenu from '../board/TaskMenu';
+import TagPopup from '@/components/ui/TagPopup';
 
 interface Task {
   id: string;
@@ -72,6 +73,8 @@ export default function TaskList({
     task: Task;
     kind: 'regular' | 'weekly' | 'backlog';
   } | null>(null);
+  
+  const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
 
   // Listen for other menus opening to auto-close this one
   React.useEffect(() => {
@@ -89,6 +92,40 @@ export default function TaskList({
       );
     };
   }, []);
+  
+  const handleTagSave = async (taskId: string, newTags: string[]) => {
+      // Find the task to get its current state for type checking if needed, 
+      // but for board/regular we can just use the board PUT endpoint or tasks PUT endpoint.
+      // The PUT /api/tasks only toggles completion.
+      // The PUT /api/tasks?view=board handles updates but requires `day` and `tasks` array.
+      // Actually, we should probably add a dedicated endpoint or handle it in POST/PUT.
+      
+      // Let's check api/tasks/route.ts. PUT is for toggle daily.
+      // Let's use the board PUT but we need to know the day or if it's backlog.
+      
+      // Alternatively, we can assume it's "Today" context for TaskList. 
+      // "Today" means regular task with date=today OR weekly task.
+      
+      // It's tricky because /api/tasks PUT only does completion.
+      // I should update /api/tasks PUT to also accept tags update if provided.
+      
+      // WAIT: I can just use the board endpoint if I know the day. 
+      // But for weekly tasks it's day 0-6. For regular tasks it's also day 0-6 (mapped).
+      
+      // Let's modify /api/tasks PUT to allow updating tags for a specific task ID.
+      
+      try {
+          await fetch('/api/tasks', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ taskId, tags: newTags }),
+          });
+          
+          window.dispatchEvent(new Event('tags-updated'));
+      } catch (e) {
+          console.error("Failed to update tags", e);
+      }
+  };
 
   const taskKind = (t: Task) => {
     const sourceType = t.type ?? t.origin ?? t.kind;
@@ -390,6 +427,8 @@ export default function TaskList({
         menu={menu}
         onClose={() => setMenu(null)}
         isDone={menu ? (tasks.find(t => t.id === menu.id)?.completed || vSet.has(menu.id)) : false}
+        onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
+        addTagsPosition="second"
         onDoLater={
           onDoLater
             ? () => {
@@ -418,6 +457,14 @@ export default function TaskList({
           }
           setMenu(null);
         }}
+      />
+
+      <TagPopup
+        open={tagPopup.open}
+        taskId={tagPopup.taskId}
+        initialTags={tasks.find(t => t.id === tagPopup.taskId)?.tags}
+        onClose={() => setTagPopup({ open: false, taskId: null })}
+        onSave={handleTagSave}
       />
 
       <DeleteDialog

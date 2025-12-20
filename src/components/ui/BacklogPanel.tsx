@@ -1,54 +1,160 @@
 'use client';
 
 import * as React from 'react';
+
 import { EllipsisVertical, CalendarClock, Plus, Loader2 } from 'lucide-react';
+
 import { AnimatePresence, motion } from 'framer-motion';
+
 import Fly from '@/components/ui/fly';
+
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
+
 import TaskMenu from '../board/TaskMenu';
+
 import useSWR from 'swr';
+
+import TagPopup from '@/components/ui/TagPopup';
+
+
 
 type BacklogItem = { id: string; text: string; tags?: string[] };
 
+
+
 export default function BacklogPanel({
+
   later,
+
   onRefreshToday,
+
   onRefreshBacklog,
+
 }: {
+
   later: BacklogItem[];
+
   onRefreshToday: () => Promise<void> | void;
+
   onRefreshBacklog: () => Promise<void> | void;
+
 }) {
+
   const [menu, setMenu] = React.useState<{ id: string; top: number; left: number } | null>(null);
+
   const [confirmId, setConfirmId] = React.useState<BacklogItem | null>(null);
+
   const [busy, setBusy] = React.useState(false);
+
   const [processingIds, setProcessingIds] = React.useState<Set<string>>(new Set());
+
   const [exitAction, setExitAction] = React.useState<{ id: string; type: 'today' } | null>(null);
-
-  // Fetch Tags for colors
-  const { data: tagsData } = useSWR('/api/tags', (url) =>
-    fetch(url).then((r) => r.json())
-  );
-  const userTags: { id: string; name: string; color: string }[] =
-    tagsData?.tags || [];
-
-    const getTagDetails = (tagIdentifier: string) => {
-
-      // Try to find by ID first
-
-      const byId = userTags.find((t) => t.id === tagIdentifier);
-
-      if (byId) return byId;
-
-      // Fallback: try to find by Name
-
-      return userTags.find((t) => t.name === tagIdentifier);
-
-    };
 
   
 
-    // Listen for other menus opening to auto-close this one (syncs with TaskList)
+  const [tagPopup, setTagPopup] = React.useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
+
+
+
+  // Fetch Tags for colors
+
+  const { data: tagsData } = useSWR('/api/tags', (url) =>
+
+    fetch(url).then((r) => r.json())
+
+  );
+
+  const userTags: { id: string; name: string; color: string }[] =
+
+    tagsData?.tags || [];
+
+
+
+  const getTagDetails = (tagIdentifier: string) => {
+
+    // Try to find by ID first
+
+    const byId = userTags.find((t) => t.id === tagIdentifier);
+
+    if (byId) return byId;
+
+    // Fallback: try to find by Name
+
+    return userTags.find((t) => t.name === tagIdentifier);
+
+  };
+
+  
+
+  const handleTagSave = async (taskId: string, newTags: string[]) => {
+
+      // Update tags for a backlog task.
+
+      // We can use the board PUT endpoint which handles updates including tags.
+
+      // We need to pass day=-1 to indicate backlog context if we use board PUT,
+
+      // but actually board PUT takes `tasks` array. 
+
+      
+
+      // Let's rely on the simpler logic: 
+
+      // We need to fetch current task details or just construct what we need.
+
+      // Since we only want to update tags, we might need a dedicated endpoint OR 
+
+      // re-use existing board PUT logic by sending just the updated task.
+
+      
+
+      // However, `handleBoardPut` in `api/tasks/route.ts` expects an array of tasks for reordering/updating.
+
+      // If we send just one task, it might be fine, but we need to be careful about `day`.
+
+      
+
+      // Actually, since `later` items are known, we can find the item.
+
+      const item = later.find(t => t.id === taskId);
+
+      if (!item) return;
+
+
+
+      try {
+
+          await fetch('/api/tasks?view=board', {
+
+            method: 'PUT',
+
+            headers: { 'Content-Type': 'application/json' },
+
+            body: JSON.stringify({
+
+              day: -1, 
+
+              tasks: [{ id: taskId, text: item.text, tags: newTags }] 
+
+            }),
+
+          });
+
+          
+
+          window.dispatchEvent(new Event('tags-updated'));
+
+      } catch (e) {
+
+          console.error("Failed to update tags", e);
+
+      }
+
+  };
+
+
+
+  // Listen for other menus opening to auto-close this one (syncs with TaskList)
 
     React.useEffect(() => {
 
@@ -494,6 +600,8 @@ export default function BacklogPanel({
       <TaskMenu
         menu={menu}
         onClose={() => setMenu(null)}
+        onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
+        addTagsPosition="first"
         onDelete={() => {
           if (menu) {
             const t = later.find((it) => it.id === menu.id);
@@ -501,6 +609,14 @@ export default function BacklogPanel({
           }
           setMenu(null);
         }}
+      />
+      
+      <TagPopup
+        open={tagPopup.open}
+        taskId={tagPopup.taskId}
+        initialTags={later.find(t => t.id === tagPopup.taskId)?.tags}
+        onClose={() => setTagPopup({ open: false, taskId: null })}
+        onSave={handleTagSave}
       />
 
       {confirmId && (

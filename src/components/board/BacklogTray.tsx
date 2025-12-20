@@ -6,6 +6,7 @@ import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import useSWR from 'swr';
+import TagPopup from '@/components/ui/TagPopup';
 
 interface Props {
   isOpen: boolean;
@@ -41,6 +42,8 @@ export default React.memo(function BacklogTray({
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [confirmItem, setConfirmItem] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
+  
+  const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
 
   // Close on Escape
   useEffect(() => {
@@ -92,6 +95,26 @@ export default React.memo(function BacklogTray({
       setBusy(false);
       setConfirmItem(null);
     }
+  };
+  
+  const handleTagSave = async (taskId: string, newTags: string[]) => {
+      const item = tasks.find(t => t.id === taskId);
+      if (!item) return;
+
+      try {
+          await fetch('/api/tasks?view=board', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              day: -1, 
+              tasks: [{ id: taskId, text: item.text, tags: newTags }] 
+            }),
+          });
+          
+          window.dispatchEvent(new Event('tags-updated'));
+      } catch (e) {
+          console.error("Failed to update tags", e);
+      }
   };
 
   return (
@@ -208,6 +231,8 @@ export default React.memo(function BacklogTray({
           <TaskMenu
             menu={menu}
             onClose={() => setMenu(null)}
+            onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
+            addTagsPosition="first"
             onDelete={() => {
               if (menu) {
                 const t = tasks.find((it) => it.id === menu.id);
@@ -215,6 +240,14 @@ export default React.memo(function BacklogTray({
               }
               setMenu(null);
             }}
+          />
+
+          <TagPopup
+            open={tagPopup.open}
+            taskId={tagPopup.taskId}
+            initialTags={tasks.find(t => t.id === tagPopup.taskId)?.tags}
+            onClose={() => setTagPopup({ open: false, taskId: null })}
+            onSave={handleTagSave}
           />
 
           {/* Delete Dialog */}

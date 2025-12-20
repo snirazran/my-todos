@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Clock } from 'lucide-react';
+import { Trash2, Clock, Tag } from 'lucide-react';
+import TagManager from '@/components/ui/TagManager';
 
 interface TaskMenuProps {
   menu: { id: string; top: number; left: number } | null;
@@ -11,9 +12,12 @@ interface TaskMenuProps {
   onDelete: () => void;
   onDoLater?: () => void;
   isDone?: boolean;
+  onAddTags?: (taskId: string) => void;
+  // Controls order of Add Tags button
+  addTagsPosition?: 'first' | 'second'; 
 }
 
-export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone }: TaskMenuProps) {
+export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second' }: TaskMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -60,6 +64,19 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone }:
           style={{ top: menu.top, left: menu.left }}
           onClick={(e) => e.stopPropagation()}
         >
+          {addTagsPosition === 'first' && onAddTags && (
+             <button
+              onClick={() => {
+                  onAddTags(menu.id);
+                  onClose();
+              }}
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Tag className="h-4 w-4 text-slate-500" />
+              Add Tags
+            </button>
+          )}
+
           {onDoLater && !isDone && (
             <button
               onClick={() => {
@@ -72,6 +89,20 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone }:
               Do Later
             </button>
           )}
+
+          {addTagsPosition === 'second' && onAddTags && (
+             <button
+              onClick={() => {
+                  onAddTags(menu.id);
+                  onClose();
+              }}
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Tag className="h-4 w-4 text-slate-500" />
+              Add Tags
+            </button>
+          )}
+
           <button
             onClick={() => {
               onDelete();

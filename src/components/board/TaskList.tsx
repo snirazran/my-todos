@@ -6,6 +6,7 @@ import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
 import { Task, draggableIdFor, type DisplayDay, apiDayFromDisplay } from './helpers';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
+import TagPopup from '@/components/ui/TagPopup';
 
 export default React.memo(function TaskList({
   day,
@@ -44,6 +45,8 @@ export default React.memo(function TaskList({
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay } | null>(null);
   const [busy, setBusy] = useState(false);
+  
+  const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
 
   const placeholderAt =
     isDragging && targetDay === day && targetIndex != null ? targetIndex : null;
@@ -108,6 +111,20 @@ export default React.memo(function TaskList({
       setDialog(null);
       setMenu(null);
     }
+  };
+  
+  const handleTagSave = async (taskId: string, newTags: string[]) => {
+      try {
+          await fetch('/api/tasks', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ taskId, tags: newTags }),
+          });
+          
+          window.dispatchEvent(new Event('tags-updated'));
+      } catch (e) {
+          console.error("Failed to update tags", e);
+      }
   };
 
   if (process.env.NODE_ENV !== 'production') {
@@ -222,6 +239,8 @@ export default React.memo(function TaskList({
       <TaskMenu
         menu={menu}
         onClose={() => setMenu(null)}
+        onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
+        addTagsPosition="second"
         onDelete={() => {
           if (menu) {
             const t = items.find((it) => it.id === menu.id);
@@ -229,6 +248,13 @@ export default React.memo(function TaskList({
           }
           setMenu(null);
         }}
+      />
+      <TagPopup
+        open={tagPopup.open}
+        taskId={tagPopup.taskId}
+        initialTags={items.find(t => t.id === tagPopup.taskId)?.tags}
+        onClose={() => setTagPopup({ open: false, taskId: null })}
+        onSave={handleTagSave}
       />
       <DeleteDialog
         open={!!dialog}

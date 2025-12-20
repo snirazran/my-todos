@@ -1,0 +1,288 @@
+'use client';
+
+import React, { useState, useRef } from 'react';
+import useSWR, { mutate } from 'swr';
+import { Tag, Palette, Plus, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+
+const TAG_COLORS = [
+  { name: 'Red', value: '#f87171', bg: 'bg-red-500', text: 'text-red-950' },
+  { name: 'Orange', value: '#fb923c', bg: 'bg-orange-500', text: 'text-orange-950' },
+  { name: 'Yellow', value: '#facc15', bg: 'bg-yellow-400', text: 'text-yellow-950' },
+  { name: 'Green', value: '#4ade80', bg: 'bg-green-500', text: 'text-green-950' },
+  { name: 'Teal', value: '#2dd4bf', bg: 'bg-teal-400', text: 'text-teal-950' },
+  { name: 'Blue', value: '#60a5fa', bg: 'bg-blue-500', text: 'text-blue-950' },
+  { name: 'Purple', value: '#c084fc', bg: 'bg-purple-500', text: 'text-purple-950' },
+  { name: 'Pink', value: '#f472b6', bg: 'bg-pink-500', text: 'text-pink-950' },
+];
+
+const TAG_MAX_LENGTH = 20;
+const MAX_SAVED_TAGS = 15;
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+type SavedTag = {
+  id: string;
+  name: string;
+  color: string;
+};
+
+interface TagManagerProps {
+  selectedTags: string[];
+  onTagsChange: (tags: string[]) => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export default function TagManager({ selectedTags, onTagsChange, open, onOpenChange }: TagManagerProps) {
+  const { data: tagsData } = useSWR('/api/tags', fetcher);
+  const savedTags: SavedTag[] = tagsData?.tags || [];
+
+  const [tagInput, setTagInput] = useState('');
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[5].value);
+  const [manageTagsMode, setManageTagsMode] = useState(false);
+  const [isTagActionPending, setIsTagActionPending] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus input when opening
+  React.useEffect(() => {
+    if (open) {
+        setTimeout(() => tagInputRef.current?.focus(), 100);
+    }
+  }, [open]);
+
+  const handleAddTag = () => {
+    if (isTagActionPending) return;
+    const trimmed = tagInput.trim();
+    if (!trimmed) return;
+
+    // Check if tag exists
+    const existing = savedTags.find(t => t.name.toLowerCase() === trimmed.toLowerCase());
+
+    if (existing) {
+        // Select existing if not already selected
+        if (!selectedTags.includes(existing.id)) {
+             onTagsChange([...selectedTags, existing.id]);
+        }
+        setTagInput('');
+        setShowColorPicker(false);
+    } else {
+        // New tag
+        if (savedTags.length >= MAX_SAVED_TAGS) {
+            return;
+        }
+
+        if (showColorPicker) {
+             createAndSaveTag();
+        } else {
+            setShowColorPicker(true);
+        }
+    }
+  };
+
+  const createAndSaveTag = async () => {
+    if (isTagActionPending) return;
+    const trimmed = tagInput.trim();
+    if (!trimmed) return;
+
+    if (savedTags.length >= MAX_SAVED_TAGS) return;
+
+    setIsTagActionPending(true);
+    try {
+      const res = await fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed, color: newTagColor }),
+      });
+      const data = await res.json();
+      
+      mutate('/api/tags');
+      
+      if (data.tag && !selectedTags.includes(data.tag.id)) {
+        onTagsChange([...selectedTags, data.tag.id]);
+      }
+      setTagInput('');
+      setShowColorPicker(false);
+    } catch (e) {
+      console.error('Failed to save tag', e);
+    } finally {
+        setIsTagActionPending(false);
+    }
+  };
+
+  const deleteSavedTag = async (id: string, name: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isTagActionPending) return;
+
+    setIsTagActionPending(true);
+    try {
+      await fetch(`/api/tags?id=${id}`, { method: 'DELETE' });
+      mutate('/api/tags');
+      // Remove from selected if present
+      onTagsChange(selectedTags.filter((tId) => tId !== id));
+      
+      window.dispatchEvent(new Event('tags-updated'));
+    } catch (error) {
+      console.error('Failed to delete tag', error);
+    } finally {
+        setIsTagActionPending(false);
+    }
+  };
+
+  const removeTag = (tagId: string) => {
+    onTagsChange(selectedTags.filter((t) => t !== tagId));
+  };
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="overflow-hidden w-full"
+        >
+            <div className="p-3 mb-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                {/* Tag Input */}
+                <div className="relative flex items-center mb-3">
+                    <Tag className="absolute left-2.5 w-4 h-4 text-slate-400" />
+                    <input
+                        ref={tagInputRef}
+                        value={tagInput}
+                        onChange={(e) => {
+                            setTagInput(e.target.value);
+                            setShowColorPicker(false);
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleAddTag();
+                            }
+                        }}
+                        maxLength={TAG_MAX_LENGTH}
+                        placeholder="Type to create or filter..."
+                        className="w-full h-10 pl-9 pr-2 rounded-xl bg-white dark:bg-slate-800 text-base md:text-sm font-medium text-slate-900 dark:text-white ring-1 ring-slate-200 dark:ring-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 placeholder:text-slate-400"
+                    />
+                    {tagInput && (
+                        <button
+                            type="button"
+                            onClick={handleAddTag}
+                            disabled={!savedTags.find(t => t.name.toLowerCase() === tagInput.trim().toLowerCase()) && savedTags.length >= MAX_SAVED_TAGS}
+                            className="absolute right-1.5 p-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-200 disabled:opacity-50 disabled:grayscale"
+                        >
+                            {showColorPicker ? <Palette className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                        </button>
+                    )}
+                </div>
+
+                {/* Color Picker */}
+                <AnimatePresence>
+                    {showColorPicker && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            className="mb-3 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700"
+                        >
+                            <div className="text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
+                            <div className="flex gap-2 flex-wrap">
+                                {TAG_COLORS.map((c) => (
+                                <button
+                                    key={c.name}
+                                    type="button"
+                                    onClick={() => setNewTagColor(c.value)}
+                                    className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-800 transition-all ${
+                                    newTagColor === c.value
+                                        ? 'ring-slate-400 scale-110'
+                                        : 'ring-transparent'
+                                    }`}
+                                    title={c.name}
+                                />
+                                ))}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={createAndSaveTag}
+                                disabled={isTagActionPending}
+                                className="w-full mt-3 py-2 text-xs font-bold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
+                            >
+                                {isTagActionPending ? 'Saving...' : 'Save Tag'}
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* Available Tags */}
+                {savedTags.length > 0 && (
+                    <div>
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                Saved Tags <span className={savedTags.length >= MAX_SAVED_TAGS ? "text-red-500" : ""}>({savedTags.length}/{MAX_SAVED_TAGS})</span>
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setManageTagsMode(!manageTagsMode)}
+                                disabled={isTagActionPending}
+                                className={`text-[11px] font-bold px-2 py-0.5 rounded transition-colors ${
+                                    manageTagsMode ? 'bg-red-100 text-red-600' : 'text-slate-400 hover:text-slate-600'
+                                }`}
+                            >
+                                {manageTagsMode ? 'Done' : 'Manage'}
+                            </button>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            {savedTags
+                                .filter(st => !tagInput || st.name.toLowerCase().includes(tagInput.toLowerCase()))
+                                .map((st) => {
+                                const isSelected = selectedTags.includes(st.id);
+                                return (
+                                    <button
+                                        key={st.id}
+                                        type="button"
+                                        disabled={isTagActionPending}
+                                        onClick={(e) => {
+                                            if (manageTagsMode) {
+                                                deleteSavedTag(st.id, st.name, e);
+                                                return;
+                                            }
+                                            if (isSelected) removeTag(st.id);
+                                            else onTagsChange([...selectedTags, st.id]);
+                                        }}
+                                        className={`
+                                            relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold uppercase tracking-wider transition-all
+                                            border disabled:opacity-50 disabled:cursor-not-allowed
+                                            ${
+                                            isSelected
+                                                ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900'
+                                                : 'hover:opacity-80 opacity-70 bg-white dark:bg-slate-800'
+                                            }
+                                        `}
+                                        style={{
+                                            backgroundColor: isSelected ? `${st.color}20` : undefined,
+                                            color: st.color,
+                                            borderColor: isSelected ? `${st.color}40` : `${st.color}20`,
+                                            boxShadow: isSelected ? `0 0 0 1px ${st.color}` : 'none',
+                                        }}
+                                    >
+                                        {st.name}
+                                        {manageTagsMode && (
+                                            <div
+                                            onClick={(e) => deleteSavedTag(st.id, st.name, e)}
+                                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 shadow-sm hover:scale-110 z-10"
+                                            >
+                                                <X className="w-2.5 h-2.5" />
+                                            </div>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
