@@ -102,10 +102,6 @@ export default function HistoryPage() {
           case '30d':
             fromDate = subDays(today, 30);
             break;
-          case 'yesterday':
-            fromDate = startOfYesterday();
-            toDate = startOfYesterday();
-            break;
           case 'custom':
             // Use user selected dates
             if (customFrom) fromDate = new Date(customFrom);
@@ -288,9 +284,7 @@ export default function HistoryPage() {
                        <div className="hidden md:flex items-center text-sm text-slate-400 gap-2">
                           <CalendarIcon className="w-4 h-4" />
                           <span>
-                             {filter === 'yesterday' 
-                                ? 'Yesterday' 
-                                : filter === '7d' 
+                             {filter === '7d' 
                                    ? 'Last 7 Days (Excl. Today)' 
                                    : 'Last 30 Days (Excl. Today)'}
                           </span>

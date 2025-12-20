@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { Calendar as CalendarIcon } from 'lucide-react';
 
-export type DateRangeOption = '7d' | '30d' | 'yesterday' | 'custom';
+export type DateRangeOption = '7d' | '30d' | 'custom';
 
 type HistoryFilterProps = {
   value: DateRangeOption;
@@ -14,7 +14,6 @@ type HistoryFilterProps = {
 
 export default function HistoryFilter({ value, onChange }: HistoryFilterProps) {
   const options: { id: DateRangeOption; label: string; icon?: React.ElementType }[] = [
-    { id: 'yesterday', label: 'Yesterday' },
     { id: '7d', label: 'Last 7 Days' },
     { id: '30d', label: 'Last 30 Days' },
     { id: 'custom', label: 'Custom', icon: CalendarIcon },
