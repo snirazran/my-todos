@@ -32,6 +32,7 @@ export default function TaskBoard({
   onRequestAdd,
   onQuickAdd,
   todayDisplayIndex,
+  onToggleRepeat,
 }: {
   titles: string[];
   week: Task[][];
@@ -51,6 +52,7 @@ export default function TaskBoard({
     tags: string[];
   }) => Promise<void> | void;
   todayDisplayIndex: Exclude<DisplayDay, 7>;
+  onToggleRepeat?: (taskId: string, day: DisplayDay) => Promise<void> | void;
 }) {
   const pathname = usePathname();
   const {
@@ -432,6 +434,7 @@ export default function TaskBoard({
                   onGrab={onGrab}
                   setCardRef={setCardRef}
                   userTags={userTags}
+                  onToggleRepeat={onToggleRepeat}
                 />
               </DayColumn>
             </div>

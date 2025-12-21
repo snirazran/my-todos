@@ -3,6 +3,7 @@ import {
   Circle,
   EllipsisVertical,
   CalendarCheck,
+  RotateCcw,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useState } from 'react';
@@ -51,6 +52,7 @@ interface SortableTaskItemProps {
   onMenuOpen: (e: React.MouseEvent<HTMLButtonElement>, task: Task) => void;
   getTagDetails: (tagId: string) => { id: string; name: string; color: string } | undefined;
   isDragDisabled?: boolean;
+  isWeekly?: boolean;
 }
 
 function SortableTaskItem({
@@ -63,6 +65,7 @@ function SortableTaskItem({
   onMenuOpen,
   getTagDetails,
   isDragDisabled,
+  isWeekly,
 }: SortableTaskItemProps) {
   const {
     attributes,
@@ -200,10 +203,16 @@ function SortableTaskItem({
             >
               {task.text}
             </motion.span>
-            {task.tags && task.tags.length > 0 && (
+            {(isWeekly || (task.tags && task.tags.length > 0)) && (
               <div className="flex flex-wrap gap-1 mt-1">
+                {isWeekly && (
+                  <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
+                    <RotateCcw className="h-3 w-3" />
+                    Weekly
+                  </span>
+                )}
                 <AnimatePresence mode="popLayout">
-                  {task.tags.map((tagId) => {
+                  {task.tags?.map((tagId) => {
                     const tagDetails = getTagDetails(tagId);
                     if (!tagDetails) return null;
 
@@ -276,6 +285,7 @@ export default function TaskList({
   onDeleteFromWeek,
   onDoLater,
   onReorder,
+  onToggleRepeat,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -293,6 +303,7 @@ export default function TaskList({
   onDeleteFromWeek: (taskId: string) => Promise<void> | void;
   onDoLater?: (taskId: string) => Promise<void> | void;
   onReorder?: (tasks: Task[]) => void;
+  onToggleRepeat?: (taskId: string) => Promise<void> | void;
 }) {
   const { data: tagsData } = useSWR('/api/tags', (url) =>
     fetch(url).then((r) => r.json())
@@ -536,6 +547,7 @@ export default function TaskList({
                       onMenuOpen={openMenu}
                       getTagDetails={getTagDetails}
                       isDragDisabled={isDone}
+                      isWeekly={taskKind(task) === 'weekly'}
                     />
                   );
                 })}
@@ -563,6 +575,20 @@ export default function TaskList({
               }
             : undefined
         }
+        onToggleRepeat={
+          onToggleRepeat
+            ? () => {
+                if (menu) {
+                  const id = menu.id;
+                  // Don't close immediately if we want to show loading, but UI usually optimistic.
+                  // Closing menu feels snappier.
+                  onToggleRepeat(id);
+                  setMenu(null);
+                }
+              }
+            : undefined
+        }
+        isWeekly={menu ? (tasks.find(t => t.id === menu.id)?.type === 'weekly' || (menu && weeklyIds.has(menu.id))) : false}
         onDelete={() => {
           if (menu) {
             const t = tasks.find((it) => it.id === menu.id);

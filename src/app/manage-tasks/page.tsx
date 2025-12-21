@@ -134,6 +134,56 @@ export default function ManageTasksPage() {
     setWeek(mapApiToDisplay(data));
   };
 
+  const onToggleRepeat = async (taskId: string, day: DisplayDay) => {
+    if (day === 7) return; // Ignore backlog for now
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(today);
+    start.setDate(today.getDate() - today.getDay());
+
+    const apiDay = apiDayFromDisplay(day);
+    const targetDate = new Date(start);
+    targetDate.setDate(start.getDate() + apiDay);
+
+    if (targetDate < today) {
+      targetDate.setDate(targetDate.getDate() + 7);
+    }
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const dateStr = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(targetDate.getDate())}`;
+
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    
+    // Optimistic Update
+    setWeek((prev) => {
+      const next = [...prev];
+      if (next[day]) {
+        next[day] = next[day].map((t) => {
+          if (t.id === taskId) {
+            const newType = t.type === 'weekly' ? 'regular' : 'weekly';
+            return { ...t, type: newType };
+          }
+          return t;
+        });
+      }
+      return next;
+    });
+
+    await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: dateStr,
+        taskId,
+        toggleType: true,
+        timezone: tz,
+      }),
+    });
+
+    fetchWeek();
+  };
+
   /** Titles in display order */
   const titles = useMemo(() => {
     const today = new Date();
@@ -191,6 +241,7 @@ export default function ManageTasksPage() {
           }}
           onQuickAdd={onAddTask}
           todayDisplayIndex={todayIdx} // Pass todayIdx as a prop
+          onToggleRepeat={onToggleRepeat}
         />
       </div>
 

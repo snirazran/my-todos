@@ -398,7 +398,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // Daily toggle or update tags
-  const { date, taskId, completed, tags } = body ?? {};
+  const { date, taskId, completed, tags, toggleType } = body ?? {};
   if ((!date && !tags) || !taskId) {
     return NextResponse.json(
       { error: 'taskId and (date+completed OR tags) are required' },
@@ -412,6 +412,49 @@ export async function PUT(req: NextRequest) {
   }).lean<TaskDoc>();
   if (!doc) {
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+  }
+
+  if (toggleType) {
+    if (doc.type === 'weekly') {
+      // Convert Weekly -> Regular
+      // We freeze the current instance into a regular task
+      const isCompletedToday = (doc.completedDates ?? []).includes(date);
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        {
+          $set: {
+            type: 'regular',
+            date,
+            completed: isCompletedToday,
+          },
+          $unset: {
+            dayOfWeek: 1,
+            suppressedDates: 1,
+            completedDates: 1,
+          },
+        }
+      );
+    } else {
+      // Convert Regular -> Weekly
+      // We assume this task now repeats every week on this weekday
+      const dow = dowFromYMD(date);
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        {
+          $set: {
+            type: 'weekly',
+            dayOfWeek: dow,
+            completedDates: doc.completed ? [date] : [],
+          },
+          $unset: {
+            date: 1,
+            weekStart: 1,
+            completed: 1,
+          },
+        }
+      );
+    }
+    return NextResponse.json({ ok: true });
   }
 
   if (tags) {

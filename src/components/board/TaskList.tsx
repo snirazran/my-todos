@@ -21,6 +21,7 @@ export default React.memo(function TaskList({
   onGrab,
   setCardRef,
   userTags,
+  onToggleRepeat,
 }: {
   day: DisplayDay;
   items: Task[];
@@ -42,6 +43,7 @@ export default React.memo(function TaskList({
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
   userTags?: { id: string; name: string; color: string }[];
+  onToggleRepeat?: (taskId: string, day: DisplayDay) => void;
 }) {
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay } | null>(null);
@@ -257,6 +259,8 @@ export default React.memo(function TaskList({
         onClose={() => setMenu(null)}
         onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
         addTagsPosition="second"
+        onToggleRepeat={onToggleRepeat ? () => { if(menu) { onToggleRepeat(menu.id, day); setMenu(null); } } : undefined}
+        isWeekly={menu ? items.find((t) => t.id === menu.id)?.type === 'weekly' : false}
         onDelete={() => {
           if (menu) {
             const t = items.find((it) => it.id === menu.id);

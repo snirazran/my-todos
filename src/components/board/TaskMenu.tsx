@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Clock, Tag } from 'lucide-react';
+import { Trash2, Clock, Tag, RotateCcw } from 'lucide-react';
 import TagManager from '@/components/ui/TagManager';
 
 interface TaskMenuProps {
@@ -13,11 +13,12 @@ interface TaskMenuProps {
   onDoLater?: () => void;
   isDone?: boolean;
   onAddTags?: (taskId: string) => void;
-  // Controls order of Add Tags button
   addTagsPosition?: 'first' | 'second'; 
+  onToggleRepeat?: () => void;
+  isWeekly?: boolean;
 }
 
-export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second' }: TaskMenuProps) {
+export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly }: TaskMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // We portal to document.body
@@ -80,6 +81,19 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             >
               <Clock className="h-4 w-4 text-violet-500" />
               Do Later
+            </button>
+          )}
+
+          {onToggleRepeat && (
+             <button
+              onClick={() => {
+                  onToggleRepeat();
+                  onClose();
+              }}
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <RotateCcw className="h-4 w-4 text-blue-500" />
+              {isWeekly ? 'Make Regular' : 'Make Weekly'}
             </button>
           )}
 

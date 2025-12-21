@@ -524,6 +524,41 @@ export default function Home() {
                         });
                       }
                     }}
+                    onToggleRepeat={async (taskId) => {
+                      const task = tasks.find((t) => t.id === taskId);
+                      if (!task) return;
+
+                      const isWeekly =
+                        task.type === 'weekly' || weeklyIds.has(taskId);
+                      const newType = isWeekly ? 'regular' : 'weekly';
+
+                      // Optimistic update
+                      setTasks((prev) =>
+                        prev.map((t) =>
+                          t.id === taskId ? { ...t, type: newType } : t
+                        )
+                      );
+                      setWeeklyIds((prev) => {
+                        const next = new Set(prev);
+                        if (newType === 'weekly') next.add(taskId);
+                        else next.delete(taskId);
+                        return next;
+                      });
+
+                      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                      await fetch('/api/tasks', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          date: dateStr,
+                          taskId,
+                          toggleType: true,
+                          timezone: tz,
+                        }),
+                      });
+                      
+                      refreshToday();
+                    }}
                   />
                 </motion.div>
               ) : (
