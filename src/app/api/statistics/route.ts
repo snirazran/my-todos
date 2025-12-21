@@ -14,7 +14,11 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
 
-  let body: { action: 'complete_task' | 'claim_gift'; taskId?: string };
+  let body: {
+    action: 'complete_task' | 'claim_gift';
+    taskId?: string;
+    timezone?: string;
+  };
   try {
     body = await req.json();
   } catch {
