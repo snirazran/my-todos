@@ -28,7 +28,9 @@ export default function GiftBoxOpening({
   const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
   const [prize, setPrize] = useState<ItemDef | null>(null);
   const [claiming, setClaiming] = useState(false);
-  const [loadingText, setLoadingText] = useState(FUNNY_SENTENCES[0]);
+  const [loadingText, setLoadingText] = useState(() => 
+    FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)]
+  );
   const [mounted, setMounted] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
 
