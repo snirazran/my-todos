@@ -14,6 +14,7 @@ import {
   useRive,
   useStateMachineInput,
 } from '@rive-app/react-canvas';
+import { useRiveAsset } from '@/hooks/useRiveAsset';
 
 /* === Artboard & geometry (adjust to your .riv) =========================== */
 const ARTBOARD_NAME = 'main';
@@ -68,9 +69,10 @@ const Frog = memo(
     ref
   ) {
     const wrapperRef = useRef<HTMLDivElement | null>(null);
+    const riveUrl = useRiveAsset('/frog_idle.riv');
 
     const { RiveComponent, rive } = useRive({
-      src: '/frog_idle.riv',
+      src: riveUrl || undefined,
       artboard: ARTBOARD_NAME,
       stateMachines: STATE_MACHINE,
       autoplay: true,
@@ -149,9 +151,11 @@ const Frog = memo(
         className={className}
         style={{ width, height, position: 'relative' }}
       >
-        <RiveComponent
-          style={{ width: '100%', height: '100%', display: 'block' }}
-        />
+        {riveUrl && (
+          <RiveComponent
+            style={{ width: '100%', height: '100%', display: 'block' }}
+          />
+        )}
       </div>
     );
   })

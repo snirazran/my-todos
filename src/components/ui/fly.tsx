@@ -2,6 +2,7 @@
 
 import React, { forwardRef, useMemo, useCallback, useEffect } from 'react';
 import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
+import { useRiveAsset } from '@/hooks/useRiveAsset';
 
 type FlyProps = {
   onClick?: (e: React.MouseEvent) => void;
@@ -15,10 +16,12 @@ type FlyProps = {
 
 const Fly = forwardRef<HTMLDivElement, FlyProps>(
   ({ onClick, size = 30, className, x = 0, y = 0, paused = false, onLoad }, ref) => {
+    const riveUrl = useRiveAsset('/fly_idle.riv');
+
     // 1) Memoize options so Rive isn't re-created on parent re-renders
     const riveOptions = useMemo(
       () => ({
-        src: '/fly_idle.riv',
+        src: riveUrl || undefined,
         artboard: 'fly',
         // If it's a single animation named "Wings and Body", replace the array with that string.
         animations: ['Wings', 'Body'],
@@ -26,7 +29,7 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
         layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
         onLoad: onLoad,
       }),
-      [onLoad]
+      [onLoad, riveUrl]
     );
 
     const { RiveComponent, rive } = useRive(riveOptions);
@@ -66,7 +69,7 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
           lineHeight: 0,
         }}
       >
-        <RiveComponent style={{ width: '100%', height: '100%' }} />
+        {riveUrl && <RiveComponent style={{ width: '100%', height: '100%' }} />}
       </div>
     );
   }

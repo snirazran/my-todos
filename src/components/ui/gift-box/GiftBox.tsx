@@ -8,6 +8,7 @@ import {
   Alignment,
 } from '@rive-app/react-canvas';
 import { cn } from '@/lib/utils';
+import { useRiveAsset } from '@/hooks/useRiveAsset';
 
 // Define layout outside component to maintain reference stability
 const RIVE_LAYOUT = new Layout({
@@ -28,8 +29,9 @@ export const GiftRive = React.memo(
     className?: string;
     triggerOpen?: boolean;
   }) => {
+    const riveUrl = useRiveAsset('/idle_gift.riv');
     const { rive, RiveComponent } = useRive({
-      src: '/idle_gift.riv',
+      src: riveUrl || undefined,
       stateMachines: 'State Machine 1',
       autoplay: true,
       layout: RIVE_LAYOUT,
@@ -60,9 +62,11 @@ export const GiftRive = React.memo(
           display: 'block', // Ensures no inline alignment issues
         }}
       >
-        <RiveComponent
-          style={{ width: '100%', height: '100%', display: 'block' }}
-        />
+        {riveUrl && (
+          <RiveComponent
+            style={{ width: '100%', height: '100%', display: 'block' }}
+          />
+        )}
       </div>
     );
   }
