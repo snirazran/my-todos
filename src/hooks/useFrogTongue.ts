@@ -234,25 +234,6 @@ export function useFrogTongue({
       const tRaw = (now - grab.startAt) / TONGUE_MS;
       const t = Math.max(0, Math.min(1, tRaw));
 
-      // Always update mouth position to handle scrolling/layout shifts
-      // We use a light lerp to smooth out minor jitter but keep it tight
-      const fresh = getMouthDoc();
-      const next = {
-        x: p0Doc.x + (fresh.x - p0Doc.x) * 0.5,
-        y: p0Doc.y + (fresh.y - p0Doc.y) * 0.5,
-      };
-      
-      // Update geometry if mouth moved significantly
-      if (Math.abs(next.x - p0Doc.x) + Math.abs(next.y - p0Doc.y) > 0.1) {
-        p0Doc = next;
-        ({ tmp, total, p1: p1Doc } = buildGeom(p0Doc));
-        if (geomRef.current) {
-          geomRef.current.total = total;
-          geomRef.current.getPointAtLength = (s: number) =>
-            tmp.getPointAtLength(s);
-        }
-      }
-
       const forward =
         t <= HIT_AT ? t / HIT_AT : 1 - (t - HIT_AT) / (1 - HIT_AT);
 
