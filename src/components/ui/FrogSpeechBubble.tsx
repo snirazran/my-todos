@@ -10,6 +10,7 @@ interface FrogSpeechBubbleProps {
   done: number;
   total: number;
   giftsClaimed: number;
+  clickedAt?: number;
 }
 
 export function FrogSpeechBubble({
@@ -18,6 +19,7 @@ export function FrogSpeechBubble({
   total,
   giftsClaimed,
   isCatching,
+  clickedAt = 0,
 }: FrogSpeechBubbleProps & { isCatching?: boolean }) {
   const slots = useProgressLogic(done, total, giftsClaimed);
   const [message, setMessage] = useState('');
@@ -25,13 +27,23 @@ export function FrogSpeechBubble({
   const prevDoneRef = useRef(done);
   const prevGiftsRef = useRef(giftsClaimed);
   const prevCatchingRef = useRef(!!isCatching);
+  const prevClickedRef = useRef(clickedAt);
   const lastHandledDoneRef = useRef<number | null>(null);
+  const lastMessageRef = useRef('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const getRandom = (arr: string[]) =>
-    arr[Math.floor(Math.random() * arr.length)];
+  const getRandom = (arr: string[]) => {
+    const candidates = arr.filter((msg) => msg !== lastMessageRef.current);
+    if (candidates.length === 0) return arr[0];
+    const picked = candidates[Math.floor(Math.random() * candidates.length)];
+    lastMessageRef.current = picked;
+    return picked;
+  };
 
-  const getMessage = (currentDone: number) => {
+  const getMessage = (currentDone: number, isC?: boolean) => {
+    // 0. Catching? (Highest priority if active)
+    if (isC) return getRandom(FROG_MESSAGES.catching);
+
     // 1. Gift Ready?
     const readySlot = slots.find((s) => s.status === 'READY');
     if (readySlot) return getRandom(FROG_MESSAGES.gift_ready);
@@ -68,23 +80,25 @@ export function FrogSpeechBubble({
   };
 
   useEffect(() => {
-    // Trigger if:
-    // 1. done count INCREASED
-    // 2. gifts claimed changed
-    // 3. isCatching switched to true (start of animation)
-
     const doneIncreased = done > prevDoneRef.current;
     const giftsChanged = giftsClaimed !== prevGiftsRef.current;
     const catchingStarted = !!isCatching && !prevCatchingRef.current;
+    const frogClicked = clickedAt > prevClickedRef.current;
 
+    // Handle Clicks (Tickles) - Highest Priority
+    if (frogClicked) {
+      setMessage(getRandom(FROG_MESSAGES.click));
+      setIsVisible(true);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => setIsVisible(false), 3000);
+    }
     // Also show on initial load if there are tasks and we haven't shown a message yet
-    const isInitial =
+    else if (
       prevDoneRef.current === done &&
       prevGiftsRef.current === giftsClaimed &&
       total > 0 &&
-      !message;
-
-    if (isInitial) {
+      !message
+    ) {
       setMessage(getRandom(FROG_MESSAGES.welcome));
       setIsVisible(true);
 
@@ -97,7 +111,7 @@ export function FrogSpeechBubble({
       const effectiveDone = done + 1;
       lastHandledDoneRef.current = effectiveDone;
 
-      const newMessage = getMessage(effectiveDone);
+      const newMessage = getMessage(effectiveDone, true);
       setMessage(newMessage);
       setIsVisible(true);
 
@@ -134,7 +148,8 @@ export function FrogSpeechBubble({
     prevDoneRef.current = done;
     prevGiftsRef.current = giftsClaimed;
     prevCatchingRef.current = !!isCatching;
-  }, [done, total, giftsClaimed, rate, slots, message, isCatching]);
+    prevClickedRef.current = clickedAt;
+  }, [done, total, giftsClaimed, rate, slots, message, isCatching, clickedAt]);
 
   const isLongMessage = message.length > 33;
 

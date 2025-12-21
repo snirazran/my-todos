@@ -50,8 +50,8 @@ export function RewardPopup({
   // 3. Use frozenIndex for data content
   const activeIndex = frozenIndex ?? dailyGiftCount;
 
-  const giftId = `gift_box_${activeIndex + 1}`;
-  const giftBoxItem = byId[giftId] || byId['gift_box_1'];
+  const giftId = 'gift_box_1';
+  const giftBoxItem = byId[giftId];
 
   const giftConfig = giftBoxItem
     ? RARITY_CONFIG[giftBoxItem.rarity]

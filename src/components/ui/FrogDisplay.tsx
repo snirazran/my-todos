@@ -45,6 +45,7 @@ export function FrogDisplay({
 }: Props) {
   const { data: session } = useSession();
   const { unseenCount } = useInventory();
+  const [clickedAt, setClickedAt] = React.useState(0);
 
   return (
     // Added mb-12 to create the requested space from the tabs below
@@ -58,7 +59,10 @@ export function FrogDisplay({
         ref={frogBoxRef}
         className="relative z-20 transition-transform duration-500 -translate-y-3.5 pointer-events-none "
       >
-        <div className="pointer-events-auto">
+        <div 
+          className="pointer-events-auto cursor-pointer" 
+          onClick={() => setClickedAt(Date.now())}
+        >
           <Frog
             ref={frogRef}
             mouthOpen={!!mouthOpen}
@@ -74,6 +78,7 @@ export function FrogDisplay({
             total={total}
             giftsClaimed={giftsClaimed}
             isCatching={isCatching}
+            clickedAt={clickedAt}
           />
         )}
       </div>

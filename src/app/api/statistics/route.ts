@@ -55,9 +55,8 @@ export async function POST(req: NextRequest) {
   // ACTION: CLAIM GIFT
   // ==========================================================
   if (body.action === 'claim_gift') {
-    const giftId = 'gift_box_1';
-
     if (isNewDay) {
+      const giftId = 'gift_box_1';
       updateQuery = {
         $set: {
           'statistics.daily': {
@@ -84,6 +83,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Grant Gift + Update High Water Mark
+      const giftId = 'gift_box_1';
       updateQuery = {
         $inc: { 
           'statistics.daily.dailyMilestoneGifts': 1,
