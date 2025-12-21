@@ -189,7 +189,8 @@ export default function Home() {
 
   const refreshToday = useCallback(async () => {
     if (!session) return;
-    const res = await fetch(`/api/tasks?date=${dateStr}`);
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
     const json = await res.json();
     setTasks((json.tasks ?? []).filter((t: Task) => !pendingIds.current.has(t.id)));
     setWeeklyIds(new Set(json.weeklyIds ?? []));
@@ -211,7 +212,8 @@ export default function Home() {
     setLoading(true);
     (async () => {
       try {
-        const res = await fetch(`/api/tasks?date=${dateStr}`);
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
         const json = await res.json();
         setTasks((json.tasks ?? []).filter((t: Task) => !pendingIds.current.has(t.id)));
         setWeeklyIds(new Set(json.weeklyIds ?? []));
@@ -271,10 +273,11 @@ export default function Home() {
         setTasks((prev) => sortTasks(prev));
       }
 
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const res = await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, taskId, completed }),
+        body: JSON.stringify({ date: dateStr, taskId, completed, timezone: tz }),
       });
       if (res.ok) {
         try {

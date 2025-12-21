@@ -172,6 +172,7 @@ export default function TaskList({
       forceState === true || (forceState === undefined && !task.completed);
 
     if (isCompleting) {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       // Fire and forget the stats update
       fetch('/api/statistics', {
         method: 'POST',
@@ -179,6 +180,7 @@ export default function TaskList({
         body: JSON.stringify({
           action: 'complete_task',
           taskId: task.id,
+          timezone: tz,
         }),
       }).catch((err) => console.error('Failed to update stats', err));
     }

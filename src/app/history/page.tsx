@@ -118,8 +118,9 @@ export default function HistoryPage() {
 
         const fromStr = format(fromDate, 'yyyy-MM-dd');
         const toStr = format(toDate, 'yyyy-MM-dd');
+        const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-        const res = await fetch(`/api/history?from=${fromStr}&to=${toStr}`);
+        const res = await fetch(`/api/history?from=${fromStr}&to=${toStr}&timezone=${encodeURIComponent(userTimezone)}`);
         if (!res.ok) throw new Error('Failed to fetch');
         
         const data = await res.json();

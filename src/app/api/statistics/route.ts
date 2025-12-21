@@ -28,8 +28,15 @@ export async function POST(req: NextRequest) {
 
   if (!user) return json({ error: 'User not found' }, 404);
 
-  // 1. Determine Date
-  const today = new Date().toISOString().split('T')[0];
+  const userTimezone = body.timezone || 'UTC';
+
+  // 1. Determine Date in User Timezone
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: userTimezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
 
   // 2. Get current stats
   const currentStats = user.statistics?.daily ?? {

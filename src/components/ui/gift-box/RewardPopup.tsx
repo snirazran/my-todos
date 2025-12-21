@@ -72,10 +72,11 @@ export function RewardPopup({
         return;
       }
 
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const statsReq = await fetch('/api/statistics', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'claim_gift' }),
+        body: JSON.stringify({ action: 'claim_gift', timezone: tz }),
       });
 
       if (!statsReq.ok) {

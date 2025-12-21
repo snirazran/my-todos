@@ -6,10 +6,7 @@ import { authOptions } from '@/lib/authOptions';
 import { Types } from 'mongoose';
 import connectMongo from '@/lib/mongoose';
 import TaskModel, { type TaskDoc, type Weekday } from '@/lib/models/Task';
-
-const pad = (n: number) => String(n).padStart(2, '0');
-const ymdLocal = (d: Date) =>
-  `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+import { format, parseISO, subDays, isBefore, isAfter, parse } from 'date-fns';
 
 /* ---------- GET  /api/history ---------- */
 export async function GET(req: NextRequest) {
@@ -27,50 +24,40 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const fromParam = url.searchParams.get('from');
     const toParam = url.searchParams.get('to');
+    const userTimezone = url.searchParams.get('timezone') || 'UTC';
 
-    let endDate = new Date();
-    if (toParam) {
-      endDate = new Date(toParam);
-    }
-    
-    // Default to 30 days ago if no 'from' is provided
-    let startDate = new Date();
-    if (fromParam) {
-      startDate = new Date(fromParam);
-    } else {
-      startDate.setDate(endDate.getDate() - 30);
-    }
+    // Determine Date Range (Local YYYY-MM-DD strings)
+    const today = new Date();
+    const toDate = toParam ? parseISO(toParam) : today;
+    const fromDate = fromParam ? parseISO(fromParam) : subDays(toDate, 30);
 
-    // Normalize to midnight for consistent comparisons
-    // Note: ymdLocal handles the string format, but for the loop we want Date objects
-    
+    // Generate array of date strings [YYYY-MM-DD] inclusive
     const dates: string[] = [];
-    const loopDate = new Date(endDate);
-    
-    // Generate dates from End to Start (descending) to match existing order preference, 
-    // or we can sort later. Let's loop naturally.
-    // Actually, the original loop was "last 30 days" (descending effectively?). 
-    // Let's just generate the array of YYYY-MM-DD strings in the range.
-    
-    // We'll iterate from endDate down to startDate to keep the 'descending' nature
-    // or we can just sort at the end.
-    
-    const curr = new Date(endDate);
-    while (curr >= startDate) {
-      dates.push(ymdLocal(curr));
+    let curr = new Date(toDate);
+    while (curr >= fromDate) {
+      dates.push(format(curr, 'yyyy-MM-dd'));
       curr.setDate(curr.getDate() - 1);
     }
 
-    const cutoff = ymdLocal(startDate);
-    const endStr = ymdLocal(endDate);
+    const startStr = format(fromDate, 'yyyy-MM-dd');
+    const endStr = format(toDate, 'yyyy-MM-dd');
 
-    // Fetch tasks needed to render history
-    // For regular tasks: date >= cutoff AND date <= endStr
+    // Helper to get YYYY-MM-DD in user's timezone
+    const getZonedYMD = (d: Date) => {
+      return new Intl.DateTimeFormat('en-CA', { // en-CA gives YYYY-MM-DD
+        timeZone: userTimezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+      }).format(d);
+    };
+
+    // Fetch tasks
     const tasks = await TaskModel.find(
       {
         userId,
         $or: [
-          { type: 'regular', date: { $gte: cutoff, $lte: endStr } },
+          { type: 'regular', date: { $gte: startStr, $lte: endStr } },
           { type: 'weekly' },
         ],
       },
@@ -86,6 +73,7 @@ export async function GET(req: NextRequest) {
         suppressedDates: 1,
         createdAt: 1,
         deletedAt: 1,
+        tags: 1,
       }
     )
       .lean<TaskDoc[]>()
@@ -96,62 +84,59 @@ export async function GET(req: NextRequest) {
       text: string;
       order: number;
       completed: boolean;
-      type: 'weekly' | 'regular'; // Added type for UI filtering/badges
+      type: 'weekly' | 'regular';
+      tags?: string[];
     };
 
     const byDate: Record<string, HistoryTask[]> = {};
 
-    for (const date of dates) {
-      const dt = new Date(date);
-      const dow = dt.getDay() as Weekday;
+    for (const dateStr of dates) {
+      // Robust DOW: Force UTC noon to avoid timezone shifts
+      const dow = new Date(`${dateStr}T12:00:00Z`).getUTCDay() as Weekday;
 
       const dayTasks = tasks
         .filter((t: TaskDoc) => {
-          // 1. Check if task matches the day (Regular vs Weekly)
+          // 1. Check if task matches the day
           let matchesDay = false;
-          if (t.type === 'regular') matchesDay = t.date === date;
-          else if (t.type === 'weekly') matchesDay = t.dayOfWeek === dow;
+          if (t.type === 'regular') {
+            matchesDay = t.date === dateStr;
+          } else if (t.type === 'weekly') {
+            matchesDay = t.dayOfWeek === dow;
+          }
           
           if (!matchesDay) return false;
 
-          // 2. Check Lifespan (Creation)
-          // If createdAt is available, ensure the task existed on 'date'
+          // 2. Check Lifespan (Creation) - in User Timezone
           if (t.createdAt) {
-             const createdYMD = ymdLocal(t.createdAt);
-             if (createdYMD > date) return false;
+             const createdYMD = getZonedYMD(t.createdAt);
+             if (createdYMD > dateStr) return false;
           }
 
-          // 3. Check Lifespan (Deletion)
-          // If deletedAt is available, ensure it wasn't deleted BEFORE 'date'
+          // 3. Check Lifespan (Deletion) - in User Timezone
           if (t.deletedAt) {
-             const deletedYMD = ymdLocal(t.deletedAt);
-             if (deletedYMD < date) return false;
+             const deletedYMD = getZonedYMD(t.deletedAt);
+             if (deletedYMD < dateStr) return false;
           }
 
           return true;
         })
-        .filter((t: TaskDoc) => !(t.suppressedDates ?? []).includes(date))
+        .filter((t: TaskDoc) => !(t.suppressedDates ?? []).includes(dateStr))
         .map(
           (t): HistoryTask => ({
             id: t.id,
             text: t.text,
             order: t.order ?? 0,
             completed:
-              (t.completedDates ?? []).includes(date) ||
+              (t.completedDates ?? []).includes(dateStr) ||
               (!!t.completed && t.type === 'regular'),
             type: t.type as 'weekly' | 'regular',
+            tags: t.tags,
           })
         )
-        // Only include completed tasks in history? 
-        // The prompt says "view tasks i did in the past".
-        // The original code returned *all* tasks for that day and checked 'completed'.
-        // To be a true history of "what I did", we usually only show completed ones,
-        // OR we show everything to show what was missed.
-        // The original code included everything. Let's keep it that way but maybe the UI filters it.
         .sort((a: HistoryTask, b: HistoryTask) => a.order - b.order);
 
       if (dayTasks.length) {
-        byDate[date] = dayTasks;
+        byDate[dateStr] = dayTasks;
       }
     }
 

@@ -43,7 +43,8 @@ export default function ManageTasksPage() {
 
   const fetchWeek = async () => {
     try {
-      const res = await fetch('/api/tasks?view=board');
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res = await fetch(`/api/tasks?view=board&timezone=${encodeURIComponent(tz)}`);
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as Task[][];
       if (Array.isArray(data)) setWeek(mapApiToDisplay(data));
@@ -70,12 +71,14 @@ export default function ManageTasksPage() {
   const saveDay = async (displayDay: DisplayDay, tasks: Task[]) => {
     const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
     try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       await fetch('/api/tasks?view=board', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           day: apiDayFromDisplay(displayDay), // 7 -> -1, else 0..6
           tasks: ordered,
+          timezone: tz,
         }),
       });
     } catch (e) {
@@ -86,12 +89,14 @@ export default function ManageTasksPage() {
   /** Delete from one display column (maps -> API day) */
   const removeTask = async (displayDay: DisplayDay, id: string) => {
     try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       await fetch('/api/tasks?view=board', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           day: apiDayFromDisplay(displayDay), // 7 -> -1, else 0..6
           taskId: id,
+          timezone: tz,
         }),
       });
     } finally {
@@ -116,13 +121,14 @@ export default function ManageTasksPage() {
     repeat: 'this-week' | 'weekly';
     tags: string[];
   }) => {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     await fetch('/api/tasks?view=board', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, days, repeat, tags }),
+      body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
     });
 
-    const data = (await fetch('/api/tasks?view=board').then((r) =>
+    const data = (await fetch(`/api/tasks?view=board&timezone=${encodeURIComponent(tz)}`).then((r) =>
       r.json()
     )) as Task[][];
     setWeek(mapApiToDisplay(data));

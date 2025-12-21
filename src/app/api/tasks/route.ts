@@ -28,7 +28,6 @@ type FlyStatus = {
 
 const DAILY_FLY_LIMIT = 15;
 
-const pad = (n: number) => String(n).padStart(2, '0');
 const isWeekday = (n: number): n is Weekday =>
   Number.isInteger(n) && n >= 0 && n <= 6;
 
@@ -40,51 +39,71 @@ function unauth() {
   return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 }
 
-function ymdLocal(d: Date) {
-  const y = d.getFullYear();
-  const m = pad(d.getMonth() + 1);
-  const day = pad(d.getDate());
-  return `${y}-${m}-${day}`;
-}
-function dowLocalFromYMD(ymd: string) {
-  const [y, m, d] = ymd.split('-').map(Number);
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1);
-  return dt.getDay() as Weekday;
-}
-function atLocalMidnight(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-}
-function sundayOf(date = new Date()) {
-  const base = atLocalMidnight(date);
-  const sun = new Date(base);
-  sun.setDate(base.getDate() - base.getDay());
-  return sun;
-}
-function getWeekDates(start = sundayOf()) {
-  const weekStart = ymdLocal(start);
-  const weekDates: string[] = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    return ymdLocal(d);
-  });
-  return { weekStart, weekDates };
-}
-function getRollingWeekDates(start = sundayOf()) {
-  const { weekStart, weekDates } = getWeekDates(start);
-  const today = ymdLocal(new Date());
+// --- Timezone Helpers ---
 
+function getZonedYMD(d: Date, tz: string) {
+  try {
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: tz,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  } catch (e) {
+    // Fallback for invalid timezone
+    console.warn('Invalid timezone:', tz);
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'UTC',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  }
+}
+
+function getZonedToday(tz: string) {
+  return getZonedYMD(new Date(), tz);
+}
+
+function getRollingWeekDatesZoned(tz: string) {
+  const todayYMD = getZonedToday(tz);
+  
+  // Pivot around UTC Noon to avoid DST/timezone shifts during math
+  const todayDate = new Date(`${todayYMD}T12:00:00Z`);
+  const dow = todayDate.getUTCDay(); // 0..6
+
+  // Find Sunday
+  const sundayDate = new Date(todayDate);
+  sundayDate.setUTCDate(todayDate.getUTCDate() - dow);
+
+  const weekStart = sundayDate.toISOString().split('T')[0]; // YYYY-MM-DD
+  const weekDates: string[] = [];
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sundayDate);
+    d.setUTCDate(sundayDate.getUTCDate() + i);
+    const dateStr = d.toISOString().split('T')[0];
+    weekDates.push(dateStr);
+  }
+
+  // Rolling logic: if date is strictly before today, push it to next week
   const rollingDates = weekDates.map((date) => {
-    if (date < today) {
-      const [y, m, d] = date.split('-').map(Number);
-      const dt = new Date(y, m - 1, d);
-      dt.setDate(dt.getDate() + 7);
-      return ymdLocal(dt);
+    if (date < todayYMD) {
+      const d = new Date(`${date}T12:00:00Z`);
+      d.setUTCDate(d.getUTCDate() + 7);
+      return d.toISOString().split('T')[0];
     }
     return date;
   });
 
-  return { weekStart, weekDates: rollingDates };
+  return { weekStart, weekDates: rollingDates, todayYMD };
 }
+
+function dowFromYMD(ymd: string) {
+  // YYYY-MM-DD -> DOW (0-6) using UTC noon
+  return new Date(`${ymd}T12:00:00Z`).getUTCDay() as Weekday;
+}
+
 function isBoardMode(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   return (
@@ -115,8 +134,8 @@ function normalizeDailyFly(
   return initDailyFly(today);
 }
 
-async function currentFlyStatus(userId: Types.ObjectId): Promise<FlyStatus> {
-  const today = ymdLocal(new Date());
+async function currentFlyStatus(userId: Types.ObjectId, tz: string): Promise<FlyStatus> {
+  const today = getZonedToday(tz);
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
   }).lean()) as LeanUser;
@@ -160,9 +179,10 @@ async function currentFlyStatus(userId: Types.ObjectId): Promise<FlyStatus> {
 
 async function awardFlyForTask(
   userId: Types.ObjectId,
-  taskId: string
+  taskId: string,
+  tz: string
 ): Promise<{ awarded: boolean; flyStatus: FlyStatus }> {
-  const today = ymdLocal(new Date());
+  const today = getZonedToday(tz);
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
   }).lean()) as LeanUser;
@@ -251,10 +271,12 @@ export async function GET(req: NextRequest) {
   if (!uid) return unauth();
   await connectMongo();
 
+  const tz = req.nextUrl.searchParams.get('timezone') || 'UTC';
+
   if (isBoardMode(req)) {
-    return handleBoardGet(req, uid);
+    return handleBoardGet(req, uid, tz);
   }
-  return handleDailyGet(req, uid);
+  return handleDailyGet(req, uid, tz);
 }
 
 /* ====================================================================== */
@@ -265,12 +287,12 @@ export async function POST(req: NextRequest) {
   if (!uid) return unauth();
   await connectMongo();
 
-  // For now, POST is used by the board (weekly/backlog/one-time)
   const body = await req.json();
+  const tz = body.timezone || 'UTC';
+  
   const text = String(body?.text ?? '').trim();
   const rawDays: number[] = Array.isArray(body?.days) ? body.days : [];
   const tags: string[] = Array.isArray(body?.tags) ? body.tags.map(String) : [];
-  console.log('Creating task with tags:', tags);
   const repeat: 'weekly' | 'this-week' | 'backlog' =
     body?.repeat === 'backlog' ? 'backlog' :
     body?.repeat === 'this-week' ? 'this-week' : 'weekly';
@@ -279,7 +301,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'text is required' }, { status: 400 });
   }
 
-  // If repeat is backlog, we automatically target d = -1
   const days = repeat === 'backlog' ? [-1] : rawDays
     .map(Number)
     .filter(Number.isInteger)
@@ -292,7 +313,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { weekStart, weekDates } = getRollingWeekDates();
+  const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
   const now = new Date();
 
   if (repeat === 'weekly') {
@@ -321,7 +342,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // One-time tasks: either backlog (-1) or regular (specific weekday)
+  // One-time tasks
   for (const d of days) {
     const id = uuid();
     if (d === -1) {
@@ -369,10 +390,11 @@ export async function PUT(req: NextRequest) {
   await connectMongo();
 
   const body = await req.json();
+  const tz = body.timezone || 'UTC';
 
   // Board reorder/update
   if (body && Object.prototype.hasOwnProperty.call(body, 'day')) {
-    return handleBoardPut(uid, body);
+    return handleBoardPut(uid, body, tz);
   }
 
   // Daily toggle or update tags
@@ -393,12 +415,10 @@ export async function PUT(req: NextRequest) {
   }
 
   if (tags) {
-      // Just update tags
       await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: { tags } });
       return NextResponse.json({ ok: true });
   }
 
-  // Ensure completed is boolean if provided (for daily toggle)
   if (typeof completed !== 'boolean') {
       return NextResponse.json({ error: 'completed must be boolean' }, { status: 400 });
   }
@@ -412,7 +432,6 @@ export async function PUT(req: NextRequest) {
       ? { $addToSet: { completedDates: date } }
       : { $pull: { completedDates: date } };
 
-  // Also keep the legacy "completed" flag for one-time tasks
   if (doc.type === 'regular') {
     (update as any).$set = { ...(update as any).$set, completed };
   }
@@ -421,9 +440,9 @@ export async function PUT(req: NextRequest) {
 
   let flyStatus: FlyStatus | undefined;
   if (completed && !alreadyCompletedForDate) {
-    ({ flyStatus } = await awardFlyForTask(uid, taskId));
+    ({ flyStatus } = await awardFlyForTask(uid, taskId, tz));
   } else {
-    flyStatus = await currentFlyStatus(uid);
+    flyStatus = await currentFlyStatus(uid, tz);
   }
 
   return NextResponse.json({ ok: true, flyStatus });
@@ -438,10 +457,11 @@ export async function DELETE(req: NextRequest) {
   await connectMongo();
 
   const body = await req.json();
+  const tz = body.timezone || 'UTC';
 
   // Board delete
   if (body && Object.prototype.hasOwnProperty.call(body, 'day')) {
-    return handleBoardDelete(uid, body);
+    return handleBoardDelete(uid, body, tz);
   }
 
   // Daily delete/suppress
@@ -474,20 +494,18 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
 
-  // backlog shouldn't appear in daily view
   return NextResponse.json({ ok: true });
 }
 
 /* ====================================================================== */
 /* Helpers: daily view                                                    */
 /* ====================================================================== */
-async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
-  // default to *local* today
+async function handleDailyGet(req: NextRequest, userId: Types.ObjectId, tz: string) {
   const url = new URL(req.url);
   const dateParam = url.searchParams.get('date');
-  const todayLocal = ymdLocal(new Date());
+  const todayLocal = getZonedToday(tz);
   const date = dateParam ?? todayLocal;
-  const dow = dowLocalFromYMD(date);
+  const dow = dowFromYMD(date);
 
   const tasks: TaskDoc[] = await TaskModel.find(
     {
@@ -539,17 +557,16 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
       return (a.order ?? 0) - (b.order ?? 0);
     });
 
-  const flyStatus = await currentFlyStatus(userId);
+  const flyStatus = await currentFlyStatus(userId, tz);
 
   // === NEW: FETCH GIFT COUNT ===
-  // We match the 'writer' logic from /api/statistics which uses ISO String
-  const todayISO = new Date().toISOString().split('T')[0];
+  // Use user's today string for stats lookup
   const userForStats = (await UserModel.findById(userId, {
     statistics: 1,
   }).lean()) as LeanUser;
 
   let dailyGiftCount = 0;
-  if (userForStats?.statistics?.daily?.date === todayISO) {
+  if (userForStats?.statistics?.daily?.date === todayLocal) {
     dailyGiftCount = userForStats.statistics.daily.dailyMilestoneGifts ?? 0;
   }
 
@@ -558,16 +575,16 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId) {
     tasks: output,
     weeklyIds: Array.from(weeklyIdsForUI),
     flyStatus,
-    dailyGiftCount, // <--- Return to frontend
+    dailyGiftCount,
   });
 }
 
 /* ====================================================================== */
 /* Helpers: board view (weekly/backlog manager)                           */
 /* ====================================================================== */
-async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
+async function handleBoardGet(req: NextRequest, uid: Types.ObjectId, tz: string) {
   const Task = TaskModel;
-  const { weekStart, weekDates } = getRollingWeekDates();
+  const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
 
   const dayParam = req.nextUrl.searchParams.get('day');
 
@@ -732,7 +749,8 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId) {
 
 async function handleBoardPut(
   uid: Types.ObjectId,
-  body: { day: number; tasks: Array<{ id: string; text?: string; tags?: string[] }> }
+  body: { day: number; tasks: Array<{ id: string; text?: string; tags?: string[] }> },
+  tz: string
 ) {
   const { day, tasks } = body;
   if (!Number.isInteger(day) || (day !== -1 && !isWeekday(day))) {
@@ -743,7 +761,7 @@ async function handleBoardPut(
   }
 
   const now = new Date();
-  const { weekStart, weekDates } = getRollingWeekDates();
+  const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
 
   // Reorder/update the Later bucket
   if (day === -1) {
@@ -762,7 +780,6 @@ async function handleBoardPut(
       id: { $nin: ids },
     });
 
-    // Fetch any existing docs (any type) to preserve text and tags
     const docs: TaskDoc[] = await TaskModel.find(
       { userId: uid, id: { $in: ids } },
       { id: 1, text: 1, type: 1, tags: 1 }
@@ -770,14 +787,12 @@ async function handleBoardPut(
       .lean<TaskDoc[]>()
       .exec();
 
-    // Prefer DB text; fall back to request payload text so backlog entries never go blank
     const textFromReq = new Map(
       (tasks as Array<{ id: string; text?: string }>).map((t) => [
         t.id,
         t.text ?? '',
       ])
     );
-    // Prefer Request tags (client is truth); fall back to DB
     const tagsFromReq = new Map(
       (tasks as Array<{ id: string; tags?: string[] }>).map((t) => [
         t.id,
@@ -792,7 +807,6 @@ async function handleBoardPut(
       tagsById.set(d.id, d.tags ?? []);
     }
 
-    // Upsert backlog entries in the given order
     await Promise.all(
       ids.map((id, i) =>
         TaskModel.updateOne(
@@ -819,7 +833,6 @@ async function handleBoardPut(
       )
     );
 
-    // Convert any weekly/regular with these ids into backlog (remove old types)
     await TaskModel.deleteMany({
       userId: uid,
       id: { $in: ids },
@@ -834,7 +847,6 @@ async function handleBoardPut(
   const batch = tasks as Array<{ id: string; text?: string; tags?: string[] }>;
   const ids = batch.map((t) => t.id);
 
-  // Remove one-time (regular) not present anymore
   await TaskModel.deleteMany({
     userId: uid,
     type: 'regular',
@@ -842,7 +854,6 @@ async function handleBoardPut(
     id: { $nin: ids },
   });
 
-  // Get current types/text/tags for all involved ids
   const docs: TaskDoc[] = await TaskModel.find(
     { userId: uid, id: { $in: ids } },
     { id: 1, type: 1, text: 1, tags: 1 }
@@ -858,14 +869,11 @@ async function handleBoardPut(
     batch.map((t, i) => {
       const ttype = typeById.get(t.id);
       const textFromReq = t.text ?? textById.get(t.id) ?? '';
-      // Prioritize request tags (from client state) -> fallback to DB -> fallback to empty
       const tags = t.tags ?? tagsById.get(t.id) ?? [];
 
       if (ttype === 'weekly') {
-        // just move/renumber the weekly item
         return TaskModel.updateOne(
           { userId: uid, type: 'weekly', id: t.id },
-          // Ensure we update tags if they differ or are missing in DB
           {
             $set: {
               dayOfWeek: weekday,
@@ -877,10 +885,8 @@ async function handleBoardPut(
         );
       }
       if (ttype === 'regular') {
-        // move/renumber inside this week
         return TaskModel.updateOne(
           { userId: uid, type: 'regular', id: t.id },
-          // Ensure we update tags
           {
             $set: {
               date: weekDates[weekday],
@@ -892,7 +898,6 @@ async function handleBoardPut(
         );
       }
       if (ttype === 'backlog') {
-        // promote backlog + one-time on that weekday
         return Promise.all([
           TaskModel.deleteOne({
             userId: uid,
@@ -922,7 +927,6 @@ async function handleBoardPut(
         ]);
       }
 
-      // Fallback: id not found (treat as new one-time on this weekday)
       return TaskModel.updateOne(
         { userId: uid, type: 'regular', id: t.id },
         {
@@ -950,7 +954,8 @@ async function handleBoardPut(
 
 async function handleBoardDelete(
   uid: Types.ObjectId,
-  body: { day: number; taskId: string }
+  body: { day: number; taskId: string },
+  tz: string
 ) {
   const { day, taskId } = body;
   if (!taskId) {
@@ -965,9 +970,8 @@ async function handleBoardDelete(
 
   const Task = TaskModel;
 
-  // Delete from Later (backlog)
   if (day === -1) {
-    const { weekStart } = getWeekDates();
+    const { weekStart } = getRollingWeekDatesZoned(tz);
     await Task.deleteOne({
       userId: uid,
       type: 'backlog',
@@ -977,25 +981,22 @@ async function handleBoardDelete(
     return NextResponse.json({ ok: true });
   }
 
-  // Determine the type for this id
   const doc = await Task.findOne({ userId: uid, id: taskId }, { type: 1 })
     .lean<TaskDoc>()
     .exec();
 
   if (doc?.type === 'regular') {
-    // remove just the one-time instance
     await Task.deleteOne({ userId: uid, type: 'regular', id: taskId });
     return NextResponse.json({ ok: true });
   }
 
-  // weekly: soft delete so history is preserved
   await Task.updateOne(
     { userId: uid, type: 'weekly', id: taskId },
     { $set: { deletedAt: new Date() } }
   );
 
-  // also remove any future one-time clones with the same id (safety)
-  const today = ymdLocal(new Date());
+  // Remove future instances relative to user's today
+  const today = getZonedToday(tz);
   await Task.deleteMany({
     userId: uid,
     type: 'regular',
