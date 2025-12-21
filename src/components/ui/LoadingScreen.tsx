@@ -11,8 +11,11 @@ interface LoadingScreenProps {
 function ThemeMorphLoader() {
   return (
     <div className="relative flex items-center justify-center w-24 h-24">
+      {/* Static Shadow - Separated so it doesn't spin */}
+      <div className="absolute w-12 h-12 bg-purple-500/40 blur-xl rounded-full translate-y-2" />
+
       {/* The Morphing Shape */}
-      <div className="w-12 h-12 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 shadow-xl shadow-purple-500/30 animate-[morph-spin_2s_ease-in-out_infinite]" />
+      <div className="relative w-12 h-12 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl animate-[morph-spin_2s_ease-in-out_infinite]" />
 
       <style jsx>{`
         @keyframes morph-spin {
