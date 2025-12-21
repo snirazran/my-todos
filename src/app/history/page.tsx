@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft, Calendar as CalendarIcon, Loader2, Tag } from 'lucide-react';
 import { subDays, startOfToday, format, startOfYesterday } from 'date-fns';
@@ -28,6 +29,7 @@ const FLY_PX = 24;
 
 export default function HistoryPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [filter, setFilter] = useState<DateRangeOption>('7d');
   const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
   
@@ -76,8 +78,8 @@ export default function HistoryPage() {
   // Initial Data Fetch (Balance + History)
   useEffect(() => {
     if (status === 'loading') return;
-    if (!session) {
-      setLoading(false);
+    if (status === 'unauthenticated') {
+      router.push('/login');
       return;
     }
 

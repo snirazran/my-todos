@@ -3,8 +3,10 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
-import { ItemDef } from '@/lib/skins/catalog';
+import { ItemDef, byId } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
 import { RARITY_CONFIG } from './constants';
 import { RotatingRays } from './RotatingRays';
@@ -21,11 +23,14 @@ export default function GiftBoxOpening({
   onWin?: (item: ItemDef) => void;
   giftBoxId?: string;
 }) {
+  const { data: session } = useSession();
+  const router = useRouter();
   const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
   const [prize, setPrize] = useState<ItemDef | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [loadingText, setLoadingText] = useState(FUNNY_SENTENCES[0]);
   const [mounted, setMounted] = useState(false);
+  const [showGuestPrompt, setShowGuestPrompt] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -48,6 +53,17 @@ export default function GiftBoxOpening({
       const animationPromise = new Promise((resolve) =>
         setTimeout(resolve, 2000)
       );
+
+      // GUEST MODE: Skip API
+      if (!session) {
+        await animationPromise;
+        // Guest always wins Wizard Hat
+        const guestPrize = byId['hat_wizard'] || byId['skin_teal'];
+        setPrize(guestPrize);
+        if (onWin) onWin(guestPrize);
+        setPhase('revealed');
+        return;
+      }
 
       // 2. API call promise
       const apiPromise = fetch('/api/skins/open-gift', {
@@ -78,6 +94,10 @@ export default function GiftBoxOpening({
   };
 
   const handleClaim = () => {
+    if (!session) {
+      setShowGuestPrompt(true);
+      return;
+    }
     // Prize is already in inventory from the open-gift API call
     // Just close the modal
     onClose();
@@ -155,6 +175,48 @@ export default function GiftBoxOpening({
           )}
         </AnimatePresence>
       </div>
+
+      {/* --- GUEST PROMPT OVERLAY --- */}
+      <AnimatePresence>
+        {showGuestPrompt && (
+          <div className="absolute inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/60 backdrop-blur-md"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm overflow-hidden bg-white shadow-2xl rounded-3xl dark:bg-slate-900"
+            >
+              <div className="relative h-32 bg-gradient-to-br from-amber-400 to-orange-500">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-6xl animate-bounce">👑</span>
+                </div>
+              </div>
+              <div className="p-6 text-center">
+                <h3 className="mb-2 text-2xl font-black text-slate-900 dark:text-white">
+                  Save Your Prize!
+                </h3>
+                <p className="mb-6 text-slate-500 dark:text-slate-400">
+                  To add this <span className="font-bold text-amber-500">Legendary Wizard Hat</span> to your collection, you need to sign in.
+                </p>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={() => router.push('/register')}
+                    className="w-full py-3.5 text-lg font-bold text-white transition-transform rounded-xl bg-slate-900 hover:bg-slate-800 active:scale-95 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+                  >
+                    Sign Up & Claim
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>,
     document.body
   );

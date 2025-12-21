@@ -44,7 +44,7 @@ export function FrogDisplay({
   isCatching,
 }: Props) {
   const { data: session } = useSession();
-  const { unseenCount } = useInventory(!!session);
+  const { unseenCount } = useInventory();
 
   return (
     // Added mb-12 to create the requested space from the tabs below

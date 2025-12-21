@@ -12,36 +12,44 @@ export default function MobileNav() {
   const router = useRouter();
   const { data: session } = useSession();
   const { openWardrobe } = useUIStore();
-  const { unseenCount } = useInventory(!!session);
+  const { unseenCount } = useInventory(); // Always fetch
 
-  if (!session) return null;
+  const handleNavigation = (path: string) => {
+    if (!session) {
+      router.push('/login');
+      return;
+    }
+    router.push(path);
+  };
 
   const navItems = [
     {
       href: '/',
       label: 'Today',
       icon: Home,
+      // Home is safe for everyone
     },
     {
       href: '/manage-tasks',
       label: 'Weekly',
       icon: LayoutDashboard,
+      protected: true,
     },
     {
       href: '/history',
       label: 'History',
       icon: History,
+      protected: true,
     },
     {
       label: 'Inventory',
       icon: Shirt,
       onClick: () => {
-        router.push('/');
-        // Small timeout to allow navigation to happen if needed, though state update is instant
-        // But since we are likely already mounted or will mount, setting state is fine.
+        // Inventory is allowed for guests (WardrobePanel handles guest state)
+        if (pathname !== '/') router.push('/');
         openWardrobe();
       },
-      isActive: false, // Inventory is a modal, not a page
+      isActive: false, 
     },
   ];
 
@@ -66,6 +74,7 @@ export default function MobileNav() {
             </>
           );
 
+          // Custom onClick handler (Inventory)
           if (item.onClick) {
             return (
               <button
@@ -82,10 +91,17 @@ export default function MobileNav() {
             );
           }
 
+          // Protected Routes Logic
           return (
-            <Link
+            <button
               key={item.href}
-              href={item.href!}
+              onClick={() => {
+                if (item.protected && !session) {
+                  router.push('/login');
+                } else {
+                  router.push(item.href!);
+                }
+              }}
               className={`flex flex-col items-center justify-center w-full h-full transition-colors ${
                 isActive
                   ? 'text-violet-600 dark:text-violet-400'
@@ -93,7 +109,7 @@ export default function MobileNav() {
               }`}
             >
               {content}
-            </Link>
+            </button>
           );
         })}
       </div>

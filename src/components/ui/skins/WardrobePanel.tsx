@@ -44,7 +44,7 @@ export function WardrobePanel({
   defaultTab?: 'inventory' | 'shop' | 'trade';
 }) {
   const { data: session } = useSession();
-  const { data, mutate, unseenItems, markItemSeen, markAllSeen } = useInventory(!!session); // shared hook
+  const { data, mutate, unseenItems, markItemSeen, markAllSeen } = useInventory(); // Always active
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
@@ -173,6 +173,11 @@ export function WardrobePanel({
   };
 
   const handleItemAction = (item: ItemDef) => {
+    if (!session) {
+      setNotif({ msg: 'Sign in to equip items!', type: 'error' });
+      return;
+    }
+
     // Mark as seen immediately when interacting (equipping or opening)
     if (unseenItems.includes(item.id)) {
       markItemSeen(item.id);
@@ -186,6 +191,11 @@ export function WardrobePanel({
   };
 
   const buyItem = async (item: ItemDef, e?: React.MouseEvent) => {
+    if (!session) {
+      setNotif({ msg: 'Sign in to buy items!', type: 'error' });
+      return;
+    }
+
     if (!data?.wardrobe) return;
     const balance = data.wardrobe.flies ?? 0;
     const price = item.priceFlies ?? 0;

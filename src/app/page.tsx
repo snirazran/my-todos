@@ -50,16 +50,17 @@ type FlyStatus = {
 };
 
 const demoTasks: Task[] = [
-  { id: 'g1', text: 'Meditation', completed: true, order: 1 },
-  { id: 'g2', text: 'Read a book', completed: true, order: 2 },
-  { id: 'g3', text: 'Walk 5,000 steps', completed: true, order: 3 },
-  { id: 'g4', text: 'Drink 2 liters of water', completed: true, order: 4 },
   {
-    id: 'g5',
+    id: 'g6',
     text: 'Check there is no monster under the bed',
     completed: false,
-    order: 5,
+    order: 1,
   },
+  { id: 'g1', text: 'Meditation', completed: true, order: 2 },
+  { id: 'g2', text: 'Read a book', completed: true, order: 3 },
+  { id: 'g3', text: 'Walk 5,000 steps', completed: true, order: 4 },
+  { id: 'g4', text: 'Drink 2 liters of water', completed: true, order: 5 },
+  { id: 'g5', text: 'Eat a healthy meal', completed: true, order: 6 },
 ];
 
 // === NEW HELPER: Calculate where the gifts should occur ===
@@ -106,7 +107,7 @@ export default function Home() {
     limitHit: false,
   });
 
-  const [dailyGiftCount, setDailyGiftCount] = useState(0);
+  const [dailyGiftCount, setDailyGiftCount] = useState(2);
   const [lastGiftTaskCount, setLastGiftTaskCount] = useState(0);
 
   const [laterThisWeek, setLaterThisWeek] = useState<
@@ -153,7 +154,7 @@ export default function Home() {
   const doneCount = data.filter((t) => t.completed).length;
   // Note: We don't rely purely on 'rate' anymore for triggering, but we keep it for the progress bar
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
-  const flyBalance = session ? flyStatus.balance : undefined;
+  const flyBalance = session ? flyStatus.balance : 5;
 
   // === UPDATED TRIGGER LOGIC ===
   useEffect(() => {
@@ -330,23 +331,6 @@ export default function Home() {
       <div className="px-4 py-6 mx-auto max-w-7xl md:px-8">
         <Header session={session} router={router} />
 
-        {!session && (
-          <div className="relative p-6 mb-6 overflow-hidden text-center rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm md:p-8">
-            <h2 className="mb-3 text-xl font-bold md:text-2xl text-slate-900 dark:text-white">
-              There’s a frog with a rumbling belly! 🐸
-            </h2>
-            <p className="mb-6 text-sm md:text-base text-slate-600 dark:text-slate-400">
-              Sign in to feed it by completing tasks!
-            </p>
-            <button
-              onClick={() => signIn('google')}
-              className="inline-flex items-center gap-2 px-6 py-2.5 text-base font-medium text-white shadow-md rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 transition-all"
-            >
-              Sign in / Create account
-            </button>
-          </div>
-        )}
-
         <div className="relative grid items-start grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-8">
           <div className="z-10 flex flex-col gap-4 lg:col-span-4 lg:sticky lg:top-8 lg:gap-6">
             <FrogDisplay
@@ -425,6 +409,21 @@ export default function Home() {
                   exit={{ opacity: 0, x: 10 }}
                   transition={{ duration: 0.2 }}
                 >
+                  {!session && (
+                    <div className="flex items-center gap-3 p-3 mb-4 border border-indigo-100 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/20 dark:border-indigo-800/50">
+                       <div className="flex items-center justify-center w-8 h-8 bg-white rounded-full shadow-sm dark:bg-slate-800 text-xl animate-bounce">
+                         🍽️
+                       </div>
+                       <div>
+                         <p className="text-sm font-bold text-indigo-900 dark:text-indigo-200">
+                           The Frog is Hungry!
+                         </p>
+                         <p className="text-xs text-indigo-700 dark:text-indigo-400">
+                           Catch a fly to make her happy and unlock a special <span className="font-bold">Gift</span>!
+                         </p>
+                       </div>
+                    </div>
+                  )}
                   <TaskList
                     tasks={data}
                     toggle={handleToggle}

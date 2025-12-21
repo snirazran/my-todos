@@ -46,7 +46,19 @@ async function ensureWardrobe(email: string) {
 
 export async function GET() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
+  
+  // Guest Mode
+  if (!session?.user?.email) {
+    return json({
+      wardrobe: {
+        equipped: {},
+        inventory: {},
+        flies: 5, // Match intro scene
+        unseenItems: [],
+      },
+      catalog: CATALOG,
+    });
+  }
 
   const wardrobe = await ensureWardrobe(session.user.email);
   if (!wardrobe) return json({ error: 'User not found' }, 404);

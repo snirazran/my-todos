@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, Variants } from 'framer-motion';
-import { Loader2, Sparkles } from 'lucide-react';
+import { Loader2, Gift, Sparkles } from 'lucide-react';
 import Frog from '@/components/ui/frog';
 import { ItemDef } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
@@ -224,12 +224,18 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
         {isProcessing ? (
           <>
             <Loader2 className="relative z-20 w-5 h-5 animate-spin" />
-            <span className="relative z-20">Claiming...</span>
+            <span className="relative z-20">
+              {prize.slot === 'container' ? 'Opening...' : 'Claiming...'}
+            </span>
           </>
         ) : (
           <>
-            <Sparkles className="relative z-20 w-5 h-5" />
-            <span className="relative z-20">Claim Reward</span>
+            {prize.slot !== 'container' && (
+              <Sparkles className="relative z-20 w-5 h-5" />
+            )}
+            <span className="relative z-20">
+              {prize.slot === 'container' ? 'Open Now' : 'Claim Reward'}
+            </span>
           </>
         )}
       </button>
