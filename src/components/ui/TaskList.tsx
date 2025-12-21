@@ -113,6 +113,7 @@ function SortableTaskItem({
           transition-all duration-200 cursor-pointer rounded-xl 
           border border-transparent hover:border-slate-200 dark:hover:border-slate-700
           hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
+          select-none
           ${
             isMenuOpen
               ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-md'
@@ -123,7 +124,9 @@ function SortableTaskItem({
         `}
           style={{
             touchAction: 'pan-y', 
-          }}
+            WebkitUserSelect: 'none',
+            userSelect: 'none',
+          } as React.CSSProperties}
         >
           {/* Bullet */}
           <div className="relative flex-shrink-0 w-7 h-7">
