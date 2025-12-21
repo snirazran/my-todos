@@ -71,6 +71,19 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             </button>
           )}
 
+          {addTagsPosition === 'second' && onAddTags && (
+             <button
+              onClick={() => {
+                  onAddTags(menu.id);
+                  onClose();
+              }}
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+            >
+              <Tag className="h-4 w-4 text-slate-500" />
+              Add Tags
+            </button>
+          )}
+
           {onDoLater && !isDone && (
             <button
               onClick={() => {
@@ -94,19 +107,6 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             >
               <RotateCcw className="h-4 w-4 text-blue-500" />
               {isWeekly ? 'Make Regular' : 'Make Weekly'}
-            </button>
-          )}
-
-          {addTagsPosition === 'second' && onAddTags && (
-             <button
-              onClick={() => {
-                  onAddTags(menu.id);
-                  onClose();
-              }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
-            >
-              <Tag className="h-4 w-4 text-slate-500" />
-              Add Tags
             </button>
           )}
 
