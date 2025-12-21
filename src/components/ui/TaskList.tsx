@@ -73,6 +73,12 @@ function SortableTaskItem({
     isDragging,
   } = useSortable({ id: task.id, disabled: isDragDisabled });
 
+  React.useEffect(() => {
+    if (isDragging && typeof window !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate(10);
+    }
+  }, [isDragging]);
+
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
@@ -119,8 +125,8 @@ function SortableTaskItem({
               ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-md'
               : ''
           }
-          ${isDragging ? 'shadow-lg bg-white dark:bg-slate-800 opacity-90' : ''}
-          ${isDone ? 'opacity-60 hover:opacity-100' : ''}
+          ${isDragging ? 'shadow-2xl ring-2 ring-violet-500/50 bg-white dark:bg-slate-800 z-[100] opacity-100' : ''}
+          ${isDone && !isDragging ? 'opacity-60 hover:opacity-100' : ''}
         `}
           style={{
             touchAction: 'pan-y', 
