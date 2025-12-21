@@ -510,6 +510,20 @@ export default function Home() {
                       // Cleanup pending (optional, mostly for safety)
                       pendingIds.current.delete(taskId);
                     }}
+                    onReorder={async (newTasks) => {
+                      setTasks(newTasks);
+                      if (session) {
+                        const dow = new Date().getDay();
+                        await fetch('/api/tasks?view=board', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            day: dow,
+                            tasks: newTasks.map((t) => ({ id: t.id })),
+                          }),
+                        });
+                      }
+                    }}
                   />
                 </motion.div>
               ) : (
