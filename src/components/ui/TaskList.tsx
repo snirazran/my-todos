@@ -120,15 +120,15 @@ function SortableTaskItem({
           className={`
           relative flex items-center gap-3 px-3 py-3.5 
           transition-all duration-200 cursor-pointer rounded-xl 
-          border border-transparent hover:border-slate-200 dark:hover:border-slate-700
-          hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
+          border border-transparent hover:border-border
+          hover:bg-accent hover:shadow-sm
           select-none
           ${
             isMenuOpen
-              ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 shadow-md'
+              ? 'bg-card border-border shadow-md'
               : ''
           }
-          ${isDragging ? 'shadow-2xl ring-2 ring-violet-500/50 bg-white dark:bg-slate-800 z-[100] opacity-100' : ''}
+          ${isDragging ? 'shadow-2xl ring-2 ring-primary/50 bg-card z-[100] opacity-100' : ''}
           ${isDone && !isDragging ? 'opacity-60 hover:opacity-100' : ''}
         `}
           style={{
@@ -157,7 +157,7 @@ function SortableTaskItem({
                         e.stopPropagation();
                         handleTaskToggle(task, true);
                       }}
-                      className="flex items-center justify-center w-full h-full transition-colors text-slate-300 hover:text-violet-500"
+                      className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 hover:text-primary"
                     >
                       <Circle className="w-6 h-6" />
                     </button>
@@ -193,8 +193,8 @@ function SortableTaskItem({
             <motion.span
               className={`block text-base font-medium md:text-lg transition-colors duration-200 ${
                 isDone
-                  ? 'text-slate-400 line-through dark:text-slate-500'
-                  : 'text-slate-800 dark:text-slate-100'
+                  ? 'text-muted-foreground line-through'
+                  : 'text-foreground'
               }`}
               animate={{
                 opacity: isDone ? 0.8 : 1,
@@ -258,11 +258,11 @@ function SortableTaskItem({
               p-2 rounded-lg transition-colors
               ${
                 isMenuOpen
-                  ? 'bg-slate-100 text-slate-900 dark:bg-slate-700 dark:text-white'
-                  : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  ? 'bg-accent text-foreground'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
               }
             `}
-              onClick={(e) => onMenuOpen(e, task)}
+              onClick={(e) => openMenu(e, task)}
             >
               <EllipsisVertical className="w-5 h-5" />
             </button>
@@ -493,15 +493,15 @@ export default function TaskList({
     <>
       <div
         dir="ltr"
-        className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm"
+        className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm"
       >
         <div className="flex items-center justify-between mb-6">
-          <h2 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-slate-800 dark:text-slate-100">
-            <CalendarCheck className="w-6 h-6 md:w-7 md:h-7 text-violet-500" />
+          <h2 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-foreground">
+            <CalendarCheck className="w-6 h-6 md:w-7 md:h-7 text-primary" />
             Your Tasks
           </h2>
           {tasks.length > 0 && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-muted-foreground">
               {tasks.length}
             </span>
           )}
@@ -509,7 +509,7 @@ export default function TaskList({
 
         <div className="pb-2 space-y-0 overflow-visible min-h-[100px]">
           {tasks.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed text-slate-400 border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-900/30 rounded-xl">
+            <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed text-muted-foreground border-border bg-muted/30 rounded-xl">
               <CalendarCheck className="w-10 h-10 mb-3 opacity-20" />
               <p className="text-sm font-medium">No tasks for today.</p>
               <p className="mt-1 text-xs opacity-60">

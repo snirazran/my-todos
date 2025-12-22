@@ -20,7 +20,7 @@ export default function HistoryFilter({ value, onChange }: HistoryFilterProps) {
   ];
 
   return (
-    <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800/50 rounded-lg w-full sm:w-auto overflow-x-auto no-scrollbar">
+    <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-full sm:w-auto overflow-x-auto no-scrollbar">
       {options.map((opt) => {
         const isActive = value === opt.id;
         const Icon = opt.icon;
@@ -31,13 +31,13 @@ export default function HistoryFilter({ value, onChange }: HistoryFilterProps) {
             onClick={() => onChange(opt.id)}
             className={cn(
               "relative px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap z-10 flex items-center gap-2",
-              isActive ? "text-slate-900 dark:text-white" : "text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
             )}
           >
             {isActive && (
               <motion.div
                 layoutId="activeFilter"
-                className="absolute inset-0 bg-white dark:bg-slate-700 shadow-sm rounded-md -z-10"
+                className="absolute inset-0 bg-background shadow-sm rounded-md -z-10"
                 transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
               />
             )}

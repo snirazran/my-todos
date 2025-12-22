@@ -64,9 +64,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                   onAddTags(menu.id);
                   onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <Tag className="h-4 w-4 text-slate-500" />
+              <Tag className="h-4 w-4 text-muted-foreground" />
               Add Tags
             </button>
           )}
@@ -77,9 +77,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                   onAddTags(menu.id);
                   onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <Tag className="h-4 w-4 text-slate-500" />
+              <Tag className="h-4 w-4 text-muted-foreground" />
               Add Tags
             </button>
           )}
@@ -90,9 +90,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                 onDoLater();
                 onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <Clock className="h-4 w-4 text-violet-500" />
+              <Clock className="h-4 w-4 text-primary" />
               Do Later
             </button>
           )}
@@ -103,9 +103,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                   onToggleRepeat();
                   onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <RotateCcw className="h-4 w-4 text-blue-500" />
+              <RotateCcw className="h-4 w-4 text-primary" />
               {isWeekly ? 'Make Regular' : 'Make Weekly'}
             </button>
           )}

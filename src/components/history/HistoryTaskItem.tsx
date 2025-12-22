@@ -63,10 +63,10 @@ export default function HistoryTaskItem({
       onMouseLeave={() => setIsHovered(false)}
       className={cn(
         "group flex items-center gap-3 p-3.5 rounded-xl border transition-all duration-200 cursor-pointer select-none",
-        "bg-white dark:bg-slate-800/50",
-        "border-slate-100 dark:border-slate-700/50",
-        "hover:border-purple-200 dark:hover:border-purple-800/50",
-        "hover:shadow-md hover:bg-slate-50 dark:hover:bg-slate-800/80" // Enhanced hover state
+        "bg-card/50",
+        "border-border",
+        "hover:border-primary/50",
+        "hover:shadow-md hover:bg-accent/50" // Enhanced hover state
       )}
     >
       {/* Icon */}
@@ -146,8 +146,8 @@ export default function HistoryTaskItem({
           className={cn(
             "truncate text-[15px] font-medium leading-snug transition-colors",
             displayedCompleted
-              ? "text-slate-400 dark:text-slate-500 line-through decoration-slate-400 dark:decoration-slate-600" 
-              : "text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white"
+              ? "text-muted-foreground line-through decoration-muted-foreground" 
+              : "text-foreground group-hover:text-primary"
           )}
         >
           {text}

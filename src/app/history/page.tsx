@@ -241,15 +241,15 @@ export default function HistoryPage() {
   // Initial Data Fetch (Balance + History)
 
   return (
-    <main className="min-h-screen bg-slate-50 dark:bg-slate-900 transition-colors">
+    <main className="min-h-screen bg-background transition-colors">
       <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-4 md:space-y-8">
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-slate-900 dark:text-white tracking-tight">
+            <h1 className="text-3xl font-bold text-foreground tracking-tight">
               Task History
             </h1>
-            <p className="text-slate-500 dark:text-slate-400">
+            <p className="text-muted-foreground">
               Review your past accomplishments and habits.
             </p>
           </div>
@@ -293,7 +293,7 @@ export default function HistoryPage() {
               {/* Controls Container */}
               <div className="flex flex-col gap-3">
                  {/* Filter Tabs */}
-                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sticky top-2 z-20 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur-md py-2 -mx-2 px-2 md:static md:bg-transparent md:p-0">
+                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sticky top-2 z-20 bg-background/90 backdrop-blur-md py-2 -mx-2 px-2 md:static md:bg-transparent md:p-0">
                     <HistoryFilter value={filter} onChange={setFilter} />
                     
                     {/* Context Label (Only show if not custom) */}
@@ -318,24 +318,24 @@ export default function HistoryPage() {
                        exit={{ height: 0, opacity: 0 }}
                        className="overflow-hidden"
                      >
-                       <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                       <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-card rounded-xl border border-border shadow-sm">
                          <div className="flex items-center gap-2 w-full sm:w-auto">
-                           <label className="text-sm font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">From:</label>
+                           <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">From:</label>
                            <input
                              type="date"
                              value={customFrom}
                              onChange={(e) => setCustomFrom(e.target.value)}
-                             className="w-full sm:w-auto px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                             className="w-full sm:w-auto px-3 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-primary outline-none text-sm"
                            />
                          </div>
-                         <div className="hidden sm:block text-slate-400">→</div>
+                         <div className="hidden sm:block text-muted-foreground">→</div>
                          <div className="flex items-center gap-2 w-full sm:w-auto">
-                           <label className="text-sm font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">To:</label>
+                           <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">To:</label>
                            <input
                              type="date"
                              value={customTo}
                              onChange={(e) => setCustomTo(e.target.value)}
-                             className="w-full sm:w-auto px-3 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                             className="w-full sm:w-auto px-3 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-primary outline-none text-sm"
                            />
                          </div>
                        </div>
@@ -351,8 +351,8 @@ export default function HistoryPage() {
                           className={`
                              whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all border
                              ${!selectedTagId 
-                                ? 'bg-slate-800 text-white border-slate-800 dark:bg-white dark:text-slate-900 dark:border-white' 
-                                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700'}
+                                ? 'bg-primary text-primary-foreground border-primary' 
+                                : 'bg-card text-muted-foreground border-border hover:border-input'}
                           `}
                        >
                           All Tags
@@ -364,8 +364,8 @@ export default function HistoryPage() {
                              className={`
                                 whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5
                                 ${selectedTagId === tag.id 
-                                   ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900' 
-                                   : 'opacity-70 hover:opacity-100 bg-white dark:bg-slate-800'}
+                                   ? 'ring-2 ring-offset-1 ring-offset-background' 
+                                   : 'opacity-70 hover:opacity-100 bg-card'}
                              `}
                              style={{
                                 backgroundColor: selectedTagId === tag.id ? `${tag.color}20` : undefined,
@@ -384,8 +384,8 @@ export default function HistoryPage() {
               {/* Main List */}
               <div className="relative min-h-[400px]">
                  {loading ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-slate-900/50 z-10 backdrop-blur-sm rounded-xl">
-                       <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10 backdrop-blur-sm rounded-xl">
+                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
                     </div>
                  ) : null}
                  
@@ -406,7 +406,7 @@ export default function HistoryPage() {
       {/* Mobile Floating Action Button for Back */}
       <div className="md:hidden fixed bottom-6 right-6 z-50">
         <Link href="/">
-           <Button className="rounded-full w-12 h-12 shadow-lg bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:scale-105 transition-transform">
+           <Button className="rounded-full w-12 h-12 shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 transition-transform">
               <ArrowLeft className="w-6 h-6" />
            </Button>
         </Link>

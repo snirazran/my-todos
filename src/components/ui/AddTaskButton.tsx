@@ -24,15 +24,15 @@ export function AddTaskButton({
       disabled={disabled}
       className={[
         'relative h-12 rounded-full px-6 md:w-full group',
-        'bg-gradient-to-b from-white to-slate-50 dark:from-slate-800 dark:to-slate-900',
-        'border border-white/50 dark:border-slate-700/50',
-        'text-slate-700 dark:text-slate-200 font-bold tracking-tight',
+        'bg-card',
+        'border border-border/50',
+        'text-foreground font-bold tracking-tight',
         'shadow-sm shadow-black/5 dark:shadow-black/40',
-        'hover:shadow-[0_12px_24px_-6px_rgba(168,85,247,0.25),0_6px_16px_-4px_rgba(168,85,247,0.15)] dark:hover:shadow-[0_12px_24px_-6px_rgba(0,0,0,0.6)]',
-        'hover:border-purple-200 dark:hover:border-purple-700/50 hover:text-purple-600 dark:hover:text-purple-300',
+        'hover:shadow-[0_12px_24px_-6px_rgba(0,0,0,0.1),0_6px_16px_-4px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_12px_24px_-6px_rgba(0,0,0,0.6)]',
+        'hover:border-primary/50 hover:text-primary',
         'transition-all duration-300 ease-out',
         'active:scale-[0.98]',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500/50 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
         disabled ? 'opacity-60 pointer-events-none grayscale' : '',
         className,
       ].join(' ')}

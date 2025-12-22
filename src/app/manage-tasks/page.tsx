@@ -219,16 +219,12 @@ export default function ManageTasksPage() {
 
   return (
     <main
-      className="relative overflow-hidden min-h-100svh pb-safe bg-gradient-to-br from-slate-50 via-slate-100 to-indigo-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-900"
+      className="relative overflow-hidden min-h-100svh pb-safe bg-background"
       style={{
         height: 'calc(100dvh - var(--header-h))',
         minHeight: 'calc(-webkit-fill-available - var(--header-h))',
       }}
     >
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute right-[-14%] top-[6%] h-72 w-72 rounded-full bg-indigo-200/30 blur-3xl dark:bg-indigo-700/25" />
-      </div>
-
       <div className="absolute inset-0">
         <TaskBoard
           titles={titles}

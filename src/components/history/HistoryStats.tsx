@@ -67,7 +67,7 @@ export default function HistoryStats({ data, className }: { data: StatData; clas
 
             >
 
-              <Card className="border-none shadow-sm hover:shadow-md transition-shadow bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm w-full">
+              <Card className="border-none shadow-sm hover:shadow-md transition-shadow bg-card/50 backdrop-blur-sm w-full">
 
                 <CardContent className="p-2 md:p-4 flex flex-row md:flex-col items-center md:items-start gap-2.5 md:gap-3 h-full">
 
@@ -81,7 +81,7 @@ export default function HistoryStats({ data, className }: { data: StatData; clas
 
                   <div className="min-w-0 flex-1 md:flex-none">
 
-                    <div className="text-sm md:text-2xl font-bold text-slate-900 dark:text-white truncate">
+                    <div className="text-sm md:text-2xl font-bold text-foreground truncate">
 
                       {typeof stat.value === 'number' ? (
 
@@ -91,7 +91,7 @@ export default function HistoryStats({ data, className }: { data: StatData; clas
 
                     </div>
 
-                    <p className="text-[9px] md:text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider truncate">
+                    <p className="text-[9px] md:text-xs text-muted-foreground font-bold uppercase tracking-wider truncate">
 
                       {stat.label}
 
@@ -111,7 +111,7 @@ export default function HistoryStats({ data, className }: { data: StatData; clas
 
                           <path
 
-                            className="text-slate-100 dark:text-slate-700"
+                            className="text-muted/20"
 
                             d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
 

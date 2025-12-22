@@ -26,7 +26,7 @@ export default function DragOverlay({
       <div
         className={[
           'flex items-center gap-3 p-3 select-none rounded-2xl',
-          'bg-white/90 backdrop-blur border border-slate-200/80 shadow-2xl', // ← border, not ring
+          'bg-card/90 backdrop-blur border border-border/80 shadow-2xl', 
           'shine',
         ].join(' ')}
         style={{
@@ -39,7 +39,7 @@ export default function DragOverlay({
         <span className="relative grid shrink-0 h-7 w-7 place-items-center">
           <Fly size={22} x={-2} y={-2} className="animate-buzz" />
         </span>
-        <span className="flex-1 text-sm text-slate-900 dark:text-slate-50">
+        <span className="flex-1 text-sm text-foreground">
           {text}
         </span>
       </div>

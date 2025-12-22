@@ -159,10 +159,10 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden w-full"
         >
-            <div className="p-3 mb-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50">
+            <div className="p-3 mb-3 bg-muted/30 rounded-xl border border-border">
                 {/* Tag Input */}
                 <div className="relative flex items-center mb-3">
-                    <Tag className="absolute left-2.5 w-4 h-4 text-slate-400" />
+                    <Tag className="absolute left-2.5 w-4 h-4 text-muted-foreground" />
                     <input
                         ref={tagInputRef}
                         value={tagInput}
@@ -178,14 +178,14 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                         }}
                         maxLength={TAG_MAX_LENGTH}
                         placeholder="Type to create or filter..."
-                        className="w-full h-10 pl-9 pr-2 rounded-xl bg-white dark:bg-slate-800 text-base md:text-sm font-medium text-slate-900 dark:text-white ring-1 ring-slate-200 dark:ring-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 placeholder:text-slate-400"
+                        className="w-full h-10 pl-9 pr-2 rounded-xl bg-background text-base md:text-sm font-medium text-foreground ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
                     />
                     {tagInput && (
                         <button
                             type="button"
                             onClick={handleAddTag}
                             disabled={!savedTags.find(t => t.name.toLowerCase() === tagInput.trim().toLowerCase()) && savedTags.length >= MAX_SAVED_TAGS}
-                            className="absolute right-1.5 p-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-200 disabled:opacity-50 disabled:grayscale"
+                            className="absolute right-1.5 p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 disabled:opacity-50 disabled:grayscale"
                         >
                             {showColorPicker ? <Palette className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                         </button>
@@ -201,17 +201,17 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                             className="overflow-hidden"
                         >
-                            <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
-                                <div className="text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
+                            <div className="p-2 bg-card rounded-lg shadow-sm border border-border">
+                                <div className="text-[11px] font-bold text-muted-foreground mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
                                 <div className="flex gap-2 flex-wrap">
                                     {TAG_COLORS.map((c) => (
                                     <button
                                         key={c.name}
                                         type="button"
                                         onClick={() => setNewTagColor(c.value)}
-                                        className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-800 transition-all ${
+                                        className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-background transition-all ${
                                         newTagColor === c.value
-                                            ? 'ring-slate-400 scale-110'
+                                            ? 'ring-muted-foreground scale-110'
                                             : 'ring-transparent'
                                         }`}
                                         title={c.name}
@@ -222,7 +222,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                     type="button"
                                     onClick={createAndSaveTag}
                                     disabled={isCreatingTag}
-                                    className="w-full mt-3 py-2 text-xs font-bold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
+                                    className="w-full mt-3 py-2 text-xs font-bold text-primary-foreground bg-primary rounded-lg shadow-sm hover:bg-primary/90 active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
                                 >
                                     {isCreatingTag ? 'Saving...' : 'Save Tag'}
                                 </button>
@@ -235,14 +235,14 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                 {savedTags.length > 0 && (
                     <div>
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                Saved Tags <span className={savedTags.length >= MAX_SAVED_TAGS ? "text-red-500" : ""}>({savedTags.length}/{MAX_SAVED_TAGS})</span>
+                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                                Saved Tags <span className={savedTags.length >= MAX_SAVED_TAGS ? "text-destructive" : ""}>({savedTags.length}/{MAX_SAVED_TAGS})</span>
                             </span>
                             <button
                                 type="button"
                                 onClick={() => setManageTagsMode(!manageTagsMode)}
                                 className={`text-[11px] font-bold px-2 py-0.5 rounded transition-colors ${
-                                    manageTagsMode ? 'bg-red-100 text-red-600' : 'text-slate-400 hover:text-slate-600'
+                                    manageTagsMode ? 'bg-destructive/10 text-destructive' : 'text-muted-foreground hover:text-foreground'
                                 }`}
                             >
                                 {manageTagsMode ? 'Done' : 'Manage'}
@@ -270,8 +270,8 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                             border disabled:opacity-50 disabled:cursor-not-allowed
                                             ${
                                             isSelected
-                                                ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900'
-                                                : 'hover:opacity-80 opacity-70 bg-white dark:bg-slate-800'
+                                                ? 'ring-2 ring-offset-1 ring-offset-background'
+                                                : 'hover:opacity-80 opacity-70 bg-card'
                                             }
                                         `}
                                         style={{
@@ -285,7 +285,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                         {manageTagsMode && (
                                             <div
                                             onClick={(e) => deleteSavedTag(st.id, st.name, e)}
-                                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 shadow-sm hover:scale-110 z-10"
+                                            className="absolute -top-1.5 -right-1.5 bg-destructive text-white rounded-full p-1 shadow-sm hover:scale-110 z-10"
                                             >
                                                 <X className="w-2.5 h-2.5" />
                                             </div>

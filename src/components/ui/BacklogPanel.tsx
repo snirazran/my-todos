@@ -222,18 +222,18 @@ export default function BacklogPanel({
       dir="ltr"
       // Added overflow-visible to allow menus to spill out if needed
 
-      className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm"
+      className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm"
     >
       {/* Header */}
 
       <div className="flex items-center justify-between mb-6">
-        <h3 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-slate-800 dark:text-slate-100">
-          <CalendarClock className="w-6 h-6 text-purple-500 md:w-7 md:h-7" />
+        <h3 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-foreground">
+          <CalendarClock className="w-6 h-6 text-primary md:w-7 md:h-7" />
           Saved Tasks
         </h3>
 
         {later.length > 0 && (
-          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-bold text-muted-foreground">
             {later.length}
           </span>
         )}
@@ -241,7 +241,7 @@ export default function BacklogPanel({
 
       <div className="pb-2 space-y-3 overflow-visible min-h-[100px]">
         {later.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-4 py-10 text-center border-2 border-dashed text-slate-400 border-slate-200 bg-slate-50/50 dark:border-slate-700 dark:bg-slate-800/30 rounded-xl">
+          <div className="flex flex-col items-center justify-center px-4 py-10 text-center border-2 border-dashed text-muted-foreground border-border bg-muted/30 rounded-xl">
             <CalendarClock className="w-10 h-10 mb-3 opacity-20" />
 
             <p className="text-sm font-medium">No tasks saved yet.</p>
@@ -304,11 +304,11 @@ export default function BacklogPanel({
 
                         transition-all duration-200 rounded-xl 
 
-                        border border-transparent hover:bg-white dark:hover:bg-slate-800 hover:shadow-sm
+                        border border-transparent hover:bg-accent hover:shadow-sm
 
                         ${
                           isMenuOpen
-                            ? 'bg-white dark:bg-slate-800 shadow-md'
+                            ? 'bg-card border-border shadow-md'
                             : ''
                         }
 
@@ -319,14 +319,14 @@ export default function BacklogPanel({
                     <div className="flex items-center justify-center flex-shrink-0 w-7 h-7">
                       <Fly
                         size={24}
-                        className="text-purple-600 transition-all opacity-70 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                        className="text-primary transition-all opacity-70 grayscale group-hover:grayscale-0 group-hover:opacity-100"
                       />
                     </div>
 
                     {/* Text */}
 
                     <div className="flex-1 min-w-0">
-                      <span className="block text-base font-medium md:text-lg text-slate-700 dark:text-slate-200">
+                      <span className="block text-base font-medium md:text-lg text-foreground">
                         {t.text}
                       </span>
 
@@ -385,7 +385,7 @@ export default function BacklogPanel({
                           addToday(t);
                         }}
                         disabled={processingIds.has(t.id)}
-                        className="group/btn flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-600 hover:to-violet-600 active:scale-95 transition-all rounded-full shadow-md shadow-indigo-500/20 hover:shadow-indigo-500/40 disabled:opacity-50 disabled:pointer-events-none"
+                        className="group/btn flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-primary-foreground bg-primary hover:bg-primary/90 active:scale-95 transition-all rounded-full shadow-md shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:pointer-events-none"
                       >
                         {processingIds.has(t.id) ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -401,8 +401,8 @@ export default function BacklogPanel({
                         p-2 rounded-lg transition-colors
                         ${
                           isMenuOpen
-                            ? 'bg-slate-100 text-slate-900 dark:bg-slate-700 dark:text-white'
-                            : 'text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            ? 'bg-accent text-foreground'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
                         }
                       `}
                         onClick={(e) => {

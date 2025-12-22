@@ -12,10 +12,10 @@ function ThemeMorphLoader() {
   return (
     <div className="relative flex items-center justify-center w-24 h-24">
       {/* Static Shadow - Separated so it doesn't spin */}
-      <div className="absolute w-12 h-12 bg-purple-500/40 blur-xl rounded-full translate-y-2" />
+      <div className="absolute w-12 h-12 bg-primary/40 blur-xl rounded-full translate-y-2" />
 
       {/* The Morphing Shape */}
-      <div className="relative w-12 h-12 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl animate-[morph-spin_2s_ease-in-out_infinite]" />
+      <div className="relative w-12 h-12 bg-gradient-to-br from-primary via-emerald-500 to-primary rounded-xl animate-[morph-spin_2s_ease-in-out_infinite]" />
 
       <style jsx>{`
         @keyframes morph-spin {
@@ -49,17 +49,17 @@ export function LoadingScreen({
       } flex items-center justify-center`}
     >
       {/* Cleaner, lighter background */}
-      <div className="absolute inset-0 bg-slate-50/50 dark:bg-slate-950/50" />
+      <div className="absolute inset-0 bg-background/50" />
       
       <div className="relative flex items-center justify-center w-full px-4">
         <div className="flex flex-col items-center gap-4">
           <ThemeMorphLoader />
           <div className="text-center space-y-1">
-            <p className="text-lg font-bold text-slate-700 dark:text-slate-200 tracking-tight">
+            <p className="text-lg font-bold text-foreground tracking-tight">
               {message}
             </p>
             {subtext ? (
-              <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
+              <p className="text-sm font-medium text-muted-foreground">
                 {subtext}
               </p>
             ) : null}
@@ -72,8 +72,8 @@ export function LoadingScreen({
 
 export function InlineSpinner({ label }: { label?: string }) {
   return (
-    <span className="inline-flex items-center gap-2 text-sm text-slate-500 dark:text-slate-300">
-      <span className="w-4 h-4 rounded-full border-2 border-slate-400/70 border-t-transparent animate-spin" />
+    <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+      <span className="w-4 h-4 rounded-full border-2 border-muted-foreground/70 border-t-transparent animate-spin" />
       {label && <span>{label}</span>}
     </span>
   );

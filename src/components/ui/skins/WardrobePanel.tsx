@@ -4,7 +4,7 @@ import React from 'react';
 import { useSession } from 'next-auth/react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Lock, Shirt, X, ArrowLeft } from 'lucide-react';
+import { Lock, Shirt, X, ArrowLeft, ShoppingBag, Repeat } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
@@ -286,7 +286,7 @@ export function WardrobePanel({
         <DialogContent
           className={cn(
           // ... (keep existing classes)
-          'fixed z-50 flex flex-col gap-0 bg-slate-50 dark:bg-slate-950 p-0 sm:p-0 shadow-none outline-none overflow-hidden',
+          'fixed z-50 flex flex-col gap-0 bg-background p-0 sm:p-0 shadow-none outline-none overflow-hidden',
           'top-0 left-0 translate-x-0 translate-y-0',
           'w-full h-[100dvh] max-w-none',
           'inset-0 border-none rounded-none',
@@ -295,26 +295,26 @@ export function WardrobePanel({
           // LARGE DESKTOP (>=1024px) AND TALL (>=800px): Floating Modal Look
           'lg:[@media(min-height:800px)]:top-[50%] lg:[@media(min-height:800px)]:left-[50%] lg:[@media(min-height:800px)]:-translate-x-1/2 lg:[@media(min-height:800px)]:-translate-y-1/2',
           'lg:[@media(min-height:800px)]:w-[95vw] lg:[@media(min-height:800px)]:max-w-[1200px] lg:[@media(min-height:800px)]:h-[90vh] lg:[@media(min-height:800px)]:max-h-[95vh]',
-          'lg:[@media(min-height:800px)]:border-4 lg:[@media(min-height:800px)]:border-slate-200 lg:[@media(min-height:800px)]:dark:border-slate-800 lg:[@media(min-height:800px)]:rounded-[36px] lg:[@media(min-height:800px)]:shadow-2xl',
+          'lg:[@media(min-height:800px)]:border-4 lg:[@media(min-height:800px)]:border-border lg:[@media(min-height:800px)]:rounded-[36px] lg:[@media(min-height:800px)]:shadow-2xl',
         )}
       >
         {/* --- HEADER --- */}
-        <div className="relative z-20 px-4 py-3 bg-white border-b shrink-0 md:px-6 md:pt-5 md:pb-4 dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+        <div className="relative z-20 px-4 py-3 bg-card border-b shrink-0 md:px-6 md:pt-5 md:pb-4 border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {/* Mobile Back Button Look */}
               <button
                 onClick={() => onOpenChange(false)}
-                className="flex items-center justify-center w-8 h-8 rounded-full md:hidden bg-slate-100 dark:bg-slate-800 text-slate-500"
+                className="flex items-center justify-center w-8 h-8 rounded-full md:hidden bg-secondary text-muted-foreground"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
 
               <div>
-                <DialogTitle className="text-lg font-black tracking-tighter uppercase md:text-4xl text-slate-800 dark:text-white">
+                <DialogTitle className="text-lg font-black tracking-tighter uppercase md:text-4xl text-foreground">
                   The Wardrobe
                 </DialogTitle>
-                <p className="hidden md:block text-sm font-bold text-slate-400 dark:text-slate-500 tracking-wide mt-0.5">
+                <p className="hidden md:block text-sm font-bold text-muted-foreground tracking-wide mt-0.5">
                   Customize Your Companion
                 </p>
               </div>
@@ -329,56 +329,60 @@ export function WardrobePanel({
                   'flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full transition-colors duration-300',
                   shakeBalance
                     ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-800'
-                    : 'bg-slate-100 border-slate-200 dark:bg-slate-800 dark:border-slate-700'
+                    : 'bg-secondary border-border'
                 )}
               >
-                <div className="flex items-center justify-center bg-white rounded-full shadow-sm dark:bg-slate-700 w-7 h-7 md:w-9 md:h-9">
+                <div className="flex items-center justify-center bg-background rounded-full shadow-sm w-7 h-7 md:w-9 md:h-9">
                   <Fly
                     size={16}
-                    className="text-slate-600 dark:text-slate-300 md:w-6 md:h-6"
+                    className="text-muted-foreground md:w-6 md:h-6"
                   />
                 </div>
                 <AnimatedNumber
                   value={balance}
-                  className="text-sm font-black leading-none md:text-xl text-slate-700 dark:text-slate-200 tabular-nums"
+                  className="text-sm font-black leading-none md:text-xl text-foreground tabular-nums"
                 />
               </motion.div>
 
               {/* Desktop Close Button */}
               <button
                 onClick={() => onOpenChange(false)}
-                className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 border-slate-200 dark:border-slate-700"
+                className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-secondary hover:bg-secondary/80 border-border"
               >
-                <X className="w-5 h-5 text-slate-500" />
+                <X className="w-5 h-5 text-muted-foreground" />
               </button>
             </div>
           </div>
         </div>
 
         {/* --- MAIN CONTENT WRAPPER --- */}
-        <div className="flex flex-col flex-1 min-h-0 bg-slate-50 dark:bg-slate-950">
+        <div className="flex flex-col flex-1 min-h-0 bg-background">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
             {/* Controls Area (Tabs + Filter) */}
             <div className="px-4 pt-4 space-y-4 shrink-0 md:px-6 md:pt-5">
               <div className="flex items-center justify-between gap-2 md:gap-4">
-                <TabsList className="flex-1 h-11 md:h-14 bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-xl md:rounded-[20px] border border-slate-200 dark:border-slate-700">
+                <TabsList className="flex-1 h-11 md:h-14 bg-muted p-1 rounded-xl md:rounded-[20px] border border-border">
                   <TabsTrigger
                     value="inventory"
-                    className="flex-1 h-full rounded-lg md:rounded-xl text-xs md:text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all relative"
+                    className="flex-1 h-full rounded-lg md:rounded-xl text-[10px] md:text-sm font-black uppercase tracking-wide transition-all relative flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm"
                   >
-                    Inventory
+                    <Shirt className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    <span className="hidden xs:inline">Inventory</span>
+                    <span className="xs:hidden">Inv</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="shop"
-                    className="flex-1 h-full rounded-lg md:rounded-xl text-xs md:text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"
+                    className="flex-1 h-full rounded-lg md:rounded-xl text-[10px] md:text-sm font-black uppercase tracking-wide transition-all flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm"
                   >
-                    Shop
+                    <ShoppingBag className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    <span>Shop</span>
                   </TabsTrigger>
                   <TabsTrigger
                     value="trade"
-                    className="flex-1 h-full rounded-lg md:rounded-xl text-xs md:text-base font-black uppercase tracking-wide data-[state=active]:bg-white data-[state=active]:shadow-sm transition-all"
+                    className="flex-1 h-full rounded-lg md:rounded-xl text-[10px] md:text-sm font-black uppercase tracking-wide transition-all flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm"
                   >
-                    Trade
+                    <Repeat className="w-3.5 h-3.5 md:w-4 md:h-4" />
+                    <span>Trade</span>
                   </TabsTrigger>
                 </TabsList>
                 <SortMenu value={sortBy} onChange={setSortBy} />
@@ -402,11 +406,11 @@ export function WardrobePanel({
             */}
             <div
               className="
-              flex-1 relative mt-4 overflow-hidden bg-slate-100/50 dark:bg-slate-900/50
+              flex-1 relative mt-4 overflow-hidden bg-muted/30
               /* Mobile Styles */
-              border-t border-slate-200 dark:border-slate-800 rounded-none
+              border-t border-border rounded-none
               /* Desktop Styles */
-              md:mx-6 md:mb-6 md:rounded-[24px] md:border-2 md:border-slate-200/50 md:dark:border-slate-800/50
+              md:mx-6 md:mb-6 md:rounded-[24px] md:border-2 md:border-border
             "
             >
               <TabsContent
@@ -415,10 +419,10 @@ export function WardrobePanel({
               >
                 {inventoryItems.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full opacity-50">
-                    <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-slate-200 dark:bg-slate-800">
-                      <Shirt className="w-8 h-8 md:w-10 md:h-10 text-slate-400" />
+                    <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
+                      <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
                     </div>
-                    <p className="text-lg font-black text-slate-400">Empty</p>
+                    <p className="text-lg font-black text-muted-foreground">Empty</p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">

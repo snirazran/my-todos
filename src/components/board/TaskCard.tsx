@@ -185,17 +185,17 @@ export default function TaskCard({
       className={[
         'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl transition-all duration-300',
         task.completed ? 'cursor-default' : 'cursor-grab',
-        'bg-white dark:bg-slate-800/90 backdrop-blur-md',
-        'hover:bg-slate-50 dark:hover:bg-slate-800', // Hover bg instead of border
+        'bg-card backdrop-blur-md border border-border/50',
+        'hover:bg-accent/50 hover:border-border', 
         'shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md',
         'mb-2', // reduced margin
-        menuOpen ? 'z-50 shadow-xl ring-2 ring-purple-500/20' : '',
+        menuOpen ? 'z-50 shadow-xl ring-2 ring-primary/20' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
       role="listitem"
       aria-grabbed={false}
     >
-      <div className="grid self-center shrink-0 place-items-center text-slate-400 group-hover:text-purple-500 transition-colors relative h-6 w-6">
+      <div className="grid self-center shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-6 w-6">
         <div
           className={`absolute inset-0 transition-opacity duration-200 ${
             task.completed ? 'opacity-0 pointer-events-none' : 'opacity-100'
@@ -266,8 +266,8 @@ export default function TaskCard({
         <div
           className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-snug transition-colors ${
             task.completed
-              ? 'text-slate-400 line-through dark:text-slate-500'
-              : 'text-slate-700 dark:text-slate-100 group-hover:text-slate-900 dark:group-hover:text-white'
+              ? 'text-muted-foreground line-through'
+              : 'text-foreground'
           }`}
         >
           {task.text}
@@ -284,12 +284,12 @@ export default function TaskCard({
           aria-label="Task actions"
           aria-expanded={menuOpen}
           className={[
-            'rounded-full p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors',
-            menuOpen ? 'bg-slate-200/80 dark:bg-slate-800/70 opacity-100' : '',
+            'rounded-full p-1.5 hover:bg-accent transition-colors',
+            menuOpen ? 'bg-accent opacity-100' : '',
           ].join(' ')}
           type="button"
         >
-          <EllipsisVertical className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+          <EllipsisVertical className="w-4 h-4 text-muted-foreground" />
         </button>
       </div>
     </div>

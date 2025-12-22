@@ -40,7 +40,7 @@ export default function BacklogBox({
       {/* Pulse Ring when dragging (far) */}
       {isDragging && !isDragOver && (
         <motion.div
-          className="absolute inset-0 border-2 rounded-full border-purple-400/50 dark:border-purple-500/50"
+          className="absolute inset-0 border-2 rounded-full border-primary/50"
           animate={{ scale: [1, 1.4], opacity: [0.6, 0] }}
           transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
         />
@@ -49,15 +49,15 @@ export default function BacklogBox({
       <div
         className={`
           relative flex items-center justify-center w-14 h-14 rounded-full
-          bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl
+          bg-card/80 backdrop-blur-xl
           border transition-all duration-200
           shadow-[0_8px_20px_rgba(0,0,0,0.12)] dark:shadow-black/40
           ${
             isDragOver
-              ? 'ring-4 ring-purple-500 bg-purple-100 dark:bg-purple-900 border-purple-500'
+              ? 'ring-4 ring-primary bg-primary/10 border-primary'
               : isDragging
-              ? 'border-purple-400 dark:border-purple-500 ring-2 ring-purple-200 dark:ring-purple-800'
-              : 'border-white/40 dark:border-slate-700/50 hover:bg-white hover:scale-105'
+              ? 'border-primary ring-2 ring-primary/20'
+              : 'border-border/40 hover:bg-card hover:scale-105'
           }
         `}
       >
@@ -65,10 +65,10 @@ export default function BacklogBox({
         <div
           className={`transition-colors ${
             isDragOver
-              ? 'text-purple-700 dark:text-purple-100'
+              ? 'text-primary'
               : isDragging
-              ? 'text-purple-600 dark:text-purple-300'
-              : 'text-slate-600 dark:text-slate-300'
+              ? 'text-primary'
+              : 'text-muted-foreground'
           }`}
         >
           <Layers size={24} strokeWidth={2.5} />
@@ -76,7 +76,7 @@ export default function BacklogBox({
 
         {/* Count Badge */}
         {count > 0 && (
-          <div className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1 text-[11px] font-bold text-white bg-rose-500 rounded-full shadow-sm ring-2 ring-white dark:ring-slate-900">
+          <div className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1 text-[11px] font-bold text-white bg-rose-500 rounded-full shadow-sm ring-2 ring-background">
             {count}
           </div>
         )}

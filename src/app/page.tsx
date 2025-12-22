@@ -330,7 +330,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen pb-48 md:pb-32 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+    <main className="min-h-screen pb-48 md:pb-32 bg-background">
       <div className="px-4 py-6 mx-auto max-w-7xl md:px-8">
         <Header session={session} router={router} />
 
@@ -365,21 +365,21 @@ export default function Home() {
             className="flex flex-col gap-4 lg:col-span-8 lg:gap-6"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
-            <div className="flex self-start w-full p-1 rounded-[20px] bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl border border-white/50 dark:border-slate-800/50 shadow-sm md:w-auto">
+            <div className="flex self-start w-full p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm md:w-auto">
               <button
                 onClick={() => setActiveTab('today')}
                 className={`
         flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2
         ${
           activeTab === 'today'
-            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-            : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
         }
       `}
               >
                 Today
                 {data.length > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px]">
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] text-muted-foreground">
                     {data.length}
                   </span>
                 )}
@@ -390,14 +390,14 @@ export default function Home() {
         flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2
         ${
           activeTab === 'backlog'
-            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-            : 'text-slate-500 hover:text-slate-700 dark:text-slate-400'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
         }
       `}
               >
                 Saved Tasks
                 {laterThisWeek.length > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-slate-200 dark:bg-slate-800 px-1 text-[10px]">
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] text-muted-foreground">
                     {laterThisWeek.length}
                   </span>
                 )}
@@ -619,7 +619,7 @@ export default function Home() {
                       }}
                     />
                   ) : (
-                    <div className="p-8 text-center text-slate-500 bg-white/50 rounded-2xl dark:bg-slate-800/50">
+                    <div className="p-8 text-center text-muted-foreground bg-card/50 rounded-2xl">
                       Sign in to use the Backlog feature!
                     </div>
                   )}
@@ -728,7 +728,7 @@ export default function Home() {
       {/* Floating Add Task Button - Home Page Version */}
       <div className="fixed bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+80px)] pointer-events-none">
         <div className="pointer-events-auto mx-auto w-full max-w-[400px] flex md:block justify-center">
-          <div className="md:w-full rounded-full bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-700/60 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
+          <div className="md:w-full rounded-full bg-card/80 backdrop-blur-2xl ring-1 ring-border/80 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
             <AddTaskButton
               onClick={() => {
                 setQuickText('');
@@ -748,10 +748,10 @@ function Header({ session, router }: { session: any; router: any }) {
   return (
     <div className="flex flex-col gap-4 mb-2 md:mb-6 md:flex-row md:items-center md:justify-between">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white md:text-5xl">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-5xl">
           {format(new Date(), 'EEEE')}
         </h1>
-        <p className="flex items-center gap-2 font-medium text-md md:text-lg text-slate-600 dark:text-slate-400">
+        <p className="flex items-center gap-2 font-medium text-md md:text-lg text-muted-foreground">
           <Calendar className="w-4 h-4 md:w-5 md:h-5" />
           {format(new Date(), 'MMMM d, yyyy')}
         </p>
@@ -760,7 +760,7 @@ function Header({ session, router }: { session: any; router: any }) {
       <div className="self-start hidden gap-2 md:flex md:self-auto">
         <Link
           href="/history"
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition bg-white rounded-lg shadow-sm text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200"
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition bg-card rounded-lg shadow-sm text-foreground hover:bg-accent border border-border"
         >
           <History className="w-4 h-4" />
           <span>History</span>
@@ -770,7 +770,7 @@ function Header({ session, router }: { session: any; router: any }) {
           onClick={() =>
             session ? router.push('/manage-tasks') : router.push('/login')
           }
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition bg-white rounded-lg shadow-sm text-slate-700 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-200"
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition bg-card rounded-lg shadow-sm text-foreground hover:bg-accent border border-border"
         >
           <LayoutDashboard className="w-4 h-4" />
           <span>Weekly Tasks</span>

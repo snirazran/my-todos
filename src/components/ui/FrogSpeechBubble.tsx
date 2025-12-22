@@ -165,13 +165,13 @@ export function FrogSpeechBubble({
             isLongMessage ? '-top-10' : '-top-4'
           } -left-[5%] -translate-x-1/2 z-50 w-72 pointer-events-none`}
         >
-          <div className="relative bg-white/80 dark:bg-slate-900/60 backdrop-blur-2xl rounded-[20px] p-4 shadow-sm border border-white/50 dark:border-slate-800/50">
-            <p className="text-sm font-bold leading-snug text-center text-slate-800 dark:text-slate-100">
+          <div className="relative bg-card/80 backdrop-blur-2xl rounded-[20px] p-4 shadow-sm border border-border/50">
+            <p className="text-sm font-bold leading-snug text-center text-foreground">
               {message}
             </p>
 
             {/* Speech Bubble Arrow */}
-            <div className="absolute w-4 h-4 transform rotate-45 -translate-x-1/2 border-b border-r -bottom-2 left-1/2 bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border-white/50 dark:border-slate-800/50" />
+            <div className="absolute w-4 h-4 transform rotate-45 -translate-x-1/2 border-b border-r -bottom-2 left-1/2 bg-card/80 backdrop-blur-xl border-border/50" />
           </div>
         </motion.div>
       )}

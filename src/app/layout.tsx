@@ -18,8 +18,8 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: 'cover',
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f8fafc' }, // slate-50
-    { media: '(prefers-color-scheme: dark)', color: '#0f172a' }, // slate-900
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0b1410' },
   ],
 };
 
@@ -46,7 +46,7 @@ export default function RootLayout({
         ].join(' ')}
       >
         {/* Global, fixed background that paints under mobile URL/search bars */}
-        <div className="fixed inset-0 -z-10 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 [background-attachment:fixed]" />
+        <div className="fixed inset-0 -z-10 bg-background [background-attachment:fixed]" />
 
         <Providers>
           <SiteHeader />

@@ -8,16 +8,16 @@ type Variant = 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive';
 type Size = 'sm' | 'md' | 'lg' | 'icon';
 
 const base =
-  'inline-flex items-center justify-center rounded-xl font-medium transition shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 disabled:opacity-50 disabled:pointer-events-none';
+  'inline-flex items-center justify-center rounded-xl font-medium transition shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 disabled:pointer-events-none';
 
 const variants: Record<Variant, string> = {
-  default: 'bg-violet-600 text-white hover:bg-violet-700',
+  default: 'bg-primary text-primary-foreground hover:bg-primary/90',
   secondary:
-    'bg-slate-100 text-slate-900 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700',
+    'bg-secondary text-secondary-foreground hover:bg-secondary/80',
   outline:
-    'border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800',
-  ghost: 'hover:bg-slate-100 dark:hover:bg-slate-800',
-  destructive: 'bg-rose-600 text-white hover:bg-rose-700',
+    'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
+  ghost: 'hover:bg-accent hover:text-accent-foreground',
+  destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
 };
 
 const sizes: Record<Size, string> = {

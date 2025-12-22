@@ -143,7 +143,7 @@ export default React.memo(function TaskList({
   const renderPlaceholder = (k: string) => (
     <div
       key={k}
-      className="h-12 my-2 border-2 border-dashed rounded-xl border-purple-300/70 bg-purple-50/40 dark:border-purple-300/40 dark:bg-purple-900/25"
+      className="h-12 my-2 border-2 border-dashed rounded-xl border-primary/50 bg-primary/10"
     />
   );
 
@@ -156,12 +156,12 @@ export default React.memo(function TaskList({
       rows.push(
         <div 
           key={`empty-state-${day}`}
-          className="flex flex-col items-center justify-center py-2.5 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 bg-slate-50/30 dark:bg-slate-900/20 rounded-2xl transition-colors group-hover:bg-slate-50/50"
+          className="flex flex-col items-center justify-center py-2.5 px-4 text-center border-2 border-dashed border-border bg-muted/30 rounded-2xl transition-colors group-hover:bg-muted/50"
         >
           <div className="mb-1 opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all">
             <Fly size={28} />
           </div>
-          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
             No tasks
           </p>
         </div>

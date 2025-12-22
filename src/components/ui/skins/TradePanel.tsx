@@ -31,15 +31,14 @@ const RARITY_CONFIG: Record<
   }
 > = {
   common: {
-    border: 'border-slate-400 dark:border-slate-600',
-    bg: 'bg-slate-100 dark:bg-slate-800',
-    text: 'text-slate-600 dark:text-slate-400',
+    border: 'border-border',
+    bg: 'bg-card',
+    text: 'text-muted-foreground',
     glow: 'shadow-none',
     label: 'Common',
-    gradient:
-      'from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900',
-    shadow: 'shadow-slate-400/10',
-    hoverGlow: 'hover:shadow-[0_0_20px_rgba(148,163,184,0.5)]',
+    gradient: 'from-muted/50 to-muted/20',
+    shadow: 'shadow-sm',
+    hoverGlow: 'hover:shadow-[0_0_20px_rgba(148,163,184,0.1)]',
   },
   uncommon: {
     border: 'border-emerald-500',
@@ -225,7 +224,7 @@ export function TradePanel({
 
   // --- Render ---
   return (
-    <div className="relative flex flex-col lg:flex-row w-full h-full overflow-y-auto lg:overflow-hidden bg-slate-50 dark:bg-black/20">
+    <div className="relative flex flex-col lg:flex-row w-full h-full overflow-y-auto lg:overflow-hidden bg-background">
       {/* --- RESULT OVERLAY --- */}
       {mounted && tradeResult && 
         createPortal(
@@ -235,7 +234,7 @@ export function TradePanel({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
+              className="absolute inset-0 bg-background/90 backdrop-blur-sm"
             />
 
             {/* Dynamic God Rays for Reveal */}
@@ -248,7 +247,7 @@ export function TradePanel({
               <RotatingRays colorClass={GIFT_RARITY_CONFIG[tradeResult.rarity].rays} />
               <div
                 className={cn(
-                  'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80'
+                  'absolute inset-0 bg-radial-gradient from-transparent to-background/80'
                 )}
               />
             </motion.div>
@@ -268,13 +267,13 @@ export function TradePanel({
       }
 
       {/* --- INVENTORY (Main View - Order 1) --- */}
-      <div className="flex-1 flex flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto order-1 bg-slate-50 dark:bg-black/20 lg:bg-transparent">
+      <div className="flex-1 flex flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto order-1 bg-background lg:bg-transparent">
         <div className="flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4 shrink-0">
-          <h3 className="text-sm font-bold tracking-wider uppercase text-slate-500">
+          <h3 className="text-sm font-bold tracking-wider uppercase text-muted-foreground">
             Your Inventory
           </h3>
           {!availableItems.length && (
-            <span className="text-xs text-slate-400">
+            <span className="text-xs text-muted-foreground/60">
               No tradeable items found
             </span>
           )}
@@ -282,7 +281,7 @@ export function TradePanel({
 
         <div className="px-4 pb-96 lg:pb-6 lg:px-6">
           {availableItems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-40 md:h-64 text-sm border-2 border-dashed text-slate-400 border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-900/50">
+            <div className="flex flex-col items-center justify-center h-40 md:h-64 text-sm border-2 border-dashed text-muted-foreground border-border rounded-xl bg-muted/30">
               <p>Your wardrobe is empty (or filtered out).</p>
             </div>
           ) : (
@@ -316,11 +315,11 @@ export function TradePanel({
       </div>
 
       {/* --- CONTRACT (Side/Bottom Dock - Order 2) --- */}
-      <div className="fixed bottom-0 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto shrink-0 z-20 order-2 lg:w-[320px] xl:w-[360px] bg-white dark:bg-slate-900 border-t lg:border-t-0 lg:border-l border-slate-200 dark:border-slate-800 shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] lg:shadow-[-4px_0_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
+      <div className="fixed bottom-0 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto shrink-0 z-20 order-2 lg:w-[320px] xl:w-[360px] bg-card border-t lg:border-t-0 lg:border-l border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30 shrink-0">
             <div>
-              <h3 className="flex items-center gap-2 text-base md:text-lg font-black uppercase text-slate-800 dark:text-white">
+              <h3 className="flex items-center gap-2 text-base md:text-lg font-black uppercase text-foreground">
                 Contract
                 {targetRarity && (
                   <span
@@ -334,9 +333,9 @@ export function TradePanel({
               </h3>
             </div>
             <div className="text-right">
-              <div className="text-lg md:text-xl font-black text-indigo-600 dark:text-indigo-400">
+              <div className="text-lg md:text-xl font-black text-primary">
                 {selectedIds.length}
-                <span className="text-slate-300">/10</span>
+                <span className="text-muted-foreground/40">/10</span>
               </div>
             </div>
         </div>
@@ -360,7 +359,7 @@ export function TradePanel({
                       className={cn(
                         'aspect-square rounded-lg border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200',
                         !item &&
-                          'border-dashed border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50',
+                          'border-dashed border-border bg-muted/50',
                         item &&
                           config &&
                           cn(config.border, config.bg, 'shadow-sm')
@@ -382,7 +381,7 @@ export function TradePanel({
                           />
                         </div>
                       ) : (
-                        <span className="text-[10px] font-bold text-slate-300 dark:text-slate-700">
+                        <span className="text-[10px] font-bold text-muted-foreground/40">
                           {i + 1}
                         </span>
                       )}
@@ -393,7 +392,7 @@ export function TradePanel({
            
            <div className="mt-auto">
              {error && (
-                <div className="flex items-center gap-2 mb-2 text-xs font-bold text-rose-500 justify-center">
+                <div className="flex items-center gap-2 mb-2 text-xs font-bold text-destructive justify-center">
                   <AlertCircle size={14} /> {error}
                 </div>
               )}
@@ -403,7 +402,7 @@ export function TradePanel({
                   <Button
                     variant="outline"
                     onClick={handleClear}
-                    className="h-12 shrink-0 border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600 px-3"
+                    className="h-12 shrink-0 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive px-3"
                   >
                     Clear
                   </Button>
@@ -414,12 +413,12 @@ export function TradePanel({
                   className={cn(
                     'group relative flex-1 h-12 md:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm md:text-base',
                     selectedIds.length === 10
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white shadow-lg shadow-indigo-500/30'
-                      : 'bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-600'
+                      ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
+                      : 'bg-muted text-muted-foreground'
                   )}
                 >
                   {selectedIds.length === 10 && (
-                    <span className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine" />
+                    <span className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-20 group-hover:animate-shine" />
                   )}
 
                   {isTrading ? (
@@ -431,7 +430,7 @@ export function TradePanel({
                   )}
                 </Button>
              </div>
-             <p className="text-[10px] text-center text-slate-400 mt-2">
+             <p className="text-[10px] text-center text-muted-foreground mt-2">
                 Combine 10 items to upgrade rarity.
               </p>
            </div>

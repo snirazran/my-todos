@@ -73,9 +73,9 @@ export default function LoginPage() {
 
   /* -------------- UI -------------- */
   return (
-    <main className="relative flex items-center justify-center w-full h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] p-4 pb-32 md:pb-60 overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-950 dark:to-slate-900">
+    <main className="relative flex items-center justify-center w-full h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] p-4 pb-32 md:pb-60 overflow-hidden bg-background">
       {/* ─── Decorative Blobs ─── */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-violet-500/10 dark:bg-violet-400/5 blur-[100px] rounded-full pointer-events-none z-0" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-primary/10 blur-[100px] rounded-full pointer-events-none z-0" />
 
       <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
         {/* ─── The Peeking Frog ─── */}
@@ -105,12 +105,12 @@ export default function LoginPage() {
           transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
           className="w-full"
         >
-          <Card className="overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-white/50 dark:border-slate-800/50 bg-white/80 dark:bg-slate-900/70 backdrop-blur-2xl rounded-[32px] pt-12">
+          <Card className="overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-border/50 bg-card/80 backdrop-blur-2xl rounded-[32px] pt-12">
             <CardHeader className="pt-2 pb-6 text-center">
-              <CardTitle className="text-3xl font-black tracking-tighter uppercase text-slate-800 dark:text-white">
+              <CardTitle className="text-3xl font-black tracking-tighter uppercase text-foreground">
                 Welcome back
               </CardTitle>
-              <p className="text-sm font-bold tracking-wide text-slate-400 dark:text-slate-500">
+              <p className="text-sm font-bold tracking-wide text-muted-foreground">
                 I'm Hungry!
               </p>
             </CardHeader>
@@ -120,7 +120,7 @@ export default function LoginPage() {
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
-                  className="p-3 text-[11px] font-black uppercase tracking-wider text-center text-red-500 border border-red-200/50 rounded-2xl bg-red-50/50 dark:bg-red-900/20 dark:border-red-900/30"
+                  className="p-3 text-[11px] font-black uppercase tracking-wider text-center text-destructive border border-destructive/50 rounded-2xl bg-destructive/10"
                 >
                   {errs.server}
                 </motion.div>
@@ -131,7 +131,7 @@ export default function LoginPage() {
                 <div className="space-y-2">
                   <Label
                     htmlFor="email"
-                    className="text-[10px] uppercase font-black tracking-[0.15em] text-slate-400 dark:text-slate-500 ml-1"
+                    className="text-[10px] uppercase font-black tracking-[0.15em] text-muted-foreground ml-1"
                   >
                     Email Address
                   </Label>
@@ -142,13 +142,13 @@ export default function LoginPage() {
                       placeholder="name@example.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
-                      className={`h-12 pl-11 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800 transition-all focus:ring-violet-500/20 focus:border-violet-500/50 ${
+                      className={`h-12 pl-11 rounded-2xl bg-muted/50 border-border transition-all focus:ring-primary/20 focus:border-primary/50 ${
                         errs.email
-                          ? 'border-red-500/50 focus:ring-red-500/10'
+                          ? 'border-destructive/50 focus:ring-destructive/10'
                           : ''
                       }`}
                     />
-                    <Mail className="absolute z-10 w-4 h-4 transition-colors left-4 top-4 text-slate-400 group-focus-within:text-violet-500" />
+                    <Mail className="absolute z-10 w-4 h-4 transition-colors left-4 top-4 text-muted-foreground group-focus-within:text-primary" />
                   </div>
                   {errs.email && <FieldError msg={errs.email} />}
                 </div>
@@ -158,7 +158,7 @@ export default function LoginPage() {
                   <div className="flex items-center justify-between ml-1">
                     <Label
                       htmlFor="password"
-                      className="text-[10px] uppercase font-black tracking-[0.15em] text-slate-400 dark:text-slate-500"
+                      className="text-[10px] uppercase font-black tracking-[0.15em] text-muted-foreground"
                     >
                       Password
                     </Label>
@@ -170,20 +170,20 @@ export default function LoginPage() {
                       placeholder="••••••••"
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
-                      className={`h-12 pl-11 rounded-2xl bg-slate-100/50 dark:bg-slate-800/50 border-slate-200/50 dark:border-slate-800 transition-all focus:ring-violet-500/20 focus:border-violet-500/50 ${
+                      className={`h-12 pl-11 rounded-2xl bg-muted/50 border-border transition-all focus:ring-primary/20 focus:border-primary/50 ${
                         errs.password
-                          ? 'border-red-500/50 focus:ring-red-500/10'
+                          ? 'border-destructive/50 focus:ring-destructive/10'
                           : ''
                       }`}
                     />
-                    <Lock className="absolute z-10 w-4 h-4 transition-colors left-4 top-4 text-slate-400 group-focus-within:text-violet-500" />
+                    <Lock className="absolute z-10 w-4 h-4 transition-colors left-4 top-4 text-muted-foreground group-focus-within:text-primary" />
                   </div>
                   {errs.password && <FieldError msg={errs.password} />}
                 </div>
 
                 <Button
                   type="submit"
-                  className="w-full h-12 mt-2 bg-violet-600 hover:bg-violet-700 text-white font-black uppercase tracking-[0.1em] rounded-2xl shadow-lg shadow-violet-500/25 transition-all active:scale-[0.98]"
+                  className="w-full h-12 mt-2 bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase tracking-[0.1em] rounded-2xl shadow-lg shadow-primary/25 transition-all active:scale-[0.98]"
                   disabled={submitting}
                 >
                   {submitting ? (
@@ -195,12 +195,12 @@ export default function LoginPage() {
               </form>
             </CardContent>
 
-            <CardFooter className="flex flex-col gap-4 py-6 border-t bg-slate-50/50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800/50">
-              <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+            <CardFooter className="flex flex-col gap-4 py-6 border-t bg-muted/30 border-border">
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                 Don&apos;t have an account?{' '}
                 <Link
                   href="/register"
-                  className="ml-1 text-violet-600 dark:text-violet-400 hover:underline decoration-2 underline-offset-4"
+                  className="ml-1 text-primary hover:underline decoration-2 underline-offset-4"
                 >
                   Create one
                 </Link>

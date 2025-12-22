@@ -168,14 +168,14 @@ export function FilterBar({
                 'relative flex-none flex items-center gap-2 px-5 py-3 rounded-2xl transition-all duration-200 border-[2px] shadow-sm select-none',
                 'text-sm font-bold whitespace-nowrap',
                 isActive
-                  ? 'bg-purple-600 border-purple-600 text-white shadow-purple-500/30'
-                  : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 border-slate-200 dark:border-slate-700 hover:border-purple-300 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-300'
+                  ? 'bg-primary border-primary text-primary-foreground shadow-primary/30'
+                  : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:text-primary'
               )}
             >
               {conf.icon}
               {conf.label}
               {badgeCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-red-500 rounded-full border-2 border-white dark:border-slate-800 shadow-sm animate-in zoom-in">
+                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background shadow-sm animate-in zoom-in">
                   {badgeCount}
                 </span>
               )}

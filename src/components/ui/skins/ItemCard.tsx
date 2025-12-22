@@ -26,15 +26,15 @@ const RARITY_CONFIG: Record<
   }
 > = {
   common: {
-    border: 'border-slate-400 dark:border-slate-600',
-    bg: 'bg-slate-100 dark:bg-slate-800',
-    text: 'text-slate-600 dark:text-slate-400',
+    border: 'border-border',
+    bg: 'bg-card',
+    text: 'text-muted-foreground',
     glow: 'shadow-none',
     label: 'Common',
     gradient:
-      'from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900',
-    shadow: 'shadow-slate-400/10',
-    hoverGlow: 'hover:shadow-[0_0_20px_rgba(148,163,184,0.5)]',
+      'from-muted/50 to-muted/20',
+    shadow: 'shadow-sm',
+    hoverGlow: 'hover:shadow-[0_0_20px_rgba(148,163,184,0.1)]',
   },
   uncommon: {
     border: 'border-emerald-500',
@@ -147,7 +147,7 @@ export function ItemCard({
         isEquipped
           ? cn(config.shadow)
           : isSelected
-          ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-500 dark:border-indigo-500 shadow-[0_0_15px_rgba(99,102,241,0.4)]'
+          ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(34,197,94,0.4)]'
           : cn(config.shadow, config.hoverGlow),
         !isOwned && mode === 'shop' && !canAfford && 'opacity-80'
       )}
@@ -170,7 +170,7 @@ export function ItemCard({
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            className="absolute z-30 px-2 py-0.5 text-white bg-indigo-500 rounded-full shadow-md top-2 right-2 text-[10px] font-black"
+            className="absolute z-30 px-2 py-0.5 text-primary-foreground bg-primary rounded-full shadow-md top-2 right-2 text-[10px] font-black"
           >
             {selectedCount}
           </motion.div>
@@ -230,7 +230,7 @@ export function ItemCard({
 
       {/* Name & Price */}
       <div className="flex-1 flex flex-col items-center justify-end gap-1 md:gap-1.5 pb-1">
-        <h4 className="w-full text-xs font-bold leading-tight text-center truncate md:text-sm text-slate-800 dark:text-slate-100">
+        <h4 className="w-full text-xs font-bold leading-tight text-center truncate md:text-sm text-foreground">
           {item.name}
         </h4>
 
@@ -240,8 +240,8 @@ export function ItemCard({
             <span
               className={
                 canAfford
-                  ? 'text-slate-800 dark:text-slate-200'
-                  : 'text-red-500'
+                  ? 'text-foreground'
+                  : 'text-destructive'
               }
             >
               {item.priceFlies}
@@ -259,8 +259,8 @@ export function ItemCard({
               isEquipped
                 ? 'bg-green-600 text-white shadow-md'
                 : isSelected
-                ? 'bg-indigo-600 text-white shadow-md'
-                : 'bg-white/50 dark:bg-black/20 text-slate-500 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 group-hover:text-purple-600'
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary'
             )}
           >
             {actionLoading
@@ -285,8 +285,8 @@ export function ItemCard({
             className={cn(
               'h-7 md:h-8 w-full font-black rounded-lg text-[10px] md:text-xs uppercase tracking-wide shadow-md overflow-hidden relative',
               canAfford
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white border border-purple-400/30'
-                : 'bg-slate-200 text-slate-400 dark:bg-slate-800'
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
+                : 'bg-muted text-muted-foreground'
             )}
             onClick={(e) => {
               e.stopPropagation();

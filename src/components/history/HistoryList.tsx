@@ -29,8 +29,8 @@ export default function HistoryList({ history, onToggleTask, setFlyRef, visually
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center opacity-60">
         <div className="text-4xl mb-4">🐸</div>
-        <h3 className="text-lg font-medium text-slate-900 dark:text-white">No history found</h3>
-        <p className="text-slate-500">Try selecting a different date range.</p>
+        <h3 className="text-lg font-medium text-foreground">No history found</h3>
+        <p className="text-muted-foreground">Try selecting a different date range.</p>
       </div>
     );
   }
@@ -57,14 +57,14 @@ export default function HistoryList({ history, onToggleTask, setFlyRef, visually
           >
             <div className="flex items-end justify-between px-1 py-2">
                <div>
-                  <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                  <h3 className="text-lg font-bold text-foreground">
                     {dateLabel}
                   </h3>
-                  <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
                      {format(dateObj, 'yyyy')}
                   </p>
                </div>
-               <div className="text-xs font-medium text-slate-400">
+               <div className="text-xs font-medium text-muted-foreground">
                   {completedCount}/{totalCount} Completed
                </div>
             </div>

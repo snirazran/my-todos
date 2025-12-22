@@ -294,7 +294,7 @@ export default function QuickAddSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => onOpenChange(false)}
-            className="fixed inset-0 z-[999] bg-slate-950/20 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[999] bg-background/80 backdrop-blur-[2px]"
           />
 
           <motion.div
@@ -305,7 +305,7 @@ export default function QuickAddSheet({
             className="fixed left-0 right-0 z-[1000] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none transition-[bottom] duration-200 bottom-0"
           >
             <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
-              <div className="rounded-[28px] bg-white/95 dark:bg-slate-950/90 backdrop-blur-2xl ring-1 ring-slate-200/80 dark:ring-slate-800/70 shadow-[0_24px_48px_rgba(15,23,42,0.25)] p-4">
+              <div className="rounded-[28px] bg-popover/95 backdrop-blur-2xl ring-1 ring-border/80 shadow-[0_24px_48px_rgba(15,23,42,0.25)] p-4">
                 {/* Input Area */}
                 <div dir="ltr" className="w-full">
                   <input
@@ -317,7 +317,7 @@ export default function QuickAddSheet({
                     spellCheck={false}
                     autoComplete="off"
                     maxLength={45}
-                    className="w-full h-12 px-4 mb-1 rounded-[16px] bg-white/95 dark:bg-slate-900/70 text-slate-900 dark:text-white ring-1 ring-slate-200/80 dark:ring-slate-700/70 shadow-[0_1px_0_rgba(255,255,255,.7)_inset] focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50 text-lg font-medium text-left"
+                    className="w-full h-12 px-4 mb-1 rounded-[16px] bg-muted/50 text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 text-lg font-medium text-left"
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -380,8 +380,8 @@ export default function QuickAddSheet({
                             inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-bold transition-all
                             border
                             ${isTagPanelOpen 
-                                ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-900/30 dark:text-purple-200 dark:border-purple-800' 
-                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 dark:bg-slate-900/50 dark:text-slate-400 dark:border-slate-800 dark:hover:bg-slate-800'
+                                ? 'bg-primary/10 text-primary border-primary/20' 
+                                : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
                             }
                         `}
                     >
@@ -552,7 +552,7 @@ export default function QuickAddSheet({
 
                 {/* Segmented control */}
                 <div className="mb-3">
-                  <div className="grid grid-cols-2 gap-1.5 p-1.5 rounded-2xl bg-slate-100/70 dark:bg-slate-900/80 ring-1 ring-slate-200/80 dark:ring-slate-800/70">
+                  <div className="grid grid-cols-2 gap-1.5 p-1.5 rounded-2xl bg-muted/50 ring-1 ring-border/50">
                     <button
                       type="button"
                       aria-pressed={when === 'pick'}
@@ -565,9 +565,9 @@ export default function QuickAddSheet({
                       }}
                       className={[
                         'h-10 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-2 transition',
-                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300',
-                        'data-[active=true]:bg-white dark:data-[active=true]:bg-slate-800 data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-slate-200/80 dark:data-[active=true]:ring-slate-700',
-                        'data-[active=false]:text-slate-600 dark:data-[active=false]:text-slate-400',
+                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'data-[active=true]:bg-card data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-border',
+                        'data-[active=false]:text-muted-foreground',
                       ].join(' ')}
                     >
                       <CalendarDays className="w-4 h-4" />
@@ -585,9 +585,9 @@ export default function QuickAddSheet({
                       }}
                       className={[
                         'h-10 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-2 transition',
-                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-300',
-                        'data-[active=true]:bg-white dark:data-[active=true]:bg-slate-800 data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-slate-200/80 dark:data-[active=true]:ring-slate-700',
-                        'data-[active=false]:text-slate-600 dark:data-[active=false]:text-slate-400',
+                        'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                        'data-[active=true]:bg-card data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-border',
+                        'data-[active=false]:text-muted-foreground',
                       ].join(' ')}
                     >
                       <CalendarCheck className="w-4 h-4" />
@@ -615,9 +615,9 @@ export default function QuickAddSheet({
                               className={[
                                 'inline-flex items-center justify-center select-none',
                                 'h-10 w-10 rounded-full text-sm font-bold',
-                                'border border-slate-300/80 dark:border-slate-700/70',
-                                'bg-white dark:bg-slate-900/70 text-slate-800 dark:text-white',
-                                'data-[active=true]:bg-purple-50 dark:data-[active=true]:bg-purple-900/40 data-[active=true]:border-purple-300 data-[active=true]:text-purple-900 dark:data-[active=true]:text-purple-200',
+                                'border border-border/70',
+                                'bg-card text-foreground',
+                                'data-[active=true]:bg-primary/20 data-[active=true]:border-primary data-[active=true]:text-primary',
                                 'transition-all duration-200',
                               ].join(' ')}
                             >
@@ -631,7 +631,7 @@ export default function QuickAddSheet({
                     <div className="sm:shrink-0 sm:pl-1">
                       <div
                         className={[
-                          'inline-flex items-center gap-2 px-3 py-1.5 border rounded-full bg-white/90 dark:bg-slate-900/70 border-slate-300/70 dark:border-slate-800/70',
+                          'inline-flex items-center gap-2 px-3 py-1.5 border rounded-full bg-card/90 border-border/70',
                           isLater ? 'opacity-50 pointer-events-none' : '',
                         ].join(' ')}
                         aria-disabled={isLater}
@@ -641,8 +641,8 @@ export default function QuickAddSheet({
                             : undefined
                         }
                       >
-                        <RotateCcw className="w-4 h-4 text-purple-700/80 dark:text-purple-200" />
-                        <span className="text-[13px] font-bold text-slate-700 dark:text-slate-200">
+                        <RotateCcw className="w-4 h-4 text-primary" />
+                        <span className="text-[13px] font-bold text-foreground">
                           Repeat weekly
                         </span>
                         <button
@@ -657,7 +657,7 @@ export default function QuickAddSheet({
                           data-on={repeatsOn}
                           className={[
                             'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                            'bg-slate-300/70 data-[on=true]:bg-purple-500',
+                            'bg-muted-foreground/30 data-[on=true]:bg-primary',
                           ].join(' ')}
                           title={repeatsOn ? 'Weekly' : 'One-time'}
                           disabled={isLater}
@@ -675,8 +675,8 @@ export default function QuickAddSheet({
                 )}
 
                 {when === 'later' && (
-                  <div className="mt-2 flex items-start gap-2 rounded-xl bg-purple-50/75 dark:bg-purple-900/30 ring-1 ring-purple-300/40 p-3 text-[13px] text-purple-900/90 dark:text-purple-100/90">
-                    <Info className="w-4 h-4 mt-0.5 shrink-0 text-purple-600 dark:text-purple-400" />
+                  <div className="mt-2 flex items-start gap-2 rounded-xl bg-accent/50 ring-1 ring-accent p-3 text-[13px] text-foreground">
+                    <Info className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
                     <span>
                       Not sure when? We&apos;ll keep it in your{' '}
                       <span className="font-bold">Saved Tasks</span> for later.
@@ -692,9 +692,9 @@ export default function QuickAddSheet({
                     disabled={!text.trim() || isSubmitting}
                     className={[
                       'relative h-12 rounded-full text-[15px] font-bold overflow-hidden transition-all',
-                      'bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-500 text-white',
-                      'shadow-[0_10px_25px_-4px_rgba(99,102,241,0.4)] ring-1 ring-white/20',
-                      'hover:brightness-105 hover:shadow-[0_12px_30px_-4px_rgba(99,102,241,0.5)] active:scale-[0.985]',
+                      'bg-primary text-primary-foreground',
+                      'shadow-sm ring-1 ring-white/20',
+                      'hover:brightness-105 active:scale-[0.985]',
                       'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
                     ].join(' ')}
                   >
@@ -717,9 +717,9 @@ export default function QuickAddSheet({
                     onClick={() => onOpenChange(false)}
                     className={[
                       'h-12 rounded-full text-[15px] font-semibold transition-all',
-                      'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300',
-                      'hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-[0.985]',
-                      'ring-1 ring-slate-200 dark:ring-slate-700',
+                      'bg-secondary text-secondary-foreground',
+                      'hover:bg-secondary/80 active:scale-[0.985]',
+                      'ring-1 ring-border',
                     ].join(' ')}
                   >
                     <span className="inline-flex items-center justify-center gap-2">

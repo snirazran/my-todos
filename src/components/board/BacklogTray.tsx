@@ -139,24 +139,24 @@ export default React.memo(function BacklogTray({
             animate={{ y: `${closeProgress * 100}%` }}
             exit={{ y: '100%' }}
             transition={closeProgress > 0 ? { type: 'tween', ease: 'linear', duration: 0 } : { type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[90] flex flex-col bg-white/90 dark:bg-slate-900/95 border-t border-slate-200/80 dark:border-slate-700/80 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] backdrop-blur-xl pb-[env(safe-area-inset-bottom)]"
+            className="fixed bottom-0 left-0 right-0 z-[90] flex flex-col bg-popover/90 border-t border-border/80 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] backdrop-blur-xl pb-[env(safe-area-inset-bottom)]"
             onClick={(e) => e.stopPropagation()} // Prevent click-through closing
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800/50">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
               <div>
-                <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">
+                <h3 className="text-lg font-bold text-foreground">
                   Saved Tasks
                 </h3>
-                <p className="text-xs text-slate-500 font-medium">
+                <p className="text-xs text-muted-foreground font-medium">
                   Tasks you're not sure when to do. Drag in to save, drag out to schedule.
                 </p>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 transition-colors"
+                className="p-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
               >
-                <X size={20} className="text-slate-600 dark:text-slate-300" />
+                <X size={20} className="text-muted-foreground" />
               </button>
             </div>
 
@@ -170,7 +170,7 @@ export default React.memo(function BacklogTray({
               className="flex gap-4 p-4 overflow-x-auto overflow-y-visible min-h-[140px] items-center no-scrollbar touch-manipulation"
             >
               {tasks.length === 0 ? (
-                <div className="w-full text-center py-8 text-slate-400 text-sm italic">
+                <div className="w-full text-center py-8 text-muted-foreground text-sm italic">
                   No tasks for later. Drop some here!
                 </div>
               ) : (

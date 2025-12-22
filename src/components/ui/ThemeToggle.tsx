@@ -17,7 +17,7 @@ export function ThemeToggle() {
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl border border-slate-200/50 bg-white/50 dark:border-slate-800/50 dark:bg-slate-950/50">
+      <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl border border-border/50 bg-background/50 dark:border-border/50 dark:bg-background/50">
         <div className="h-4 w-4" />
       </Button>
     );
@@ -28,7 +28,7 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-      className="relative h-9 w-9 rounded-xl border border-slate-200/50 bg-white/50 transition-all hover:bg-slate-100 dark:border-slate-800/50 dark:bg-slate-950/50 dark:hover:bg-slate-900"
+      className="relative h-9 w-9 rounded-xl border border-border/50 bg-background/50 transition-all hover:bg-accent dark:border-border/50 dark:bg-background/50 dark:hover:bg-accent"
     >
       <AnimatePresence mode="wait" initial={false}>
         {theme === 'dark' ? (
