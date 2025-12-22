@@ -4,6 +4,7 @@ import {
   EllipsisVertical,
   CalendarCheck,
   RotateCcw,
+  GripVertical,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useState } from 'react';
@@ -114,12 +115,9 @@ function SortableTaskItem({
         className={`group relative ${isMenuOpen ? 'z-50' : 'z-auto'}`}
       >
         <div
-          {...attributes}
-          {...listeners}
-          onClick={() => handleTaskToggle(task)}
           className={`
-          relative flex items-center gap-3 px-3 py-3.5 
-          transition-all duration-200 cursor-pointer rounded-xl 
+          relative flex items-center gap-1.5 px-2 py-3.5 
+          transition-all duration-200 rounded-xl 
           border border-transparent hover:border-border
           hover:bg-accent hover:shadow-sm
           select-none
@@ -137,118 +135,134 @@ function SortableTaskItem({
             userSelect: 'none',
           } as React.CSSProperties}
         >
-          {/* Bullet */}
-          <div className="relative flex-shrink-0 w-7 h-7">
-            <AnimatePresence initial={false}>
-              {!isDone ? (
-                <motion.div
-                  key="fly"
-                  className="absolute inset-0"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18 }}
-                >
-                  {renderBullet ? (
-                    renderBullet(task, false)
-                  ) : (
+          {/* Drag Handle */}
+          {!isDone && (
+            <div
+              {...attributes}
+              {...listeners}
+              className="flex items-center justify-center w-6 h-full cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground transition-colors touch-none"
+            >
+              <GripVertical size={18} />
+            </div>
+          )}
+          
+          <div 
+            onClick={() => handleTaskToggle(task)}
+            className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer"
+          >
+            {/* Bullet */}
+            <div className="relative flex-shrink-0 w-7 h-7">
+              <AnimatePresence initial={false}>
+                {!isDone ? (
+                  <motion.div
+                    key="fly"
+                    className="absolute inset-0"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                  >
+                    {renderBullet ? (
+                      renderBullet(task, false)
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTaskToggle(task, true);
+                        }}
+                        className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 hover:text-primary"
+                      >
+                        <Circle className="w-6 h-6" />
+                      </button>
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="check"
+                    className="absolute inset-0"
+                    initial={{ opacity: 0, scale: 0.6 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.6 }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 400,
+                      damping: 25,
+                    }}
+                  >
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleTaskToggle(task, true);
+                        handleTaskToggle(task, false);
                       }}
-                      className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 hover:text-primary"
                     >
-                      <Circle className="w-6 h-6" />
+                      <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
                     </button>
-                  )}
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="check"
-                  className="absolute inset-0"
-                  initial={{ opacity: 0, scale: 0.6 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.6 }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 400,
-                    damping: 25,
-                  }}
-                >
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleTaskToggle(task, false);
-                    }}
-                  >
-                    <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <motion.span
-              className={`block text-base font-medium md:text-lg transition-colors duration-200 ${
-                isDone
-                  ? 'text-muted-foreground line-through'
-                  : 'text-foreground'
-              }`}
-              animate={{
-                opacity: isDone ? 0.8 : 1,
-              }}
-              transition={{ duration: 0.2 }}
-            >
-              {task.text}
-            </motion.span>
-            {(isWeekly || (task.tags && task.tags.length > 0)) && (
-              <div className="flex flex-wrap gap-1 mt-1">
-                {isWeekly && (
-                  <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
-                    <RotateCcw className="h-3 w-3" />
-                    Weekly
-                  </span>
+                  </motion.div>
                 )}
-                <AnimatePresence mode="popLayout">
-                  {task.tags?.map((tagId) => {
-                    const tagDetails = getTagDetails(tagId);
-                    if (!tagDetails) return null;
+              </AnimatePresence>
+            </div>
 
-                    const color = tagDetails.color;
-                    const name = tagDetails.name;
+            <div className="flex-1 min-w-0">
+              <motion.span
+                className={`block text-base font-medium md:text-lg transition-colors duration-200 ${
+                  isDone
+                    ? 'text-muted-foreground line-through'
+                    : 'text-foreground'
+                }`}
+                animate={{
+                  opacity: isDone ? 0.8 : 1,
+                }}
+                transition={{ duration: 0.2 }}
+              >
+                {task.text}
+              </motion.span>
+              {(isWeekly || (task.tags && task.tags.length > 0)) && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {isWeekly && (
+                    <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
+                      <RotateCcw className="h-3 w-3" />
+                      Weekly
+                    </span>
+                  )}
+                  <AnimatePresence mode="popLayout">
+                    {task.tags?.map((tagId) => {
+                      const tagDetails = getTagDetails(tagId);
+                      if (!tagDetails) return null;
 
-                    return (
-                      <motion.span
-                        layout
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0 }}
-                        transition={{ duration: 0.2 }}
-                        key={tagId}
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
-                          !color
-                            ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
-                            : ''
-                        }`}
-                        style={
-                          color
-                            ? {
-                                backgroundColor: `${color}20`,
-                                color: color,
-                                borderColor: `${color}40`,
-                              }
-                            : undefined
-                        }
-                      >
-                        {name}
-                      </motion.span>
-                    );
-                  })}
-                </AnimatePresence>
-              </div>
-            )}
+                      const color = tagDetails.color;
+                      const name = tagDetails.name;
+
+                      return (
+                        <motion.span
+                          layout
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0 }}
+                          transition={{ duration: 0.2 }}
+                          key={tagId}
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
+                            !color
+                              ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
+                              : ''
+                          }`}
+                          style={
+                            color
+                              ? {
+                                  backgroundColor: `${color}20`,
+                                  color: color,
+                                  borderColor: `${color}40`,
+                                }
+                              : undefined
+                          }
+                        >
+                          {name}
+                        </motion.span>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Actions */}
