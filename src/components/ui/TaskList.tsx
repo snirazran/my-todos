@@ -4,7 +4,6 @@ import {
   EllipsisVertical,
   CalendarCheck,
   RotateCcw,
-  GripVertical,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 import React, { useState } from 'react';
@@ -130,25 +129,16 @@ function SortableTaskItem({
           ${isDone && !isDragging ? 'opacity-60 hover:opacity-100' : ''}
         `}
           style={{
-            touchAction: 'pan-y', 
+            touchAction: isDragging ? 'none' : 'pan-y', 
             WebkitUserSelect: 'none',
             userSelect: 'none',
           } as React.CSSProperties}
+          {...attributes}
+          {...listeners}
         >
-          {/* Drag Handle */}
-          {!isDone && (
-            <div
-              {...attributes}
-              {...listeners}
-              className="flex items-center justify-center w-6 h-full cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-muted-foreground transition-colors touch-none"
-            >
-              <GripVertical size={18} />
-            </div>
-          )}
-          
           <div 
             onClick={() => handleTaskToggle(task)}
-            className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer"
+            className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer pl-2"
           >
             {/* Bullet */}
             <div className="relative flex-shrink-0 w-7 h-7">
@@ -349,7 +339,7 @@ export default function TaskList({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 250,
+        delay: 120,
         tolerance: 5,
       },
     }),

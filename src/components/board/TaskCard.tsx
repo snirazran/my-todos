@@ -57,7 +57,7 @@ export default function TaskCard({
   onToggleMenuRef.current = onToggleMenu;
 
   const MOVE_TOLERANCE = 8;
-  const LONG_PRESS_DURATION = 230;
+  const LONG_PRESS_DURATION = 120;
   const defaultTouchAction = touchAction || 'auto';
 
   const cleanupLP = useCallback(() => {
