@@ -435,6 +435,7 @@ export default function TaskBoard({
                   setCardRef={setCardRef}
                   userTags={userTags}
                   onToggleRepeat={onToggleRepeat}
+                  isAnyDragging={!!drag?.active}
                 />
               </DayColumn>
             </div>
@@ -528,6 +529,7 @@ export default function TaskBoard({
           width={drag.width}
           height={drag.height}
           text={drag.taskText}
+          tags={drag.tags}
         />
       )}
 

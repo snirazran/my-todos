@@ -15,6 +15,7 @@ export type DragState = {
   dy: number;
   width: number;
   height: number;
+  tags?: { id: string; name: string; color: string }[];
 };
 
 export function useDragManager() {
@@ -121,7 +122,8 @@ export function useDragManager() {
       taskText: string,
       clientX: number,
       clientY: number,
-      rect: DOMRect
+      rect: DOMRect,
+      tags?: { id: string; name: string; color: string }[]
     ) => {
       document.body.style.userSelect = 'none';
       document.body.style.touchAction = 'none'; // block body scroll
@@ -151,6 +153,7 @@ export function useDragManager() {
         dy: clientY - rect.top,
         width: rect.width,
         height: rect.height,
+        tags,
       });
       setTargetDay(day);
       setTargetIndex(index);
@@ -167,12 +170,13 @@ export function useDragManager() {
       clientX: number;
       clientY: number;
       rectGetter: () => DOMRect;
+      tags?: { id: string; name: string; color: string }[];
     }) => {
-      const { day, index, taskId, taskText, clientX, clientY, rectGetter } =
+      const { day, index, taskId, taskText, clientX, clientY, rectGetter, tags } =
         params;
 
       const rect = rectGetter();
-      beginDragFromCard(day, index, taskId, taskText, clientX, clientY, rect);
+      beginDragFromCard(day, index, taskId, taskText, clientX, clientY, rect, tags);
     },
     [beginDragFromCard]
   );

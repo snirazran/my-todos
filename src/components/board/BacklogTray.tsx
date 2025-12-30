@@ -177,7 +177,6 @@ export default React.memo(function BacklogTray({
                 <AnimatePresence mode="popLayout">
                 {tasks.map((t, i) => (
                   <motion.div
-                    layout
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
@@ -213,7 +212,14 @@ export default React.memo(function BacklogTray({
                       hiddenWhileDragging={activeDragId === t.id}
                       isRepeating={t.type === 'weekly'}
                       touchAction="pan-x"
+                      isAnyDragging={!!activeDragId}
                       onGrab={(payload) => {
+                        // Resolve tags
+                        const resolvedTags = t.tags?.map(tagId => {
+                           const found = userTags?.find(ut => ut.id === tagId || ut.name === tagId);
+                           return found || { id: tagId, name: tagId, color: '' };
+                        });
+
                         onGrab({
                             day: 7,
                             index: i,
@@ -226,7 +232,8 @@ export default React.memo(function BacklogTray({
                                 const id = draggableIdFor(7, t.id);
                                 const el = document.querySelector(`[data-card-id="${id}"]`);
                                 return el?.getBoundingClientRect() ?? new DOMRect(0,0,0,0);
-                            }
+                            },
+                            tags: resolvedTags
                         })
                       }}
                     />

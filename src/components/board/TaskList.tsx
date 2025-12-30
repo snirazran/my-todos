@@ -22,6 +22,7 @@ export default React.memo(function TaskList({
   setCardRef,
   userTags,
   onToggleRepeat,
+  isAnyDragging,
 }: {
   day: DisplayDay;
   items: Task[];
@@ -40,10 +41,12 @@ export default React.memo(function TaskList({
     clientY: number;
     pointerType: 'mouse' | 'touch';
     rectGetter: () => DOMRect;
+    tags?: { id: string; name: string; color: string }[];
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
   userTags?: { id: string; name: string; color: string }[];
   onToggleRepeat?: (taskId: string, day: DisplayDay) => void;
+  isAnyDragging?: boolean;
 }) {
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay } | null>(null);
@@ -216,6 +219,12 @@ export default React.memo(function TaskList({
             }}
             onGrab={(payload) => {
               const id = draggableIdFor(day, t.id);
+              // Resolve tags
+              const resolvedTags = t.tags?.map(tagId => {
+                 const found = userTags?.find(ut => ut.id === tagId || ut.name === tagId);
+                 return found || { id: tagId, name: tagId, color: '' };
+              });
+
               onGrab({
                 day,
                 index: i, // original array index
@@ -234,11 +243,13 @@ export default React.memo(function TaskList({
                     new DOMRect(payload.clientX - 1, payload.clientY - 1, 1, 1)
                   );
                 },
+                tags: resolvedTags,
               });
             }}
             hiddenWhileDragging={false}
             isRepeating={t.type === 'weekly'}
             userTags={userTags}
+            isAnyDragging={isAnyDragging}
           />
         </div>
       );

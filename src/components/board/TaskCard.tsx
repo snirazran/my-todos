@@ -24,6 +24,7 @@ export default function TaskCard({
   touchAction,
   requireLongPress = false,
   userTags,
+  isAnyDragging,
 }: {
   dragId: string;
   task: Task;
@@ -36,6 +37,7 @@ export default function TaskCard({
   touchAction?: string;
   requireLongPress?: boolean;
   userTags?: { id: string; name: string; color: string }[];
+  isAnyDragging?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -195,7 +197,11 @@ export default function TaskCard({
       role="listitem"
       aria-grabbed={false}
     >
-      <div className="grid self-center shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-6 w-6">
+      <motion.div 
+        layout={!isAnyDragging}
+        className="flex items-stretch gap-3 w-full"
+      >
+        <div className="grid self-center shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-6 w-6">
         <div
           className={`absolute inset-0 transition-opacity duration-200 ${
             task.completed ? 'opacity-0 pointer-events-none' : 'opacity-100'
@@ -235,7 +241,6 @@ export default function TaskCard({
 
               return (
                 <motion.span
-                  layout
                   initial={{ opacity: 0, scale: 0.8 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0 }}
@@ -292,6 +297,7 @@ export default function TaskCard({
           <EllipsisVertical className="w-4 h-4 text-muted-foreground" />
         </button>
       </div>
+      </motion.div>
     </div>
   );
 }

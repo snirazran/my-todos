@@ -53,6 +53,7 @@ interface SortableTaskItemProps {
   getTagDetails: (tagId: string) => { id: string; name: string; color: string } | undefined;
   isDragDisabled?: boolean;
   isWeekly?: boolean;
+  disableLayout?: boolean;
 }
 
 function SortableTaskItem({
@@ -66,6 +67,7 @@ function SortableTaskItem({
   getTagDetails,
   isDragDisabled,
   isWeekly,
+  disableLayout,
 }: SortableTaskItemProps) {
   const {
     attributes,
@@ -91,7 +93,7 @@ function SortableTaskItem({
   return (
     <div ref={setNodeRef} style={style} className="relative mb-3">
       <motion.div
-        layout={!isDragging}
+        layout={!disableLayout}
         initial={{ opacity: 0, y: 20 }}
         animate={
           isExitingLater
@@ -224,7 +226,6 @@ function SortableTaskItem({
 
                       return (
                         <motion.span
-                          layout={!isDragging}
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0 }}
@@ -334,6 +335,7 @@ export default function TaskList({
   } | null>(null);
   
   const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
+  const [isAnyDragging, setIsAnyDragging] = useState(false);
 
   // DnD Sensors
   const sensors = useSensors(
@@ -441,7 +443,12 @@ export default function TaskList({
     .filter((t) => !t.completed && !vSet.has(t.id))
     .map((t) => t.id);
 
+  const handleDragStart = () => {
+    setIsAnyDragging(true);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
+    setIsAnyDragging(false);
     const { active, over } = event;
 
     if (over && active.id !== over.id && onReorder) {
@@ -528,6 +535,7 @@ export default function TaskList({
           <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           >
@@ -557,6 +565,7 @@ export default function TaskList({
                         getTagDetails={getTagDetails}
                         isDragDisabled={false}
                         isWeekly={taskKind(task) === 'weekly'}
+                        disableLayout={isAnyDragging}
                       />
                     );
                   })}
