@@ -692,13 +692,14 @@ export default function Home() {
         initialText={quickText}
         defaultRepeat="this-week"
         onSubmit={async ({ text, days, repeat, tags }) => {
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
           await fetch('/api/tasks?view=board', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, days, repeat, tags }),
+            body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
           });
           if (session) {
-            const res = await fetch(`/api/tasks?date=${dateStr}`);
+            const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
             const json = await res.json();
             setTasks(json.tasks ?? []);
             setWeeklyIds(new Set(json.weeklyIds ?? []));
