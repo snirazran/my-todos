@@ -36,14 +36,14 @@ export default function ProgressCard({
       >
         {/* Header Row */}
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold tracking-wider uppercase md:text-base text-muted-foreground">
+          <h2 className="text-sm font-bold tracking-wider uppercase md:text-sm text-muted-foreground">
             Daily Goals
           </h2>
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black md:text-3xl text-foreground">
+            <span className="text-2xl font-black md:text-2xl text-foreground">
               {done}
             </span>
-            <span className="text-sm font-bold md:text-lg text-muted-foreground">
+            <span className="text-sm font-bold md:text-base text-muted-foreground">
               / {total}
             </span>
           </div>
@@ -72,114 +72,261 @@ export default function ProgressCard({
           </div>
         </div>
 
-        {/* Rewards Grid */}
-        {!allGiftsClaimed && (
-          <div className="grid grid-cols-3 gap-3">
-            {slots.map((slot, idx) => {
-              const isLocked = slot.status === 'LOCKED';
-              const isClaimed = slot.status === 'CLAIMED';
-              const isReady = slot.status === 'READY';
+                                {/* Rewards Grid */}
 
-              // Common card styles
-              const cardBase =
-                'relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all duration-300 min-h-[90px]';
+                                {!allGiftsClaimed && (
 
-              if (isClaimed) {
-                return (
-                  <div
-                    key={idx}
-                    className={`${cardBase} bg-green-50/50 dark:bg-green-900/10 border-green-200/50 dark:border-green-800/30`}
-                  >
-                    <div className="flex items-center justify-center h-14">
-                      <div className="p-3 bg-green-100 rounded-full shadow-sm dark:bg-green-500/20">
-                        <Check
-                          className="w-5 h-5 text-green-600 dark:text-green-400"
-                          strokeWidth={4}
-                        />
-                      </div>
-                    </div>
-                    <span className="text-[10px] md:text-xs font-bold text-green-700 dark:text-green-300 uppercase tracking-wider">
-                      Collected
-                    </span>
-                  </div>
-                );
-              }
+                                  <div className="grid grid-cols-3 gap-2 xl:gap-3">
 
-              if (isReady) {
-                return (
-                  <div
-                    key={idx}
-                    className={`${cardBase} bg-card border-primary shadow-lg scale-105 z-10`}
-                  >
-                    <div className="flex items-center justify-center h-14">
-                      <div className="relative -top-4">
-                        <GiftRive
-                          key="milestone-ready"
-                          width={90}
-                          height={90}
-                          isMilestone={true}
-                        />
-                      </div>
-                    </div>
-                    <span className="text-[11px] md:text-sm font-black text-primary uppercase animate-pulse">
-                      Open!
-                    </span>
-                  </div>
-                );
-              }
+                                    {slots.map((slot, idx) => {
 
-              if (isLocked) {
-                return (
-                  <div
-                    key={idx}
-                    onClick={onAddRequested}
-                    className={`${cardBase} bg-muted/30 border-dashed border-2 border-muted-foreground/20 cursor-pointer hover:bg-muted/50 hover:border-muted-foreground/40 group`}
-                  >
-                    <div className="flex items-center justify-center h-14">
-                      <div className="p-2 rounded-full bg-muted border border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
-                        <Fly size={28} y={-3} />
-                      </div>
-                    </div>
-                    <span className="text-[10px] md:text-[13px] font-bold text-muted-foreground uppercase leading-tight text-center px-1">
-                      ADD +{slot.neededToUnlock} Task{slot.neededToUnlock > 1 ? 's' : ''}
-                    </span>
-                  </div>
-                );
-              }
+                                      const isLocked = slot.status === 'LOCKED';
 
-              // Pending (Tasks left)
-              return (
-                <div
-                  key={idx}
-                  className={`${cardBase} bg-card border-border/60`}
-                >
-                  <div className="flex items-center justify-center h-14">
-                    <div className="relative -top-4">
-                      <GiftRive
-                        key={`pending-${idx}`}
-                        width={90}
-                        height={90}
-                        isMilestone={true}
-                      />
-                    </div>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-[11px] md:text-[13px] font-bold text-foreground">
-                      {slot.tasksLeft} Task{slot.tasksLeft > 1 ? 's' : ''} Left
-                    </span>
-                    {/* Mini Bar */}
-                    <div className="w-12 h-1 mt-1 overflow-hidden rounded-full bg-muted">
-                      <div
-                        className="h-full transition-all duration-500 bg-primary"
-                        style={{ width: `${slot.percent}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                                      const isClaimed = slot.status === 'CLAIMED';
+
+                                      const isReady = slot.status === 'READY';
+
+                        
+
+                                      // Common card styles
+
+                                      const cardBase =
+
+                                        'relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all duration-300 min-h-[90px]';
+
+                        
+
+                                      if (isClaimed) {
+
+                                        return (
+
+                                          <div
+
+                                            key={idx}
+
+                                            className={`${cardBase} bg-green-50/50 dark:bg-green-900/10 border-green-200/50 dark:border-green-800/30`}
+
+                                          >
+
+                                            <div className="flex items-center justify-center h-14">
+
+                                              <div className="p-2.5 bg-green-100 rounded-full shadow-sm dark:bg-green-500/20">
+
+                                                <Check
+
+                                                  className="w-5 h-5 text-green-600 dark:text-green-400"
+
+                                                  strokeWidth={4}
+
+                                                />
+
+                                              </div>
+
+                                            </div>
+
+                                            <div className="flex flex-col items-center mt-1">
+
+                                              <span className="text-[10px] xl:text-xs font-bold text-green-700 dark:text-green-300 uppercase tracking-wider leading-tight">
+
+                                                Collected
+
+                                              </span>
+
+                                              <div className="h-2" /> {/* Spacer to match bar */}
+
+                                            </div>
+
+                                          </div>
+
+                                        );
+
+                                      }
+
+                        
+
+                                      if (isReady) {
+
+                                        return (
+
+                                          <div
+
+                                            key={idx}
+
+                                            className={`${cardBase} bg-card border-primary shadow-lg scale-105 z-10`}
+
+                                          >
+
+                                            <div className="flex items-center justify-center h-14">
+
+                                              <div className="relative -top-3">
+
+                                                <GiftRive
+
+                                                  key="milestone-ready"
+
+                                                  width={80}
+
+                                                  height={80}
+
+                                                  isMilestone={true}
+
+                                                />
+
+                                              </div>
+
+                                            </div>
+
+                                            <div className="flex flex-col items-center mt-1">
+
+                                              <span className="text-[10px] xl:text-xs font-black text-primary uppercase animate-pulse leading-tight">
+
+                                                Open!
+
+                                              </span>
+
+                                              <div className="h-2" /> {/* Spacer to match bar */}
+
+                                            </div>
+
+                                          </div>
+
+                                        );
+
+                                      }
+
+                        
+
+                                      if (isLocked) {
+
+                                        return (
+
+                                          <div
+
+                                            key={idx}
+
+                                            onClick={onAddRequested}
+
+                                            className={`${cardBase} bg-muted/30 border-dashed border-2 border-muted-foreground/20 cursor-pointer hover:bg-muted/50 hover:border-muted-foreground/40 group`}
+
+                                          >
+
+                                            <div className="flex items-center justify-center h-14">
+
+                                              <div className="p-2 rounded-full bg-muted border border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
+
+                                                <Fly size={28} y={-3} />
+
+                                              </div>
+
+                                            </div>
+
+                                            <div className="flex flex-col items-center mt-1">
+
+                                              <span className="text-[10px] xl:text-xs font-bold text-muted-foreground uppercase leading-tight text-center px-0.5">
+
+                                                ADD +{slot.neededToUnlock} Task{slot.neededToUnlock > 1 ? 's' : ''}
+
+                                              </span>
+
+                                              <div className="h-2" /> {/* Spacer to match bar */}
+
+                                            </div>
+
+                                          </div>
+
+                                        );
+
+                                      }
+
+                        
+
+                                      // Pending (Tasks left)
+
+                                      return (
+
+                                        <div
+
+                                          key={idx}
+
+                                          className={`${cardBase} bg-card border-border/60`}
+
+                                        >
+
+                                          <div className="flex items-center justify-center h-14">
+
+                                            <div className="relative -top-3">
+
+                                              <GiftRive
+
+                                                key={`pending-${idx}`}
+
+                                                width={80}
+
+                                                height={80}
+
+                                                isMilestone={true}
+
+                                              />
+
+                                            </div>
+
+                                          </div>
+
+                                          <div className="flex flex-col items-center mt-1">
+
+                                            <span className="text-[10px] xl:text-xs font-bold text-foreground leading-tight">
+
+                                              {slot.tasksLeft} Task{slot.tasksLeft > 1 ? 's' : ''} Left
+
+                                            </span>
+
+                                            {/* Mini Bar */}
+
+                                            <div className="relative w-10 h-1 mt-1 overflow-hidden rounded-full xl:w-12 bg-muted">
+
+                                              <div
+
+                                                className={`h-full transition-all duration-500 relative ${
+
+                                                  slot.percent > 50
+
+                                                    ? 'bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500'
+
+                                                    : 'bg-primary'
+
+                                                }`}
+
+                                                style={{ width: `${slot.percent}%` }}
+
+                                              >
+
+                                                {slot.percent > 50 && (
+
+                                                  <div
+
+                                                    className="absolute inset-0 w-full h-full bg-[linear-gradient(110deg,transparent,rgba(255,255,255,0.4),transparent)] animate-shimmer"
+
+                                                    style={{ backgroundSize: '200% 100%' }}
+
+                                                  />
+
+                                                )}
+
+                                              </div>
+
+                                            </div>
+
+                                          </div>
+
+                                        </div>
+
+                                      );
+
+                                    })}
+
+                                  </div>
+
+                                )}
 
         {allGiftsClaimed && (
           <div className="flex items-center gap-3 p-3 border border-green-100 bg-green-50 dark:bg-green-900/20 rounded-xl dark:border-green-900/50">

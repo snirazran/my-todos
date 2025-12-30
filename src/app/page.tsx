@@ -66,9 +66,9 @@ const demoTasks: Task[] = [
 // === NEW HELPER: Calculate where the gifts should occur ===
 // === NEW HELPER: Calculate where the gifts should occur ===
 function getMilestones(totalTasks: number): number[] {
-  if (totalTasks === 0) return [];
+  if (totalTasks < 2) return [];
 
-  // 1-3 tasks -> 1 gift at the end
+  // 2-3 tasks -> 1 gift at the end
   if (totalTasks <= 3) {
     return [totalTasks];
   }

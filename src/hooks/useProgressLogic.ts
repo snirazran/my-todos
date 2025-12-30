@@ -27,7 +27,7 @@ export function useProgressLogic(done: number, total: number, giftsClaimed: numb
       // i=2 (Gift 3): Unlocked if total >= 6.
       //    - 6+ tasks: Target is LAST task (total).
 
-      const minTasksForSlot = [1, 4, 6];
+      const minTasksForSlot = [2, 4, 6];
 
       if (total < minTasksForSlot[i]) {
         isLocked = true;
