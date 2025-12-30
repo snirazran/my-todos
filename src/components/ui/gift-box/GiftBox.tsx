@@ -16,6 +16,12 @@ const RIVE_LAYOUT = new Layout({
   alignment: Alignment.Center,
 });
 
+const shakeVariants = {
+  idle: { x: 0, rotate: 0 },
+  shaking: { x: 0, rotate: 0 },
+  revealed: { x: 0, rotate: 0 },
+};
+
 // --- FIXED: Removed all delay logic, just simple rendering ---
 export const GiftRive = React.memo(
   ({
@@ -23,11 +29,13 @@ export const GiftRive = React.memo(
     height,
     className,
     triggerOpen,
+    isMilestone = false,
   }: {
     width?: number;
     height?: number;
     className?: string;
     triggerOpen?: boolean;
+    isMilestone?: boolean;
   }) => {
     const riveUrl = useRiveAsset('/idle_gift.riv');
     const { rive, RiveComponent } = useRive({
@@ -43,13 +51,25 @@ export const GiftRive = React.memo(
       'start_box_open'
     );
 
+    const isMileStoneInput = useStateMachineInput(
+      rive,
+      'State Machine 1',
+      'is_mile_stone'
+    );
+
+    useEffect(() => {
+      if (isMilestone && isMileStoneInput) {
+        // Delay to allow state machine to enter idle before firing trigger
+        const timer = setTimeout(() => {
+          isMileStoneInput.fire();
+        }, 100);
+        return () => clearTimeout(timer);
+      }
+    }, [isMilestone, isMileStoneInput]);
+
     useEffect(() => {
       if (triggerOpen && startOpenInput) {
-        // Delay the Rive animation to let the CSS/Framer shake finish (1.5s)
-        const timer = setTimeout(() => {
-          startOpenInput.fire();
-        }, 500);
-        return () => clearTimeout(timer);
+        startOpenInput.fire();
       }
     }, [triggerOpen, startOpenInput]);
 
@@ -79,9 +99,15 @@ type GiftBoxProps = {
   phase: 'idle' | 'shaking' | 'revealed';
   onOpen: () => void;
   loadingText?: string;
+  isMilestone?: boolean;
 };
 
-export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
+export const GiftBox = ({
+  phase,
+  onOpen,
+  loadingText,
+  isMilestone,
+}: GiftBoxProps) => {
   return (
     <motion.div
       key="gift"
@@ -98,9 +124,10 @@ export const GiftBox = ({ phase, onOpen, loadingText }: GiftBoxProps) => {
     >
       <motion.div
         animate={phase}
+        variants={shakeVariants}
         className="relative w-[450px] h-[450px] md:w-[500px] md:h-[500px]"
       >
-        <GiftRive triggerOpen={phase === 'shaking'} />
+        <GiftRive triggerOpen={phase === 'shaking'} isMilestone={isMilestone} />
       </motion.div>
 
       <motion.div

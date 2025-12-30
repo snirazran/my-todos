@@ -2,8 +2,8 @@
 
 import React from 'react';
 import { Lock, CheckCircle2, Gift } from 'lucide-react';
-import Image from 'next/image';
 import { useProgressLogic } from '@/hooks/useProgressLogic';
+import { GiftRive } from './gift-box/GiftBox';
 
 interface ProgressCardProps {
   rate: number;
@@ -36,10 +36,10 @@ export default function ProgressCard({
             Daily Goals
           </h2>
           <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black text-foreground">
-              {done}
+            <span className="text-2xl font-black text-foreground">{done}</span>
+            <span className="text-sm font-bold text-muted-foreground">
+              / {total}
             </span>
-            <span className="text-sm font-bold text-muted-foreground">/ {total}</span>
           </div>
         </div>
 
@@ -58,6 +58,7 @@ export default function ProgressCard({
               const isLocked = slot.status === 'LOCKED';
               const isClaimed = slot.status === 'CLAIMED';
               const isReady = slot.status === 'READY';
+              const isPending = slot.status === 'PENDING';
 
               return (
                 <div
@@ -75,22 +76,22 @@ export default function ProgressCard({
                     }
                   `}
                 >
-                  {/* Centered Icon - Slightly Larger */}
-                  <div className="relative flex items-center justify-center mb-1 h-9 w-9">
+                  {/* Centered Icon - Adjusted for visibility */}
+                  <div className="relative flex items-center justify-center mb-1 h-14 w-14">
                     {isLocked ? (
                       <Lock className="w-4 h-4 text-muted-foreground/50" />
                     ) : isClaimed ? (
                       <CheckCircle2 className="w-6 h-6 text-green-500" />
                     ) : (
-                      <div className={isReady ? 'animate-bounce' : ''}>
-                        <Image
-                          src="/gift1.png"
-                          width={32}
-                          height={32}
-                          alt="Gift"
-                          className={
-                            isReady ? '' : 'opacity-90 grayscale-[0.2]'
+                      <div className="relative -top-3">
+                        <GiftRive
+                          key={
+                            isReady ? 'milestone-ready' : 'milestone-pending'
                           }
+                          width={96}
+                          height={96}
+                          isMilestone={isPending}
+                          className=""
                         />
                       </div>
                     )}
@@ -116,7 +117,7 @@ export default function ProgressCard({
                           </span>
                         ) : (
                           <span className="text-[11px] font-bold text-foreground leading-tight">
-                            {slot.tasksLeft} left
+                            {slot.tasksLeft} tasks left
                           </span>
                         )}
 
@@ -124,9 +125,7 @@ export default function ProgressCard({
                         <div className="h-1 mx-6 overflow-hidden rounded-full bg-muted">
                           <div
                             className={`h-full transition-all duration-500 ${
-                              isLocked
-                                ? 'bg-muted-foreground/30'
-                                : 'bg-primary'
+                              isLocked ? 'bg-muted-foreground/30' : 'bg-primary'
                             }`}
                             style={{ width: `${slot.percent}%` }}
                           />
