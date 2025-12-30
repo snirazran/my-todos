@@ -500,9 +500,6 @@ export default function TaskList({
     });
   };
 
-  const activeTaskList = tasks.filter((t) => !(t.completed || vSet.has(t.id)));
-  const completedTaskList = tasks.filter((t) => t.completed || vSet.has(t.id));
-
   return (
     <>
       <div
@@ -539,64 +536,37 @@ export default function TaskList({
             onDragEnd={handleDragEnd}
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           >
-            {/* Active Tasks Container - Boundary for dragging */}
-            <div>
-              <SortableContext
-                items={activeTaskIds}
-                strategy={verticalListSortingStrategy}
-              >
-                <AnimatePresence initial={false} mode="popLayout">
-                  {activeTaskList.map((task) => {
-                    const isDone = false; // Always false here
-                    const isMenuOpen = menu?.id === task.id;
-                    const isExitingLater =
-                      exitAction?.id === task.id && exitAction.type === 'later';
-                      
-                    return (
-                      <SortableTaskItem
-                        key={task.id}
-                        task={task}
-                        isDone={isDone}
-                        isMenuOpen={isMenuOpen}
-                        isExitingLater={isExitingLater}
-                        renderBullet={renderBullet}
-                        handleTaskToggle={handleTaskToggle}
-                        onMenuOpen={openMenu}
-                        getTagDetails={getTagDetails}
-                        isDragDisabled={false}
-                        isWeekly={taskKind(task) === 'weekly'}
-                        disableLayout={isAnyDragging}
-                      />
-                    );
-                  })}
-                </AnimatePresence>
-              </SortableContext>
-            </div>
+            <SortableContext
+              items={activeTaskIds}
+              strategy={verticalListSortingStrategy}
+            >
+              <AnimatePresence initial={false} mode="popLayout">
+                {tasks.map((task) => {
+                  const isDone = task.completed || vSet.has(task.id);
+                  const isMenuOpen = menu?.id === task.id;
+                  const isExitingLater =
+                    exitAction?.id === task.id && exitAction.type === 'later';
+                    
+                  return (
+                    <SortableTaskItem
+                      key={task.id}
+                      task={task}
+                      isDone={isDone}
+                      isMenuOpen={isMenuOpen}
+                      isExitingLater={isExitingLater}
+                      renderBullet={renderBullet}
+                      handleTaskToggle={handleTaskToggle}
+                      onMenuOpen={openMenu}
+                      getTagDetails={getTagDetails}
+                      isDragDisabled={isDone}
+                      isWeekly={taskKind(task) === 'weekly'}
+                      disableLayout={isAnyDragging}
+                    />
+                  );
+                })}
+              </AnimatePresence>
+            </SortableContext>
           </DndContext>
-
-          {/* Completed Tasks - Rendered separately, not draggable */}
-          <AnimatePresence initial={false} mode="popLayout">
-            {completedTaskList.map((task) => {
-              const isDone = true;
-              const isMenuOpen = menu?.id === task.id;
-              
-              return (
-                <SortableTaskItem
-                  key={task.id}
-                  task={task}
-                  isDone={isDone}
-                  isMenuOpen={isMenuOpen}
-                  isExitingLater={false}
-                  renderBullet={renderBullet}
-                  handleTaskToggle={handleTaskToggle}
-                  onMenuOpen={openMenu}
-                  getTagDetails={getTagDetails}
-                  isDragDisabled={true}
-                  isWeekly={taskKind(task) === 'weekly'}
-                />
-              );
-            })}
-          </AnimatePresence>
         </div>
       </div>
 
