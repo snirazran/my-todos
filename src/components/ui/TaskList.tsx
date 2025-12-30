@@ -83,7 +83,7 @@ function SortableTaskItem({
   }, [isDragging]);
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: CSS.Translate.toString(transform),
     transition,
     zIndex: isDragging ? 100 : isMenuOpen ? 50 : isExitingLater ? 0 : 1,
   };
