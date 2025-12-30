@@ -357,6 +357,10 @@ export default function Home() {
                 done={doneCount}
                 total={data.length}
                 giftsClaimed={dailyGiftCount}
+                onAddRequested={() => {
+                  setQuickText('');
+                  setShowQuickAdd(true);
+                }}
               />
             </div>
           </div>

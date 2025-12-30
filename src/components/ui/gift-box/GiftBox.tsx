@@ -30,18 +30,20 @@ export const GiftRive = React.memo(
     className,
     triggerOpen,
     isMilestone = false,
+    paused = false,
   }: {
     width?: number;
     height?: number;
     className?: string;
     triggerOpen?: boolean;
     isMilestone?: boolean;
+    paused?: boolean;
   }) => {
     const riveUrl = useRiveAsset('/idle_gift.riv');
     const { rive, RiveComponent } = useRive({
       src: riveUrl || undefined,
       stateMachines: 'State Machine 1',
-      autoplay: true,
+      autoplay: true, // Always autoplay initially to engage State Machine
       layout: RIVE_LAYOUT,
     });
 
@@ -56,6 +58,22 @@ export const GiftRive = React.memo(
       'State Machine 1',
       'is_mile_stone'
     );
+
+    useEffect(() => {
+      if (rive) {
+        if (paused) {
+          // Reset to initial state, play briefly to engage SM, then pause
+          rive.reset();
+          rive.play();
+          const timer = setTimeout(() => {
+            rive.pause();
+          }, 50);
+          return () => clearTimeout(timer);
+        } else if (!rive.isPlaying) {
+          rive.play();
+        }
+      }
+    }, [rive, paused]);
 
     useEffect(() => {
       if (isMilestone && isMileStoneInput) {

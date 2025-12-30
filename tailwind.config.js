@@ -25,10 +25,15 @@ module.exports = {
           '60%': { transform: 'translateX(100%)' },
           '100%': { transform: 'translateX(100%)' },
         },
+        shimmer: {
+          '0%': { backgroundPosition: '200% 0' },
+          '100%': { backgroundPosition: '-200% 0' },
+        },
       },
       animation: {
         float: 'float 3s ease-in-out infinite',
         'logo-line': 'logo-line 3s ease-in-out infinite',
+        shimmer: 'shimmer 2s linear infinite',
       },
       colors: {
         // every key here becomes a colour-utility name
