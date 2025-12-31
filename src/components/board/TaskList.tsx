@@ -24,6 +24,7 @@ export default React.memo(function TaskList({
   userTags,
   onToggleRepeat,
   isAnyDragging,
+  onAddRequested,
 }: {
   day: DisplayDay;
   items: Task[];
