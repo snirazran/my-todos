@@ -731,17 +731,15 @@ export default function Home() {
       />
 
       {/* Floating Add Task Button - Home Page Version */}
-      <div className="fixed bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+80px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[400px] flex md:block justify-center">
-          <div className="md:w-full rounded-full bg-card/80 backdrop-blur-2xl ring-1 ring-border/80 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
-            <AddTaskButton
-              onClick={() => {
-                setQuickText('');
-                setShowQuickAdd(true);
-              }}
-              label="Add a task"
-            />
-          </div>
+      <div className="fixed bottom-0 left-0 right-0 z-[40] px-6 pb-[calc(env(safe-area-inset-bottom)+88px)] md:pb-[calc(env(safe-area-inset-bottom)+24px)] pointer-events-none">
+        <div className="pointer-events-auto mx-auto w-full max-w-[420px] flex justify-center">
+          <AddTaskButton
+            onClick={() => {
+              setQuickText('');
+              setShowQuickAdd(true);
+            }}
+            label="Add a task"
+          />
         </div>
       </div>
     </main>

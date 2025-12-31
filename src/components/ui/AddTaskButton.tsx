@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Fly from '@/components/ui/fly';
+import { Plus } from 'lucide-react';
 
 interface Props {
   onClick: () => void;
@@ -14,7 +15,7 @@ interface Props {
 export function AddTaskButton({
   onClick,
   disabled,
-  label = 'Add a',
+  label = 'Add a task',
   className = '',
   showFly = true,
 }: Props) {
@@ -23,25 +24,34 @@ export function AddTaskButton({
       onClick={onClick}
       disabled={disabled}
       className={[
-        'relative h-12 rounded-full px-6 md:w-full group',
-        'bg-card',
-        'border border-border/50',
+        'relative h-14 rounded-2xl px-6 w-auto md:w-full group overflow-hidden',
+        'bg-card/80 backdrop-blur-2xl',
+        'border border-border/80',
         'text-foreground font-bold tracking-tight',
-        'shadow-sm shadow-black/5 dark:shadow-black/40',
-        'hover:shadow-[0_12px_24px_-6px_rgba(0,0,0,0.1),0_6px_16px_-4px_rgba(0,0,0,0.05)] dark:hover:shadow-[0_12px_24px_-6px_rgba(0,0,0,0.6)]',
-        'hover:border-primary/50 hover:text-primary',
+        'shadow-lg shadow-black/5 dark:shadow-black/20',
+        'hover:border-primary/50 hover:bg-card/95',
         'transition-all duration-300 ease-out',
         'active:scale-[0.98]',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20',
         disabled ? 'opacity-60 pointer-events-none grayscale' : '',
         className,
       ].join(' ')}
     >
-      <span className="relative z-10 flex items-center justify-center h-full gap-2.5">
-        <span className="text-[15px]">{label}</span>
+      {/* Subtle Gradient Hover Effect */}
+      <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-emerald-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      
+      <span className="relative z-10 flex items-center justify-center h-full gap-3">
+        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-300">
+          <Plus size={18} strokeWidth={3} />
+        </div>
+        
+        <span className="text-[15px] text-muted-foreground group-hover:text-foreground transition-colors duration-300">
+          {label}
+        </span>
+        
         {showFly && (
-          <span className="translate-y-[1px] opacity-70 group-hover:opacity-100 transition-opacity grayscale group-hover:grayscale-0">
-            <Fly size={22} x={-2} y={-3} />
+          <span className="opacity-40 group-hover:opacity-100 transition-all duration-300">
+            <Fly size={24} y={-3} x={-5} />
           </span>
         )}
       </span>

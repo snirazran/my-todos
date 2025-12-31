@@ -395,7 +395,7 @@ export default function TaskBoard({
         onPointerUp={endPan}
         className={[
           'no-scrollbar absolute inset-0 w-full h-full',
-          'flex flex-col items-start overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x', // 🟢 Added items-start
+          'flex flex-col items-start overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x',
           snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth',
         ].join(' ')}
         style={{
@@ -403,7 +403,7 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex mx-auto gap-3 px-4 pt-4 md:px-6 md:pt-6 lg:pt-8 pb-[220px] sm:pb-[180px] md:pb-[188px]">
+        <div className="flex mx-auto gap-3 px-4 pt-16 pb-[220px] sm:pb-[180px] md:pb-[188px]">
           {/* Render only 0..6 (Exclude Backlog Column 7) */}
           {Array.from({ length: DAYS - 1 }, (_, day) => ({
             day: day as DisplayDay,
@@ -419,7 +419,7 @@ export default function TaskBoard({
                 title={titles[day]}
                 count={week[day]?.length || 0}
                 listRef={setListRef(day)}
-                maxHeightClass="max-h-[60svh] md:max-h-[73svh]"
+                maxHeightClass="max-h-[calc(100svh-340px-var(--safe-bottom))] md:max-h-[calc(100svh-280px-var(--safe-bottom))]"
                 isToday={day === todayDisplayIndex}
               >
                 <TaskList
@@ -443,44 +443,41 @@ export default function TaskBoard({
         </div>
       </div>
 
-      {/* Pagination - Only show dots for actual days */}
-      <div className="absolute left-0 right-0 z-[60] flex justify-center pointer-events-none bottom-[calc(env(safe-area-inset-bottom)+152px)] md:bottom-[calc(env(safe-area-inset-bottom)+112px)]">
-        <div className="pointer-events-auto">
+      {/* Top Pagination - Mobile Only */}
+      <div className="absolute top-4 left-0 right-0 z-[60] flex justify-center pointer-events-none md:hidden">
+        <div className="pointer-events-auto px-1.5 py-1 rounded-2xl bg-card/40 backdrop-blur-xl">
           <PaginationDots
             count={DAYS - 1}
             activeIndex={Math.min(pageIndex, 6) as any}
+            todayIndex={todayDisplayIndex}
+            onSelectDay={(idx) => centerColumnSmooth(idx as any)}
           />
         </div>
       </div>
-
       {/* GLOBAL BOTTOM AREA - Floating Toolbar */}
-      <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 sm:px-6 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+80px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[400px] flex items-center gap-3">
-          {/* Backlog Trigger (Left) */}
-          <div className="shrink-0">
-            <BacklogBox
-              count={week[7]?.length || 0}
-              isDragOver={isDragOverBacklog}
-              isDragging={!!drag?.active}
-              proximity={backlogProximity}
-              onClick={() => setBacklogOpen(true)}
-              forwardRef={backlogBoxRef}
-            />
-          </div>
+      <div className="absolute bottom-0 left-0 right-0 z-[40] px-6 pb-[calc(env(safe-area-inset-bottom)+88px)] md:pb-[calc(env(safe-area-inset-bottom)+24px)] pointer-events-none">
+        <div className="pointer-events-auto mx-auto w-full max-w-[420px] flex flex-col items-center gap-4">
+          {/* Backlog Trigger */}
+          <BacklogBox
+            count={week[7]?.length || 0}
+            isDragOver={isDragOverBacklog}
+            isDragging={!!drag?.active}
+            proximity={backlogProximity}
+            onClick={() => setBacklogOpen(true)}
+            forwardRef={backlogBoxRef}
+          />
 
-          {/* Add Task Button (Main) */}
-          <div className="flex-1 min-w-0">
-            <div className="rounded-full bg-background/80 backdrop-blur-2xl ring-1 ring-border/80 shadow-[0_8px_32px_rgba(0,0,0,.18)] p-1">
-              <AddTaskButton
-                className="w-full"
-                label="Add a task"
-                onClick={() => {
-                  setQuickText('');
-                  setShowQuickAdd(true);
-                }}
-                disabled={!!drag?.active}
-              />
-            </div>
+          {/* Add Task Button */}
+          <div className="w-full flex justify-center">
+            <AddTaskButton
+              className="w-full"
+              label="Add a task"
+              onClick={() => {
+                setQuickText('');
+                setShowQuickAdd(true);
+              }}
+              disabled={!!drag?.active}
+            />
           </div>
         </div>
       </div>

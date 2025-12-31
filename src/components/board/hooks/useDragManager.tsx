@@ -38,6 +38,7 @@ export function useDragManager() {
   // Refs to hold drag invariants to avoid effect dependencies
   const dragActiveRef = useRef(false);
   const dragFromDayRef = useRef<number>(0);
+  const targetDayRef = useRef<number | null>(null);
 
   // remember scroller inline styles so we can restore after drag
   const prevTouchAction = useRef<string>('');
@@ -140,6 +141,7 @@ export function useDragManager() {
 
       dragActiveRef.current = true;
       dragFromDayRef.current = day;
+      targetDayRef.current = day;
 
       setDrag({
         active: true,
@@ -186,6 +188,7 @@ export function useDragManager() {
     setDrag(null);
     setTargetDay(null);
     setTargetIndex(null);
+    targetDayRef.current = null;
   }, [restoreGlobalInteraction]);
 
   const cancelDrag = useCallback(() => {
@@ -193,6 +196,7 @@ export function useDragManager() {
     setDrag(null);
     setTargetDay(null);
     setTargetIndex(null);
+    targetDayRef.current = null;
   }, [restoreGlobalInteraction]);
 
   // Unified Loop: Event Tracking + Auto-Scroll + Target Detection
@@ -263,13 +267,27 @@ export function useDragManager() {
 
       // --- 3. Auto-Scroll Logic ---
       const s = scrollerRef.current;
+      
+      // Tray Zone Logic:
+      // We want to prevent accidental column switching when aiming for the bottom-center tray button.
+      // But we still want to allow:
+      // 1. Edge scrolling (if user goes to screen edge)
+      // 2. Intentional swipes (high velocity)
+      
+      const isBottom = py > window.innerHeight - 200;
+      const isEdge = px < 100 || px > window.innerWidth - 100;
+      const isFastX = Math.abs(pxVelSmoothedRef.current) > 15;
+
+      // We lock the column/scroll if we are at the bottom, NOT at the edge, and NOT swiping fast.
+      const isLockedTrayZone = isBottom && !isEdge && !isFastX;
+
       if (s) {
         const rect = s.getBoundingClientRect();
-        const isNearBottom = py > window.innerHeight - 150; 
         
         let distFactor = 0, dir = 0;
           
-        if (!isNearBottom) {
+        // Only allow X-scroll if NOT locked in tray zone
+        if (!isLockedTrayZone) {
           if (px > rect.right - EDGE_X) {
             const d = px - (rect.right - EDGE_X);
             if (d > HYST) {
@@ -307,36 +325,43 @@ export function useDragManager() {
       // --- 4. Target Detection ---
       // Find Column
       let newDay: number | null = null;
-      for (let day = 0; day < DAYS; day++) {
-        const col = slideRefs.current[day];
-        if (!col) continue;
-        const r = col.getBoundingClientRect();
-        // Use center-point check or strict bound?
-        // Using bounds is usually fine, but if we scrolled, bounds updated.
-        if (px >= r.left && px <= r.right) {
-          newDay = day;
-          break;
-        }
-      }
-      // Fallback: Closest Column
-      if (newDay == null) {
-        let minDist = Infinity, best: number | null = null;
+
+      // Only check for new column if NOT locked in tray zone
+      if (!isLockedTrayZone) {
         for (let day = 0; day < DAYS; day++) {
           const col = slideRefs.current[day];
           if (!col) continue;
           const r = col.getBoundingClientRect();
-          const dist = px < r.left ? r.left - px : px - r.right;
-          if (dist < minDist) {
-            minDist = dist;
-            best = day;
+          if (px >= r.left && px <= r.right) {
+            newDay = day;
+            break;
           }
         }
-        newDay = best;
+        // Fallback: Closest Column
+        if (newDay == null) {
+          let minDist = Infinity, best: number | null = null;
+          for (let day = 0; day < DAYS; day++) {
+            const col = slideRefs.current[day];
+            if (!col) continue;
+            const r = col.getBoundingClientRect();
+            const dist = px < r.left ? r.left - px : px - r.right;
+            if (dist < minDist) {
+              minDist = dist;
+              best = day;
+            }
+          }
+          newDay = best;
+        }
+      } else {
+        // Locked in Tray Zone: Keep current column
+        newDay = targetDayRef.current;
       }
+
+      if (newDay != null) targetDayRef.current = newDay;
 
       // Find Index (Vertical Auto-Scroll mixed in here usually, but let's separate index logic)
       // First, Vertical Scroll:
-      const dayForV = newDay != null ? newDay : dragFromDayRef.current;
+      const dayForV = newDay != null ? newDay : (targetDayRef.current ?? dragFromDayRef.current);
       const list = listRefs.current[dayForV];
       
       if (list) {

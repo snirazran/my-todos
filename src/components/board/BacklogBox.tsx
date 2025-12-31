@@ -2,15 +2,14 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Layers } from 'lucide-react';
+import { Inbox } from 'lucide-react';
 
 interface Props {
   count: number;
   isDragOver: boolean;
   isDragging: boolean;
-  proximity: number; // 0 to 1
+  proximity: number; 
   onClick: () => void;
-  // ✅ FIX: Explicitly typed for Button to match <motion.button>
   forwardRef: React.Ref<HTMLButtonElement>;
 }
 
@@ -18,69 +17,75 @@ export default function BacklogBox({
   count,
   isDragOver,
   isDragging,
-  proximity,
   onClick,
   forwardRef,
 }: Props) {
-  // Calculate scaling based on proximity
-  const scale = isDragOver ? 1.25 : isDragging ? 1.05 + proximity * 0.2 : 1;
-
   return (
     <motion.button
       ref={forwardRef}
       onClick={onClick}
       aria-label="Backlog"
       className="relative outline-none group"
-      animate={{
-        scale: scale,
-      }}
-      whileTap={{ scale: 0.95 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      whileTap={{ scale: 0.96 }}
     >
-      {/* Pulse Ring when dragging (far) */}
-      {isDragging && !isDragOver && (
-        <motion.div
-          className="absolute inset-0 border-2 rounded-full border-primary/50"
-          animate={{ scale: [1, 1.4], opacity: [0.6, 0] }}
-          transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
-        />
+      {/* Soft Pulse Effect when dragging */}
+      {isDragging && (
+        <>
+          <motion.div
+            className="absolute inset-0 rounded-2xl bg-primary/20 -z-10"
+            animate={{
+              scale: [1, 1.25, 1],
+              opacity: [0.3, 0, 0.3],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          />
+        </>
       )}
 
-      <div
+      <motion.div
+        animate={{
+          scale: isDragOver ? 1.1 : 1,
+        }}
         className={`
-          relative flex items-center justify-center w-14 h-14 rounded-full
-          bg-card/80 backdrop-blur-xl
-          border transition-all duration-200
-          shadow-[0_8px_20px_rgba(0,0,0,0.12)] dark:shadow-black/40
+          relative flex items-center justify-center w-14 h-14 rounded-2xl
+          bg-card/80 backdrop-blur-2xl
+          border transition-all duration-300
+          shadow-lg shadow-black/5 dark:shadow-black/20
           ${
             isDragOver
-              ? 'ring-4 ring-primary bg-primary/10 border-primary'
+              ? 'border-primary ring-4 ring-primary/10 bg-primary/5'
               : isDragging
-              ? 'border-primary ring-2 ring-primary/20'
-              : 'border-border/40 hover:bg-card hover:scale-105'
+              ? 'border-primary/40'
+              : 'border-border/80 hover:border-primary/50 hover:bg-card/95'
           }
         `}
       >
         {/* Icon */}
         <div
-          className={`transition-colors ${
-            isDragOver
+          className={`transition-colors duration-300 ${
+            isDragOver || isDragging
               ? 'text-primary'
-              : isDragging
-              ? 'text-primary'
-              : 'text-muted-foreground'
+              : 'text-muted-foreground/80 group-hover:text-primary'
           }`}
         >
-          <Layers size={24} strokeWidth={2.5} />
+          <Inbox size={22} strokeWidth={2} />
         </div>
 
         {/* Count Badge */}
         {count > 0 && (
-          <div className="absolute -top-1 -right-1 flex items-center justify-center min-w-[20px] h-5 px-1 text-[11px] font-bold text-white bg-rose-500 rounded-full shadow-sm ring-2 ring-background">
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[22px] h-[22px] px-1.5 text-[10px] font-black text-white bg-rose-500 rounded-full shadow-md shadow-rose-500/20 ring-2 ring-background"
+          >
             {count}
-          </div>
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </motion.button>
   );
 }
