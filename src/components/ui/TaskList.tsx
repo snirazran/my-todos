@@ -120,8 +120,8 @@ function SortableTaskItem({
           className={`
           relative flex items-center gap-1.5 px-2 py-3.5 
           transition-all duration-200 rounded-xl 
-          border border-transparent hover:border-border
-          hover:bg-accent hover:shadow-sm
+          border border-transparent md:hover:border-border
+          md:hover:bg-accent md:hover:shadow-sm
           select-none
           ${
             isMenuOpen
@@ -129,7 +129,7 @@ function SortableTaskItem({
               : ''
           }
           ${isDragging ? 'shadow-2xl ring-2 ring-primary/50 bg-card z-[100] opacity-100' : ''}
-          ${isDone && !isDragging ? 'opacity-60 hover:opacity-100' : ''}
+          ${isDone && !isDragging ? 'opacity-60 md:hover:opacity-100' : ''}
         `}
           style={{
             touchAction: isDragging ? 'none' : 'pan-y', 
@@ -163,7 +163,7 @@ function SortableTaskItem({
                           e.stopPropagation();
                           handleTaskToggle(task, true);
                         }}
-                        className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 hover:text-primary"
+                        className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 md:hover:text-primary"
                       >
                         <Circle className="w-6 h-6" />
                       </button>
@@ -265,7 +265,7 @@ function SortableTaskItem({
               ${
                 isMenuOpen
                   ? 'bg-accent text-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                  : 'text-muted-foreground md:hover:text-foreground md:hover:bg-accent'
               }
             `}
               onClick={(e) => onMenuOpen(e, task)}
@@ -360,13 +360,13 @@ export default function TaskList({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 300,
+        delay: 200,
         tolerance: 8,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 300,
+        delay: 200,
         tolerance: 8,
       },
     }),
@@ -574,36 +574,68 @@ export default function TaskList({
             onDragCancel={handleDragCancel}
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           >
-            <SortableContext
-              items={activeTaskIds}
-              strategy={verticalListSortingStrategy}
-            >
-              <AnimatePresence initial={false} mode="popLayout">
-                {tasks.map((task) => {
-                  const isDone = task.completed || vSet.has(task.id);
-                  const isMenuOpen = menu?.id === task.id;
-                  const isExitingLater =
-                    exitAction?.id === task.id && exitAction.type === 'later';
-                    
-                  return (
-                    <SortableTaskItem
-                      key={task.id}
-                      task={task}
-                      isDone={isDone}
-                      isMenuOpen={isMenuOpen}
-                      isExitingLater={isExitingLater}
-                      renderBullet={renderBullet}
-                      handleTaskToggle={handleTaskToggle}
-                      onMenuOpen={openMenu}
-                      getTagDetails={getTagDetails}
-                      isDragDisabled={isDone}
-                      isWeekly={taskKind(task) === 'weekly'}
-                      disableLayout={isAnyDragging}
-                    />
-                  );
-                })}
-              </AnimatePresence>
-            </SortableContext>
+            <div className="relative">
+              {/* Active Tasks Container - This acts as the parent element for restriction */}
+              <div className="relative overflow-visible">
+                <SortableContext
+                  items={activeTaskIds}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <AnimatePresence initial={false} mode="popLayout">
+                    {tasks.filter(t => !t.completed && !vSet.has(t.id)).map((task) => {
+                      const isMenuOpen = menu?.id === task.id;
+                      const isExitingLater =
+                        exitAction?.id === task.id && exitAction.type === 'later';
+                        
+                      return (
+                        <SortableTaskItem
+                          key={task.id}
+                          task={task}
+                          isDone={false}
+                          isMenuOpen={isMenuOpen}
+                          isExitingLater={isExitingLater}
+                          renderBullet={renderBullet}
+                          handleTaskToggle={handleTaskToggle}
+                          onMenuOpen={openMenu}
+                          getTagDetails={getTagDetails}
+                          isDragDisabled={false}
+                          isWeekly={taskKind(task) === 'weekly'}
+                          disableLayout={isAnyDragging}
+                        />
+                      );
+                    })}
+                  </AnimatePresence>
+                </SortableContext>
+              </div>
+
+              {/* Completed Tasks Container - Outside of the restricted active tasks area */}
+              <div className="mt-0">
+                <AnimatePresence initial={false} mode="popLayout">
+                  {tasks.filter(t => t.completed || vSet.has(t.id)).map((task) => {
+                    const isMenuOpen = menu?.id === task.id;
+                    const isExitingLater =
+                      exitAction?.id === task.id && exitAction.type === 'later';
+                      
+                    return (
+                      <SortableTaskItem
+                        key={task.id}
+                        task={task}
+                        isDone={true}
+                        isMenuOpen={isMenuOpen}
+                        isExitingLater={isExitingLater}
+                        renderBullet={renderBullet}
+                        handleTaskToggle={handleTaskToggle}
+                        onMenuOpen={openMenu}
+                        getTagDetails={getTagDetails}
+                        isDragDisabled={true}
+                        isWeekly={taskKind(task) === 'weekly'}
+                        disableLayout={isAnyDragging}
+                      />
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            </div>
           </DndContext>
         </div>
       </div>

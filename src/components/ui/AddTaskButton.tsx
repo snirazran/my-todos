@@ -29,7 +29,7 @@ export function AddTaskButton({
         'border border-border/80',
         'text-foreground font-bold tracking-tight',
         'shadow-lg shadow-black/5 dark:shadow-black/20',
-        'hover:border-primary/50 hover:bg-card/95',
+        'md:hover:border-primary/50 md:hover:bg-card/95',
         'transition-all duration-300 ease-out',
         'active:scale-[0.98]',
         'focus:outline-none outline-none',
@@ -38,10 +38,10 @@ export function AddTaskButton({
       ].join(' ')}
     >
       {/* Subtle Gradient Hover Effect */}
-      <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-emerald-400/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-emerald-400/5 opacity-0 md:group-hover:opacity-100 transition-opacity duration-500" />
       
       <span className="relative z-10 flex items-center justify-center h-full gap-3">
-        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary group-hover:scale-110 transition-transform duration-300">
+        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary md:group-hover:scale-110 transition-transform duration-300">
           <Plus size={18} strokeWidth={3} />
         </div>
         

@@ -760,24 +760,32 @@ function Header({ session, router }: { session: any; router: any }) {
         </p>
       </div>
 
-      <div className="self-start hidden gap-2 md:flex md:self-auto">
-        <Link
-          href="/history"
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition bg-card rounded-lg shadow-sm text-foreground hover:bg-accent border border-border"
-        >
-          <History className="w-4 h-4" />
-          <span>History</span>
-        </Link>
+      <div className="self-start hidden gap-3 md:flex md:self-auto">
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <Link
+            href="/history"
+            className="group flex items-center gap-2.5 px-5 py-2.5 text-sm font-bold transition-all bg-card/80 backdrop-blur-xl rounded-2xl border border-border/50 shadow-sm text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-card active:shadow-inner"
+          >
+            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+              <History className="w-4 h-4" strokeWidth={2.5} />
+            </div>
+            <span>History</span>
+          </Link>
+        </motion.div>
 
-        <button
-          onClick={() =>
-            session ? router.push('/manage-tasks') : router.push('/login')
-          }
-          className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition bg-card rounded-lg shadow-sm text-foreground hover:bg-accent border border-border"
-        >
-          <LayoutDashboard className="w-4 h-4" />
-          <span>Weekly Tasks</span>
-        </button>
+        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+          <button
+            onClick={() =>
+              session ? router.push('/manage-tasks') : router.push('/login')
+            }
+            className="group flex items-center gap-2.5 px-5 py-2.5 text-sm font-bold transition-all bg-card/80 backdrop-blur-xl rounded-2xl border border-border/50 shadow-sm text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-card active:shadow-inner"
+          >
+            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+              <LayoutDashboard className="w-4 h-4" strokeWidth={2.5} />
+            </div>
+            <span>Weekly Tasks</span>
+          </button>
+        </motion.div>
       </div>
     </div>
   );

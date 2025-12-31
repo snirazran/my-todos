@@ -304,7 +304,7 @@ export default function BacklogPanel({
 
                         transition-all duration-200 rounded-xl 
 
-                        border border-transparent hover:bg-accent hover:shadow-sm
+                        border border-transparent md:hover:bg-accent md:hover:shadow-sm
 
                         ${
                           isMenuOpen
@@ -319,7 +319,7 @@ export default function BacklogPanel({
                     <div className="flex items-center justify-center flex-shrink-0 w-7 h-7">
                       <Fly
                         size={24}
-                        className="text-primary transition-all opacity-70 grayscale group-hover:grayscale-0 group-hover:opacity-100"
+                        className="text-primary transition-all opacity-70 grayscale md:group-hover:grayscale-0 md:group-hover:opacity-100"
                       />
                     </div>
 
@@ -385,12 +385,12 @@ export default function BacklogPanel({
                           addToday(t);
                         }}
                         disabled={processingIds.has(t.id)}
-                        className="group/btn flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-primary-foreground bg-primary hover:bg-primary/90 active:scale-95 transition-all rounded-full shadow-md shadow-primary/20 hover:shadow-primary/40 disabled:opacity-50 disabled:pointer-events-none"
+                        className="group/btn flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-primary-foreground bg-primary md:hover:bg-primary/90 active:scale-95 transition-all rounded-full shadow-md shadow-primary/20 md:hover:shadow-primary/40 disabled:opacity-50 disabled:pointer-events-none"
                       >
                         {processingIds.has(t.id) ? (
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         ) : (
-                          <Plus className="w-3.5 h-3.5 transition-transform group-hover/btn:rotate-90" />
+                          <Plus className="w-3.5 h-3.5 transition-transform md:group-hover/btn:rotate-90" />
                         )}
                         <span>Do Today!</span>
                       </button>
@@ -402,7 +402,7 @@ export default function BacklogPanel({
                         ${
                           isMenuOpen
                             ? 'bg-accent text-foreground'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                            : 'text-muted-foreground md:hover:text-foreground md:hover:bg-accent'
                         }
                       `}
                         onClick={(e) => {
