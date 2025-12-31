@@ -349,8 +349,8 @@ export default function TaskList({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 250,
-        tolerance: 8,
+        delay: 200,
+        tolerance: 6,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -455,6 +455,10 @@ export default function TaskList({
     setIsAnyDragging(true);
   };
 
+  const handleDragCancel = () => {
+    setIsAnyDragging(false);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     setIsAnyDragging(false);
     const { active, over } = event;
@@ -462,18 +466,22 @@ export default function TaskList({
     if (over && active.id !== over.id && onReorder) {
       const activeTasks = tasks.filter((t) => !t.completed && !vSet.has(t.id));
       const oldIndex = activeTasks.findIndex((t) => t.id === active.id);
-      const newIndex = activeTasks.findIndex((t) => t.id === over.id);
+      let newIndex = activeTasks.findIndex((t) => t.id === over.id);
 
-      if (oldIndex !== -1 && newIndex !== -1) {
-        // Reorder only the active tasks locally
-        const newActiveTasks = arrayMove(activeTasks, oldIndex, newIndex);
-        
-        // Reconstruct the full list: newActiveTasks + existing completed tasks
-        // NOTE: We rely on the fact that completed tasks are usually at the bottom.
-        // If they are mixed (during animation), this might be slightly jumpy, 
-        // but the user wants dragging *only* for active tasks.
-        const currentCompleted = tasks.filter((t) => t.completed || vSet.has(t.id));
-        onReorder([...newActiveTasks, ...currentCompleted]);
+      if (oldIndex !== -1) {
+        if (newIndex === -1) {
+          // If hovering over a completed task, target the end of active list
+          const overTask = tasks.find(t => t.id === over.id);
+          if (overTask && (overTask.completed || vSet.has(overTask.id))) {
+             newIndex = activeTasks.length - 1;
+          }
+        }
+
+        if (newIndex !== -1) {
+          const newActiveTasks = arrayMove(activeTasks, oldIndex, newIndex);
+          const currentCompleted = tasks.filter((t) => t.completed || vSet.has(t.id));
+          onReorder([...newActiveTasks, ...currentCompleted]);
+        }
       }
     }
   };
@@ -542,6 +550,7 @@ export default function TaskList({
             collisionDetection={closestCenter}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
+            onDragCancel={handleDragCancel}
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           >
             <SortableContext
