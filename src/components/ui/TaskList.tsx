@@ -131,7 +131,7 @@ function SortableTaskItem({
           ${isDone && !isDragging ? 'opacity-60 hover:opacity-100' : ''}
         `}
           style={{
-            touchAction: 'none', 
+            touchAction: isDragging ? 'none' : 'pan-y', 
             WebkitUserSelect: 'none',
             userSelect: 'none',
           } as React.CSSProperties}
@@ -337,12 +337,20 @@ export default function TaskList({
   const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
   const [isAnyDragging, setIsAnyDragging] = useState(false);
 
+  React.useEffect(() => {
+    if (isAnyDragging) {
+      document.documentElement.classList.add('dragging');
+    } else {
+      document.documentElement.classList.remove('dragging');
+    }
+  }, [isAnyDragging]);
+
   // DnD Sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 120,
-        tolerance: 5,
+        delay: 250,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {

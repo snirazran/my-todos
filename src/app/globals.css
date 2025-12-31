@@ -173,6 +173,8 @@ body.dragging {
   user-select: none;
   -webkit-touch-callout: none;
   overscroll-behavior: none; /* prevent page from pulling in any direction */
+  overflow: hidden !important;
+  touch-action: none !important;
 }
 [data-role='board-scroller'][data-drag='1'] {
   cursor: grabbing;
