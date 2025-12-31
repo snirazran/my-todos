@@ -120,7 +120,7 @@ export default function ProgressCard({
                     className={`${cardBase} bg-card border-primary shadow-lg scale-105 z-10`}
                   >
                     <div className="flex items-center justify-center w-full h-14">
-                      <div className="relative -top-5">
+                      <div className="relative -top-4">
                         <GiftRive
                           key="milestone-ready"
                           width={90}
@@ -172,7 +172,7 @@ export default function ProgressCard({
                   className={`${cardBase} bg-card border-border/60`}
                 >
                   <div className="flex items-center justify-center h-14">
-                    <div className="relative -top-5">
+                    <div className="relative -top-4">
                       <GiftRive
                         key={`pending-${idx}`}
                         width={90}
