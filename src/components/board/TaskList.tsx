@@ -45,6 +45,7 @@ export default React.memo(function TaskList({
     tags?: { id: string; name: string; color: string }[];
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
+  onAddRequested: (text: string) => void;
   userTags?: { id: string; name: string; color: string }[];
   onToggleRepeat?: (taskId: string, day: DisplayDay) => void;
   isAnyDragging?: boolean;

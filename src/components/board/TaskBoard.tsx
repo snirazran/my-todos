@@ -433,6 +433,7 @@ export default function TaskBoard({
                   removeTask={removeTask}
                   onGrab={onGrab}
                   setCardRef={setCardRef}
+                  onAddRequested={(text) => onRequestAdd(day, text)}
                   userTags={userTags}
                   onToggleRepeat={onToggleRepeat}
                   isAnyDragging={!!drag?.active}
