@@ -419,7 +419,7 @@ export default function TaskBoard({
                 title={titles[day]}
                 count={week[day]?.length || 0}
                 listRef={setListRef(day)}
-                maxHeightClass="max-h-[calc(100svh-340px-var(--safe-bottom))] md:max-h-[calc(100svh-280px-var(--safe-bottom))]"
+                maxHeightClass="max-h-[calc(100svh-390px-var(--safe-bottom))] md:max-h-[calc(100svh-270px-var(--safe-bottom))]"
                 isToday={day === todayDisplayIndex}
               >
                 <TaskList
@@ -501,6 +501,7 @@ export default function TaskBoard({
         onOpenChange={setShowQuickAdd}
         initialText={quickText}
         defaultRepeat="this-week"
+        defaultPickedDay={pageIndex}
         onSubmit={async ({ text, days, repeat, tags }) => {
           if (onQuickAdd) {
             await onQuickAdd({

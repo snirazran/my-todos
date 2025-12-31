@@ -45,12 +45,12 @@ export function AddTaskButton({
           <Plus size={18} strokeWidth={3} />
         </div>
         
-        <span className="text-[15px] text-muted-foreground group-hover:text-foreground transition-colors duration-300">
+        <span className="text-[15px] text-foreground transition-colors duration-300">
           {label}
         </span>
         
         {showFly && (
-          <span className="opacity-40 group-hover:opacity-100 transition-all duration-300">
+          <span className="opacity-100 transition-all duration-300">
             <Fly size={24} y={-3} x={-5} />
           </span>
         )}

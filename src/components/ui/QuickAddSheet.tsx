@@ -90,6 +90,7 @@ export default function QuickAddSheet({
   onSubmit,
   initialText = '',
   defaultRepeat = 'this-week',
+  defaultPickedDay,
 }: Props) {
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
@@ -125,7 +126,9 @@ export default function QuickAddSheet({
     if (open) {
       setText(initialText);
       setWhen('pick');
-      setPickedDays([todayDisplayIndex()]);
+      // Use defaultPickedDay if provided, otherwise fallback to today
+      const initialDay = defaultPickedDay !== undefined ? defaultPickedDay : todayDisplayIndex();
+      setPickedDays([initialDay as Exclude<DisplayDay, 7>]);
       setRepeat(defaultRepeat);
       setTags([]);
       setTagInput('');
@@ -135,7 +138,7 @@ export default function QuickAddSheet({
       setIsTagPanelOpen(false);
       setIsCreatingTag(false);
     }
-  }, [open, initialText, defaultRepeat]);
+  }, [open, initialText, defaultRepeat, defaultPickedDay]);
 
   const filteredTags = useMemo(() => {
     if (!tagInput) return savedTags;

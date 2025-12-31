@@ -1,11 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Inbox, Archive, CalendarRange, Trash2 } from 'lucide-react';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
-import useSWR from 'swr';
 import TagPopup from '@/components/ui/TagPopup';
 
 interface Props {
@@ -67,7 +66,6 @@ export default React.memo(function BacklogTray({
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!scrollRef.current) return;
-    // Don't drag-scroll if clicking a button (context menu) or a task card (it handles its own drag)
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('[data-card-id]')) return;
 
@@ -80,7 +78,7 @@ export default React.memo(function BacklogTray({
     if (!isDragging || !scrollRef.current) return;
     e.preventDefault();
     const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX.current) * 1.5; // Scroll-fast
+    const walk = (x - startX.current) * 1.5;
     scrollRef.current.scrollLeft = scrollLeft.current - walk;
   };
 
@@ -98,9 +96,6 @@ export default React.memo(function BacklogTray({
   };
   
   const handleTagSave = async (taskId: string, newTags: string[]) => {
-      const item = tasks.find(t => t.id === taskId);
-      if (!item) return;
-
       try {
           await fetch('/api/tasks', {
             method: 'PUT',
@@ -110,7 +105,6 @@ export default React.memo(function BacklogTray({
               tags: newTags
             }),
           });
-          
           window.dispatchEvent(new Event('tags-updated'));
       } catch (e) {
           console.error("Failed to update tags", e);
@@ -127,7 +121,7 @@ export default React.memo(function BacklogTray({
             animate={{ opacity: 1 - closeProgress }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.1 }}
-            className="fixed inset-0 z-[80] bg-black/20 backdrop-blur-[1px]"
+            className="fixed inset-0 z-[80] bg-background/40 backdrop-blur-md"
             onClick={onClose}
             style={{ pointerEvents: closeProgress > 0.5 ? 'none' : 'auto' }}
           />
@@ -138,25 +132,36 @@ export default React.memo(function BacklogTray({
             initial={{ y: '100%' }}
             animate={{ y: `${closeProgress * 100}%` }}
             exit={{ y: '100%' }}
-            transition={closeProgress > 0 ? { type: 'tween', ease: 'linear', duration: 0 } : { type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed bottom-0 left-0 right-0 z-[90] flex flex-col bg-popover/90 border-t border-border/80 shadow-[0_-10px_40px_rgba(0,0,0,0.15)] backdrop-blur-xl pb-[env(safe-area-inset-bottom)]"
-            onClick={(e) => e.stopPropagation()} // Prevent click-through closing
+            transition={closeProgress > 0 ? { type: 'tween', ease: 'linear', duration: 0 } : { type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
+            className="fixed bottom-0 left-0 right-0 z-[90] flex flex-col bg-card/95 border-t border-border/50 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] backdrop-blur-3xl pb-[env(safe-area-inset-bottom)] rounded-t-[32px] overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
           >
+            {/* Grab Handle */}
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-12 h-1.5 rounded-full bg-border/40" />
+            </div>
+
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-              <div>
-                <h3 className="text-lg font-bold text-foreground">
-                  Saved Tasks
-                </h3>
-                <p className="text-xs text-muted-foreground font-medium">
-                  Tasks you're not sure when to do. Drag in to save, drag out to schedule.
-                </p>
+            <div className="flex items-center justify-between px-8 py-4">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-primary/10 text-primary">
+                  <Archive size={22} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black tracking-tight text-foreground uppercase">
+                    Saved Tasks
+                  </h3>
+                  <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
+                    <CalendarRange size={12} strokeWidth={3} />
+                    <span>Drop here to schedule later</span>
+                  </div>
+                </div>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-full bg-secondary hover:bg-secondary/80 transition-colors"
+                className="flex items-center justify-center w-10 h-10 rounded-2xl bg-secondary hover:bg-secondary/80 text-muted-foreground transition-all active:scale-95"
               >
-                <X size={20} className="text-muted-foreground" />
+                <X size={20} strokeWidth={2.5} />
               </button>
             </div>
 
@@ -167,76 +172,76 @@ export default React.memo(function BacklogTray({
               onMouseMove={handleMouseMove}
               onMouseUp={stopDragging}
               onMouseLeave={stopDragging}
-              className="flex gap-4 p-4 overflow-x-auto overflow-y-visible min-h-[140px] items-center no-scrollbar touch-manipulation"
+              className="flex gap-4 px-8 py-6 overflow-x-auto overflow-y-visible min-h-[160px] items-center no-scrollbar touch-manipulation"
             >
               {tasks.length === 0 ? (
-                <div className="w-full text-center py-8 text-muted-foreground text-sm italic">
-                  No tasks for later. Drop some here!
+                <div className="w-full flex flex-col items-center justify-center py-10 gap-3 opacity-30">
+                  <Inbox size={48} strokeWidth={1.5} />
+                  <p className="text-sm font-bold uppercase tracking-widest">Your backlog is empty</p>
                 </div>
               ) : (
                 <AnimatePresence mode="popLayout">
                 {tasks.map((t, i) => (
                   <motion.div
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                    initial={{ opacity: 0, scale: 0.9, x: 20 }}
+                    animate={{ opacity: 1, scale: 1, x: 0 }}
+                    exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
                     key={t.id}
-                    className="w-[300px] shrink-0 relative"
+                    className="w-[280px] sm:w-[320px] shrink-0 relative"
                   >
-                    <TaskCard
-                      innerRef={(el) => setCardRef(draggableIdFor(7, t.id), el)}
-                      dragId={draggableIdFor(7, t.id)}
-                      task={t}
-                      userTags={userTags}
-                      menuOpen={menu?.id === t.id}
-                      onToggleMenu={(rect) => {
-                        setMenu((prev) => {
-                          if (prev?.id === t.id) return null;
-                          const MENU_W = 160;
-                          const MENU_H = 60;
-                          const GAP = 8; // increased gap
-                          const MARGIN = 10;
-                          const vw = typeof window !== 'undefined' ? window.innerWidth : 480;
-                          const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-                          let left = rect.left + rect.width / 2 - MENU_W / 2;
-                          left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
-                          // Position below by default
-                          let top = rect.bottom + GAP + 8; // added +8 for lower positioning
-                          if (top + MENU_H > vh - MARGIN) {
-                            top = rect.top - MENU_H - GAP;
-                          }
-                          top = Math.max(MARGIN, Math.min(top, vh - MENU_H - MARGIN));
-                          return { id: t.id, top, left };
-                        });
-                      }}
-                      hiddenWhileDragging={activeDragId === t.id}
-                      isRepeating={t.type === 'weekly'}
-                      touchAction="pan-x"
-                      isAnyDragging={!!activeDragId}
-                      onGrab={(payload) => {
-                        // Resolve tags
-                        const resolvedTags = t.tags?.map(tagId => {
-                           const found = userTags?.find(ut => ut.id === tagId || ut.name === tagId);
-                           return found || { id: tagId, name: tagId, color: '' };
-                        });
+                    <div className="group relative">
+                      <TaskCard
+                        innerRef={(el) => setCardRef(draggableIdFor(7, t.id), el)}
+                        dragId={draggableIdFor(7, t.id)}
+                        task={t}
+                        userTags={userTags}
+                        menuOpen={menu?.id === t.id}
+                        onToggleMenu={(rect) => {
+                          setMenu((prev) => {
+                            if (prev?.id === t.id) return null;
+                            const MENU_W = 180;
+                            const MENU_H = 64;
+                            const GAP = 12;
+                            const MARGIN = 16;
+                            const vw = typeof window !== 'undefined' ? window.innerWidth : 480;
+                            const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+                            let left = rect.left + rect.width / 2 - MENU_W / 2;
+                            left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
+                            let top = rect.bottom + GAP;
+                            if (top + MENU_H > vh - MARGIN) {
+                              top = rect.top - MENU_H - GAP;
+                            }
+                            return { id: t.id, top, left };
+                          });
+                        }}
+                        hiddenWhileDragging={activeDragId === t.id}
+                        isRepeating={t.type === 'weekly'}
+                        touchAction="pan-x"
+                        isAnyDragging={!!activeDragId}
+                        onGrab={(payload) => {
+                          const resolvedTags = t.tags?.map(tagId => {
+                             const found = userTags?.find(ut => ut.id === tagId || ut.name === tagId);
+                             return found || { id: tagId, name: tagId, color: '' };
+                          });
 
-                        onGrab({
-                            day: 7,
-                            index: i,
-                            taskId: t.id,
-                            taskText: t.text,
-                            clientX: payload.clientX,
-                            clientY: payload.clientY,
-                            pointerType: payload.pointerType,
-                            rectGetter: () => {
-                                const id = draggableIdFor(7, t.id);
-                                const el = document.querySelector(`[data-card-id="${id}"]`);
-                                return el?.getBoundingClientRect() ?? new DOMRect(0,0,0,0);
-                            },
-                            tags: resolvedTags
-                        })
-                      }}
-                    />
+                          onGrab({
+                              day: 7,
+                              index: i,
+                              taskId: t.id,
+                              taskText: t.text,
+                              clientX: payload.clientX,
+                              clientY: payload.clientY,
+                              pointerType: payload.pointerType,
+                              rectGetter: () => {
+                                  const id = draggableIdFor(7, t.id);
+                                  const el = document.querySelector(`[data-card-id="${id}"]`);
+                                  return el?.getBoundingClientRect() ?? new DOMRect(0,0,0,0);
+                              },
+                              tags: resolvedTags
+                          })
+                        }}
+                      />
+                    </div>
                   </motion.div>
                 ))}
                 </AnimatePresence>
@@ -266,7 +271,6 @@ export default React.memo(function BacklogTray({
             onSave={handleTagSave}
           />
 
-          {/* Delete Dialog */}
           <DeleteDialog
             open={!!confirmItem}
             variant="backlog"
