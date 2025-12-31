@@ -20,7 +20,7 @@ export default function HistoryFilter({ value, onChange }: HistoryFilterProps) {
   ];
 
   return (
-    <div className="flex items-center gap-1 p-1 bg-muted rounded-lg w-full sm:w-auto overflow-x-auto no-scrollbar">
+    <div className="grid grid-cols-3 gap-1 p-1 bg-card/80 backdrop-blur-2xl border border-border/50 rounded-[14px] w-full sm:flex sm:items-center sm:w-auto overflow-hidden">
       {options.map((opt) => {
         const isActive = value === opt.id;
         const Icon = opt.icon;
@@ -30,18 +30,18 @@ export default function HistoryFilter({ value, onChange }: HistoryFilterProps) {
             key={opt.id}
             onClick={() => onChange(opt.id)}
             className={cn(
-              "relative px-4 py-2 text-sm font-medium rounded-md transition-all whitespace-nowrap z-10 flex items-center gap-2",
-              isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
+              "relative px-3 py-2 text-[11px] font-black uppercase tracking-wider rounded-[10px] transition-all whitespace-nowrap z-10 flex items-center justify-center gap-1.5",
+              isActive ? "text-primary shadow-sm" : "text-muted-foreground/60 hover:text-muted-foreground"
             )}
           >
             {isActive && (
               <motion.div
                 layoutId="activeFilter"
-                className="absolute inset-0 bg-background shadow-sm rounded-md -z-10"
-                transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
+                className="absolute inset-0 bg-background rounded-[10px] -z-10"
+                transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
               />
             )}
-            {Icon && <Icon className="w-4 h-4" />}
+            {Icon && <Icon className="w-3.5 h-3.5" />}
             {opt.label}
           </button>
         );

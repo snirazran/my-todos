@@ -131,7 +131,7 @@ function SortableTaskItem({
           ${isDone && !isDragging ? 'opacity-60 hover:opacity-100' : ''}
         `}
           style={{
-            touchAction: isDragging ? 'none' : 'pan-y', 
+            touchAction: 'none', 
             WebkitUserSelect: 'none',
             userSelect: 'none',
           } as React.CSSProperties}

@@ -4,8 +4,8 @@ import React, { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, Calendar as CalendarIcon, Loader2, Tag } from 'lucide-react';
-import { subDays, startOfToday, format, startOfYesterday } from 'date-fns';
+import { ArrowLeft, Calendar as CalendarIcon, Loader2, Tag, X } from 'lucide-react';
+import { subDays, startOfToday, format } from 'date-fns';
 import { motion, AnimatePresence } from 'framer-motion';
 import useSWR from 'swr';
 
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { type FrogHandle } from '@/components/ui/frog';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { cn } from '@/lib/utils';
 import {
   HIT_AT,
   OFFSET_MS,
@@ -31,11 +32,11 @@ export default function HistoryPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [filter, setFilter] = useState<DateRangeOption>('7d');
-  const [selectedTagId, setSelectedTagId] = useState<string | null>(null);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [showTagFilter, setShowTagFilter] = useState(false);
   
-  // Custom date range state
   const [customFrom, setCustomFrom] = useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
-  const [customTo, setCustomTo] = useState<string>(format(subDays(new Date(), 1), 'yyyy-MM-dd')); // Default to yesterday
+  const [customTo, setCustomTo] = useState<string>(format(subDays(new Date(), 1), 'yyyy-MM-dd'));
 
   const [historyData, setHistoryData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,7 +44,6 @@ export default function HistoryPage() {
   const { data: tagsData } = useSWR('/api/tags', (url) => fetch(url).then((r) => r.json()));
   const availableTags: { id: string; name: string; color: string }[] = tagsData?.tags || [];
 
-  /* ---- Frog Animation State ---- */
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
@@ -63,7 +63,6 @@ export default function HistoryPage() {
     visuallyDone,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
-  // Prevent scrolling during cinematic
   useEffect(() => {
     if (!cinematic) return;
     const stop = (e: Event) => e.preventDefault();
@@ -75,7 +74,6 @@ export default function HistoryPage() {
     };
   }, [cinematic]);
 
-  // Initial Data Fetch (Balance + History)
   useEffect(() => {
     if (status === 'loading') return;
     if (status === 'unauthenticated') {
@@ -86,7 +84,6 @@ export default function HistoryPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // 1. Fetch Fly Balance
         const todayStr = format(startOfToday(), 'yyyy-MM-dd');
         const flyRes = await fetch(`/api/tasks?date=${todayStr}`);
         if (flyRes.ok) {
@@ -96,21 +93,14 @@ export default function HistoryPage() {
            }
         }
 
-        // 2. Fetch History
         const today = startOfToday();
         let fromDate = new Date();
-        let toDate = subDays(today, 1); // Always end yesterday by default for standard filters
+        let toDate = subDays(today, 1);
 
-        // Determine dates based on filter
         switch (filter) {
-          case '7d':
-            fromDate = subDays(today, 7); 
-            break;
-          case '30d':
-            fromDate = subDays(today, 30);
-            break;
+          case '7d': fromDate = subDays(today, 7); break;
+          case '30d': fromDate = subDays(today, 30); break;
           case 'custom':
-            // Use user selected dates
             if (customFrom) fromDate = new Date(customFrom);
             if (customTo) toDate = new Date(customTo);
             break;
@@ -133,29 +123,27 @@ export default function HistoryPage() {
     };
 
     fetchData();
-  }, [filter, session, status, customFrom, customTo]);
+  }, [filter, session, status, customFrom, customTo, router]);
 
-  // Filter history data by tag
   const filteredHistory = useMemo(() => {
-    if (!selectedTagId) return historyData;
+    if (selectedTagIds.length === 0) return historyData;
     return historyData.map(day => ({
       ...day,
-      tasks: day.tasks.filter((t: any) => t.tags?.includes(selectedTagId))
+      tasks: day.tasks.filter((t: any) => 
+        selectedTagIds.some(id => t.tags?.includes(id))
+      )
     })).filter(day => day.tasks.length > 0);
-  }, [historyData, selectedTagId]);
+  }, [historyData, selectedTagIds]);
 
-  // Updated stats calculation (combined view)
   const stats = useMemo(() => {
     let total = 0;
     let completed = 0;
-
     filteredHistory.forEach((day) => {
       day.tasks.forEach((t: any) => {
         total++;
         if (t.completed) completed++;
       });
     });
-
     return {
       total,
       completed,
@@ -163,60 +151,38 @@ export default function HistoryPage() {
     };
   }, [filteredHistory]);
 
-  // Handler for task toggling
   const handleToggleTask = async (taskId: string, date: string, currentStatus: boolean) => {
-     if (cinematic || grab) return; // Prevent interaction during animation
+     if (cinematic || grab) return;
 
      const performUpdate = async () => {
-       // 1. Optimistic Update
        const newStatus = !currentStatus;
-       
        setHistoryData(prevData => prevData.map(day => {
           if (day.date !== date) return day;
           return {
              ...day,
              tasks: day.tasks.map((t: any) => {
-                if (t.id === taskId) {
-                   return { ...t, completed: newStatus };
-                }
+                if (t.id === taskId) return { ...t, completed: newStatus };
                 return t;
              })
           };
        }));
 
-       // 2. API Call
        try {
           const res = await fetch('/api/tasks', {
              method: 'PUT',
              headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify({
-                taskId,
-                date,
-                completed: newStatus
-             })
+             body: JSON.stringify({ taskId, date, completed: newStatus })
           });
-
-          if (!res.ok) {
-             throw new Error("Failed to update task");
-          }
-          
-          // Update fly balance if returned
           const data = await res.json();
-          if (data.flyStatus?.balance !== undefined) {
-             setFlyBalance(data.flyStatus.balance);
-          }
-
+          if (data.flyStatus?.balance !== undefined) setFlyBalance(data.flyStatus.balance);
        } catch (error) {
           console.error("Failed to persist task toggle", error);
-          // Revert on error
           setHistoryData(prevData => prevData.map(day => {
              if (day.date !== date) return day;
              return {
                 ...day,
                 tasks: day.tasks.map((t: any) => {
-                   if (t.id === taskId) {
-                      return { ...t, completed: currentStatus }; // Revert to old status
-                   }
+                   if (t.id === taskId) return { ...t, completed: currentStatus };
                    return t;
                 })
              };
@@ -224,243 +190,178 @@ export default function HistoryPage() {
        }
      };
 
-     // If marking as complete, trigger tongue first
      if (!currentStatus) {
-        const uniqueKey = `${date}::${taskId}`;
         await triggerTongue({
-           key: uniqueKey,
+           key: `${date}::${taskId}`,
            completed: true,
            onPersist: performUpdate
         });
      } else {
-        // Marking as incomplete, just do it
         await performUpdate();
      }
   };
 
-  // Initial Data Fetch (Balance + History)
+  const toggleTag = (id: string) => {
+    setSelectedTagIds(prev => 
+      prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]
+    );
+  };
+
+  if (status === 'loading') return <LoadingScreen message="Loading history..." />;
 
   return (
-    <main className="min-h-screen bg-background transition-colors">
-      <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-4 md:space-y-8">
+    <main className="min-h-screen pb-48 md:pb-32 bg-background">
+      <div className="px-4 py-6 mx-auto max-w-7xl md:px-8">
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h1 className="text-3xl font-bold text-foreground tracking-tight">
+        <div className="flex flex-col gap-4 mb-2 md:mb-6 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-5xl">
               Task History
             </h1>
-            <p className="text-muted-foreground">
+            <p className="flex items-center gap-2 font-medium text-md md:text-lg text-muted-foreground">
+              <CalendarIcon className="w-4 h-4 md:w-5 md:h-5" />
               Review your past accomplishments and habits.
             </p>
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="self-start hidden gap-2 md:flex md:self-auto">
              <Link href="/">
-                <Button variant="outline" size="sm" className="hidden md:flex gap-2">
+                <Button variant="outline" size="sm" className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium transition bg-card rounded-lg shadow-sm text-foreground hover:bg-accent border border-border">
                    <ArrowLeft className="w-4 h-4" />
-                   Back to Board
+                   <span>Back to Board</span>
                 </Button>
              </Link>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-8 items-start">
+        <div className="relative grid items-start grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-8">
            {/* Left Column: Frog & Stats */}
-           <div className="lg:col-span-4 space-y-4 lg:space-y-6 lg:sticky lg:top-8">
-              {/* Frog Display */}
-              <div className="flex flex-col items-center w-full">
-                <FrogDisplay
-                  frogRef={frogRef}
-                  frogBoxRef={frogBoxRef}
-                  mouthOpen={!!grab}
-                  mouthOffset={{ y: -4 }}
-                  indices={indices}
-                  openWardrobe={openWardrobe}
-                  onOpenChange={setOpenWardrobe}
-                  flyBalance={flyBalance}
-                />
-              </div>
-
-              {/* Stats Section (Vertical Stack on Desktop) */}
-              <HistoryStats 
-                 data={stats} 
-                 className="grid-cols-1 md:grid-cols-3 lg:grid-cols-1 mb-0"
+           <div className="z-10 flex flex-col gap-4 lg:col-span-4 lg:sticky lg:top-8 lg:gap-6">
+              <FrogDisplay
+                frogRef={frogRef}
+                frogBoxRef={frogBoxRef}
+                mouthOpen={!!grab}
+                mouthOffset={{ y: -4 }}
+                indices={indices}
+                openWardrobe={openWardrobe}
+                onOpenChange={setOpenWardrobe}
+                flyBalance={flyBalance}
+                rate={stats.completionRate}
+                done={stats.total}
+                animateBalance={false}
               />
+
+              <div className="w-full">
+                <HistoryStats data={stats} className="grid-cols-1 md:grid-cols-3 lg:grid-cols-1 mb-0" />
+              </div>
            </div>
 
            {/* Right Column: Filters & List */}
-           <div className="lg:col-span-8 space-y-4 lg:space-y-6">
-              {/* Controls Container */}
+           <div className="flex flex-col gap-4 lg:col-span-8 lg:gap-6">
               <div className="flex flex-col gap-3">
-                 {/* Filter Tabs */}
                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sticky top-2 z-20 bg-background/90 backdrop-blur-md py-2 -mx-2 px-2 md:static md:bg-transparent md:p-0">
                     <HistoryFilter value={filter} onChange={setFilter} />
-                    
-                    {/* Context Label (Only show if not custom) */}
                     {filter !== 'custom' && (
                        <div className="hidden md:flex items-center text-sm text-slate-400 gap-2">
                           <CalendarIcon className="w-4 h-4" />
-                          <span>
-                             {filter === '7d' 
-                                   ? 'Last 7 Days (Excl. Today)' 
-                                   : 'Last 30 Days (Excl. Today)'}
-                          </span>
+                          <span>{filter === '7d' ? 'Last 7 Days (Excl. Today)' : 'Last 30 Days (Excl. Today)'}</span>
                        </div>
                     )}
                  </div>
 
-                 {/* Custom Date Pickers (Animated Expansion) */}
                  <AnimatePresence>
                    {filter === 'custom' && (
-                     <motion.div
-                       initial={{ height: 0, opacity: 0 }}
-                       animate={{ height: 'auto', opacity: 1 }}
-                       exit={{ height: 0, opacity: 0 }}
-                       className="overflow-hidden"
-                     >
-                       <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-card rounded-xl border border-border shadow-sm">
-                         <div className="flex items-center gap-2 w-full sm:w-auto">
-                           <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">From:</label>
-                           <input
-                             type="date"
-                             value={customFrom}
-                             onChange={(e) => setCustomFrom(e.target.value)}
-                             className="w-full sm:w-auto px-3 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-primary outline-none text-sm"
-                           />
+                     <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4 bg-card/80 backdrop-blur-xl rounded-[24px] border border-border/50 shadow-sm">
+                         <div className="flex-1 flex flex-col gap-1.5">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">From</label>
+                           <input type="date" value={customFrom} onChange={(e) => setCustomFrom(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-border/50 bg-background/50 text-foreground font-bold focus:ring-2 focus:ring-primary/20 outline-none text-sm transition-all" />
                          </div>
-                         <div className="hidden sm:block text-muted-foreground">→</div>
-                         <div className="flex items-center gap-2 w-full sm:w-auto">
-                           <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">To:</label>
-                           <input
-                             type="date"
-                             value={customTo}
-                             onChange={(e) => setCustomTo(e.target.value)}
-                             className="w-full sm:w-auto px-3 py-2 rounded-lg border border-input bg-background text-foreground focus:ring-2 focus:ring-primary outline-none text-sm"
-                           />
+                         <div className="hidden sm:flex items-center justify-center self-end pb-3 text-muted-foreground/30">
+                           <ArrowLeft className="w-4 h-4 rotate-180" strokeWidth={3} />
+                         </div>
+                         <div className="flex-1 flex flex-col gap-1.5">
+                           <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">To</label>
+                           <input type="date" value={customTo} onChange={(e) => setCustomTo(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-border/50 bg-background/50 text-foreground font-bold focus:ring-2 focus:ring-primary/20 outline-none text-sm transition-all" />
                          </div>
                        </div>
                      </motion.div>
                    )}
                  </AnimatePresence>
 
-                 {/* Tag Filter */}
+                 {/* Tag Filter Trigger */}
                  {availableTags.length > 0 && (
-                    <div className="flex items-center gap-2 overflow-x-auto no-scrollbar p-1 pb-2 -mx-1 px-1">
+                    <div className="flex items-center gap-2">
                        <button
-                          onClick={() => setSelectedTagId(null)}
-                          className={`
-                             whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all border
-                             ${!selectedTagId 
-                                ? 'bg-primary text-primary-foreground border-primary' 
-                                : 'bg-card text-muted-foreground border-border hover:border-input'}
-                          `}
+                          onClick={() => setShowTagFilter(true)}
+                          className={cn(
+                             "inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all border",
+                             selectedTagIds.length > 0 
+                                ? "bg-primary/10 text-primary border-primary/20 shadow-sm" 
+                                : "bg-card/80 backdrop-blur-md text-muted-foreground border-border/50 hover:border-primary/30"
+                          )}
                        >
-                          All Tags
+                          <Tag className="w-3.5 h-3.5" strokeWidth={3} />
+                          <span>
+                            {selectedTagIds.length === 0 
+                              ? 'Filter by Tag' 
+                              : selectedTagIds.length === 1 
+                                ? availableTags.find(t => t.id === selectedTagIds[0])?.name 
+                                : `${selectedTagIds.length} Tags Selected`}
+                          </span>
+                          {selectedTagIds.length > 0 && (
+                             <X 
+                                className="w-3 h-3 ml-1 hover:text-rose-500 transition-colors" 
+                                strokeWidth={4}
+                                onClick={(e) => { e.stopPropagation(); setSelectedTagIds([]); }} 
+                             />
+                          )}
                        </button>
-                       {availableTags.map(tag => (
-                          <button
-                             key={tag.id}
-                             onClick={() => setSelectedTagId(selectedTagId === tag.id ? null : tag.id)}
-                             className={`
-                                whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5
-                                ${selectedTagId === tag.id 
-                                   ? 'ring-2 ring-offset-1 ring-offset-background' 
-                                   : 'opacity-70 hover:opacity-100 bg-card'}
-                             `}
-                             style={{
-                                backgroundColor: selectedTagId === tag.id ? `${tag.color}20` : undefined,
-                                color: tag.color,
-                                borderColor: selectedTagId === tag.id ? `${tag.color}40` : `${tag.color}20`,
-                                boxShadow: selectedTagId === tag.id ? `0 0 0 1px ${tag.color}` : 'none',
-                             }}
-                          >
-                             {tag.name}
-                          </button>
-                       ))}
                     </div>
                  )}
               </div>
 
-              {/* Main List */}
-              <div className="relative min-h-[400px]">
-                 {loading ? (
-                    <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10 backdrop-blur-sm rounded-xl">
-                       <Loader2 className="w-8 h-8 animate-spin text-primary" />
+              <AnimatePresence>
+                 {showTagFilter && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowTagFilter(false)} className="absolute inset-0 bg-background/80 backdrop-blur-sm" />
+                       <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative w-full max-w-lg bg-card border border-border/50 shadow-2xl rounded-[32px] overflow-hidden">
+                          <div className="p-6 border-b border-border/50 flex items-center justify-between">
+                             <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-xl bg-primary/10 text-primary"><Tag size={20} strokeWidth={2.5} /></div>
+                                <h2 className="text-xl font-black uppercase tracking-tight">Select Tags</h2>
+                             </div>
+                             <button onClick={() => setShowTagFilter(false)} className="p-2 rounded-xl bg-secondary text-muted-foreground hover:text-foreground transition-colors"><X size={20} strokeWidth={2.5} /></button>
+                          </div>
+                          <div className="p-6 max-h-[60vh] overflow-y-auto no-scrollbar">
+                             <div className="grid grid-cols-2 gap-3">
+                                <button onClick={() => setSelectedTagIds([])} className={cn("px-4 py-3 rounded-2xl text-[13px] font-bold uppercase tracking-wider transition-all border text-center", selectedTagIds.length === 0 ? "bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20" : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted")}>Clear All</button>
+                                {availableTags.map(tag => (
+                                   <button key={tag.id} onClick={() => toggleTag(tag.id)} className={cn("px-4 py-3 rounded-2xl text-[13px] font-bold uppercase tracking-wider transition-all border flex items-center gap-3", selectedTagIds.includes(tag.id) ? "ring-2 ring-offset-2 ring-offset-card scale-[1.02]" : "bg-muted/30 border-transparent hover:bg-muted/50")} style={{ backgroundColor: selectedTagIds.includes(tag.id) ? `${tag.color}20` : undefined, color: tag.color, borderColor: selectedTagIds.includes(tag.id) ? `${tag.color}40` : undefined }}><span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: tag.color }} /><span className="truncate">{tag.name}</span></button>
+                                ))}
+                             </div>
+                          </div>
+                          <div className="p-4 bg-muted/30 border-t border-border/50 flex justify-center">
+                             <Button onClick={() => setShowTagFilter(false)} className="rounded-xl px-12 py-6 font-black uppercase tracking-[0.2em] text-[11px] shadow-lg shadow-primary/20">Apply Filters</Button>
+                          </div>
+                       </motion.div>
                     </div>
-                 ) : null}
-                 
-                 <HistoryList 
-                    history={filteredHistory} 
-                    onToggleTask={handleToggleTask} 
-                    setFlyRef={(key, el) => { flyRefs.current[key] = el; }}
-                    visuallyCompleted={visuallyDone}
-                 />
+                 )}
+              </AnimatePresence>
+
+              <div className="relative min-h-[400px]">
+                 {loading ? <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10 backdrop-blur-sm rounded-xl"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div> : null}
+                 <HistoryList history={filteredHistory} onToggleTask={handleToggleTask} setFlyRef={(key, el) => { flyRefs.current[key] = el; }} visuallyCompleted={visuallyDone} />
               </div>
            </div>
         </div>
-
-      </div>
-      
-      {/* Mobile Floating Action Button for Back */}
-      
-      {/* Mobile Floating Action Button for Back */}
-      <div className="md:hidden fixed bottom-6 right-6 z-50">
-        <Link href="/">
-           <Button className="rounded-full w-12 h-12 shadow-lg bg-primary text-primary-foreground hover:bg-primary/90 hover:scale-105 transition-transform">
-              <ArrowLeft className="w-6 h-6" />
-           </Button>
-        </Link>
       </div>
 
-      {/* SVG Tongue Overlay */}
       {grab && (
-        <svg
-          key={grab.startAt}
-          className="fixed inset-0 z-50 pointer-events-none"
-          width={vp.w}
-          height={vp.h}
-          viewBox={`0 0 ${vp.w} ${vp.h}`}
-          preserveAspectRatio="none"
-          style={{ width: vp.w, height: vp.h }}
-        >
-          <defs>
-            <linearGradient id="tongue-grad" x1="0" y1="0" x2="0" y2="1">
-              <stop stopColor="#ff6b6b" />
-              <stop offset="1" stopColor="#f43f5e" />
-            </linearGradient>
-          </defs>
-
-          <motion.path
-            key={`tongue-${grab.startAt}`}
-            ref={tonguePathEl}
-            d="M0 0 L0 0"
-            fill="none"
-            stroke="url(#tongue-grad)"
-            strokeWidth={TONGUE_STROKE}
-            strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: [0, 1, 0] }}
-            transition={{
-              delay: OFFSET_MS / 1000,
-              duration: TONGUE_MS / 1000,
-              times: [0, HIT_AT, 1],
-              ease: 'linear',
-            }}
-          />
-
-          {tipVisible && tip && (
-            <g transform={`translate(${tip.x}, ${tip.y})`}>
-              <circle r={10} fill="transparent" />
-              <image
-                href="/fly.svg"
-                x={-FLY_PX / 2}
-                y={-FLY_PX / 2}
-                width={FLY_PX}
-                height={FLY_PX}
-              />
-            </g>
-          )}
+        <svg key={grab.startAt} className="fixed inset-0 z-50 pointer-events-none" width={vp.w} height={vp.h} viewBox={`0 0 ${vp.w} ${vp.h}`} preserveAspectRatio="none" style={{ width: vp.w, height: vp.h }}>
+          <defs><linearGradient id="tongue-grad" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#ff6b6b" /><stop offset="1" stopColor="#f43f5e" /></linearGradient></defs>
+          <motion.path key={`tongue-${grab.startAt}`} ref={tonguePathEl} d="M0 0 L0 0" fill="none" stroke="url(#tongue-grad)" strokeWidth={TONGUE_STROKE} strokeLinecap="round" vectorEffect="non-scaling-stroke" initial={{ pathLength: 0 }} animate={{ pathLength: [0, 1, 0] }} transition={{ delay: OFFSET_MS / 1000, duration: TONGUE_MS / 1000, times: [0, HIT_AT, 1], ease: 'linear' }} />
+          {tipVisible && tip && (<g transform={`translate(${tip.x}, ${tip.y})`}><circle r={10} fill="transparent" /><image href="/fly.svg" x={-FLY_PX / 2} y={-FLY_PX / 2} width={FLY_PX} height={FLY_PX} /></g>)}
         </svg>
       )}
     </main>

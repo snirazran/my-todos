@@ -8,6 +8,7 @@ import { Task, draggableIdFor, type DisplayDay, apiDayFromDisplay } from './help
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import Fly from '@/components/ui/fly';
+import { Plus } from 'lucide-react';
 
 export default React.memo(function TaskList({
   day,
@@ -155,19 +156,20 @@ export default React.memo(function TaskList({
     if (placeholderAt === 0) {
       rows.push(renderPlaceholder(`ph-empty-${day}`));
     } else {
-      // THEMED EMPTY STATE
+      // THEMED EMPTY STATE / ADD BUTTON
       rows.push(
-        <div 
+        <button
           key={`empty-state-${day}`}
-          className="flex flex-col items-center justify-center py-2.5 px-4 text-center border-2 border-dashed border-border bg-muted/30 rounded-2xl transition-colors group-hover:bg-muted/50"
+          onClick={() => onAddRequested('')}
+          className="w-full flex flex-col items-center justify-center py-6 px-4 text-center border-2 border-dashed border-border/50 bg-muted/20 rounded-2xl transition-all hover:bg-muted/40 hover:border-primary/30 group"
         >
-          <div className="mb-1 opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100 transition-all">
+          <div className="mb-2 p-2 rounded-xl bg-primary/5 opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100 group-hover:bg-primary/10 transition-all">
             <Fly size={28} />
           </div>
-          <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-            No tasks
+          <p className="text-[11px] font-black text-muted-foreground/60 uppercase tracking-widest group-hover:text-primary transition-colors">
+            Add task
           </p>
-        </div>
+        </button>
       );
     }
     return <>{rows}</>;

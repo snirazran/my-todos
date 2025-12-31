@@ -45,13 +45,13 @@ export function LoadingScreen({
   return (
     <div
       className={`relative overflow-hidden ${
-        fullscreen ? 'min-h-[calc(100dvh-3.5rem)] md:min-h-[calc(100dvh-4rem)]' : 'py-12'
-      } flex items-center justify-center`}
+        fullscreen ? 'h-[calc(100dvh-var(--header-h))] flex items-center justify-center' : 'py-12 flex items-center justify-center'
+      }`}
     >
       {/* Cleaner, lighter background */}
       <div className="absolute inset-0 bg-background/50" />
       
-      <div className="relative flex items-center justify-center w-full px-4">
+      <div className={`relative flex items-center justify-center w-full px-4 ${fullscreen ? '-translate-y-8 md:translate-y-0' : ''}`}>
         <div className="flex flex-col items-center gap-4">
           <ThemeMorphLoader />
           <div className="text-center space-y-1">

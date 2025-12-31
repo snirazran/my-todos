@@ -9,6 +9,7 @@ import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { useInventory } from '@/hooks/useInventory';
 import { useSession } from 'next-auth/react';
+import { cn } from '@/lib/utils';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle>;
@@ -25,6 +26,7 @@ type Props = {
   total?: number;
   giftsClaimed?: number;
   isCatching?: boolean;
+  animateBalance?: boolean;
 };
 
 export function FrogDisplay({
@@ -42,6 +44,7 @@ export function FrogDisplay({
   total,
   giftsClaimed,
   isCatching,
+  animateBalance = true,
 }: Props) {
   const { data: session } = useSession();
   const { unseenCount } = useInventory();
@@ -102,7 +105,7 @@ export function FrogDisplay({
               <Fly
                 size={24}
                 y={-2}
-                className="transition-transform duration-300 text-muted-foreground group-hover:rotate-12"
+                className={cn("transition-transform duration-300 text-muted-foreground", animateBalance && "group-hover:rotate-12")}
               />
             </div>
 

@@ -40,6 +40,7 @@ type Props = Readonly<{
   }) => Promise<void> | void;
   initialText?: string;
   defaultRepeat?: RepeatChoice;
+  defaultPickedDay?: number;
 }>;
 
 type SavedTag = {
@@ -330,42 +331,44 @@ export default function QuickAddSheet({
                     }}
                   />
 
-                  {/* Selected Tags Display (Inline) */}
+                  {/* Selected Tags Display (Horizontal Scroll) */}
                   {tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 px-1 mb-3 mt-2">
-                       {tags.map((tagId) => {
-                        const tag = getTagDetails(tagId);
-                        const color = tag?.color;
-                        const name = tag?.name || 'Unknown';
-                        
-                        return (
-                          <span
-                            key={tagId}
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border transition-colors shadow-sm"
-                            style={
-                              color
-                                ? {
-                                    backgroundColor: `${color}20`,
-                                    color: color,
-                                    borderColor: `${color}40`,
-                                  }
-                                : undefined
-                            }
-                          >
-                             {!color && (
-                               <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800 flex items-center gap-1 h-full w-full absolute inset-0 rounded-md px-2 opacity-10 pointer-events-none" />
-                             )}
-                             {!color ? <span className="text-indigo-700 dark:text-indigo-300 relative z-10">{name}</span> : name}
-                            <button
-                              type="button"
-                              onClick={() => removeTag(tagId)}
-                              className="relative z-10 hover:opacity-70 p-0.5"
+                    <div className="relative mb-3 mt-2 px-1 overflow-hidden">
+                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-3 pt-2 px-2 -mx-2 mask-fade-right">
+                        {tags.map((tagId) => {
+                          const tag = getTagDetails(tagId);
+                          const color = tag?.color;
+                          const name = tag?.name || 'Unknown';
+                          
+                          return (
+                            <span
+                              key={tagId}
+                              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all shadow-sm hover:scale-105"
+                              style={
+                                color
+                                  ? {
+                                      backgroundColor: `${color}20`,
+                                      color: color,
+                                      borderColor: `${color}40`,
+                                    }
+                                  : undefined
+                              }
                             >
-                              <X className="w-3 h-3" />
-                            </button>
-                          </span>
-                        );
-                      })}
+                               {!color && (
+                                 <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800 flex items-center gap-1 h-full w-full absolute inset-0 rounded-md px-2 opacity-10 pointer-events-none" />
+                               )}
+                               {!color ? <span className="text-indigo-700 dark:text-indigo-300 relative z-10">{name}</span> : name}
+                              <button
+                                type="button"
+                                onClick={() => removeTag(tagId)}
+                                className="relative z-10 hover:opacity-70 p-0.5"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 
@@ -601,9 +604,9 @@ export default function QuickAddSheet({
 
                 {/* PICK MODE */}
                 {when === 'pick' && (
-                  <div className="flex flex-col gap-2 mt-1 sm:flex-row sm:items-center">
-                    <div className="flex-1 min-w-0 px-1 -mx-1 overflow-x-auto overflow-y-visible no-scrollbar">
-                      <div className="inline-flex w-max gap-2 pr-2 py-1.5">
+                  <div className="flex flex-col gap-4 mt-1 sm:flex-row sm:items-center">
+                    <div className="flex-1 min-w-0 -mx-1 px-1">
+                      <div className="flex justify-between sm:justify-start sm:gap-2 py-1.5 overflow-x-auto no-scrollbar mask-fade-right">
                         {dayLabels.map(({ short, title }, idx) => {
                           const d = idx as Exclude<DisplayDay, 7>;
                           const on = pickedDays.includes(d);
@@ -616,12 +619,12 @@ export default function QuickAddSheet({
                               data-active={on}
                               title={title}
                               className={[
-                                'inline-flex items-center justify-center select-none',
-                                'h-10 w-10 rounded-full text-sm font-bold',
-                                'border border-border/70',
+                                'shrink-0 inline-flex items-center justify-center select-none',
+                                'h-10 w-10 sm:h-11 sm:w-11 rounded-full text-[11px] font-black uppercase tracking-tighter sm:tracking-normal',
+                                'border border-border/70 shadow-sm transition-all duration-300',
                                 'bg-card text-foreground',
-                                'data-[active=true]:bg-primary/20 data-[active=true]:border-primary data-[active=true]:text-primary',
-                                'transition-all duration-200',
+                                'data-[active=true]:bg-primary/20 data-[active=true]:border-primary data-[active=true]:text-primary data-[active=true]:scale-110 data-[active=true]:shadow-md data-[active=true]:shadow-primary/10',
+                                'hover:bg-accent/50 hover:border-border',
                               ].join(' ')}
                             >
                               {short}
