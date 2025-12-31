@@ -11,6 +11,7 @@ import useSWR from 'swr';
 import {
   DndContext,
   closestCenter,
+  closestCorners,
   KeyboardSensor,
   PointerSensor,
   useSensor,
@@ -340,7 +341,6 @@ export default function TaskList({
   React.useEffect(() => {
     if (isAnyDragging) {
       document.documentElement.classList.add('dragging');
-      document.body.classList.add('dragging');
       
       // Lock the scroll aggressively for the current gesture
       const handleTouchMove = (e: TouchEvent) => {
@@ -351,7 +351,6 @@ export default function TaskList({
       
       return () => {
         document.documentElement.classList.remove('dragging');
-        document.body.classList.remove('dragging');
         window.removeEventListener('touchmove', handleTouchMove);
       };
     }
@@ -481,25 +480,29 @@ export default function TaskList({
     setIsAnyDragging(false);
     const { active, over } = event;
 
-    if (over && active.id !== over.id && onReorder) {
+    if (!over || !onReorder) return;
+
+    if (active.id !== over.id) {
       const activeTasks = tasks.filter((t) => !t.completed && !vSet.has(t.id));
       const oldIndex = activeTasks.findIndex((t) => t.id === active.id);
+      
+      if (oldIndex === -1) return;
+
       let newIndex = activeTasks.findIndex((t) => t.id === over.id);
 
-      if (oldIndex !== -1) {
-        if (newIndex === -1) {
-          // If hovering over a completed task, target the end of active list
-          const overTask = tasks.find(t => t.id === over.id);
-          if (overTask && (overTask.completed || vSet.has(overTask.id))) {
-             newIndex = activeTasks.length - 1;
-          }
+      // If we are hovering over a completed task (which isn't in activeTasks),
+      // we should treat it as dragging to the end of the active list.
+      if (newIndex === -1) {
+        const overTask = tasks.find((t) => t.id === over.id);
+        if (overTask && (overTask.completed || vSet.has(overTask.id))) {
+          newIndex = activeTasks.length - 1;
         }
+      }
 
-        if (newIndex !== -1) {
-          const newActiveTasks = arrayMove(activeTasks, oldIndex, newIndex);
-          const currentCompleted = tasks.filter((t) => t.completed || vSet.has(t.id));
-          onReorder([...newActiveTasks, ...currentCompleted]);
-        }
+      if (newIndex !== -1 && oldIndex !== newIndex) {
+        const newActiveTasks = arrayMove(activeTasks, oldIndex, newIndex);
+        const currentCompleted = tasks.filter((t) => t.completed || vSet.has(t.id));
+        onReorder([...newActiveTasks, ...currentCompleted]);
       }
     }
   };
@@ -565,7 +568,7 @@ export default function TaskList({
 
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCenter}
+            collisionDetection={closestCorners}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
