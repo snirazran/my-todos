@@ -340,8 +340,20 @@ export default function TaskList({
   React.useEffect(() => {
     if (isAnyDragging) {
       document.documentElement.classList.add('dragging');
-    } else {
-      document.documentElement.classList.remove('dragging');
+      document.body.classList.add('dragging');
+      
+      // Lock the scroll aggressively for the current gesture
+      const handleTouchMove = (e: TouchEvent) => {
+        if (e.cancelable) e.preventDefault();
+      };
+      
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+      
+      return () => {
+        document.documentElement.classList.remove('dragging');
+        document.body.classList.remove('dragging');
+        window.removeEventListener('touchmove', handleTouchMove);
+      };
     }
   }, [isAnyDragging]);
 
@@ -349,8 +361,14 @@ export default function TaskList({
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        delay: 200,
-        tolerance: 6,
+        delay: 300,
+        tolerance: 8,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 300,
+        tolerance: 8,
       },
     }),
     useSensor(KeyboardSensor, {
