@@ -32,7 +32,7 @@ export function AddTaskButton({
         'hover:border-primary/50 hover:bg-card/95',
         'transition-all duration-300 ease-out',
         'active:scale-[0.98]',
-        'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/20',
+        'focus:outline-none outline-none',
         disabled ? 'opacity-60 pointer-events-none grayscale' : '',
         className,
       ].join(' ')}
