@@ -20,7 +20,10 @@ import {
   TouchSensor,
   Modifier,
 } from '@dnd-kit/core';
-import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+import {
+  restrictToVerticalAxis,
+  restrictToParentElement,
+} from '@dnd-kit/modifiers';
 import {
   arrayMove,
   SortableContext,
@@ -52,7 +55,9 @@ interface SortableTaskItemProps {
   renderBullet?: (task: Task, isVisuallyDone: boolean) => React.ReactNode;
   handleTaskToggle: (task: Task, forceState?: boolean) => void;
   onMenuOpen: (e: React.MouseEvent<HTMLButtonElement>, task: Task) => void;
-  getTagDetails: (tagId: string) => { id: string; name: string; color: string } | undefined;
+  getTagDetails: (
+    tagId: string
+  ) => { id: string; name: string; color: string } | undefined;
   isDragDisabled?: boolean;
   isWeekly?: boolean;
   disableLayout?: boolean;
@@ -93,7 +98,12 @@ function SortableTaskItem({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="relative mb-3" data-is-active={!isDone}>
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="relative mb-3"
+      data-is-active={!isDone}
+    >
       <motion.div
         layout={!disableLayout}
         initial={{ opacity: 0, y: 20 }}
@@ -107,11 +117,7 @@ function SortableTaskItem({
               }
             : { opacity: 1, x: 0, y: 0 }
         }
-        exit={
-          isExitingLater
-            ? { opacity: 0 }
-            : { opacity: 0, scale: 0.95 }
-        }
+        exit={isExitingLater ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
         transition={{
           layout: { type: 'spring', stiffness: 300, damping: 30 },
         }}
@@ -124,25 +130,27 @@ function SortableTaskItem({
           border border-transparent md:hover:border-border
           md:hover:bg-accent md:hover:shadow-sm
           select-none
+          ${isMenuOpen ? 'bg-card border-border shadow-md' : ''}
           ${
-            isMenuOpen
-              ? 'bg-card border-border shadow-md'
+            isDragging
+              ? 'shadow-2xl ring-2 ring-primary/50 bg-card z-[100] opacity-100'
               : ''
           }
-          ${isDragging ? 'shadow-2xl ring-2 ring-primary/50 bg-card z-[100] opacity-100' : ''}
           ${isDone && !isDragging ? 'opacity-60 md:hover:opacity-100' : ''}
         `}
-          style={{
-            touchAction: isDragging ? 'none' : 'pan-y', 
-            WebkitUserSelect: 'none',
-            userSelect: 'none',
-          } as React.CSSProperties}
+          style={
+            {
+              touchAction: isDragging ? 'none' : 'pan-y',
+              WebkitUserSelect: 'none',
+              userSelect: 'none',
+            } as React.CSSProperties
+          }
           {...attributes}
           {...listeners}
         >
-          <div 
+          <div
             onClick={() => handleTaskToggle(task)}
-            className="flex flex-1 items-center gap-3 min-w-0 cursor-pointer pl-2"
+            className="flex items-center flex-1 min-w-0 gap-3 pl-2 cursor-pointer"
           >
             {/* Bullet */}
             <div className="relative flex-shrink-0 w-7 h-7">
@@ -214,7 +222,7 @@ function SortableTaskItem({
                 <div className="flex flex-wrap gap-1 mt-1">
                   {isWeekly && (
                     <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
-                      <RotateCcw className="h-3 w-3" />
+                      <RotateCcw className="w-3 h-3" />
                       Weekly
                     </span>
                   )}
@@ -329,28 +337,38 @@ export default function TaskList({
   const vSet = visuallyCompleted ?? new Set<string>();
 
   const [busy, setBusy] = useState(false);
-  const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
-  const [exitAction, setExitAction] = useState<{ id: string; type: 'later' } | null>(null);
+  const [menu, setMenu] = useState<{
+    id: string;
+    top: number;
+    left: number;
+  } | null>(null);
+  const [exitAction, setExitAction] = useState<{
+    id: string;
+    type: 'later';
+  } | null>(null);
   const [dialog, setDialog] = useState<{
     task: Task;
     kind: 'regular' | 'weekly' | 'backlog';
   } | null>(null);
-  
-  const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
+
+  const [tagPopup, setTagPopup] = useState<{
+    open: boolean;
+    taskId: string | null;
+  }>({ open: false, taskId: null });
   const [isAnyDragging, setIsAnyDragging] = useState(false);
   const activeAreaBottomRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     if (isAnyDragging) {
       document.documentElement.classList.add('dragging');
-      
+
       // Lock the scroll aggressively for the current gesture
       const handleTouchMove = (e: TouchEvent) => {
         if (e.cancelable) e.preventDefault();
       };
-      
+
       window.addEventListener('touchmove', handleTouchMove, { passive: false });
-      
+
       return () => {
         document.documentElement.classList.remove('dragging');
         window.removeEventListener('touchmove', handleTouchMove);
@@ -393,19 +411,19 @@ export default function TaskList({
       );
     };
   }, []);
-  
+
   const handleTagSave = async (taskId: string, newTags: string[]) => {
-      try {
-          await fetch('/api/tasks', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ taskId, tags: newTags }),
-          });
-          
-          window.dispatchEvent(new Event('tags-updated'));
-      } catch (e) {
-          console.error("Failed to update tags", e);
-      }
+    try {
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, tags: newTags }),
+      });
+
+      window.dispatchEvent(new Event('tags-updated'));
+    } catch (e) {
+      console.error('Failed to update tags', e);
+    }
   };
 
   const taskKind = (t: Task) => {
@@ -475,7 +493,9 @@ export default function TaskList({
     // Calculate boundary
     const activeNodes = document.querySelectorAll('[data-is-active="true"]');
     if (activeNodes.length > 0) {
-      const bottoms = Array.from(activeNodes).map(n => n.getBoundingClientRect().bottom);
+      const bottoms = Array.from(activeNodes).map(
+        (n) => n.getBoundingClientRect().bottom
+      );
       activeAreaBottomRef.current = Math.max(...bottoms);
     } else {
       activeAreaBottomRef.current = null;
@@ -497,7 +517,7 @@ export default function TaskList({
     if (active.id !== over.id) {
       const activeTasks = tasks.filter((t) => !t.completed && !vSet.has(t.id));
       const oldIndex = activeTasks.findIndex((t) => t.id === active.id);
-      
+
       if (oldIndex === -1) return;
 
       let newIndex = activeTasks.findIndex((t) => t.id === over.id);
@@ -513,7 +533,9 @@ export default function TaskList({
 
       if (newIndex !== -1 && oldIndex !== newIndex) {
         const newActiveTasks = arrayMove(activeTasks, oldIndex, newIndex);
-        const currentCompleted = tasks.filter((t) => t.completed || vSet.has(t.id));
+        const currentCompleted = tasks.filter(
+          (t) => t.completed || vSet.has(t.id)
+        );
         onReorder([...newActiveTasks, ...currentCompleted]);
       }
     }
@@ -528,7 +550,7 @@ export default function TaskList({
         detail: { id },
       })
     );
-    
+
     setMenu((prev) => {
       if (prev?.id === task.id) return null;
       const MENU_W = 160;
@@ -537,10 +559,10 @@ export default function TaskList({
       const MARGIN = 10;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      
+
       let left = rect.left + rect.width / 2 - MENU_W / 2;
       left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
-      
+
       let top = rect.bottom + GAP;
       if (top + MENU_H > vh - MARGIN) {
         top = rect.top - MENU_H - GAP;
@@ -550,21 +572,27 @@ export default function TaskList({
   };
 
   const restrictToActiveArea: Modifier = ({ transform, draggingNodeRect }) => {
-     const limit = activeAreaBottomRef.current;
-     // Apply parent restriction first
-     const parentRestricted = restrictToParentElement({ transform, draggingNodeRect } as any);
-     const verticalRestricted = restrictToVerticalAxis({ transform: parentRestricted, draggingNodeRect } as any);
-     
-     if (limit !== null && draggingNodeRect) {
-        const currentBottom = draggingNodeRect.bottom + verticalRestricted.y;
-        if (currentBottom > limit) {
-           return {
-              ...verticalRestricted,
-              y: limit - draggingNodeRect.bottom
-           };
-        }
-     }
-     return verticalRestricted;
+    const limit = activeAreaBottomRef.current;
+    // Apply parent restriction first
+    const parentRestricted = restrictToParentElement({
+      transform,
+      draggingNodeRect,
+    } as any);
+    const verticalRestricted = restrictToVerticalAxis({
+      transform: parentRestricted,
+      draggingNodeRect,
+    } as any);
+
+    if (limit !== null && draggingNodeRect) {
+      const currentBottom = draggingNodeRect.bottom + verticalRestricted.y;
+      if (currentBottom > limit) {
+        return {
+          ...verticalRestricted,
+          y: limit - draggingNodeRect.bottom,
+        };
+      }
+    }
+    return verticalRestricted;
   };
 
   return (
@@ -619,7 +647,8 @@ export default function TaskList({
                       const isCompleted = task.completed || vSet.has(task.id);
                       const isMenuOpen = menu?.id === task.id;
                       const isExitingLater =
-                        exitAction?.id === task.id && exitAction.type === 'later';
+                        exitAction?.id === task.id &&
+                        exitAction.type === 'later';
 
                       return (
                         <SortableTaskItem
@@ -649,7 +678,12 @@ export default function TaskList({
       <TaskMenu
         menu={menu}
         onClose={() => setMenu(null)}
-        isDone={menu ? (tasks.find(t => t.id === menu.id)?.completed || vSet.has(menu.id)) : false}
+        isDone={
+          menu
+            ? tasks.find((t) => t.id === menu.id)?.completed ||
+              vSet.has(menu.id)
+            : false
+        }
         onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
         addTagsPosition="second"
         onDoLater={
@@ -677,7 +711,12 @@ export default function TaskList({
               }
             : undefined
         }
-        isWeekly={menu ? (tasks.find(t => t.id === menu.id)?.type === 'weekly' || (menu && weeklyIds.has(menu.id))) : false}
+        isWeekly={
+          menu
+            ? tasks.find((t) => t.id === menu.id)?.type === 'weekly' ||
+              (menu && weeklyIds.has(menu.id))
+            : false
+        }
         onDelete={() => {
           if (menu) {
             const t = tasks.find((it) => it.id === menu.id);
@@ -695,7 +734,7 @@ export default function TaskList({
       <TagPopup
         open={tagPopup.open}
         taskId={tagPopup.taskId}
-        initialTags={tasks.find(t => t.id === tagPopup.taskId)?.tags}
+        initialTags={tasks.find((t) => t.id === tagPopup.taskId)?.tags}
         onClose={() => setTagPopup({ open: false, taskId: null })}
         onSave={handleTagSave}
       />
