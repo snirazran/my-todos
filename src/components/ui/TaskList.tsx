@@ -575,30 +575,34 @@ export default function TaskList({
             modifiers={[restrictToVerticalAxis, restrictToParentElement]}
           >
             <div className="relative">
-              {/* Active Tasks Container - This acts as the parent element for restriction */}
+              {/* Unified Tasks Container */}
               <div className="relative overflow-visible">
                 <SortableContext
                   items={activeTaskIds}
                   strategy={verticalListSortingStrategy}
                 >
                   <AnimatePresence initial={false} mode="popLayout">
-                    {tasks.filter(t => !t.completed && !vSet.has(t.id)).map((task) => {
+                    {[
+                      ...tasks.filter((t) => !t.completed && !vSet.has(t.id)),
+                      ...tasks.filter((t) => t.completed || vSet.has(t.id)),
+                    ].map((task) => {
+                      const isCompleted = task.completed || vSet.has(task.id);
                       const isMenuOpen = menu?.id === task.id;
                       const isExitingLater =
                         exitAction?.id === task.id && exitAction.type === 'later';
-                        
+
                       return (
                         <SortableTaskItem
                           key={task.id}
                           task={task}
-                          isDone={false}
+                          isDone={isCompleted}
                           isMenuOpen={isMenuOpen}
                           isExitingLater={isExitingLater}
                           renderBullet={renderBullet}
                           handleTaskToggle={handleTaskToggle}
                           onMenuOpen={openMenu}
                           getTagDetails={getTagDetails}
-                          isDragDisabled={false}
+                          isDragDisabled={isCompleted}
                           isWeekly={taskKind(task) === 'weekly'}
                           disableLayout={isAnyDragging}
                         />
@@ -606,34 +610,6 @@ export default function TaskList({
                     })}
                   </AnimatePresence>
                 </SortableContext>
-              </div>
-
-              {/* Completed Tasks Container - Outside of the restricted active tasks area */}
-              <div className="mt-0">
-                <AnimatePresence initial={false} mode="popLayout">
-                  {tasks.filter(t => t.completed || vSet.has(t.id)).map((task) => {
-                    const isMenuOpen = menu?.id === task.id;
-                    const isExitingLater =
-                      exitAction?.id === task.id && exitAction.type === 'later';
-                      
-                    return (
-                      <SortableTaskItem
-                        key={task.id}
-                        task={task}
-                        isDone={true}
-                        isMenuOpen={isMenuOpen}
-                        isExitingLater={isExitingLater}
-                        renderBullet={renderBullet}
-                        handleTaskToggle={handleTaskToggle}
-                        onMenuOpen={openMenu}
-                        getTagDetails={getTagDetails}
-                        isDragDisabled={true}
-                        isWeekly={taskKind(task) === 'weekly'}
-                        disableLayout={isAnyDragging}
-                      />
-                    );
-                  })}
-                </AnimatePresence>
               </div>
             </div>
           </DndContext>
