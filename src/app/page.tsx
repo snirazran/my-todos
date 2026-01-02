@@ -259,25 +259,48 @@ export default function Home() {
 
   const persistTask = async (taskId: string, completed: boolean) => {
     if (session) {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, completed } : t))
-      );
+      let apiOrder: number | undefined;
 
       if (completed) {
+        // Calculate new order to ensure task stays above existing completed tasks
+        const completedTasks = tasks.filter((t) => t.completed && t.id !== taskId);
+        const currentTask = tasks.find((t) => t.id === taskId);
+        
+        let newOrder = currentTask?.order;
+        if (currentTask && completedTasks.length > 0) {
+           const minOrder = Math.min(...completedTasks.map((t) => t.order ?? 0));
+           // If current order puts it below the top completed task, bump it up
+           if ((currentTask.order ?? 0) >= minOrder) {
+              newOrder = minOrder - 1;
+           }
+        }
+        apiOrder = newOrder;
+
+        setTasks((prev) =>
+          prev.map((t) => (t.id === taskId ? { ...t, completed, order: newOrder } : t))
+        );
+
         setIsAnimating(true);
         setTimeout(() => {
           setTasks((prev) => sortTasks(prev));
           setTimeout(() => setIsAnimating(false), 400);
         }, 250);
       } else {
-        setTasks((prev) => sortTasks(prev));
+        // Optimistically move to bottom
+        setTasks((prev) => {
+          const maxOrder = Math.max(0, ...prev.map((t) => t.order ?? 0));
+          const updated = prev.map((t) =>
+            t.id === taskId ? { ...t, completed, order: maxOrder + 1 } : t
+          );
+          return sortTasks(updated);
+        });
       }
 
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const res = await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, taskId, completed, timezone: tz }),
+        body: JSON.stringify({ date: dateStr, taskId, completed, timezone: tz, order: apiOrder }),
       });
       if (res.ok) {
         try {

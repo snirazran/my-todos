@@ -398,7 +398,7 @@ export async function PUT(req: NextRequest) {
   }
 
   // Daily toggle or update tags
-  const { date, taskId, completed, tags, toggleType } = body ?? {};
+  const { date, taskId, completed, tags, toggleType, order } = body ?? {};
   if ((!date && !tags) || !taskId) {
     return NextResponse.json(
       { error: 'taskId and (date+completed OR tags) are required' },
@@ -477,6 +477,18 @@ export async function PUT(req: NextRequest) {
 
   if (doc.type === 'regular') {
     (update as any).$set = { ...(update as any).$set, completed };
+  }
+
+  // If un-completing, move to bottom of the list
+  if (completed === false && alreadyCompletedForDate) {
+    const dow = dowFromYMD(date);
+    const newOrder = await nextOrderForDay(uid, dow, date);
+    (update as any).$set = { ...((update as any).$set || {}), order: newOrder };
+  }
+  
+  // Explicit order update (e.g. from client for "complete in place")
+  if (typeof order === 'number') {
+    (update as any).$set = { ...((update as any).$set || {}), order };
   }
 
   await TaskModel.updateOne({ userId: uid, id: taskId }, update);
