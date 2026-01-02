@@ -18,6 +18,7 @@ import {
   useSensors,
   DragEndEvent,
   TouchSensor,
+  Modifier,
 } from '@dnd-kit/core';
 import { restrictToVerticalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import {
@@ -92,7 +93,7 @@ function SortableTaskItem({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="relative mb-3">
+    <div ref={setNodeRef} style={style} className="relative mb-3" data-is-active={!isDone}>
       <motion.div
         layout={!disableLayout}
         initial={{ opacity: 0, y: 20 }}
@@ -337,6 +338,7 @@ export default function TaskList({
   
   const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
   const [isAnyDragging, setIsAnyDragging] = useState(false);
+  const activeAreaBottomRef = React.useRef<number | null>(null);
 
   React.useEffect(() => {
     if (isAnyDragging) {
@@ -470,14 +472,24 @@ export default function TaskList({
 
   const handleDragStart = () => {
     setIsAnyDragging(true);
+    // Calculate boundary
+    const activeNodes = document.querySelectorAll('[data-is-active="true"]');
+    if (activeNodes.length > 0) {
+      const bottoms = Array.from(activeNodes).map(n => n.getBoundingClientRect().bottom);
+      activeAreaBottomRef.current = Math.max(...bottoms);
+    } else {
+      activeAreaBottomRef.current = null;
+    }
   };
 
   const handleDragCancel = () => {
     setIsAnyDragging(false);
+    activeAreaBottomRef.current = null;
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     setIsAnyDragging(false);
+    activeAreaBottomRef.current = null;
     const { active, over } = event;
 
     if (!over || !onReorder) return;
@@ -537,6 +549,24 @@ export default function TaskList({
     });
   };
 
+  const restrictToActiveArea: Modifier = ({ transform, draggingNodeRect }) => {
+     const limit = activeAreaBottomRef.current;
+     // Apply parent restriction first
+     const parentRestricted = restrictToParentElement({ transform, draggingNodeRect } as any);
+     const verticalRestricted = restrictToVerticalAxis({ transform: parentRestricted, draggingNodeRect } as any);
+     
+     if (limit !== null && draggingNodeRect) {
+        const currentBottom = draggingNodeRect.bottom + verticalRestricted.y;
+        if (currentBottom > limit) {
+           return {
+              ...verticalRestricted,
+              y: limit - draggingNodeRect.bottom
+           };
+        }
+     }
+     return verticalRestricted;
+  };
+
   return (
     <>
       <div
@@ -572,7 +602,7 @@ export default function TaskList({
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onDragCancel={handleDragCancel}
-            modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+            modifiers={[restrictToActiveArea]}
           >
             <div className="relative">
               {/* Unified Tasks Container */}
