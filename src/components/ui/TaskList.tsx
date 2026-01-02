@@ -356,19 +356,19 @@ export default function TaskList({
     taskId: string | null;
   }>({ open: false, taskId: null });
   const [isAnyDragging, setIsAnyDragging] = useState(false);
-  const activeAreaBottomRef = React.useRef<number | null>(null);
+  const activeAreaLimitsRef = React.useRef<{ top: number; bottom: number } | null>(null);
 
   React.useEffect(() => {
     if (isAnyDragging) {
       document.documentElement.classList.add('dragging');
-
+      
       // Lock the scroll aggressively for the current gesture
       const handleTouchMove = (e: TouchEvent) => {
         if (e.cancelable) e.preventDefault();
       };
-
+      
       window.addEventListener('touchmove', handleTouchMove, { passive: false });
-
+      
       return () => {
         document.documentElement.classList.remove('dragging');
         window.removeEventListener('touchmove', handleTouchMove);
@@ -411,19 +411,19 @@ export default function TaskList({
       );
     };
   }, []);
-
+  
   const handleTagSave = async (taskId: string, newTags: string[]) => {
-    try {
-      await fetch('/api/tasks', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, tags: newTags }),
-      });
-
-      window.dispatchEvent(new Event('tags-updated'));
-    } catch (e) {
-      console.error('Failed to update tags', e);
-    }
+      try {
+          await fetch('/api/tasks', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ taskId, tags: newTags }),
+          });
+          
+          window.dispatchEvent(new Event('tags-updated'));
+      } catch (e) {
+          console.error("Failed to update tags", e);
+      }
   };
 
   const taskKind = (t: Task) => {
@@ -493,23 +493,23 @@ export default function TaskList({
     // Calculate boundary
     const activeNodes = document.querySelectorAll('[data-is-active="true"]');
     if (activeNodes.length > 0) {
-      const bottoms = Array.from(activeNodes).map(
-        (n) => n.getBoundingClientRect().bottom
-      );
-      activeAreaBottomRef.current = Math.max(...bottoms);
+      const rects = Array.from(activeNodes).map(n => n.getBoundingClientRect());
+      const bottom = Math.max(...rects.map(r => r.bottom));
+      const top = Math.min(...rects.map(r => r.top));
+      activeAreaLimitsRef.current = { top, bottom };
     } else {
-      activeAreaBottomRef.current = null;
+      activeAreaLimitsRef.current = null;
     }
   };
 
   const handleDragCancel = () => {
     setIsAnyDragging(false);
-    activeAreaBottomRef.current = null;
+    activeAreaLimitsRef.current = null;
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     setIsAnyDragging(false);
-    activeAreaBottomRef.current = null;
+    activeAreaLimitsRef.current = null;
     const { active, over } = event;
 
     if (!over || !onReorder) return;
@@ -517,7 +517,7 @@ export default function TaskList({
     if (active.id !== over.id) {
       const activeTasks = tasks.filter((t) => !t.completed && !vSet.has(t.id));
       const oldIndex = activeTasks.findIndex((t) => t.id === active.id);
-
+      
       if (oldIndex === -1) return;
 
       let newIndex = activeTasks.findIndex((t) => t.id === over.id);
@@ -533,9 +533,7 @@ export default function TaskList({
 
       if (newIndex !== -1 && oldIndex !== newIndex) {
         const newActiveTasks = arrayMove(activeTasks, oldIndex, newIndex);
-        const currentCompleted = tasks.filter(
-          (t) => t.completed || vSet.has(t.id)
-        );
+        const currentCompleted = tasks.filter((t) => t.completed || vSet.has(t.id));
         onReorder([...newActiveTasks, ...currentCompleted]);
       }
     }
@@ -550,7 +548,7 @@ export default function TaskList({
         detail: { id },
       })
     );
-
+    
     setMenu((prev) => {
       if (prev?.id === task.id) return null;
       const MENU_W = 160;
@@ -559,10 +557,10 @@ export default function TaskList({
       const MARGIN = 10;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-
+      
       let left = rect.left + rect.width / 2 - MENU_W / 2;
       left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
-
+      
       let top = rect.bottom + GAP;
       if (top + MENU_H > vh - MARGIN) {
         top = rect.top - MENU_H - GAP;
@@ -572,27 +570,32 @@ export default function TaskList({
   };
 
   const restrictToActiveArea: Modifier = ({ transform, draggingNodeRect }) => {
-    const limit = activeAreaBottomRef.current;
-    // Apply parent restriction first
-    const parentRestricted = restrictToParentElement({
-      transform,
-      draggingNodeRect,
-    } as any);
-    const verticalRestricted = restrictToVerticalAxis({
-      transform: parentRestricted,
-      draggingNodeRect,
-    } as any);
+     const limits = activeAreaLimitsRef.current;
+     // Apply parent restriction first
+     const parentRestricted = restrictToParentElement({ transform, draggingNodeRect } as any);
+     const verticalRestricted = restrictToVerticalAxis({ transform: parentRestricted, draggingNodeRect } as any);
+     
+     if (limits !== null && draggingNodeRect) {
+        let newY = verticalRestricted.y;
+        
+        // Bottom restriction
+        const currentBottom = draggingNodeRect.bottom + newY;
+        if (currentBottom > limits.bottom) {
+           newY = limits.bottom - draggingNodeRect.bottom;
+        }
 
-    if (limit !== null && draggingNodeRect) {
-      const currentBottom = draggingNodeRect.bottom + verticalRestricted.y;
-      if (currentBottom > limit) {
+        // Top restriction
+        const currentTop = draggingNodeRect.top + newY;
+        if (currentTop < limits.top) {
+           newY = limits.top - draggingNodeRect.top;
+        }
+
         return {
-          ...verticalRestricted,
-          y: limit - draggingNodeRect.bottom,
+           ...verticalRestricted,
+           y: newY
         };
-      }
-    }
-    return verticalRestricted;
+     }
+     return verticalRestricted;
   };
 
   return (
