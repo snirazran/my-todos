@@ -58,95 +58,230 @@ export function FrogDisplay({
     ? Math.max(0, Math.min(100, (hunger / maxHunger) * 100)) 
     : 100;
 
-  return (
-    // Added mb-12 to create the requested space from the tabs below
-    <div className={`${className} flex flex-col items-center mb-6 md:mb-12 relative`}>
-      <CurrencyShop 
-        open={shopOpen} 
-        onOpenChange={setShopOpen}
-        balance={flyBalance ?? 0}
-        hunger={hunger ?? 0}
-        maxHunger={maxHunger ?? 100}
-      />
+  const hungerColor = hungerPercent > 50 
+    ? 'bg-emerald-500' 
+    : hungerPercent > 20 
+      ? 'bg-amber-500' 
+      : 'bg-rose-500';
 
-      <div
-        ref={frogBoxRef}
-        className="relative z-20 transition-transform duration-500 -translate-y-3.5 pointer-events-none "
-      >
-        <div 
-          className="pointer-events-auto cursor-pointer" 
-          onClick={() => setClickedAt(Date.now())}
-        >
-          <Frog
-            ref={frogRef}
-            mouthOpen={!!mouthOpen}
-            mouthOffset={mouthOffset}
-            indices={indices}
-          />
-        </div>
-        {/* SPEECH BUBBLE - NOW INSIDE FROG'S CONTAINER */}
-        {typeof rate === 'number' && typeof done === 'number' && typeof total === 'number' && typeof giftsClaimed === 'number' && (
-          <FrogSpeechBubble
-            rate={rate}
-            done={done}
-            total={total}
-            giftsClaimed={giftsClaimed}
-            isCatching={isCatching}
-            clickedAt={clickedAt}
-          />
-        )}
-      </div>
+        const hungerStatus = hungerPercent > 50 
 
-      {/* 2. THE CONTROL DECK 
-          - Ceramic Glass Aesthetic
-          - Subtle gradient border
-      */}
-      <div
-        className="relative z-10 -mt-6 flex items-center justify-between 
-        w-[340px] max-w-[92vw] h-[76px] px-3
-        bg-card/80
-        backdrop-blur-2xl
-        rounded-[20px]
-        border border-border/50
-        shadow-sm"
-      >
-        {/* Decorative Top Highlight to simulate glass edge light */}
-        <div className="absolute inset-x-4 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/80 to-transparent opacity-50" />
+          ? 'WELL FED' 
 
-        {/* Left: Digital Fly Counter (Recessed Look) */}
-        {typeof flyBalance === 'number' ? (
-          <div 
-              onClick={() => setShopOpen(true)}
-              className="group relative overflow-hidden flex items-center gap-3 pl-2.5 pr-5 py-2 h-[52px] rounded-[15px] bg-muted/50 shadow-inner border border-border/30 transition-all hover:bg-muted/80 cursor-pointer active:scale-95 duration-200"
-          >
-            {/* Hunger Fill Background - Green to represent fullness */}
-            <div 
-              className="absolute bottom-0 left-0 right-0 bg-emerald-500/20 transition-all duration-1000 ease-in-out z-0"
-              style={{ height: `${hungerPercent}%` }}
+          : hungerPercent > 20 
+
+            ? 'HUNGRY' 
+
+            : 'STARVING!!';
+
+      
+
+        return (
+
+          // Added mb-12 to create the requested space from the tabs below
+
+          <div className={`${className} flex flex-col items-center mb-6 md:mb-12 relative`}>
+
+            <CurrencyShop 
+
+              open={shopOpen} 
+
+              onOpenChange={setShopOpen}
+
+              balance={flyBalance ?? 0}
+
+              hunger={hunger ?? 0}
+
+              maxHunger={maxHunger ?? 100}
+
             />
-            
-            {/* Icon Container with subtle glow */}
-            <div className="relative z-10 flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5">
-              <Fly
-                size={24}
-                y={-2}
-                className={cn("transition-transform duration-300 text-muted-foreground", animateBalance && "group-hover:rotate-12")}
-              />
+
+      
+
+            <div
+
+              ref={frogBoxRef}
+
+              className="relative z-20 transition-transform duration-500 -translate-y-3.5 pointer-events-none "
+
+            >
+
+              <div 
+
+                className="pointer-events-auto cursor-pointer" 
+
+                onClick={() => setClickedAt(Date.now())}
+
+              >
+
+                <Frog
+
+                  ref={frogRef}
+
+                  mouthOpen={!!mouthOpen}
+
+                  mouthOffset={mouthOffset}
+
+                  indices={indices}
+
+                />
+
+              </div>
+
+              {/* SPEECH BUBBLE - NOW INSIDE FROG'S CONTAINER */}
+
+              {typeof rate === 'number' && typeof done === 'number' && typeof total === 'number' && typeof giftsClaimed === 'number' && (
+
+                <FrogSpeechBubble
+
+                  rate={rate}
+
+                  done={done}
+
+                  total={total}
+
+                  giftsClaimed={giftsClaimed}
+
+                  isCatching={isCatching}
+
+                  clickedAt={clickedAt}
+
+                />
+
+              )}
+
             </div>
 
-            <div className="relative z-10 flex flex-col justify-center">
-              <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none mb-0.5">
-                Balance
-              </span>
-              <span className="text-xl font-black leading-none text-foreground tabular-nums">
-                {flyBalance}
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="w-24" />
-        )}
+      
 
+            {/* 2. THE CONTROL DECK 
+
+                - Ceramic Glass Aesthetic
+
+                - Subtle gradient border
+
+            */}
+
+            <div
+
+              className="relative z-10 -mt-6 flex items-center justify-between 
+
+              w-[340px] max-w-[92vw] h-[76px] px-3
+
+              bg-card/80
+
+              backdrop-blur-2xl
+
+              rounded-[20px]
+
+              border border-border/50
+
+              shadow-sm"
+
+            >
+
+              {/* Decorative Top Highlight to simulate glass edge light */}
+
+              <div className="absolute inset-x-4 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/80 to-transparent opacity-50" />
+
+      
+
+              {/* Left Section: Unified Balance & Hunger Pill */}
+
+              <div className="relative flex items-center ml-1">
+
+                {typeof flyBalance === 'number' ? (
+
+                  <div 
+
+                      onClick={() => setShopOpen(true)}
+
+                      className={cn(
+
+                        "group relative overflow-hidden flex items-center gap-3 pl-2.5 pr-5 py-2 h-[60px] rounded-[18px] bg-muted/50 shadow-inner border border-border/30 transition-all hover:bg-muted/80 cursor-pointer active:scale-95 duration-200",
+
+                        hungerPercent <= 20 && "ring-2 ring-rose-500/20"
+
+                      )}
+
+                  >
+
+                    {/* Hunger Fill Background */}
+
+                    <div 
+
+                      className={cn("absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0 opacity-20", hungerColor)}
+
+                      style={{ height: `${hungerPercent}%` }}
+
+                    />
+
+                    
+
+                    {/* Icon Container */}
+
+                    <div className="relative z-10 flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0">
+
+                      <Fly
+
+                        size={24}
+
+                        y={-2}
+
+                        className={cn("transition-transform duration-300 text-muted-foreground", animateBalance && "group-hover:rotate-12")}
+
+                      />
+
+                    </div>
+
+      
+
+                    <div className="relative z-10 flex flex-col justify-center">
+
+                      {/* Hunger Status - Integrated Line at the top */}
+
+                      <div className="flex items-center gap-1.5 mb-1">
+
+                        <div className={cn("w-1.5 h-1.5 rounded-full ring-1 ring-white/10 shadow-sm", hungerColor)} />
+
+                        <span className={cn(
+
+                          "text-[8px] font-black uppercase tracking-[0.15em]",
+
+                          hungerPercent > 50 ? "text-emerald-500" : hungerPercent > 20 ? "text-amber-500" : "text-rose-500"
+
+                        )}>
+
+                          {hungerStatus}
+
+                        </span>
+
+                      </div>
+
+                      
+
+                      <span className="text-2xl font-black leading-none text-foreground tabular-nums tracking-tight">
+
+                        {flyBalance}
+
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                ) : (
+
+                  <div className="w-24" />
+
+                )}
+
+              </div>
+  
+          {/* Center: Invisible Grip Area for Frog Paws */}
+                    <div className="flex-1" />
+          
+                  {/* Right: Wardrobe Button (Floating Key Look) */}
         {/* Center: Invisible Grip Area for Frog Paws */}
                   <div className="flex-1" />
         

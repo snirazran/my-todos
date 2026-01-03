@@ -19,28 +19,25 @@ export function HungerWarningModal({ stolenFlies, onAcknowledge, open }: Props) 
         <div className="relative bg-card/95 backdrop-blur-xl border border-border/50 rounded-[32px] p-6 shadow-2xl overflow-hidden">
           
           {/* Header Graphic */}
-          <div className="flex flex-col items-center justify-center pt-4 pb-6">
-            <div className="relative w-32 h-32 mb-4">
-               {/* Sad Frog Placeholder or actual Frog component if it supports emotions */}
-               {/* Using the standard Frog for now, maybe we can add a 'sad' prop later */}
-               <Frog className="transform scale-125" />
-               <div className="absolute -right-4 -top-2 text-4xl animate-bounce">
-                 😢
+          <div className="flex flex-col items-center justify-center pt-2 pb-6 w-full">
+            <div className="relative w-full mb-2 flex items-center justify-center">
+               <div className="flex items-center justify-center">
+                  <Frog width={200} height={150} />
                </div>
             </div>
             
             <DialogHeader className="text-center space-y-2">
-              <DialogTitle className="text-2xl font-black text-foreground">
-                Oops! I was hungry...
+              <DialogTitle className="text-3xl font-black text-foreground tracking-tight">
+                Oh no... I was so hungry!
               </DialogTitle>
-              <DialogDescription className="text-base font-medium text-muted-foreground">
-                Sorry, I was so hungry I ate <span className="font-bold text-rose-500">{stolenFlies} of your flies</span> :(
+              <DialogDescription className="text-base font-medium text-muted-foreground px-4">
+                I'm sorry, I couldn't help it! I had to eat <span className="font-bold text-rose-500">{stolenFlies} of your flies</span> :(
               </DialogDescription>
             </DialogHeader>
           </div>
 
-          <div className="bg-muted/50 rounded-2xl p-4 mb-6 text-center text-sm text-muted-foreground leading-relaxed">
-            Completing tasks keeps me full! Don't let me starve, or I might snack on your hard-earned flies again.
+          <div className="bg-muted/50 rounded-2xl p-4 mb-6 text-center text-sm font-medium text-muted-foreground leading-relaxed mx-2">
+            Feed me by <span className="text-foreground font-bold italic">completing tasks</span>! It's the only way to keep me full and your flies safe.
           </div>
 
           <DialogFooter className="sm:justify-center">

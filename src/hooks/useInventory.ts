@@ -19,7 +19,7 @@ export function useInventory(active: boolean = true) {
     fetcher,
     {
       refreshInterval: 60000, // Poll every minute to keep balance/inventory fresh-ish
-      revalidateOnFocus: true,
+      revalidateOnFocus: false,
     }
   );
 
