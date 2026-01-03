@@ -27,6 +27,8 @@ type Props = {
   giftsClaimed?: number;
   isCatching?: boolean;
   animateBalance?: boolean;
+  hunger?: number;
+  maxHunger?: number;
 };
 
 export function FrogDisplay({
@@ -45,10 +47,16 @@ export function FrogDisplay({
   giftsClaimed,
   isCatching,
   animateBalance = true,
+  hunger,
+  maxHunger,
 }: Props) {
   const { data: session } = useSession();
   const { unseenCount } = useInventory();
   const [clickedAt, setClickedAt] = React.useState(0);
+  
+  const hungerPercent = (typeof hunger === 'number' && typeof maxHunger === 'number') 
+    ? Math.max(0, Math.min(100, (hunger / maxHunger) * 100)) 
+    : 100;
 
   return (
     // Added mb-12 to create the requested space from the tabs below
@@ -99,13 +107,22 @@ export function FrogDisplay({
 
         {/* Left: Digital Fly Counter (Recessed Look) */}
         {typeof flyBalance === 'number' ? (
-          <div className="group relative overflow-hidden flex items-center gap-3 pl-2.5 pr-5 py-2 h-[52px] rounded-[15px] bg-muted/50 shadow-inner border border-border/30 transition-all hover:bg-muted/80">
-            {/* Icon Container with subtle glow */}
-            <div className="relative flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5">
+          <div 
+             className="group relative overflow-hidden flex items-center gap-3 pl-2.5 pr-5 py-2 h-[52px] rounded-[15px] bg-muted/50 shadow-inner border border-border/30 transition-all hover:bg-muted/80"
+             title={`Hunger Level: ${Math.round(hungerPercent)}%`}
+          >
+            {/* Icon Container with subtle glow and hunger fill */}
+            <div className="relative flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 overflow-hidden">
+              {/* Hunger Fill */}
+              <div 
+                className="absolute bottom-0 left-0 right-0 bg-emerald-400/30 transition-all duration-1000 ease-in-out"
+                style={{ height: `${hungerPercent}%` }}
+              />
+              
               <Fly
                 size={24}
                 y={-2}
-                className={cn("transition-transform duration-300 text-muted-foreground", animateBalance && "group-hover:rotate-12")}
+                className={cn("relative z-10 transition-transform duration-300 text-muted-foreground", animateBalance && "group-hover:rotate-12")}
               />
             </div>
 

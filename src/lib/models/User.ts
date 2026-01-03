@@ -12,7 +12,15 @@ const UserSchema = new Schema<UserDoc>(
     createdAt: { type: Date, default: Date.now },
     wardrobe: {
       type: Schema.Types.Mixed,
-      default: () => ({ equipped: {}, inventory: {}, unseenItems: [], flies: 0 }),
+      default: () => ({ 
+        equipped: {}, 
+        inventory: {}, 
+        unseenItems: [], 
+        flies: 0,
+        hunger: 86400000, // Start full (24h)
+        lastHungerUpdate: new Date(),
+        stolenFlies: 0
+      }),
     },
     skins: { type: Schema.Types.Mixed },
 

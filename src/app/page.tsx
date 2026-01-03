@@ -19,7 +19,9 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { RewardPopup } from '@/components/ui/gift-box/RewardPopup';
+import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { mutate } from 'swr';
+import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 import {
   useFrogTongue,
   HIT_AT,
@@ -47,6 +49,12 @@ type FlyStatus = {
   limit: number;
   limitHit: boolean;
   justHitLimit?: boolean;
+};
+
+type HungerStatus = {
+  hunger: number;
+  stolenFlies: number;
+  maxHunger: number;
 };
 
 const demoTasks: Task[] = [
@@ -106,6 +114,11 @@ export default function Home() {
     limit: 15,
     limitHit: false,
   });
+  const [hungerStatus, setHungerStatus] = useState<HungerStatus>({
+    hunger: MAX_HUNGER_MS,
+    stolenFlies: 0,
+    maxHunger: MAX_HUNGER_MS,
+  });
 
   const [dailyGiftCount, setDailyGiftCount] = useState(2);
   const [lastGiftTaskCount, setLastGiftTaskCount] = useState(0);
@@ -138,14 +151,20 @@ export default function Home() {
 
   const fetchBacklog = useCallback(async () => {
     if (!session) return;
-    const items = await fetch('/api/tasks?view=board&day=-1').then((r) =>
-      r.json()
-    );
-    setLaterThisWeek(
-      items
-        .filter((t: any) => !pendingIds.current.has(t.id))
-        .map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
-    );
+    try {
+      const res = await fetch('/api/tasks?view=board&day=-1');
+      if (!res.ok) return;
+      const items = await res.json();
+      if (!Array.isArray(items)) return;
+      
+      setLaterThisWeek(
+        items
+          .filter((t: any) => !pendingIds.current.has(t.id))
+          .map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
+      );
+    } catch (e) {
+      console.error('Failed to fetch backlog:', e);
+    }
   }, [session]);
 
   const today = new Date();
@@ -189,15 +208,24 @@ export default function Home() {
 
   const refreshToday = useCallback(async () => {
     if (!session) return;
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
-    const json = await res.json();
-    setTasks((json.tasks ?? []).filter((t: Task) => !pendingIds.current.has(t.id)));
-    setWeeklyIds(new Set(json.weeklyIds ?? []));
-    applyFlyStatus(json.flyStatus);
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
+      if (!res.ok) {
+        console.error('Failed to fetch tasks:', res.status, res.statusText);
+        return;
+      }
+      const json = await res.json();
+      setTasks((json.tasks ?? []).filter((t: Task) => !pendingIds.current.has(t.id)));
+      setWeeklyIds(new Set(json.weeklyIds ?? []));
+      applyFlyStatus(json.flyStatus);
+      if (json.hungerStatus) setHungerStatus(json.hungerStatus);
 
-    setDailyGiftCount(json.dailyGiftCount || 0);
-    setLastGiftTaskCount(json.taskCountAtLastGift || 0);
+      setDailyGiftCount(json.dailyGiftCount || 0);
+      setLastGiftTaskCount(json.taskCountAtLastGift || 0);
+    } catch (e) {
+      console.error('Error in refreshToday:', e);
+    }
   }, [session, dateStr, applyFlyStatus]);
 
   useEffect(() => {
@@ -214,13 +242,17 @@ export default function Home() {
       try {
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const json = await res.json();
         setTasks((json.tasks ?? []).filter((t: Task) => !pendingIds.current.has(t.id)));
         setWeeklyIds(new Set(json.weeklyIds ?? []));
         applyFlyStatus(json.flyStatus);
+        if (json.hungerStatus) setHungerStatus(json.hungerStatus);
 
         setDailyGiftCount(json.dailyGiftCount || 0);
         setLastGiftTaskCount(json.taskCountAtLastGift || 0);
+      } catch (e) {
+        console.error('Initial load failed:', e);
       } finally {
         setLoading(false);
       }
@@ -306,7 +338,10 @@ export default function Home() {
         try {
           const body = await res.json();
           applyFlyStatus(body?.flyStatus);
-        } catch {}
+          if (body?.hungerStatus) setHungerStatus(body.hungerStatus);
+        } catch (e) {
+           console.error('Failed to parse PUT response', e);
+        }
       }
     } else {
       setGuestTasks((prev) => {
@@ -373,6 +408,8 @@ export default function Home() {
               total={data.length}
               giftsClaimed={dailyGiftCount}
               isCatching={cinematic}
+              hunger={hungerStatus.hunger}
+              maxHunger={hungerStatus.maxHunger}
             />
             <div className="w-full">
               <ProgressCard
@@ -727,6 +764,7 @@ export default function Home() {
             setTasks(json.tasks ?? []);
             setWeeklyIds(new Set(json.weeklyIds ?? []));
             applyFlyStatus(json.flyStatus);
+            if (json.hungerStatus) setHungerStatus(json.hungerStatus);
 
             setDailyGiftCount(json.dailyGiftCount || 0);
             setLastGiftTaskCount(json.taskCountAtLastGift || 0);
@@ -751,6 +789,16 @@ export default function Home() {
           refreshToday();
         }}
         dailyGiftCount={dailyGiftCount}
+      />
+      
+      <HungerWarningModal 
+        open={!!session && hungerStatus.stolenFlies > 0} 
+        stolenFlies={hungerStatus.stolenFlies}
+        onAcknowledge={async () => {
+           // Optimistic clear
+           setHungerStatus(prev => ({ ...prev, stolenFlies: 0 }));
+           await fetch('/api/hunger/acknowledge', { method: 'POST' });
+        }}
       />
 
       {/* Floating Add Task Button - Home Page Version */}

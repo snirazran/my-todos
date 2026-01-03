@@ -34,6 +34,11 @@ export type UserWardrobe = {
   unseenItems?: string[];
   flies: number;
   flyDaily?: DailyFlyProgress;
+  
+  // Hunger System
+  hunger?: number;           // Time remaining in ms (Max 24h = 86400000)
+  lastHungerUpdate?: Date;   // Timestamp of last calculation
+  stolenFlies?: number;      // Flies eaten by frog since last acknowledgement
 };
 
 export type UserSkins = {

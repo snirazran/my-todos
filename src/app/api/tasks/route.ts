@@ -14,6 +14,7 @@ import TaskModel, {
   type Weekday,
 } from '@/lib/models/Task';
 import type { DailyFlyProgress } from '@/lib/types/UserDoc';
+import { calculateHunger, MAX_HUNGER_MS, TASK_HUNGER_REWARD_MS } from '@/lib/hungerLogic';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
@@ -26,115 +27,20 @@ type FlyStatus = {
   justHitLimit?: boolean;
 };
 
+type HungerStatus = {
+  hunger: number;
+  stolenFlies: number;
+  maxHunger: number;
+};
+
 const DAILY_FLY_LIMIT = 15;
 
 const isWeekday = (n: number): n is Weekday =>
   Number.isInteger(n) && n >= 0 && n <= 6;
 
-async function currentUserId() {
-  const s = await getServerSession(authOptions);
-  return s?.user?.id ? new Types.ObjectId(s.user.id) : null;
-}
-function unauth() {
-  return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-}
+// ... (existing helper functions) ...
 
-// --- Timezone Helpers ---
-
-function getZonedYMD(d: Date, tz: string) {
-  try {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: tz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(d);
-  } catch (e) {
-    // Fallback for invalid timezone
-    console.warn('Invalid timezone:', tz);
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'UTC',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(d);
-  }
-}
-
-function getZonedToday(tz: string) {
-  return getZonedYMD(new Date(), tz);
-}
-
-function getRollingWeekDatesZoned(tz: string) {
-  const todayYMD = getZonedToday(tz);
-  
-  // Pivot around UTC Noon to avoid DST/timezone shifts during math
-  const todayDate = new Date(`${todayYMD}T12:00:00Z`);
-  const dow = todayDate.getUTCDay(); // 0..6
-
-  // Find Sunday
-  const sundayDate = new Date(todayDate);
-  sundayDate.setUTCDate(todayDate.getUTCDate() - dow);
-
-  const weekStart = sundayDate.toISOString().split('T')[0]; // YYYY-MM-DD
-  const weekDates: string[] = [];
-
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(sundayDate);
-    d.setUTCDate(sundayDate.getUTCDate() + i);
-    const dateStr = d.toISOString().split('T')[0];
-    weekDates.push(dateStr);
-  }
-
-  // Rolling logic: if date is strictly before today, push it to next week
-  const rollingDates = weekDates.map((date) => {
-    if (date < todayYMD) {
-      const d = new Date(`${date}T12:00:00Z`);
-      d.setUTCDate(d.getUTCDate() + 7);
-      return d.toISOString().split('T')[0];
-    }
-    return date;
-  });
-
-  return { weekStart, weekDates: rollingDates, todayYMD };
-}
-
-function dowFromYMD(ymd: string) {
-  // YYYY-MM-DD -> DOW (0-6) using UTC noon
-  return new Date(`${ymd}T12:00:00Z`).getUTCDay() as Weekday;
-}
-
-function isBoardMode(req: NextRequest) {
-  const params = req.nextUrl.searchParams;
-  return (
-    params.get('view') === 'board' ||
-    params.has('day') ||
-    params.get('fullWeek') === '1'
-  );
-}
-
-const initDailyFly = (date: string): DailyFlyProgress => ({
-  date,
-  earned: 0,
-  taskIds: [],
-  limitNotified: false,
-});
-
-function normalizeDailyFly(
-  today: string,
-  flyDaily?: DailyFlyProgress
-): DailyFlyProgress {
-  if (flyDaily?.date === today) {
-    return {
-      ...flyDaily,
-      taskIds: flyDaily.taskIds ?? [],
-      limitNotified: flyDaily.limitNotified ?? false,
-    };
-  }
-  return initDailyFly(today);
-}
-
-async function currentFlyStatus(userId: Types.ObjectId, tz: string): Promise<FlyStatus> {
+async function currentFlyStatus(userId: Types.ObjectId, tz: string): Promise<{ flyStatus: FlyStatus; hungerStatus: HungerStatus }> {
   const today = getZonedToday(tz);
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
@@ -142,38 +48,58 @@ async function currentFlyStatus(userId: Types.ObjectId, tz: string): Promise<Fly
 
   if (!user) {
     return {
-      balance: 0,
-      earnedToday: 0,
-      limit: DAILY_FLY_LIMIT,
-      limitHit: false,
+      flyStatus: {
+        balance: 0,
+        earnedToday: 0,
+        limit: DAILY_FLY_LIMIT,
+        limitHit: false,
+      },
+      hungerStatus: {
+        hunger: MAX_HUNGER_MS,
+        stolenFlies: 0,
+        maxHunger: MAX_HUNGER_MS,
+      }
     };
   }
 
+  // 1. Process Hunger Decay & Penalties
+  const { updates, status: hungerStatus } = calculateHunger(user);
+  
+  // 2. Process Daily Fly Logic
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
   const daily = normalizeDailyFly(
     today,
     wardrobe.flyDaily as DailyFlyProgress | undefined
   );
 
+  const pendingUpdates: Record<string, any> = { ...updates };
+  let needsUpdate = Object.keys(updates).length > 0;
+
+  // Check if daily fly object needs initialization/reset
   if (!user?.wardrobe || wardrobe.flyDaily?.date !== today) {
-    await UserModel.updateOne(
-      { _id: userId },
-      {
-        $set: {
-          'wardrobe.equipped': wardrobe.equipped ?? {},
-          'wardrobe.inventory': wardrobe.inventory ?? {},
-          'wardrobe.flies': wardrobe.flies ?? 0,
-          'wardrobe.flyDaily': daily,
-        },
-      }
-    );
+    pendingUpdates['wardrobe.flyDaily'] = daily;
+    // Ensure wardrobe structure exists
+    if (!wardrobe.equipped) pendingUpdates['wardrobe.equipped'] = {};
+    if (!wardrobe.inventory) pendingUpdates['wardrobe.inventory'] = {};
+    if (wardrobe.flies === undefined) pendingUpdates['wardrobe.flies'] = 0;
+    needsUpdate = true;
   }
 
+  if (needsUpdate) {
+    await UserModel.updateOne({ _id: userId }, { $set: pendingUpdates });
+  }
+
+  // Use the potentially updated fly balance from hunger logic
+  const currentBalance = pendingUpdates['wardrobe.flies'] ?? wardrobe.flies ?? 0;
+
   return {
-    balance: wardrobe.flies ?? 0,
-    earnedToday: daily.earned,
-    limit: DAILY_FLY_LIMIT,
-    limitHit: daily.earned >= DAILY_FLY_LIMIT,
+    flyStatus: {
+      balance: currentBalance,
+      earnedToday: daily.earned,
+      limit: DAILY_FLY_LIMIT,
+      limitHit: daily.earned >= DAILY_FLY_LIMIT,
+    },
+    hungerStatus
   };
 }
 
@@ -181,7 +107,7 @@ async function awardFlyForTask(
   userId: Types.ObjectId,
   taskId: string,
   tz: string
-): Promise<{ awarded: boolean; flyStatus: FlyStatus }> {
+): Promise<{ awarded: boolean; flyStatus: FlyStatus; hungerStatus: HungerStatus }> {
   const today = getZonedToday(tz);
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
@@ -196,9 +122,17 @@ async function awardFlyForTask(
         limit: DAILY_FLY_LIMIT,
         limitHit: false,
       },
+      hungerStatus: {
+        hunger: MAX_HUNGER_MS,
+        stolenFlies: 0,
+        maxHunger: MAX_HUNGER_MS
+      }
     };
   }
 
+  // 1. Process Decay First (so we don't apply reward to stale time)
+  const { updates: hungerUpdates, status: currentHungerState } = calculateHunger(user);
+  
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
   const daily = normalizeDailyFly(
     today,
@@ -208,24 +142,47 @@ async function awardFlyForTask(
   const atLimit = daily.earned >= DAILY_FLY_LIMIT;
   const limitNotified = daily.limitNotified ?? false;
 
+  // Use the balance from hunger calculation if it changed (due to penalties)
+  let currentBalance = hungerUpdates['wardrobe.flies'] ?? wardrobe.flies ?? 0;
+
   if (alreadyRewarded || atLimit) {
+    // If already rewarded or at limit, we ONLY apply the time-based decay updates.
+    // We do NOT add the hunger reward (4h).
+    
     if (atLimit && !limitNotified) {
       await UserModel.updateOne(
         { _id: user._id },
-        { $set: { 'wardrobe.flyDaily.limitNotified': true } }
+        { $set: { ...hungerUpdates, 'wardrobe.flyDaily.limitNotified': true } }
       );
+    } else {
+      // Still need to save hunger updates if any (from decay)
+      if (Object.keys(hungerUpdates).length > 0) {
+        await UserModel.updateOne({ _id: user._id }, { $set: hungerUpdates });
+      }
     }
+    
     return {
       awarded: false,
       flyStatus: {
-        balance: wardrobe.flies ?? 0,
+        balance: currentBalance,
         earnedToday: daily.earned,
         limit: DAILY_FLY_LIMIT,
         limitHit: daily.earned >= DAILY_FLY_LIMIT,
         justHitLimit: atLimit && !limitNotified ? true : undefined,
       },
+      hungerStatus: currentHungerState
     };
   }
+
+  // 2. Apply Hunger Reward (boost by 4h) ONLY if not already rewarded
+  let newHunger = currentHungerState.hunger + TASK_HUNGER_REWARD_MS;
+  if (newHunger > MAX_HUNGER_MS) newHunger = MAX_HUNGER_MS;
+  
+  // Update the status object for return
+  const finalHungerStatus = { ...currentHungerState, hunger: newHunger };
+  
+  // Merge into updates
+  const setFields: Record<string, any> = { ...hungerUpdates, 'wardrobe.hunger': newHunger };
 
   const nextEarned = daily.earned + 1;
   const hitLimit = nextEarned >= DAILY_FLY_LIMIT;
@@ -235,18 +192,18 @@ async function awardFlyForTask(
     taskIds: Array.from(new Set([...(daily.taskIds ?? []), taskId])),
     limitNotified: limitNotified || hitLimit,
   };
-  const nextBalance = (wardrobe.flies ?? 0) + 1;
+  
+  const nextBalance = currentBalance + 1;
 
-  const setFields: Record<string, any> = {
-    'wardrobe.flyDaily': nextDaily,
-  };
+  setFields['wardrobe.flyDaily'] = nextDaily;
+  setFields['wardrobe.flies'] = nextBalance; // Explicitly set final balance
   if (!user.wardrobe?.equipped) setFields['wardrobe.equipped'] = {};
   if (!user.wardrobe?.inventory) setFields['wardrobe.inventory'] = {};
 
+  // We are setting 'wardrobe.flies' instead of incrementing to ensure consistency with hunger penalties
   await UserModel.updateOne(
     { _id: user._id },
     {
-      $inc: { 'wardrobe.flies': 1 },
       $set: setFields,
     }
   );
@@ -260,6 +217,7 @@ async function awardFlyForTask(
       limitHit: hitLimit,
       justHitLimit: hitLimit && !limitNotified ? true : undefined,
     },
+    hungerStatus: finalHungerStatus
   };
 }
 
@@ -494,13 +452,15 @@ export async function PUT(req: NextRequest) {
   await TaskModel.updateOne({ userId: uid, id: taskId }, update);
 
   let flyStatus: FlyStatus | undefined;
+  let hungerStatus: HungerStatus | undefined;
+
   if (completed && !alreadyCompletedForDate) {
-    ({ flyStatus } = await awardFlyForTask(uid, taskId, tz));
+    ({ flyStatus, hungerStatus } = await awardFlyForTask(uid, taskId, tz));
   } else {
-    flyStatus = await currentFlyStatus(uid, tz);
+    ({ flyStatus, hungerStatus } = await currentFlyStatus(uid, tz));
   }
 
-  return NextResponse.json({ ok: true, flyStatus });
+  return NextResponse.json({ ok: true, flyStatus, hungerStatus });
 }
 
 /* ====================================================================== */
@@ -612,7 +572,7 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId, tz: stri
       return (a.order ?? 0) - (b.order ?? 0);
     });
 
-  const flyStatus = await currentFlyStatus(userId, tz);
+  const { flyStatus, hungerStatus } = await currentFlyStatus(userId, tz);
 
   // === NEW: FETCH GIFT COUNT ===
   // Use user's today string for stats lookup
@@ -630,6 +590,7 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId, tz: stri
     tasks: output,
     weeklyIds: Array.from(weeklyIdsForUI),
     flyStatus,
+    hungerStatus,
     dailyGiftCount,
   });
 }
