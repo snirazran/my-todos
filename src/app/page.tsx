@@ -752,29 +752,35 @@ export default function Home() {
         initialText={quickText}
         defaultRepeat="this-week"
         onSubmit={async ({ text, days, repeat, tags }) => {
-          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-          await fetch('/api/tasks?view=board', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
-          });
-          if (session) {
-            const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
-            const json = await res.json();
-            setTasks(json.tasks ?? []);
-            setWeeklyIds(new Set(json.weeklyIds ?? []));
-            applyFlyStatus(json.flyStatus);
-            if (json.hungerStatus) setHungerStatus(json.hungerStatus);
+          try {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            await fetch('/api/tasks?view=board', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
+            });
+            if (session) {
+              const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
+              if (!res.ok) return;
+              const json = await res.json();
+              
+              setTasks(json.tasks ?? []);
+              setWeeklyIds(new Set(json.weeklyIds ?? []));
+              applyFlyStatus(json.flyStatus);
+              if (json.hungerStatus) setHungerStatus(json.hungerStatus);
 
-            setDailyGiftCount(json.dailyGiftCount || 0);
-            setLastGiftTaskCount(json.taskCountAtLastGift || 0);
-          } else {
-            setGuestTasks((prev) => [
-              ...prev,
-              { id: crypto.randomUUID(), text, completed: false, tags },
-            ]);
+              setDailyGiftCount(json.dailyGiftCount || 0);
+              setLastGiftTaskCount(json.taskCountAtLastGift || 0);
+            } else {
+              setGuestTasks((prev) => [
+                ...prev,
+                { id: crypto.randomUUID(), text, completed: false, tags },
+              ]);
+            }
+            fetchBacklog();
+          } catch (e) {
+            console.error('Failed to add task or refresh state:', e);
           }
-          fetchBacklog();
         }}
       />
 

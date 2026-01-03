@@ -2,9 +2,10 @@
 import type { Metadata, Viewport } from 'next';
 import { Poppins } from 'next/font/google';
 import './globals.css';
-import Providers from './providers';
+import Providers from '@/app/providers';
 import SiteHeader from '@/components/ui/siteHeader';
 import MobileNav from '@/components/ui/MobileNav';
+import { AuthContext } from '@/components/auth/AuthContext';
 
 const poppins = Poppins({
   subsets: ['latin'],
@@ -48,11 +49,13 @@ export default function RootLayout({
         {/* Global, fixed background that paints under mobile URL/search bars */}
         <div className="fixed inset-0 -z-10 bg-background [background-attachment:fixed]" />
 
-        <Providers>
-          <SiteHeader />
-          {children}
-          <MobileNav />
-        </Providers>
+        <AuthContext>
+          <Providers>
+            <SiteHeader />
+            {children}
+            <MobileNav />
+          </Providers>
+        </AuthContext>
       </body>
     </html>
   );

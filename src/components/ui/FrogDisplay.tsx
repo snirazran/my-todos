@@ -8,8 +8,8 @@ import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { useInventory } from '@/hooks/useInventory';
-import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
+import { CurrencyShop } from '@/components/ui/shop/CurrencyShop';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle>;
@@ -50,9 +50,9 @@ export function FrogDisplay({
   hunger,
   maxHunger,
 }: Props) {
-  const { data: session } = useSession();
   const { unseenCount } = useInventory();
   const [clickedAt, setClickedAt] = React.useState(0);
+  const [shopOpen, setShopOpen] = React.useState(false);
   
   const hungerPercent = (typeof hunger === 'number' && typeof maxHunger === 'number') 
     ? Math.max(0, Math.min(100, (hunger / maxHunger) * 100)) 
@@ -61,6 +61,14 @@ export function FrogDisplay({
   return (
     // Added mb-12 to create the requested space from the tabs below
     <div className={`${className} flex flex-col items-center mb-6 md:mb-12 relative`}>
+      <CurrencyShop 
+        open={shopOpen} 
+        onOpenChange={setShopOpen}
+        balance={flyBalance ?? 0}
+        hunger={hunger ?? 0}
+        maxHunger={maxHunger ?? 100}
+      />
+
       <div
         ref={frogBoxRef}
         className="relative z-20 transition-transform duration-500 -translate-y-3.5 pointer-events-none "
@@ -108,25 +116,25 @@ export function FrogDisplay({
         {/* Left: Digital Fly Counter (Recessed Look) */}
         {typeof flyBalance === 'number' ? (
           <div 
-             className="group relative overflow-hidden flex items-center gap-3 pl-2.5 pr-5 py-2 h-[52px] rounded-[15px] bg-muted/50 shadow-inner border border-border/30 transition-all hover:bg-muted/80"
-             title={`Hunger Level: ${Math.round(hungerPercent)}%`}
+              onClick={() => setShopOpen(true)}
+              className="group relative overflow-hidden flex items-center gap-3 pl-2.5 pr-5 py-2 h-[52px] rounded-[15px] bg-muted/50 shadow-inner border border-border/30 transition-all hover:bg-muted/80 cursor-pointer active:scale-95 duration-200"
           >
-            {/* Icon Container with subtle glow and hunger fill */}
-            <div className="relative flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 overflow-hidden">
-              {/* Hunger Fill */}
-              <div 
-                className="absolute bottom-0 left-0 right-0 bg-emerald-400/30 transition-all duration-1000 ease-in-out"
-                style={{ height: `${hungerPercent}%` }}
-              />
-              
+            {/* Hunger Fill Background - Green to represent fullness */}
+            <div 
+              className="absolute bottom-0 left-0 right-0 bg-emerald-500/20 transition-all duration-1000 ease-in-out z-0"
+              style={{ height: `${hungerPercent}%` }}
+            />
+            
+            {/* Icon Container with subtle glow */}
+            <div className="relative z-10 flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5">
               <Fly
                 size={24}
                 y={-2}
-                className={cn("relative z-10 transition-transform duration-300 text-muted-foreground", animateBalance && "group-hover:rotate-12")}
+                className={cn("transition-transform duration-300 text-muted-foreground", animateBalance && "group-hover:rotate-12")}
               />
             </div>
 
-            <div className="flex flex-col justify-center">
+            <div className="relative z-10 flex flex-col justify-center">
               <span className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider leading-none mb-0.5">
                 Balance
               </span>
