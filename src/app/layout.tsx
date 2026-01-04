@@ -25,8 +25,13 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Weekly Tasks',
-  description: 'Track your daily tasks',
+  title: 'FrogTask',
+  description: 'FrogTask Todo List App',
+  icons: {
+    icon: '/48x48.png',
+    apple: '/180x180.png',
+  },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({
