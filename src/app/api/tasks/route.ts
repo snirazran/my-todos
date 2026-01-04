@@ -155,6 +155,11 @@ async function currentFlyStatus(userId: Types.ObjectId, tz: string): Promise<{ f
     if (!wardrobe.equipped) pendingUpdates['wardrobe.equipped'] = {};
     if (!wardrobe.inventory) pendingUpdates['wardrobe.inventory'] = {};
     if (wardrobe.flies === undefined) pendingUpdates['wardrobe.flies'] = 0;
+    
+    // Ensure hunger fields are initialized if missing
+    if (wardrobe.hunger === undefined) pendingUpdates['wardrobe.hunger'] = MAX_HUNGER_MS;
+    if (!wardrobe.lastHungerUpdate) pendingUpdates['wardrobe.lastHungerUpdate'] = new Date();
+
     needsUpdate = true;
   }
 
@@ -201,25 +206,38 @@ async function awardFlyForTask(
   const limitNotified = daily.limitNotified ?? false;
   let currentBalance = hungerUpdates['wardrobe.flies'] ?? wardrobe.flies ?? 0;
 
-  if (alreadyRewarded || atLimit) {
-    if (atLimit && !limitNotified) {
-      await UserModel.updateOne({ _id: user._id }, { $set: { ...hungerUpdates, 'wardrobe.flyDaily.limitNotified': true } });
-    } else if (Object.keys(hungerUpdates).length > 0) {
+  if (alreadyRewarded) {
+    if (Object.keys(hungerUpdates).length > 0) {
       await UserModel.updateOne({ _id: user._id }, { $set: hungerUpdates });
     }
     return {
       awarded: false,
-      flyStatus: { balance: currentBalance, earnedToday: daily.earned, limit: DAILY_FLY_LIMIT, limitHit: atLimit, justHitLimit: atLimit && !limitNotified ? true : undefined },
+      flyStatus: { balance: currentBalance, earnedToday: daily.earned, limit: DAILY_FLY_LIMIT, limitHit: atLimit },
       hungerStatus: currentHungerState
     };
   }
 
-  let newHunger = currentHungerState.hunger + TASK_HUNGER_REWARD_MS;
-  if (newHunger > MAX_HUNGER_MS) newHunger = MAX_HUNGER_MS;
+  // Calculate new hunger (capped at max), forgiving any negative debt
+  let newHunger = Math.min(MAX_HUNGER_MS, Math.max(0, currentHungerState.hunger) + TASK_HUNGER_REWARD_MS);
   const finalHungerStatus = { ...currentHungerState, hunger: newHunger };
-  const setFields: Record<string, any> = { ...hungerUpdates, 'wardrobe.hunger': newHunger };
+  
+  const setFields: Record<string, any> = { 
+    ...hungerUpdates, 
+    'wardrobe.hunger': newHunger,
+    'wardrobe.lastHungerUpdate': new Date() // Ensure we don't double-drain
+  };
 
-  const nextEarned = daily.earned + 1;
+  let nextEarned = daily.earned;
+  let nextBalance = currentBalance;
+  let awardedFly = false;
+
+  if (!atLimit) {
+    nextEarned += 1;
+    nextBalance += 1;
+    awardedFly = true;
+    setFields['wardrobe.flies'] = nextBalance;
+  }
+
   const hitLimit = nextEarned >= DAILY_FLY_LIMIT;
   const nextDaily: DailyFlyProgress = {
     date: today,
@@ -227,18 +245,22 @@ async function awardFlyForTask(
     taskIds: Array.from(new Set([...(daily.taskIds ?? []), taskId])),
     limitNotified: limitNotified || hitLimit,
   };
-  const nextBalance = currentBalance + 1;
 
   setFields['wardrobe.flyDaily'] = nextDaily;
-  setFields['wardrobe.flies'] = nextBalance;
   if (!user.wardrobe?.equipped) setFields['wardrobe.equipped'] = {};
   if (!user.wardrobe?.inventory) setFields['wardrobe.inventory'] = {};
 
   await UserModel.updateOne({ _id: user._id }, { $set: setFields });
 
   return {
-    awarded: true,
-    flyStatus: { balance: nextBalance, earnedToday: nextEarned, limit: DAILY_FLY_LIMIT, limitHit: hitLimit, justHitLimit: hitLimit && !limitNotified ? true : undefined },
+    awarded: awardedFly,
+    flyStatus: { 
+      balance: nextBalance, 
+      earnedToday: nextEarned, 
+      limit: DAILY_FLY_LIMIT, 
+      limitHit: hitLimit, 
+      justHitLimit: hitLimit && !limitNotified ? true : undefined 
+    },
     hungerStatus: finalHungerStatus
   };
 }

@@ -54,8 +54,29 @@ export function FrogDisplay({
   const [clickedAt, setClickedAt] = React.useState(0);
   const [shopOpen, setShopOpen] = React.useState(false);
   
-  const hungerPercent = (typeof hunger === 'number' && typeof maxHunger === 'number') 
-    ? Math.max(0, Math.min(100, (hunger / maxHunger) * 100)) 
+  // Local state for smooth hunger updates
+  const [displayedHunger, setDisplayedHunger] = React.useState(hunger ?? 0);
+
+  // Sync with prop updates
+  React.useEffect(() => {
+    if (typeof hunger === 'number') {
+      setDisplayedHunger(hunger);
+    }
+  }, [hunger]);
+
+  // Constant visual decay
+  React.useEffect(() => {
+    if (displayedHunger <= 0) return;
+    
+    const interval = setInterval(() => {
+      setDisplayedHunger(prev => Math.max(0, prev - 1000));
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, [displayedHunger]);
+  
+  const hungerPercent = (typeof displayedHunger === 'number' && typeof maxHunger === 'number') 
+    ? Math.max(0, Math.min(100, (displayedHunger / maxHunger) * 100)) 
     : 100;
 
   const hungerColor = hungerPercent > 50 
@@ -82,19 +103,19 @@ export function FrogDisplay({
 
           <div className={`${className} flex flex-col items-center mb-6 md:mb-12 relative`}>
 
-            <CurrencyShop 
+                        <CurrencyShop 
 
-              open={shopOpen} 
+                          open={shopOpen} 
 
-              onOpenChange={setShopOpen}
+                          onOpenChange={setShopOpen}
 
-              balance={flyBalance ?? 0}
+                          balance={flyBalance ?? 0}
 
-              hunger={hunger ?? 0}
+                          hunger={displayedHunger}
 
-              maxHunger={maxHunger ?? 100}
+                          maxHunger={maxHunger ?? 100}
 
-            />
+                        />
 
       
 

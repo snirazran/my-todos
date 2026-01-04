@@ -1,53 +1,64 @@
 'use client';
 
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { FrogMessage } from '@/components/ui/FrogMessage';
 import Frog from '@/components/ui/frog';
+import type { WardrobeSlot } from '@/components/ui/frog';
+import Fly from '@/components/ui/fly';
+import { Utensils } from 'lucide-react';
 
 interface Props {
   stolenFlies: number;
   onAcknowledge: () => void;
   open: boolean;
+  indices?: Partial<Record<WardrobeSlot, number>>;
 }
 
-export function HungerWarningModal({ stolenFlies, onAcknowledge, open }: Props) {
+export function HungerWarningModal({ stolenFlies, onAcknowledge, open, indices }: Props) {
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onAcknowledge()}>
-      <DialogContent className="sm:max-w-[425px] border-none bg-transparent shadow-none p-0">
-        <div className="relative bg-card/95 backdrop-blur-xl border border-border/50 rounded-[32px] p-6 shadow-2xl overflow-hidden">
+      <DialogContent className="sm:max-w-[360px] border-none bg-transparent shadow-none p-0 outline-none">
+        <div className="relative flex flex-col items-center bg-card/95 backdrop-blur-2xl border border-border/60 rounded-[32px] p-6 shadow-2xl overflow-hidden ring-1 ring-black/5">
           
-          {/* Header Graphic */}
-          <div className="flex flex-col items-center justify-center pt-2 pb-6 w-full">
-            <div className="relative w-full mb-2 flex items-center justify-center">
-               <div className="flex items-center justify-center">
-                  <Frog width={200} height={150} />
-               </div>
-            </div>
-            
-            <DialogHeader className="text-center space-y-2">
-              <DialogTitle className="text-3xl font-black text-foreground tracking-tight">
-                Oh no... I was so hungry!
-              </DialogTitle>
-              <DialogDescription className="text-base font-medium text-muted-foreground px-4">
-                I'm sorry, I couldn't help it! I had to eat <span className="font-bold text-rose-500">{stolenFlies} of your flies</span> :(
-              </DialogDescription>
-            </DialogHeader>
+          {/* Header: Frog + Icon */}
+          <div className="relative mb-4 mt-2 scale-110">
+             <Frog width={200} height={150} indices={indices} className="drop-shadow-sm" />
+             <div className="absolute -right-2 -top-1 bg-rose-500 text-white p-2.5 rounded-full shadow-lg border-[3px] border-card animate-in zoom-in duration-300">
+                <Utensils className="w-5 h-5" strokeWidth={3} />
+             </div>
           </div>
 
-          <div className="bg-muted/50 rounded-2xl p-4 mb-6 text-center text-sm font-medium text-muted-foreground leading-relaxed mx-2">
-            Feed me by <span className="text-foreground font-bold italic">completing tasks</span>! It's the only way to keep me full and your flies safe.
+          {/* Title */}
+          <h2 className="text-2xl font-black text-foreground tracking-tight mb-1 text-center">
+            I was Starving!
+          </h2>
+          
+          {/* Explanation */}
+          <p className="text-sm text-muted-foreground font-medium text-center mb-6 px-4 leading-relaxed">
+            I got too hungry and had to snack on your stash while you were away.
+          </p>
+
+          {/* The "Bill" / Loss Visual */}
+          <div className="w-full bg-rose-500/10 border border-rose-500/20 rounded-2xl p-4 mb-6 flex items-center justify-center gap-4">
+             <div className="relative opacity-80 -top-2">
+                <Fly size={52} className="text-rose-600 grayscale brightness-75" />
+                {/* Cross out the fly */}
+                <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-rose-600 -rotate-45 rounded-full" />
+             </div>
+             <span className="text-3xl font-black text-rose-600 tabular-nums tracking-tight">
+               -{stolenFlies}
+             </span>
           </div>
 
-          <DialogFooter className="sm:justify-center">
-            <Button 
-              onClick={onAcknowledge}
-              className="w-full sm:w-auto min-w-[200px] h-12 rounded-xl text-lg font-bold shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all active:scale-95"
-            >
-              I understand, I'll feed you!
-            </Button>
-          </DialogFooter>
+          {/* Action */}
+          <Button 
+            onClick={onAcknowledge}
+            className="w-full h-12 rounded-2xl text-base font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20"
+          >
+            I'll Do My Tasks
+          </Button>
+
         </div>
       </DialogContent>
     </Dialog>

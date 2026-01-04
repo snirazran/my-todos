@@ -800,6 +800,7 @@ export default function Home() {
       <HungerWarningModal 
         open={!!session && hungerStatus.stolenFlies > 0} 
         stolenFlies={hungerStatus.stolenFlies}
+        indices={indices}
         onAcknowledge={async () => {
            // Optimistic clear
            setHungerStatus(prev => ({ ...prev, stolenFlies: 0 }));
