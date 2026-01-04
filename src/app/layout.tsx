@@ -29,7 +29,12 @@ export const metadata: Metadata = {
   description: 'FrogTask Todo List App',
   icons: {
     icon: '/48x48.png',
+    shortcut: '/48x48.png',
     apple: '/180x180.png',
+    other: {
+      rel: 'apple-touch-icon-precomposed',
+      url: '/180x180.png',
+    },
   },
   manifest: '/manifest.json',
 };
