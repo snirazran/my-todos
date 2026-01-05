@@ -72,8 +72,6 @@ export function CurrencyShop({
       ? Math.max(0, Math.min(100, (hunger / maxHunger) * 100))
       : 100;
 
-  const isHungry = hungerPercent < 20;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 overflow-hidden border-none bg-transparent shadow-none w-full sm:max-w-[95vw] md:max-w-5xl">
@@ -111,7 +109,13 @@ export function CurrencyShop({
                  <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
                    Hunger
                  </span>
-                 <span className={cn("text-xs font-black tabular-nums", isHungry ? 'text-rose-500' : 'text-emerald-500')}>
+                 <span className={cn("text-xs font-black tabular-nums", 
+                    hungerPercent > 80 ? 'text-emerald-500' :
+                    hungerPercent > 60 ? 'text-lime-500' :
+                    hungerPercent > 40 ? 'text-yellow-500' :
+                    hungerPercent > 20 ? 'text-amber-500' :
+                    'text-rose-500'
+                 )}>
                    {Math.round(hungerPercent)}%
                  </span>
               </div>

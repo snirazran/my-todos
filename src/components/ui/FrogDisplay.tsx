@@ -79,21 +79,16 @@ export function FrogDisplay({
     ? Math.max(0, Math.min(100, (displayedHunger / maxHunger) * 100)) 
     : 100;
 
-  const hungerColor = hungerPercent > 50 
-    ? 'bg-emerald-500' 
-    : hungerPercent > 20 
-      ? 'bg-amber-500' 
-      : 'bg-rose-500';
+  // Expanded hunger states for better transition
+  const getHungerState = (p: number) => {
+    if (p > 80) return { bg: 'bg-emerald-500', text: 'text-emerald-500', label: 'FULL TUMMY' };
+    if (p > 60) return { bg: 'bg-lime-500', text: 'text-lime-500', label: 'HAPPY' };
+    if (p > 40) return { bg: 'bg-yellow-500', text: 'text-yellow-500', label: 'PECKISH' };
+    if (p > 20) return { bg: 'bg-amber-500', text: 'text-amber-500', label: 'GRUMPY' };
+    return { bg: 'bg-rose-500', text: 'text-rose-500', label: 'HANGRY!!' };
+  };
 
-        const hungerStatus = hungerPercent > 50 
-
-          ? 'WELL FED' 
-
-          : hungerPercent > 20 
-
-            ? 'HUNGRY' 
-
-            : 'STARVING!!';
+  const { bg: hungerColor, text: hungerTextColor, label: hungerStatus } = getHungerState(hungerPercent);
 
       
 
@@ -227,19 +222,19 @@ export function FrogDisplay({
 
                   >
 
-                    {/* Hunger Fill Background */}
+                                                                                {/* Hunger Fill Background */}
 
-                    <div 
+                                                                                <div 
 
-                      className={cn("absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0 opacity-20", hungerColor)}
+                                                                                  className={cn("absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-in-out z-0 opacity-20", hungerColor)}
 
-                      style={{ height: `${hungerPercent}%` }}
+                                                                                  style={{ height: `${hungerPercent}%` }}
 
-                    />
+                                                                                />
 
-                    
+                                                            
 
-                    {/* Icon Container */}
+                                                                                {/* Icon Container */}
 
                     <div className="relative z-10 flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0">
 
@@ -259,25 +254,25 @@ export function FrogDisplay({
 
                     <div className="relative z-10 flex flex-col justify-center">
 
-                      {/* Hunger Status - Integrated Line at the top */}
+                                            {/* Hunger Status - Integrated Line at the top */}
 
-                      <div className="flex items-center gap-1.5 mb-1">
+                                            <div className="flex items-center gap-1.5 mb-1">
 
-                        <div className={cn("w-1.5 h-1.5 rounded-full ring-1 ring-white/10 shadow-sm", hungerColor)} />
+                                              <div className={cn("w-1.5 h-1.5 rounded-full ring-1 ring-white/10 shadow-sm", hungerColor)} />
 
-                        <span className={cn(
+                                              <span className={cn(
 
-                          "text-[8px] font-black uppercase tracking-[0.15em]",
+                                                "text-[8px] font-black uppercase tracking-[0.15em]",
 
-                          hungerPercent > 50 ? "text-emerald-500" : hungerPercent > 20 ? "text-amber-500" : "text-rose-500"
+                                                hungerTextColor
 
-                        )}>
+                                              )}>
 
-                          {hungerStatus}
+                                                {hungerStatus}
 
-                        </span>
+                                              </span>
 
-                      </div>
+                                            </div>
 
                       
 
