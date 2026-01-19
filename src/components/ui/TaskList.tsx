@@ -12,7 +12,6 @@ import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import {
   DndContext,
-  closestCenter,
   closestCorners,
   KeyboardSensor,
   PointerSensor,
@@ -78,6 +77,11 @@ function SortableTaskItem({
   isWeekly,
   disableLayout,
 }: SortableTaskItemProps) {
+  /* Swipe Logic */
+  const [isOpen, setIsOpen] = useState(false);
+  const isDraggingRef = React.useRef(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
   const {
     attributes,
     listeners,
@@ -85,12 +89,7 @@ function SortableTaskItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: task.id, disabled: isDragDisabled });
-
-  /* Swipe Logic */
-  const [isOpen, setIsOpen] = useState(false);
-  const isDraggingRef = React.useRef(false);
-  const containerRef = React.useRef<HTMLDivElement>(null);
+  } = useSortable({ id: task.id, disabled: isDragDisabled || isOpen });
 
   useEffect(() => {
     const handleOtherSwipe = (e: Event) => {
@@ -734,7 +733,7 @@ export default function TaskList({
           )}
         </div>
 
-        <div className="pb-2 space-y-0 overflow-visible min-h-[100px]">
+        <div className="pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar pr-1 [mask-image:linear-gradient(to_bottom,black_90%,transparent)]">
           {tasks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed text-muted-foreground border-border bg-muted/30 rounded-xl">
               <CalendarCheck className="w-10 h-10 mb-3 opacity-20" />

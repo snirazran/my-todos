@@ -388,7 +388,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen pb-48 md:pb-32 bg-background">
+    <main className="min-h-screen pb-24 md:pb-12 bg-background">
       <div className="px-4 py-6 mx-auto max-w-7xl md:px-8">
         <Header session={session} router={router} />
 
