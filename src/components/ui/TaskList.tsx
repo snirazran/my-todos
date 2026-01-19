@@ -466,6 +466,7 @@ export default function TaskList({
   }>({ open: false, taskId: null });
   const [isAnyDragging, setIsAnyDragging] = useState(false);
   const activeAreaLimitsRef = React.useRef<{ top: number; bottom: number } | null>(null);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
     if (isAnyDragging) {
@@ -609,10 +610,17 @@ export default function TaskList({
     setIsAnyDragging(true);
     // Calculate boundary
     const activeNodes = document.querySelectorAll('[data-is-active="true"]');
-    if (activeNodes.length > 0) {
+    const container = scrollContainerRef.current;
+    
+    if (activeNodes.length > 0 && container) {
+      const containerRect = container.getBoundingClientRect();
       const rects = Array.from(activeNodes).map(n => n.getBoundingClientRect());
-      const bottom = Math.max(...rects.map(r => r.bottom));
-      const top = Math.min(...rects.map(r => r.top));
+      
+      // Calculate limits relative to the container's *content* top
+      // We add scrollTop because we want the position relative to the start of the scrollable content
+      const top = Math.min(...rects.map(r => r.top - containerRect.top + container.scrollTop));
+      const bottom = Math.max(...rects.map(r => r.bottom - containerRect.top + container.scrollTop));
+      
       activeAreaLimitsRef.current = { top, bottom };
     } else {
       activeAreaLimitsRef.current = null;
@@ -688,23 +696,32 @@ export default function TaskList({
 
   const restrictToActiveArea: Modifier = ({ transform, draggingNodeRect }) => {
      const limits = activeAreaLimitsRef.current;
+     const container = scrollContainerRef.current;
+
      // Apply parent restriction first
      const parentRestricted = restrictToParentElement({ transform, draggingNodeRect } as any);
      const verticalRestricted = restrictToVerticalAxis({ transform: parentRestricted, draggingNodeRect } as any);
      
-     if (limits !== null && draggingNodeRect) {
+     if (limits !== null && draggingNodeRect && container) {
+        const containerRect = container.getBoundingClientRect();
+        const currentScrollTop = container.scrollTop;
+        
+        // Calculate absolute viewport boundaries for the active area based on current scroll
+        const limitTop = containerRect.top - currentScrollTop + limits.top;
+        const limitBottom = containerRect.top - currentScrollTop + limits.bottom;
+        
         let newY = verticalRestricted.y;
         
         // Bottom restriction
         const currentBottom = draggingNodeRect.bottom + newY;
-        if (currentBottom > limits.bottom) {
-           newY = limits.bottom - draggingNodeRect.bottom;
+        if (currentBottom > limitBottom) {
+           newY = limitBottom - draggingNodeRect.bottom;
         }
 
         // Top restriction
         const currentTop = draggingNodeRect.top + newY;
-        if (currentTop < limits.top) {
-           newY = limits.top - draggingNodeRect.top;
+        if (currentTop < limitTop) {
+           newY = limitTop - draggingNodeRect.top;
         }
 
         return {
@@ -733,7 +750,7 @@ export default function TaskList({
           )}
         </div>
 
-        <div className="pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar pr-1 [mask-image:linear-gradient(to_bottom,black_90%,transparent)]">
+        <div className="pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar pr-1 [mask-image:linear-gradient(to_bottom,black_90%,transparent)]" ref={scrollContainerRef}>
           {tasks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed text-muted-foreground border-border bg-muted/30 rounded-xl">
               <CalendarCheck className="w-10 h-10 mb-3 opacity-20" />
