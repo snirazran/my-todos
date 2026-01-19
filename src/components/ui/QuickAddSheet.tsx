@@ -404,23 +404,17 @@ export default function QuickAddSheet({
                   <AnimatePresence initial={false}>
                     {isTagPanelOpen && (
                         <motion.div
-                            initial={{ opacity: 0, scaleY: 0.96, y: -6 }}
+                            initial={{ opacity: 0 }}
                             animate={{ 
                                 opacity: 1, 
-                                scaleY: 1,
-                                y: 0,
                                 transition: {
-                                    duration: 0.4,
-                                    ease: [0.19, 1.0, 0.22, 1.0]
+                                    duration: 0,
                                 }
                             }}
                             exit={{ 
                                 opacity: 0, 
-                                scaleY: 0.96,
-                                y: -6,
                                 transition: {
-                                    duration: 0.3,
-                                    ease: [0.45, 0, 0.55, 1]
+                                    duration: 0,
                                 }
                             }}
                             style={{ transformOrigin: 'top' }}
@@ -463,7 +457,7 @@ export default function QuickAddSheet({
                                         <motion.div
                                             initial={{ opacity: 0, maxHeight: 0 }}
                                             animate={{ opacity: 1, maxHeight: 500, transition: { duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] } }}
-                                            exit={{ opacity: 0, maxHeight: 0, transition: { duration: 0.15, ease: [0.7, 0, 0.84, 0] } }}
+                                            exit={{ opacity: 0, maxHeight: 0, transition: { duration: 0 } }}
                                             className="overflow-hidden mb-3"
                                         >
                                              <div className="p-2 bg-card rounded-lg shadow-sm border border-border">
@@ -516,7 +510,7 @@ export default function QuickAddSheet({
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}
                                         exit={{ opacity: 0 }}
-                                        transition={{ duration: 0.15 }}
+                                        transition={{ duration: 0 }}
                                     >
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-2">
