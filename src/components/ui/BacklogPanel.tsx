@@ -24,8 +24,8 @@ export default function BacklogPanel({
   onRefreshToday,
 
   onRefreshBacklog,
-
   onMoveToToday,
+  onAddRequested,
 }: {
   later: BacklogItem[];
 
@@ -34,6 +34,7 @@ export default function BacklogPanel({
   onRefreshBacklog: () => Promise<void> | void;
 
   onMoveToToday?: (item: BacklogItem) => Promise<void> | void;
+  onAddRequested: () => void;
 }) {
   const [menu, setMenu] = React.useState<{
     id: string;
@@ -241,15 +242,18 @@ export default function BacklogPanel({
 
       <div className="pb-2 space-y-3 overflow-visible min-h-[100px]">
         {later.length === 0 ? (
-          <div className="flex flex-col items-center justify-center px-4 py-10 text-center border-2 border-dashed text-muted-foreground border-border bg-muted/30 rounded-xl">
-            <CalendarClock className="w-10 h-10 mb-3 opacity-20" />
-
-            <p className="text-sm font-medium">No tasks saved yet.</p>
-
-            <p className="mt-1 text-xs opacity-60">
-              Save tasks for later and add them when you&apos;re ready!
-            </p>
-          </div>
+            <button
+              onClick={onAddRequested}
+              className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+            >
+               <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+                  <Fly size={32} y={-4} />
+               </div>
+              <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">Start your backlog</p>
+              <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+                Tap to save a task for later
+              </p>
+            </button>
         ) : (
           <AnimatePresence mode="popLayout">
             {later.map((t, i) => {

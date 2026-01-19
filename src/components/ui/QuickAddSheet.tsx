@@ -43,6 +43,7 @@ type Props = Readonly<{
   initialText?: string;
   defaultRepeat?: RepeatChoice;
   defaultPickedDay?: number;
+  defaultMode?: WhenChoice;
 }>;
 
 type SavedTag = {
@@ -82,10 +83,11 @@ export default function QuickAddSheet({
   initialText = '',
   defaultRepeat = 'this-week',
   defaultPickedDay,
+  defaultMode = 'pick',
 }: Props) {
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
-  const [when, setWhen] = useState<WhenChoice>('pick');
+  const [when, setWhen] = useState<WhenChoice>(defaultMode);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -117,7 +119,7 @@ export default function QuickAddSheet({
   useEffect(() => {
     if (open) {
       setText(initialText);
-      setWhen('pick');
+      setWhen(defaultMode);
       // Use defaultPickedDay if provided, otherwise fallback to today
       const initialDay = defaultPickedDay !== undefined ? defaultPickedDay : todayDisplayIndex();
       setPickedDays([initialDay as Exclude<DisplayDay, 7>]);
@@ -131,7 +133,7 @@ export default function QuickAddSheet({
     }
     // Always reset tag panel state when open changes to prevent animation flash
     setIsTagPanelOpen(false);
-  }, [open, initialText, defaultRepeat, defaultPickedDay]);
+  }, [open, initialText, defaultRepeat, defaultPickedDay, defaultMode]);
 
   const filteredTags = useMemo(() => {
     if (!tagInput) return savedTags;

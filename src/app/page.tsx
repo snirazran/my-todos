@@ -107,6 +107,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [quickText, setQuickText] = useState('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickAddMode, setQuickAddMode] = useState<'pick' | 'later'>('pick');
   const [weeklyIds, setWeeklyIds] = useState<Set<string>>(new Set());
   const [flyStatus, setFlyStatus] = useState<FlyStatus>({
     balance: 0,
@@ -419,6 +420,7 @@ export default function Home() {
                 giftsClaimed={dailyGiftCount}
                 onAddRequested={() => {
                   setQuickText('');
+                  setQuickAddMode('pick');
                   setShowQuickAdd(true);
                 }}
               />
@@ -511,6 +513,7 @@ export default function Home() {
                     }
                     onAddRequested={(prefill) => {
                       setQuickText(prefill || '');
+                      setQuickAddMode('pick');
                       setShowQuickAdd(true);
                     }}
                     weeklyIds={weeklyIds}
@@ -681,6 +684,11 @@ export default function Home() {
                         // Cleanup pending
                         pendingIds.current.delete(item.id);
                       }}
+                      onAddRequested={() => {
+                        setQuickText('');
+                        setQuickAddMode('later');
+                        setShowQuickAdd(true);
+                      }}
                     />
                   ) : (
                     <div className="p-8 text-center text-muted-foreground bg-card/50 rounded-2xl">
@@ -751,6 +759,7 @@ export default function Home() {
         onOpenChange={setShowQuickAdd}
         initialText={quickText}
         defaultRepeat="this-week"
+        defaultMode={quickAddMode}
         onSubmit={async ({ text, days, repeat, tags }) => {
           try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;

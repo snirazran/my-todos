@@ -7,6 +7,7 @@ import {
   Trash2,
   Pencil,
 } from 'lucide-react';
+import Fly from '@/components/ui/fly';
 import { AnimatePresence, motion, PanInfo } from 'framer-motion';
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
@@ -762,17 +763,22 @@ export default function TaskList({
         </div>
 
         <div
-          className="pb-2 pt-3 px-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)]"
+          className="pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)]"
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed text-muted-foreground border-border bg-muted/30 rounded-xl">
-              <CalendarCheck className="w-10 h-10 mb-3 opacity-20" />
-              <p className="text-sm font-medium">No tasks for today.</p>
-              <p className="mt-1 text-xs opacity-60">
-                Add one below to get started!
+            <button
+              onClick={() => onAddRequested('', null, { preselectToday: true })}
+              className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+            >
+              <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+                 <Fly size={32} y={-4} />
+              </div>
+              <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">Start your day</p>
+              <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+                Tap to add your first task
               </p>
-            </div>
+            </button>
           )}
 
           <DndContext
