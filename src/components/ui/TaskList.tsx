@@ -261,7 +261,7 @@ function SortableTaskItem({
               relative flex items-center gap-1.5 px-2 py-3.5 
               transition-colors duration-200 rounded-xl 
               bg-card 
-              border border-transparent md:hover:border-border
+              border ${isOpen ? 'border-border shadow-sm' : 'border-transparent'} md:hover:border-border
               md:hover:shadow-sm
               select-none
               ${isDragging ? 'z-[100] opacity-100' : ''}
