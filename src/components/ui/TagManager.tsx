@@ -2,18 +2,18 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import useSWR, { mutate } from 'swr';
-import { Tag, Palette, Plus, X, Loader2 } from 'lucide-react';
+import { Tag, Palette, Plus, X, Loader2, Pencil, Check } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const TAG_COLORS = [
-  { name: 'Red', value: '#f87171', bg: 'bg-red-500', text: 'text-red-950' },
-  { name: 'Orange', value: '#fb923c', bg: 'bg-orange-500', text: 'text-orange-950' },
-  { name: 'Yellow', value: '#facc15', bg: 'bg-yellow-400', text: 'text-yellow-950' },
-  { name: 'Green', value: '#4ade80', bg: 'bg-green-500', text: 'text-green-950' },
-  { name: 'Teal', value: '#2dd4bf', bg: 'bg-teal-400', text: 'text-teal-950' },
-  { name: 'Blue', value: '#60a5fa', bg: 'bg-blue-500', text: 'text-blue-950' },
-  { name: 'Purple', value: '#c084fc', bg: 'bg-purple-500', text: 'text-purple-950' },
-  { name: 'Pink', value: '#f472b6', bg: 'bg-pink-500', text: 'text-pink-950' },
+  { name: 'Red', value: '#f87171', bg: 'bg-red-500', text: 'text-red-950 dark:text-red-100' },
+  { name: 'Orange', value: '#fb923c', bg: 'bg-orange-500', text: 'text-orange-950 dark:text-orange-100' },
+  { name: 'Yellow', value: '#facc15', bg: 'bg-yellow-400', text: 'text-yellow-950 dark:text-yellow-100' },
+  { name: 'Green', value: '#4ade80', bg: 'bg-green-500', text: 'text-green-950 dark:text-green-100' },
+  { name: 'Teal', value: '#2dd4bf', bg: 'bg-teal-400', text: 'text-teal-950 dark:text-teal-100' },
+  { name: 'Blue', value: '#60a5fa', bg: 'bg-blue-500', text: 'text-blue-950 dark:text-blue-100' },
+  { name: 'Purple', value: '#c084fc', bg: 'bg-purple-500', text: 'text-purple-950 dark:text-purple-100' },
+  { name: 'Pink', value: '#f472b6', bg: 'bg-pink-500', text: 'text-pink-950 dark:text-pink-100' },
 ];
 
 const TAG_MAX_LENGTH = 20;
@@ -46,6 +46,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
   const [isCreatingTag, setIsCreatingTag] = useState(false);
 
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const ignoreClickRef = useRef(false);
 
   // Auto-focus input when opening
   React.useEffect(() => {
@@ -159,7 +160,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
             exit={{ opacity: 0, height: 0 }}
             className="overflow-hidden w-full"
         >
-            <div className="p-3 mb-3 bg-muted/30 rounded-xl border border-border">
+            <div className="p-3 mb-3 bg-muted/30 dark:bg-muted/10 rounded-xl border border-border">
                 {/* Tag Input */}
                 <div className="relative flex items-center mb-3">
                     <Tag className="absolute left-2.5 w-4 h-4 text-muted-foreground" />
@@ -177,19 +178,17 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                             }
                         }}
                         maxLength={TAG_MAX_LENGTH}
-                        placeholder="Type to create or filter..."
-                        className="w-full h-10 pl-9 pr-2 rounded-xl bg-background text-base md:text-sm font-medium text-foreground ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
+                        placeholder="Name your new tag..."
+                        className="w-full h-10 pl-9 pr-10 rounded-xl bg-background text-base md:text-sm font-medium text-foreground ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
                     />
-                    {tagInput && (
-                        <button
-                            type="button"
-                            onClick={handleAddTag}
-                            disabled={!savedTags.find(t => t.name.toLowerCase() === tagInput.trim().toLowerCase()) && savedTags.length >= MAX_SAVED_TAGS}
-                            className="absolute right-1.5 p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 disabled:opacity-50 disabled:grayscale"
-                        >
-                            {showColorPicker ? <Palette className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                        </button>
-                    )}
+                    <button
+                        type="button"
+                        onClick={handleAddTag}
+                        disabled={!tagInput || (!savedTags.find(t => t.name.toLowerCase() === tagInput.trim().toLowerCase()) && savedTags.length >= MAX_SAVED_TAGS)}
+                        className="absolute right-1.5 p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
+                    >
+                        {showColorPicker ? <Palette className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                    </button>
                 </div>
 
                 {/* Color Picker */}
@@ -209,9 +208,9 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                         key={c.name}
                                         type="button"
                                         onClick={() => setNewTagColor(c.value)}
-                                        className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-background transition-all ${
+                                        className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-card transition-all ${
                                         newTagColor === c.value
-                                            ? 'ring-muted-foreground scale-110'
+                                            ? 'ring-primary scale-110'
                                             : 'ring-transparent'
                                         }`}
                                         title={c.name}
@@ -235,17 +234,27 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                 {savedTags.length > 0 && (
                     <div>
                         <div className="flex items-center justify-between mb-2">
-                            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                                Saved Tags <span className={savedTags.length >= MAX_SAVED_TAGS ? "text-destructive" : ""}>({savedTags.length}/{MAX_SAVED_TAGS})</span>
-                            </span>
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                                    Available Tags <span className={savedTags.length >= MAX_SAVED_TAGS ? "text-destructive" : ""}>({savedTags.length}/{MAX_SAVED_TAGS})</span>
+                                </span>
+                                {!manageTagsMode && (
+                                    <span className="hidden sm:inline text-[10px] text-muted-foreground/50 italic">
+                                        (Long press to edit)
+                                    </span>
+                                )}
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => setManageTagsMode(!manageTagsMode)}
-                                className={`text-[11px] font-bold px-2 py-0.5 rounded transition-colors ${
-                                    manageTagsMode ? 'bg-destructive/10 text-destructive' : 'text-muted-foreground hover:text-foreground'
+                                className={`p-1.5 rounded-lg transition-colors ${
+                                    manageTagsMode 
+                                        ? 'bg-primary/10 text-primary' 
+                                        : 'text-muted-foreground/50 hover:text-foreground hover:bg-muted'
                                 }`}
+                                title={manageTagsMode ? "Done editing" : "Manage tags"}
                             >
-                                {manageTagsMode ? 'Done' : 'Manage'}
+                                {manageTagsMode ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
                             </button>
                         </div>
                         <div className="flex flex-wrap gap-2">
@@ -257,7 +266,27 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                         exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
                                         key={st.id}
                                         type="button"
+                                        // Long Press
+                                        onPointerDown={(e) => {
+                                            ignoreClickRef.current = false;
+                                            const timer = setTimeout(() => {
+                                                setManageTagsMode(true);
+                                                ignoreClickRef.current = true;
+                                                if (navigator.vibrate) navigator.vibrate(50);
+                                            }, 500); 
+                                            (e.target as any)._longPressTimer = timer;
+                                        }}
+                                        onPointerUp={(e) => {
+                                            if ((e.target as any)._longPressTimer) clearTimeout((e.target as any)._longPressTimer);
+                                        }}
+                                        onPointerLeave={(e) => {
+                                            if ((e.target as any)._longPressTimer) clearTimeout((e.target as any)._longPressTimer);
+                                        }}
                                         onClick={(e) => {
+                                            if (ignoreClickRef.current) {
+                                                ignoreClickRef.current = false;
+                                                return;
+                                            }
                                             if (manageTagsMode) {
                                                 deleteSavedTag(st.id, st.name, e);
                                                 return;
@@ -268,6 +297,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                         className={`
                                             relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold uppercase tracking-wider transition-all
                                             border disabled:opacity-50 disabled:cursor-not-allowed
+                                            ${manageTagsMode ? 'animate-wiggle cursor-pointer' : ''}
                                             ${
                                             isSelected
                                                 ? 'ring-2 ring-offset-1 ring-offset-background'
@@ -276,18 +306,16 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                         `}
                                         style={{
                                             backgroundColor: isSelected ? `${st.color}20` : undefined,
-                                            color: st.color,
-                                            borderColor: isSelected ? `${st.color}40` : `${st.color}20`,
+                                            color: manageTagsMode ? '#ef4444' : st.color,
+                                            borderColor: manageTagsMode ? '#ef4444' : (isSelected ? `${st.color}40` : `${st.color}20`),
                                             boxShadow: isSelected ? `0 0 0 1px ${st.color}` : 'none',
+                                            opacity: manageTagsMode && !isSelected ? 1 : undefined
                                         }}
                                     >
                                         {st.name}
                                         {manageTagsMode && (
-                                            <div
-                                            onClick={(e) => deleteSavedTag(st.id, st.name, e)}
-                                            className="absolute -top-1.5 -right-1.5 bg-destructive text-white rounded-full p-1 shadow-sm hover:scale-110 z-10"
-                                            >
-                                                <X className="w-2.5 h-2.5" />
+                                            <div className="absolute -top-2 -left-2 bg-red-500 text-white rounded-full p-0.5 shadow-sm z-10">
+                                                <X className="w-3 h-3" />
                                             </div>
                                         )}
                                     </motion.button>

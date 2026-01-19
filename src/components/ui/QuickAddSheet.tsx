@@ -95,6 +95,7 @@ export default function QuickAddSheet({
   const [isCreatingTag, setIsCreatingTag] = useState(false);
   
   const tagInputRef = React.useRef<HTMLInputElement>(null);
+  const ignoreClickRef = React.useRef(false);
 
   useEffect(() => {
     setMounted(true);
@@ -508,8 +509,10 @@ export default function QuickAddSheet({
                                                         type="button"
                                                         // Long Press Handlers
                                                         onPointerDown={(e) => {
+                                                            ignoreClickRef.current = false; // Reset
                                                             const timer = setTimeout(() => {
                                                                 setManageTagsMode(true);
+                                                                ignoreClickRef.current = true; // Mark to ignore next click
                                                                 // Optional: Vibrate if device supports it
                                                                 if (navigator.vibrate) navigator.vibrate(50);
                                                             }, 500); // 500ms long press
@@ -522,6 +525,11 @@ export default function QuickAddSheet({
                                                             if ((e.target as any)._longPressTimer) clearTimeout((e.target as any)._longPressTimer);
                                                         }}
                                                         onClick={(e) => {
+                                                            if (ignoreClickRef.current) {
+                                                                ignoreClickRef.current = false;
+                                                                return;
+                                                            }
+
                                                             if (manageTagsMode) {
                                                                 deleteSavedTag(st.id, st.name, e);
                                                                 return;

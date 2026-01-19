@@ -59,7 +59,7 @@ export default function TagPopup({ open, onClose, taskId, initialTags = [], onSa
                  }}
             >
                 <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-foreground">Manage Tags</h3>
+                    <h3 className="text-lg font-bold text-foreground">Add Tags</h3>
                     <button onClick={onClose} className="p-1 rounded-full hover:bg-accent text-muted-foreground">
                         <X className="w-5 h-5" />
                     </button>
@@ -89,7 +89,7 @@ export default function TagPopup({ open, onClose, taskId, initialTags = [], onSa
                         {isSaving ? 'Saving...' : (
                             <>
                                 <Check className="w-4 h-4" />
-                                Save
+                                Done
                             </>
                         )}
                     </button>
