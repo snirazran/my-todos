@@ -127,9 +127,10 @@ export default function QuickAddSheet({
       setIsSubmitting(false);
       setShowColorPicker(false);
       setManageTagsMode(false);
-      setIsTagPanelOpen(false);
       setIsCreatingTag(false);
     }
+    // Always reset tag panel state when open changes to prevent animation flash
+    setIsTagPanelOpen(false);
   }, [open, initialText, defaultRepeat, defaultPickedDay]);
 
   const filteredTags = useMemo(() => {
