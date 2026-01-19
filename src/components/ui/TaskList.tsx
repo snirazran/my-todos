@@ -145,22 +145,24 @@ function SortableTaskItem({
     const offset = info.offset.x;
     const velocity = info.velocity.x;
 
-    // Strict Spotify-like snap logic
+    // Strict Spotify-like snap logic (Swapped: Right->Open)
     if (isOpen) {
-        // If already open, we only need a small nudge right to close it
-        if (offset > 15 || velocity > 100) {
-            setIsOpen(false);
-        }
-        // Otherwise stay open (snap back to -100)
-    } else {
-        // If closed, we only need a small nudge left to open it
+        // If already open (Right Swipe state), closing needs Left motion
         if (offset < -15 || velocity < -100) {
+            setIsOpen(false);
+            window.dispatchEvent(
+                new CustomEvent('task-swipe-open', { detail: { id: null } })
+            );
+        }
+    } else {
+        // Closed state
+        // Opening: Swipe Right (Positive)
+        if (offset > 15 || velocity > 100) {
             setIsOpen(true);
              window.dispatchEvent(
                 new CustomEvent('task-swipe-open', { detail: { id: task.id } })
             );
         }
-        // Otherwise stay closed (snap back to 0)
     }
   };
   
@@ -211,9 +213,9 @@ function SortableTaskItem({
         }}
         className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : 'overflow-hidden bg-muted/50'}`}
       >
-          {/* Swipe Actions Layer (Behind) */}
+          {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
           <div 
-             className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity duration-200 ${isOpen || isDraggingRef.current ? 'opacity-100' : 'opacity-0 delay-200'}`}
+             className={`absolute inset-y-0 left-0 flex items-center pl-2 gap-2 transition-opacity duration-200 ${isOpen || isDraggingRef.current ? 'opacity-100' : 'opacity-0 delay-200'}`}
              aria-hidden={!isOpen}
           >
              <button
@@ -248,13 +250,13 @@ function SortableTaskItem({
             drag={isDesktop ? false : "x"}
             dragListener={!isDragging}
             dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
-            dragConstraints={{ left: -100, right: 0 }}
+            dragConstraints={{ left: 0, right: 100 }}
             dragElastic={0.05}
             dragMomentum={false}
 
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
-            animate={{ x: isOpen ? -100 : 0 }}
+            animate={{ x: isOpen ? 100 : 0 }}
             transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }} // Snappier spring
 
             className={`

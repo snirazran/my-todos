@@ -3,7 +3,7 @@
 import * as React from 'react';
 
 import { EllipsisVertical, CalendarClock, Plus, Loader2, Trash2, Pencil } from 'lucide-react';
-import { AnimatePresence, motion, PanInfo } from 'framer-motion';
+import { AnimatePresence, motion, PanInfo, useMotionValue, useTransform, animate } from 'framer-motion';
 import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TaskMenu from '../board/TaskMenu';
@@ -37,7 +37,18 @@ function BacklogTaskItem({
   const [isDesktop, setIsDesktop] = React.useState(false);
   const isDraggingRef = React.useRef(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
-
+  
+  // Motion Values for Spotify-like swipe (Swapped: Now Left Swipe trigges Plus)
+  const x = useMotionValue(0);
+  const swipeThreshold = 60;
+  
+  // Transform values based on drag position x (Negative for Left Swipe)
+  const doTodayOpacity = useTransform(x, [0, -25], [0, 1]);
+  const doTodayScale = useTransform(x, [0, -swipeThreshold], [0.8, 1.2]);
+  const doTodayColor = useTransform(x, [-25, -swipeThreshold], ["#9ca3af", "#16a34a"]);
+  const doTodayTextColor = useTransform(x, [-25, -swipeThreshold], ["#9ca3af", "#ffffff"]);
+  const doTodayBgOpacity = useTransform(x, [-40, -swipeThreshold], [0, 1]);
+  
   const isMenuOpen = menu?.id === item.id;
   const isExiting = exitAction?.id === item.id;
 
@@ -47,6 +58,32 @@ function BacklogTaskItem({
     window.addEventListener('resize', checkDesktop);
     return () => window.removeEventListener('resize', checkDesktop);
   }, []);
+
+  // "The Nudge" - Discovery animation for new users (on mobile)
+  React.useEffect(() => {
+    // Only nudge the first 2 items, only on mobile, only once on mount
+    if (!isDesktop && index < 2) {
+        const timeout = setTimeout(() => {
+            // Peek: Slide to -60px (Left) to show Green state (Plus is now on Right)
+            animate(x, -60, { 
+                type: "spring", 
+                stiffness: 400, 
+                damping: 20 
+            });
+            
+            // Snap back
+            setTimeout(() => {
+                animate(x, 0, { 
+                    type: "spring", 
+                    stiffness: 400, 
+                    damping: 20 
+                });
+            }, 600); 
+        }, 800 + (index * 200)); 
+
+        return () => clearTimeout(timeout);
+    }
+  }, [isDesktop, index, x]);
 
   // Sync swipe close with other interactions
   React.useEffect(() => {
@@ -59,8 +96,6 @@ function BacklogTaskItem({
     
     const handleGlobalClick = (e: MouseEvent) => {
        if (!isOpen) return;
-       // If clicking inside THIS task's actions or card, don't close via this handler
-       // But clicking "Do Today" SHOULD probably close it? Maybe not.
        if (containerRef.current && containerRef.current.contains(e.target as Node)) {
            return;
        }
@@ -86,6 +121,8 @@ function BacklogTaskItem({
       setIsDragging(true);
   };
 
+
+
   const handleDragEnd = (_: any, info: PanInfo) => {
     setTimeout(() => {
          isDraggingRef.current = false;
@@ -96,15 +133,32 @@ function BacklogTaskItem({
     const velocity = info.velocity.x;
 
     if (isOpen) {
-        if (offset > 15 || velocity > 100) {
+        // If already open (Right Swipe -> Trash State) | x is positive (~100)
+        // Close if we swipe left a bit
+        if (offset < -15 || velocity < -100) {
             setIsOpen(false);
+        } else {
+             // Snap back to 100 (Trash visible)
+             animate(x, 100, { type: "spring", stiffness: 600, damping: 28 });
         }
     } else {
-        if (offset < -15 || velocity < -100) {
+        // Closed state
+        // Check for Right Swipe (Trash/Edit) -> Positive Offset
+        if (offset > 15 || velocity > 100) {
             setIsOpen(true);
              window.dispatchEvent(
                 new CustomEvent('task-swipe-open', { detail: { id: `backlog:${item.id}` } })
             );
+        } 
+        // Check for Left Swipe (Plus) -> Negative Offset
+        else if (offset < -swipeThreshold) {
+            // Trigger Add Today
+            onAddToday(item);
+            animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
+        }
+        else {
+             // Not enough swipe - Snap back
+             animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
         }
     }
   };
@@ -136,19 +190,18 @@ function BacklogTaskItem({
         className={`group relative mb-3 rounded-xl ${isOpen ? 'z-20' : isMenuOpen ? 'z-50' : isExiting ? 'z-0' : 'z-auto'} ${isDesktop ? '' : 'overflow-hidden bg-muted/50'}`}
         style={{ zIndex: isMenuOpen ? 50 : isExiting ? 0 : isOpen ? 20 : 1 }}
     >
-        {/* Swipe Actions Layer (Behind) */}
-        <div 
-             className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity duration-200 ${isOpen || isDragging ? 'opacity-100' : 'opacity-0 delay-200'}`}
-             aria-hidden={!isOpen}
-          >
+        {/* Swipe Actions Layer (Left - for Right Swipe - Trash) */}
+        {!isDesktop && (
+            <div 
+                className={`absolute inset-y-0 left-0 flex items-center pl-2 gap-2 transition-opacity duration-200 ${isOpen || isDragging ? 'opacity-100' : 'opacity-0 delay-200'}`}
+                aria-hidden={!isOpen}
+            >
              <button
                 onClick={(e) => {
                   e.stopPropagation();
                   onMenuOpen(e, item);
                 }}
                 className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
-                title="Edit"
-                tabIndex={isOpen ? 0 : -1}
              >
                 <Pencil className="w-4 h-4" />
              </button>
@@ -159,22 +212,41 @@ function BacklogTaskItem({
                 }}
                 className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors"
                 title="Delete"
-                tabIndex={isOpen ? 0 : -1}
              >
                <Trash2 className="w-4 h-4" />
              </button>
-        </div>
+            </div>
+        )}
+
+        {/* Swipe Actions Layer (Right - for Left Swipe - Plus) */}
+        {!isDesktop && (
+            <div 
+                className="absolute inset-y-0 right-0 flex items-center pr-4"
+            >
+                <motion.div 
+                    className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
+                    style={{ 
+                        opacity: doTodayOpacity,
+                        scale: doTodayScale,
+                        color: doTodayTextColor,
+                        backgroundColor: doTodayColor 
+                    }}
+                >
+                     <Plus className="w-5 h-5" />
+                </motion.div>
+            </div>
+        )}
 
         {/* Foreground Card */}
         <motion.div
             drag={isDesktop ? false : "x"}
             dragDirectionLock={true}
-            dragConstraints={{ left: -100, right: 0 }}
-            dragElastic={0.05}
+            dragConstraints={{ left: -70, right: 100 }} // Left: Plus (-70), Right: Trash (100)
+            dragElastic={0.1} // More elasticity for the "pull" feel
             dragMomentum={false}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
-            animate={{ x: isOpen ? -100 : 0 }}
+            animate={{ x: isOpen ? 100 : 0 }}
             transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }}
             className={`
                 relative flex items-center gap-1.5 px-2 py-3.5 
@@ -185,7 +257,7 @@ function BacklogTaskItem({
                     : `bg-card ${isOpen ? 'border-border shadow-sm' : 'border-transparent'}`
                 }
             `}
-            style={{ touchAction: 'pan-y' }}
+            style={{ x, touchAction: 'pan-y' }}
             onClick={() => {
                 if (isOpen) setIsOpen(false);
             }}
@@ -250,35 +322,30 @@ function BacklogTaskItem({
             </div>
 
             {/* Actions */}
-            <div className="relative flex items-center gap-2 shrink-0">
-                {/* "Do Today!" Button - Always visible */}
-                <button
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onAddToday(item);
-                    }}
-                    disabled={processingIds.has(item.id)}
-                    className={`
-                        group/btn flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold 
-                        text-primary-foreground bg-primary 
-                        active:scale-95 transition-all rounded-full shadow-md 
-                        shadow-primary/20 disabled:opacity-50 disabled:pointer-events-none
-                        ${isDesktop ? 'hover:bg-primary/90 hover:shadow-primary/40' : ''}
-                    `}
-                >
-                    {processingIds.has(item.id) ? (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                        <Plus className="w-3.5 h-3.5 transition-transform md:group-hover/btn:rotate-90" />
-                    )}
-                    <span>Do Today!</span>
-                </button>
-
-                {/* Desktop Menu Button (3 Dots) - Only visible on desktop hover */}
+            <div className="relative flex items-center gap-1 shrink-0">
+                 {/* Desktop Group: Add Today + Menu */}
                 <div className={`
-                    hidden md:block transition-opacity duration-200
+                    hidden md:flex items-center gap-1 transition-opacity duration-200
                     ${isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
                 `}>
+                     {/* Hover Toggle "Do Today" Button */}
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onAddToday(item);
+                        }}
+                        disabled={processingIds.has(item.id)}
+                        className="p-2 rounded-lg text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+                        title="Do Today"
+                    >
+                         {processingIds.has(item.id) ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                        ) : (
+                            <Plus className="w-5 h-5" />
+                        )}
+                    </button>
+
+                     {/* 3-Dots Menu */}
                     <button
                         className={`
                             p-2 rounded-lg transition-colors
