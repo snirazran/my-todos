@@ -54,12 +54,20 @@ type SavedTag = {
 const TAG_COLORS = [
   { name: 'Red', value: '#ef4444', bg: 'bg-red-500', text: 'text-red-950 dark:text-red-100' },
   { name: 'Orange', value: '#f97316', bg: 'bg-orange-500', text: 'text-orange-950 dark:text-orange-100' },
+  { name: 'Amber', value: '#f59e0b', bg: 'bg-amber-500', text: 'text-amber-950 dark:text-amber-100' },
   { name: 'Yellow', value: '#eab308', bg: 'bg-yellow-400', text: 'text-yellow-950 dark:text-yellow-100' },
+  { name: 'Lime', value: '#84cc16', bg: 'bg-lime-500', text: 'text-lime-950 dark:text-lime-100' },
   { name: 'Green', value: '#22c55e', bg: 'bg-green-500', text: 'text-green-950 dark:text-green-100' },
-  { name: 'Teal', value: '#14b8a6', bg: 'bg-teal-400', text: 'text-teal-950 dark:text-teal-100' },
+  { name: 'Emerald', value: '#10b981', bg: 'bg-emerald-500', text: 'text-emerald-950 dark:text-emerald-100' },
+  { name: 'Teal', value: '#14b8a6', bg: 'bg-teal-500', text: 'text-teal-950 dark:text-teal-100' },
+  { name: 'Cyan', value: '#06b6d4', bg: 'bg-cyan-500', text: 'text-cyan-950 dark:text-cyan-100' },
   { name: 'Blue', value: '#3b82f6', bg: 'bg-blue-500', text: 'text-blue-950 dark:text-blue-100' },
+  { name: 'Indigo', value: '#6366f1', bg: 'bg-indigo-500', text: 'text-indigo-950 dark:text-indigo-100' },
+  { name: 'Violet', value: '#8b5cf6', bg: 'bg-violet-500', text: 'text-violet-950 dark:text-violet-100' },
   { name: 'Purple', value: '#a855f7', bg: 'bg-purple-500', text: 'text-purple-950 dark:text-purple-100' },
+  { name: 'Fuchsia', value: '#d946ef', bg: 'bg-fuchsia-500', text: 'text-fuchsia-950 dark:text-fuchsia-100' },
   { name: 'Pink', value: '#ec4899', bg: 'bg-pink-500', text: 'text-pink-950 dark:text-pink-100' },
+  { name: 'Rose', value: '#f43f5e', bg: 'bg-rose-500', text: 'text-rose-950 dark:text-rose-100' },
 ];
 
 const TAG_MAX_LENGTH = 20;
@@ -392,13 +400,30 @@ export default function QuickAddSheet({
                   </div>
 
                   {/* Tag Management Panel */}
-                  <AnimatePresence>
+                  <AnimatePresence initial={false}>
                     {isTagPanelOpen && (
                         <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: 'auto' }}
-                            exit={{ opacity: 0, height: 0 }}
-                            className="overflow-hidden"
+                            initial={{ opacity: 0, scaleY: 0.96, y: -6 }}
+                            animate={{ 
+                                opacity: 1, 
+                                scaleY: 1,
+                                y: 0,
+                                transition: {
+                                    duration: 0.4,
+                                    ease: [0.19, 1.0, 0.22, 1.0]
+                                }
+                            }}
+                            exit={{ 
+                                opacity: 0, 
+                                scaleY: 0.96,
+                                y: -6,
+                                transition: {
+                                    duration: 0.3,
+                                    ease: [0.45, 0, 0.55, 1]
+                                }
+                            }}
+                            style={{ transformOrigin: 'top' }}
+                            className="overflow-hidden mb-3"
                         >
                             <div className="p-3 mb-3 bg-muted/30 rounded-xl border border-border/50">
                                 {/* Tag Input */}
@@ -435,13 +460,26 @@ export default function QuickAddSheet({
                                 <AnimatePresence>
                                     {showColorPicker && (
                                         <motion.div
-                                            initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                                            animate={{ opacity: 1, height: 'auto', marginBottom: 12 }}
-                                            exit={{ opacity: 0, height: 0, marginBottom: 0 }}
-                                            className="overflow-hidden"
+                                            initial={{ opacity: 0, maxHeight: 0 }}
+                                            animate={{ opacity: 1, maxHeight: 500, transition: { duration: 0.25, ease: [0.25, 0.46, 0.45, 0.94] } }}
+                                            exit={{ opacity: 0, maxHeight: 0, transition: { duration: 0.15, ease: [0.7, 0, 0.84, 0] } }}
+                                            className="overflow-hidden mb-3"
                                         >
-                                            <div className="p-2 bg-card rounded-lg shadow-sm border border-border">
-                                                <div className="text-[11px] font-bold text-muted-foreground mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
+                                             <div className="p-2 bg-card rounded-lg shadow-sm border border-border">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Pick a color for "{tagInput}"</div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setShowColorPicker(false);
+                                                            setTagInput('');
+                                                        }}
+                                                        className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                                                        title="Cancel"
+                                                    >
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
                                                 <div className="flex gap-2 flex-wrap">
                                                     {TAG_COLORS.map((c) => (
                                                     <button
@@ -471,8 +509,14 @@ export default function QuickAddSheet({
                                 </AnimatePresence>
 
                                 {/* Available Tags (Wrap layout for mobile) */}
-                                {savedTags.length > 0 && (
-                                    <div>
+                                <AnimatePresence mode="wait">
+                                {savedTags.length > 0 && !showColorPicker && (
+                                    <motion.div
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        transition={{ duration: 0.15 }}
+                                    >
                                         <div className="flex items-center justify-between mb-2">
                                             <div className="flex items-center gap-2">
                                                 <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
@@ -566,8 +610,9 @@ export default function QuickAddSheet({
                                             })}
                                           </AnimatePresence>
                                         </div>
-                                    </div>
+                                    </motion.div>
                                 )}
+                                </AnimatePresence>
                             </div>
                         </motion.div>
                     )}
@@ -575,7 +620,7 @@ export default function QuickAddSheet({
                 </div>
 
                 {/* Segmented control */}
-                <div className="mb-3">
+                <div className="mb-3" style={{ transform: 'translateZ(0)' }}>
                   <div className="grid grid-cols-2 gap-1.5 p-1.5 rounded-2xl bg-muted/50 ring-1 ring-border/50">
                     <button
                       type="button"
@@ -622,7 +667,7 @@ export default function QuickAddSheet({
 
                 {/* PICK MODE */}
                 {when === 'pick' && (
-                  <div className="flex flex-col gap-4 mt-1 sm:flex-row sm:items-center">
+                  <div className="flex flex-col gap-4 mt-1 sm:flex-row sm:items-center" style={{ transform: 'translateZ(0)' }}>
                     <div className="flex-1 min-w-0 -mx-2 px-2">
                       <div className="flex justify-start gap-2 sm:gap-2 py-2 px-1 overflow-x-auto no-scrollbar mask-fade-right">
                         {dayLabels.map(({ short, title }, idx) => {
@@ -680,17 +725,16 @@ export default function QuickAddSheet({
                 )}
 
                 {when === 'later' && (
-                  <div className="mt-2 flex items-start gap-2 rounded-xl bg-accent/50 ring-1 ring-accent p-3 text-[13px] text-foreground">
-                    <Info className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
-                    <span>
-                      Not sure when? We&apos;ll keep it in your{' '}
-                      <span className="font-bold">Saved Tasks</span> for later.
+                  <div className="mt-2 flex items-start gap-2 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 ring-1 ring-green-200 dark:ring-green-800/50 p-3 text-[13px]">
+                    <Info className="w-4 h-4 mt-0.5 shrink-0 text-green-600 dark:text-green-500" />
+                    <span className="text-foreground">
+                      <span className="font-bold text-green-700 dark:text-green-400">Not sure when?</span> Your task will be saved for later.
                     </span>
                   </div>
                 )}
 
                 {/* Actions */}
-                <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="grid grid-cols-2 gap-3 mt-4" style={{ transform: 'translateZ(0)' }}>
                   <button
                     type="button"
                     onClick={handleSubmit}
