@@ -645,47 +645,28 @@ export default function QuickAddSheet({
                     </div>
 
                     <div className="sm:shrink-0 sm:pl-1">
-                      <div
-                        className={[
-                          'inline-flex items-center gap-2 px-3 py-1.5 border rounded-full bg-card/90 border-border/70',
-                          isLater ? 'opacity-50 pointer-events-none' : '',
-                        ].join(' ')}
-                        aria-disabled={isLater}
-                        title={
-                          isLater
-                            ? 'Repeat is not available for Later'
-                            : undefined
-                        }
-                      >
-                        <RotateCcw className="w-4 h-4 text-primary" />
-                        <span className="text-[13px] font-bold text-foreground">
-                          Repeat weekly
-                        </span>
-                        <button
+                         <button
                           type="button"
-                          role="switch"
-                          aria-checked={repeatsOn}
                           onClick={() =>
                             setRepeat((r) =>
                               r === 'weekly' ? 'this-week' : 'weekly'
                             )
                           }
-                          data-on={repeatsOn}
-                          className={[
-                            'relative inline-flex h-5 w-9 items-center rounded-full transition-colors',
-                            'bg-muted-foreground/30 data-[on=true]:bg-primary',
-                          ].join(' ')}
-                          title={repeatsOn ? 'Weekly' : 'One-time'}
                           disabled={isLater}
+                          className={`
+                            inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-bold transition-all
+                            border shadow-sm
+                            ${repeatsOn 
+                                ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15' 
+                                : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted/80 hover:text-foreground'
+                            }
+                            ${isLater ? 'opacity-50 cursor-not-allowed' : ''}
+                        `}
+                          title={isLater ? 'Repeat is not available for Later' : (repeatsOn ? 'Repeats Weekly' : 'One-time task')}
                         >
-                          <span
-                            className={[
-                              'inline-block h-4 w-4 transform rounded-full bg-white shadow ring-1 ring-black/10 transition-transform',
-                              repeatsOn ? 'translate-x-4' : 'translate-x-1',
-                            ].join(' ')}
-                          />
-                        </button>
-                      </div>
+                          <RotateCcw className={`w-3.5 h-3.5 ${repeatsOn ? 'text-primary' : 'text-muted-foreground'}`} />
+                          {repeatsOn ? 'Repeats Weekly' : 'Repeat Weekly'}
+                         </button>
                     </div>
                   </div>
                 )}
