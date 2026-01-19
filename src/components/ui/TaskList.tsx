@@ -255,14 +255,16 @@ function SortableTaskItem({
               border border-transparent md:hover:border-border
               md:hover:shadow-sm
               select-none
-              ${isDragging ? 'shadow-2xl ring-2 ring-primary/50 z-[100] opacity-100' : ''}
+              ${isDragging ? 'z-[100] opacity-100' : ''}
               ${isDone && !isDragging ? 'md:hover:bg-accent/50' : ''} 
               cursor-pointer
             `}
-            style={{
-               touchAction: 'pan-y',
-               // Opacity removed here to keep background opaque
-            }}
+          style={{
+  touchAction: 'pan-y',
+  ...(isDragging
+    ? { boxShadow: 'inset 0 0 0 2px hsl(var(--primary) / 0.55)' }
+    : undefined),
+}}
              onClick={handleCardClick}
           >
             <div className={`flex items-center flex-1 min-w-0 gap-3 pl-2 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}>
@@ -750,7 +752,10 @@ export default function TaskList({
           )}
         </div>
 
-        <div className="pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar pr-1 [mask-image:linear-gradient(to_bottom,black_90%,transparent)]" ref={scrollContainerRef}>
+        <div
+          className="pb-2 pt-3 px-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)]"
+          ref={scrollContainerRef}
+        >
           {tasks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-10 text-center border-2 border-dashed text-muted-foreground border-border bg-muted/30 rounded-xl">
               <CalendarCheck className="w-10 h-10 mb-3 opacity-20" />
@@ -806,7 +811,7 @@ export default function TaskList({
                     })}
                   </AnimatePresence>
                 </SortableContext>
-              </div>
+             </div>
             </div>
           </DndContext>
         </div>
