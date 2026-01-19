@@ -315,8 +315,8 @@ export default function Home() {
         setIsAnimating(true);
         setTimeout(() => {
           setTasks((prev) => sortTasks(prev));
-          setTimeout(() => setIsAnimating(false), 400);
-        }, 250);
+          setTimeout(() => setIsAnimating(false), 50);
+        }, 350);
       } else {
         // Optimistically move to bottom
         setTasks((prev) => {

@@ -119,7 +119,7 @@ function SortableTaskItem({
         }
         exit={isExitingLater ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
         transition={{
-          layout: { type: 'spring', stiffness: 300, damping: 30 },
+          layout: { type: 'spring', stiffness: 180, damping: 25 },
         }}
         className={`group relative ${isMenuOpen ? 'z-50' : 'z-auto'}`}
       >
@@ -137,6 +137,7 @@ function SortableTaskItem({
               : ''
           }
           ${isDone && !isDragging ? 'opacity-60 md:hover:opacity-100' : ''}
+          cursor-pointer
         `}
           style={
             {
@@ -147,10 +148,10 @@ function SortableTaskItem({
           }
           {...attributes}
           {...listeners}
+          onClick={() => handleTaskToggle(task)}
         >
           <div
-            onClick={() => handleTaskToggle(task)}
-            className="flex items-center flex-1 min-w-0 gap-3 pl-2 cursor-pointer"
+            className="flex items-center flex-1 min-w-0 gap-3 pl-2"
           >
             {/* Bullet */}
             <div className="relative flex-shrink-0 w-7 h-7">
