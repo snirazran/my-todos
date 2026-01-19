@@ -81,6 +81,14 @@ function SortableTaskItem({
   const [isOpen, setIsOpen] = useState(false);
   const isDraggingRef = React.useRef(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const checkDesktop = () => setIsDesktop(window.innerWidth >= 768);
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
 
   const {
     attributes,
@@ -236,7 +244,7 @@ function SortableTaskItem({
 
           {/* Foreground Card (Swipeable) */}
           <motion.div
-            drag="x"
+            drag={isDesktop ? false : "x"}
             dragListener={!isDragging}
             dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
             dragConstraints={{ left: -100, right: 0 }}
@@ -388,6 +396,7 @@ function SortableTaskItem({
                  <button
                    className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
                    onClick={(e) => onMenuOpen(e, task)}
+                   onPointerDown={(e) => e.stopPropagation()}
                    title="Options"
                  >
                    <EllipsisVertical className="w-5 h-5" />
