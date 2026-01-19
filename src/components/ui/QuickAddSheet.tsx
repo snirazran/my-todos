@@ -21,6 +21,8 @@ import {
   Palette,
   Trash2,
   Loader2,
+  Pencil,
+  Check,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -50,34 +52,14 @@ type SavedTag = {
 };
 
 const TAG_COLORS = [
-  { name: 'Red', value: '#f87171', bg: 'bg-red-500', text: 'text-red-950' },
-  {
-    name: 'Orange',
-    value: '#fb923c',
-    bg: 'bg-orange-500',
-    text: 'text-orange-950',
-  },
-  {
-    name: 'Yellow',
-    value: '#facc15',
-    bg: 'bg-yellow-400',
-    text: 'text-yellow-950',
-  },
-  {
-    name: 'Green',
-    value: '#4ade80',
-    bg: 'bg-green-500',
-    text: 'text-green-950',
-  },
-  { name: 'Teal', value: '#2dd4bf', bg: 'bg-teal-400', text: 'text-teal-950' },
-  { name: 'Blue', value: '#60a5fa', bg: 'bg-blue-500', text: 'text-blue-950' },
-  {
-    name: 'Purple',
-    value: '#c084fc',
-    bg: 'bg-purple-500',
-    text: 'text-purple-950',
-  },
-  { name: 'Pink', value: '#f472b6', bg: 'bg-pink-500', text: 'text-pink-950' },
+  { name: 'Red', value: '#ef4444', bg: 'bg-red-500', text: 'text-red-950 dark:text-red-100' },
+  { name: 'Orange', value: '#f97316', bg: 'bg-orange-500', text: 'text-orange-950 dark:text-orange-100' },
+  { name: 'Yellow', value: '#eab308', bg: 'bg-yellow-400', text: 'text-yellow-950 dark:text-yellow-100' },
+  { name: 'Green', value: '#22c55e', bg: 'bg-green-500', text: 'text-green-950 dark:text-green-100' },
+  { name: 'Teal', value: '#14b8a6', bg: 'bg-teal-400', text: 'text-teal-950 dark:text-teal-100' },
+  { name: 'Blue', value: '#3b82f6', bg: 'bg-blue-500', text: 'text-blue-950 dark:text-blue-100' },
+  { name: 'Purple', value: '#a855f7', bg: 'bg-purple-500', text: 'text-purple-950 dark:text-purple-100' },
+  { name: 'Pink', value: '#ec4899', bg: 'bg-pink-500', text: 'text-pink-950 dark:text-pink-100' },
 ];
 
 const TAG_MAX_LENGTH = 20;
@@ -306,7 +288,7 @@ export default function QuickAddSheet({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.4 }}
-            className="fixed left-0 right-0 z-[1000] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none bottom-0"
+            className="fixed left-0 right-0 z-[1000] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none bottom-0 will-change-transform"
           >
             <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
               <div className="rounded-[28px] bg-popover/95 backdrop-blur-2xl ring-1 ring-border/80 shadow-[0_24px_48px_rgba(15,23,42,0.25)] p-4">
@@ -333,17 +315,19 @@ export default function QuickAddSheet({
 
                   {/* Selected Tags Display (Horizontal Scroll) */}
                   {tags.length > 0 && (
-                    <div className="relative mb-3 mt-2 px-1 overflow-hidden">
-                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-3 pt-2 px-2 -mx-2 mask-fade-right">
+                    <div className="relative mb-3 mt-2 px-1 overflow-visible">
+                      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 pt-1 px-1 -mx-1 mask-fade-right">
                         {tags.map((tagId) => {
                           const tag = getTagDetails(tagId);
                           const color = tag?.color;
                           const name = tag?.name || 'Unknown';
                           
                           return (
-                            <span
+                            <button
                               key={tagId}
-                              className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all shadow-sm hover:scale-105"
+                              type="button"
+                              onClick={() => removeTag(tagId)}
+                              className="group shrink-0 relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all shadow-sm hover:opacity-75 active:scale-95"
                               style={
                                 color
                                   ? {
@@ -357,15 +341,9 @@ export default function QuickAddSheet({
                                {!color && (
                                  <span className="bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-200 border-indigo-200 dark:border-indigo-800 flex items-center gap-1 h-full w-full absolute inset-0 rounded-md px-2 opacity-10 pointer-events-none" />
                                )}
-                               {!color ? <span className="text-indigo-700 dark:text-indigo-300 relative z-10">{name}</span> : name}
-                              <button
-                                type="button"
-                                onClick={() => removeTag(tagId)}
-                                className="relative z-10 hover:opacity-70 p-0.5"
-                              >
-                                <X className="w-3.5 h-3.5" />
-                              </button>
-                            </span>
+                               <span className={!color ? "text-indigo-700 dark:text-indigo-300 relative z-10" : "relative z-10"}>{name}</span>
+                               <X className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity" />
+                            </button>
                           );
                         })}
                       </div>
@@ -383,16 +361,25 @@ export default function QuickAddSheet({
                             }
                         }}
                         className={`
-                            inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-[13px] font-bold transition-all
-                            border
+                            inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-bold transition-all
+                            border shadow-sm
                             ${isTagPanelOpen 
-                                ? 'bg-primary/10 text-primary border-primary/20' 
-                                : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                                ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15' 
+                                : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted/80 hover:text-foreground'
                             }
                         `}
                     >
-                        <Tag className="w-3.5 h-3.5" />
-                        {isTagPanelOpen ? 'Close Tags' : 'Add Tags'}
+                        {isTagPanelOpen ? (
+                            <>
+                                <X className="w-3.5 h-3.5" />  
+                                Close Tags
+                            </>
+                        ) : (
+                            <>
+                                <Tag className="w-3.5 h-3.5" />
+                                Add Tags
+                            </>
+                        )}
                     </button>
                      <span
                       className={`text-[11px] font-bold ${
@@ -412,7 +399,7 @@ export default function QuickAddSheet({
                             exit={{ opacity: 0, height: 0 }}
                             className="overflow-hidden"
                         >
-                            <div className="p-3 mb-3 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                            <div className="p-3 mb-3 bg-muted/30 rounded-xl border border-border/50">
                                 {/* Tag Input */}
                                 <div className="relative flex items-center mb-3">
                                     <Tag className="absolute left-2.5 w-4 h-4 text-slate-400" />
@@ -430,19 +417,17 @@ export default function QuickAddSheet({
                                             }
                                         }}
                                         maxLength={TAG_MAX_LENGTH}
-                                        placeholder="Type to create or filter..."
-                                        className="w-full h-10 pl-9 pr-2 rounded-xl bg-white dark:bg-slate-800 text-base md:text-sm font-medium text-slate-900 dark:text-white ring-1 ring-slate-200 dark:ring-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300 placeholder:text-slate-400"
+                                        placeholder="Name your new tag..."
+                                        className="w-full h-10 pl-9 pr-10 rounded-xl bg-card text-base md:text-sm font-medium text-foreground ring-1 ring-border focus:outline-none focus:ring-2 focus:ring-primary/50 placeholder:text-muted-foreground"
                                     />
-                                    {tagInput && (
-                                        <button
-                                            type="button"
-                                            onClick={handleAddTag}
-                                            disabled={!savedTags.find(t => t.name.toLowerCase() === tagInput.trim().toLowerCase()) && savedTags.length >= MAX_SAVED_TAGS}
-                                            className="absolute right-1.5 p-1.5 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 dark:bg-purple-900/50 dark:text-purple-200 disabled:opacity-50 disabled:grayscale"
-                                        >
-                                            {showColorPicker ? <Palette className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                                        </button>
-                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={handleAddTag}
+                                        disabled={!tagInput || (!savedTags.find(t => t.name.toLowerCase() === tagInput.trim().toLowerCase()) && savedTags.length >= MAX_SAVED_TAGS)}
+                                        className="absolute right-1.5 p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
+                                    >
+                                        {showColorPicker ? <Palette className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                                    </button>
                                 </div>
 
                                 {/* Color Picker (Conditionally shown) */}
@@ -454,17 +439,17 @@ export default function QuickAddSheet({
                                             exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                                             className="overflow-hidden"
                                         >
-                                            <div className="p-2 bg-white dark:bg-slate-800 rounded-lg shadow-sm border border-slate-100 dark:border-slate-700">
-                                                <div className="text-[11px] font-bold text-slate-500 mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
+                                            <div className="p-2 bg-card rounded-lg shadow-sm border border-border">
+                                                <div className="text-[11px] font-bold text-muted-foreground mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
                                                 <div className="flex gap-2 flex-wrap">
                                                     {TAG_COLORS.map((c) => (
                                                     <button
                                                         key={c.name}
                                                         type="button"
                                                         onClick={() => setNewTagColor(c.value)}
-                                                        className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-white dark:ring-offset-slate-800 transition-all ${
+                                                        className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-card transition-all ${
                                                         newTagColor === c.value
-                                                            ? 'ring-slate-400 scale-110'
+                                                            ? 'ring-primary scale-110'
                                                             : 'ring-transparent'
                                                         }`}
                                                         title={c.name}
@@ -475,7 +460,7 @@ export default function QuickAddSheet({
                                                     type="button"
                                                     onClick={createAndSaveTag}
                                                     disabled={isCreatingTag}
-                                                    className="w-full mt-3 py-2 text-xs font-bold text-white bg-purple-600 rounded-lg shadow-sm hover:bg-purple-700 active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
+                                                    className="w-full mt-3 py-2 text-xs font-bold text-primary-foreground bg-primary rounded-lg shadow-sm hover:bg-primary/90 active:scale-95 transition-transform disabled:opacity-50 disabled:active:scale-100"
                                                 >
                                                     {isCreatingTag ? 'Saving...' : 'Save Tag'}
                                                 </button>
@@ -488,17 +473,28 @@ export default function QuickAddSheet({
                                 {savedTags.length > 0 && (
                                     <div>
                                         <div className="flex items-center justify-between mb-2">
-                                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                                Saved Tags <span className={savedTags.length >= MAX_SAVED_TAGS ? "text-red-500" : ""}>({savedTags.length}/{MAX_SAVED_TAGS})</span>
-                                            </span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                                    Saved Tags <span className={savedTags.length >= MAX_SAVED_TAGS ? "text-red-500" : ""}>({savedTags.length}/{MAX_SAVED_TAGS})</span>
+                                                </span>
+                                                {/* Hint text only shown when NOT managing */}
+                                                {!manageTagsMode && (
+                                                    <span className="hidden sm:inline text-[10px] text-muted-foreground/50 italic">
+                                                        (Long press to edit)
+                                                    </span>
+                                                )}
+                                            </div>
                                             <button
                                                 type="button"
                                                 onClick={() => setManageTagsMode(!manageTagsMode)}
-                                                className={`text-[11px] font-bold px-2 py-0.5 rounded transition-colors ${
-                                                    manageTagsMode ? 'bg-red-100 text-red-600' : 'text-slate-400 hover:text-slate-600'
+                                                className={`p-1.5 rounded-lg transition-colors ${
+                                                    manageTagsMode 
+                                                        ? 'bg-primary/10 text-primary' 
+                                                        : 'text-muted-foreground/50 hover:text-foreground hover:bg-muted'
                                                 }`}
+                                                title={manageTagsMode ? "Done editing" : "Manage tags"}
                                             >
-                                                {manageTagsMode ? 'Done' : 'Manage'}
+                                                {manageTagsMode ? <Check className="w-3.5 h-3.5" /> : <Pencil className="w-3.5 h-3.5" />}
                                             </button>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
@@ -510,6 +506,21 @@ export default function QuickAddSheet({
                                                         exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
                                                         key={st.id}
                                                         type="button"
+                                                        // Long Press Handlers
+                                                        onPointerDown={(e) => {
+                                                            const timer = setTimeout(() => {
+                                                                setManageTagsMode(true);
+                                                                // Optional: Vibrate if device supports it
+                                                                if (navigator.vibrate) navigator.vibrate(50);
+                                                            }, 500); // 500ms long press
+                                                            (e.target as any)._longPressTimer = timer;
+                                                        }}
+                                                        onPointerUp={(e) => {
+                                                            if ((e.target as any)._longPressTimer) clearTimeout((e.target as any)._longPressTimer);
+                                                        }}
+                                                        onPointerLeave={(e) => {
+                                                            if ((e.target as any)._longPressTimer) clearTimeout((e.target as any)._longPressTimer);
+                                                        }}
                                                         onClick={(e) => {
                                                             if (manageTagsMode) {
                                                                 deleteSavedTag(st.id, st.name, e);
@@ -521,26 +532,25 @@ export default function QuickAddSheet({
                                                         className={`
                                                             relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold uppercase tracking-wider transition-all
                                                             border disabled:opacity-50 disabled:cursor-not-allowed
+                                                            ${manageTagsMode ? 'animate-wiggle cursor-pointer' : ''}
                                                             ${
                                                             isSelected
-                                                                ? 'ring-2 ring-offset-1 ring-offset-white dark:ring-offset-slate-900'
-                                                                : 'hover:opacity-80 opacity-70 bg-white dark:bg-slate-800'
+                                                                ? 'ring-2 ring-offset-1 ring-offset-background'
+                                                                : 'hover:opacity-80 opacity-70 bg-card'
                                                             }
                                                         `}
                                                         style={{
                                                             backgroundColor: isSelected ? `${st.color}20` : undefined,
-                                                            color: st.color,
-                                                            borderColor: isSelected ? `${st.color}40` : `${st.color}20`,
+                                                            color: manageTagsMode ? '#ef4444' : st.color, // Red text when managing
+                                                            borderColor: manageTagsMode ? '#ef4444' : (isSelected ? `${st.color}40` : `${st.color}20`),
                                                             boxShadow: isSelected ? `0 0 0 1px ${st.color}` : 'none',
+                                                            opacity: manageTagsMode && !isSelected ? 1 : undefined // Keep visible during manage
                                                         }}
                                                     >
                                                         {st.name}
                                                         {manageTagsMode && (
-                                                            <div
-                                                            onClick={(e) => deleteSavedTag(st.id, st.name, e)}
-                                                            className="absolute -top-1.5 -right-1.5 bg-red-500 text-white rounded-full p-1 shadow-sm hover:scale-110 z-10"
-                                                            >
-                                                                <X className="w-2.5 h-2.5" />
+                                                            <div className="absolute -top-2 -left-2 bg-red-500 text-white rounded-full p-0.5 shadow-sm z-10">
+                                                                <X className="w-3 h-3" />
                                                             </div>
                                                         )}
                                                     </motion.button>
@@ -605,8 +615,8 @@ export default function QuickAddSheet({
                 {/* PICK MODE */}
                 {when === 'pick' && (
                   <div className="flex flex-col gap-4 mt-1 sm:flex-row sm:items-center">
-                    <div className="flex-1 min-w-0 -mx-1 px-1">
-                      <div className="flex justify-between sm:justify-start sm:gap-2 py-1.5 overflow-x-auto no-scrollbar mask-fade-right">
+                    <div className="flex-1 min-w-0 -mx-2 px-2">
+                      <div className="flex justify-start gap-2 sm:gap-2 py-2 px-1 overflow-x-auto no-scrollbar mask-fade-right">
                         {dayLabels.map(({ short, title }, idx) => {
                           const d = idx as Exclude<DisplayDay, 7>;
                           const on = pickedDays.includes(d);
