@@ -45,7 +45,7 @@ export function AddTaskButton({
           <Plus size={18} strokeWidth={3} />
         </div>
         
-        <span className="text-[15px] text-foreground transition-colors duration-300">
+        <span className="text-[15px] text-foreground transition-colors duration-300 whitespace-nowrap">
           {label}
         </span>
         

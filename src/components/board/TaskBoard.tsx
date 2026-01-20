@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
+import { motion } from 'framer-motion';
 import useSWR from 'swr';
 import {
   Task,
@@ -514,7 +515,26 @@ export default function TaskBoard({
             />
 
           {/* Add Task Button (Hide when dragging) */}
-          <div className={`transition-all duration-300 ml-3 flex-1 ${drag?.active ? 'opacity-0 scale-95 pointer-events-none w-0 ml-0 overflow-hidden' : 'opacity-100 scale-100 w-auto'}`}>
+          {/* Add Task Button (Hide when dragging) */}
+          <motion.div 
+            initial={false}
+            animate={{ 
+              opacity: drag?.active ? 0 : 1,
+              scale: drag?.active ? 0.9 : 1, // subtle scale down
+              width: drag?.active ? 0 : 'auto',
+              marginLeft: drag?.active ? 0 : 12,
+            }}
+            transition={{
+              type: 'spring',
+              stiffness: 300,
+              damping: 28,
+            }}
+            className="flex-1 overflow-hidden" 
+            style={{ 
+              pointerEvents: drag?.active ? 'none' : 'auto',
+              whiteSpace: 'nowrap'
+            }}
+          >
             <AddTaskButton
               className="w-full h-[56px]"
               label="Add a task"
@@ -524,7 +544,7 @@ export default function TaskBoard({
               }}
               disabled={!!drag?.active}
             />
-          </div>
+          </motion.div>
         </div>
       </div>
 

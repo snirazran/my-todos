@@ -73,34 +73,36 @@ export default function BacklogBox({
            }
         `}
       >
-        <AnimatePresence mode="popLayout">
-          {isDragging ? (
-            <motion.div
-              key="drop-zone"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.15 }}
-              className="flex flex-col items-center gap-1"
-            >
-              <ArrowDownToLine size={24} className={isDragOver ? 'animate-bounce' : ''} />
-              <span className="text-sm font-bold">
-                {isDragOver ? 'Drop to save' : 'Save for later'}
-              </span>
-            </motion.div>
-          ) : (
-            <motion.div
-              key="icon"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              transition={{ duration: 0.15 }}
-              className="relative"
-            >
-              <Inbox size={22} strokeWidth={2} className="text-muted-foreground group-hover:text-primary transition-colors" />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* State A: Drop Zone (Visible when dragging) */}
+        <motion.div
+          initial={false}
+          animate={{ 
+            opacity: isDragging ? 1 : 0,
+            scale: isDragging ? 1 : 0.8 
+          }}
+          transition={{ duration: 0.2 }}
+          className="absolute inset-0 flex flex-col items-center justify-center gap-1"
+          style={{ pointerEvents: 'none' }}
+        >
+          <ArrowDownToLine size={24} className={isDragOver ? 'animate-bounce' : ''} />
+          <span className="text-sm font-bold whitespace-nowrap">
+            {isDragOver ? 'Drop to save' : 'Save for later'}
+          </span>
+        </motion.div>
+
+        {/* State B: Icon (Visible when NOT dragging) */}
+        <motion.div
+           initial={false}
+           animate={{ 
+             opacity: isDragging ? 0 : 1,
+             scale: isDragging ? 0.8 : 1 
+           }}
+           transition={{ duration: 0.2 }}
+           className="absolute inset-0 flex items-center justify-center"
+           style={{ pointerEvents: 'none' }}
+        >
+          <Inbox size={22} strokeWidth={2} className="text-muted-foreground group-hover:text-primary transition-colors" />
+        </motion.div>
 
         {/* Drag Over Glow Effect */}
         {isDragging && isDragOver && (
