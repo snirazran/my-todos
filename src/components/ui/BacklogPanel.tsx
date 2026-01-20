@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 
-import { EllipsisVertical, CalendarClock, Plus, Loader2, Trash2, Pencil } from 'lucide-react';
+import { EllipsisVertical, CalendarClock, CalendarCheck, Plus, Loader2, Trash2, Pencil } from 'lucide-react';
 import { animate, useMotionValue, useTransform, motion, AnimatePresence, useAnimation, PanInfo } from "framer-motion";
 import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
@@ -39,6 +39,7 @@ function BacklogTaskItem({
   const [isDesktop, setIsDesktop] = React.useState(false);
   const isDraggingRef = React.useRef(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
+  const [isNudging, setIsNudging] = React.useState(false);
   
   // Motion Values for Spotify-like swipe (Swapped: Now Left Swipe trigges Plus)
   const x = useMotionValue(0);
@@ -48,7 +49,8 @@ function BacklogTaskItem({
   const doTodayOpacity = useTransform(x, [0, -25], [0, 1]);
   const doTodayScale = useTransform(x, [0, -swipeThreshold], [0.8, 1.2]);
   // Instant color snap at threshold
-  const doTodayColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#16a34a"]);
+  // Always green
+  const doTodayColor = "#16a34a";
   const doTodayTextColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#ffffff", "#ffffff"]);
   const doTodayBgOpacity = useTransform(x, [-40, -swipeThreshold], [0, 1]);
   
@@ -71,21 +73,24 @@ function BacklogTaskItem({
     // allowNudge ensures we don't nudge items that are added later (after the panel is already open)
     if (!isDesktop && initialIndex.current < 2 && allowNudge) {
         const timeout = setTimeout(() => {
-            // Peek: Slide to -60px (Left) to show Green state (Plus is now on Right)
+            setIsNudging(true);
+            // Peek: Slide to -60px (Left) - MUCH slower/smoother
             animate(x, -60, { 
                 type: "spring", 
-                stiffness: 400, 
-                damping: 20 
+                stiffness: 150, 
+                damping: 25 
             });
             
-            // Snap back
+            // Snap back with a longer stay
             setTimeout(() => {
                 animate(x, 0, { 
                     type: "spring", 
-                    stiffness: 400, 
-                    damping: 20 
+                    stiffness: 150, 
+                    damping: 25 
                 });
-            }, 600); 
+                // Reset nudging after snap back completes (longer timeout to match slower spring)
+                setTimeout(() => setIsNudging(false), 500);
+            }, 800); 
         }, 800 + (initialIndex.current * 200)); 
 
         return () => clearTimeout(timeout);
@@ -240,7 +245,7 @@ function BacklogTaskItem({
                         backgroundColor: doTodayColor 
                     }}
                 >
-                     <Plus className="w-5 h-5" />
+                     <CalendarCheck className="w-5 h-5" />
                 </motion.div>
             </div>
         )}
@@ -262,7 +267,7 @@ function BacklogTaskItem({
                 border 
                 ${isDesktop 
                     ? `md:hover:bg-card md:hover:border-border md:hover:shadow-sm ${isMenuOpen ? 'bg-card border-border shadow-md' : 'bg-transparent border-transparent'}` 
-                    : `bg-card ${isOpen ? 'border-border shadow-sm' : 'border-transparent'}`
+                    : `bg-card ${(isOpen || isDragging || isNudging) ? 'border-border shadow-sm' : 'border-transparent'}`
                 }
             `}
             style={{ x, touchAction: 'pan-y' }}

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Calendar, History, LayoutDashboard } from 'lucide-react';
+import { Calendar, History, LayoutDashboard, CalendarCheck, CalendarClock } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 import { signIn, useSession } from 'next-auth/react';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
@@ -444,6 +444,7 @@ export default function Home() {
         }
       `}
               >
+                <CalendarCheck className={`w-4 h-4 ${activeTab === 'today' ? 'text-primary' : 'text-muted-foreground'}`} />
                 Today
                 {data.length > 0 && (
                   <TaskCounter count={data.length} />
@@ -460,6 +461,7 @@ export default function Home() {
         }
       `}
               >
+                <CalendarClock className={`w-4 h-4 ${activeTab === 'backlog' ? 'text-primary' : 'text-muted-foreground'}`} />
                 Saved Tasks
                 {laterThisWeek.length > 0 && (
                   <TaskCounter count={laterThisWeek.length} />

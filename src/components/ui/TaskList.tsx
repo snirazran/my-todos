@@ -3,6 +3,7 @@ import {
   Circle,
   EllipsisVertical,
   CalendarCheck,
+  CalendarClock,
   RotateCcw,
   Trash2,
   Pencil,
@@ -265,7 +266,7 @@ function SortableTaskItem({
                        backgroundColor: doLaterColor
                    }}
                >
-                    <CalendarCheck className="w-5 h-5" />
+                    <CalendarClock className="w-5 h-5" />
                </motion.div>
            </div>
           
@@ -321,7 +322,7 @@ function SortableTaskItem({
               relative flex items-center gap-1.5 px-2 py-3.5 
               transition-colors duration-200 rounded-xl 
               bg-card 
-              border ${isOpen ? 'border-border shadow-sm' : 'border-transparent'} md:hover:border-border
+              border ${ (isOpen || isSwiping) ? 'border-border shadow-sm' : 'border-transparent'} md:hover:border-border
               md:hover:shadow-sm
               select-none
               ${isDragging ? 'z-[100] opacity-100' : ''}
