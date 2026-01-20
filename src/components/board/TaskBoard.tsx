@@ -517,6 +517,7 @@ export default function TaskBoard({
           {/* Add Task Button (Hide when dragging) */}
           {/* Add Task Button (Hide when dragging) */}
           <motion.div 
+            layout
             initial={false}
             animate={{ 
               opacity: drag?.active ? 0 : 1,
@@ -529,7 +530,7 @@ export default function TaskBoard({
               stiffness: 300,
               damping: 28,
             }}
-            className="flex-1 overflow-hidden" 
+            className={`${drag?.active ? '' : 'flex-1'} overflow-hidden`} 
             style={{ 
               pointerEvents: drag?.active ? 'none' : 'auto',
               whiteSpace: 'nowrap'
