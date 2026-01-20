@@ -47,8 +47,9 @@ function BacklogTaskItem({
   // Transform values based on drag position x (Negative for Left Swipe)
   const doTodayOpacity = useTransform(x, [0, -25], [0, 1]);
   const doTodayScale = useTransform(x, [0, -swipeThreshold], [0.8, 1.2]);
-  const doTodayColor = useTransform(x, [-25, -swipeThreshold], ["#9ca3af", "#16a34a"]);
-  const doTodayTextColor = useTransform(x, [-25, -swipeThreshold], ["#9ca3af", "#ffffff"]);
+  // Instant color snap at threshold
+  const doTodayColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#16a34a"]);
+  const doTodayTextColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#ffffff"]);
   const doTodayBgOpacity = useTransform(x, [-40, -swipeThreshold], [0, 1]);
   
   const isMenuOpen = menu?.id === item.id;

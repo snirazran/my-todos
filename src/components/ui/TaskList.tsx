@@ -94,8 +94,9 @@ function SortableTaskItem({
   // Left Swipe (Negative X) -> Do Later (Indigo)
   const doLaterOpacity = useTransform(x, [0, -25], [0, 1]);
   const doLaterScale = useTransform(x, [0, -swipeThreshold], [0.8, 1.2]);
-  const doLaterColor = useTransform(x, [-25, -swipeThreshold], ["#9ca3af", "#6366f1"]); // Slate to Indigo
-  const doLaterTextColor = useTransform(x, [-25, -swipeThreshold], ["#9ca3af", "#ffffff"]);
+  // Instant color snap at threshold
+  const doLaterColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#6366f1"]); // Slate to Indigo
+  const doLaterTextColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#ffffff"]);
 
   useEffect(() => {
     const checkDesktop = () => setIsDesktop(window.innerWidth >= 768);
