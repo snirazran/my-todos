@@ -189,7 +189,7 @@ export default function TaskCard({
         task.completed ? 'cursor-default opacity-60' : 'cursor-grab',
         // Increased presence: Solid background, stronger border, more defined shadow
         'bg-card border border-border/80', 
-        'shadow-sm hover:shadow-md hover:border-primary/40',
+        task.completed ? 'shadow-sm' : 'shadow-sm hover:shadow-md hover:border-primary/40',
         'mb-2.5', // slightly more breathing room
         menuOpen ? 'z-50 shadow-xl ring-2 ring-primary/20' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
