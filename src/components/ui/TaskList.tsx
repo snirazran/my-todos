@@ -8,7 +8,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
-import { AnimatePresence, motion, PanInfo, useMotionValue, useTransform, animate } from 'framer-motion';
+import { AnimatePresence, motion, PanInfo, useMotionValue, useTransform, animate, useAnimation } from 'framer-motion';
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import {
@@ -812,9 +812,7 @@ export default function TaskList({
             Your Tasks
           </h2>
           {tasks.length > 0 && (
-            <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-muted-foreground">
-              {tasks.length}
-            </span>
+            <TaskCounter count={tasks.length} />
           )}
         </div>
 
@@ -987,5 +985,31 @@ export default function TaskList({
         }
       `}</style>
     </>
+  );
+}
+// Helper component for add-only animation
+function TaskCounter({ count }: { count: number }) {
+  const controls = useAnimation();
+  const prevCount = React.useRef(count);
+
+  React.useEffect(() => {
+    if (count > prevCount.current) {
+       // Only animate if count INCREASED
+       controls.start({
+           scale: [1, 1.2, 1],
+           color: ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"],
+           transition: { duration: 0.3 }
+       });
+    }
+    prevCount.current = count;
+  }, [count, controls]);
+
+  return (
+    <motion.span
+       animate={controls}
+       className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-muted-foreground"
+    >
+       {count}
+    </motion.span>
   );
 }

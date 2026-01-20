@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { Calendar, History, LayoutDashboard } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 import { signIn, useSession } from 'next-auth/react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { useUIStore } from '@/lib/uiStore';
 import { type FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
@@ -420,7 +420,8 @@ export default function Home() {
                 giftsClaimed={dailyGiftCount}
                 onAddRequested={() => {
                   setQuickText('');
-                  setQuickAddMode('pick');
+                  // Context-aware add: if backlog tab is active, default to 'later' mode
+                  setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
                   setShowQuickAdd(true);
                 }}
               />
@@ -445,9 +446,7 @@ export default function Home() {
               >
                 Today
                 {data.length > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] text-muted-foreground">
-                    {data.length}
-                  </span>
+                  <TaskCounter count={data.length} />
                 )}
               </button>
               <button
@@ -463,9 +462,7 @@ export default function Home() {
               >
                 Saved Tasks
                 {laterThisWeek.length > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] text-muted-foreground">
-                    {laterThisWeek.length}
-                  </span>
+                  <TaskCounter count={laterThisWeek.length} />
                 )}
               </button>
             </div>
@@ -823,6 +820,7 @@ export default function Home() {
           <AddTaskButton
             onClick={() => {
               setQuickText('');
+              setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
               setShowQuickAdd(true);
             }}
             label="Add a task"
@@ -877,3 +875,32 @@ function Header({ session, router }: { session: any; router: any }) {
     </div>
   );
 }
+
+// Helper component for add-only animation
+function TaskCounter({ count }: { count: number }) {
+  const controls = useAnimation();
+  const prevCount = React.useRef(count);
+
+  React.useEffect(() => {
+    if (count > prevCount.current) {
+       // Only animate if count INCREASED
+       controls.start({
+           scale: [1, 1.2, 1],
+           color: ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"],
+           transition: { duration: 0.3 }
+       });
+    }
+    prevCount.current = count;
+  }, [count, controls]);
+
+  return (
+    <motion.span
+       animate={controls}
+       className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-muted-foreground"
+    >
+       {count}
+    </motion.span>
+  );
+}
+
+

@@ -3,7 +3,7 @@
 import * as React from 'react';
 
 import { EllipsisVertical, CalendarClock, Plus, Loader2, Trash2, Pencil } from 'lucide-react';
-import { AnimatePresence, motion, PanInfo, useMotionValue, useTransform, animate } from 'framer-motion';
+import { animate, useMotionValue, useTransform, motion, AnimatePresence, useAnimation, PanInfo } from "framer-motion";
 import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TaskMenu from '../board/TaskMenu';
@@ -565,9 +565,7 @@ export default function BacklogPanel({
         </h3>
 
         {later.length > 0 && (
-          <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[10px] font-bold text-muted-foreground">
-            {later.length}
-          </span>
+          <TaskCounter count={later.length} />
         )}
       </div>
 
@@ -657,5 +655,31 @@ export default function BacklogPanel({
         }
       `}</style>
     </div>
+  );
+}
+// Helper component for add-only animation
+function TaskCounter({ count }: { count: number }) {
+  const controls = useAnimation();
+  const prevCount = React.useRef(count);
+
+  React.useEffect(() => {
+    if (count > prevCount.current) {
+       // Only animate if count INCREASED
+       controls.start({
+           scale: [1, 1.2, 1],
+           color: ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"],
+           transition: { duration: 0.3 }
+       });
+    }
+    prevCount.current = count;
+  }, [count, controls]);
+
+  return (
+    <motion.span
+       animate={controls}
+       className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-muted-foreground"
+    >
+       {count}
+    </motion.span>
   );
 }
