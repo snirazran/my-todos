@@ -198,7 +198,6 @@ export default function TaskCard({
       aria-grabbed={false}
     >
       <motion.div 
-        layout={!isAnyDragging}
         className="flex items-stretch gap-3 w-full"
       >
         <div className="grid self-center shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-6 w-6">
