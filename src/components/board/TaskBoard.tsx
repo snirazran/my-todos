@@ -144,6 +144,7 @@ export default function TaskBoard({
     usePan(scrollerRef);
   recomputeCanPanRef.current = recomputeCanPan;
 
+  // Disable snap when dragging task OR panning board
   const snapSuppressed = !!drag?.active || panActive;
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -438,7 +439,7 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex mx-auto gap-3 px-4 pt-16 pb-[220px] sm:pb-[180px] md:pb-[188px]">
+        <div className="flex mx-auto gap-3 px-4 pt-16 pb-[calc(100px+env(safe-area-inset-bottom))]">
           {/* Render only 0..6 (Exclude Backlog Column 7) */}
           {Array.from({ length: DAYS - 1 }, (_, day) => ({
             day: day as DisplayDay,
@@ -454,7 +455,8 @@ export default function TaskBoard({
                 title={titles[day]}
                 count={week[day]?.length || 0}
                 listRef={setListRef(day)}
-                maxHeightClass="max-h-[calc(100svh-390px-var(--safe-bottom))] md:max-h-[calc(100svh-270px-var(--safe-bottom))]"
+                // Aggressive subtraction for both mobile (320px) and desktop (340px) to prevent overlap consistently
+                maxHeightClass="max-h-[calc(100svh-320px-var(--safe-bottom))] md:max-h-[calc(100svh-340px-var(--safe-bottom))]"
                 isToday={day === todayDisplayIndex}
               >
                 <TaskList
@@ -493,22 +495,24 @@ export default function TaskBoard({
         </div>
       </div>
       {/* GLOBAL BOTTOM AREA - Floating Toolbar */}
-      <div className="absolute bottom-0 left-0 right-0 z-[40] px-6 pb-[calc(env(safe-area-inset-bottom)+88px)] md:pb-[calc(env(safe-area-inset-bottom)+24px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[420px] flex flex-col items-center gap-4">
+      {/* Increased padding drastically to clear standard mobile app navbars (typically 60-80px) */}
+      <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
+        <div className="pointer-events-auto mx-auto w-full max-w-[360px] relative min-h-[56px] flex items-end justify-center">
+            
           {/* Backlog Trigger */}
-          <BacklogBox
+            <BacklogBox
             count={week[7]?.length || 0}
             isDragOver={isDragOverBacklog}
             isDragging={!!drag?.active}
             proximity={backlogProximity}
             onClick={() => setBacklogOpen(true)}
             forwardRef={backlogBoxRef}
-          />
+            />
 
-          {/* Add Task Button */}
-          <div className="w-full flex justify-center">
+          {/* Add Task Button (Hide when dragging) */}
+          <div className={`transition-all duration-300 ml-3 flex-1 ${drag?.active ? 'opacity-0 scale-95 pointer-events-none w-0 ml-0 overflow-hidden' : 'opacity-100 scale-100 w-auto'}`}>
             <AddTaskButton
-              className="w-full"
+              className="w-full h-[56px]"
               label="Add a task"
               onClick={() => {
                 setQuickText('');

@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { motion, useSpring, useTransform } from 'framer-motion';
-import { Inbox } from 'lucide-react';
+import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
+import { Inbox, ArrowDownToLine } from 'lucide-react';
 
 interface Props {
   count: number;
@@ -28,91 +28,104 @@ export default function BacklogBox({
     mass: 0.5
   });
 
-  // Sync the spring with the prop
   useEffect(() => {
     smoothProx.set(isDragging ? proximity : 0);
   }, [proximity, isDragging, smoothProx]);
 
-  // Derived smooth values for the "Glow" behind the box
-  const glowScale = useTransform(smoothProx, [0, 1], [1.1, 1.4]);
-  const glowOpacity = useTransform(smoothProx, [0, 1], [0.1, 0.4]);
-
   return (
-    <motion.button
-      ref={forwardRef}
-      onClick={onClick}
-      aria-label="Backlog"
-      className="relative outline-none group"
-      whileTap={{ scale: 0.96 }}
+    <motion.div 
+      className="relative flex pointer-events-auto origin-left"
+      initial={false}
+      animate={{
+        width: isDragging ? '100%' : '56px',
+      }}
+      transition={{
+        type: 'spring',
+        stiffness: 300,
+        damping: 28,
+      }}
     >
-      {/* 1. Constant Pulse (Always runs when dragging) */}
-      {isDragging && (
-        <motion.div
-          className="absolute inset-0 rounded-2xl bg-primary/30 -z-20"
-          animate={{
-            scale: [1, 1.45, 1],
-            opacity: [0.5, 0.1, 0.5],
-          }}
-          transition={{
-            duration: 1.8,
-            repeat: Infinity,
-            ease: "easeInOut"
-          }}
-        />
-      )}
-
-      {/* 2. Proximity Glow (Grows as you get closer) */}
-      {isDragging && (
-        <motion.div
-          className="absolute inset-0 rounded-2xl bg-primary -z-10"
-          style={{
-            scale: glowScale,
-            opacity: glowOpacity,
-          }}
-        />
-      )}
-
-      <motion.div
+      <motion.button
+        ref={forwardRef}
+        onClick={!isDragging ? onClick : undefined}
+        aria-label="Backlog"
+        initial={false}
         animate={{
-          scale: isDragOver ? 1.15 : 1 + (proximity * 0.05),
+          width: '100%', // Button always fills wrapper
+          height: isDragging ? '80px' : '56px',
+          borderRadius: isDragging ? 24 : 16, 
         }}
-        transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+        transition={{
+          type: 'spring',
+          stiffness: 300,
+          damping: 28,
+        }}
+        // Base styles
         className={`
-          relative flex items-center justify-center w-14 h-14 rounded-2xl
-          bg-card/80 backdrop-blur-2xl
-          border transition-all duration-300
-          shadow-lg shadow-black/5 dark:shadow-black/20
-          ${
-            isDragOver
-              ? 'border-primary ring-4 ring-primary/10 bg-primary/5'
-              : isDragging
-              ? 'border-primary/40'
-              : 'border-border/80 hover:border-primary/50 hover:bg-card/95'
-          }
+           relative flex items-center justify-center overflow-hidden w-full
+           backdrop-blur-2xl duration-200
+           bg-card/80 border-border/80 border shadow-lg
+           ${isDragging 
+             ? isDragOver 
+               ? 'bg-primary border-primary text-primary-foreground shadow-[0_0_50px_rgba(var(--primary),0.3)]' 
+               : 'bg-card/95 border-primary/50 text-foreground shadow-2xl'
+             : 'hover:bg-card/95 hover:border-primary/50 transition-colors'
+           }
         `}
       >
-        {/* Icon */}
-        <div
-          className={`transition-colors duration-300 ${
-            isDragOver || isDragging
-              ? 'text-primary'
-              : 'text-muted-foreground group-hover:text-primary'
-          }`}
-        >
-          <Inbox size={22} strokeWidth={2} />
-        </div>
+        <AnimatePresence mode="popLayout">
+          {isDragging ? (
+            <motion.div
+              key="drop-zone"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
+              className="flex flex-col items-center gap-1"
+            >
+              <ArrowDownToLine size={24} className={isDragOver ? 'animate-bounce' : ''} />
+              <span className="text-sm font-bold">
+                {isDragOver ? 'Drop to save' : 'Save for later'}
+              </span>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="icon"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
+              className="relative"
+            >
+              <Inbox size={22} strokeWidth={2} className="text-muted-foreground group-hover:text-primary transition-colors" />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {/* Count Badge */}
-        {count > 0 && (
+        {/* Drag Over Glow Effect */}
+        {isDragging && isDragOver && (
+          <motion.div
+            layoutId="glow"
+            className="absolute inset-0 z-[-1] bg-white/20 dark:bg-black/20"
+            transition={{ duration: 0.2 }}
+          />
+        )}
+      </motion.button>
+
+      {/* Count Badge - Outside button to avoid overflow clipping */}
+      <AnimatePresence>
+        {!isDragging && count > 0 && (
           <motion.div 
-            initial={{ scale: 0.8, opacity: 0 }}
+            initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[22px] h-[22px] px-1.5 text-[10px] font-black text-white bg-rose-500 rounded-full shadow-md shadow-rose-500/20 ring-2 ring-background"
+            exit={{ scale: 0, opacity: 0 }}
+            className="absolute -top-2 -right-2 z-10 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black text-white bg-rose-500 rounded-full shadow-sm ring-2 ring-background pointer-events-none"
           >
             {count}
           </motion.div>
         )}
-      </motion.div>
-    </motion.button>
+      </AnimatePresence>
+    </motion.div>
   );
 }
+
