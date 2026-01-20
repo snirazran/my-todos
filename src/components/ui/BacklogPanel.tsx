@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 
-import { EllipsisVertical, CalendarClock, CalendarCheck, Plus, Loader2, Trash2, Pencil } from 'lucide-react';
+import { EllipsisVertical, CalendarClock, CalendarCheck, Plus, Loader2, Trash2 } from 'lucide-react';
 import { animate, useMotionValue, useTransform, motion, AnimatePresence, useAnimation, PanInfo } from "framer-motion";
 import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
@@ -227,8 +227,9 @@ function BacklogTaskItem({
                   onMenuOpen(e, item);
                 }}
                 className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
+                title="More options"
              >
-                <Pencil className="w-4 h-4" />
+                <EllipsisVertical className="w-5 h-5" />
              </button>
              <button
                 onClick={(e) => {
@@ -264,7 +265,7 @@ function BacklogTaskItem({
 
         {/* Foreground Card */}
         <motion.div
-            drag={isDesktop ? false : "x"}
+            drag={(isDesktop || isNudging) ? false : "x"}
             dragDirectionLock={true}
             dragConstraints={{ left: -70, right: 100 }} // Left: Plus (-70), Right: Trash (100)
             dragElastic={0.1} // More elasticity for the "pull" feel
@@ -284,6 +285,7 @@ function BacklogTaskItem({
             `}
             style={{ x, touchAction: 'pan-y' }}
             onClick={() => {
+                if (isNudging) return;
                 if (isOpen) setIsOpen(false);
             }}
         >

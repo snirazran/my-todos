@@ -9,15 +9,15 @@ import TagManager from '@/components/ui/TagManager';
 interface TaskMenuProps {
   menu: { id: string; top: number; left: number } | null;
   onClose: () => void;
-  onDelete: () => void;
+  onDelete?: () => void;
   onDoLater?: () => void;
-  isDone?: boolean;
-  onAddTags?: (taskId: string) => void;
   addTagsPosition?: 'first' | 'second'; 
   onToggleRepeat?: () => void;
   isWeekly?: boolean;
   onEdit?: (taskId: string) => void;
   onDoToday?: () => void;
+  isDone?: boolean;
+  onAddTags?: (taskId: string) => void;
 }
 
 export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, onEdit, onDoToday }: TaskMenuProps) {
@@ -152,6 +152,19 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             >
               <CalendarCheck className="h-4 w-4 text-muted-foreground group-hover:text-green-600 transition-colors" />
               Do Today
+            </button>
+          )}
+
+          {onDelete && (
+             <button
+              onClick={() => {
+                  onDelete();
+                  onClose();
+              }}
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+              <Trash2 className="h-4 w-4 text-red-500 group-hover:text-red-600 transition-colors" />
+              Delete Task
             </button>
           )}
 

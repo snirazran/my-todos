@@ -6,6 +6,7 @@ import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
 import { Task, draggableIdFor, type DisplayDay, apiDayFromDisplay } from './helpers';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
+import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import Fly from '@/components/ui/fly';
 import { Plus } from 'lucide-react';
@@ -25,6 +26,8 @@ export default React.memo(function TaskList({
   onToggleRepeat,
   isAnyDragging,
   onAddRequested,
+  onEditTask,
+  onDoLater,
 }: {
   day: DisplayDay;
   items: Task[];
@@ -50,9 +53,11 @@ export default React.memo(function TaskList({
   userTags?: { id: string; name: string; color: string }[];
   onToggleRepeat?: (taskId: string, day: DisplayDay) => void;
   isAnyDragging?: boolean;
+  onEditTask?: (day: DisplayDay, taskId: string, newText: string) => Promise<void>;
+  onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
 }) {
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
-  const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay } | null>(null);
+  const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay; kind?: 'edit' } | null>(null);
   const [busy, setBusy] = useState(false);
   
   const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
@@ -283,6 +288,21 @@ export default React.memo(function TaskList({
           }
           setMenu(null);
         }}
+        onEdit={(taskId) => {
+            if (menu) {
+                const t = items.find((it) => it.id === menu.id);
+                if (t && onEditTask) {
+                    setDialog({ task: t, day, kind: 'edit' });
+                }
+            }
+            setMenu(null);
+        }}
+        onDoLater={onDoLater ? () => {
+             if (menu && onDoLater) {
+                 onDoLater(day, menu.id);
+                 setMenu(null);
+             }
+        } : undefined}
       />
       <TagPopup
         open={tagPopup.open}
@@ -291,8 +311,24 @@ export default React.memo(function TaskList({
         onClose={() => setTagPopup({ open: false, taskId: null })}
         onSave={handleTagSave}
       />
+
+      {dialog && dialog.kind === 'edit' && onEditTask && (
+         <EditTaskDialog
+            open={!!dialog}
+            initialText={dialog.task.text}
+            busy={busy}
+            onClose={() => setDialog(null)}
+            onSave={async (newText) => {
+                setBusy(true);
+                await onEditTask(dialog.day, dialog.task.id, newText);
+                setBusy(false);
+                setDialog(null);
+            }}
+         />
+      )}
+
       <DeleteDialog
-        open={!!dialog}
+        open={!!dialog && dialog.kind !== 'edit'}
         variant={dialogVariant}
         itemLabel={dialog?.task.text}
         busy={busy}

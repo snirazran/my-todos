@@ -53,6 +53,8 @@ export default function TaskBoard({
   }) => Promise<void> | void;
   todayDisplayIndex: Exclude<DisplayDay, 7>;
   onToggleRepeat?: (taskId: string, day: DisplayDay) => Promise<void> | void;
+  onEditTask?: (day: DisplayDay, taskId: string, newText: string) => Promise<void>;
+  onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
 }) {
   const pathname = usePathname();
   const {
@@ -295,6 +297,39 @@ export default function TaskBoard({
     [drag, saveDay, setWeek]
   );
 
+  const handleEditTask = useCallback(async (day: DisplayDay, taskId: string, newText: string) => {
+      setWeek(prev => {
+          const next = prev.map(d => d.slice());
+          const taskIndex = next[day].findIndex(t => t.id === taskId);
+          if (taskIndex !== -1) {
+              next[day][taskIndex] = { ...next[day][taskIndex], text: newText };
+              saveDay(day, next[day]).catch(console.error);
+          }
+          return next;
+      });
+  }, [setWeek, saveDay]);
+
+  const handleDoLater = useCallback(async (day: DisplayDay, taskId: string) => {
+      // Move to Backlog (Index 7)
+      setWeek(prev => {
+          const next = prev.map(d => d.slice());
+          const taskIndex = next[day].findIndex(t => t.id === taskId);
+          if (taskIndex !== -1) {
+              const [task] = next[day].splice(taskIndex, 1);
+              task.type = 'backlog'; // Ensure it's marked as backlog
+              
+              if (!next[7]) next[7] = [];
+              next[7].push(task); // Add to end of backlog
+              
+              Promise.all([
+                  saveDay(day, next[day]),
+                  saveDay(7 as DisplayDay, next[7])
+              ]).catch(console.error);
+          }
+          return next;
+      });
+  }, [setWeek, saveDay]);
+
   const onDrop = useCallback(() => {
     if (!drag) return;
 
@@ -436,6 +471,8 @@ export default function TaskBoard({
                   onAddRequested={(text) => onRequestAdd(day, text)}
                   userTags={userTags}
                   onToggleRepeat={onToggleRepeat}
+                  onEditTask={handleEditTask}
+                  onDoLater={handleDoLater}
                   isAnyDragging={!!drag?.active}
                 />
               </DayColumn>
