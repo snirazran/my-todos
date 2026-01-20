@@ -45,6 +45,7 @@ export default function BacklogBox({
       }}
     >
       <motion.button
+        layout
         ref={forwardRef}
         onClick={!isDragging ? onClick : undefined}
         aria-label="Backlog"
