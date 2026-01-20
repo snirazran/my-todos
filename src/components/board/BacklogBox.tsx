@@ -34,10 +34,11 @@ export default function BacklogBox({
 
   return (
     <motion.div 
-      layout
-      className={`relative flex pointer-events-auto origin-left ${isDragging ? 'flex-1 w-auto' : 'flex-none w-[56px]'}`}
+      className="relative flex pointer-events-auto origin-left"
       initial={false}
-      // Animate prop removed for width, handled by layout + className
+      animate={{
+        width: isDragging ? '100%' : '56px',
+      }}
       transition={{
         type: 'spring',
         stiffness: 300,
@@ -45,7 +46,6 @@ export default function BacklogBox({
       }}
     >
       <motion.button
-        layout
         ref={forwardRef}
         onClick={!isDragging ? onClick : undefined}
         aria-label="Backlog"
@@ -80,7 +80,7 @@ export default function BacklogBox({
             opacity: isDragging ? 1 : 0,
             scale: isDragging ? 1 : 0.8 
           }}
-          transition={{ duration: isDragging ? 0.2 : 0 }}
+          transition={{ duration: 0.2 }}
           className="absolute inset-0 flex flex-col items-center justify-center gap-1"
           style={{ pointerEvents: 'none' }}
         >
@@ -97,7 +97,7 @@ export default function BacklogBox({
              opacity: isDragging ? 0 : 1,
              scale: isDragging ? 0.8 : 1 
            }}
-           transition={{ duration: isDragging ? 0.2 : 0 }}
+           transition={{ duration: 0.2 }}
            className="absolute inset-0 flex items-center justify-center"
            style={{ pointerEvents: 'none' }}
         >
