@@ -887,9 +887,14 @@ function TaskCounter({ count }: { count: number }) {
     if (count > prevCount.current) {
        // Only animate if count INCREASED
        controls.start({
-           scale: [1, 1.2, 1],
-           color: ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"],
-           transition: { duration: 0.3 }
+           scale: [1, 1.15, 1],
+           backgroundColor: ["hsl(var(--secondary))", "hsl(var(--primary))", "hsl(var(--secondary))"],
+           color: ["hsl(var(--muted-foreground))", "hsl(var(--primary-foreground))", "hsl(var(--muted-foreground))"],
+           transition: { 
+               scale: { duration: 0.3, ease: "easeOut" },
+               backgroundColor: { duration: 0.4 },
+               color: { duration: 0.4 }
+           }
        });
     }
     prevCount.current = count;
@@ -898,7 +903,7 @@ function TaskCounter({ count }: { count: number }) {
   return (
     <motion.span
        animate={controls}
-       className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-muted-foreground"
+       className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm"
     >
        {count}
     </motion.span>
