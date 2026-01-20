@@ -186,7 +186,8 @@ export default function TaskCard({
       }}
       className={[
         'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
-        task.completed ? 'cursor-default opacity-60' : 'cursor-grab',
+        'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
+        task.completed ? 'cursor-default' : 'cursor-grab',
         // Increased presence: Solid background, stronger border, more defined shadow
         'bg-card border border-border/80', 
         task.completed ? 'shadow-sm' : 'shadow-sm hover:shadow-md hover:border-primary/40',
@@ -200,7 +201,7 @@ export default function TaskCard({
       <motion.div 
         className="flex items-stretch gap-3 w-full"
       >
-        <div className="grid self-center shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-6 w-6">
+      <div className={`grid self-center shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-6 w-6 ${task.completed ? 'opacity-60' : ''}`}>
         <div
           className={`absolute inset-0 transition-opacity duration-200 ${
             task.completed ? 'opacity-0 pointer-events-none' : 'opacity-100'
@@ -218,7 +219,7 @@ export default function TaskCard({
         </div>
       </div>
 
-      <div className="flex-1 min-w-0 flex flex-col justify-center">
+      <div className={`flex-1 min-w-0 flex flex-col justify-center ${task.completed ? 'opacity-60' : ''}`}>
         {(isRepeating || (task.tags && task.tags.length > 0)) && (
           <div className="mb-1 flex flex-wrap items-center gap-1.5">
             {isRepeating && (
