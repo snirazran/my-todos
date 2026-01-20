@@ -432,7 +432,7 @@ export default function TaskBoard({
         className={[
           'no-scrollbar absolute inset-0 w-full h-full',
           'flex flex-col items-start overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x',
-          snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth',
+          snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth md:snap-none',
         ].join(' ')}
         style={{
           WebkitOverflowScrolling: 'touch',
