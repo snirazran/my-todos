@@ -49,7 +49,7 @@ function BacklogTaskItem({
   const doTodayScale = useTransform(x, [0, -swipeThreshold], [0.8, 1.2]);
   // Instant color snap at threshold
   const doTodayColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#16a34a"]);
-  const doTodayTextColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#ffffff"]);
+  const doTodayTextColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#ffffff", "#ffffff"]);
   const doTodayBgOpacity = useTransform(x, [-40, -swipeThreshold], [0, 1]);
   
   const isMenuOpen = menu?.id === item.id;

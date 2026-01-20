@@ -82,6 +82,7 @@ function SortableTaskItem({
 }: SortableTaskItemProps) {
   /* Swipe Logic */
   const [isOpen, setIsOpen] = useState(false);
+  const [isSwiping, setIsSwiping] = useState(false);
   const isDraggingRef = React.useRef(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -96,7 +97,7 @@ function SortableTaskItem({
   const doLaterScale = useTransform(x, [0, -swipeThreshold], [0.8, 1.2]);
   // Instant color snap at threshold
   const doLaterColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#6366f1"]); // Slate to Indigo
-  const doLaterTextColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#ffffff"]);
+  const doLaterTextColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#ffffff", "#ffffff"]);
 
   useEffect(() => {
     const checkDesktop = () => setIsDesktop(window.innerWidth >= 768);
@@ -149,11 +150,13 @@ function SortableTaskItem({
 
   const handleDragStart = () => {
       isDraggingRef.current = true;
+      setIsSwiping(true);
   };
 
   const handleDragEnd = (_: any, info: PanInfo) => {
     setTimeout(() => {
          isDraggingRef.current = false;
+         setIsSwiping(false);
     }, 100);
 
     const offset = info.offset.x;
@@ -241,7 +244,7 @@ function SortableTaskItem({
       >
           {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
           <div 
-             className={`absolute inset-y-0 left-0 flex items-center pl-2 gap-2 transition-opacity duration-200 ${isOpen || isDraggingRef.current ? 'opacity-100' : 'opacity-0 delay-200'}`}
+             className={`absolute inset-y-0 left-0 flex items-center pl-2 gap-2 transition-opacity duration-200 ${isOpen || isSwiping ? 'opacity-100' : 'opacity-0 delay-200'}`}
              aria-hidden={!isOpen}
           >
              <button
