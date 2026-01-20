@@ -29,7 +29,7 @@ export function AddTaskButton({
         'border border-border/80',
         'text-foreground font-bold tracking-tight',
         'shadow-lg shadow-black/5 dark:shadow-black/20',
-        'md:hover:border-primary/50 md:hover:bg-card/95',
+        'hover:border-primary/50 hover:bg-card/95',
         'transition-all duration-300 ease-out',
         'active:scale-[0.98]',
         'focus:outline-none outline-none',

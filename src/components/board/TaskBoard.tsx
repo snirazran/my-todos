@@ -470,7 +470,11 @@ export default function TaskBoard({
                   removeTask={removeTask}
                   onGrab={onGrab}
                   setCardRef={setCardRef}
-                  onAddRequested={(text) => onRequestAdd(day, text)}
+                  onAddRequested={(text) => {
+                    setQuickText(text);
+                    setPageIndex(day); // Ensure sheet defaults to this day, even if not fully centered
+                    setShowQuickAdd(true);
+                  }}
                   userTags={userTags}
                   onToggleRepeat={onToggleRepeat}
                   onEditTask={handleEditTask}

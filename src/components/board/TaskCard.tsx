@@ -185,12 +185,12 @@ export default function TaskCard({
         WebkitTapHighlightColor: 'transparent',
       }}
       className={[
-        'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl transition-all duration-300',
-        task.completed ? 'cursor-default' : 'cursor-grab',
-        'bg-card backdrop-blur-md border border-border/50',
-        'hover:bg-accent/50 hover:border-border', 
-        'shadow-[0_1px_3px_rgba(0,0,0,0.05)] hover:shadow-md',
-        'mb-2', // reduced margin
+        'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
+        task.completed ? 'cursor-default opacity-60' : 'cursor-grab',
+        // Increased presence: Solid background, stronger border, more defined shadow
+        'bg-card border border-border/80', 
+        'shadow-sm hover:shadow-md hover:border-primary/40',
+        'mb-2.5', // slightly more breathing room
         menuOpen ? 'z-50 shadow-xl ring-2 ring-primary/20' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
