@@ -62,13 +62,13 @@ export default function BacklogBox({
         }}
         // Base styles
         className={`
+           // Removed backdrop-blur-2xl for performance, simplified shadow
            relative flex items-center justify-center overflow-hidden w-full
-           backdrop-blur-2xl duration-200
-           bg-card/80 border-border/80 border shadow-lg
+           bg-card border-border/80 border shadow-md will-change-transform
            ${isDragging 
              ? isDragOver 
-               ? 'bg-primary border-primary text-primary-foreground shadow-[0_0_50px_rgba(var(--primary),0.3)]' 
-               : 'bg-card/95 border-primary/50 text-foreground shadow-2xl'
+               ? 'bg-primary border-primary text-primary-foreground shadow-xl' 
+               : 'bg-card border-primary/50 text-foreground shadow-lg'
              : 'hover:bg-card/95 hover:border-primary/50 transition-colors'
            }
         `}
