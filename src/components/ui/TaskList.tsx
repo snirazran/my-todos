@@ -91,13 +91,12 @@ function SortableTaskItem({
   const x = useMotionValue(0);
   const swipeThreshold = 60;
 
-  // Transform values based on drag position x
-  // Left Swipe (Negative X) -> Do Later (Indigo)
-  const doLaterOpacity = useTransform(x, [0, -25], [0, 1]);
-  const doLaterScale = useTransform(x, [0, -swipeThreshold], [0.8, 1.2]);
-  // Instant color snap at threshold
-  const doLaterColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#6366f1"]); // Slate to Indigo
-  const doLaterTextColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#ffffff", "#ffffff"]);
+  // Transform values removed from here as they need x from useSortable if passed? No, local x.
+  // Move transforms down if x is local. x is local. 
+  // Wait, I can't delete lines 94-100 without replacing them with something or empty string?
+  // I will replace them with empty string here and redefine below if needed? 
+  // Actually x is defined at line 91. I should update them there.
+
 
   useEffect(() => {
     const checkDesktop = () => setIsDesktop(window.innerWidth >= 768);
@@ -114,6 +113,14 @@ function SortableTaskItem({
     transition,
     isDragging,
   } = useSortable({ id: task.id, disabled: isDragDisabled || isOpen });
+
+  // Transform values based on drag position x
+  // Right Swipe (Positive X) -> Do Later (Indigo) - SWAPPED
+  const doLaterOpacity = useTransform(x, [0, 25], [0, 1]);
+  const doLaterScale = useTransform(x, [0, swipeThreshold], [0.8, 1.2]);
+  // Instant color snap at threshold
+  const doLaterColor = useTransform(x, [swipeThreshold - 1, swipeThreshold], ["#9ca3af", "#6366f1"]); // Slate to Indigo
+  const doLaterTextColor = useTransform(x, [swipeThreshold - 1, swipeThreshold], ["#ffffff", "#ffffff"]);
 
   useEffect(() => {
     const handleOtherSwipe = (e: Event) => {
@@ -162,32 +169,32 @@ function SortableTaskItem({
     const offset = info.offset.x;
     const velocity = info.velocity.x;
 
-    // Strict Spotify-like snap logic (Swapped: Right->Open)
+    // Strict Spotify-like snap logic (Swapped again: Open is now Left/Negative)
     if (isOpen) {
-        // If already open (Right Swipe state), closing needs Left motion
-        if (offset < -15 || velocity < -100) {
+        // If already open (Left Swipe state -> Menu), closing needs Right motion (Positive)
+        if (offset > 15 || velocity > 100) {
             setIsOpen(false);
             window.dispatchEvent(
                 new CustomEvent('task-swipe-open', { detail: { id: null } })
             );
         } else {
-             // Snap back to open
-             animate(x, 100, { type: "spring", stiffness: 600, damping: 28 });
+             // Snap back to open (Negative X)
+             animate(x, -100, { type: "spring", stiffness: 600, damping: 28 });
         }
     } else {
         // Closed state
-        // Opening: Swipe Right (Positive) -> Edit/Trash
-        // Increased threshold to 60 to require more deliberate swipe
-        if (offset > 60 || velocity > 200) {
-            setIsOpen(true);
+        
+        // Action: Swipe Right (Positive) -> Do Later - SWAPPED
+        if (offset > swipeThreshold && onDoLater) {
+            onDoLater(task);
+            animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
+        }
+        // Opening: Swipe Left (Negative) -> Edit/Trash - SWAPPED
+        else if (offset < -60 || velocity < -200) {
+             setIsOpen(true);
              window.dispatchEvent(
                 new CustomEvent('task-swipe-open', { detail: { id: task.id } })
             );
-        }
-        // Action: Swipe Left (Negative) -> Do Later
-        else if (offset < -swipeThreshold && onDoLater) {
-            onDoLater(task);
-            animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
         }
         else {
              // Snap back
@@ -244,8 +251,28 @@ function SortableTaskItem({
         className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : 'overflow-hidden bg-muted/50'}`}
       >
           {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
+          {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
+          {/* Positioned on Left to be revealed by Right drag */}
           <div 
-             className={`absolute inset-y-0 left-0 flex items-center pl-2 gap-2 transition-opacity duration-200 ${isOpen || isSwiping ? 'opacity-100' : 'opacity-0 delay-200'}`}
+               className="absolute inset-y-0 left-0 flex items-center pl-4"
+           >
+               <motion.div 
+                   className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
+                   style={{ 
+                       opacity: doLaterOpacity,
+                       scale: doLaterScale,
+                       color: doLaterTextColor,
+                       backgroundColor: doLaterColor
+                   }}
+               >
+                    <CalendarCheck className="w-5 h-5" />
+               </motion.div>
+           </div>
+          
+          {/* Swipe Actions Layer (Visible when dragging Left -> Menu) */}
+          {/* Positioned on Right to be revealed by Left drag */}
+          <div 
+             className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity duration-200 ${isOpen || isSwiping ? 'opacity-100' : 'opacity-0 delay-200'}`}
              aria-hidden={!isOpen}
           >
              <button
@@ -275,35 +302,18 @@ function SortableTaskItem({
              </button>
           </div>
 
-          {/* Swipe Actions Layer (Right - for Left Swipe - Do Later) */}
-          <div 
-              className="absolute inset-y-0 right-0 flex items-center pr-4"
-          >
-              <motion.div 
-                  className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
-                  style={{ 
-                      opacity: doLaterOpacity,
-                      scale: doLaterScale,
-                      color: doLaterTextColor,
-                      backgroundColor: doLaterColor
-                  }}
-              >
-                   <CalendarCheck className="w-5 h-5" />
-              </motion.div>
-          </div>
-
           {/* Foreground Card (Swipeable) */}
           <motion.div
             drag={isDesktop ? false : "x"}
             dragListener={!isDragging}
             dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
-            dragConstraints={{ left: -70, right: 100 }}
+            dragConstraints={{ left: -100, right: 70 }}
             dragElastic={0.1}
             dragMomentum={false}
             
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
-            animate={{ x: isOpen ? 100 : 0 }}
+            animate={{ x: isOpen ? -100 : 0 }}
             style={{ x, touchAction: 'pan-y', cursor: 'grab' }}
             transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }} // Snappier spring
 
