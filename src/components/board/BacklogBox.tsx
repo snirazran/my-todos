@@ -34,7 +34,7 @@ export default function BacklogBox({
 
   return (
     <motion.div 
-      className="relative flex pointer-events-auto origin-left"
+      className="relative flex pointer-events-auto origin-left shrink-0"
       initial={false}
       animate={{
         width: isDragging ? '100%' : '56px',
