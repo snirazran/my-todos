@@ -8,7 +8,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
-import { AnimatePresence, motion, PanInfo } from 'framer-motion';
+import { AnimatePresence, motion, PanInfo, useMotionValue, useTransform, animate } from 'framer-motion';
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import {
@@ -63,6 +63,7 @@ interface SortableTaskItemProps {
   isDragDisabled?: boolean;
   isWeekly?: boolean;
   disableLayout?: boolean;
+  onDoLater?: (task: Task) => void;
 }
 
 function SortableTaskItem({
@@ -77,12 +78,24 @@ function SortableTaskItem({
   isDragDisabled,
   isWeekly,
   disableLayout,
+  onDoLater,
 }: SortableTaskItemProps) {
   /* Swipe Logic */
   const [isOpen, setIsOpen] = useState(false);
   const isDraggingRef = React.useRef(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [isDesktop, setIsDesktop] = useState(false);
+
+  // Motion Values for Swipe
+  const x = useMotionValue(0);
+  const swipeThreshold = 60;
+
+  // Transform values based on drag position x
+  // Left Swipe (Negative X) -> Do Later (Indigo)
+  const doLaterOpacity = useTransform(x, [0, -25], [0, 1]);
+  const doLaterScale = useTransform(x, [0, -swipeThreshold], [0.8, 1.2]);
+  const doLaterColor = useTransform(x, [-25, -swipeThreshold], ["#9ca3af", "#6366f1"]); // Slate to Indigo
+  const doLaterTextColor = useTransform(x, [-25, -swipeThreshold], ["#9ca3af", "#ffffff"]);
 
   useEffect(() => {
     const checkDesktop = () => setIsDesktop(window.innerWidth >= 768);
@@ -153,15 +166,27 @@ function SortableTaskItem({
             window.dispatchEvent(
                 new CustomEvent('task-swipe-open', { detail: { id: null } })
             );
+        } else {
+             // Snap back to open
+             animate(x, 100, { type: "spring", stiffness: 600, damping: 28 });
         }
     } else {
         // Closed state
-        // Opening: Swipe Right (Positive)
+        // Opening: Swipe Right (Positive) -> Edit/Trash
         if (offset > 15 || velocity > 100) {
             setIsOpen(true);
              window.dispatchEvent(
                 new CustomEvent('task-swipe-open', { detail: { id: task.id } })
             );
+        }
+        // Action: Swipe Left (Negative) -> Do Later
+        else if (offset < -swipeThreshold && onDoLater) {
+            onDoLater(task);
+            animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
+        }
+        else {
+             // Snap back
+             animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
         }
     }
   };
@@ -245,18 +270,36 @@ function SortableTaskItem({
              </button>
           </div>
 
+          {/* Swipe Actions Layer (Right - for Left Swipe - Do Later) */}
+          <div 
+              className="absolute inset-y-0 right-0 flex items-center pr-4"
+          >
+              <motion.div 
+                  className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
+                  style={{ 
+                      opacity: doLaterOpacity,
+                      scale: doLaterScale,
+                      color: doLaterTextColor,
+                      backgroundColor: doLaterColor
+                  }}
+              >
+                   <CalendarCheck className="w-5 h-5" />
+              </motion.div>
+          </div>
+
           {/* Foreground Card (Swipeable) */}
           <motion.div
             drag={isDesktop ? false : "x"}
             dragListener={!isDragging}
             dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
-            dragConstraints={{ left: 0, right: 100 }}
-            dragElastic={0.05}
+            dragConstraints={{ left: -70, right: 100 }}
+            dragElastic={0.1}
             dragMomentum={false}
-
+            
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             animate={{ x: isOpen ? 100 : 0 }}
+            style={{ x, touchAction: 'pan-y', cursor: 'grab' }}
             transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }} // Snappier spring
 
             className={`
@@ -270,13 +313,9 @@ function SortableTaskItem({
               ${isDone && !isDragging ? 'md:hover:bg-accent/50' : ''} 
               cursor-pointer
             `}
-          style={{
-  touchAction: 'pan-y',
-  ...(isDragging
-    ? { boxShadow: 'inset 0 0 0 2px hsl(var(--primary) / 0.55)' }
-    : undefined),
-}}
-             onClick={handleCardClick}
+           // Note: We are using 'style' prop for x motion value to avoid re-renders
+           // combined with the style object above, so we pass x via the style prop on the motion component directly
+           onClick={handleCardClick}
           >
             <div className={`flex items-center flex-1 min-w-0 gap-3 pl-2 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}>
                {/* Bullet */}
@@ -823,6 +862,10 @@ export default function TaskList({
                           isDragDisabled={isCompleted}
                           isWeekly={taskKind(task) === 'weekly'}
                           disableLayout={isAnyDragging}
+                          onDoLater={onDoLater ? (t) => {
+                             setExitAction({ id: t.id, type: 'later' });
+                             onDoLater(t.id);
+                          } : undefined}
                         />
                       );
                     })}

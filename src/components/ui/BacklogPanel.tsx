@@ -22,6 +22,7 @@ function BacklogTaskItem({
   onMenuOpen,
   onDeleteRequest,
   getTagDetails,
+  allowNudge,
 }: {
   item: BacklogItem;
   index: number;
@@ -32,6 +33,7 @@ function BacklogTaskItem({
   onMenuOpen: (e: React.MouseEvent, item: BacklogItem) => void;
   onDeleteRequest: (item: BacklogItem) => void;
   getTagDetails: (id: string) => { name: string; color: string } | undefined;
+  allowNudge: boolean;
 }) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isDesktop, setIsDesktop] = React.useState(false);
@@ -60,9 +62,13 @@ function BacklogTaskItem({
   }, []);
 
   // "The Nudge" - Discovery animation for new users (on mobile)
+  const initialIndex = React.useRef(index);
+  
   React.useEffect(() => {
     // Only nudge the first 2 items, only on mobile, only once on mount
-    if (!isDesktop && index < 2) {
+    // checking initialIndex ensures we don't nudge items that *slide into* the top spots later
+    // allowNudge ensures we don't nudge items that are added later (after the panel is already open)
+    if (!isDesktop && initialIndex.current < 2 && allowNudge) {
         const timeout = setTimeout(() => {
             // Peek: Slide to -60px (Left) to show Green state (Plus is now on Right)
             animate(x, -60, { 
@@ -79,11 +85,11 @@ function BacklogTaskItem({
                     damping: 20 
                 });
             }, 600); 
-        }, 800 + (index * 200)); 
+        }, 800 + (initialIndex.current * 200)); 
 
         return () => clearTimeout(timeout);
     }
-  }, [isDesktop, index, x]);
+  }, [isDesktop, x, allowNudge]);
 
   // Sync swipe close with other interactions
   React.useEffect(() => {
@@ -427,11 +433,17 @@ export default function BacklogPanel({
             }),
           });
           
-          window.dispatchEvent(new Event('tags-updated'));
       } catch (e) {
           console.error("Failed to update tags", e);
       }
   };
+
+  // Only allow nudges in the first 1s of mounting
+  const [allowNudge, setAllowNudge] = React.useState(true);
+  React.useEffect(() => {
+      const t = setTimeout(() => setAllowNudge(false), 1000);
+      return () => clearTimeout(t);
+  }, []);
 
   // Listen for other menus opening to auto-close this one (syncs with TaskList)
   React.useEffect(() => {
@@ -585,6 +597,7 @@ export default function BacklogPanel({
                 onMenuOpen={handleMenuOpen}
                 onDeleteRequest={(item) => setConfirmId(item)}
                 getTagDetails={getTagDetails}
+                allowNudge={allowNudge}
               />
             ))}
           </AnimatePresence>
