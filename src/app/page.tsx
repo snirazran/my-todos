@@ -384,6 +384,35 @@ export default function Home() {
     });
   };
 
+  const handleEditTask = async (taskId: string, newText: string) => {
+    // Optimistic Update
+    setTasks((prev) =>
+       prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
+    );
+    // Also update backlog optimistically if needed (though usually separate)
+    setLaterThisWeek((prev) => 
+       prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
+    );
+
+    if (session) {
+        try {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            await fetch('/api/tasks', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskId, text: newText, timezone: tz }),
+            });
+        } catch (e) {
+            console.error("Failed to edit task", e);
+            // Revert? For now, we assume success or user refresh.
+        }
+    } else {
+        setGuestTasks((prev) =>
+             prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
+        );
+    }
+  };
+
   if (sessionLoading || (session && loading)) {
     return <LoadingScreen message="Loading your day..." />;
   }
@@ -625,6 +654,7 @@ export default function Home() {
                       
                       refreshToday();
                     }}
+                    onEditTask={handleEditTask}
                   />
                 </motion.div>
               ) : (
@@ -688,6 +718,7 @@ export default function Home() {
                         setQuickAddMode('later');
                         setShowQuickAdd(true);
                       }}
+                      onEditTask={handleEditTask}
                     />
                   ) : (
                     <div className="p-8 text-center text-muted-foreground bg-card/50 rounded-2xl">

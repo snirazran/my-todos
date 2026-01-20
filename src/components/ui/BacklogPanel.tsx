@@ -9,6 +9,7 @@ import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TaskMenu from '../board/TaskMenu';
 import useSWR from 'swr';
 import TagPopup from '@/components/ui/TagPopup';
+import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 
 type BacklogItem = { id: string; text: string; tags?: string[] };
 
@@ -117,11 +118,22 @@ function BacklogTaskItem({
     window.addEventListener('task-swipe-open', handleOtherSwipe);
     if (isOpen) {
         window.addEventListener('click', handleGlobalClick, { capture: true }); 
+        
+        // Also close on scroll
+        const handleScroll = () => {
+             setIsOpen(false);
+        };
+        window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+
+        return () => {
+            window.removeEventListener('task-swipe-open', handleOtherSwipe);
+            window.removeEventListener('click', handleGlobalClick, { capture: true });
+            window.removeEventListener('scroll', handleScroll, { capture: true });
+        };
     }
     
     return () => {
         window.removeEventListener('task-swipe-open', handleOtherSwipe);
-        window.removeEventListener('click', handleGlobalClick, { capture: true });
     };
   }, [item.id, isOpen]);
 
@@ -381,12 +393,14 @@ export default function BacklogPanel({
   onRefreshBacklog,
   onMoveToToday,
   onAddRequested,
+  onEditTask,
 }: {
   later: BacklogItem[];
   onRefreshToday: () => Promise<void> | void;
   onRefreshBacklog: () => Promise<void> | void;
   onMoveToToday?: (item: BacklogItem) => Promise<void> | void;
   onAddRequested: () => void;
+  onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
 }) {
   const [menu, setMenu] = React.useState<{
     id: string;
@@ -621,6 +635,23 @@ export default function BacklogPanel({
           }
           setMenu(null);
         }}
+        onEdit={(taskId) => {
+            const t = later.find((it) => it.id === taskId);
+            if (t) {
+                // HACK: Use confirmId state but prefix ID to distinguish Edit vs Delete
+                // Or add separate state. Let's add separate state if possible? No, reusing is cleaner for this quick implementation?
+                // Actually, let's just make a new object:
+                setConfirmId({ ...t, id: `EDIT-${t.id}` });
+            }
+            setMenu(null);
+        }}
+        onDoToday={() => {
+            if (menu) {
+                const t = later.find((it) => it.id === menu.id);
+                if (t) addToday(t);
+            }
+            setMenu(null);
+        }}
       />
 
       <TagPopup
@@ -631,11 +662,29 @@ export default function BacklogPanel({
         onSave={handleTagSave}
       />
 
-      {confirmId && (
-        <DeleteDialog
-          open={!!confirmId}
+      {/* Reusing Busy/Delete state for Edit as well, or simpler to separate? Simple to reuse confirmId for dialog logic but we need text editing */}
+      {/* For Backlog, we only have one delete variant. Let's add Edit Dialog separately */}
+      <EditTaskDialog
+         open={!!confirmId && confirmId.id.startsWith('EDIT-')}
+         initialText={confirmId && confirmId.id.startsWith('EDIT-') ? confirmId.text : ''}
+         busy={busy}
+         onClose={() => setConfirmId(null)}
+         onSave={async (newText) => {
+             if (confirmId && onEditTask) {
+                // Strip prefix
+                const realId = confirmId.id.replace('EDIT-', '');
+                setBusy(true);
+                await onEditTask(realId, newText);
+                setBusy(false);
+                setConfirmId(null);
+             }
+         }}
+      />
+
+       <DeleteDialog
+          open={!!confirmId && !confirmId.id.startsWith('EDIT-')}
           variant="backlog"
-          itemLabel={confirmId.text}
+          itemLabel={confirmId?.text}
           busy={busy}
           onClose={() => {
             if (!busy) setConfirmId(null);
@@ -645,7 +694,6 @@ export default function BacklogPanel({
             removeLater(confirmId.id).then(() => setConfirmId(null));
           }}
         />
-      )}
 
       <style jsx>{`
         @keyframes fadeInUp {

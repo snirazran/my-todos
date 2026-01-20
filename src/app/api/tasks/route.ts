@@ -321,8 +321,9 @@ export async function PUT(req: NextRequest) {
   const body = await req.json();
   const tz = body.timezone || 'UTC';
   if (body && Object.prototype.hasOwnProperty.call(body, 'day')) return handleBoardPut(uid, body, tz);
-  const { date, taskId, completed, tags, toggleType, order } = body ?? {};
-  if ((!date && !tags) || !taskId) return NextResponse.json({ error: 'taskId and (date+completed OR tags) are required' }, { status: 400 });
+  const { date, taskId, completed, tags, toggleType, order, text } = body ?? {};
+  // Relaxed validation to allow text updates
+  if ((!date && !tags && !text && typeof completed === 'undefined' && !toggleType && typeof order === 'undefined') || !taskId) return NextResponse.json({ error: 'taskId and update fields are required' }, { status: 400 });
   const doc = await TaskModel.findOne({ userId: uid, id: taskId }).lean<TaskDoc>();
   if (!doc) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   if (toggleType) {
@@ -339,6 +340,12 @@ export async function PUT(req: NextRequest) {
     await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: { tags } });
     return NextResponse.json({ ok: true });
   }
+  // New: Handle text update
+  if (body.text) {
+      await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: { text: body.text } });
+      return NextResponse.json({ ok: true });
+  }
+
   if (typeof completed !== 'boolean') return NextResponse.json({ error: 'completed must be boolean' }, { status: 400 });
   const alreadyCompletedForDate = (doc.completedDates ?? []).includes(date) || (!!doc.completed && doc.type === 'regular');
   const update = completed === true ? { $addToSet: { completedDates: date } } : { $pull: { completedDates: date } };
@@ -459,6 +466,13 @@ async function handleBoardPut(uid: Types.ObjectId, body: { day: number; tasks: A
   }));
   return NextResponse.json({ ok: true });
 }
+
+// Ensure PUT handles simple text updates for single task edit
+// We add a check for 'text' in the main PUT body handler, which was missing in the original file view for the single-task update block.
+// The original code:
+//   const { date, taskId, completed, tags, toggleType, order } = body ?? {};
+//   if ((!date && !tags) || !taskId) ...
+// We need to allow text updates now.
 
 async function handleBoardDelete(uid: Types.ObjectId, body: { day: number; taskId: string }, tz: string) {
   const { day, taskId } = body;

@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Clock, Tag, RotateCcw } from 'lucide-react';
+import { Trash2, CalendarClock, Tag, RotateCcw, Pencil, CalendarCheck } from 'lucide-react';
 import TagManager from '@/components/ui/TagManager';
 
 interface TaskMenuProps {
@@ -16,14 +16,32 @@ interface TaskMenuProps {
   addTagsPosition?: 'first' | 'second'; 
   onToggleRepeat?: () => void;
   isWeekly?: boolean;
+  onEdit?: (taskId: string) => void;
+  onDoToday?: () => void;
 }
 
-export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly }: TaskMenuProps) {
+export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, onEdit, onDoToday }: TaskMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // We portal to document.body
   // Ensure document is available (client-side)
   if (typeof document === 'undefined') return null;
+
+  // Close on scroll
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (!menu) return;
+    const handleScroll = () => {
+       onClose();
+    };
+    // Capture scroll events on window (including scrolling within elements if they bubble/capture)
+    // 'scroll' doesn't bubble, so we need capture to catch scroll on any element, or just listen on window for main scroll.
+    // Usually sticking to window 'scroll' with capture: true is best for "close on any scroll"
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll, { capture: true });
+    };
+  }, [menu, onClose]);
 
   return createPortal(
     <AnimatePresence>
@@ -58,6 +76,20 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             style={{ top: menu.top, left: menu.left }}
             onClick={(e) => e.stopPropagation()}
           >
+
+          {onEdit && (
+            <button
+               onClick={() => {
+                   onEdit(menu.id);
+                   onClose();
+               }}
+               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+             >
+               <Pencil className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+               Edit Task
+             </button>
+          )}
+
           {addTagsPosition === 'first' && onAddTags && (
              <button
               onClick={() => {
@@ -66,7 +98,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               }}
               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <Tag className="h-4 w-4 text-muted-foreground" />
+              <Tag className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               Add Tags
             </button>
           )}
@@ -79,21 +111,8 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               }}
               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <Tag className="h-4 w-4 text-muted-foreground" />
+              <Tag className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               Add Tags
-            </button>
-          )}
-
-          {onDoLater && !isDone && (
-            <button
-              onClick={() => {
-                onDoLater();
-                onClose();
-              }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-            >
-              <Clock className="h-4 w-4 text-primary" />
-              Do Later
             </button>
           )}
 
@@ -105,20 +124,37 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               }}
               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <RotateCcw className="h-4 w-4 text-primary" />
+              <RotateCcw className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               {isWeekly ? 'Make Regular' : 'Make Weekly'}
             </button>
           )}
 
-          <button
-            onClick={() => {
-              onDelete();
-            }}
-            className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-          >
-            <Trash2 className="h-4 w-4" />
-            Delete Task
-          </button>
+          {onDoLater && !isDone && (
+            <button
+              onClick={() => {
+                onDoLater();
+                onClose();
+              }}
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              <CalendarClock className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              Do Later
+            </button>
+          )}
+
+          {onDoToday && (
+             <button
+              onClick={() => {
+                  onDoToday();
+                  onClose();
+              }}
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              <CalendarCheck className="h-4 w-4 text-muted-foreground group-hover:text-green-600 transition-colors" />
+              Do Today
+            </button>
+          )}
+
         </motion.div>
         </>
       )}

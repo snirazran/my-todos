@@ -39,6 +39,7 @@ import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import TaskMenu from '../board/TaskMenu';
 import TagPopup from '@/components/ui/TagPopup';
+import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 
 interface Task {
   id: string;
@@ -85,19 +86,13 @@ function SortableTaskItem({
   const [isOpen, setIsOpen] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
   const isDraggingRef = React.useRef(false);
+  const hasActionTriggeredRef = React.useRef(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [isDesktop, setIsDesktop] = useState(false);
 
   // Motion Values for Swipe
   const x = useMotionValue(0);
   const swipeThreshold = 60;
-
-  // Transform values removed from here as they need x from useSortable if passed? No, local x.
-  // Move transforms down if x is local. x is local. 
-  // Wait, I can't delete lines 94-100 without replacing them with something or empty string?
-  // I will replace them with empty string here and redefine below if needed? 
-  // Actually x is defined at line 91. I should update them there.
-
 
   useEffect(() => {
     const checkDesktop = () => setIsDesktop(window.innerWidth >= 768);
@@ -148,11 +143,22 @@ function SortableTaskItem({
     // Only attach click listener if open, using capture to ensure we get it
     if (isOpen) {
         window.addEventListener('click', handleGlobalClick, { capture: true }); 
+        
+        // Also close on scroll
+        const handleScroll = () => {
+             setIsOpen(false);
+        };
+        window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+        
+        return () => {
+             window.removeEventListener('task-swipe-open', handleOtherSwipe);
+             window.removeEventListener('click', handleGlobalClick, { capture: true });
+             window.removeEventListener('scroll', handleScroll, { capture: true });
+        };
     }
     
     return () => {
         window.removeEventListener('task-swipe-open', handleOtherSwipe);
-        window.removeEventListener('click', handleGlobalClick, { capture: true });
     };
   }, [task.id, isOpen]);
 
@@ -187,6 +193,7 @@ function SortableTaskItem({
         
         // Action: Swipe Right (Positive) -> Do Later - SWAPPED
         if (offset > swipeThreshold && onDoLater) {
+            hasActionTriggeredRef.current = true;
             onDoLater(task);
             animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
         }
@@ -196,6 +203,7 @@ function SortableTaskItem({
              window.dispatchEvent(
                 new CustomEvent('task-swipe-open', { detail: { id: task.id } })
             );
+             animate(x, -100, { type: "spring", stiffness: 600, damping: 28 });
         }
         else {
              // Snap back
@@ -206,6 +214,7 @@ function SortableTaskItem({
   
   const handleCardClick = (e: React.MouseEvent) => {
       if (isDraggingRef.current) return;
+      if (isExitingLater || hasActionTriggeredRef.current) return;
       
       if (isOpen) {
           setIsOpen(false);
@@ -270,8 +279,7 @@ function SortableTaskItem({
                </motion.div>
            </div>
           
-          {/* Swipe Actions Layer (Visible when dragging Left -> Menu) */}
-          {/* Positioned on Right to be revealed by Left drag */}
+          {/* Swipe (Menu) Actions Layer */}
           <div 
              className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity duration-200 ${isOpen || isSwiping ? 'opacity-100' : 'opacity-0 delay-200'}`}
              aria-hidden={!isOpen}
@@ -286,7 +294,7 @@ function SortableTaskItem({
                 title="More options"
                 tabIndex={isOpen ? 0 : -1}
              >
-                <Pencil className="w-4 h-4" />
+                <EllipsisVertical className="w-5 h-5" />
              </button>
              <button
                 onClick={(e) => {
@@ -352,6 +360,7 @@ function SortableTaskItem({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
+                            if (isExitingLater || isSwiping || isDraggingRef.current || hasActionTriggeredRef.current) return;
                             handleTaskToggle(task, true);
                           }}
                           className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 md:hover:text-primary"
@@ -479,6 +488,7 @@ export default function TaskList({
   onDoLater,
   onReorder,
   onToggleRepeat,
+  onEditTask,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -497,6 +507,7 @@ export default function TaskList({
   onDoLater?: (taskId: string) => Promise<void> | void;
   onReorder?: (tasks: Task[]) => void;
   onToggleRepeat?: (taskId: string) => Promise<void> | void;
+  onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
 }) {
   const { data: tagsData } = useSWR('/api/tags', (url) =>
     fetch(url).then((r) => r.json())
@@ -526,7 +537,7 @@ export default function TaskList({
   } | null>(null);
   const [dialog, setDialog] = useState<{
     task: Task;
-    kind: 'regular' | 'weekly' | 'backlog';
+    kind: 'regular' | 'weekly' | 'backlog' | 'edit';
   } | null>(null);
 
   const [tagPopup, setTagPopup] = useState<{
@@ -647,8 +658,8 @@ export default function TaskList({
     }
   };
 
-  const dialogVariant: 'regular' | 'weekly' | 'backlog' = dialog
-    ? taskKind(dialog.task)
+  const dialogVariant: 'regular' | 'weekly' | 'backlog' | 'edit' = dialog
+    ? dialog.kind === 'edit' ? 'edit' : taskKind(dialog.task)
     : 'regular';
 
   const handleTaskToggle = (task: Task, forceState?: boolean) => {
@@ -945,6 +956,15 @@ export default function TaskList({
           }
           setMenu(null);
         }}
+        onEdit={(taskId) => {
+             if (menu) {
+                 const t = tasks.find((it) => it.id === menu.id);
+                 if (t) {
+                     setDialog({ task: t, kind: 'edit' });
+                 }
+             }
+             setMenu(null);
+        }}
       />
 
       <TagPopup
@@ -955,14 +975,31 @@ export default function TaskList({
         onSave={handleTagSave}
       />
 
+      {dialog && dialogVariant !== 'regular' && dialogVariant !== 'weekly' && dialogVariant !== 'backlog' && (
+         <EditTaskDialog
+            open={!!dialog && dialog.kind === 'edit'}
+            initialText={dialog.task.text}
+            busy={busy}
+            onClose={() => setDialog(null)}
+            onSave={async (newText) => {
+                if (onEditTask) {
+                    setBusy(true);
+                    await onEditTask(dialog.task.id, newText);
+                    setBusy(false);
+                    setDialog(null);
+                }
+            }}
+         />
+      )}
+
       <DeleteDialog
-        open={!!dialog}
-        variant={dialogVariant}
+        open={!!dialog && dialog.kind !== 'edit'}
+        variant={dialogVariant === 'edit' ? 'regular' : dialogVariant}
         itemLabel={dialog?.task.text}
         busy={busy}
         onClose={() => setDialog(null)}
         onDeleteToday={
-          dialogVariant !== 'backlog' ? confirmDeleteToday : undefined
+          dialogVariant !== 'backlog' && dialogVariant !== 'edit' ? confirmDeleteToday : undefined
         }
         onDeleteAll={
           dialogVariant === 'weekly'
