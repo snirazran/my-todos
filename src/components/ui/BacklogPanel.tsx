@@ -151,7 +151,8 @@ function BacklogTaskItem({
     } else {
         // Closed state
         // Check for Right Swipe (Trash/Edit) -> Positive Offset
-        if (offset > 15 || velocity > 100) {
+        // Increased threshold to 60
+        if (offset > 60 || velocity > 200) {
             setIsOpen(true);
              window.dispatchEvent(
                 new CustomEvent('task-swipe-open', { detail: { id: `backlog:${item.id}` } })

@@ -177,7 +177,8 @@ function SortableTaskItem({
     } else {
         // Closed state
         // Opening: Swipe Right (Positive) -> Edit/Trash
-        if (offset > 15 || velocity > 100) {
+        // Increased threshold to 60 to require more deliberate swipe
+        if (offset > 60 || velocity > 200) {
             setIsOpen(true);
              window.dispatchEvent(
                 new CustomEvent('task-swipe-open', { detail: { id: task.id } })
