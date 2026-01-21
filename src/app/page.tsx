@@ -524,7 +524,6 @@ export default function Home() {
                     toggle={handleToggle}
                     showConfetti={rate === 100}
                     visuallyCompleted={visuallyDone}
-                    disableInitialAnimation={true}
                     renderBullet={(task, isVisuallyDone) =>
                       task.completed || isVisuallyDone ? null : (
                         <Fly
