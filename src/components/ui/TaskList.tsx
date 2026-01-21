@@ -242,7 +242,7 @@ function SortableTaskItem({
       data-is-active={!isDone}
     >
       <motion.div
-        layout={!disableLayout && !isDragging}
+        layout={!disableLayout && !isDragging && !isExitingLater}
         initial={{ opacity: 0, y: 20 }}
         animate={
           isExitingLater
@@ -259,7 +259,7 @@ function SortableTaskItem({
         transition={{
             layout: { type: 'spring', stiffness: 250, damping: 25 },
         }}
-        className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : 'overflow-hidden bg-muted/50'}`}
+        className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : 'overflow-hidden bg-muted/50'} ${isExitingLater ? 'will-change-transform' : ''}`}
       >
           {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
           {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}

@@ -193,7 +193,7 @@ function BacklogTaskItem({
   return (
     <motion.div
         ref={containerRef}
-        layout
+        layout={!isExiting}
         initial={false}
         animate={
         isExiting
@@ -215,7 +215,7 @@ function BacklogTaskItem({
             : { opacity: 0, scale: 0.95 }
         }
         transition={{ delay: index * 0.05 }}
-        className={`group relative mb-3 rounded-xl ${isOpen ? 'z-20' : isMenuOpen ? 'z-50' : isExiting ? 'z-0' : 'z-auto'} ${isDesktop ? '' : 'overflow-hidden bg-muted/50'}`}
+        className={`group relative mb-3 rounded-xl ${isOpen ? 'z-20' : isMenuOpen ? 'z-50' : isExiting ? 'z-0' : 'z-auto'} ${isDesktop ? '' : 'overflow-hidden bg-muted/50'} ${isExiting ? 'will-change-transform' : ''}`}
         style={{ zIndex: isMenuOpen ? 50 : isExiting ? 0 : isOpen ? 20 : 1 }}
     >
         {/* Swipe Actions Layer (Left - for Right Swipe - Trash) */}
