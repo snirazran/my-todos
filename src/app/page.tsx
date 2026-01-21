@@ -569,26 +569,45 @@ export default function Home() {
                       const task = tasks.find((t) => t.id === taskId);
                       if (!task) return;
 
-                      // API calls to transfer task
-                      await Promise.all([
-                        fetch('/api/tasks?view=board', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            text: task.text,
-                            repeat: 'backlog',
-                            tags: task.tags,
-                          }),
-                        }),
-                        fetch('/api/tasks', {
-                          method: 'DELETE',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ date: dateStr, taskId }),
-                        }),
-                      ]);
+                      // --- Optimistic Update ---
+                      // 1. Remove from today
+                      setTasks((prev) => prev.filter((t) => t.id !== taskId));
                       
-                      // Refresh to show updated state
-                      await Promise.all([refreshToday(), fetchBacklog()]);
+                      // 2. Add to backlog (laterThisWeek)
+                      setLaterThisWeek((prev) => [
+                          ...prev,
+                          { id: task.id, text: task.text, tags: task.tags }
+                      ]);
+
+                      // API calls to transfer task
+                      try {
+                          await Promise.all([
+                            fetch('/api/tasks?view=board', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                text: task.text,
+                                repeat: 'backlog',
+                                tags: task.tags,
+                              }),
+                            }),
+                            fetch('/api/tasks', {
+                              method: 'DELETE',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ date: dateStr, taskId }),
+                            }),
+                          ]);
+                      } catch (e) {
+                          console.error("Failed to move to later", e);
+                          // Revert would go here if we were being very strict, 
+                          // but a refresh usually fixes it eventually.
+                      }
+                      
+                      // Refresh to show updated state (sync with server)
+                      // Delayed to prevent "ghost" task from reappearing if DB is slow
+                      setTimeout(async () => {
+                          await Promise.all([refreshToday(), fetchBacklog()]);
+                      }, 800);
                     }}
                     onReorder={async (newTasks) => {
                       setTasks(newTasks);
@@ -655,29 +674,52 @@ export default function Home() {
                       onRefreshToday={refreshToday}
                       onRefreshBacklog={fetchBacklog}
                       onMoveToToday={async (item) => {
+                        // --- Optimistic Update ---
+                        // 1. Remove from backlog
+                        setLaterThisWeek((prev) => prev.filter((t) => t.id !== item.id));
+
+                        // 2. Add to today
+                        setTasks((prev) => [
+                            ...prev,
+                            { 
+                                id: item.id, 
+                                text: item.text, 
+                                completed: false, 
+                                type: 'regular',
+                                tags: item.tags 
+                            }
+                        ]);
+
                         const dow = new Date().getDay();
 
                         // API Calls to transfer task
-                        await Promise.all([
-                          fetch('/api/tasks?view=board', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              text: item.text,
-                              days: [dow],
-                              repeat: 'this-week',
-                              tags: item.tags,
-                            }),
-                          }),
-                          fetch('/api/tasks?view=board', {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ day: -1, taskId: item.id }),
-                          }),
-                        ]);
+                        try {
+                            await Promise.all([
+                              fetch('/api/tasks?view=board', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  text: item.text,
+                                  days: [dow],
+                                  repeat: 'this-week',
+                                  tags: item.tags,
+                                }),
+                              }),
+                              fetch('/api/tasks?view=board', {
+                                method: 'DELETE',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ day: -1, taskId: item.id }),
+                              }),
+                            ]);
+                        } catch (e) {
+                            console.error("Failed to move to today", e);
+                        }
                         
-                        // Refresh to show updated state
-                        await Promise.all([refreshToday(), fetchBacklog()]);
+                        // Refresh to show updated state and get real IDs if changed
+                        // Delayed to prevent "ghost" task from reappearing
+                        setTimeout(async () => {
+                             await Promise.all([refreshToday(), fetchBacklog()]);
+                        }, 800);
                       }}
                       onAddRequested={() => {
                         setQuickText('');

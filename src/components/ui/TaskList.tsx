@@ -1,3 +1,4 @@
+import { flushSync } from 'react-dom';
 import {
   CheckCircle2,
   Circle,
@@ -258,6 +259,8 @@ function SortableTaskItem({
 
         transition={{
             layout: { type: 'spring', stiffness: 250, damping: 25 },
+            default: { type: 'spring', stiffness: 400, damping: 25 },
+            opacity: { duration: 0.2 }
         }}
         className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : 'overflow-hidden bg-muted/50'}`}
       >
@@ -891,9 +894,11 @@ export default function TaskList({
                           isDragDisabled={isCompleted}
                           isWeekly={taskKind(task) === 'weekly'}
                           disableLayout={isAnyDragging}
-                          onDoLater={onDoLater ? (t) => {
-                             setExitAction({ id: t.id, type: 'later' });
-                             onDoLater(t.id);
+                           onDoLater={onDoLater ? (t) => {
+                              flushSync(() => {
+                                  setExitAction({ id: t.id, type: 'later' });
+                              });
+                              onDoLater(t.id);
                           } : undefined}
                         />
                       );
@@ -923,7 +928,9 @@ export default function TaskList({
                 if (menu) {
                   const id = menu.id;
                   setMenu(null);
-                  setExitAction({ id, type: 'later' });
+                  flushSync(() => {
+                      setExitAction({ id, type: 'later' });
+                  });
                   onDoLater(id);
                 }
               }
