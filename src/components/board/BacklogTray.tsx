@@ -4,6 +4,7 @@ import { X, CalendarClock, CalendarRange, Trash2 } from 'lucide-react';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
+import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TagPopup from '@/components/ui/TagPopup';
 
@@ -17,6 +18,9 @@ interface Props {
   trayRef?: React.RefObject<HTMLDivElement>;
   closeProgress?: number; // 0 = fully open, 1 = fully closed
   onRemove?: (id: string) => void;
+  onEdit?: (id: string, newText: string) => void;
+  onToggleRepeat?: (id: string) => void;
+  onDoToday?: (id: string) => void;
   userTags?: { id: string; name: string; color: string }[];
 }
 
@@ -30,6 +34,9 @@ export default React.memo(function BacklogTray({
   trayRef,
   closeProgress = 0,
   onRemove,
+  onEdit,
+  onToggleRepeat,
+  onDoToday,
   userTags = [],
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -40,6 +47,7 @@ export default React.memo(function BacklogTray({
   // Menu & Dialog State
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [confirmItem, setConfirmItem] = useState<Task | null>(null);
+  const [editItem, setEditItem] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
   
   const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
@@ -208,19 +216,20 @@ export default React.memo(function BacklogTray({
                             onToggleMenu={(rect) => {
                                 setMenu((prev) => {
                                     if (prev?.id === t.id) return null;
-                                    // Adjust menu positioning logic for vertical list if needed
-                                    // Simply centering relative to rect is usually fine
-                                    const MENU_W = 180;
-                                    const MENU_H = 64;
+                                    const MENU_W = 160;
+                                    const MENU_H = 180; // Approximate height with all options
+                                    const MARGIN = 10;
                                     const vw = window.innerWidth;
                                     const vh = window.innerHeight;
                                     
                                     let left = rect.left + rect.width / 2 - MENU_W / 2;
-                                    // Ensure menu stays within sidebar bounds if on desktop?
-                                    // Actually we want it to pop out.
+                                    
+                                    // Clamp horizontal position
+                                    left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
                                     
                                     let top = rect.bottom + 8;
-                                    if (top + MENU_H > vh - 20) {
+                                    // If menu would go off bottom, flip to above
+                                    if (top + MENU_H > vh - MARGIN) {
                                         top = rect.top - MENU_H - 8;
                                     }
                                     
@@ -271,6 +280,22 @@ export default React.memo(function BacklogTray({
             onClose={() => setMenu(null)}
             onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
             addTagsPosition="first"
+            onToggleRepeat={() => {
+                if (menu && onToggleRepeat) onToggleRepeat(menu.id);
+                setMenu(null);
+            }}
+            isWeekly={menu ? tasks.find(t => t.id === menu.id)?.type === 'weekly' : false}
+            onEdit={(id) => {
+                const t = tasks.find(it => it.id === id);
+                if (t && onEdit) {
+                    setEditItem(t);
+                }
+                setMenu(null);
+            }}
+            onDoToday={() => {
+                if (menu && onDoToday) onDoToday(menu.id);
+                setMenu(null);
+            }}
             onDelete={() => {
               if (menu) {
                 const t = tasks.find((it) => it.id === menu.id);
@@ -287,6 +312,23 @@ export default React.memo(function BacklogTray({
             onClose={() => setTagPopup({ open: false, taskId: null })}
             onSave={handleTagSave}
           />
+
+         {editItem && (
+            <EditTaskDialog
+                open={!!editItem}
+                initialText={editItem.text}
+                busy={busy}
+                onClose={() => setEditItem(null)}
+                onSave={async (newText) => {
+                    if (onEdit) {
+                        setBusy(true);
+                        await onEdit(editItem.id, newText);
+                        setBusy(false);
+                        setEditItem(null);
+                    }
+                }}
+            />
+         )}
 
           <DeleteDialog
             open={!!confirmItem}

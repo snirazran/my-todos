@@ -203,13 +203,12 @@ export default function TaskBoard({
       // Don't return here, we might still want proximity logic if we drag back near the box?
       // Actually, if tray is open, box proximity is less relevant, or maybe we want it to highlight if we drop back "into" the button?
       // For simplicity, let's prioritize tray animation.
-      setIsDragOverBacklog(false);
-      setBacklogProximity(0);
-      return;
+      // Don't return here! We WANT to check if we are hovering the box to allow "drop to return".
+      // We continue to the hit test below.
+    } else {
+      // Reset tray progress if not dragging from backlog
+      setTrayCloseProgress(0);
     }
-
-    // Reset tray progress if not dragging from backlog
-    setTrayCloseProgress(0);
 
     // 2. Handle Box Proximity (Dragging TO backlog)
     if (!drag?.active || !backlogBoxRef.current) {
@@ -531,6 +530,29 @@ export default function TaskBoard({
         closeProgress={trayCloseProgress}
         onRemove={(id) => removeTask(7 as DisplayDay, id)}
         userTags={userTags}
+        onEdit={(id, newText) => handleEditTask(7 as DisplayDay, id, newText)}
+        onToggleRepeat={(id) => onToggleRepeat && onToggleRepeat(id, 7 as DisplayDay)}
+        onDoToday={async (id) => {
+             // Move to today (DisplayIndex)
+             const tDay = todayDisplayIndex;
+             setWeek(prev => {
+                const next = prev.map(d => d.slice());
+                const taskIndex = next[7].findIndex(t => t.id === id);
+                if (taskIndex !== -1) {
+                    const [task] = next[7].splice(taskIndex, 1);
+                    if (task.type === 'backlog') task.type = 'regular';
+                    
+                    if (!next[tDay]) next[tDay] = [];
+                    next[tDay].push(task);
+                    
+                    Promise.all([
+                        saveDay(7 as DisplayDay, next[7]),
+                        saveDay(tDay, next[tDay])
+                    ]).catch(console.error);
+                }
+                return next;
+             });
+        }}
       />
 
       <QuickAddSheet
