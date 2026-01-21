@@ -132,6 +132,7 @@ export default function Home() {
   const [isAnimating, setIsAnimating] = useState(false);
   const [showReward, setShowReward] = useState(false);
   const pendingIds = useRef(new Set<string>());
+  const pendingDeletionsRef = useRef(new Set<string>());
 
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -158,8 +159,10 @@ export default function Home() {
       const items = await res.json();
       if (!Array.isArray(items)) return;
       
-      setLaterThisWeek(
-        items.map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
+       setLaterThisWeek(
+        items
+          .filter((t: any) => !pendingDeletionsRef.current.has(t.id))
+          .map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
       );
     } catch (e) {
       console.error('Failed to fetch backlog:', e);
@@ -215,7 +218,7 @@ export default function Home() {
         return;
       }
       const json = await res.json();
-      setTasks(json.tasks ?? []);
+      setTasks((json.tasks ?? []).filter((t: Task) => !pendingDeletionsRef.current.has(t.id)));
       setWeeklyIds(new Set(json.weeklyIds ?? []));
       applyFlyStatus(json.flyStatus);
       if (json.hungerStatus) setHungerStatus(json.hungerStatus);
@@ -570,6 +573,9 @@ export default function Home() {
                       if (!task) return;
 
                       // --- Optimistic Update ---
+                      // 0. Track pending deletion to prevent ghosting
+                      pendingDeletionsRef.current.add(taskId);
+
                       // 1. Remove from today
                       setTasks((prev) => prev.filter((t) => t.id !== taskId));
                       
@@ -599,14 +605,20 @@ export default function Home() {
                           ]);
                       } catch (e) {
                           console.error("Failed to move to later", e);
-                          // Revert would go here if we were being very strict, 
-                          // but a refresh usually fixes it eventually.
+                          pendingDeletionsRef.current.delete(taskId);
                       }
                       
                       // Refresh to show updated state (sync with server)
                       // Delayed to prevent "ghost" task from reappearing if DB is slow
                       setTimeout(async () => {
-                          await Promise.all([refreshToday(), fetchBacklog()]);
+                          try {
+                              await Promise.all([refreshToday(), fetchBacklog()]);
+                          } finally {
+                              // Clear pending deletion after we're reasonably sure sync is done
+                              // or just keep it until next hard refresh? 
+                              // Clearing it here is safer if the user moves it back again.
+                              pendingDeletionsRef.current.delete(taskId);
+                          }
                       }, 800);
                     }}
                     onReorder={async (newTasks) => {
@@ -675,6 +687,9 @@ export default function Home() {
                       onRefreshBacklog={fetchBacklog}
                       onMoveToToday={async (item) => {
                         // --- Optimistic Update ---
+                        // 0. Track pending deletion
+                        pendingDeletionsRef.current.add(item.id);
+
                         // 1. Remove from backlog
                         setLaterThisWeek((prev) => prev.filter((t) => t.id !== item.id));
 
@@ -713,12 +728,17 @@ export default function Home() {
                             ]);
                         } catch (e) {
                             console.error("Failed to move to today", e);
+                            pendingDeletionsRef.current.delete(item.id);
                         }
                         
                         // Refresh to show updated state and get real IDs if changed
                         // Delayed to prevent "ghost" task from reappearing
                         setTimeout(async () => {
-                             await Promise.all([refreshToday(), fetchBacklog()]);
+                             try {
+                                await Promise.all([refreshToday(), fetchBacklog()]);
+                             } finally {
+                                pendingDeletionsRef.current.delete(item.id);
+                             }
                         }, 800);
                       }}
                       onAddRequested={() => {

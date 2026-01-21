@@ -212,7 +212,7 @@ function BacklogTaskItem({
         }
         exit={
         isExiting
-            ? { opacity: 1, x: -600 }
+            ? { opacity: 0, x: -600, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0, borderTopWidth: 0, borderBottomWidth: 0, overflow: 'hidden' }
             : { opacity: 0, scale: 0.95 }
         }
         transition={{ delay: index * 0.05 }}
@@ -596,7 +596,7 @@ export default function BacklogPanel({
         )}
       </div>
 
-      <div className="pb-2 space-y-3 overflow-hidden min-h-[100px]">
+      <div className="pb-2 overflow-hidden min-h-[100px]">
         {later.length === 0 ? (
             <button
               onClick={onAddRequested}
