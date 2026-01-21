@@ -62,14 +62,14 @@ export default function BacklogBox({
         }}
         // Base styles
         className={`
-           // Removed backdrop-blur-2xl for performance, simplified shadow
+           // Added backdrop-blur-2xl and matched shadow to AddTaskButton
            relative flex items-center justify-center overflow-hidden w-full
-           bg-card border-border/80 border shadow-md will-change-transform
+           bg-card border-border/80 border backdrop-blur-2xl will-change-transform
            ${isDragging 
              ? isDragOver 
                ? 'bg-primary border-primary text-primary-foreground shadow-xl' 
                : 'bg-card border-primary/50 text-foreground shadow-lg'
-             : 'hover:bg-card/95 hover:border-primary/50 transition-colors'
+             : 'hover:bg-card/95 hover:border-primary/50 transition-colors shadow-lg shadow-black/5 dark:shadow-black/20'
            }
         `}
       >

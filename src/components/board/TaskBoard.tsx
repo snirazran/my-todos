@@ -529,8 +529,7 @@ export default function TaskBoard({
               stiffness: 300,
               damping: 28,
             }}
-            className="flex-1 overflow-hidden min-w-0" 
-            style={{ 
+            className={`flex-1 min-w-0 ${drag?.active ? 'overflow-hidden' : 'overflow-visible'}`}            style={{ 
               pointerEvents: drag?.active ? 'none' : 'auto',
               whiteSpace: 'nowrap'
             }}
