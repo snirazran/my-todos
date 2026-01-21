@@ -196,9 +196,10 @@ function BacklogTaskItem({
         animate={
         isExiting
             ? {
-                opacity: 0,
-                x: -200,
-                scale: 0.8,
+                opacity: 1,
+                x: -600,
+                scale: 0.8, // Keep slight scale or remove? User said "smooth slide". Let's removing scale for consistency with TaskList? 
+                // Wait, TaskList had scale:0.8 removed. Let's remove it here too for symmetry.
                 transition: {
                 duration: 0.4,
                 ease: [0.32, 0.72, 0, 1],
@@ -208,7 +209,7 @@ function BacklogTaskItem({
         }
         exit={
         isExiting
-            ? { opacity: 0 }
+            ? { opacity: 1, x: -600 }
             : { opacity: 0, scale: 0.95 }
         }
         transition={{ delay: index * 0.05 }}
@@ -277,10 +278,10 @@ function BacklogTaskItem({
             className={`
                 relative flex items-center gap-1.5 px-2 py-3.5 
                 transition-colors duration-200 rounded-xl 
-                border 
+                border border-border/40 shadow-sm
                 ${isDesktop 
-                    ? `md:hover:bg-card md:hover:border-border md:hover:shadow-sm ${isMenuOpen ? 'bg-card border-border shadow-md' : 'bg-transparent border-transparent'}` 
-                    : `bg-card ${(isOpen || isDragging || isNudging) ? 'border-border shadow-sm' : 'border-transparent'}`
+                    ? `md:hover:bg-card md:hover:border-border ${isMenuOpen ? 'bg-card border-border shadow-md' : 'bg-transparent'}` 
+                    : `bg-card ${(isOpen || isDragging || isNudging) ? '' : ''}`
                 }
             `}
             style={{ x, touchAction: 'pan-y' }}
@@ -590,7 +591,7 @@ export default function BacklogPanel({
         )}
       </div>
 
-      <div className="pb-2 space-y-3 overflow-visible min-h-[100px]">
+      <div className="pb-2 space-y-3 overflow-hidden min-h-[100px]">
         {later.length === 0 ? (
             <button
               onClick={onAddRequested}

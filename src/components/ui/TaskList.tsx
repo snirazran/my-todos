@@ -247,14 +247,15 @@ function SortableTaskItem({
         animate={
           isExitingLater
             ? {
-                opacity: 0,
-                x: 200,
-                scale: 0.8,
+                opacity: 1,
+                x: 600,
+                y: 0,
                 transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] },
               }
             : { opacity: 1, x: 0, y: 0 }
         }
-        exit={isExitingLater ? { opacity: 0 } : { opacity: 0, scale: 0.95 }}
+        exit={isExitingLater ? { opacity: 1, x: 600, y: 0 } : { opacity: 0, scale: 0.95 }}
+
         transition={{
             layout: { type: 'spring', stiffness: 250, damping: 25 },
         }}
@@ -330,7 +331,10 @@ function SortableTaskItem({
               relative flex items-center gap-1.5 px-2 py-3.5 
               transition-colors duration-200 rounded-xl 
               bg-card 
-              border ${ (isOpen || isSwiping) ? 'border-border shadow-sm' : 'border-transparent'} md:hover:border-border
+            border border-border/40 shadow-sm
+              ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
+              md:hover:border-border
+
               md:hover:shadow-sm
               select-none
               ${isDragging ? 'z-[100] opacity-100' : ''}
@@ -829,7 +833,7 @@ export default function TaskList({
         </div>
 
         <div
-          className="pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)]"
+          className="pb-2 space-y-0 overflow-y-auto overflow-x-hidden min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)]"
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && (
