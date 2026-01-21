@@ -6,14 +6,22 @@ import { Tag, Palette, Plus, X, Loader2, Pencil, Check } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const TAG_COLORS = [
-  { name: 'Red', value: '#f87171', bg: 'bg-red-500', text: 'text-red-950 dark:text-red-100' },
-  { name: 'Orange', value: '#fb923c', bg: 'bg-orange-500', text: 'text-orange-950 dark:text-orange-100' },
-  { name: 'Yellow', value: '#facc15', bg: 'bg-yellow-400', text: 'text-yellow-950 dark:text-yellow-100' },
-  { name: 'Green', value: '#4ade80', bg: 'bg-green-500', text: 'text-green-950 dark:text-green-100' },
-  { name: 'Teal', value: '#2dd4bf', bg: 'bg-teal-400', text: 'text-teal-950 dark:text-teal-100' },
-  { name: 'Blue', value: '#60a5fa', bg: 'bg-blue-500', text: 'text-blue-950 dark:text-blue-100' },
-  { name: 'Purple', value: '#c084fc', bg: 'bg-purple-500', text: 'text-purple-950 dark:text-purple-100' },
-  { name: 'Pink', value: '#f472b6', bg: 'bg-pink-500', text: 'text-pink-950 dark:text-pink-100' },
+  { name: 'Red', value: '#ef4444', bg: 'bg-red-500', text: 'text-red-950 dark:text-red-100' },
+  { name: 'Orange', value: '#f97316', bg: 'bg-orange-500', text: 'text-orange-950 dark:text-orange-100' },
+  { name: 'Amber', value: '#f59e0b', bg: 'bg-amber-500', text: 'text-amber-950 dark:text-amber-100' },
+  { name: 'Yellow', value: '#eab308', bg: 'bg-yellow-400', text: 'text-yellow-950 dark:text-yellow-100' },
+  { name: 'Lime', value: '#84cc16', bg: 'bg-lime-500', text: 'text-lime-950 dark:text-lime-100' },
+  { name: 'Green', value: '#22c55e', bg: 'bg-green-500', text: 'text-green-950 dark:text-green-100' },
+  { name: 'Emerald', value: '#10b981', bg: 'bg-emerald-500', text: 'text-emerald-950 dark:text-emerald-100' },
+  { name: 'Teal', value: '#14b8a6', bg: 'bg-teal-500', text: 'text-teal-950 dark:text-teal-100' },
+  { name: 'Cyan', value: '#06b6d4', bg: 'bg-cyan-500', text: 'text-cyan-950 dark:text-cyan-100' },
+  { name: 'Blue', value: '#3b82f6', bg: 'bg-blue-500', text: 'text-blue-950 dark:text-blue-100' },
+  { name: 'Indigo', value: '#6366f1', bg: 'bg-indigo-500', text: 'text-indigo-950 dark:text-indigo-100' },
+  { name: 'Violet', value: '#8b5cf6', bg: 'bg-violet-500', text: 'text-violet-950 dark:text-violet-100' },
+  { name: 'Purple', value: '#a855f7', bg: 'bg-purple-500', text: 'text-purple-950 dark:text-purple-100' },
+  { name: 'Fuchsia', value: '#d946ef', bg: 'bg-fuchsia-500', text: 'text-fuchsia-950 dark:text-fuchsia-100' },
+  { name: 'Pink', value: '#ec4899', bg: 'bg-pink-500', text: 'text-pink-950 dark:text-pink-100' },
+  { name: 'Rose', value: '#f43f5e', bg: 'bg-rose-500', text: 'text-rose-950 dark:text-rose-100' },
 ];
 
 const TAG_MAX_LENGTH = 20;
@@ -201,7 +209,20 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                             className="overflow-hidden"
                         >
                             <div className="p-2 bg-card rounded-lg shadow-sm border border-border">
-                                <div className="text-[11px] font-bold text-muted-foreground mb-2 uppercase tracking-wider">Pick a color for "{tagInput}"</div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Pick a color for "{tagInput}"</div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowColorPicker(false);
+                                            setTagInput('');
+                                        }}
+                                        className="p-1 text-muted-foreground hover:text-foreground transition-colors"
+                                        title="Cancel"
+                                    >
+                                        <X className="w-3.5 h-3.5" />
+                                    </button>
+                                </div>
                                 <div className="flex gap-2 flex-wrap">
                                     {TAG_COLORS.map((c) => (
                                     <button
@@ -231,7 +252,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                 </AnimatePresence>
 
                 {/* Available Tags */}
-                {savedTags.length > 0 && (
+                {savedTags.length > 0 && !showColorPicker && (
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
