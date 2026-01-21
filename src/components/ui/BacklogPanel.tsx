@@ -50,8 +50,10 @@ function BacklogTaskItem({
   const doTodayOpacity = useTransform(x, [0, -25], [0, 1]);
   const doTodayScale = useTransform(x, [0, -swipeThreshold], [0.8, 1.2]);
   // Instant color snap at threshold
-  // Always green
-  const doTodayColor = "#16a34a";
+  // Dynamic color snap at threshold (Gray -> Green)
+  const dynaColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#16a34a"]);
+  const doTodayColor = isNudging ? "#16a34a" : dynaColor;
+  
   const doTodayTextColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#ffffff", "#ffffff"]);
   const doTodayBgOpacity = useTransform(x, [-40, -swipeThreshold], [0, 1]);
   
