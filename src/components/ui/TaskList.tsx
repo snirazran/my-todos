@@ -243,7 +243,7 @@ function SortableTaskItem({
     >
       <motion.div
         layout={!disableLayout && !isDragging}
-        initial={{ opacity: 0, y: 20 }}
+        initial={disableLayout ? false : { opacity: 0, y: 20 }}
         animate={
           isExitingLater
             ? {
@@ -489,6 +489,7 @@ export default function TaskList({
   onReorder,
   onToggleRepeat,
   onEditTask,
+  disableInitialAnimation = false,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -508,6 +509,7 @@ export default function TaskList({
   onReorder?: (tasks: Task[]) => void;
   onToggleRepeat?: (taskId: string) => Promise<void> | void;
   onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
+  disableInitialAnimation?: boolean;
 }) {
   const { data: tagsData } = useSWR('/api/tags', (url) =>
     fetch(url).then((r) => r.json())
@@ -886,7 +888,7 @@ export default function TaskList({
                           getTagDetails={getTagDetails}
                           isDragDisabled={isCompleted}
                           isWeekly={taskKind(task) === 'weekly'}
-                          disableLayout={isAnyDragging}
+                          disableLayout={isAnyDragging || disableInitialAnimation}
                           onDoLater={onDoLater ? (t) => {
                              setExitAction({ id: t.id, type: 'later' });
                              onDoLater(t.id);

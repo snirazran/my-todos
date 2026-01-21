@@ -159,9 +159,7 @@ export default function Home() {
       if (!Array.isArray(items)) return;
       
       setLaterThisWeek(
-        items
-          .filter((t: any) => !pendingIds.current.has(t.id))
-          .map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
+        items.map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
       );
     } catch (e) {
       console.error('Failed to fetch backlog:', e);
@@ -217,7 +215,7 @@ export default function Home() {
         return;
       }
       const json = await res.json();
-      setTasks((json.tasks ?? []).filter((t: Task) => !pendingIds.current.has(t.id)));
+      setTasks(json.tasks ?? []);
       setWeeklyIds(new Set(json.weeklyIds ?? []));
       applyFlyStatus(json.flyStatus);
       if (json.hungerStatus) setHungerStatus(json.hungerStatus);
@@ -245,7 +243,7 @@ export default function Home() {
         const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
         if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
         const json = await res.json();
-        setTasks((json.tasks ?? []).filter((t: Task) => !pendingIds.current.has(t.id)));
+        setTasks(json.tasks ?? []);
         setWeeklyIds(new Set(json.weeklyIds ?? []));
         applyFlyStatus(json.flyStatus);
         if (json.hungerStatus) setHungerStatus(json.hungerStatus);
@@ -526,6 +524,7 @@ export default function Home() {
                     toggle={handleToggle}
                     showConfetti={rate === 100}
                     visuallyCompleted={visuallyDone}
+                    disableInitialAnimation={true}
                     renderBullet={(task, isVisuallyDone) =>
                       task.completed || isVisuallyDone ? null : (
                         <Fly
@@ -571,17 +570,7 @@ export default function Home() {
                       const task = tasks.find((t) => t.id === taskId);
                       if (!task) return;
 
-                      // Mark pending
-                      pendingIds.current.add(taskId);
-
-                      // Optimistic Update
-                      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-                      setLaterThisWeek((prev) => [
-                        ...prev,
-                        { id: taskId, text: task.text, tags: task.tags },
-                      ]);
-
-                      // Parallel API calls
+                      // API calls to transfer task
                       await Promise.all([
                         fetch('/api/tasks?view=board', {
                           method: 'POST',
@@ -598,12 +587,9 @@ export default function Home() {
                           body: JSON.stringify({ date: dateStr, taskId }),
                         }),
                       ]);
-
-                      // Parallel Refresh
-                      await Promise.all([refreshToday(), fetchBacklog()]);
                       
-                      // Cleanup pending (optional, mostly for safety)
-                      pendingIds.current.delete(taskId);
+                      // Refresh to show updated state
+                      await Promise.all([refreshToday(), fetchBacklog()]);
                     }}
                     onReorder={async (newTasks) => {
                       setTasks(newTasks);
@@ -670,25 +656,9 @@ export default function Home() {
                       onRefreshToday={refreshToday}
                       onRefreshBacklog={fetchBacklog}
                       onMoveToToday={async (item) => {
-                        // Mark pending
-                        pendingIds.current.add(item.id);
-
-                        // Optimistic Update
-                        setLaterThisWeek((prev) => prev.filter((t) => t.id !== item.id));
-                        setTasks((prev) => [
-                          ...prev,
-                          {
-                            id: item.id, // Temp ID until refresh
-                            text: item.text,
-                            completed: false,
-                            tags: item.tags,
-                            type: 'regular',
-                          },
-                        ]);
-
                         const dow = new Date().getDay();
 
-                        // Parallel API Calls
+                        // API Calls to transfer task
                         await Promise.all([
                           fetch('/api/tasks?view=board', {
                             method: 'POST',
@@ -706,12 +676,9 @@ export default function Home() {
                             body: JSON.stringify({ day: -1, taskId: item.id }),
                           }),
                         ]);
-
-                        // Parallel Refresh
-                        await Promise.all([refreshToday(), fetchBacklog()]);
                         
-                        // Cleanup pending
-                        pendingIds.current.delete(item.id);
+                        // Refresh to show updated state
+                        await Promise.all([refreshToday(), fetchBacklog()]);
                       }}
                       onAddRequested={() => {
                         setQuickText('');
@@ -916,29 +883,24 @@ function TaskCounter({ count }: { count: number }) {
 
   React.useEffect(() => {
     if (count > prevCount.current) {
-       // Only animate if count INCREASED
-       controls.start({
-           scale: [1, 1.15, 1],
-           backgroundColor: ["hsl(var(--secondary))", "hsl(var(--primary))", "hsl(var(--secondary))"],
-           color: ["hsl(var(--muted-foreground))", "hsl(var(--primary-foreground))", "hsl(var(--muted-foreground))"],
-           transition: { 
-               scale: { duration: 0.3, ease: "easeOut" },
-               backgroundColor: { duration: 0.4 },
-               color: { duration: 0.4 }
-           }
-       });
+      // Only animate if count INCREASED
+      controls.start({
+        scale: [1, 1.5, 1],
+        transition: { 
+          duration: 0.5,
+          ease: [0.34, 1.56, 0.64, 1], // Bouncy spring
+        }
+      });
     }
     prevCount.current = count;
   }, [count, controls]);
 
   return (
     <motion.span
-       animate={controls}
-       className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm"
+      animate={controls}
+      className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm"
     >
-       {count}
+      {count}
     </motion.span>
   );
 }
-
-
