@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, Inbox, Archive, CalendarRange, Trash2 } from 'lucide-react';
+import { X, CalendarClock, CalendarRange, Trash2 } from 'lucide-react';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
@@ -111,6 +111,9 @@ export default React.memo(function BacklogTray({
       }
   };
 
+  // Auto-hide when dragging FROM the tray
+  const isDraggingAny = !!activeDragId;
+  
   return (
     <AnimatePresence>
       {isOpen && (
@@ -118,135 +121,149 @@ export default React.memo(function BacklogTray({
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: 1 - closeProgress }}
+            animate={{ opacity: isDraggingAny ? 0 : (1 - closeProgress) }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.1 }}
-            className="fixed inset-0 z-[80] bg-background/40 backdrop-blur-md"
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[80] bg-background/60 backdrop-blur-sm"
             onClick={onClose}
-            style={{ pointerEvents: closeProgress > 0.5 ? 'none' : 'auto' }}
+            style={{ pointerEvents: (closeProgress > 0.5 || isDraggingAny) ? 'none' : 'auto' }}
           />
 
-          {/* The Tray */}
+          {/* The Vertical Tray/Drawer */}
           <motion.div
             ref={trayRef}
-            initial={{ y: '100%' }}
-            animate={{ y: `${closeProgress * 100}%` }}
-            exit={{ y: '100%' }}
-            transition={closeProgress > 0 ? { type: 'tween', ease: 'linear', duration: 0 } : { type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
-            className="fixed bottom-0 left-0 right-0 z-[90] flex flex-col bg-card/95 border-t border-border/50 shadow-[0_-20px_50px_rgba(0,0,0,0.1)] backdrop-blur-3xl pb-[env(safe-area-inset-bottom)] rounded-t-[32px] overflow-hidden"
+            initial={{ x: '-100%', opacity: 0 }} // Desktop: Slide from Left
+            animate={{ 
+                x: typeof window !== 'undefined' && window.innerWidth >= 768 ? '0%' : '0%', // Desktop: Slide In (0%)
+                y: typeof window !== 'undefined' && window.innerWidth >= 768 ? '0%' : `${closeProgress * 100}%`, // Mobile: Slide Up (Bottom)
+                opacity: isDraggingAny ? 0 : 1,
+                scale: isDraggingAny ? 0.95 : 1
+            }}
+            exit={{ x: '-100%', opacity: 0 }} // Desktop: Slide out Left
+            transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
+            className={`
+                fixed z-[90] flex flex-col bg-card/95 border-r border-border/50 shadow-2xl backdrop-blur-3xl overflow-hidden
+                
+                /* Mobile: Bottom Sheet */
+                inset-x-0 bottom-0 top-[15vh] rounded-t-[32px] border-t
+                
+                /* Desktop: Left Sidebar */
+                md:inset-y-0 md:left-0 md:right-auto md:w-[420px] md:top-0 md:bottom-0 md:rounded-none md:border-t-0
+            `}
             onClick={(e) => e.stopPropagation()}
+            style={{ pointerEvents: isDraggingAny ? 'none' : 'auto' }}
           >
-            {/* Grab Handle */}
-            <div className="flex justify-center pt-3 pb-1">
-              <div className="w-12 h-1.5 rounded-full bg-border/40" />
-            </div>
-
             {/* Header */}
-            <div className="flex items-center justify-between px-8 py-4">
+            <div className="flex items-center justify-between px-6 py-8 md:px-8 shrink-0">
               <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center w-10 h-10 rounded-2xl bg-primary/10 text-primary">
-                  <Archive size={22} strokeWidth={2.5} />
+                <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 text-primary shadow-sm">
+                  <CalendarClock size={24} strokeWidth={2.5} />
                 </div>
                 <div>
-                  <h3 className="text-xl font-black tracking-tight text-foreground uppercase">
+                  <h3 className="text-2xl font-black tracking-tight text-foreground uppercase">
                     Saved Tasks
                   </h3>
-                  <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
+                  <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
                     <CalendarRange size={12} strokeWidth={3} />
-                    <span>Drop here to schedule later</span>
+                    <span>{tasks.length} {tasks.length === 1 ? 'Task' : 'Tasks'} Saved</span>
                   </div>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="flex items-center justify-center w-10 h-10 rounded-2xl bg-secondary hover:bg-secondary/80 text-muted-foreground transition-all active:scale-95"
+                className="flex items-center justify-center w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground transition-all active:scale-95"
               >
                 <X size={20} strokeWidth={2.5} />
               </button>
             </div>
 
-            {/* Horizontal Scroll Content */}
+            {/* Vertical Scroll Content */}
             <div
               ref={scrollRef}
-              onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={stopDragging}
-              onMouseLeave={stopDragging}
-              className="flex gap-4 px-8 py-6 overflow-x-auto overflow-y-visible min-h-[160px] items-center no-scrollbar touch-manipulation"
+              className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4 md:px-6 pb-8 space-y-3"
             >
-              {tasks.length === 0 ? (
-                <div className="w-full flex flex-col items-center justify-center py-10 gap-3 opacity-30">
-                  <Inbox size={48} strokeWidth={1.5} />
-                  <p className="text-sm font-bold uppercase tracking-widest">Your backlog is empty</p>
-                </div>
-              ) : (
-                <AnimatePresence mode="popLayout">
-                {tasks.map((t, i) => (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.9, x: 20 }}
-                    animate={{ opacity: 1, scale: 1, x: 0 }}
-                    exit={{ opacity: 0, scale: 0.8, transition: { duration: 0.15 } }}
-                    key={t.id}
-                    className="w-[280px] sm:w-[320px] shrink-0 relative"
-                  >
-                    <div className="group relative">
-                      <TaskCard
-                        innerRef={(el) => setCardRef(draggableIdFor(7, t.id), el)}
-                        dragId={draggableIdFor(7, t.id)}
-                        task={t}
-                        userTags={userTags}
-                        menuOpen={menu?.id === t.id}
-                        onToggleMenu={(rect) => {
-                          setMenu((prev) => {
-                            if (prev?.id === t.id) return null;
-                            const MENU_W = 180;
-                            const MENU_H = 64;
-                            const GAP = 12;
-                            const MARGIN = 16;
-                            const vw = typeof window !== 'undefined' ? window.innerWidth : 480;
-                            const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
-                            let left = rect.left + rect.width / 2 - MENU_W / 2;
-                            left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
-                            let top = rect.bottom + GAP;
-                            if (top + MENU_H > vh - MARGIN) {
-                              top = rect.top - MENU_H - GAP;
-                            }
-                            return { id: t.id, top, left };
-                          });
-                        }}
-                        hiddenWhileDragging={activeDragId === t.id}
-                        isRepeating={t.type === 'weekly'}
-                        touchAction="pan-x"
-                        isAnyDragging={!!activeDragId}
-                        onGrab={(payload) => {
-                          const resolvedTags = t.tags?.map(tagId => {
-                             const found = userTags?.find(ut => ut.id === tagId || ut.name === tagId);
-                             return found || { id: tagId, name: tagId, color: '' };
-                          });
-
-                          onGrab({
-                              day: 7,
-                              index: i,
-                              taskId: t.id,
-                              taskText: t.text,
-                              clientX: payload.clientX,
-                              clientY: payload.clientY,
-                              pointerType: payload.pointerType,
-                              rectGetter: () => {
-                                  const id = draggableIdFor(7, t.id);
-                                  const el = document.querySelector(`[data-card-id="${id}"]`);
-                                  return el?.getBoundingClientRect() ?? new DOMRect(0,0,0,0);
-                              },
-                              tags: resolvedTags
-                          })
-                        }}
-                      />
+              <AnimatePresence mode="popLayout">
+                {tasks.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
+                    <CalendarClock size={64} strokeWidth={1} />
+                    <p className="text-sm font-bold uppercase tracking-widest">No saved tasks</p>
                     </div>
-                  </motion.div>
-                ))}
-                </AnimatePresence>
-              )}
+                ) : (
+                    tasks.map((t, i) => (
+                    <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
+                        key={t.id}
+                        layout
+                        className="w-full relative"
+                    >
+                        <div className="group relative">
+                        <TaskCard
+                            innerRef={(el) => setCardRef(draggableIdFor(7, t.id), el)}
+                            dragId={draggableIdFor(7, t.id)}
+                            task={t}
+                            userTags={userTags}
+                            menuOpen={menu?.id === t.id}
+                            onToggleMenu={(rect) => {
+                                setMenu((prev) => {
+                                    if (prev?.id === t.id) return null;
+                                    // Adjust menu positioning logic for vertical list if needed
+                                    // Simply centering relative to rect is usually fine
+                                    const MENU_W = 180;
+                                    const MENU_H = 64;
+                                    const vw = window.innerWidth;
+                                    const vh = window.innerHeight;
+                                    
+                                    let left = rect.left + rect.width / 2 - MENU_W / 2;
+                                    // Ensure menu stays within sidebar bounds if on desktop?
+                                    // Actually we want it to pop out.
+                                    
+                                    let top = rect.bottom + 8;
+                                    if (top + MENU_H > vh - 20) {
+                                        top = rect.top - MENU_H - 8;
+                                    }
+                                    
+                                    return { id: t.id, top, left };
+                                });
+                            }}
+                            hiddenWhileDragging={activeDragId === t.id}
+                            isRepeating={t.type === 'weekly'}
+                            touchAction="auto" // Vertical scroll, so auto is fine? Or none? TaskCard usually handles handle
+                            isAnyDragging={!!activeDragId}
+                            onGrab={(payload) => {
+                                // Same grab logic
+                                const resolvedTags = t.tags?.map(tagId => {
+                                    const found = userTags?.find(ut => ut.id === tagId || ut.name === tagId);
+                                    return found || { id: tagId, name: tagId, color: '' };
+                                });
+                                onGrab({
+                                    day: 7,
+                                    index: i,
+                                    taskId: t.id,
+                                    taskText: t.text,
+                                    clientX: payload.clientX,
+                                    clientY: payload.clientY,
+                                    pointerType: payload.pointerType,
+                                    rectGetter: () => { // ... },
+                                        const id = draggableIdFor(7, t.id);
+                                        const el = document.querySelector(`[data-card-id="${id}"]`);
+                                        return el?.getBoundingClientRect() ?? new DOMRect(0,0,0,0);
+                                    },
+                                    tags: resolvedTags
+                                })
+                            }}
+                        />
+                        </div>
+                    </motion.div>
+                    ))
+                )}
+              </AnimatePresence>
             </div>
+            
+            {/* Footer / Gradient Cover at bottom? */}
+            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
+
           </motion.div>
 
           <TaskMenu

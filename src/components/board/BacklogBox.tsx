@@ -2,7 +2,7 @@
 
 import React, { useEffect } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
-import { Inbox, ArrowDownToLine } from 'lucide-react';
+import { CalendarClock, ArrowDownToLine } from 'lucide-react';
 
 interface Props {
   count: number;
@@ -101,7 +101,7 @@ export default function BacklogBox({
            className="absolute inset-0 flex items-center justify-center"
            style={{ pointerEvents: 'none' }}
         >
-          <Inbox size={22} strokeWidth={2} className="text-muted-foreground group-hover:text-primary transition-colors" />
+          <CalendarClock size={22} strokeWidth={2} className="text-muted-foreground group-hover:text-primary transition-colors" />
         </motion.div>
 
         {/* Drag Over Glow Effect */}

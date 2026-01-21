@@ -152,21 +152,9 @@ export default function TaskBoard({
   const [quickText, setQuickText] = useState('');
 
   // Derived state for masking targetDay (Placeholder Suppression)
-  let effectiveTargetDay = targetDay;
-  if (drag?.active && backlogOpen && backlogTrayRef.current) {
-    // If dragging within the visual bounds of the tray, suppress column placeholders
-    // The tray might be animating down (trayCloseProgress > 0).
-    // We consider it "covering" if we are below its current visual top.
-
-    const trayHeight = backlogTrayRef.current.offsetHeight;
-    // Calculate visual top based on close progress (0=open, 1=closed/down)
-    const visualTrayTop =
-      window.innerHeight - trayHeight * (1 - trayCloseProgress);
-
-    if (drag.y > visualTrayTop) {
-      effectiveTargetDay = null;
-    }
-  }
+  // Derived state for masking targetDay (Placeholder Suppression)
+  // Removed outdated suppression logic for vertical drawer
+  const effectiveTargetDay = targetDay;
 
   // --- Clamp Target Index Logic ---
   // If we are targeting a regular day (0..6), we must not allow the targetIndex
@@ -346,25 +334,9 @@ export default function TaskBoard({
     }
     // 2. If hovering the tray (while open), force drop to backlog to avoid "ghost drop" onto background column
     //    BUT only if we haven't dragged it "out" (trayCloseProgress < 1)
-    else if (backlogOpen && backlogTrayRef.current && trayCloseProgress < 0.9) {
-      const tr = backlogTrayRef.current.getBoundingClientRect();
-      // Only capture if we are physically over the tray (or what's left of it)
-      // Although with the animation, the tray moves down.
-      // But conceptually, if the user is dragging "out", we want them to hit the columns.
-      if (
-        drag.x >= tr.left &&
-        drag.x <= tr.right &&
-        drag.y >= tr.top &&
-        drag.y <= tr.bottom
-      ) {
-        finalToDay = 7 as DisplayDay;
-        if (drag.fromDay === 7) {
-          finalToIndex = drag.fromIndex;
-        } else {
-          finalToIndex = week[7]?.length || 0;
-        }
-      }
-    }
+    // 2. Tray Logic Removed: Since we auto-hide the tray on drag, we should NOT capture drops "onto the tray".
+    //    We let them fall through to the underlying columns.
+    //    If the user releases over the "void" (not a column), it might default to 7 (backlog) if targetDay is null, below.
     // 3. If we dragged it OUT of the tray (trayCloseProgress >= 0.9), we implicitly "close" the tray logic for this drop.
     //    So we let it fall through to the calculated `finalToDay` (which is based on column geometry).
 
