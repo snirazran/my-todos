@@ -1,4 +1,3 @@
-import { flushSync } from 'react-dom';
 import {
   CheckCircle2,
   Circle,
@@ -239,7 +238,7 @@ function SortableTaskItem({
       style={style}
       {...attributes}
       {...listeners}
-      className={`relative ${isDragging ? 'z-[100]' : 'z-auto'}`}
+      className={`relative mb-3 ${isDragging ? 'z-[100]' : 'z-auto'}`}
       data-is-active={!isDone}
     >
       <motion.div
@@ -255,11 +254,12 @@ function SortableTaskItem({
               }
             : { opacity: 1, x: 0, y: 0 }
         }
-        exit={isExitingLater ? { opacity: 0, x: 600, height: 0, marginBottom: 0, marginTop: 0, paddingTop: 0, paddingBottom: 0, borderTopWidth: 0, borderBottomWidth: 0, overflow: 'hidden' } : { opacity: 0, scale: 0.95 }}
+        exit={isExitingLater ? { opacity: 1, x: 600, y: 0 } : { opacity: 0, scale: 0.95 }}
 
-          // Simplify transition to reduce jitter
-          transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }}
-        className={`group relative rounded-xl mb-3 ${isDragging ? 'overflow-visible' : 'overflow-hidden bg-muted/50'}`}
+        transition={{
+            layout: { type: 'spring', stiffness: 250, damping: 25 },
+        }}
+        className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : 'overflow-hidden bg-muted/50'}`}
       >
           {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
           {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
@@ -859,7 +859,7 @@ export default function TaskList({
             onDragCancel={handleDragCancel}
             modifiers={[restrictToActiveArea]}
           >
-            <div className="relative pb-24">
+            <div className="relative">
               {/* Unified Tasks Container */}
               <div className="relative overflow-visible">
                 <SortableContext
@@ -891,11 +891,9 @@ export default function TaskList({
                           isDragDisabled={isCompleted}
                           isWeekly={taskKind(task) === 'weekly'}
                           disableLayout={isAnyDragging}
-                           onDoLater={onDoLater ? (t) => {
-                              flushSync(() => {
-                                  setExitAction({ id: t.id, type: 'later' });
-                              });
-                              onDoLater(t.id);
+                          onDoLater={onDoLater ? (t) => {
+                             setExitAction({ id: t.id, type: 'later' });
+                             onDoLater(t.id);
                           } : undefined}
                         />
                       );
@@ -925,9 +923,7 @@ export default function TaskList({
                 if (menu) {
                   const id = menu.id;
                   setMenu(null);
-                  flushSync(() => {
-                      setExitAction({ id, type: 'later' });
-                  });
+                  setExitAction({ id, type: 'later' });
                   onDoLater(id);
                 }
               }

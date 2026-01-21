@@ -1,7 +1,6 @@
 'use client';
 
 import * as React from 'react';
-import { flushSync } from 'react-dom';
 
 import { EllipsisVertical, CalendarClock, CalendarCheck, Plus, Loader2, Trash2 } from 'lucide-react';
 import { animate, useMotionValue, useTransform, motion, AnimatePresence, useAnimation, PanInfo } from "framer-motion";
@@ -212,7 +211,7 @@ function BacklogTaskItem({
         }
         exit={
         isExiting
-            ? { opacity: 0, x: -600, height: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0, borderTopWidth: 0, borderBottomWidth: 0, overflow: 'hidden' }
+            ? { opacity: 1, x: -600 }
             : { opacity: 0, scale: 0.95 }
         }
         transition={{ delay: index * 0.05 }}
@@ -490,43 +489,41 @@ export default function BacklogPanel({
   const addToday = async (item: BacklogItem) => {
     if (processingIds.has(item.id)) return;
     setProcessingIds((prev) => new Set(prev).add(item.id));
-    flushSync(() => {
-        setExitAction({ id: item.id, type: 'today' });
-    });
+    setExitAction({ id: item.id, type: 'today' });
 
     try {
-        if (onMoveToToday) {
-            await onMoveToToday(item);
-            return;
-        }
+      if (onMoveToToday) {
+        await onMoveToToday(item);
+        return;
+      }
 
-        const dow = new Date().getDay();
-        await Promise.all([
-            fetch('/api/tasks?view=board', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                text: item.text,
-                days: [dow],
-                repeat: 'this-week',
-                tags: item.tags,
-            }),
-            }),
-            fetch('/api/tasks?view=board', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ day: -1, taskId: item.id }),
-            }),
-        ]);
+      const dow = new Date().getDay();
+      await Promise.all([
+        fetch('/api/tasks?view=board', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: item.text,
+            days: [dow],
+            repeat: 'this-week',
+            tags: item.tags,
+          }),
+        }),
+        fetch('/api/tasks?view=board', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ day: -1, taskId: item.id }),
+        }),
+      ]);
 
-        await onRefreshToday();
-        await onRefreshBacklog();
+      await onRefreshToday();
+      await onRefreshBacklog();
     } finally {
-        setProcessingIds((prev) => {
-            const next = new Set(prev);
-            next.delete(item.id);
-            return next;
-        });
+      setProcessingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(item.id);
+        return next;
+      });
     }
   };
 
@@ -596,7 +593,7 @@ export default function BacklogPanel({
         )}
       </div>
 
-      <div className="pb-2 overflow-hidden min-h-[100px]">
+      <div className="pb-2 space-y-3 overflow-hidden min-h-[100px]">
         {later.length === 0 ? (
             <button
               onClick={onAddRequested}
