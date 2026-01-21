@@ -569,6 +569,17 @@ export default function Home() {
                       const task = tasks.find((t) => t.id === taskId);
                       if (!task) return;
 
+                      // OPTIMISTIC UPDATE:
+                      // 1. Remove from "Today" immediately
+                      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+                      
+                      // 2. Add to "Backlog" immediately (so if they switch tabs, it's there)
+                      // We might not have 'tags' fully populated if it was a simplified object, but usually it is.
+                      setLaterThisWeek((prev) => [
+                        ...prev,
+                        { id: task.id, text: task.text, tags: task.tags },
+                      ]);
+
                       // API calls to transfer task
                       await Promise.all([
                         fetch('/api/tasks?view=board', {
@@ -587,7 +598,7 @@ export default function Home() {
                         }),
                       ]);
                       
-                      // Refresh to show updated state
+                      // Refresh to sync final state (IDs might change on the new one, etc)
                       await Promise.all([refreshToday(), fetchBacklog()]);
                     }}
                     onReorder={async (newTasks) => {
@@ -656,6 +667,21 @@ export default function Home() {
                       onRefreshBacklog={fetchBacklog}
                       onMoveToToday={async (item) => {
                         const dow = new Date().getDay();
+
+                        // OPTIMISTIC UPDATE:
+                        // 1. Remove from Backlog immediately
+                        setLaterThisWeek((prev) => prev.filter((t) => t.id !== item.id));
+
+                        // 2. Add to Today immediately
+                        // Need to conform to Task interface. Completed=false by default.
+                        const optimisticTask: Task = {
+                             id: item.id, // ID might change after server post, but for now use this
+                             text: item.text,
+                             completed: false,
+                             tags: item.tags,
+                             order: tasks.length + 1 // Add to end logic
+                        };
+                        setTasks((prev) => [...prev, optimisticTask]);
 
                         // API Calls to transfer task
                         await Promise.all([

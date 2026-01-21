@@ -893,7 +893,7 @@ export default function TaskList({
                           disableLayout={isAnyDragging}
                           onDoLater={onDoLater ? (t) => {
                              setExitAction({ id: t.id, type: 'later' });
-                             onDoLater(t.id);
+                             setTimeout(() => onDoLater(t.id), 0);
                           } : undefined}
                         />
                       );
@@ -924,7 +924,7 @@ export default function TaskList({
                   const id = menu.id;
                   setMenu(null);
                   setExitAction({ id, type: 'later' });
-                  onDoLater(id);
+                  setTimeout(() => onDoLater(id), 0);
                 }
               }
             : undefined

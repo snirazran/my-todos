@@ -493,7 +493,8 @@ export default function BacklogPanel({
 
     try {
       if (onMoveToToday) {
-        await onMoveToToday(item);
+        // Break batching to preserve exit animation
+        setTimeout(() => onMoveToToday(item), 0);
         return;
       }
 
