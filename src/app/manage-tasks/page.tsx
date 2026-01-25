@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import TaskBoard from '@/components/board/TaskBoard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
@@ -11,6 +11,7 @@ import {
   apiDayFromDisplay,
   displayDayFromApi,
   todayDisplayIndex, // Import todayDisplayIndex
+  getRollingWeekOrder,
   type ApiDay,
   type DisplayDay,
 } from '@/components/board/helpers';
@@ -22,10 +23,12 @@ export default function ManageTasksPage() {
     Array.from({ length: DAYS }, () => [])
   );
   const [loading, setLoading] = useState(true);
-  const todayIdx = useMemo(() => todayDisplayIndex(), []); // Calculate todayDisplayIndex once
+  // Calculate rolling week order once on mount
+  const processingWeekOrder = useMemo(() => getRollingWeekOrder(), []);
+  const todayIdx = useMemo(() => todayDisplayIndex(processingWeekOrder), [processingWeekOrder]);
 
   /** Map API order (Sun..Sat, Later at index 7) -> Display order */
-  const mapApiToDisplay = (apiWeek: Task[][]): Task[][] => {
+  const mapApiToDisplay = useCallback((apiWeek: Task[][]): Task[][] => {
     const out: Task[][] = Array.from({ length: DAYS }, () => []);
     // API days 0..6 (Sun..Sat)
     for (
@@ -33,15 +36,15 @@ export default function ManageTasksPage() {
       apiDay <= 6;
       apiDay = (apiDay + 1) as ApiDay
     ) {
-      const displayIdx = displayDayFromApi(apiDay);
+      const displayIdx = displayDayFromApi(apiDay, processingWeekOrder);
       out[displayIdx] = apiWeek[apiDay] ?? [];
     }
     // Later bucket is already at index 7 from the API
     out[7] = apiWeek[7] ?? [];
     return out;
-  };
+  }, [processingWeekOrder]);
 
-  const fetchWeek = async () => {
+  const fetchWeek = useCallback(async () => {
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const res = await fetch(`/api/tasks?view=board&timezone=${encodeURIComponent(tz)}`);
@@ -51,7 +54,7 @@ export default function ManageTasksPage() {
     } catch (err) {
       console.error('Failed to fetch weekly tasks:', err);
     }
-  };
+  }, [mapApiToDisplay]);
 
   useEffect(() => {
     (async () => {
@@ -59,13 +62,13 @@ export default function ManageTasksPage() {
       await fetchWeek();
       setLoading(false);
     })();
-  }, []);
+  }, [fetchWeek]);
 
   // Listen for global tag updates
   useEffect(() => {
     window.addEventListener('tags-updated', fetchWeek);
     return () => window.removeEventListener('tags-updated', fetchWeek);
-  }, []);
+  }, [fetchWeek]);
 
   /** Save order for one display column (maps -> API day) */
   const saveDay = async (displayDay: DisplayDay, tasks: Task[]) => {
@@ -76,7 +79,7 @@ export default function ManageTasksPage() {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          day: apiDayFromDisplay(displayDay), // 7 -> -1, else 0..6
+          day: apiDayFromDisplay(displayDay, processingWeekOrder), // 7 -> -1, else 0..6
           tasks: ordered,
           timezone: tz,
         }),
@@ -94,7 +97,7 @@ export default function ManageTasksPage() {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          day: apiDayFromDisplay(displayDay), // 7 -> -1, else 0..6
+          day: apiDayFromDisplay(displayDay, processingWeekOrder), // 7 -> -1, else 0..6
           taskId: id,
           timezone: tz,
         }),
@@ -139,22 +142,24 @@ export default function ManageTasksPage() {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const start = new Date(today);
-    start.setDate(today.getDate() - today.getDay());
+    // In this view, 'day' corresponds directly to offset from today if we just used indices,
+    // but let's stick to strict API logic:
+    // 1. Get API day (0..6)
+    const apiDay = apiDayFromDisplay(day, processingWeekOrder);
 
-    const apiDay = apiDayFromDisplay(day);
-    const targetDate = new Date(start);
-    targetDate.setDate(start.getDate() + apiDay);
+    // 2. Find closest future date with that weekday
+    const currentDow = today.getDay();
+    let daysUntil = apiDay - currentDow;
+    if (daysUntil < 0) daysUntil += 7;
 
-    if (targetDate < today) {
-      targetDate.setDate(targetDate.getDate() + 7);
-    }
+    const targetDate = new Date(today);
+    targetDate.setDate(today.getDate() + daysUntil);
 
     const pad = (n: number) => String(n).padStart(2, '0');
     const dateStr = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(targetDate.getDate())}`;
 
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    
+
     // Optimistic Update
     setWeek((prev) => {
       const next = [...prev];
@@ -187,31 +192,23 @@ export default function ManageTasksPage() {
   /** Titles in display order */
   const titles = useMemo(() => {
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to midnight for comparison
-
-    // Reset to Sunday (0) of current week
-    const start = new Date(today);
-    start.setDate(today.getDate() - today.getDay());
+    today.setHours(0, 0, 0, 0);
 
     return Array.from({ length: DAYS }, (_, i) => {
       if (i === 7) return EXTRA;
       const displayDay = i as Exclude<DisplayDay, 7>;
-      const apiDay = apiDayFromDisplay(displayDay);
 
-      const d = new Date(start);
-      d.setDate(start.getDate() + apiDay);
+      // With rolling order, index 0 is today, 1 is tomorrow, etc.
+      // But let's use the robust mapping for labels
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
 
-      // Rolling logic: if date < today, it's next week
-      if (d < today) {
-        d.setDate(d.getDate() + 7);
-      }
-
-      const dayName = labelForDisplayDay(displayDay);
+      const dayName = labelForDisplayDay(displayDay, processingWeekOrder);
       // Format d/M
       const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
       return `${dayName} ${dateStr}`;
     });
-  }, []);
+  }, [processingWeekOrder]);
 
   if (loading) {
     return <LoadingScreen message="Loading weekly tasks..." fullscreen />;
