@@ -29,6 +29,7 @@ import {
   TONGUE_MS,
   TONGUE_STROKE,
 } from '@/hooks/useFrogTongue';
+import { useNotification } from '@/components/providers/NotificationProvider';
 
 const FLY_PX = 24;
 
@@ -145,6 +146,8 @@ export default function Home() {
     visuallyDone,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
+  const { showNotification } = useNotification();
+
   const applyFlyStatus = useCallback((incoming?: FlyStatus | null) => {
     if (!incoming) return;
     setFlyStatus(incoming);
@@ -157,7 +160,7 @@ export default function Home() {
       if (!res.ok) return;
       const items = await res.json();
       if (!Array.isArray(items)) return;
-      
+
       setLaterThisWeek(
         items.map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
       );
@@ -296,14 +299,14 @@ export default function Home() {
         // Calculate new order to ensure task stays above existing completed tasks
         const completedTasks = tasks.filter((t) => t.completed && t.id !== taskId);
         const currentTask = tasks.find((t) => t.id === taskId);
-        
+
         let newOrder = currentTask?.order;
         if (currentTask && completedTasks.length > 0) {
-           const minOrder = Math.min(...completedTasks.map((t) => t.order ?? 0));
-           // If current order puts it below the top completed task, bump it up
-           if ((currentTask.order ?? 0) >= minOrder) {
-              newOrder = minOrder - 1;
-           }
+          const minOrder = Math.min(...completedTasks.map((t) => t.order ?? 0));
+          // If current order puts it below the top completed task, bump it up
+          if ((currentTask.order ?? 0) >= minOrder) {
+            newOrder = minOrder - 1;
+          }
         }
         apiOrder = newOrder;
 
@@ -339,7 +342,7 @@ export default function Home() {
           applyFlyStatus(body?.flyStatus);
           if (body?.hungerStatus) setHungerStatus(body.hungerStatus);
         } catch (e) {
-           console.error('Failed to parse PUT response', e);
+          console.error('Failed to parse PUT response', e);
         }
       }
     } else {
@@ -385,29 +388,29 @@ export default function Home() {
   const handleEditTask = async (taskId: string, newText: string) => {
     // Optimistic Update
     setTasks((prev) =>
-       prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
+      prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
     );
     // Also update backlog optimistically if needed (though usually separate)
-    setLaterThisWeek((prev) => 
-       prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
+    setLaterThisWeek((prev) =>
+      prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
     );
 
     if (session) {
-        try {
-            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            await fetch('/api/tasks', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ taskId, text: newText, timezone: tz }),
-            });
-        } catch (e) {
-            console.error("Failed to edit task", e);
-            // Revert? For now, we assume success or user refresh.
-        }
+      try {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        await fetch('/api/tasks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, text: newText, timezone: tz }),
+        });
+      } catch (e) {
+        console.error("Failed to edit task", e);
+        // Revert? For now, we assume success or user refresh.
+      }
     } else {
-        setGuestTasks((prev) =>
-             prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
-        );
+      setGuestTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
+      );
     }
   };
 
@@ -464,11 +467,10 @@ export default function Home() {
                 onClick={() => setActiveTab('today')}
                 className={`
         flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2
-        ${
-          activeTab === 'today'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground'
-        }
+        ${activeTab === 'today'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                  }
       `}
               >
                 <CalendarCheck className={`w-4 h-4 ${activeTab === 'today' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -481,11 +483,10 @@ export default function Home() {
                 onClick={() => setActiveTab('backlog')}
                 className={`
         flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2
-        ${
-          activeTab === 'backlog'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground'
-        }
+        ${activeTab === 'backlog'
+                    ? 'bg-background text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
+                  }
       `}
               >
                 <CalendarClock className={`w-4 h-4 ${activeTab === 'backlog' ? 'text-primary' : 'text-muted-foreground'}`} />
@@ -506,17 +507,17 @@ export default function Home() {
                 >
                   {!session && (
                     <div className="flex items-center gap-3 p-3 mb-4 border border-indigo-100 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/20 dark:border-indigo-800/50">
-                       <div className="flex items-center justify-center w-8 h-8 bg-white rounded-full shadow-sm dark:bg-slate-800 text-xl animate-bounce">
-                         🍽️
-                       </div>
-                       <div>
-                         <p className="text-sm font-bold text-indigo-900 dark:text-indigo-200">
-                           The Frog is Hungry!
-                         </p>
-                         <p className="text-xs text-indigo-700 dark:text-indigo-400">
-                           Catch a fly to make her happy and unlock a special <span className="font-bold">Gift</span>!
-                         </p>
-                       </div>
+                      <div className="flex items-center justify-center w-8 h-8 bg-white rounded-full shadow-sm dark:bg-slate-800 text-xl animate-bounce">
+                        🍽️
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-indigo-900 dark:text-indigo-200">
+                          The Frog is Hungry!
+                        </p>
+                        <p className="text-xs text-indigo-700 dark:text-indigo-400">
+                          Catch a fly to make her happy and unlock a special <span className="font-bold">Gift</span>!
+                        </p>
+                      </div>
                     </div>
                   )}
                   <TaskList
@@ -572,35 +573,73 @@ export default function Home() {
                       // OPTIMISTIC UPDATE:
                       // 1. Remove from "Today" immediately
                       setTasks((prev) => prev.filter((t) => t.id !== taskId));
-                      
-                      // 2. Add to "Backlog" immediately (so if they switch tabs, it's there)
-                      // We might not have 'tags' fully populated if it was a simplified object, but usually it is.
+
+                      // 2. Add to "Backlog" immediately
                       setLaterThisWeek((prev) => [
                         ...prev,
                         { id: task.id, text: task.text, tags: task.tags },
                       ]);
 
-                      // API calls to transfer task
-                      await Promise.all([
-                        fetch('/api/tasks?view=board', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            text: task.text,
-                            repeat: 'backlog',
-                            tags: task.tags,
+                      // API calls: POST to backlog, then DELETE from today
+                      // We must capture the NEW ID from the backlog creation to allow undoing it
+                      const postRes = await fetch('/api/tasks?view=board', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          text: task.text,
+                          repeat: 'backlog',
+                          tags: task.tags,
+                        }),
+                      });
+                      const postJson = await postRes.json();
+                      const newBacklogId = postJson.ids?.[0];
+
+                      // Now delete from today
+                      await fetch('/api/tasks', {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ date: dateStr, taskId }),
+                      });
+
+                      showNotification("Moved to Saved Tasks", async () => {
+                        // UNDO ACTION: Move back to Today
+                        if (newBacklogId) {
+                          // Optimistic: Remove the NEW backlog item
+                          setLaterThisWeek((prev) => prev.filter(t => t.id !== newBacklogId));
+                        } else {
+                          // Fallback if we didn't get ID? (Shouldn't happen if API ok)
+                          setLaterThisWeek((prev) => prev.filter(t => t.text !== task.text));
+                        }
+                        // Restore to Today
+                        setTasks((prev) => [...prev, task]);
+
+                        // API: Move to Today
+                        const dow = new Date().getDay();
+                        await Promise.all([
+                          fetch('/api/tasks?view=board', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              text: task.text,
+                              days: [dow],
+                              repeat: 'this-week',
+                              tags: task.tags,
+                            }),
                           }),
-                        }),
-                        fetch('/api/tasks', {
-                          method: 'DELETE',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ date: dateStr, taskId }),
-                        }),
-                      ]);
-                      
-                      // Refresh to sync final state (IDs might change on the new one, etc)
+                          // DELETE the backlog item we just created
+                          newBacklogId ? fetch('/api/tasks?view=board', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ day: -1, taskId: newBacklogId }),
+                          }) : Promise.resolve()
+                        ]);
+                        await Promise.all([refreshToday(), fetchBacklog()]);
+                      });
+
+                      // Refresh to sync final state
                       await Promise.all([refreshToday(), fetchBacklog()]);
                     }}
+
                     onReorder={async (newTasks) => {
                       setTasks(newTasks);
                       if (session) {
@@ -647,7 +686,7 @@ export default function Home() {
                           timezone: tz,
                         }),
                       });
-                      
+
                       refreshToday();
                     }}
                     onEditTask={handleEditTask}
@@ -675,36 +714,69 @@ export default function Home() {
                         // 2. Add to Today immediately
                         // Need to conform to Task interface. Completed=false by default.
                         const optimisticTask: Task = {
-                             id: item.id, // ID might change after server post, but for now use this
-                             text: item.text,
-                             completed: false,
-                             tags: item.tags,
-                             order: tasks.length + 1 // Add to end logic
+                          id: item.id, // ID might change after server post, but for now use this
+                          text: item.text,
+                          completed: false,
+                          tags: item.tags,
+                          order: tasks.length + 1 // Add to end logic
                         };
                         setTasks((prev) => [...prev, optimisticTask]);
 
-                        // API Calls to transfer task
-                        await Promise.all([
-                          fetch('/api/tasks?view=board', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              text: item.text,
-                              days: [dow],
-                              repeat: 'this-week',
-                              tags: item.tags,
+                        // API Calls to transfer task: POST to Today, DELETE from Backlog
+                        const postRes = await fetch('/api/tasks?view=board', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            text: item.text,
+                            days: [dow],
+                            repeat: 'this-week',
+                            tags: item.tags,
+                          }),
+                        });
+                        const postJson = await postRes.json();
+                        const newTodayId = postJson.ids?.[0];
+
+                        await fetch('/api/tasks?view=board', {
+                          method: 'DELETE',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ day: -1, taskId: item.id }),
+                        });
+
+                        showNotification("Moved to Today", async () => {
+                          // UNDO: Move back to Backlog
+                          // Optimistic: Remove the NEW today item
+                          if (newTodayId) {
+                            setTasks((prev) => prev.filter((t) => t.id !== newTodayId));
+                          } else {
+                            setTasks((prev) => prev.filter((t) => t.text !== item.text));
+                          }
+                          setLaterThisWeek((prev) => [...prev, { id: item.id, text: item.text, tags: item.tags }]);
+
+                          // API: Move to Backlog
+                          await Promise.all([
+                            fetch('/api/tasks?view=board', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                text: item.text,
+                                repeat: 'backlog',
+                                tags: item.tags,
+                              }),
                             }),
-                          }),
-                          fetch('/api/tasks?view=board', {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ day: -1, taskId: item.id }),
-                          }),
-                        ]);
-                        
+                            // Delete from Today using the NEW ID
+                            newTodayId ? fetch('/api/tasks', {
+                              method: 'DELETE',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ date: dateStr, taskId: newTodayId }),
+                            }) : Promise.resolve(),
+                          ]);
+                          await Promise.all([refreshToday(), fetchBacklog()]);
+                        });
+
                         // Refresh to show updated state
                         await Promise.all([refreshToday(), fetchBacklog()]);
                       }}
+
                       onAddRequested={() => {
                         setQuickText('');
                         setQuickAddMode('later');
@@ -794,7 +866,7 @@ export default function Home() {
               const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
               if (!res.ok) return;
               const json = await res.json();
-              
+
               setTasks(json.tasks ?? []);
               setWeeklyIds(new Set(json.weeklyIds ?? []));
               applyFlyStatus(json.flyStatus);
@@ -827,15 +899,15 @@ export default function Home() {
         }}
         dailyGiftCount={dailyGiftCount}
       />
-      
-      <HungerWarningModal 
-        open={!!session && hungerStatus.stolenFlies > 0} 
+
+      <HungerWarningModal
+        open={!!session && hungerStatus.stolenFlies > 0}
         stolenFlies={hungerStatus.stolenFlies}
         indices={indices}
         onAcknowledge={async () => {
-           // Optimistic clear
-           setHungerStatus(prev => ({ ...prev, stolenFlies: 0 }));
-           await fetch('/api/hunger/acknowledge', { method: 'POST' });
+          // Optimistic clear
+          setHungerStatus(prev => ({ ...prev, stolenFlies: 0 }));
+          await fetch('/api/hunger/acknowledge', { method: 'POST' });
         }}
       />
 
@@ -911,7 +983,7 @@ function TaskCounter({ count }: { count: number }) {
       // Only animate if count INCREASED
       controls.start({
         scale: [1, 1.5, 1],
-        transition: { 
+        transition: {
           duration: 0.5,
           ease: [0.34, 1.56, 0.64, 1], // Bouncy spring
         }

@@ -155,7 +155,7 @@ async function currentFlyStatus(userId: Types.ObjectId, tz: string): Promise<{ f
     if (!wardrobe.equipped) pendingUpdates['wardrobe.equipped'] = {};
     if (!wardrobe.inventory) pendingUpdates['wardrobe.inventory'] = {};
     if (wardrobe.flies === undefined) pendingUpdates['wardrobe.flies'] = 0;
-    
+
     // Ensure hunger fields are initialized if missing
     if (wardrobe.hunger === undefined) pendingUpdates['wardrobe.hunger'] = MAX_HUNGER_MS;
     if (!wardrobe.lastHungerUpdate) pendingUpdates['wardrobe.lastHungerUpdate'] = new Date();
@@ -220,9 +220,9 @@ async function awardFlyForTask(
   // Calculate new hunger (capped at max), forgiving any negative debt
   let newHunger = Math.min(MAX_HUNGER_MS, Math.max(0, currentHungerState.hunger) + TASK_HUNGER_REWARD_MS);
   const finalHungerStatus = { ...currentHungerState, hunger: newHunger };
-  
-  const setFields: Record<string, any> = { 
-    ...hungerUpdates, 
+
+  const setFields: Record<string, any> = {
+    ...hungerUpdates,
     'wardrobe.hunger': newHunger,
     'wardrobe.lastHungerUpdate': new Date() // Ensure we don't double-drain
   };
@@ -254,12 +254,12 @@ async function awardFlyForTask(
 
   return {
     awarded: awardedFly,
-    flyStatus: { 
-      balance: nextBalance, 
-      earnedToday: nextEarned, 
-      limit: DAILY_FLY_LIMIT, 
-      limitHit: hitLimit, 
-      justHitLimit: hitLimit && !limitNotified ? true : undefined 
+    flyStatus: {
+      balance: nextBalance,
+      earnedToday: nextEarned,
+      limit: DAILY_FLY_LIMIT,
+      limitHit: hitLimit,
+      justHitLimit: hitLimit && !limitNotified ? true : undefined
     },
     hungerStatus: finalHungerStatus
   };
@@ -288,19 +288,22 @@ export async function POST(req: NextRequest) {
   const days = repeat === 'backlog' ? [-1] : rawDays.map(Number).filter(Number.isInteger).filter((d) => d === -1 || isWeekday(d));
   if (days.length === 0) return NextResponse.json({ error: 'days must include -1 or 0..6' }, { status: 400 });
   const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
+  const createdIds: string[] = [];
   const now = new Date();
   if (repeat === 'weekly') {
     if (days.some((d) => d === -1)) return NextResponse.json({ error: 'Repeating tasks target weekdays 0..6' }, { status: 400 });
     for (const d of days) {
       const dayOfWeek: Weekday = d as Weekday;
       const id = uuid();
+      createdIds.push(id);
       const order = await nextOrderForDay(uid, dayOfWeek, weekDates[dayOfWeek]);
       await TaskModel.create({ userId: uid, type: 'weekly', id, text, order, dayOfWeek, createdAt: now, updatedAt: now, tags });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, ids: createdIds });
   }
   for (const d of days) {
     const id = uuid();
+    createdIds.push(id);
     if (d === -1) {
       const order = await nextOrderBacklog(uid, weekStart);
       await TaskModel.create({ userId: uid, type: 'backlog', id, text, order, weekStart, completed: false, createdAt: now, updatedAt: now, tags });
@@ -311,7 +314,7 @@ export async function POST(req: NextRequest) {
       await TaskModel.create({ userId: uid, type: 'regular', id, text, order, date, completed: false, createdAt: now, updatedAt: now, tags });
     }
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ids: createdIds });
 }
 
 export async function PUT(req: NextRequest) {
@@ -342,8 +345,8 @@ export async function PUT(req: NextRequest) {
   }
   // New: Handle text update
   if (body.text) {
-      await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: { text: body.text } });
-      return NextResponse.json({ ok: true });
+    await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: { text: body.text } });
+    return NextResponse.json({ ok: true });
   }
 
   if (typeof completed !== 'boolean') return NextResponse.json({ error: 'completed must be boolean' }, { status: 400 });

@@ -3,6 +3,7 @@
 import { SWRConfig } from 'swr';
 import { ThemeProvider } from 'next-themes';
 import type { ReactNode } from 'react';
+import { NotificationProvider } from '@/components/providers/NotificationProvider';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -13,7 +14,7 @@ export default function Providers({ children }: { children: ReactNode }) {
           revalidateOnReconnect: false,
         }}
       >
-        {children}
+        <NotificationProvider>{children}</NotificationProvider>
       </SWRConfig>
     </ThemeProvider>
   );

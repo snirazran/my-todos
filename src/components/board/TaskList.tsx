@@ -59,7 +59,7 @@ export default React.memo(function TaskList({
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay; kind?: 'edit' } | null>(null);
   const [busy, setBusy] = useState(false);
-  
+
   const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
 
   const placeholderAt =
@@ -126,19 +126,19 @@ export default React.memo(function TaskList({
       setMenu(null);
     }
   };
-  
+
   const handleTagSave = async (taskId: string, newTags: string[]) => {
-      try {
-          await fetch('/api/tasks', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ taskId, tags: newTags }),
-          });
-          
-          window.dispatchEvent(new Event('tags-updated'));
-      } catch (e) {
-          console.error("Failed to update tags", e);
-      }
+    try {
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, tags: newTags }),
+      });
+
+      window.dispatchEvent(new Event('tags-updated'));
+    } catch (e) {
+      console.error("Failed to update tags", e);
+    }
   };
 
   if (process.env.NODE_ENV !== 'production') {
@@ -168,13 +168,13 @@ export default React.memo(function TaskList({
         <button
           key={`empty-state-${day}`}
           onClick={() => onAddRequested('')}
-          className="w-full flex flex-col items-center justify-center py-6 px-4 text-center border-2 border-dashed border-border/50 bg-muted/20 rounded-2xl transition-all hover:bg-muted/40 hover:border-primary/30 group"
+          className="w-full flex flex-col items-center justify-center py-4 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
         >
-          <div className="mb-2 p-2 rounded-xl bg-primary/5 opacity-40 grayscale group-hover:grayscale-0 group-hover:opacity-100 group-hover:bg-primary/10 transition-all duration-500">
-            <Fly size={28} />
+          <div className="flex items-center justify-center w-10 h-10 mb-2 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+            <Fly size={20} y={-2} />
           </div>
-          <p className="text-[11px] font-black text-muted-foreground/60 uppercase tracking-widest group-hover:text-primary transition-colors">
-            Add task
+          <p className="text-xs font-bold text-muted-foreground group-hover:text-primary transition-colors">
+            Add Task
           </p>
         </button>
       );
@@ -230,8 +230,8 @@ export default React.memo(function TaskList({
               const id = draggableIdFor(day, t.id);
               // Resolve tags
               const resolvedTags = t.tags?.map(tagId => {
-                 const found = userTags?.find(ut => ut.id === tagId || ut.name === tagId);
-                 return found || { id: tagId, name: tagId, color: '' };
+                const found = userTags?.find(ut => ut.id === tagId || ut.name === tagId);
+                return found || { id: tagId, name: tagId, color: '' };
               });
 
               onGrab({
@@ -279,7 +279,7 @@ export default React.memo(function TaskList({
         onClose={() => setMenu(null)}
         onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
         addTagsPosition="second"
-        onToggleRepeat={onToggleRepeat ? () => { if(menu) { onToggleRepeat(menu.id, day); setMenu(null); } } : undefined}
+        onToggleRepeat={onToggleRepeat ? () => { if (menu) { onToggleRepeat(menu.id, day); setMenu(null); } } : undefined}
         isWeekly={menu ? items.find((t) => t.id === menu.id)?.type === 'weekly' : false}
         onDelete={() => {
           if (menu) {
@@ -289,19 +289,19 @@ export default React.memo(function TaskList({
           setMenu(null);
         }}
         onEdit={(taskId) => {
-            if (menu) {
-                const t = items.find((it) => it.id === menu.id);
-                if (t && onEditTask) {
-                    setDialog({ task: t, day, kind: 'edit' });
-                }
+          if (menu) {
+            const t = items.find((it) => it.id === menu.id);
+            if (t && onEditTask) {
+              setDialog({ task: t, day, kind: 'edit' });
             }
-            setMenu(null);
+          }
+          setMenu(null);
         }}
         onDoLater={onDoLater ? () => {
-             if (menu && onDoLater) {
-                 onDoLater(day, menu.id);
-                 setMenu(null);
-             }
+          if (menu && onDoLater) {
+            onDoLater(day, menu.id);
+            setMenu(null);
+          }
         } : undefined}
       />
       <TagPopup
@@ -313,18 +313,18 @@ export default React.memo(function TaskList({
       />
 
       {dialog && dialog.kind === 'edit' && onEditTask && (
-         <EditTaskDialog
-            open={!!dialog}
-            initialText={dialog.task.text}
-            busy={busy}
-            onClose={() => setDialog(null)}
-            onSave={async (newText) => {
-                setBusy(true);
-                await onEditTask(dialog.day, dialog.task.id, newText);
-                setBusy(false);
-                setDialog(null);
-            }}
-         />
+        <EditTaskDialog
+          open={!!dialog}
+          initialText={dialog.task.text}
+          busy={busy}
+          onClose={() => setDialog(null)}
+          onSave={async (newText) => {
+            setBusy(true);
+            await onEditTask(dialog.day, dialog.task.id, newText);
+            setBusy(false);
+            setDialog(null);
+          }}
+        />
       )}
 
       <DeleteDialog
@@ -340,8 +340,8 @@ export default React.memo(function TaskList({
           dialogVariant === 'weekly'
             ? handleDeleteAll
             : dialogVariant === 'backlog'
-            ? handleDeleteToday
-            : undefined
+              ? handleDeleteToday
+              : undefined
         }
       />
     </>
