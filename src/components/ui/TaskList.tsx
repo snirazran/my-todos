@@ -196,7 +196,7 @@ function SortableTaskItem({
         hasActionTriggeredRef.current = true;
         onDoLater(task);
         // Fix: Don't snap back. Continue the movement outwards to match the exit animation.
-        animate(x, 500, { duration: 0.4, ease: [0.32, 0.72, 0, 1] });
+        animate(x, 1000, { duration: 0.4, ease: [0.32, 0.72, 0, 1] });
       }
       // Opening: Swipe Left (Negative) -> Edit/Trash - SWAPPED
       else if (offset < -60 || velocity < -200) {
@@ -249,13 +249,13 @@ function SortableTaskItem({
           isExitingLater
             ? {
               opacity: 1,
-              x: 600,
+              x: 1000,
               y: 0,
               transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] },
             }
             : { opacity: 1, x: 0, y: 0 }
         }
-        exit={isExitingLater ? { opacity: 1, x: 600, y: 0 } : { opacity: 0, scale: 0.95 }}
+        exit={isExitingLater ? { opacity: 1, x: 1000, y: 0 } : { opacity: 0, scale: 0.95 }}
 
         transition={{
           layout: { type: 'spring', stiffness: 250, damping: 25 },
