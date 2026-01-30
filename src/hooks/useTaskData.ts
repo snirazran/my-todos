@@ -174,10 +174,8 @@ export function useTaskData() {
                 const completedTasks = tasks.filter((t) => t.completed && t.id !== taskId);
                 const currentTask = tasks.find((t) => t.id === taskId);
                 if (currentTask && completedTasks.length > 0) {
-                    const minOrder = Math.min(...completedTasks.map((t) => t.order ?? 0));
-                    if ((currentTask.order ?? 0) >= minOrder) {
-                        apiOrder = minOrder - 1;
-                    }
+                    const maxOrder = Math.max(...completedTasks.map((t) => t.order ?? 0));
+                    apiOrder = maxOrder + 1;
                 }
             }
 
