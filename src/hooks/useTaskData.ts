@@ -210,12 +210,8 @@ export function useTaskData() {
         // Mark as pending removal from Today
         setPendingExclusions(prev => new Map(prev).set(taskId, 'today'));
 
-        // 1. Optimistic Update 
-        // Remove from Today (handled by exclusion, but we enforce it for optimistic cache too)
-        const newTodayTasks = tasks.filter(t => t.id !== taskId);
-        await mutateToday({ ...todayData, tasks: newTodayTasks }, { revalidate: false });
-
-        // Don't optimistically add to backlog - let revalidation handle it
+        // No optimistic cache updates - let exclusion filter handle hiding
+        // API Call will move the task, revalidation will update lists
 
         // 2. API Call
         try {
@@ -304,12 +300,8 @@ export function useTaskData() {
         // Mark as pending removal from Backlog
         setPendingExclusions(prev => new Map(prev).set(item.id, 'backlog'));
 
-        // 1. Optimistic Update
-        // Remove from Backlog
-        const newBacklog = backlogData.filter(t => t.id !== item.id);
-        await mutateBacklog(newBacklog, { revalidate: false });
-
-        // Don't optimistically add to today - let revalidation handle it
+        // No optimistic cache updates - let exclusion filter handle hiding
+        // API Call will move the task, revalidation will update lists
 
         // 2. API Call
         try {
