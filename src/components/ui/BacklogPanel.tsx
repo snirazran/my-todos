@@ -194,8 +194,10 @@ function BacklogTaskItem({
           new CustomEvent('task-swipe-open', { detail: { id: null } })
         );
         onAddToday(item);
-        // Continue the movement outwards (left) to match the exit animation
-        animate(x, -1000, { duration: 0.4, ease: [0.32, 0.72, 0, 1] });
+        // Continue the movement outwards with smooth timing
+        // Use larger distance for desktop (wider container) vs mobile
+        const exitDistance = isDesktop ? -800 : -450;
+        animate(x, exitDistance, { duration: 0.8, ease: [0.22, 1, 0.36, 1] });
       }
       else {
         // Not enough swipe - Snap back
@@ -276,8 +278,22 @@ function BacklogTaskItem({
         dragMomentum={false}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        animate={{ x: isExiting ? -1000 : (isOpen ? 100 : 0) }}
-        transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }}
+        initial={false}
+        animate={{ x: isExiting ? (isDesktop ? -800 : -450) : (isOpen ? 100 : 0) }}
+        style={{
+          touchAction: 'pan-y',
+          willChange: isExiting ? 'transform' : 'auto',
+          x: x // Always use motion value
+        }}
+        transition={
+          isExiting
+            ? {
+              type: "tween",
+              duration: 0.8,
+              ease: [0.22, 1, 0.36, 1]
+            }
+            : { type: "spring", stiffness: 600, damping: 28, mass: 1 }
+        }
         className={`
                 relative flex items-center gap-1.5 px-2 py-3.5 
                 transition-colors duration-200 rounded-xl 
@@ -288,7 +304,6 @@ function BacklogTaskItem({
           }
                 ${isExiting ? 'pointer-events-none' : ''}
             `}
-        style={{ x: isExiting ? undefined : x, touchAction: 'pan-y' }}
         onClick={() => {
           if (isNudging) return;
           if (isOpen) setIsOpen(false);

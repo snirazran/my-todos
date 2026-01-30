@@ -208,8 +208,10 @@ function SortableTaskItem({
           new CustomEvent('task-swipe-open', { detail: { id: null } })
         );
         onDoLater(task);
-        // Continue the movement outwards to match the exit animation
-        animate(x, 1000, { duration: 0.4, ease: [0.32, 0.72, 0, 1] });
+        // Continue the movement outwards with smooth timing
+        // Use larger distance for desktop (wider container) vs mobile
+        const exitDistance = isDesktop ? 800 : 450;
+        animate(x, exitDistance, { duration: 0.8, ease: [0.22, 1, 0.36, 1] });
       }
       // Opening: Swipe Left (Negative) -> Edit/Trash - SWAPPED
       else if (offset < -60 || velocity < -200) {
@@ -264,7 +266,7 @@ function SortableTaskItem({
         transition={{
           layout: { type: 'spring', stiffness: 250, damping: 25 },
         }}
-        className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : 'overflow-hidden bg-muted/50'} ${isExitingLater ? 'will-change-transform' : ''}`}
+        className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : isExitingLater ? 'overflow-visible' : 'overflow-hidden bg-muted/50'} ${isExitingLater ? 'will-change-transform' : ''}`}
       >
         {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
         {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
@@ -328,9 +330,23 @@ function SortableTaskItem({
 
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          animate={{ x: isExitingLater ? 1000 : (isOpen ? -100 : 0) }}
-          style={{ x: isExitingLater ? undefined : x, touchAction: 'pan-y', cursor: 'grab' }}
-          transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }} // Snappier spring
+          initial={false}
+          animate={{ x: isExitingLater ? (isDesktop ? 800 : 450) : (isOpen ? -100 : 0) }}
+          style={{
+            x: x,
+            touchAction: 'pan-y',
+            cursor: 'grab',
+            willChange: isExitingLater ? 'transform' : 'auto'
+          }}
+          transition={
+            isExitingLater
+              ? {
+                type: "tween",
+                duration: 0.8,
+                ease: [0.22, 1, 0.36, 1]
+              }
+              : { type: "spring", stiffness: 600, damping: 28, mass: 1 }
+          }
 
           className={`
               relative flex items-center gap-1.5 px-2 py-3.5 
@@ -836,7 +852,7 @@ export default function TaskList({
         </div>
 
         <div
-          className="pb-2 space-y-0 overflow-y-auto overflow-x-hidden min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)]"
+          className={`pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)] ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && !exitAction && (
@@ -903,7 +919,7 @@ export default function TaskList({
                           onDoLater={onDoLater ? (t) => {
                             setExitAction({ id: t.id, type: 'later' });
                             setTimeout(() => onDoLater(t.id), 0);
-                            setTimeout(() => setExitAction(null), 600); // Clear after animation
+                            setTimeout(() => setExitAction(null), 800); // Clear after animation
                           } : undefined}
                         />
                       );
@@ -934,7 +950,7 @@ export default function TaskList({
                 const id = menu.id;
                 setExitAction({ id, type: 'later' });
                 setTimeout(() => onDoLater(id), 0);
-                setTimeout(() => setExitAction(null), 600); // Clear after animation
+                setTimeout(() => setExitAction(null), 800); // Clear after animation
               }
             }
             : undefined
