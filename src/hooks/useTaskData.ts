@@ -1,5 +1,5 @@
 import useSWR, { mutate } from 'swr';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useRef } from 'react';
 import { format } from 'date-fns';
 import { useSession } from 'next-auth/react';
 import { useNotification } from '@/components/providers/NotificationProvider';
@@ -49,6 +49,7 @@ export function useTaskData() {
     const today = new Date();
     const dateStr = format(today, 'yyyy-MM-dd');
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const pendingOperations = useRef(new Set<string>());
 
     // --- SWR Keys ---
     const todayKey = session ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}` : null;
@@ -74,13 +75,13 @@ export function useTaskData() {
     });
 
     // --- Derived State ---
-    const tasks = todayData?.tasks || [];
+    const tasks = (todayData?.tasks || []).filter(t => !pendingOperations.current.has(t.id));
     const weeklyIds = new Set(todayData?.weeklyIds || []);
     const flyStatus = todayData?.flyStatus || { balance: 0, earnedToday: 0, limit: 15, limitHit: false };
     const hungerStatus = todayData?.hungerStatus || { hunger: 0, stolenFlies: 0, maxHunger: 0 };
     const dailyGiftCount = todayData?.dailyGiftCount || 0;
 
-    const backlogTasks = backlogData || [];
+    const backlogTasks = (backlogData || []).filter(t => !pendingOperations.current.has(t.id));
 
     // --- Helper for Optimistic Updates ---
     const sortTasks = (ts: Task[]) => {
@@ -142,6 +143,7 @@ export function useTaskData() {
                 }),
             });
             await mutateToday();
+            // We assume successful toggle means state is settled.
         } catch (e) {
             console.error("Toggle failed", e);
             await mutateToday(); // Rollback
@@ -155,6 +157,8 @@ export function useTaskData() {
         if (!todayData || !backlogData) return;
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
+
+        pendingOperations.current.add(taskId);
 
         // 1. Optimistic Update
         // Remove from Today
@@ -187,8 +191,13 @@ export function useTaskData() {
                 body: JSON.stringify({ date: dateStr, taskId }),
             });
 
+            pendingOperations.current.delete(taskId);
+
             showNotification("Moved to Saved Tasks", async () => {
                 // UNDO Logic
+                pendingOperations.current.delete(taskId);
+                if (newBacklogId) pendingOperations.current.add(newBacklogId);
+
                 // 1. Optimistically restore
                 const restoredTask = { ...task };
                 await mutateToday(curr => (curr ? { ...curr, tasks: [...curr.tasks, restoredTask] } : curr), { revalidate: false });
@@ -216,6 +225,8 @@ export function useTaskData() {
                     });
                 }
 
+                if (newBacklogId) pendingOperations.current.delete(newBacklogId);
+
                 // Final sync
                 mutateToday();
                 mutateBacklog();
@@ -226,6 +237,7 @@ export function useTaskData() {
 
         } catch (e) {
             console.error("Move to backlog failed", e);
+            pendingOperations.current.delete(taskId);
             mutateToday();
             mutateBacklog();
         }
@@ -236,6 +248,8 @@ export function useTaskData() {
      */
     const moveTaskToToday = useCallback(async (item: { id: string; text: string; tags?: string[] }) => {
         if (!todayData || !backlogData) return;
+
+        pendingOperations.current.add(item.id);
 
         // 1. Optimistic Update
         // Remove from Backlog
@@ -274,13 +288,16 @@ export function useTaskData() {
                 body: JSON.stringify({ day: -1, taskId: item.id }),
             });
 
+            pendingOperations.current.delete(item.id);
+
             showNotification("Moved to Today", async () => {
                 // UNDO Logic
+                if (newTodayId) pendingOperations.current.add(newTodayId);
+
                 // Remove from Today
                 await mutateToday(curr => curr ? { ...curr, tasks: curr.tasks.filter(t => t.id !== (newTodayId || item.id)) } : curr, { revalidate: false });
 
                 // Restore to Backlog
-                // Fix: added completed: false explicitly
                 await mutateBacklog(curr => curr ? [...curr, { ...item, completed: false } as Task] : [{ ...item, completed: false } as Task], { revalidate: false });
 
                 // API Undo
@@ -299,6 +316,7 @@ export function useTaskData() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ date: dateStr, taskId: newTodayId }),
                     });
+                    if (newTodayId) pendingOperations.current.delete(newTodayId);
                 }
                 mutateToday();
                 mutateBacklog();
@@ -308,6 +326,7 @@ export function useTaskData() {
 
         } catch (e) {
             console.error("Move to today failed", e);
+            pendingOperations.current.delete(item.id);
             mutateToday();
             mutateBacklog();
         }
@@ -317,6 +336,8 @@ export function useTaskData() {
      * Delete Task (Today)
      */
     const deleteTask = useCallback(async (taskId: string) => {
+        pendingOperations.current.add(taskId);
+
         // Optimistic
         if (todayData) {
             await mutateToday({
@@ -331,6 +352,7 @@ export function useTaskData() {
             body: JSON.stringify({ date: dateStr, taskId }),
         });
 
+        pendingOperations.current.delete(taskId);
         mutateToday();
     }, [todayData, tasks, mutateToday, dateStr]);
 
