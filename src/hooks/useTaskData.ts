@@ -209,9 +209,6 @@ export function useTaskData() {
         // Mark as pending removal from Today
         setPendingExclusions(prev => new Map(prev).set(taskId, 'today'));
 
-        // Optimistic: Add to backlog immediately for instant UI update
-        await mutateBacklog(curr => curr ? [...curr, { ...task, completed: false }] : [{ ...task, completed: false }], { revalidate: false });
-
         // No optimistic cache updates - let exclusion filter handle hiding
         // API Call will move the task, revalidation will update lists
 
@@ -294,9 +291,6 @@ export function useTaskData() {
 
         // Mark as pending removal from Backlog
         setPendingExclusions(prev => new Map(prev).set(item.id, 'backlog'));
-
-        // Optimistic: Add to today immediately for instant UI update
-        await mutateToday(curr => curr ? { ...curr, tasks: [...curr.tasks, { ...item, completed: false }] } : curr, { revalidate: false });
 
         // No optimistic cache updates - let exclusion filter handle hiding
         // API Call will move the task, revalidation will update lists
