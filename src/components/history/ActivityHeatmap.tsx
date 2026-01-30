@@ -142,8 +142,8 @@ export default function ActivityHeatmap({ historyData, rangeDays }: ActivityHeat
                         >
                             <CardContent className="px-4 pb-4 pt-0">
                                 {/* Scrollable Container */}
-                                <div className="w-full pb-2">
-                                    <div className="flex gap-0.5 w-full justify-start items-end h-full">
+                                <div className="w-full pb-2 max-h-[8rem] overflow-y-auto custom-scrollbar">
+                                    <div className="flex flex-wrap gap-0.5 w-full justify-start items-start">
                                         {allDays.map((day, index) => {
                                             const dateStr = format(day, 'yyyy-MM-dd');
                                             const count = dataMap.get(dateStr) || 0;
@@ -157,7 +157,7 @@ export default function ActivityHeatmap({ historyData, rangeDays }: ActivityHeat
                                                             animate={{ opacity: 1, scale: 1 }}
                                                             transition={{ delay: index * 0.005 }}
                                                             className={cn(
-                                                                "flex-1 aspect-square rounded-sm cursor-help transition-colors min-w-0 max-w-[50px]",
+                                                                "w-4 h-4 rounded-sm cursor-help transition-colors flex-shrink-0",
                                                                 getBlockColor(level)
                                                             )}
                                                         />

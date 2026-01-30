@@ -109,6 +109,7 @@ export default function HistoryTimeSelector({
                         <div className="flex items-center justify-center gap-2 p-2 bg-card/80 backdrop-blur-xl border border-border/50 rounded-xl shadow-sm w-fit mx-auto">
                             <input
                                 type="date"
+                                max={new Date().toISOString().split('T')[0]}
                                 value={customDateRange.from}
                                 onChange={(e) => onCustomDateChange({ ...customDateRange, from: e.target.value })}
                                 className="w-24 px-2 py-1.5 bg-background border border-border rounded-lg text-[10px] font-medium focus:ring-1 focus:ring-primary outline-none"
@@ -116,6 +117,8 @@ export default function HistoryTimeSelector({
                             <span className="text-muted-foreground font-bold">-</span>
                             <input
                                 type="date"
+                                min={customDateRange.from}
+                                max={new Date().toISOString().split('T')[0]}
                                 value={customDateRange.to}
                                 onChange={(e) => onCustomDateChange({ ...customDateRange, to: e.target.value })}
                                 className="w-24 px-2 py-1.5 bg-background border border-border rounded-lg text-[10px] font-medium focus:ring-1 focus:ring-primary outline-none"
