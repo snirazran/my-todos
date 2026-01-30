@@ -80,7 +80,7 @@ export function useTaskData() {
     });
 
     // --- Cleanup Effect ---
-    // Remove exclusions when task successfully appears in destination list
+    // Remove exclusions when task is confirmed gone from source list
     useEffect(() => {
         if (pendingExclusions.size === 0) return;
 
@@ -97,18 +97,16 @@ export function useTaskData() {
             // Check each pending exclusion
             Array.from(next.entries()).forEach(([id, source]) => {
                 if (source === 'today') {
-                    // Task was hidden from Today → Should appear in Backlog
-                    // Only remove exclusion when task successfully appears in destination
-                    const inBacklog = effectiveBacklog.some(t => t.id === id);
-                    if (inBacklog && backlogData) {
+                    // If excluded from Today, wait until it's actually GONE from Today
+                    const inToday = effectiveToday.some(t => t.id === id);
+                    if (!inToday && todayData) {
                         next.delete(id);
                         changed = true;
                     }
                 } else if (source === 'backlog') {
-                    // Task was hidden from Backlog → Should appear in Today
-                    // Only remove exclusion when task successfully appears in destination
-                    const inToday = effectiveToday.some(t => t.id === id);
-                    if (inToday && todayData) {
+                    // If excluded from Backlog, wait until gone from Backlog
+                    const inBacklog = effectiveBacklog.some(t => t.id === id);
+                    if (!inBacklog && backlogData) {
                         next.delete(id);
                         changed = true;
                     }
@@ -217,9 +215,7 @@ export function useTaskData() {
         const newTodayTasks = tasks.filter(t => t.id !== taskId);
         await mutateToday({ ...todayData, tasks: newTodayTasks }, { revalidate: false });
 
-        // Add to Backlog
-        const newBacklogItem = { id: task.id, text: task.text, tags: task.tags, completed: false } as Task;
-        await mutateBacklog([...backlogData, newBacklogItem], { revalidate: false });
+        // Don't optimistically add to backlog - let revalidation handle it
 
         // 2. API Call
         try {
@@ -313,13 +309,7 @@ export function useTaskData() {
         const newBacklog = backlogData.filter(t => t.id !== item.id);
         await mutateBacklog(newBacklog, { revalidate: false });
 
-        // Add to Today
-        const newTask = {
-            ...item,
-            completed: false,
-            order: tasks.length + 1
-        } as Task;
-        await mutateToday({ ...todayData, tasks: [...tasks, newTask] }, { revalidate: false });
+        // Don't optimistically add to today - let revalidation handle it
 
         // 2. API Call
         try {
