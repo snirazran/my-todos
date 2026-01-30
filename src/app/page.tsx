@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import { Calendar, History, LayoutDashboard, CalendarCheck, CalendarClock } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
+//fix
 import { signIn, useSession } from 'next-auth/react';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { useUIStore } from '@/lib/uiStore';
