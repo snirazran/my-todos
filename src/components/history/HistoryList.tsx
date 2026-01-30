@@ -2,20 +2,20 @@
 
 import React from 'react';
 import { format, isToday, isYesterday } from 'date-fns';
-import HistoryTaskItem, { HistoryTaskItemProps } from './HistoryTaskItem';
+import HistoryTaskCard, { HistoryTaskCardProps } from './HistoryTaskCard';
 import { motion } from 'framer-motion';
 import useSWR from 'swr';
 
 type DailyGroup = {
   date: string;
-  tasks: HistoryTaskItemProps[];
+  tasks: HistoryTaskCardProps[];
 };
 
 type HistoryListProps = {
-   history: DailyGroup[];
-   onToggleTask: (id: string, date: string, currentStatus: boolean) => void;
-   setFlyRef?: (key: string, el: HTMLDivElement | null) => void;
-   visuallyCompleted?: Set<string>;
+  history: DailyGroup[];
+  onToggleTask: (id: string, date: string, currentStatus: boolean) => void;
+  setFlyRef?: (key: string, el: HTMLDivElement | null) => void;
+  visuallyCompleted?: Set<string>;
 };
 
 export default function HistoryList({ history, onToggleTask, setFlyRef, visuallyCompleted }: HistoryListProps) {
@@ -48,7 +48,7 @@ export default function HistoryList({ history, onToggleTask, setFlyRef, visually
         const totalCount = day.tasks.length;
 
         return (
-          <motion.div 
+          <motion.div
             key={day.date}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -56,32 +56,35 @@ export default function HistoryList({ history, onToggleTask, setFlyRef, visually
             className="space-y-3"
           >
             <div className="flex items-end justify-between px-1 py-2">
-               <div>
-                  <h3 className="text-lg font-bold text-foreground">
-                    {dateLabel}
-                  </h3>
-                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
-                     {format(dateObj, 'yyyy')}
-                  </p>
-               </div>
-               <div className="text-xs font-medium text-muted-foreground">
-                  {completedCount}/{totalCount} Completed
-               </div>
+              <div>
+                <h3 className="text-lg font-bold text-foreground">
+                  {dateLabel}
+                </h3>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">
+                  {format(dateObj, 'yyyy')}
+                </p>
+              </div>
+              <div className="text-xs font-medium text-muted-foreground">
+                {completedCount}/{totalCount} Completed
+              </div>
             </div>
-            
+
             <div className="grid gap-2">
               {day.tasks.map((task, i) => {
                 const uniqueKey = `${day.date}::${task.id}`;
                 return (
-                  <HistoryTaskItem 
-                    key={uniqueKey} 
-                    {...task} 
-                    index={i}
-                    date={day.date} // Explicitly pass the date of the group
+                  <HistoryTaskCard
+                    key={uniqueKey}
+                    id={task.id}
+                    text={task.text}
+                    completed={task.completed}
+                    type={task.type}
+                    tags={task.tags}
+                    date={day.date}
                     onToggle={onToggleTask}
                     setFlyRef={(el) => setFlyRef?.(uniqueKey, el)}
                     isEaten={visuallyCompleted?.has(uniqueKey)}
-                    userTags={userTags} // Pass userTags
+                    userTags={userTags}
                   />
                 );
               })}
