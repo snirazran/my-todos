@@ -258,6 +258,7 @@ function SortableTaskItem({
       data-is-active={!isDone}
     >
       <motion.div
+        layoutId={task.id}
         layout={!disableLayout && !isDragging && !isExitingLater}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, x: 0, y: 0 }}
