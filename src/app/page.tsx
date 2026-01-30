@@ -21,7 +21,6 @@ import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { RewardPopup } from '@/components/ui/gift-box/RewardPopup';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { mutate } from 'swr';
-import { MAX_HUNGER_MS } from '@/lib/hungerLogic';
 import {
   useFrogTongue,
   HIT_AT,
@@ -30,33 +29,9 @@ import {
   TONGUE_STROKE,
 } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
+import { useTaskData, Task, FlyStatus, HungerStatus } from '@/hooks/useTaskData';
 
 const FLY_PX = 24;
-
-interface Task {
-  id: string;
-  text: string;
-  completed: boolean;
-  order?: number;
-  type?: 'regular' | 'weekly' | 'backlog';
-  origin?: 'regular' | 'weekly' | 'backlog';
-  kind?: 'regular' | 'weekly' | 'backlog';
-  tags?: string[];
-}
-
-type FlyStatus = {
-  balance: number;
-  earnedToday: number;
-  limit: number;
-  limitHit: boolean;
-  justHitLimit?: boolean;
-};
-
-type HungerStatus = {
-  hunger: number;
-  stolenFlies: number;
-  maxHunger: number;
-};
 
 const demoTasks: Task[] = [
   {
@@ -72,8 +47,6 @@ const demoTasks: Task[] = [
   { id: 'g5', text: 'Eat a healthy meal', completed: true, order: 6 },
 ];
 
-// === NEW HELPER: Calculate where the gifts should occur ===
-// === NEW HELPER: Calculate where the gifts should occur ===
 function getMilestones(totalTasks: number): number[] {
   if (totalTasks < 2) return [];
 
@@ -95,44 +68,44 @@ function getMilestones(totalTasks: number): number[] {
 
   return Array.from(new Set(milestones)).sort((a, b) => a - b);
 }
+
 export default function Home() {
   const { data: session, status } = useSession();
   const sessionLoading = status === 'loading';
   const router = useRouter();
+
+  // -- NEW STATE HOOK --
+  const {
+    tasks,
+    backlogTasks,
+    isLoading,
+    flyStatus,
+    hungerStatus,
+    dailyGiftCount,
+    weeklyIds,
+    toggleTask,
+    moveTaskToBacklog,
+    moveTaskToToday,
+    deleteTask,
+    reorderTasks,
+    editTask,
+    mutateToday,
+    mutateBacklog
+  } = useTaskData();
+
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
   const isInitialLoad = useRef(true);
-  const [tasks, setTasks] = useState<Task[]>([]);
+
   const { isWardrobeOpen, setWardrobeOpen } = useUIStore();
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
-  const [loading, setLoading] = useState(true);
+
   const [quickText, setQuickText] = useState('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddMode, setQuickAddMode] = useState<'pick' | 'later'>('pick');
-  const [weeklyIds, setWeeklyIds] = useState<Set<string>>(new Set());
-  const [flyStatus, setFlyStatus] = useState<FlyStatus>({
-    balance: 0,
-    earnedToday: 0,
-    limit: 15,
-    limitHit: false,
-  });
-  const [hungerStatus, setHungerStatus] = useState<HungerStatus>({
-    hunger: MAX_HUNGER_MS,
-    stolenFlies: 0,
-    maxHunger: MAX_HUNGER_MS,
-  });
-
-  const [dailyGiftCount, setDailyGiftCount] = useState(2);
-  const [lastGiftTaskCount, setLastGiftTaskCount] = useState(0);
-
-  const [laterThisWeek, setLaterThisWeek] = useState<
-    { id: string; text: string }[]
-  >([]);
 
   const [activeTab, setActiveTab] = useState<'today' | 'backlog'>('today');
-  const [isAnimating, setIsAnimating] = useState(false);
   const [showReward, setShowReward] = useState(false);
-  const pendingIds = useRef(new Set<string>());
 
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -148,39 +121,18 @@ export default function Home() {
 
   const { showNotification } = useNotification();
 
-  const applyFlyStatus = useCallback((incoming?: FlyStatus | null) => {
-    if (!incoming) return;
-    setFlyStatus(incoming);
-  }, []);
-
-  const fetchBacklog = useCallback(async () => {
-    if (!session) return;
-    try {
-      const res = await fetch('/api/tasks?view=board&day=-1');
-      if (!res.ok) return;
-      const items = await res.json();
-      if (!Array.isArray(items)) return;
-
-      setLaterThisWeek(
-        items.map((t: any) => ({ id: t.id, text: t.text, tags: t.tags }))
-      );
-    } catch (e) {
-      console.error('Failed to fetch backlog:', e);
-    }
-  }, [session]);
-
-  const today = new Date();
-  const dateStr = format(today, 'yyyy-MM-dd');
+  // Data Switching
   const data = session ? tasks : guestTasks;
   const doneCount = data.filter((t) => t.completed).length;
   // Note: We don't rely purely on 'rate' anymore for triggering, but we keep it for the progress bar
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
   const flyBalance = session ? flyStatus.balance : 5;
+  const laterThisWeek = session ? backlogTasks : [];
 
-  // === UPDATED TRIGGER LOGIC ===
+  // Trigger Logic
   useEffect(() => {
     // 1. SAFETY LOCK: Don't do anything while loading
-    if (loading) return;
+    if (isLoading && session) return;
 
     // 2. SAFETY LOCK: If this is the very first time data loaded,
     // simply "acknowledge" the current state but DO NOT trigger the popup.
@@ -189,13 +141,9 @@ export default function Home() {
       return;
     }
 
-    // 1. Calculate milestones
     const milestones = getMilestones(data.length);
-
-    // 2. Determine target
     const nextMilestoneTarget = milestones[dailyGiftCount];
 
-    // 3. Trigger Condition
     if (
       data.length > 0 &&
       !showReward &&
@@ -205,62 +153,10 @@ export default function Home() {
     ) {
       setShowReward(true);
     }
-    // IMPORTANT: Add 'loading' to the dependency array
-  }, [doneCount, data.length, dailyGiftCount, showReward, loading]);
+    // IMPORTANT: Add 'isLoading' to the dependency array
+  }, [doneCount, data.length, dailyGiftCount, showReward, isLoading, session]);
 
-  const refreshToday = useCallback(async () => {
-    if (!session) return;
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
-      if (!res.ok) {
-        console.error('Failed to fetch tasks:', res.status, res.statusText);
-        return;
-      }
-      const json = await res.json();
-      setTasks(json.tasks ?? []);
-      setWeeklyIds(new Set(json.weeklyIds ?? []));
-      applyFlyStatus(json.flyStatus);
-      if (json.hungerStatus) setHungerStatus(json.hungerStatus);
-
-      setDailyGiftCount(json.dailyGiftCount || 0);
-      setLastGiftTaskCount(json.taskCountAtLastGift || 0);
-    } catch (e) {
-      console.error('Error in refreshToday:', e);
-    }
-  }, [session, dateStr, applyFlyStatus]);
-
-  useEffect(() => {
-    fetchBacklog();
-  }, [fetchBacklog]);
-
-  useEffect(() => {
-    if (!session) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    (async () => {
-      try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
-        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-        const json = await res.json();
-        setTasks(json.tasks ?? []);
-        setWeeklyIds(new Set(json.weeklyIds ?? []));
-        applyFlyStatus(json.flyStatus);
-        if (json.hungerStatus) setHungerStatus(json.hungerStatus);
-
-        setDailyGiftCount(json.dailyGiftCount || 0);
-        setLastGiftTaskCount(json.taskCountAtLastGift || 0);
-      } catch (e) {
-        console.error('Initial load failed:', e);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [session, dateStr, applyFlyStatus]);
-
+  // Block Scrolling during cinematic
   useEffect(() => {
     if (!cinematic) return;
     const stop = (e: Event) => e.preventDefault();
@@ -272,149 +168,44 @@ export default function Home() {
     };
   }, [cinematic]);
 
-  // Listen for global tag updates
-  useEffect(() => {
-    const handleTagsUpdated = () => {
-      refreshToday();
-      fetchBacklog();
-    };
-    window.addEventListener('tags-updated', handleTagsUpdated);
-    return () => window.removeEventListener('tags-updated', handleTagsUpdated);
-  }, [refreshToday, fetchBacklog]);
-
-  const sortTasks = (ts: Task[]) => {
-    return [...ts].sort((a, b) => {
-      if (!!a.completed !== !!b.completed) {
-        return a.completed ? 1 : -1;
-      }
-      return (a.order ?? 0) - (b.order ?? 0);
+  const persistGuestTask = (taskId: string, completed: boolean) => {
+    setGuestTasks((prev) => {
+      const toggled = prev.map((t) =>
+        t.id === taskId ? { ...t, completed } : t
+      );
+      // Sort for guest
+      return [...toggled].sort((a, b) => {
+        if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1;
+        return (a.order ?? 0) - (b.order ?? 0);
+      });
     });
   };
 
-  const persistTask = async (taskId: string, completed: boolean) => {
-    if (session) {
-      let apiOrder: number | undefined;
+  const handleToggle = async (taskId: string, explicitCompleted?: boolean) => {
+    if (cinematic || grab) return;
+    const task = data.find((t) => t.id === taskId);
+    if (!task) return;
+    const completed = explicitCompleted !== undefined ? explicitCompleted : !task.completed;
 
-      if (completed) {
-        // Calculate new order to ensure task stays above existing completed tasks
-        const completedTasks = tasks.filter((t) => t.completed && t.id !== taskId);
-        const currentTask = tasks.find((t) => t.id === taskId);
-
-        let newOrder = currentTask?.order;
-        if (currentTask && completedTasks.length > 0) {
-          const minOrder = Math.min(...completedTasks.map((t) => t.order ?? 0));
-          // If current order puts it below the top completed task, bump it up
-          if ((currentTask.order ?? 0) >= minOrder) {
-            newOrder = minOrder - 1;
-          }
-        }
-        apiOrder = newOrder;
-
-        setTasks((prev) =>
-          prev.map((t) => (t.id === taskId ? { ...t, completed, order: newOrder } : t))
-        );
-
-        setIsAnimating(true);
-        setTimeout(() => {
-          setTasks((prev) => sortTasks(prev));
-          setTimeout(() => setIsAnimating(false), 50);
-        }, 350);
-      } else {
-        // Optimistically move to bottom
-        setTasks((prev) => {
-          const maxOrder = Math.max(0, ...prev.map((t) => t.order ?? 0));
-          const updated = prev.map((t) =>
-            t.id === taskId ? { ...t, completed, order: maxOrder + 1 } : t
-          );
-          return sortTasks(updated);
-        });
-      }
-
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const res = await fetch('/api/tasks', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, taskId, completed, timezone: tz, order: apiOrder }),
-      });
-      if (res.ok) {
-        try {
-          const body = await res.json();
-          applyFlyStatus(body?.flyStatus);
-          if (body?.hungerStatus) setHungerStatus(body.hungerStatus);
-        } catch (e) {
-          console.error('Failed to parse PUT response', e);
-        }
-      }
-    } else {
-      setGuestTasks((prev) => {
-        const toggled = prev.map((t) =>
-          t.id === taskId ? { ...t, completed } : t
-        );
-        if (completed) {
-          return toggled;
-        }
-        return sortTasks(toggled);
-      });
-
-      if (completed) {
-        setIsAnimating(true);
-        setTimeout(() => {
-          setGuestTasks((prev) => sortTasks(prev));
-          setTimeout(() => setIsAnimating(false), 400);
-        }, 250);
-      }
+    if (!completed) {
+      if (session) toggleTask(taskId, false);
+      else persistGuestTask(taskId, false);
+      return;
     }
+
+    await triggerTongue({
+      key: taskId,
+      completed,
+      onPersist: () => {
+        if (session) toggleTask(taskId, true);
+        else persistGuestTask(taskId, true);
+      },
+    });
   };
 
   const { indices } = useWardrobeIndices(!!session);
 
-  const handleToggle = async (taskId: string, explicitCompleted?: boolean) => {
-    if (cinematic || grab || isAnimating) return;
-    const task = data.find((t) => t.id === taskId);
-    if (!task) return;
-    const completed =
-      explicitCompleted !== undefined ? explicitCompleted : !task.completed;
-    if (!completed) {
-      persistTask(taskId, false);
-      return;
-    }
-    await triggerTongue({
-      key: taskId,
-      completed,
-      onPersist: () => persistTask(taskId, true),
-    });
-  };
-
-  const handleEditTask = async (taskId: string, newText: string) => {
-    // Optimistic Update
-    setTasks((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
-    );
-    // Also update backlog optimistically if needed (though usually separate)
-    setLaterThisWeek((prev) =>
-      prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
-    );
-
-    if (session) {
-      try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        await fetch('/api/tasks', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId, text: newText, timezone: tz }),
-        });
-      } catch (e) {
-        console.error("Failed to edit task", e);
-        // Revert? For now, we assume success or user refresh.
-      }
-    } else {
-      setGuestTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, text: newText } : t))
-      );
-    }
-  };
-
-  if (sessionLoading || (session && loading)) {
+  if (sessionLoading || (session && isLoading && tasks.length === 0)) {
     return <LoadingScreen message="Loading your day..." />;
   }
 
@@ -450,7 +241,6 @@ export default function Home() {
                 giftsClaimed={dailyGiftCount}
                 onAddRequested={() => {
                   setQuickText('');
-                  // Context-aware add: if backlog tab is active, default to 'later' mode
                   setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
                   setShowQuickAdd(true);
                 }}
@@ -544,14 +334,7 @@ export default function Home() {
                       setShowQuickAdd(true);
                     }}
                     weeklyIds={weeklyIds}
-                    onDeleteToday={async (taskId) => {
-                      await fetch('/api/tasks', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ date: dateStr, taskId }),
-                      });
-                      await refreshToday();
-                    }}
+                    onDeleteToday={deleteTask}
                     onDeleteFromWeek={async (taskId) => {
                       const dow = new Date().getDay();
                       await fetch('/api/tasks?view=board', {
@@ -559,123 +342,22 @@ export default function Home() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ day: dow, taskId }),
                       });
-                      await fetch('/api/tasks', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ date: dateStr, taskId }),
-                      });
-                      await refreshToday();
+                      deleteTask(taskId);
                     }}
-                    onDoLater={async (taskId) => {
-                      const task = tasks.find((t) => t.id === taskId);
-                      if (!task) return;
-
-                      // OPTIMISTIC UPDATE:
-                      // 1. Remove from "Today" immediately
-                      setTasks((prev) => prev.filter((t) => t.id !== taskId));
-
-                      // 2. Add to "Backlog" immediately
-                      setLaterThisWeek((prev) => [
-                        ...prev,
-                        { id: task.id, text: task.text, tags: task.tags },
-                      ]);
-
-                      // API calls: POST to backlog, then DELETE from today
-                      // We must capture the NEW ID from the backlog creation to allow undoing it
-                      const postRes = await fetch('/api/tasks?view=board', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          text: task.text,
-                          repeat: 'backlog',
-                          tags: task.tags,
-                        }),
-                      });
-                      const postJson = await postRes.json();
-                      const newBacklogId = postJson.ids?.[0];
-
-                      // Now delete from today
-                      await fetch('/api/tasks', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ date: dateStr, taskId }),
-                      });
-
-                      showNotification("Moved to Saved Tasks", async () => {
-                        // UNDO ACTION: Move back to Today
-                        if (newBacklogId) {
-                          // Optimistic: Remove the NEW backlog item
-                          setLaterThisWeek((prev) => prev.filter(t => t.id !== newBacklogId));
-                        } else {
-                          // Fallback if we didn't get ID? (Shouldn't happen if API ok)
-                          setLaterThisWeek((prev) => prev.filter(t => t.text !== task.text));
-                        }
-                        // Restore to Today
-                        setTasks((prev) => [...prev, task]);
-
-                        // API: Move to Today
-                        const dow = new Date().getDay();
-                        await Promise.all([
-                          fetch('/api/tasks?view=board', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              text: task.text,
-                              days: [dow],
-                              repeat: 'this-week',
-                              tags: task.tags,
-                            }),
-                          }),
-                          // DELETE the backlog item we just created
-                          newBacklogId ? fetch('/api/tasks?view=board', {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ day: -1, taskId: newBacklogId }),
-                          }) : Promise.resolve()
-                        ]);
-                        await Promise.all([refreshToday(), fetchBacklog()]);
-                      });
-
-                      // Refresh to sync final state
-                      await Promise.all([refreshToday(), fetchBacklog()]);
-                    }}
-
-                    onReorder={async (newTasks) => {
-                      setTasks(newTasks);
-                      if (session) {
-                        const dow = new Date().getDay();
-                        await fetch('/api/tasks?view=board', {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            day: dow,
-                            tasks: newTasks.map((t) => ({ id: t.id })),
-                          }),
-                        });
-                      }
-                    }}
+                    onDoLater={moveTaskToBacklog}
+                    onReorder={reorderTasks}
                     onToggleRepeat={async (taskId) => {
-                      const task = tasks.find((t) => t.id === taskId);
+                      const task = tasks.find(t => t.id === taskId);
                       if (!task) return;
 
-                      const isWeekly =
-                        task.type === 'weekly' || weeklyIds.has(taskId);
-                      const newType = isWeekly ? 'regular' : 'weekly';
-
-                      // Optimistic update
-                      setTasks((prev) =>
-                        prev.map((t) =>
-                          t.id === taskId ? { ...t, type: newType } : t
-                        )
-                      );
-                      setWeeklyIds((prev) => {
-                        const next = new Set(prev);
-                        if (newType === 'weekly') next.add(taskId);
-                        else next.delete(taskId);
-                        return next;
-                      });
+                      // Optimistic
+                      const isWeekly = task.type === 'weekly' || weeklyIds.has(taskId);
+                      const newType: 'regular' | 'weekly' = isWeekly ? 'regular' : 'weekly';
+                      const updated = tasks.map(t => t.id === taskId ? { ...t, type: newType } as Task : t);
+                      await mutateToday({ ...session!, flyStatus: flyStatus, tasks: updated }, { revalidate: false });
 
                       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                      const dateStr = format(new Date(), 'yyyy-MM-dd');
                       await fetch('/api/tasks', {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
@@ -686,10 +368,9 @@ export default function Home() {
                           timezone: tz,
                         }),
                       });
-
-                      refreshToday();
+                      await mutateToday();
                     }}
-                    onEditTask={handleEditTask}
+                    onEditTask={(id, text) => editTask(id, text, false)}
                   />
                 </motion.div>
               ) : (
@@ -702,87 +383,15 @@ export default function Home() {
                   {session ? (
                     <BacklogPanel
                       later={laterThisWeek}
-                      onRefreshToday={refreshToday}
-                      onRefreshBacklog={fetchBacklog}
-                      onMoveToToday={async (item) => {
-                        const dow = new Date().getDay();
-
-                        // OPTIMISTIC UPDATE:
-                        // 1. Remove from Backlog immediately
-                        setLaterThisWeek((prev) => prev.filter((t) => t.id !== item.id));
-
-                        // 2. Add to Today immediately
-                        // Need to conform to Task interface. Completed=false by default.
-                        const optimisticTask: Task = {
-                          id: item.id, // ID might change after server post, but for now use this
-                          text: item.text,
-                          completed: false,
-                          tags: item.tags,
-                          order: tasks.length + 1 // Add to end logic
-                        };
-                        setTasks((prev) => [...prev, optimisticTask]);
-
-                        // API Calls to transfer task: POST to Today, DELETE from Backlog
-                        const postRes = await fetch('/api/tasks?view=board', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            text: item.text,
-                            days: [dow],
-                            repeat: 'this-week',
-                            tags: item.tags,
-                          }),
-                        });
-                        const postJson = await postRes.json();
-                        const newTodayId = postJson.ids?.[0];
-
-                        await fetch('/api/tasks?view=board', {
-                          method: 'DELETE',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ day: -1, taskId: item.id }),
-                        });
-
-                        showNotification("Moved to Today", async () => {
-                          // UNDO: Move back to Backlog
-                          // Optimistic: Remove the NEW today item
-                          if (newTodayId) {
-                            setTasks((prev) => prev.filter((t) => t.id !== newTodayId));
-                          } else {
-                            setTasks((prev) => prev.filter((t) => t.text !== item.text));
-                          }
-                          setLaterThisWeek((prev) => [...prev, { id: item.id, text: item.text, tags: item.tags }]);
-
-                          // API: Move to Backlog
-                          await Promise.all([
-                            fetch('/api/tasks?view=board', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                text: item.text,
-                                repeat: 'backlog',
-                                tags: item.tags,
-                              }),
-                            }),
-                            // Delete from Today using the NEW ID
-                            newTodayId ? fetch('/api/tasks', {
-                              method: 'DELETE',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({ date: dateStr, taskId: newTodayId }),
-                            }) : Promise.resolve(),
-                          ]);
-                          await Promise.all([refreshToday(), fetchBacklog()]);
-                        });
-
-                        // Refresh to show updated state
-                        await Promise.all([refreshToday(), fetchBacklog()]);
-                      }}
-
+                      onRefreshToday={async () => { await mutateToday(); }}
+                      onRefreshBacklog={async () => { await mutateBacklog(); }}
+                      onMoveToToday={moveTaskToToday}
                       onAddRequested={() => {
                         setQuickText('');
                         setQuickAddMode('later');
                         setShowQuickAdd(true);
                       }}
-                      onEditTask={handleEditTask}
+                      onEditTask={(id, text) => editTask(id, text, true)}
                     />
                   ) : (
                     <div className="p-8 text-center text-muted-foreground bg-card/50 rounded-2xl">
@@ -857,30 +466,23 @@ export default function Home() {
         onSubmit={async ({ text, days, repeat, tags }) => {
           try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const dateStr = format(new Date(), 'yyyy-MM-dd');
+
             await fetch('/api/tasks?view=board', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
             });
             if (session) {
-              const res = await fetch(`/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`);
-              if (!res.ok) return;
-              const json = await res.json();
-
-              setTasks(json.tasks ?? []);
-              setWeeklyIds(new Set(json.weeklyIds ?? []));
-              applyFlyStatus(json.flyStatus);
-              if (json.hungerStatus) setHungerStatus(json.hungerStatus);
-
-              setDailyGiftCount(json.dailyGiftCount || 0);
-              setLastGiftTaskCount(json.taskCountAtLastGift || 0);
+              // SWR mutate
+              mutateToday();
+              mutateBacklog();
             } else {
               setGuestTasks((prev) => [
                 ...prev,
                 { id: crypto.randomUUID(), text, completed: false, tags },
               ]);
             }
-            fetchBacklog();
           } catch (e) {
             console.error('Failed to add task or refresh state:', e);
           }
@@ -892,10 +494,9 @@ export default function Home() {
         onClose={(claimed) => {
           setShowReward(false);
           if (claimed) {
-            setDailyGiftCount((prev) => prev + 1);
+            mutateToday(); // Should get new dailyGiftCount
             mutate('/api/skins/inventory');
           }
-          refreshToday();
         }}
         dailyGiftCount={dailyGiftCount}
       />
@@ -905,9 +506,11 @@ export default function Home() {
         stolenFlies={hungerStatus.stolenFlies}
         indices={indices}
         onAcknowledge={async () => {
-          // Optimistic clear
-          setHungerStatus(prev => ({ ...prev, stolenFlies: 0 }));
+          // Optimistic clear handled in hook? No, exposure should be in hook if commonly used, 
+          // but here we can just do manual fetch or add 'acknowledgeHunger' to hook.
+          // For now, manual fetch + mutate.
           await fetch('/api/hunger/acknowledge', { method: 'POST' });
+          mutateToday();
         }}
       />
 
