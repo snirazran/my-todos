@@ -33,6 +33,7 @@ export default function TaskBoard({
   onRequestAdd,
   onQuickAdd,
   todayDisplayIndex,
+  daysOrder,
   onToggleRepeat,
 }: {
   titles: string[];
@@ -53,6 +54,7 @@ export default function TaskBoard({
     tags: string[];
   }) => Promise<void> | void;
   todayDisplayIndex: Exclude<DisplayDay, 7>;
+  daysOrder?: ReadonlyArray<number>; // New Prop
   onToggleRepeat?: (taskId: string, day: DisplayDay) => Promise<void> | void;
   onEditTask?: (day: DisplayDay, taskId: string, newText: string) => Promise<void>;
   onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
@@ -276,10 +278,10 @@ export default function TaskBoard({
           drag.fromDay === toDay
             ? [saveDay(toDay, next[toDay])]
             : [
-                saveDay(drag.fromDay as DisplayDay, next[drag.fromDay]),
-                saveDay(toDay, next[toDay]),
-              ]
-        ).catch(() => {});
+              saveDay(drag.fromDay as DisplayDay, next[drag.fromDay]),
+              saveDay(toDay, next[toDay]),
+            ]
+        ).catch(() => { });
         return next;
       });
     },
@@ -287,36 +289,36 @@ export default function TaskBoard({
   );
 
   const handleEditTask = useCallback(async (day: DisplayDay, taskId: string, newText: string) => {
-      setWeek(prev => {
-          const next = prev.map(d => d.slice());
-          const taskIndex = next[day].findIndex(t => t.id === taskId);
-          if (taskIndex !== -1) {
-              next[day][taskIndex] = { ...next[day][taskIndex], text: newText };
-              saveDay(day, next[day]).catch(console.error);
-          }
-          return next;
-      });
+    setWeek(prev => {
+      const next = prev.map(d => d.slice());
+      const taskIndex = next[day].findIndex(t => t.id === taskId);
+      if (taskIndex !== -1) {
+        next[day][taskIndex] = { ...next[day][taskIndex], text: newText };
+        saveDay(day, next[day]).catch(console.error);
+      }
+      return next;
+    });
   }, [setWeek, saveDay]);
 
   const handleDoLater = useCallback(async (day: DisplayDay, taskId: string) => {
-      // Move to Backlog (Index 7)
-      setWeek(prev => {
-          const next = prev.map(d => d.slice());
-          const taskIndex = next[day].findIndex(t => t.id === taskId);
-          if (taskIndex !== -1) {
-              const [task] = next[day].splice(taskIndex, 1);
-              task.type = 'backlog'; // Ensure it's marked as backlog
-              
-              if (!next[7]) next[7] = [];
-              next[7].push(task); // Add to end of backlog
-              
-              Promise.all([
-                  saveDay(day, next[day]),
-                  saveDay(7 as DisplayDay, next[7])
-              ]).catch(console.error);
-          }
-          return next;
-      });
+    // Move to Backlog (Index 7)
+    setWeek(prev => {
+      const next = prev.map(d => d.slice());
+      const taskIndex = next[day].findIndex(t => t.id === taskId);
+      if (taskIndex !== -1) {
+        const [task] = next[day].splice(taskIndex, 1);
+        task.type = 'backlog'; // Ensure it's marked as backlog
+
+        if (!next[7]) next[7] = [];
+        next[7].push(task); // Add to end of backlog
+
+        Promise.all([
+          saveDay(day, next[day]),
+          saveDay(7 as DisplayDay, next[7])
+        ]).catch(console.error);
+      }
+      return next;
+    });
   }, [setWeek, saveDay]);
 
   const onDrop = useCallback(() => {
@@ -466,6 +468,7 @@ export default function TaskBoard({
             count={DAYS - 1}
             activeIndex={Math.min(pageIndex, 6) as any}
             todayIndex={todayDisplayIndex}
+            daysOrder={daysOrder} // Pass the daysOrder
             onSelectDay={(idx) => centerColumnSmooth(idx as any)}
           />
         </div>
@@ -474,22 +477,22 @@ export default function TaskBoard({
       {/* Increased padding drastically to clear standard mobile app navbars (typically 60-80px) */}
       <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
         <div className="pointer-events-auto mx-auto w-full max-w-[360px] relative min-h-[56px] flex items-end justify-center">
-            
+
           {/* Backlog Trigger */}
-            <BacklogBox
+          <BacklogBox
             count={week[7]?.length || 0}
             isDragOver={isDragOverBacklog}
             isDragging={!!drag?.active}
             proximity={backlogProximity}
             onClick={() => setBacklogOpen(true)}
             forwardRef={backlogBoxRef}
-            />
+          />
 
           {/* Add Task Button (Hide when dragging) */}
           {/* Add Task Button (Hide when dragging) */}
-          <motion.div 
+          <motion.div
             initial={false}
-            animate={{ 
+            animate={{
               opacity: drag?.active ? 0 : 1,
               scale: drag?.active ? 0.9 : 1, // subtle scale down
               width: drag?.active ? 0 : 'auto',
@@ -500,7 +503,7 @@ export default function TaskBoard({
               stiffness: 300,
               damping: 28,
             }}
-            className={`flex-1 min-w-0 ${drag?.active ? 'overflow-hidden' : 'overflow-visible'}`}            style={{ 
+            className={`flex-1 min-w-0 ${drag?.active ? 'overflow-hidden' : 'overflow-visible'}`} style={{
               pointerEvents: drag?.active ? 'none' : 'auto',
               whiteSpace: 'nowrap'
             }}
@@ -533,25 +536,25 @@ export default function TaskBoard({
         onEdit={(id, newText) => handleEditTask(7 as DisplayDay, id, newText)}
         onToggleRepeat={(id) => onToggleRepeat && onToggleRepeat(id, 7 as DisplayDay)}
         onDoToday={async (id) => {
-             // Move to today (DisplayIndex)
-             const tDay = todayDisplayIndex;
-             setWeek(prev => {
-                const next = prev.map(d => d.slice());
-                const taskIndex = next[7].findIndex(t => t.id === id);
-                if (taskIndex !== -1) {
-                    const [task] = next[7].splice(taskIndex, 1);
-                    if (task.type === 'backlog') task.type = 'regular';
-                    
-                    if (!next[tDay]) next[tDay] = [];
-                    next[tDay].push(task);
-                    
-                    Promise.all([
-                        saveDay(7 as DisplayDay, next[7]),
-                        saveDay(tDay, next[tDay])
-                    ]).catch(console.error);
-                }
-                return next;
-             });
+          // Move to today (DisplayIndex)
+          const tDay = todayDisplayIndex;
+          setWeek(prev => {
+            const next = prev.map(d => d.slice());
+            const taskIndex = next[7].findIndex(t => t.id === id);
+            if (taskIndex !== -1) {
+              const [task] = next[7].splice(taskIndex, 1);
+              if (task.type === 'backlog') task.type = 'regular';
+
+              if (!next[tDay]) next[tDay] = [];
+              next[tDay].push(task);
+
+              Promise.all([
+                saveDay(7 as DisplayDay, next[7]),
+                saveDay(tDay, next[tDay])
+              ]).catch(console.error);
+            }
+            return next;
+          });
         }}
       />
 

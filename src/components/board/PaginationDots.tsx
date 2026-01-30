@@ -16,6 +16,9 @@ interface Props {
 
   todayIndex: number;
 
+  /** Order of API days (0..6) corresponding to the dots */
+  daysOrder?: ReadonlyArray<number>;
+
   onSelectDay: (index: number) => void;
 
 }
@@ -29,6 +32,8 @@ export default function PaginationDots({
   activeIndex,
 
   todayIndex,
+
+  daysOrder,
 
   onSelectDay,
 
@@ -62,7 +67,7 @@ export default function PaginationDots({
 
         {Array.from({ length: count }).map((_, i) => {
 
-          const apiDay = WEEK_ORDER[i];
+          const apiDay = daysOrder ? daysOrder[i] : WEEK_ORDER[i];
 
           const label = getDayLabel(apiDay);
 
@@ -92,13 +97,11 @@ export default function PaginationDots({
 
                   w-6 h-6 rounded-[8px] text-[10px] font-black transition-all duration-300
 
-                  ${
+                  ${isActive
 
-                    isActive
+                    ? 'bg-gradient-to-r from-primary/20 to-emerald-400/20 text-primary scale-105'
 
-                      ? 'bg-gradient-to-r from-primary/20 to-emerald-400/20 text-primary scale-105'
-
-                      : 'text-muted-foreground/60 hover:text-muted-foreground/90 hover:bg-muted/30'
+                    : 'text-muted-foreground/60 hover:text-muted-foreground/90 hover:bg-muted/30'
 
                   }
 
@@ -112,45 +115,45 @@ export default function PaginationDots({
 
               </div>
 
-              
 
-                            {isToday && (
 
-              
+              {isToday && (
 
-                              <motion.div
 
-              
 
-                                animate={{ 
+                <motion.div
 
-              
 
-                                  y: isActive ? -3 : 0,
 
-              
+                  animate={{
 
-                                  opacity: 1 
 
-              
 
-                                }}
+                    y: isActive ? -3 : 0,
 
-              
 
-                                transition={{ type: 'spring', stiffness: 500, damping: 35 }}
 
-              
+                    opacity: 1
 
-                                className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary/30"
 
-              
 
-                              />
+                  }}
 
-              
 
-                            )}
+
+                  transition={{ type: 'spring', stiffness: 500, damping: 35 }}
+
+
+
+                  className="absolute -bottom-0.5 w-1 h-1 rounded-full bg-primary/30"
+
+
+
+                />
+
+
+
+              )}
 
             </button>
 

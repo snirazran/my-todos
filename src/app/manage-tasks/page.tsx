@@ -234,6 +234,7 @@ export default function ManageTasksPage() {
           }}
           onQuickAdd={onAddTask}
           todayDisplayIndex={todayIdx} // Pass todayIdx as a prop
+          daysOrder={processingWeekOrder} // Pass the rolling order
           onToggleRepeat={onToggleRepeat}
         />
       </div>
