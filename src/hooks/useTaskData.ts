@@ -41,11 +41,6 @@ interface TasksResponse {
 
 type ExclusionSource = 'today' | 'backlog';
 
-type PendingExclusion = {
-    source: ExclusionSource;
-    timestamp: number;
-};
-
 // --- Fetcher ---
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -57,9 +52,9 @@ export function useTaskData() {
     const dateStr = format(today, 'yyyy-MM-dd');
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    // Map<TaskId, {source, timestamp}>
-    // Tracks where a task should be HIDDEN from, with timestamp to prevent premature cleanup
-    const [pendingExclusions, setPendingExclusions] = useState(new Map<string, PendingExclusion>());
+    // Map<TaskId, SourceList>
+    // Tracks where a task should be HIDDEN from until it appears in destination
+    const [pendingExclusions, setPendingExclusions] = useState(new Map<string, ExclusionSource>());
 
     // --- SWR Keys ---
     const todayKey = session ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}` : null;
@@ -85,6 +80,7 @@ export function useTaskData() {
     });
 
     // --- Cleanup Effect ---
+    // Remove exclusions when task successfully appears in destination list
     useEffect(() => {
         if (pendingExclusions.size === 0) return;
 
@@ -98,28 +94,21 @@ export function useTaskData() {
             // Only cleanup if we actually have data loaded for the check
             if (!todayData && !backlogData) return prev;
 
-            const now = Date.now();
-            const CLEANUP_DELAY_MS = 2000; // Don't cleanup exclusions added within last 2 seconds
-
             // Check each pending exclusion
-            Array.from(next.entries()).forEach(([id, exclusion]) => {
-                // Skip cleanup if exclusion was added recently (prevents race condition with rapid swipes)
-                if (now - exclusion.timestamp < CLEANUP_DELAY_MS) {
-                    return;
-                }
-
-                if (exclusion.source === 'today') {
-                    // If excluded from Today, wait until it's actually GONE from Today
-                    // We only check todayData for this.
-                    const inToday = effectiveToday.some(t => t.id === id);
-                    if (!inToday && todayData) {
+            Array.from(next.entries()).forEach(([id, source]) => {
+                if (source === 'today') {
+                    // Task was hidden from Today → Should appear in Backlog
+                    // Only remove exclusion when task successfully appears in destination
+                    const inBacklog = effectiveBacklog.some(t => t.id === id);
+                    if (inBacklog && backlogData) {
                         next.delete(id);
                         changed = true;
                     }
-                } else if (exclusion.source === 'backlog') {
-                    // If excluded from Backlog, wait until gone from Backlog
-                    const inBacklog = effectiveBacklog.some(t => t.id === id);
-                    if (!inBacklog && backlogData) {
+                } else if (source === 'backlog') {
+                    // Task was hidden from Backlog → Should appear in Today
+                    // Only remove exclusion when task successfully appears in destination
+                    const inToday = effectiveToday.some(t => t.id === id);
+                    if (inToday && todayData) {
                         next.delete(id);
                         changed = true;
                     }
@@ -133,7 +122,7 @@ export function useTaskData() {
 
     // --- Derived State ---
     // Filter Today: Hide if excluded from 'today'
-    const tasks = (todayData?.tasks || []).filter(t => pendingExclusions.get(t.id)?.source !== 'today');
+    const tasks = (todayData?.tasks || []).filter(t => pendingExclusions.get(t.id) !== 'today');
 
     const weeklyIds = new Set(todayData?.weeklyIds || []);
     const flyStatus = todayData?.flyStatus || { balance: 0, earnedToday: 0, limit: 15, limitHit: false };
@@ -141,7 +130,7 @@ export function useTaskData() {
     const dailyGiftCount = todayData?.dailyGiftCount || 0;
 
     // Filter Backlog: Hide if excluded from 'backlog'
-    const backlogTasks = (backlogData || []).filter(t => pendingExclusions.get(t.id)?.source !== 'backlog');
+    const backlogTasks = (backlogData || []).filter(t => pendingExclusions.get(t.id) !== 'backlog');
 
     // --- Helper for Optimistic Updates ---
     const sortTasks = (ts: Task[]) => {
@@ -221,7 +210,7 @@ export function useTaskData() {
         if (!task) return;
 
         // Mark as pending removal from Today
-        setPendingExclusions(prev => new Map(prev).set(taskId, { source: 'today', timestamp: Date.now() }));
+        setPendingExclusions(prev => new Map(prev).set(taskId, 'today'));
 
         // 1. Optimistic Update 
         // Remove from Today (handled by exclusion, but we enforce it for optimistic cache too)
@@ -259,7 +248,7 @@ export function useTaskData() {
                 setPendingExclusions(prev => {
                     const next = new Map(prev);
                     next.delete(taskId); // Show in Today
-                    if (newBacklogId) next.set(newBacklogId, { source: 'backlog', timestamp: Date.now() }); // Hide from Backlog
+                    if (newBacklogId) next.set(newBacklogId, 'backlog'); // Hide from Backlog
                     return next;
                 });
 
@@ -317,7 +306,7 @@ export function useTaskData() {
         if (!todayData || !backlogData) return;
 
         // Mark as pending removal from Backlog
-        setPendingExclusions(prev => new Map(prev).set(item.id, { source: 'backlog', timestamp: Date.now() }));
+        setPendingExclusions(prev => new Map(prev).set(item.id, 'backlog'));
 
         // 1. Optimistic Update
         // Remove from Backlog
@@ -361,7 +350,7 @@ export function useTaskData() {
                 setPendingExclusions(prev => {
                     const next = new Map(prev);
                     next.delete(item.id); // Show in Backlog
-                    if (newTodayId) next.set(newTodayId, { source: 'today', timestamp: Date.now() }); // Hide from Today
+                    if (newTodayId) next.set(newTodayId, 'today'); // Hide from Today
                     return next;
                 });
 
@@ -410,7 +399,7 @@ export function useTaskData() {
      * Delete Task (Today)
      */
     const deleteTask = useCallback(async (taskId: string) => {
-        setPendingExclusions(prev => new Map(prev).set(taskId, { source: 'today', timestamp: Date.now() }));
+        setPendingExclusions(prev => new Map(prev).set(taskId, 'today'));
 
         // Optimistic
         if (todayData) {
