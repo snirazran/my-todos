@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 
 interface NotificationContextType {
-    showNotification: (message: string, undoAction?: () => void) => void;
+    showNotification: (message: string, undoAction?: () => void | Promise<void>) => void;
     hideNotification: () => void;
 }
 
@@ -22,9 +22,11 @@ export function useNotification() {
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
     const [notification, setNotification] = useState<{
         message: string;
-        undoAction?: () => void;
+        undoAction?: () => void | Promise<void>;
         id: number;
     } | null>(null);
+
+    const [isUndoing, setIsUndoing] = useState(false);
 
     const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -36,7 +38,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
     }, []);
 
-    const showNotification = useCallback((message: string, undoAction?: () => void) => {
+    const showNotification = useCallback((message: string, undoAction?: () => void | Promise<void>) => {
         // Clear existing timeout
         if (timeoutRef.current) {
             clearTimeout(timeoutRef.current);
@@ -53,6 +55,26 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             setNotification(null);
         }, 4000);
     }, []);
+
+    const handleUndo = async () => {
+        if (!notification?.undoAction) return;
+
+        setIsUndoing(true);
+        // Clear timeout so it doesn't dismiss while we are undoing
+        if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+            timeoutRef.current = null;
+        }
+
+        try {
+            await notification.undoAction();
+        } catch (error) {
+            console.error("Undo failed", error);
+        } finally {
+            setIsUndoing(false);
+            hideNotification();
+        }
+    };
 
     return (
         <NotificationContext.Provider value={{ showNotification, hideNotification }}>
@@ -71,18 +93,27 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                             <span className="flex-1 text-sm font-medium">{notification.message}</span>
                             {notification.undoAction && (
                                 <button
-                                    onClick={() => {
-                                        notification.undoAction?.();
-                                        hideNotification();
-                                    }}
-                                    className="text-sm font-bold text-primary hover:text-primary/80 transition-colors uppercase tracking-wider"
+                                    onClick={handleUndo}
+                                    disabled={isUndoing}
+                                    className="text-sm font-bold text-primary hover:text-primary/80 transition-colors uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                 >
-                                    Undo
+                                    {isUndoing ? (
+                                        <>
+                                            <svg className="animate-spin h-3 w-3 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Undo
+                                        </>
+                                    ) : (
+                                        "Undo"
+                                    )}
                                 </button>
                             )}
                             <button
                                 onClick={hideNotification}
-                                className="p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                                disabled={isUndoing}
+                                className="p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
                                 aria-label="Close"
                             >
                                 <X size={16} />
