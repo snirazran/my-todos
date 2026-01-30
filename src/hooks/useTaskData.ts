@@ -39,6 +39,8 @@ interface TasksResponse {
     taskCountAtLastGift?: number;
 }
 
+type ExclusionSource = 'today' | 'backlog';
+
 // --- Fetcher ---
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -50,8 +52,9 @@ export function useTaskData() {
     const dateStr = format(today, 'yyyy-MM-dd');
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-    // Use State for pending deletes to trigger re-renders and filter strictly
-    const [pendingDeletes, setPendingDeletes] = useState(new Set<string>());
+    // Map<TaskId, SourceList>
+    // Tracks where a task should be HIDDEN from.
+    const [pendingExclusions, setPendingExclusions] = useState(new Map<string, ExclusionSource>());
 
     // --- SWR Keys ---
     const todayKey = session ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}` : null;
@@ -77,46 +80,55 @@ export function useTaskData() {
     });
 
     // --- Cleanup Effect ---
-    // If a task ID is in pendingDeletes but NO LONGER in the server data, 
-    // it means the deletion is confirmed and we can stop tracking it.
-    // If it IS in the server data, we keep tracking it so it remains hidden (ghost fix).
     useEffect(() => {
-        if (pendingDeletes.size === 0) return;
+        if (pendingExclusions.size === 0) return;
 
-        setPendingDeletes(prev => {
-            const next = new Set(prev);
+        setPendingExclusions(prev => {
+            const next = new Map(prev);
             let changed = false;
-
-            // Sync with server state
 
             const effectiveToday = todayData?.tasks || [];
             const effectiveBacklog = backlogData || [];
 
-            // Only cleanup if we actually have data
+            // Only cleanup if we actually have data loaded for the check
             if (!todayData && !backlogData) return prev;
 
-            Array.from(next).forEach(id => {
-                const presentInToday = effectiveToday.some(t => t.id === id);
-                const presentInBacklog = effectiveBacklog.some(t => t.id === id);
-
-                if (!presentInToday && !presentInBacklog) {
-                    next.delete(id);
-                    changed = true;
+            // Check each pending exclusion
+            Array.from(next.entries()).forEach(([id, source]) => {
+                if (source === 'today') {
+                    // If excluded from Today, wait until it's actually GONE from Today
+                    // We only check todayData for this.
+                    const inToday = effectiveToday.some(t => t.id === id);
+                    if (!inToday && todayData) {
+                        next.delete(id);
+                        changed = true;
+                    }
+                } else if (source === 'backlog') {
+                    // If excluded from Backlog, wait until gone from Backlog
+                    const inBacklog = effectiveBacklog.some(t => t.id === id);
+                    if (!inBacklog && backlogData) {
+                        next.delete(id);
+                        changed = true;
+                    }
                 }
             });
+
             return changed ? next : prev;
         });
-    }, [todayData, backlogData]); // Depend on data updates
+    }, [todayData, backlogData]);
 
 
     // --- Derived State ---
-    const tasks = (todayData?.tasks || []).filter(t => !pendingDeletes.has(t.id));
+    // Filter Today: Hide if excluded from 'today'
+    const tasks = (todayData?.tasks || []).filter(t => pendingExclusions.get(t.id) !== 'today');
+
     const weeklyIds = new Set(todayData?.weeklyIds || []);
     const flyStatus = todayData?.flyStatus || { balance: 0, earnedToday: 0, limit: 15, limitHit: false };
     const hungerStatus = todayData?.hungerStatus || { hunger: 0, stolenFlies: 0, maxHunger: 0 };
     const dailyGiftCount = todayData?.dailyGiftCount || 0;
 
-    const backlogTasks = (backlogData || []).filter(t => !pendingDeletes.has(t.id));
+    // Filter Backlog: Hide if excluded from 'backlog'
+    const backlogTasks = (backlogData || []).filter(t => pendingExclusions.get(t.id) !== 'backlog');
 
     // --- Helper for Optimistic Updates ---
     const sortTasks = (ts: Task[]) => {
@@ -192,10 +204,11 @@ export function useTaskData() {
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
-        setPendingDeletes(prev => new Set(prev).add(taskId));
+        // Mark as pending removal from Today
+        setPendingExclusions(prev => new Map(prev).set(taskId, 'today'));
 
-        // 1. Optimistic Update (For other potential consumers, although derived state handles hiding)
-        // Remove from Today
+        // 1. Optimistic Update 
+        // Remove from Today (handled by exclusion, but we enforce it for optimistic cache too)
         const newTodayTasks = tasks.filter(t => t.id !== taskId);
         await mutateToday({ ...todayData, tasks: newTodayTasks }, { revalidate: false });
 
@@ -225,15 +238,12 @@ export function useTaskData() {
                 body: JSON.stringify({ date: dateStr, taskId }),
             });
 
-            // NOTE: We DO NOT remove from pendingDeletes here.
-            // We wait for the useEffect to confirm it's gone.
-
             showNotification("Moved to Saved Tasks", async () => {
                 // UNDO Logic
-                setPendingDeletes(prev => {
-                    const next = new Set(prev);
-                    next.delete(taskId); // Un-hide original
-                    if (newBacklogId) next.add(newBacklogId); // Hide new backlog item
+                setPendingExclusions(prev => {
+                    const next = new Map(prev);
+                    next.delete(taskId); // Show in Today
+                    if (newBacklogId) next.set(newBacklogId, 'backlog'); // Hide from Backlog
                     return next;
                 });
 
@@ -274,8 +284,8 @@ export function useTaskData() {
 
         } catch (e) {
             console.error("Move to backlog failed", e);
-            setPendingDeletes(prev => {
-                const next = new Set(prev);
+            setPendingExclusions(prev => {
+                const next = new Map(prev);
                 next.delete(taskId);
                 return next;
             });
@@ -290,7 +300,8 @@ export function useTaskData() {
     const moveTaskToToday = useCallback(async (item: { id: string; text: string; tags?: string[] }) => {
         if (!todayData || !backlogData) return;
 
-        setPendingDeletes(prev => new Set(prev).add(item.id));
+        // Mark as pending removal from Backlog
+        setPendingExclusions(prev => new Map(prev).set(item.id, 'backlog'));
 
         // 1. Optimistic Update
         // Remove from Backlog
@@ -329,14 +340,12 @@ export function useTaskData() {
                 body: JSON.stringify({ day: -1, taskId: item.id }),
             });
 
-            // Wait for useEffect cleanup
-
             showNotification("Moved to Today", async () => {
                 // UNDO Logic
-                setPendingDeletes(prev => {
-                    const next = new Set(prev);
-                    next.delete(item.id); // Show original in backlog
-                    if (newTodayId) next.add(newTodayId); // Hide new today item
+                setPendingExclusions(prev => {
+                    const next = new Map(prev);
+                    next.delete(item.id); // Show in Backlog
+                    if (newTodayId) next.set(newTodayId, 'today'); // Hide from Today
                     return next;
                 });
 
@@ -371,8 +380,8 @@ export function useTaskData() {
 
         } catch (e) {
             console.error("Move to today failed", e);
-            setPendingDeletes(prev => {
-                const next = new Set(prev);
+            setPendingExclusions(prev => {
+                const next = new Map(prev);
                 next.delete(item.id);
                 return next;
             });
@@ -385,7 +394,7 @@ export function useTaskData() {
      * Delete Task (Today)
      */
     const deleteTask = useCallback(async (taskId: string) => {
-        setPendingDeletes(prev => new Set(prev).add(taskId));
+        setPendingExclusions(prev => new Map(prev).set(taskId, 'today'));
 
         // Optimistic
         if (todayData) {
