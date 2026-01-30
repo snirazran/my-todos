@@ -199,8 +199,11 @@ export function useTaskData() {
     /**
      * Move Task: Today -> Backlog
      */
-    const moveTaskToBacklog = useCallback(async (taskId: string) => {
+    const moveTaskToBacklog = useCallback(async (taskIdOrTask: string | Task) => {
         if (!todayData || !backlogData) return;
+
+        // Normalize input - accept both task ID string or task object
+        const taskId = typeof taskIdOrTask === 'string' ? taskIdOrTask : taskIdOrTask.id;
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
