@@ -45,9 +45,9 @@ export default function HistoryTimeSelector({
 
     return (
         <div className="flex flex-col gap-2 mb-6 sticky top-2 z-30">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 p-2 bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-sm">
+            <div className="flex flex-row items-center justify-between gap-2 p-1.5 bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-sm overflow-x-auto no-scrollbar">
                 {/* Toggles */}
-                <div className="flex items-center gap-1 p-1 bg-muted/30 rounded-xl overflow-hidden w-full sm:w-auto">
+                <div className="flex items-center gap-1 p-1 bg-muted/30 rounded-xl overflow-hidden flex-shrink-0">
                     {dateOptions.map((opt) => {
                         const isActive = dateRange === opt.id;
                         const Icon = opt.icon;
@@ -56,7 +56,7 @@ export default function HistoryTimeSelector({
                                 key={opt.id}
                                 onClick={() => onDateRangeChange(opt.id)}
                                 className={cn(
-                                    "relative flex-1 sm:flex-none px-3 py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 z-10 whitespace-nowrap",
+                                    "relative px-3 py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 z-10 whitespace-nowrap",
                                     isActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                                 )}
                             >
@@ -74,39 +74,14 @@ export default function HistoryTimeSelector({
                     })}
                 </div>
 
-                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    {/* Custom Inputs */}
-                    {dateRange === 'custom' && (
-                        <motion.div
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="flex items-center gap-2 flex-1 sm:flex-none"
-                        >
-                            <input
-                                type="date"
-                                value={customDateRange.from}
-                                onChange={(e) => onCustomDateChange({ ...customDateRange, from: e.target.value })}
-                                className="flex-1 w-full sm:w-auto px-2 py-1.5 bg-background border border-border rounded-lg text-[10px] font-medium focus:ring-1 focus:ring-primary outline-none"
-                            />
-                            <span className="text-muted-foreground font-bold">-</span>
-                            <input
-                                type="date"
-                                value={customDateRange.to}
-                                onChange={(e) => onCustomDateChange({ ...customDateRange, to: e.target.value })}
-                                className="flex-1 w-full sm:w-auto px-2 py-1.5 bg-background border border-border rounded-lg text-[10px] font-medium focus:ring-1 focus:ring-primary outline-none"
-                            />
-                        </motion.div>
-                    )}
-
+                <div className="flex items-center gap-2 flex-shrink-0">
                     {/* Filter Button */}
-                    <div className="h-6 w-px bg-border/50 mx-1 hidden sm:block" />
-
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setShowTags(!showTags)}
                         className={cn(
-                            "gap-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all h-9 px-3",
+                            "gap-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all h-9 px-3 whitespace-nowrap",
                             showTags || selectedTags.length > 0 ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-muted/50"
                         )}
                     >
@@ -122,16 +97,45 @@ export default function HistoryTimeSelector({
                 </div>
             </div>
 
-            {/* Expandable Tag Area */}
+            {/* Custom Inputs Row */}
+            <AnimatePresence>
+                {dateRange === 'custom' && (
+                    <motion.div
+                        initial={{ height: 0, opacity: 0, marginTop: 0 }}
+                        animate={{ height: 'auto', opacity: 1, marginTop: 8 }}
+                        exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                        className="overflow-hidden"
+                    >
+                        <div className="flex items-center justify-center gap-2 p-2 bg-card/80 backdrop-blur-xl border border-border/50 rounded-xl shadow-sm w-fit mx-auto">
+                            <input
+                                type="date"
+                                value={customDateRange.from}
+                                onChange={(e) => onCustomDateChange({ ...customDateRange, from: e.target.value })}
+                                className="w-24 px-2 py-1.5 bg-background border border-border rounded-lg text-[10px] font-medium focus:ring-1 focus:ring-primary outline-none"
+                            />
+                            <span className="text-muted-foreground font-bold">-</span>
+                            <input
+                                type="date"
+                                value={customDateRange.to}
+                                onChange={(e) => onCustomDateChange({ ...customDateRange, to: e.target.value })}
+                                className="w-24 px-2 py-1.5 bg-background border border-border rounded-lg text-[10px] font-medium focus:ring-1 focus:ring-primary outline-none"
+                            />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Expandable Tag Area - Absolute Positioned Dropdown */}
             <AnimatePresence>
                 {showTags && (
                     <motion.div
-                        initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-                        animate={{ height: 'auto', opacity: 1, marginBottom: 16 }}
-                        exit={{ height: 0, opacity: 0, marginBottom: 0 }}
-                        className="overflow-hidden"
+                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute top-full right-0 mt-2 z-50 w-full md:w-auto md:min-w-[300px]"
                     >
-                        <div className="p-3 bg-card/50 backdrop-blur-sm border border-border/50 rounded-2xl flex flex-col gap-2 shadow-sm">
+                        <div className="p-3 bg-popover text-popover-foreground border border-border shadow-md rounded-xl flex flex-col gap-2">
                             <div className="flex items-center justify-between">
                                 <h4 className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Filter by Tags</h4>
                                 {selectedTags.length > 0 && (
@@ -156,7 +160,7 @@ export default function HistoryTimeSelector({
                                                 "relative px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all flex items-center gap-1.5",
                                                 isSelected
                                                     ? "ring-1 ring-offset-1 ring-offset-background"
-                                                    : "bg-card hover:bg-card/80 border-transparent opacity-70 hover:opacity-100"
+                                                    : "bg-muted/50 hover:bg-muted border-transparent"
                                             )}
                                             style={{
                                                 backgroundColor: isSelected ? `${tag.color}20` : undefined,
