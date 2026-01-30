@@ -59,7 +59,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             {children}
             <AnimatePresence>
                 {notification && (
-                    <div className="fixed bottom-0 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4 pb-safe md:pb-8">
+                    <div className="fixed bottom-0 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4 pb-24 md:pb-20">
                         <motion.div
                             key={notification.id}
                             initial={{ opacity: 0, y: 50, scale: 0.95 }}
@@ -67,12 +67,6 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                             exit={{ opacity: 0, y: 20, scale: 0.95 }}
                             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
                             className="pointer-events-auto flex items-center gap-3 px-4 py-3 bg-popover text-popover-foreground rounded-lg shadow-xl max-w-sm w-full border border-border"
-                            style={{
-                                // Adjust bottom position to avoid mobile nav bar overlapping if needed, 
-                                // though 'pb-safe' usually handles it.
-                                // We add a little margin to float above standard nav bars.
-                                marginBottom: 'var(--mobile-nav-height, 60px)'
-                            }}
                         >
                             <span className="flex-1 text-sm font-medium">{notification.message}</span>
                             {notification.undoAction && (

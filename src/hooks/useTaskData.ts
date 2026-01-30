@@ -236,21 +236,14 @@ export function useTaskData() {
             });
 
             showNotification("Moved to Saved Tasks", async () => {
-                // UNDO Logic
+                // UNDO Logic - Clear exclusion immediately
                 setPendingExclusions(prev => {
                     const next = new Map(prev);
-                    next.delete(taskId); // Show in Today
-                    if (newBacklogId) next.set(newBacklogId, 'backlog'); // Hide from Backlog
+                    next.delete(taskId); // Remove from exclusions so it shows in Today
                     return next;
                 });
 
-                // 1. Optimistically restore
-                const restoredTask = { ...task };
-                await mutateToday(curr => (curr ? { ...curr, tasks: [...curr.tasks, restoredTask] } : curr), { revalidate: false });
-
-                await mutateBacklog(curr => curr ? curr.filter(t => t.id !== (newBacklogId || taskId)) : [], { revalidate: false });
-
-                // 2. API Undo
+                // API Undo - restore to today
                 const dow = new Date().getDay();
                 await fetch('/api/tasks?view=board', {
                     method: 'POST',
@@ -263,6 +256,7 @@ export function useTaskData() {
                     }),
                 });
 
+                // Delete from backlog
                 if (newBacklogId) {
                     await fetch('/api/tasks?view=board', {
                         method: 'DELETE',
@@ -271,9 +265,8 @@ export function useTaskData() {
                     });
                 }
 
-                // mutate to sync
-                mutateToday();
-                mutateBacklog();
+                // Revalidate to sync with server
+                await Promise.all([mutateToday(), mutateBacklog()]);
             });
 
             // Final revalidate
@@ -328,21 +321,14 @@ export function useTaskData() {
             });
 
             showNotification("Moved to Today", async () => {
-                // UNDO Logic
+                // UNDO Logic - Clear exclusion immediately
                 setPendingExclusions(prev => {
                     const next = new Map(prev);
-                    next.delete(item.id); // Show in Backlog
-                    if (newTodayId) next.set(newTodayId, 'today'); // Hide from Today
+                    next.delete(item.id); // Remove from exclusions so it shows in Backlog
                     return next;
                 });
 
-                // Remove from Today
-                await mutateToday(curr => curr ? { ...curr, tasks: curr.tasks.filter(t => t.id !== (newTodayId || item.id)) } : curr, { revalidate: false });
-
-                // Restore to Backlog
-                await mutateBacklog(curr => curr ? [...curr, { ...item, completed: false } as Task] : [{ ...item, completed: false } as Task], { revalidate: false });
-
-                // API Undo
+                // API Undo - restore to backlog
                 await fetch('/api/tasks?view=board', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -352,6 +338,8 @@ export function useTaskData() {
                         tags: item.tags,
                     }),
                 });
+
+                // Delete from today
                 if (newTodayId) {
                     await fetch('/api/tasks', {
                         method: 'DELETE',
@@ -359,8 +347,9 @@ export function useTaskData() {
                         body: JSON.stringify({ date: dateStr, taskId: newTodayId }),
                     });
                 }
-                mutateToday();
-                mutateBacklog();
+
+                // Revalidate to sync with server
+                await Promise.all([mutateToday(), mutateBacklog()]);
             });
 
             await Promise.all([mutateToday(), mutateBacklog()]);
