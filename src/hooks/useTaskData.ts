@@ -153,15 +153,14 @@ export function useTaskData() {
 
         const newCompleted = forceState !== undefined ? forceState : !task.completed;
 
-        // 1. Optimistic Update
+        // 1. Optimistic Update - only update completion state, don't sort yet
         const updatedTasks = tasks.map(t =>
             t.id === taskId ? { ...t, completed: newCompleted } : t
         );
-        const optimisticallySorted = sortTasks(updatedTasks);
 
         await mutateToday({
             ...todayData,
-            tasks: optimisticallySorted
+            tasks: updatedTasks // Don't sort - let server response handle it
         }, { revalidate: false });
 
         // 2. API Call
