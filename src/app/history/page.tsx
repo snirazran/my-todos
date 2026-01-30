@@ -12,7 +12,7 @@ import { useTaskData } from '@/hooks/useTaskData';
 
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import HistoryMetrics from '@/components/history/HistoryMetrics';
-import ActivityHeatmap from '@/components/history/ActivityHeatmap';
+
 import HistoryTimeSelector, { DateRangeOption } from '@/components/history/HistoryTimeSelector';
 import HistoryList from '@/components/history/HistoryList';
 import { Button } from '@/components/ui/button';
@@ -283,15 +283,7 @@ export default function HistoryPage() {
                   />
 
                   {/* Collapsible Chart */}
-                  {/* Collapsible Chart */}
-                  <ActivityHeatmap
-                     historyData={filteredHistory}
-                     rangeDays={
-                        filter === '7d' ? 7 :
-                           filter === '30d' ? 30 :
-                              Math.max(1, Math.ceil((new Date(customTo).getTime() - new Date(customFrom).getTime()) / (1000 * 60 * 60 * 24)) + 1)
-                     }
-                  />
+
 
                   <div className="relative min-h-[400px]">
                      {loading ? <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10 backdrop-blur-sm rounded-xl"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div> : null}

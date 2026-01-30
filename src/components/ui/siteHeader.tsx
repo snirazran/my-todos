@@ -13,7 +13,7 @@ export default function SiteHeader() {
   // Fixed height so pages can reserve space (mobile/desktop)
   // mobile: h-14 (=3.5rem), md: h-16 (=4rem)
   return (
-    <header className="sticky top-0 z-50 w-full h-14 md:h-16 backdrop-blur-md border-b border-border/50 bg-background/70">
+    <header className="sticky md:static top-0 z-50 w-full h-14 md:h-16 backdrop-blur-md border-b border-border/50 bg-background/70">
       <div className="flex items-center justify-between h-full gap-4 px-6 py-3 mx-auto max-w-7xl md:px-10">
         {/* ───────── Logo ───────── */}
         <Link
@@ -34,9 +34,9 @@ export default function SiteHeader() {
           <ThemeToggle />
           <div className="flex items-center gap-2">
             {status === 'loading' ? (
-               <Button variant="ghost" disabled size="sm">
-                 ...
-               </Button>
+              <Button variant="ghost" disabled size="sm">
+                ...
+              </Button>
             ) : session ? (
               <Button
                 variant="secondary"

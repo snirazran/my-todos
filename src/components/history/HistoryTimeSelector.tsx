@@ -44,7 +44,7 @@ export default function HistoryTimeSelector({
     };
 
     return (
-        <div className="flex flex-col gap-2 mb-6 sticky top-2 z-30">
+        <div className="flex flex-col gap-2 mb-6 sticky top-16 md:top-2 z-30 transition-all">
             <div className="flex flex-row items-center justify-between gap-2 p-1.5 bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-sm overflow-x-auto no-scrollbar">
                 {/* Toggles */}
                 <div className="flex items-center gap-1 p-1 bg-muted/30 rounded-xl overflow-hidden flex-shrink-0">
