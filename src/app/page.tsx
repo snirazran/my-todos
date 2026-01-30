@@ -90,7 +90,9 @@ export default function Home() {
     reorderTasks,
     editTask,
     mutateToday,
-    mutateBacklog
+    mutateBacklog,
+    pendingToBacklog,
+    pendingToToday
   } = useTaskData();
 
   const frogRef = useRef<FrogHandle>(null);
@@ -265,9 +267,7 @@ export default function Home() {
               >
                 <CalendarCheck className={`w-4 h-4 ${activeTab === 'today' ? 'text-primary' : 'text-muted-foreground'}`} />
                 Today
-                {data.length > 0 && (
-                  <TaskCounter count={data.length} />
-                )}
+                <TaskCounter count={data.length} pendingCount={pendingToToday} />
               </button>
               <button
                 onClick={() => setActiveTab('backlog')}
@@ -281,9 +281,7 @@ export default function Home() {
               >
                 <CalendarClock className={`w-4 h-4 ${activeTab === 'backlog' ? 'text-primary' : 'text-muted-foreground'}`} />
                 Saved Tasks
-                {laterThisWeek.length > 0 && (
-                  <TaskCounter count={laterThisWeek.length} />
-                )}
+                <TaskCounter count={laterThisWeek.length} pendingCount={pendingToBacklog} />
               </button>
             </div>
 
@@ -346,6 +344,7 @@ export default function Home() {
                     }}
                     onDoLater={moveTaskToBacklog}
                     onReorder={reorderTasks}
+                    pendingToToday={pendingToToday}
                     onToggleRepeat={async (taskId) => {
                       const task = tasks.find(t => t.id === taskId);
                       if (!task) return;
@@ -386,6 +385,7 @@ export default function Home() {
                       onRefreshToday={async () => { await mutateToday(); }}
                       onRefreshBacklog={async () => { await mutateBacklog(); }}
                       onMoveToToday={moveTaskToToday}
+                      pendingToBacklog={pendingToBacklog}
                       onAddRequested={() => {
                         setQuickText('');
                         setQuickAddMode('later');
@@ -577,7 +577,8 @@ function Header({ session, router }: { session: any; router: any }) {
 }
 
 // Helper component for add-only animation
-function TaskCounter({ count }: { count: number }) {
+// Helper component for add-only animation
+function TaskCounter({ count, pendingCount }: { count: number; pendingCount?: number }) {
   const controls = useAnimation();
   const prevCount = React.useRef(count);
 
@@ -585,22 +586,35 @@ function TaskCounter({ count }: { count: number }) {
     if (count > prevCount.current) {
       // Only animate if count INCREASED
       controls.start({
-        scale: [1, 1.5, 1],
+        scale: [1, 1.35, 1],
+        color: ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"],
         transition: {
-          duration: 0.5,
-          ease: [0.34, 1.56, 0.64, 1], // Bouncy spring
+          duration: 0.3,
+          ease: "easeInOut",
         }
       });
     }
     prevCount.current = count;
   }, [count, controls]);
 
+  if (count === 0 && (!pendingCount || pendingCount === 0)) return null;
+
   return (
-    <motion.span
-      animate={controls}
-      className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm"
-    >
-      {count}
-    </motion.span>
+    <div className="flex items-center gap-1.5 ">
+      {count > 0 && (
+        <motion.span
+          animate={controls}
+          className={`flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm ${count === 0 ? 'hidden' : ''}`}
+        >
+          {count}
+        </motion.span>
+      )}
+      {(pendingCount ?? 0) > 0 && (
+        <svg className="w-3.5 h-3.5 animate-spin text-muted-foreground/60" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      )}
+    </div>
   );
 }

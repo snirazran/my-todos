@@ -56,6 +56,10 @@ export function useTaskData() {
     // Tracks where a task should be HIDDEN from until it appears in destination
     const [pendingExclusions, setPendingExclusions] = useState(new Map<string, ExclusionSource>());
 
+    // Track pending moves for loading indicators (count only)
+    const [pendingToBacklog, setPendingToBacklog] = useState(0);
+    const [pendingToToday, setPendingToToday] = useState(0);
+
     // --- SWR Keys ---
     const todayKey = session ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}` : null;
     const backlogKey = session ? `/api/tasks?view=board&day=-1` : null;
@@ -207,6 +211,7 @@ export function useTaskData() {
         if (!task) return;
 
         // Mark as pending removal from Today
+        setPendingToBacklog(prev => prev + 1);
         setPendingExclusions(prev => new Map(prev).set(taskId, 'today'));
 
         // No optimistic cache updates - let exclusion filter handle hiding
@@ -280,6 +285,8 @@ export function useTaskData() {
             });
             mutateToday();
             mutateBacklog();
+        } finally {
+            setPendingToBacklog(prev => prev - 1);
         }
     }, [todayData, backlogData, tasks, mutateToday, mutateBacklog, dateStr, showNotification]);
 
@@ -290,6 +297,7 @@ export function useTaskData() {
         if (!todayData || !backlogData) return;
 
         // Mark as pending removal from Backlog
+        setPendingToToday(prev => prev + 1);
         setPendingExclusions(prev => new Map(prev).set(item.id, 'backlog'));
 
         // No optimistic cache updates - let exclusion filter handle hiding
@@ -362,6 +370,8 @@ export function useTaskData() {
             });
             mutateToday();
             mutateBacklog();
+        } finally {
+            setPendingToToday(prev => prev - 1);
         }
     }, [todayData, backlogData, tasks, mutateToday, mutateBacklog, dateStr, showNotification]);
 
@@ -439,6 +449,8 @@ export function useTaskData() {
     return {
         tasks,
         backlogTasks,
+        pendingToBacklog,
+        pendingToToday,
         flyStatus,
         hungerStatus,
         dailyGiftCount,
