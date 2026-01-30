@@ -1,5 +1,5 @@
 import useSWR, { mutate } from 'swr';
-import { useCallback, useState, useRef } from 'react';
+import { useCallback, useState, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useSession } from 'next-auth/react';
 import { useNotification } from '@/components/providers/NotificationProvider';
@@ -49,7 +49,9 @@ export function useTaskData() {
     const today = new Date();
     const dateStr = format(today, 'yyyy-MM-dd');
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const pendingOperations = useRef(new Set<string>());
+
+    // Use State for pending deletes to trigger re-renders and filter strictly
+    const [pendingDeletes, setPendingDeletes] = useState(new Set<string>());
 
     // --- SWR Keys ---
     const todayKey = session ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}` : null;
@@ -61,7 +63,7 @@ export function useTaskData() {
         mutate: mutateToday,
         isLoading: isLoadingToday
     } = useSWR<TasksResponse>(todayKey, fetcher, {
-        refreshInterval: 0, // Disable auto-refresh to prevent flickering unless needed
+        refreshInterval: 0,
         revalidateOnFocus: true,
     });
 
@@ -74,14 +76,47 @@ export function useTaskData() {
         revalidateOnFocus: true,
     });
 
+    // --- Cleanup Effect ---
+    // If a task ID is in pendingDeletes but NO LONGER in the server data, 
+    // it means the deletion is confirmed and we can stop tracking it.
+    // If it IS in the server data, we keep tracking it so it remains hidden (ghost fix).
+    useEffect(() => {
+        if (pendingDeletes.size === 0) return;
+
+        setPendingDeletes(prev => {
+            const next = new Set(prev);
+            let changed = false;
+
+            // Sync with server state
+
+            const effectiveToday = todayData?.tasks || [];
+            const effectiveBacklog = backlogData || [];
+
+            // Only cleanup if we actually have data
+            if (!todayData && !backlogData) return prev;
+
+            Array.from(next).forEach(id => {
+                const presentInToday = effectiveToday.some(t => t.id === id);
+                const presentInBacklog = effectiveBacklog.some(t => t.id === id);
+
+                if (!presentInToday && !presentInBacklog) {
+                    next.delete(id);
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [todayData, backlogData]); // Depend on data updates
+
+
     // --- Derived State ---
-    const tasks = (todayData?.tasks || []).filter(t => !pendingOperations.current.has(t.id));
+    const tasks = (todayData?.tasks || []).filter(t => !pendingDeletes.has(t.id));
     const weeklyIds = new Set(todayData?.weeklyIds || []);
     const flyStatus = todayData?.flyStatus || { balance: 0, earnedToday: 0, limit: 15, limitHit: false };
     const hungerStatus = todayData?.hungerStatus || { hunger: 0, stolenFlies: 0, maxHunger: 0 };
     const dailyGiftCount = todayData?.dailyGiftCount || 0;
 
-    const backlogTasks = (backlogData || []).filter(t => !pendingOperations.current.has(t.id));
+    const backlogTasks = (backlogData || []).filter(t => !pendingDeletes.has(t.id));
 
     // --- Helper for Optimistic Updates ---
     const sortTasks = (ts: Task[]) => {
@@ -143,7 +178,6 @@ export function useTaskData() {
                 }),
             });
             await mutateToday();
-            // We assume successful toggle means state is settled.
         } catch (e) {
             console.error("Toggle failed", e);
             await mutateToday(); // Rollback
@@ -158,9 +192,9 @@ export function useTaskData() {
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
-        pendingOperations.current.add(taskId);
+        setPendingDeletes(prev => new Set(prev).add(taskId));
 
-        // 1. Optimistic Update
+        // 1. Optimistic Update (For other potential consumers, although derived state handles hiding)
         // Remove from Today
         const newTodayTasks = tasks.filter(t => t.id !== taskId);
         await mutateToday({ ...todayData, tasks: newTodayTasks }, { revalidate: false });
@@ -191,12 +225,17 @@ export function useTaskData() {
                 body: JSON.stringify({ date: dateStr, taskId }),
             });
 
-            pendingOperations.current.delete(taskId);
+            // NOTE: We DO NOT remove from pendingDeletes here.
+            // We wait for the useEffect to confirm it's gone.
 
             showNotification("Moved to Saved Tasks", async () => {
                 // UNDO Logic
-                pendingOperations.current.delete(taskId);
-                if (newBacklogId) pendingOperations.current.add(newBacklogId);
+                setPendingDeletes(prev => {
+                    const next = new Set(prev);
+                    next.delete(taskId); // Un-hide original
+                    if (newBacklogId) next.add(newBacklogId); // Hide new backlog item
+                    return next;
+                });
 
                 // 1. Optimistically restore
                 const restoredTask = { ...task };
@@ -225,19 +264,21 @@ export function useTaskData() {
                     });
                 }
 
-                if (newBacklogId) pendingOperations.current.delete(newBacklogId);
-
-                // Final sync
+                // mutate to sync
                 mutateToday();
                 mutateBacklog();
             });
 
-            // Final revalidate to ensure IDs are correct
+            // Final revalidate
             await Promise.all([mutateToday(), mutateBacklog()]);
 
         } catch (e) {
             console.error("Move to backlog failed", e);
-            pendingOperations.current.delete(taskId);
+            setPendingDeletes(prev => {
+                const next = new Set(prev);
+                next.delete(taskId);
+                return next;
+            });
             mutateToday();
             mutateBacklog();
         }
@@ -249,7 +290,7 @@ export function useTaskData() {
     const moveTaskToToday = useCallback(async (item: { id: string; text: string; tags?: string[] }) => {
         if (!todayData || !backlogData) return;
 
-        pendingOperations.current.add(item.id);
+        setPendingDeletes(prev => new Set(prev).add(item.id));
 
         // 1. Optimistic Update
         // Remove from Backlog
@@ -288,11 +329,16 @@ export function useTaskData() {
                 body: JSON.stringify({ day: -1, taskId: item.id }),
             });
 
-            pendingOperations.current.delete(item.id);
+            // Wait for useEffect cleanup
 
             showNotification("Moved to Today", async () => {
                 // UNDO Logic
-                if (newTodayId) pendingOperations.current.add(newTodayId);
+                setPendingDeletes(prev => {
+                    const next = new Set(prev);
+                    next.delete(item.id); // Show original in backlog
+                    if (newTodayId) next.add(newTodayId); // Hide new today item
+                    return next;
+                });
 
                 // Remove from Today
                 await mutateToday(curr => curr ? { ...curr, tasks: curr.tasks.filter(t => t.id !== (newTodayId || item.id)) } : curr, { revalidate: false });
@@ -316,7 +362,6 @@ export function useTaskData() {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ date: dateStr, taskId: newTodayId }),
                     });
-                    if (newTodayId) pendingOperations.current.delete(newTodayId);
                 }
                 mutateToday();
                 mutateBacklog();
@@ -326,7 +371,11 @@ export function useTaskData() {
 
         } catch (e) {
             console.error("Move to today failed", e);
-            pendingOperations.current.delete(item.id);
+            setPendingDeletes(prev => {
+                const next = new Set(prev);
+                next.delete(item.id);
+                return next;
+            });
             mutateToday();
             mutateBacklog();
         }
@@ -336,7 +385,7 @@ export function useTaskData() {
      * Delete Task (Today)
      */
     const deleteTask = useCallback(async (taskId: string) => {
-        pendingOperations.current.add(taskId);
+        setPendingDeletes(prev => new Set(prev).add(taskId));
 
         // Optimistic
         if (todayData) {
@@ -352,7 +401,6 @@ export function useTaskData() {
             body: JSON.stringify({ date: dateStr, taskId }),
         });
 
-        pendingOperations.current.delete(taskId);
         mutateToday();
     }, [todayData, tasks, mutateToday, dateStr]);
 
