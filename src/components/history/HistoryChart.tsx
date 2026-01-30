@@ -23,22 +23,19 @@ export default function HistoryChart({ historyData }: HistoryChartProps) {
     const chartData = useMemo(() => {
         const sorted = [...historyData].sort((a, b) => a.date.localeCompare(b.date));
 
-        // Find maximum completed tasks to scale the bars (min 5 for meaningful height)
-        const counts = sorted.map(d => d.tasks.filter(t => t.completed).length);
-        const maxVal = Math.max(...counts, 5);
-
         return sorted.map(d => {
             const completed = d.tasks.filter(t => t.completed).length;
             const total = d.tasks.length;
 
-            // Calculate height percentage relative to max volume
-            const heightPercent = completed === 0 ? 5 : (completed / maxVal) * 100;
+            // FIXED SCALE: 10 tasks = 100% height (Full Productivity)
+            // This guarantees variance: 1 task is always small (10%), 5 is medium (50%), 10 is full (100%).
+            // If > 10, cap at 100%.
+            const rawHeight = (completed / 10) * 100;
+            const heightPercent = Math.min(Math.max(rawHeight, 5), 100); // multiple constraints (min 5, max 100)
 
-            // Calculate opacity based on intensity relative to max volume
-            // 0 tasks -> 0.1 opacity (faint)
-            // 1 task (vs max 5) -> 0.2 scale -> 0.44 opacity
-            // Max tasks -> 1.0 opacity
-            const opacity = completed === 0 ? 0.1 : 0.3 + (Math.min(completed / maxVal, 1) * 0.7);
+            // Opacity scales similarly
+            const rawOpacity = 0.3 + (completed / 10) * 0.7;
+            const opacity = completed === 0 ? 0.1 : Math.min(rawOpacity, 1);
 
             return {
                 date: d.date,
@@ -94,7 +91,7 @@ export default function HistoryChart({ historyData }: HistoryChartProps) {
                                                     transition={{ delay: i * 0.02, duration: 0.5, type: 'spring' }}
                                                     className={cn(
                                                         "w-full rounded-t transition-all min-h-[4px]",
-                                                        // Color is simpler: Always Green, but intensity (opacity) varies with volume
+                                                        // Use Green for "more greener" on high volume
                                                         d.completed === 0 ? "bg-muted-foreground" : "bg-emerald-500"
                                                     )}
                                                     style={{ opacity: d.opacity }}
