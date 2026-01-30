@@ -141,6 +141,14 @@ function BacklogTaskItem({
 
   // State to track dragging for visual updates (e.g. keeping icons visible during drag)
   const [isDragging, setIsDragging] = React.useState(false);
+  const [hasTriggeredExit, setHasTriggeredExit] = React.useState(false); // Immediate exit tracking
+
+  // Sync exit state
+  React.useEffect(() => {
+    if (isExiting) {
+      setHasTriggeredExit(true);
+    }
+  }, [isExiting]);
 
   const handleDragStart = () => {
     isDraggingRef.current = true;
@@ -179,9 +187,14 @@ function BacklogTaskItem({
       }
       // Check for Left Swipe (Plus) -> Negative Offset
       else if (offset < -swipeThreshold) {
-        // Trigger Add Today
+        // Trigger Add Today with clean exit
+        setHasTriggeredExit(true); // Immediately hide menu
+        setIsOpen(false); // Close menu immediately for clean exit
+        window.dispatchEvent(
+          new CustomEvent('task-swipe-open', { detail: { id: null } })
+        );
         onAddToday(item);
-        // Fix: Don't snap back. Continue the movement outwards (left) to match the exit animation.
+        // Continue the movement outwards (left) to match the exit animation
         animate(x, -1000, { duration: 0.4, ease: [0.32, 0.72, 0, 1] });
       }
       else {
@@ -196,21 +209,10 @@ function BacklogTaskItem({
       ref={containerRef}
       layout={!isDragging && !isExiting}
       initial={false}
-      animate={
-        isExiting
-          ? {
-            opacity: 1,
-            x: -1000,
-            transition: {
-              duration: 0.4,
-              ease: [0.32, 0.72, 0, 1],
-            },
-          }
-          : { opacity: 1, x: 0, y: 0 }
-      }
+      animate={{ opacity: 1, x: 0, y: 0 }}
       exit={
         isExiting
-          ? { opacity: 1, x: -1000 }
+          ? { opacity: 1 }
           : { opacity: 0, scale: 0.95 }
       }
       transition={{ delay: index * 0.05 }}
@@ -220,8 +222,8 @@ function BacklogTaskItem({
       {/* Swipe Actions Layer (Left - for Right Swipe - Trash) */}
       {!isDesktop && (
         <div
-          className={`absolute inset-y-0 left-0 flex items-center pl-2 gap-2 transition-opacity duration-200 ${isOpen || isDragging ? 'opacity-100' : 'opacity-0 delay-200'}`}
-          aria-hidden={!isOpen}
+          className={`absolute inset-y-0 left-0 flex items-center pl-2 gap-2 transition-opacity ${!(isExiting || hasTriggeredExit) && (isOpen || isDragging) ? 'opacity-100 duration-200' : (isExiting || hasTriggeredExit) ? 'opacity-0 duration-0' : 'opacity-0 duration-200 delay-200'}`}
+          aria-hidden={!isOpen || isExiting || hasTriggeredExit}
         >
           <button
             onClick={(e) => {
@@ -274,7 +276,7 @@ function BacklogTaskItem({
         dragMomentum={false}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
-        animate={{ x: isOpen ? 100 : 0 }}
+        animate={{ x: isExiting ? -1000 : (isOpen ? 100 : 0) }}
         transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }}
         className={`
                 relative flex items-center gap-1.5 px-2 py-3.5 
@@ -284,8 +286,9 @@ function BacklogTaskItem({
             ? `md:hover:bg-card md:hover:border-border ${isMenuOpen ? 'bg-card border-border shadow-md' : 'bg-transparent'}`
             : `bg-card ${(isOpen || isDragging || isNudging) ? '' : ''}`
           }
+                ${isExiting ? 'pointer-events-none' : ''}
             `}
-        style={{ x, touchAction: 'pan-y' }}
+        style={{ x: isExiting ? undefined : x, touchAction: 'pan-y' }}
         onClick={() => {
           if (isNudging) return;
           if (isOpen) setIsOpen(false);

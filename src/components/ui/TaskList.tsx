@@ -85,6 +85,7 @@ function SortableTaskItem({
   /* Swipe Logic */
   const [isOpen, setIsOpen] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
+  const [hasTriggeredExit, setHasTriggeredExit] = useState(false); // Immediate exit tracking
   const isDraggingRef = React.useRef(false);
   const hasActionTriggeredRef = React.useRef(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -117,6 +118,13 @@ function SortableTaskItem({
   // Instant color snap at threshold
   const doLaterColor = useTransform(x, [swipeThreshold - 1, swipeThreshold], ["#9ca3af", "#6366f1"]); // Slate to Indigo
   const doLaterTextColor = useTransform(x, [swipeThreshold - 1, swipeThreshold], ["#ffffff", "#ffffff"]);
+
+  // Sync exit state
+  useEffect(() => {
+    if (isExitingLater) {
+      setHasTriggeredExit(true);
+    }
+  }, [isExitingLater]);
 
   useEffect(() => {
     const handleOtherSwipe = (e: Event) => {
@@ -194,8 +202,13 @@ function SortableTaskItem({
       // Action: Swipe Right (Positive) -> Do Later - SWAPPED
       if (offset > swipeThreshold && onDoLater) {
         hasActionTriggeredRef.current = true;
+        setHasTriggeredExit(true); // Immediately hide menu
+        setIsOpen(false); // Close menu immediately for clean exit
+        window.dispatchEvent(
+          new CustomEvent('task-swipe-open', { detail: { id: null } })
+        );
         onDoLater(task);
-        // Fix: Don't snap back. Continue the movement outwards to match the exit animation.
+        // Continue the movement outwards to match the exit animation
         animate(x, 1000, { duration: 0.4, ease: [0.32, 0.72, 0, 1] });
       }
       // Opening: Swipe Left (Negative) -> Edit/Trash - SWAPPED
@@ -245,17 +258,8 @@ function SortableTaskItem({
       <motion.div
         layout={!disableLayout && !isDragging && !isExitingLater}
         initial={{ opacity: 0, y: 20 }}
-        animate={
-          isExitingLater
-            ? {
-              opacity: 1,
-              x: 1000,
-              y: 0,
-              transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] },
-            }
-            : { opacity: 1, x: 0, y: 0 }
-        }
-        exit={isExitingLater ? { opacity: 1, x: 1000, y: 0 } : { opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, x: 0, y: 0 }}
+        exit={isExitingLater ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
 
         transition={{
           layout: { type: 'spring', stiffness: 250, damping: 25 },
@@ -283,8 +287,8 @@ function SortableTaskItem({
 
         {/* Swipe (Menu) Actions Layer */}
         <div
-          className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity duration-200 ${isOpen || isSwiping ? 'opacity-100' : 'opacity-0 delay-200'}`}
-          aria-hidden={!isOpen}
+          className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity ${!(isExitingLater || hasTriggeredExit) && (isOpen || isSwiping) ? 'opacity-100 duration-200' : (isExitingLater || hasTriggeredExit) ? 'opacity-0 duration-0' : 'opacity-0 duration-200 delay-200'}`}
+          aria-hidden={!isOpen || isExitingLater || hasTriggeredExit}
         >
           <button
             onClick={(e) => {
@@ -324,8 +328,8 @@ function SortableTaskItem({
 
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
-          animate={{ x: isOpen ? -100 : 0 }}
-          style={{ x, touchAction: 'pan-y', cursor: 'grab' }}
+          animate={{ x: isExitingLater ? 1000 : (isOpen ? -100 : 0) }}
+          style={{ x: isExitingLater ? undefined : x, touchAction: 'pan-y', cursor: 'grab' }}
           transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }} // Snappier spring
 
           className={`
