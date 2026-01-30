@@ -125,52 +125,52 @@ function SortableTaskItem({
         setIsOpen(false);
       }
     };
-    
+
     // Global click listener to close on outside click
     const handleGlobalClick = (e: MouseEvent) => {
-       if (!isOpen) return;
-       
-       // If clicking inside THIS task's actions or card, don't close via this handler
-       if (containerRef.current && containerRef.current.contains(e.target as Node)) {
-           return;
-       }
-       
-       setIsOpen(false);
+      if (!isOpen) return;
+
+      // If clicking inside THIS task's actions or card, don't close via this handler
+      if (containerRef.current && containerRef.current.contains(e.target as Node)) {
+        return;
+      }
+
+      setIsOpen(false);
     };
 
     window.addEventListener('task-swipe-open', handleOtherSwipe);
-    
+
     // Only attach click listener if open, using capture to ensure we get it
     if (isOpen) {
-        window.addEventListener('click', handleGlobalClick, { capture: true }); 
-        
-        // Also close on scroll
-        const handleScroll = () => {
-             setIsOpen(false);
-        };
-        window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
-        
-        return () => {
-             window.removeEventListener('task-swipe-open', handleOtherSwipe);
-             window.removeEventListener('click', handleGlobalClick, { capture: true });
-             window.removeEventListener('scroll', handleScroll, { capture: true });
-        };
-    }
-    
-    return () => {
+      window.addEventListener('click', handleGlobalClick, { capture: true });
+
+      // Also close on scroll
+      const handleScroll = () => {
+        setIsOpen(false);
+      };
+      window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+
+      return () => {
         window.removeEventListener('task-swipe-open', handleOtherSwipe);
+        window.removeEventListener('click', handleGlobalClick, { capture: true });
+        window.removeEventListener('scroll', handleScroll, { capture: true });
+      };
+    }
+
+    return () => {
+      window.removeEventListener('task-swipe-open', handleOtherSwipe);
     };
   }, [task.id, isOpen]);
 
   const handleDragStart = () => {
-      isDraggingRef.current = true;
-      setIsSwiping(true);
+    isDraggingRef.current = true;
+    setIsSwiping(true);
   };
 
   const handleDragEnd = (_: any, info: PanInfo) => {
     setTimeout(() => {
-         isDraggingRef.current = false;
-         setIsSwiping(false);
+      isDraggingRef.current = false;
+      setIsSwiping(false);
     }, 100);
 
     const offset = info.offset.x;
@@ -178,49 +178,50 @@ function SortableTaskItem({
 
     // Strict Spotify-like snap logic (Swapped again: Open is now Left/Negative)
     if (isOpen) {
-        // If already open (Left Swipe state -> Menu), closing needs Right motion (Positive)
-        if (offset > 15 || velocity > 100) {
-            setIsOpen(false);
-            window.dispatchEvent(
-                new CustomEvent('task-swipe-open', { detail: { id: null } })
-            );
-        } else {
-             // Snap back to open (Negative X)
-             animate(x, -100, { type: "spring", stiffness: 600, damping: 28 });
-        }
+      // If already open (Left Swipe state -> Menu), closing needs Right motion (Positive)
+      if (offset > 15 || velocity > 100) {
+        setIsOpen(false);
+        window.dispatchEvent(
+          new CustomEvent('task-swipe-open', { detail: { id: null } })
+        );
+      } else {
+        // Snap back to open (Negative X)
+        animate(x, -100, { type: "spring", stiffness: 600, damping: 28 });
+      }
     } else {
-        // Closed state
-        
-        // Action: Swipe Right (Positive) -> Do Later - SWAPPED
-        if (offset > swipeThreshold && onDoLater) {
-            hasActionTriggeredRef.current = true;
-            onDoLater(task);
-            animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
-        }
-        // Opening: Swipe Left (Negative) -> Edit/Trash - SWAPPED
-        else if (offset < -60 || velocity < -200) {
-             setIsOpen(true);
-             window.dispatchEvent(
-                new CustomEvent('task-swipe-open', { detail: { id: task.id } })
-            );
-             animate(x, -100, { type: "spring", stiffness: 600, damping: 28 });
-        }
-        else {
-             // Snap back
-             animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
-        }
+      // Closed state
+
+      // Action: Swipe Right (Positive) -> Do Later - SWAPPED
+      if (offset > swipeThreshold && onDoLater) {
+        hasActionTriggeredRef.current = true;
+        onDoLater(task);
+        // Fix: Don't snap back. Continue the movement outwards to match the exit animation.
+        animate(x, 500, { duration: 0.4, ease: [0.32, 0.72, 0, 1] });
+      }
+      // Opening: Swipe Left (Negative) -> Edit/Trash - SWAPPED
+      else if (offset < -60 || velocity < -200) {
+        setIsOpen(true);
+        window.dispatchEvent(
+          new CustomEvent('task-swipe-open', { detail: { id: task.id } })
+        );
+        animate(x, -100, { type: "spring", stiffness: 600, damping: 28 });
+      }
+      else {
+        // Snap back
+        animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
+      }
     }
   };
-  
+
   const handleCardClick = (e: React.MouseEvent) => {
-      if (isDraggingRef.current) return;
-      if (isExitingLater || hasActionTriggeredRef.current) return;
-      
-      if (isOpen) {
-          setIsOpen(false);
-          return;
-      }
-      handleTaskToggle(task);
+    if (isDraggingRef.current) return;
+    if (isExitingLater || hasActionTriggeredRef.current) return;
+
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+    handleTaskToggle(task);
   };
 
   const style = {
@@ -247,87 +248,87 @@ function SortableTaskItem({
         animate={
           isExitingLater
             ? {
-                opacity: 1,
-                x: 600,
-                y: 0,
-                transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] },
-              }
+              opacity: 1,
+              x: 600,
+              y: 0,
+              transition: { duration: 0.4, ease: [0.32, 0.72, 0, 1] },
+            }
             : { opacity: 1, x: 0, y: 0 }
         }
         exit={isExitingLater ? { opacity: 1, x: 600, y: 0 } : { opacity: 0, scale: 0.95 }}
 
         transition={{
-            layout: { type: 'spring', stiffness: 250, damping: 25 },
+          layout: { type: 'spring', stiffness: 250, damping: 25 },
         }}
         className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : 'overflow-hidden bg-muted/50'} ${isExitingLater ? 'will-change-transform' : ''}`}
       >
-          {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
-          {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
-          {/* Positioned on Left to be revealed by Right drag */}
-          <div 
-               className="absolute inset-y-0 left-0 flex items-center pl-4"
-           >
-               <motion.div 
-                   className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
-                   style={{ 
-                       opacity: doLaterOpacity,
-                       scale: doLaterScale,
-                       color: doLaterTextColor,
-                       backgroundColor: doLaterColor
-                   }}
-               >
-                    <CalendarClock className="w-5 h-5" />
-               </motion.div>
-           </div>
-          
-          {/* Swipe (Menu) Actions Layer */}
-          <div 
-             className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity duration-200 ${isOpen || isSwiping ? 'opacity-100' : 'opacity-0 delay-200'}`}
-             aria-hidden={!isOpen}
-          >
-             <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
-                  onMenuOpen(e, task); 
-                }}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
-                title="More options"
-                tabIndex={isOpen ? 0 : -1}
-             >
-                <EllipsisVertical className="w-5 h-5" />
-             </button>
-             <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
-                  const event = new CustomEvent('task-delete-request', { detail: { id: task.id } });
-                  window.dispatchEvent(event);
-                }}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors"
-                title="Delete"
-                tabIndex={isOpen ? 0 : -1}
-             >
-               <Trash2 className="w-4 h-4" />
-             </button>
-          </div>
-
-          {/* Foreground Card (Swipeable) */}
+        {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
+        {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
+        {/* Positioned on Left to be revealed by Right drag */}
+        <div
+          className="absolute inset-y-0 left-0 flex items-center pl-4"
+        >
           <motion.div
-            drag={isDesktop ? false : "x"}
-            dragListener={!isDragging}
-            dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
-            dragConstraints={{ left: -100, right: 70 }}
-            dragElastic={0.1}
-            dragMomentum={false}
-            
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            animate={{ x: isOpen ? -100 : 0 }}
-            style={{ x, touchAction: 'pan-y', cursor: 'grab' }}
-            transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }} // Snappier spring
+            className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
+            style={{
+              opacity: doLaterOpacity,
+              scale: doLaterScale,
+              color: doLaterTextColor,
+              backgroundColor: doLaterColor
+            }}
+          >
+            <CalendarClock className="w-5 h-5" />
+          </motion.div>
+        </div>
 
-            className={`
+        {/* Swipe (Menu) Actions Layer */}
+        <div
+          className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity duration-200 ${isOpen || isSwiping ? 'opacity-100' : 'opacity-0 delay-200'}`}
+          aria-hidden={!isOpen}
+        >
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+              onMenuOpen(e, task);
+            }}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
+            title="More options"
+            tabIndex={isOpen ? 0 : -1}
+          >
+            <EllipsisVertical className="w-5 h-5" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+              const event = new CustomEvent('task-delete-request', { detail: { id: task.id } });
+              window.dispatchEvent(event);
+            }}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors"
+            title="Delete"
+            tabIndex={isOpen ? 0 : -1}
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Foreground Card (Swipeable) */}
+        <motion.div
+          drag={isDesktop ? false : "x"}
+          dragListener={!isDragging}
+          dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
+          dragConstraints={{ left: -100, right: 70 }}
+          dragElastic={0.1}
+          dragMomentum={false}
+
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+          animate={{ x: isOpen ? -100 : 0 }}
+          style={{ x, touchAction: 'pan-y', cursor: 'grab' }}
+          transition={{ type: "spring", stiffness: 600, damping: 28, mass: 1 }} // Snappier spring
+
+          className={`
               relative flex items-center gap-1.5 px-2 py-3.5 
               transition-colors duration-200 rounded-xl 
               bg-card 
@@ -341,139 +342,137 @@ function SortableTaskItem({
               ${isDone && !isDragging ? 'md:hover:bg-accent/50' : ''} 
               cursor-pointer
             `}
-           // Note: We are using 'style' prop for x motion value to avoid re-renders
-           // combined with the style object above, so we pass x via the style prop on the motion component directly
-           onClick={handleCardClick}
-          >
-            <div className={`flex items-center flex-1 min-w-0 gap-3 pl-2 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}>
-               {/* Bullet */}
-              <div className="relative flex-shrink-0 w-7 h-7">
-                <AnimatePresence initial={false}>
-                  {!isDone ? (
-                    <motion.div
-                      key="fly"
-                      className="absolute inset-0"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.18 }}
-                    >
-                      {renderBullet ? (
-                        renderBullet(task, false)
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (isExitingLater || isSwiping || isDraggingRef.current || hasActionTriggeredRef.current) return;
-                            handleTaskToggle(task, true);
-                          }}
-                          className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 md:hover:text-primary"
-                        >
-                          <Circle className="w-6 h-6" />
-                        </button>
-                      )}
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="check"
-                      className="absolute inset-0"
-                      initial={{ opacity: 0, scale: 0.6 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.6 }}
-                      transition={{
-                        type: 'spring',
-                        stiffness: 400,
-                        damping: 25,
-                      }}
-                    >
+          // Note: We are using 'style' prop for x motion value to avoid re-renders
+          // combined with the style object above, so we pass x via the style prop on the motion component directly
+          onClick={handleCardClick}
+        >
+          <div className={`flex items-center flex-1 min-w-0 gap-3 pl-2 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}>
+            {/* Bullet */}
+            <div className="relative flex-shrink-0 w-7 h-7">
+              <AnimatePresence initial={false}>
+                {!isDone ? (
+                  <motion.div
+                    key="fly"
+                    className="absolute inset-0"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                  >
+                    {renderBullet ? (
+                      renderBullet(task, false)
+                    ) : (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleTaskToggle(task, false);
+                          if (isExitingLater || isSwiping || isDraggingRef.current || hasActionTriggeredRef.current) return;
+                          handleTaskToggle(task, true);
                         }}
+                        className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 md:hover:text-primary"
                       >
-                        <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
+                        <Circle className="w-6 h-6" />
                       </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <motion.span
-                  className={`block text-base font-medium md:text-lg transition-colors duration-200 ${
-                    isDone
-                      ? 'text-muted-foreground line-through'
-                      : 'text-foreground'
-                  }`}
-                  animate={{
-                    opacity: isDone ? 0.8 : 1, // Double ensure text is dimmed
-                  }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {task.text}
-                </motion.span>
-                {(isWeekly || (task.tags && task.tags.length > 0)) && (
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {isWeekly && (
-                      <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
-                        <RotateCcw className="w-3 h-3" />
-                        Weekly
-                      </span>
                     )}
-                    <AnimatePresence mode="popLayout">
-                      {task.tags?.map((tagId) => {
-                        const tagDetails = getTagDetails(tagId);
-                        if (!tagDetails) return null;
-
-                        const color = tagDetails.color;
-                        const name = tagDetails.name;
-
-                        return (
-                          <motion.span
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0 }}
-                            transition={{ duration: 0.2 }}
-                            key={tagId}
-                            className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
-                              !color
-                                ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
-                                : ''
-                            }`}
-                            style={
-                              color
-                                ? {
-                                    backgroundColor: `${color}20`,
-                                    color: color,
-                                    borderColor: `${color}40`,
-                                  }
-                                : undefined
-                            }
-                          >
-                            {name}
-                          </motion.span>
-                        );
-                      })}
-                    </AnimatePresence>
-                  </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="check"
+                    className="absolute inset-0"
+                    initial={{ opacity: 0, scale: 0.6 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.6 }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 400,
+                      damping: 25,
+                    }}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTaskToggle(task, false);
+                      }}
+                    >
+                      <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
+                    </button>
+                  </motion.div>
                 )}
-              </div>
+              </AnimatePresence>
             </div>
-            {/* Grab handle area for mobile if needed, or just edge drag */}
 
-            {/* Desktop Hover Menu (3 Dots) */}
-            <div className={`hidden md:group-hover:block absolute right-2 top-1/2 -translate-y-1/2 transition-opacity ${isDragging ? 'opacity-0' : 'opacity-100'}`}>
-                 <button
-                   className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
-                   onClick={(e) => onMenuOpen(e, task)}
-                   onPointerDown={(e) => e.stopPropagation()}
-                   title="Options"
-                 >
-                   <EllipsisVertical className="w-5 h-5" />
-                 </button>
+            <div className="flex-1 min-w-0">
+              <motion.span
+                className={`block text-base font-medium md:text-lg transition-colors duration-200 ${isDone
+                  ? 'text-muted-foreground line-through'
+                  : 'text-foreground'
+                  }`}
+                animate={{
+                  opacity: isDone ? 0.8 : 1, // Double ensure text is dimmed
+                }}
+                transition={{ duration: 0.2 }}
+              >
+                {task.text}
+              </motion.span>
+              {(isWeekly || (task.tags && task.tags.length > 0)) && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {isWeekly && (
+                    <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
+                      <RotateCcw className="w-3 h-3" />
+                      Weekly
+                    </span>
+                  )}
+                  <AnimatePresence mode="popLayout">
+                    {task.tags?.map((tagId) => {
+                      const tagDetails = getTagDetails(tagId);
+                      if (!tagDetails) return null;
+
+                      const color = tagDetails.color;
+                      const name = tagDetails.name;
+
+                      return (
+                        <motion.span
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0 }}
+                          transition={{ duration: 0.2 }}
+                          key={tagId}
+                          className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${!color
+                            ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
+                            : ''
+                            }`}
+                          style={
+                            color
+                              ? {
+                                backgroundColor: `${color}20`,
+                                color: color,
+                                borderColor: `${color}40`,
+                              }
+                              : undefined
+                          }
+                        >
+                          {name}
+                        </motion.span>
+                      );
+                    })}
+                  </AnimatePresence>
+                </div>
+              )}
             </div>
-          </motion.div>
+          </div>
+          {/* Grab handle area for mobile if needed, or just edge drag */}
+
+          {/* Desktop Hover Menu (3 Dots) */}
+          <div className={`hidden md:group-hover:block absolute right-2 top-1/2 -translate-y-1/2 transition-opacity ${isDragging ? 'opacity-0' : 'opacity-100'}`}>
+            <button
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
+              onClick={(e) => onMenuOpen(e, task)}
+              onPointerDown={(e) => e.stopPropagation()}
+              title="Options"
+            >
+              <EllipsisVertical className="w-5 h-5" />
+            </button>
+          </div>
+        </motion.div>
       </motion.div>
     </div>
   );
@@ -555,14 +554,14 @@ export default function TaskList({
   React.useEffect(() => {
     if (isAnyDragging) {
       document.documentElement.classList.add('dragging');
-      
+
       // Lock the scroll aggressively for the current gesture
       const handleTouchMove = (e: TouchEvent) => {
         if (e.cancelable) e.preventDefault();
       };
-      
+
       window.addEventListener('touchmove', handleTouchMove, { passive: false });
-      
+
       return () => {
         document.documentElement.classList.remove('dragging');
         window.removeEventListener('touchmove', handleTouchMove);
@@ -597,12 +596,12 @@ export default function TaskList({
     };
 
     const handleDeleteRequest = (e: Event) => {
-        const id = (e as CustomEvent<{ id: string }>).detail?.id;
-        const task = tasks.find(t => t.id === id);
-        if (task) {
-           setDialog({ task, kind: taskKind(task) });
-           setMenu(null); // Close any open menu
-        }
+      const id = (e as CustomEvent<{ id: string }>).detail?.id;
+      const task = tasks.find(t => t.id === id);
+      if (task) {
+        setDialog({ task, kind: taskKind(task) });
+        setMenu(null); // Close any open menu
+      }
     };
 
     window.addEventListener('task-menu-open', closeIfOther as EventListener);
@@ -613,19 +612,19 @@ export default function TaskList({
       window.removeEventListener('task-delete-request', handleDeleteRequest as EventListener);
     };
   }, [tasks]); // Added tasks dependency to find task
-  
+
   const handleTagSave = async (taskId: string, newTags: string[]) => {
-      try {
-          await fetch('/api/tasks', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ taskId, tags: newTags }),
-          });
-          
-          window.dispatchEvent(new Event('tags-updated'));
-      } catch (e) {
-          console.error("Failed to update tags", e);
-      }
+    try {
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, tags: newTags }),
+      });
+
+      window.dispatchEvent(new Event('tags-updated'));
+    } catch (e) {
+      console.error("Failed to update tags", e);
+    }
   };
 
   const taskKind = (t: Task) => {
@@ -695,16 +694,16 @@ export default function TaskList({
     // Calculate boundary
     const activeNodes = document.querySelectorAll('[data-is-active="true"]');
     const container = scrollContainerRef.current;
-    
+
     if (activeNodes.length > 0 && container) {
       const containerRect = container.getBoundingClientRect();
       const rects = Array.from(activeNodes).map(n => n.getBoundingClientRect());
-      
+
       // Calculate limits relative to the container's *content* top
       // We add scrollTop because we want the position relative to the start of the scrollable content
       const top = Math.min(...rects.map(r => r.top - containerRect.top + container.scrollTop));
       const bottom = Math.max(...rects.map(r => r.bottom - containerRect.top + container.scrollTop));
-      
+
       activeAreaLimitsRef.current = { top, bottom };
     } else {
       activeAreaLimitsRef.current = null;
@@ -726,7 +725,7 @@ export default function TaskList({
     if (active.id !== over.id) {
       const activeTasks = tasks.filter((t) => !t.completed && !vSet.has(t.id));
       const oldIndex = activeTasks.findIndex((t) => t.id === active.id);
-      
+
       if (oldIndex === -1) return;
 
       let newIndex = activeTasks.findIndex((t) => t.id === over.id);
@@ -757,7 +756,7 @@ export default function TaskList({
         detail: { id },
       })
     );
-    
+
     setMenu((prev) => {
       if (prev?.id === task.id) return null;
       const MENU_W = 160;
@@ -766,10 +765,10 @@ export default function TaskList({
       const MARGIN = 10;
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      
+
       let left = rect.left + rect.width / 2 - MENU_W / 2;
       left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
-      
+
       let top = rect.bottom + GAP;
       if (top + MENU_H > vh - MARGIN) {
         top = rect.top - MENU_H - GAP;
@@ -779,41 +778,41 @@ export default function TaskList({
   };
 
   const restrictToActiveArea: Modifier = ({ transform, draggingNodeRect }) => {
-     const limits = activeAreaLimitsRef.current;
-     const container = scrollContainerRef.current;
+    const limits = activeAreaLimitsRef.current;
+    const container = scrollContainerRef.current;
 
-     // Apply parent restriction first
-     const parentRestricted = restrictToParentElement({ transform, draggingNodeRect } as any);
-     const verticalRestricted = restrictToVerticalAxis({ transform: parentRestricted, draggingNodeRect } as any);
-     
-     if (limits !== null && draggingNodeRect && container) {
-        const containerRect = container.getBoundingClientRect();
-        const currentScrollTop = container.scrollTop;
-        
-        // Calculate absolute viewport boundaries for the active area based on current scroll
-        const limitTop = containerRect.top - currentScrollTop + limits.top;
-        const limitBottom = containerRect.top - currentScrollTop + limits.bottom;
-        
-        let newY = verticalRestricted.y;
-        
-        // Bottom restriction
-        const currentBottom = draggingNodeRect.bottom + newY;
-        if (currentBottom > limitBottom) {
-           newY = limitBottom - draggingNodeRect.bottom;
-        }
+    // Apply parent restriction first
+    const parentRestricted = restrictToParentElement({ transform, draggingNodeRect } as any);
+    const verticalRestricted = restrictToVerticalAxis({ transform: parentRestricted, draggingNodeRect } as any);
 
-        // Top restriction
-        const currentTop = draggingNodeRect.top + newY;
-        if (currentTop < limitTop) {
-           newY = limitTop - draggingNodeRect.top;
-        }
+    if (limits !== null && draggingNodeRect && container) {
+      const containerRect = container.getBoundingClientRect();
+      const currentScrollTop = container.scrollTop;
 
-        return {
-           ...verticalRestricted,
-           y: newY
-        };
-     }
-     return verticalRestricted;
+      // Calculate absolute viewport boundaries for the active area based on current scroll
+      const limitTop = containerRect.top - currentScrollTop + limits.top;
+      const limitBottom = containerRect.top - currentScrollTop + limits.bottom;
+
+      let newY = verticalRestricted.y;
+
+      // Bottom restriction
+      const currentBottom = draggingNodeRect.bottom + newY;
+      if (currentBottom > limitBottom) {
+        newY = limitBottom - draggingNodeRect.bottom;
+      }
+
+      // Top restriction
+      const currentTop = draggingNodeRect.top + newY;
+      if (currentTop < limitTop) {
+        newY = limitTop - draggingNodeRect.top;
+      }
+
+      return {
+        ...verticalRestricted,
+        y: newY
+      };
+    }
+    return verticalRestricted;
   };
 
   return (
@@ -836,19 +835,25 @@ export default function TaskList({
           className="pb-2 space-y-0 overflow-y-auto overflow-x-hidden min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)]"
           ref={scrollContainerRef}
         >
-          {tasks.length === 0 && (
-            <button
-              onClick={() => onAddRequested('', null, { preselectToday: true })}
-              className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+          {tasks.length === 0 && !exitAction && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
             >
-              <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
-                 <Fly size={32} y={-4} />
-              </div>
-              <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">Start your day</p>
-              <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
-                Tap to add your first task
-              </p>
-            </button>
+              <button
+                onClick={() => onAddRequested('', null, { preselectToday: true })}
+                className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+                  <Fly size={32} y={-4} />
+                </div>
+                <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">Start your day</p>
+                <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+                  Tap to add your first task
+                </p>
+              </button>
+            </motion.div>
           )}
 
           <DndContext
@@ -892,15 +897,16 @@ export default function TaskList({
                           isWeekly={taskKind(task) === 'weekly'}
                           disableLayout={isAnyDragging}
                           onDoLater={onDoLater ? (t) => {
-                             setExitAction({ id: t.id, type: 'later' });
-                             setTimeout(() => onDoLater(t.id), 0);
+                            setExitAction({ id: t.id, type: 'later' });
+                            setTimeout(() => onDoLater(t.id), 0);
+                            setTimeout(() => setExitAction(null), 600); // Clear after animation
                           } : undefined}
                         />
                       );
                     })}
                   </AnimatePresence>
                 </SortableContext>
-             </div>
+              </div>
             </div>
           </DndContext>
         </div>
@@ -912,7 +918,7 @@ export default function TaskList({
         isDone={
           menu
             ? tasks.find((t) => t.id === menu.id)?.completed ||
-              vSet.has(menu.id)
+            vSet.has(menu.id)
             : false
         }
         onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
@@ -920,32 +926,32 @@ export default function TaskList({
         onDoLater={
           onDoLater
             ? () => {
-                if (menu) {
-                  const id = menu.id;
-                  setMenu(null);
-                  setExitAction({ id, type: 'later' });
-                  setTimeout(() => onDoLater(id), 0);
-                }
+              if (menu) {
+                const id = menu.id;
+                setExitAction({ id, type: 'later' });
+                setTimeout(() => onDoLater(id), 0);
+                setTimeout(() => setExitAction(null), 600); // Clear after animation
               }
+            }
             : undefined
         }
         onToggleRepeat={
           onToggleRepeat
             ? () => {
-                if (menu) {
-                  const id = menu.id;
-                  // Don't close immediately if we want to show loading, but UI usually optimistic.
-                  // Closing menu feels snappier.
-                  onToggleRepeat(id);
-                  setMenu(null);
-                }
+              if (menu) {
+                const id = menu.id;
+                // Don't close immediately if we want to show loading, but UI usually optimistic.
+                // Closing menu feels snappier.
+                onToggleRepeat(id);
+                setMenu(null);
               }
+            }
             : undefined
         }
         isWeekly={
           menu
             ? tasks.find((t) => t.id === menu.id)?.type === 'weekly' ||
-              (menu && weeklyIds.has(menu.id))
+            (menu && weeklyIds.has(menu.id))
             : false
         }
         onDelete={() => {
@@ -961,13 +967,13 @@ export default function TaskList({
           setMenu(null);
         }}
         onEdit={(taskId) => {
-             if (menu) {
-                 const t = tasks.find((it) => it.id === menu.id);
-                 if (t) {
-                     setDialog({ task: t, kind: 'edit' });
-                 }
-             }
-             setMenu(null);
+          if (menu) {
+            const t = tasks.find((it) => it.id === menu.id);
+            if (t) {
+              setDialog({ task: t, kind: 'edit' });
+            }
+          }
+          setMenu(null);
         }}
       />
 
@@ -980,20 +986,20 @@ export default function TaskList({
       />
 
       {dialog && dialogVariant !== 'regular' && dialogVariant !== 'weekly' && dialogVariant !== 'backlog' && (
-         <EditTaskDialog
-            open={!!dialog && dialog.kind === 'edit'}
-            initialText={dialog.task.text}
-            busy={busy}
-            onClose={() => setDialog(null)}
-            onSave={async (newText) => {
-                if (onEditTask) {
-                    setBusy(true);
-                    await onEditTask(dialog.task.id, newText);
-                    setBusy(false);
-                    setDialog(null);
-                }
-            }}
-         />
+        <EditTaskDialog
+          open={!!dialog && dialog.kind === 'edit'}
+          initialText={dialog.task.text}
+          busy={busy}
+          onClose={() => setDialog(null)}
+          onSave={async (newText) => {
+            if (onEditTask) {
+              setBusy(true);
+              await onEditTask(dialog.task.id, newText);
+              setBusy(false);
+              setDialog(null);
+            }
+          }}
+        />
       )}
 
       <DeleteDialog
@@ -1009,8 +1015,8 @@ export default function TaskList({
           dialogVariant === 'weekly'
             ? confirmDeleteWeek
             : dialogVariant === 'backlog'
-            ? confirmDeleteToday
-            : undefined
+              ? confirmDeleteToday
+              : undefined
         }
       />
 
@@ -1036,22 +1042,22 @@ function TaskCounter({ count }: { count: number }) {
 
   React.useEffect(() => {
     if (count > prevCount.current) {
-       // Only animate if count INCREASED
-       controls.start({
-           scale: [1, 1.2, 1],
-           color: ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"],
-           transition: { duration: 0.3 }
-       });
+      // Only animate if count INCREASED
+      controls.start({
+        scale: [1, 1.2, 1],
+        color: ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"],
+        transition: { duration: 0.3 }
+      });
     }
     prevCount.current = count;
   }, [count, controls]);
 
   return (
     <motion.span
-       animate={controls}
-       className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-muted-foreground"
+      animate={controls}
+      className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1 text-[11px] font-bold text-muted-foreground"
     >
-       {count}
+      {count}
     </motion.span>
   );
 }
