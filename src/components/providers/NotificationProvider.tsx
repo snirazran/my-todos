@@ -59,7 +59,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
             {children}
             <AnimatePresence>
                 {notification && (
-                    <div className="fixed bottom-0 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4 pb-24 md:pb-20">
+                    <div className="fixed bottom-0 left-0 right-0 z-[100] flex justify-center pointer-events-none px-4 pb-40 md:pb-20">
                         <motion.div
                             key={notification.id}
                             initial={{ opacity: 0, y: 50, scale: 0.95 }}
