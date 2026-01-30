@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent } from '@/components/ui/card';
-import { ChevronDown, ChevronUp, BarChart, ScrollText } from 'lucide-react';
+import { ChevronDown, ChevronUp, BarChart } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -18,26 +18,36 @@ type HistoryChartProps = {
 };
 
 export default function HistoryChart({ historyData }: HistoryChartProps) {
-    const [isOpen, setIsOpen] = useState(false); // Collapsed by default
+    const [isOpen, setIsOpen] = useState(false);
 
     const chartData = useMemo(() => {
         const sorted = [...historyData].sort((a, b) => a.date.localeCompare(b.date));
 
-        // Ensure maxVal is at least 1 to avoid division by zero
-        const maxVal = Math.max(...sorted.map(d => d.tasks.filter(t => t.completed).length), 1);
+        // Find maximum completed tasks to scale the bars (min 5 for meaningful height)
+        const counts = sorted.map(d => d.tasks.filter(t => t.completed).length);
+        const maxVal = Math.max(...counts, 5);
 
         return sorted.map(d => {
             const completed = d.tasks.filter(t => t.completed).length;
             const total = d.tasks.length;
-            const rate = total > 0 ? completed / total : 0;
+
+            // Calculate height percentage relative to max volume
+            const heightPercent = completed === 0 ? 5 : (completed / maxVal) * 100;
+
+            // Calculate opacity based on intensity relative to max volume
+            // 0 tasks -> 0.1 opacity (faint)
+            // 1 task (vs max 5) -> 0.2 scale -> 0.44 opacity
+            // Max tasks -> 1.0 opacity
+            const opacity = completed === 0 ? 0.1 : 0.3 + (Math.min(completed / maxVal, 1) * 0.7);
+
             return {
                 date: d.date,
                 dayName: format(parseISO(d.date), 'EEE'),
                 displayDate: format(parseISO(d.date), 'MMM d'),
                 completed,
                 total,
-                rate,
-                height: (completed / maxVal) * 100
+                height: heightPercent,
+                opacity: opacity
             };
         });
     }, [historyData]);
@@ -71,43 +81,42 @@ export default function HistoryChart({ historyData }: HistoryChartProps) {
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
                         className="overflow-hidden"
                     >
-                        <CardContent className="px-6 pb-6 pt-0">
+                        <CardContent className="px-4 pb-4 pt-0">
                             {/* Scrollable Container */}
-                            <div className="mt-4 w-full overflow-x-auto no-scrollbar pb-2">
-                                {/* Minimum width container to ensure bars don't squash */}
-                                <div className="min-w-full w-max flex items-end gap-2 h-40 px-2" style={{ minWidth: chartData.length > 10 ? 'max-content' : '100%' }}>
+                            <div className="mt-2 w-full overflow-x-auto no-scrollbar pb-2">
+                                <div className="min-w-full w-max flex items-end gap-1.5 h-24 px-1" style={{ minWidth: chartData.length > 10 ? 'max-content' : '100%' }}>
                                     {chartData.map((d, i) => (
-                                        <div key={d.date} className="flex flex-col items-center gap-2 group min-w-[24px] flex-1">
-                                            <div className="relative w-full flex items-end justify-center h-full rounded-lg bg-muted/20 overflow-hidden">
+                                        <div key={d.date} className="flex flex-col items-center gap-1 group min-w-[20px] flex-1">
+                                            <div className="relative w-full flex items-end justify-center h-full rounded-md bg-muted/20 overflow-hidden">
                                                 <motion.div
                                                     initial={{ height: 0 }}
                                                     animate={{ height: `${d.height}%` }}
                                                     transition={{ delay: i * 0.02, duration: 0.5, type: 'spring' }}
                                                     className={cn(
-                                                        "w-full rounded-t opacity-80 group-hover:opacity-100 transition-opacity min-h-[4px]",
-                                                        d.rate >= 1 ? "bg-green-500" :
-                                                            d.rate >= 0.5 ? "bg-primary" : "bg-primary/50"
+                                                        "w-full rounded-t transition-all min-h-[4px]",
+                                                        // Color is simpler: Always Green, but intensity (opacity) varies with volume
+                                                        d.completed === 0 ? "bg-muted-foreground" : "bg-emerald-500"
                                                     )}
+                                                    style={{ opacity: d.opacity }}
                                                 />
-                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/10 backdrop-blur-[1px]">
-                                                    <span className="text-[10px] font-bold text-white drop-shadow-md">{d.completed}</span>
-                                                </div>
+                                                {d.completed > 0 && (
+                                                    <div className="absolute inset-0 flex items-end justify-center pb-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <span className="text-[9px] font-bold text-foreground drop-shadow-sm bg-background/80 px-1 rounded-sm">{d.completed}</span>
+                                                    </div>
+                                                )}
                                             </div>
+                                            {/* Date Labels */}
                                             <div className="flex flex-col items-center">
-                                                <span className="text-[9px] uppercase font-bold text-muted-foreground">{d.dayName}</span>
-                                                <span className="text-[7px] font-bold text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity -mt-1">{d.displayDate}</span>
+                                                <span className="text-[8px] uppercase font-bold text-muted-foreground">{d.dayName}</span>
                                             </div>
                                         </div>
                                     ))}
                                     {chartData.length === 0 && (
-                                        <div className="w-full flex items-center justify-center text-muted-foreground text-sm h-full">
-                                            No data available
+                                        <div className="w-full flex items-center justify-center text-muted-foreground text-xs h-full">
+                                            No data
                                         </div>
                                     )}
                                 </div>
-                            </div>
-                            <div className="flex justify-center mt-2">
-                                <div className="h-1 w-12 bg-muted rounded-full opacity-50" />
                             </div>
                         </CardContent>
                     </motion.div>

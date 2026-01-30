@@ -13,8 +13,7 @@ import { useTaskData } from '@/hooks/useTaskData';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import HistoryMetrics from '@/components/history/HistoryMetrics';
 import HistoryChart from '@/components/history/HistoryChart';
-import HistoryTimeSelector from '@/components/history/HistoryTimeSelector';
-import HistoryFilterBar, { DateRangeOption } from '@/components/history/HistoryFilterBar';
+import HistoryTimeSelector, { DateRangeOption } from '@/components/history/HistoryTimeSelector';
 import HistoryList from '@/components/history/HistoryList';
 import { Button } from '@/components/ui/button';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
@@ -269,7 +268,7 @@ export default function HistoryPage() {
                {/* Right Column: Filters & List */}
                <div className="flex flex-col gap-4 lg:col-span-8 lg:gap-6">
 
-                  {/* Master Time Selector */}
+                  {/* Master Time Control (+ Filters) */}
                   <HistoryTimeSelector
                      dateRange={filter}
                      onDateRangeChange={setFilter}
@@ -278,18 +277,13 @@ export default function HistoryPage() {
                         setCustomFrom(range.from);
                         setCustomTo(range.to);
                      }}
+                     selectedTags={selectedTagIds}
+                     onTagsChange={setSelectedTagIds}
+                     availableTags={availableTags}
                   />
 
                   {/* Collapsible Chart */}
                   <HistoryChart historyData={filteredHistory} />
-
-                  <div className="flex flex-col gap-3">
-                     <HistoryFilterBar
-                        selectedTags={selectedTagIds}
-                        onTagsChange={setSelectedTagIds}
-                        availableTags={availableTags}
-                     />
-                  </div>
 
                   <div className="relative min-h-[400px]">
                      {loading ? <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10 backdrop-blur-sm rounded-xl"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div> : null}
