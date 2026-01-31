@@ -16,7 +16,7 @@ import {
   DndContext,
   closestCorners,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   useSensor,
   useSensors,
   DragEndEvent,
@@ -112,6 +112,11 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
     transition,
     isDragging,
   } = useSortable({ id: task.id, disabled: isDragDisabled || isOpen });
+
+  // Clear hover state when dragging starts
+  useEffect(() => {
+    if (isDragging) setIsHovered(false);
+  }, [isDragging]);
 
   // Transform values based on drag position x
   // Right Swipe (Positive X) -> Do Later (Indigo) - SWAPPED
@@ -330,20 +335,19 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
           dragListener={!isDragging}
           dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
           dragConstraints={{ left: -100, right: 70 }}
-          dragElastic={0.1}
+          dragElastic={0}
           dragMomentum={false}
 
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
           // Hover handlers for robust desktop behavior
-          onMouseEnter={() => !isDragging && setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
+          onMouseEnter={() => isDesktop && !isDragging && setIsHovered(true)}
+          onMouseLeave={() => isDesktop && setIsHovered(false)}
 
           initial={false}
           animate={{ x: isExitingLater ? (isDesktop ? 800 : 450) : (isOpen ? -100 : 0) }}
           style={{
             x: x,
-            touchAction: 'pan-y',
             cursor: 'grab',
             willChange: isExitingLater ? 'transform' : 'auto'
           }}
@@ -359,7 +363,7 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
 
           className={`
               relative flex items-center gap-1.5 px-2 py-3.5 
-              transition-all duration-200 rounded-xl 
+              transition-colors duration-200 rounded-xl 
               bg-card 
               border border-border/40 shadow-sm
               ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
@@ -599,16 +603,15 @@ export default function TaskList({
 
   // DnD Sensors
   const sensors = useSensors(
-    useSensor(PointerSensor, {
+    useSensor(MouseSensor, {
       activationConstraint: {
-        delay: 200,
-        tolerance: 8,
+        distance: 10,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 200,
-        tolerance: 8,
+        delay: 250,
+        tolerance: 5,
       },
     }),
     useSensor(KeyboardSensor, {
