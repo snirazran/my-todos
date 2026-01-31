@@ -363,31 +363,35 @@ export async function POST(req: NextRequest) {
   const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
   const createdIds: string[] = [];
   const now = new Date();
+  const createdTasks: any[] = [];
   if (repeat === 'weekly') {
     if (days.some((d) => d === -1)) return NextResponse.json({ error: 'Repeating tasks target weekdays 0..6' }, { status: 400 });
     for (const d of days) {
       const dayOfWeek: Weekday = d as Weekday;
       const id = uuid();
-      createdIds.push(id);
       const order = await nextOrderForDay(uid, dayOfWeek, weekDates[dayOfWeek]);
-      await TaskModel.create({ userId: uid, type: 'weekly', id, text, order, dayOfWeek, createdAt: now, updatedAt: now, tags });
+      const task = await TaskModel.create({ userId: uid, type: 'weekly', id, text, order, dayOfWeek, createdAt: now, updatedAt: now, tags });
+      createdIds.push(id);
+      createdTasks.push({ id: task.id, text: task.text, order: task.order, completed: false, type: 'weekly', tags: task.tags || [] });
     }
-    return NextResponse.json({ ok: true, ids: createdIds });
+    return NextResponse.json({ ok: true, ids: createdIds, tasks: createdTasks });
   }
   for (const d of days) {
     const id = uuid();
     createdIds.push(id);
     if (d === -1) {
       const order = await nextOrderBacklog(uid, weekStart);
-      await TaskModel.create({ userId: uid, type: 'backlog', id, text, order, weekStart, completed: false, createdAt: now, updatedAt: now, tags });
+      const task = await TaskModel.create({ userId: uid, type: 'backlog', id, text, order, weekStart, completed: false, createdAt: now, updatedAt: now, tags });
+      createdTasks.push({ id: task.id, text: task.text, order: task.order, completed: false, type: 'backlog', tags: task.tags || [] });
     } else {
       const weekday = d as Weekday;
       const date = weekDates[weekday];
       const order = await nextOrderForDay(uid, weekday, date);
-      await TaskModel.create({ userId: uid, type: 'regular', id, text, order, date, completed: false, createdAt: now, updatedAt: now, tags });
+      const task = await TaskModel.create({ userId: uid, type: 'regular', id, text, order, date, completed: false, createdAt: now, updatedAt: now, tags });
+      createdTasks.push({ id: task.id, text: task.text, order: task.order, completed: false, type: 'regular', tags: task.tags || [] });
     }
   }
-  return NextResponse.json({ ok: true, ids: createdIds });
+  return NextResponse.json({ ok: true, ids: createdIds, tasks: createdTasks });
 }
 
 export async function PUT(req: NextRequest) {

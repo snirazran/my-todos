@@ -69,7 +69,7 @@ interface SortableTaskItemProps {
   onDoLater?: (task: Task) => void;
 }
 
-function SortableTaskItem({
+const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>(({
   task,
   isDone,
   isMenuOpen,
@@ -82,7 +82,7 @@ function SortableTaskItem({
   isWeekly,
   disableLayout,
   onDoLater,
-}: SortableTaskItemProps) {
+}, ref) => {
   /* Swipe Logic */
   const [isOpen, setIsOpen] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
@@ -251,6 +251,9 @@ function SortableTaskItem({
       ref={(node: HTMLDivElement | null) => {
         setNodeRef(node);
         (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+        // Handle forwarded ref
+        if (typeof ref === 'function') ref(node);
+        else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
       }}
       style={style}
       {...attributes}
@@ -497,7 +500,7 @@ function SortableTaskItem({
       </motion.div>
     </div>
   );
-}
+});
 
 export default function TaskList({
   tasks,

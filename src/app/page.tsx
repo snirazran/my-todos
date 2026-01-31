@@ -448,15 +448,37 @@ export default function Home() {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const dateStr = format(new Date(), 'yyyy-MM-dd');
 
-            await fetch('/api/tasks?view=board', {
+            const res = await fetch('/api/tasks?view=board', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
             });
-            if (session) {
-              // SWR mutate
-              mutateToday();
-              mutateBacklog();
+            const data = await res.json();
+
+            if (session && data.ok && data.tasks) {
+              const newTasks = data.tasks;
+              // Check backlog based on days array or repeat type if casted
+              const isBacklog = (repeat as string) === 'backlog' || (Array.isArray(days) && days.includes(-1));
+
+              if (isBacklog) {
+                mutateBacklog((curr) => {
+                  if (!curr) return newTasks;
+                  return [...curr, ...newTasks];
+                }, { revalidate: false });
+              } else {
+                mutateToday((curr) => {
+                  if (!curr) return undefined;
+                  return {
+                    ...curr,
+                    tasks: [...curr.tasks, ...newTasks]
+                  };
+                }, { revalidate: false });
+              }
+            } else if (session) {
+              // Fallback
+              const isBacklog = (repeat as string) === 'backlog' || (Array.isArray(days) && days.includes(-1));
+              if (isBacklog) mutateBacklog();
+              else mutateToday();
             } else {
               setGuestTasks((prev) => [
                 ...prev,
