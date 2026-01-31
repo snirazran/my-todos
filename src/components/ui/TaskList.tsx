@@ -91,6 +91,7 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
   const hasActionTriggeredRef = React.useRef(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   // Motion Values for Swipe
   const x = useMotionValue(0);
@@ -334,6 +335,10 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
 
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
+          // Hover handlers for robust desktop behavior
+          onMouseEnter={() => !isDragging && setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
+
           initial={false}
           animate={{ x: isExitingLater ? (isDesktop ? 800 : 450) : (isOpen ? -100 : 0) }}
           style={{
@@ -354,16 +359,15 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
 
           className={`
               relative flex items-center gap-1.5 px-2 py-3.5 
-              transition-colors duration-200 rounded-xl 
+              transition-all duration-200 rounded-xl 
               bg-card 
-            border border-border/40 shadow-sm
+              border border-border/40 shadow-sm
               ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
-              md:hover:border-border
+              ${isHovered && isDesktop ? 'border-border shadow-md' : ''}
 
-              md:hover:shadow-sm
               select-none
               ${isDragging ? 'z-[100] opacity-100' : ''}
-              ${isDone && !isDragging ? 'md:hover:bg-accent/50' : ''} 
+              ${isDone && !isDragging && isHovered && isDesktop ? 'bg-accent/50' : ''} 
               cursor-pointer
             `}
           // Note: We are using 'style' prop for x motion value to avoid re-renders
