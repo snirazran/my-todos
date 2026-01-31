@@ -45,6 +45,7 @@ interface Task {
   id: string;
   text: string;
   completed: boolean;
+  order?: number;
   type?: 'regular' | 'weekly' | 'backlog';
   origin?: 'regular' | 'weekly' | 'backlog';
   kind?: 'regular' | 'weekly' | 'backlog';
@@ -874,38 +875,45 @@ export default function TaskList({
                   strategy={verticalListSortingStrategy}
                 >
                   <AnimatePresence initial={false} mode="popLayout">
-                    {[
-                      ...tasks.filter((t) => !t.completed && !vSet.has(t.id)),
-                      ...tasks.filter((t) => t.completed || vSet.has(t.id)),
-                    ].map((task) => {
-                      const isCompleted = task.completed || vSet.has(task.id);
-                      const isMenuOpen = menu?.id === task.id;
-                      const isExitingLater =
-                        exitAction?.id === task.id &&
-                        exitAction.type === 'later';
+                    {(() => {
+                      const active = tasks
+                        .filter((t) => !t.completed && !vSet.has(t.id))
+                        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-                      return (
-                        <SortableTaskItem
-                          key={task.id}
-                          task={task}
-                          isDone={isCompleted}
-                          isMenuOpen={isMenuOpen}
-                          isExitingLater={isExitingLater}
-                          renderBullet={renderBullet}
-                          handleTaskToggle={handleTaskToggle}
-                          onMenuOpen={openMenu}
-                          getTagDetails={getTagDetails}
-                          isDragDisabled={isCompleted}
-                          isWeekly={taskKind(task) === 'weekly'}
-                          disableLayout={isAnyDragging}
-                          onDoLater={onDoLater ? (t) => {
-                            setExitAction({ id: t.id, type: 'later' });
-                            setTimeout(() => onDoLater(t.id), 0);
-                            setTimeout(() => setExitAction(null), 800); // Clear after animation
-                          } : undefined}
-                        />
-                      );
-                    })}
+                      const done = tasks
+                        .filter((t) => t.completed || vSet.has(t.id))
+                        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+                      return [...active, ...done].map((task) => {
+                        const isCompleted = task.completed || vSet.has(task.id);
+                        const isMenuOpen = menu?.id === task.id;
+                        const isExitingLater =
+                          exitAction?.id === task.id &&
+                          exitAction.type === 'later';
+
+                        return (
+                          <SortableTaskItem
+                            key={task.id}
+                            task={task}
+                            isDone={isCompleted}
+                            isMenuOpen={isMenuOpen}
+                            isExitingLater={isExitingLater}
+                            renderBullet={renderBullet}
+                            handleTaskToggle={handleTaskToggle}
+                            onMenuOpen={openMenu}
+                            getTagDetails={getTagDetails}
+                            isDragDisabled={isCompleted}
+                            isWeekly={taskKind(task) === 'weekly'}
+                            disableLayout={isAnyDragging}
+                            onDoLater={onDoLater ? (t) => {
+                              setExitAction({ id: t.id, type: 'later' });
+                              setTimeout(() => onDoLater(t.id), 0);
+                              setTimeout(() => setExitAction(null), 800); // Clear after animation
+                            } : undefined}
+                          />
+                        );
+                      })
+                    })()}
                   </AnimatePresence>
                 </SortableContext>
               </div>

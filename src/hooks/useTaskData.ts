@@ -171,11 +171,10 @@ export function useTaskData() {
 
         const sortedTasks = sortTasks(updatedTasks);
 
+        // Revalidate: false to prevent immediate fetch override
         mutateToday({ ...todayData, tasks: sortedTasks }, { revalidate: false });
 
         try {
-            const apiOrder = sortedTasks.findIndex(t => t.id === taskId);
-
             const res = await fetch('/api/tasks', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
@@ -184,7 +183,6 @@ export function useTaskData() {
                     taskId,
                     completed: nextCompleted,
                     timezone: tz,
-                    order: apiOrder // Sync order
                 }),
             });
 
@@ -192,12 +190,23 @@ export function useTaskData() {
 
             if (json.ok) {
                 // Update Fly/Hunger status if returned
+                // We use a functional update to ensure we're modifying the LATEST state (which might include the optimistic change)
                 if (json.flyStatus || json.hungerStatus) {
-                    mutateToday(curr => curr ? ({
-                        ...curr,
-                        flyStatus: json.flyStatus || curr.flyStatus,
-                        hungerStatus: json.hungerStatus || curr.hungerStatus
-                    }) : curr, { revalidate: false });
+                    mutateToday(curr => {
+                        if (!curr) return curr;
+
+                        // Check if values actually changed to avoid re-render if identical
+                        const flyChanged = JSON.stringify(curr.flyStatus) !== JSON.stringify(json.flyStatus);
+                        const hungerChanged = JSON.stringify(curr.hungerStatus) !== JSON.stringify(json.hungerStatus);
+
+                        if (!flyChanged && !hungerChanged) return curr;
+
+                        return {
+                            ...curr,
+                            flyStatus: json.flyStatus || curr.flyStatus,
+                            hungerStatus: json.hungerStatus || curr.hungerStatus
+                        };
+                    }, { revalidate: false });
                 }
             } else {
                 throw new Error(json.error || 'Failed to toggle');
