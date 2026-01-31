@@ -471,10 +471,26 @@ export default function Home() {
 
       <RewardPopup
         show={showReward}
-        onClose={(claimed) => {
-          setShowReward(false);
+        onClose={async (claimed) => {
           if (claimed) {
-            mutateToday(); // Should get new dailyGiftCount
+            // Optimistically update gift count to prevent popup from re-triggering
+            // immediately due to stale data race condition
+            await mutateToday(
+              (current) => {
+                if (!current) return current;
+                return {
+                  ...current,
+                  dailyGiftCount: (current.dailyGiftCount || 0) + 1,
+                };
+              },
+              { revalidate: false }
+            );
+          }
+
+          setShowReward(false);
+
+          if (claimed) {
+            mutateToday(); // Should get new dailyGiftCount (CONFIRMATION)
             mutate('/api/skins/inventory');
           }
         }}
