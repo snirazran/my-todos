@@ -24,6 +24,7 @@ type HistoryCalendarProps = {
     selectedDate?: string | null;
     onSelectDate: (date: string) => void;
     historyData: { date: string; tasks: any[] }[];
+    disableSwipe?: boolean;
 };
 
 export default function HistoryCalendar({
@@ -31,7 +32,8 @@ export default function HistoryCalendar({
     onDateChange,
     selectedDate,
     onSelectDate,
-    historyData
+    historyData,
+    disableSwipe = false
 }: HistoryCalendarProps) {
 
     const monthStart = startOfMonth(currentDate);
@@ -61,7 +63,7 @@ export default function HistoryCalendar({
     const handleNextMonth = () => onDateChange(addMonths(currentDate, 1));
 
     return (
-        <div className="w-full max-w-md mx-auto bg-card/80 backdrop-blur-2xl border border-border/50 rounded-[32px] p-6 shadow-sm">
+        <div className="w-full max-w-md mx-auto bg-card/80 backdrop-blur-2xl border border-border/50 rounded-[32px] p-6 shadow-sm overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between mb-8 px-2">
                 <h2 className="text-2xl font-black text-foreground tracking-tight flex-1 text-center sm:text-left">
@@ -92,8 +94,21 @@ export default function HistoryCalendar({
                 ))}
             </div>
 
-            {/* Days Grid */}
-            <div className="grid grid-cols-7 gap-1 sm:gap-2">
+            {/* Days Grid - Swipeable Area */}
+            <motion.div
+                drag={disableSwipe ? false : "x"}
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.1} // Feel of resistance
+                onDragEnd={(e, { offset, velocity }) => {
+                    const swipeThreshold = 50;
+                    if (offset.x > swipeThreshold) {
+                        handlePrevMonth();
+                    } else if (offset.x < -swipeThreshold) {
+                        handleNextMonth();
+                    }
+                }}
+                className="grid grid-cols-7 gap-1 sm:gap-2 touch-pan-y" // touch-pan-y allows vertical scrolling while dragging
+            >
                 {calendarDays.map((day, idx) => {
                     const dateStr = format(day, 'yyyy-MM-dd');
                     const isCurrentMonth = isSameMonth(day, monthStart);
@@ -108,9 +123,10 @@ export default function HistoryCalendar({
                     return (
                         <motion.button
                             key={day.toISOString()}
+                            layout // helps with smooth transitions if layout changes
                             initial={{ opacity: 0, scale: 0.9 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.01 }}
+                            transition={{ delay: idx * 0.005 }} // Reduce delay for snappier feel
                             onClick={() => onSelectDate(dateStr)}
                             className={cn(
                                 "relative aspect-square flex flex-col items-center justify-center rounded-2xl transition-all border-2",
@@ -168,7 +184,7 @@ export default function HistoryCalendar({
                         </motion.button>
                     );
                 })}
-            </div>
+            </motion.div>
         </div>
     );
 }

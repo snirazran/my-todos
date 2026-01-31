@@ -243,6 +243,7 @@ export default function HistoryPage() {
                   selectedDate={selectedDate}
                   onSelectDate={setSelectedDate}
                   historyData={calendarData}
+                  disableSwipe={isStatsOpen || !!selectedDate}
                />
             </div>
 

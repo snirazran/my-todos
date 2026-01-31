@@ -27,8 +27,6 @@ export default function HistoryTimeSelector({
     availableTags
 }: TimeSelectorProps) {
 
-    const [showTags, setShowTags] = useState(false);
-
     const dateOptions: { id: DateRangeOption; label: string; icon?: React.ElementType }[] = [
         { id: '7d', label: '7 Days' },
         { id: '30d', label: '30 Days' },
@@ -44,147 +42,133 @@ export default function HistoryTimeSelector({
     };
 
     return (
-        <div className="flex flex-col gap-2 mb-6 sticky top-16 md:top-2 z-30 transition-all">
-            <div className="flex flex-row items-center justify-between gap-2 p-1.5 bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl shadow-sm overflow-x-auto no-scrollbar">
-                {/* Toggles */}
-                <div className="flex items-center gap-1 p-1 bg-muted/30 rounded-xl overflow-hidden flex-shrink-0">
-                    {dateOptions.map((opt) => {
-                        const isActive = dateRange === opt.id;
-                        const Icon = opt.icon;
-                        return (
-                            <button
-                                key={opt.id}
-                                onClick={() => onDateRangeChange(opt.id)}
-                                className={cn(
-                                    "relative px-3 py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 z-10 whitespace-nowrap",
-                                    isActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                                )}
-                            >
-                                {isActive && (
-                                    <motion.div
-                                        layoutId="activeTimeSelector"
-                                        className="absolute inset-0 bg-primary rounded-lg -z-10 shadow-sm"
-                                        transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
-                                    />
-                                )}
-                                {Icon && <Icon className="w-3.5 h-3.5" />}
-                                {opt.label}
-                            </button>
-                        );
-                    })}
-                </div>
-
-                <div className="flex items-center gap-2 flex-shrink-0">
-                    {/* Filter Button */}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowTags(!showTags)}
-                        className={cn(
-                            "gap-2 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all h-9 px-3 whitespace-nowrap",
-                            showTags || selectedTags.length > 0 ? "bg-secondary text-foreground" : "text-muted-foreground hover:bg-muted/50"
-                        )}
-                    >
-                        <Tag className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Filters</span>
-                        {selectedTags.length > 0 && (
-                            <span className="flex items-center justify-center w-5 h-5 ml-1 text-[9px] text-primary-foreground bg-primary rounded-full">
-                                {selectedTags.length}
-                            </span>
-                        )}
-                        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform duration-300", showTags && "rotate-180")} />
-                    </Button>
-                </div>
+        <div className="flex flex-col gap-5">
+            {/* 1. Date Range Segmented Control */}
+            <div className="bg-muted/30 p-1.5 rounded-2xl flex relative">
+                {dateOptions.map((opt) => {
+                    const isActive = dateRange === opt.id;
+                    const Icon = opt.icon;
+                    return (
+                        <button
+                            key={opt.id}
+                            onClick={() => onDateRangeChange(opt.id)}
+                            className={cn(
+                                "flex-1 relative py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2 z-10",
+                                isActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {isActive && (
+                                <motion.div
+                                    layoutId="activeDateSegment"
+                                    className="absolute inset-0 bg-primary/90 shadow-lg shadow-primary/20 rounded-xl -z-10"
+                                    transition={{ type: "spring", bounce: 0.15, duration: 0.5 }}
+                                />
+                            )}
+                            {Icon && <Icon className="w-3.5 h-3.5" />}
+                            {opt.label}
+                        </button>
+                    );
+                })}
             </div>
 
-            {/* Custom Inputs Row */}
+            {/* Custom Range Inputs (Animate In) */}
             <AnimatePresence>
                 {dateRange === 'custom' && (
                     <motion.div
-                        initial={{ height: 0, opacity: 0, marginTop: 0 }}
-                        animate={{ height: 'auto', opacity: 1, marginTop: 8 }}
-                        exit={{ height: 0, opacity: 0, marginTop: 0 }}
+                        initial={{ height: 0, opacity: 0, marginTop: -10 }}
+                        animate={{ height: 'auto', opacity: 1, marginTop: 0 }}
+                        exit={{ height: 0, opacity: 0, marginTop: -10 }}
                         className="overflow-hidden"
                     >
-                        <div className="flex items-center justify-center gap-2 p-2 bg-card/80 backdrop-blur-xl border border-border/50 rounded-xl shadow-sm w-fit mx-auto">
-                            <input
-                                type="date"
-                                max={new Date().toISOString().split('T')[0]}
-                                value={customDateRange.from}
-                                onChange={(e) => onCustomDateChange({ ...customDateRange, from: e.target.value })}
-                                className="w-24 px-2 py-1.5 bg-background border border-border rounded-lg text-[10px] font-medium focus:ring-1 focus:ring-primary outline-none"
-                            />
-                            <span className="text-muted-foreground font-bold">-</span>
-                            <input
-                                type="date"
-                                min={customDateRange.from}
-                                max={new Date().toISOString().split('T')[0]}
-                                value={customDateRange.to}
-                                onChange={(e) => onCustomDateChange({ ...customDateRange, to: e.target.value })}
-                                className="w-24 px-2 py-1.5 bg-background border border-border rounded-lg text-[10px] font-medium focus:ring-1 focus:ring-primary outline-none"
-                            />
+                        <div className="flex items-center gap-3 bg-muted/20 p-3 rounded-2xl border border-border/50">
+                            <div className="flex-1 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase pl-1">From</label>
+                                <input
+                                    type="date"
+                                    max={new Date().toISOString().split('T')[0]}
+                                    value={customDateRange.from}
+                                    onChange={(e) => onCustomDateChange({ ...customDateRange, from: e.target.value })}
+                                    className="w-full px-3 py-2 bg-background border border-border/50 rounded-xl text-xs font-bold focus:ring-1 focus:ring-primary outline-none text-center"
+                                />
+                            </div>
+                            <span className="text-muted-foreground/30 pt-4">▬</span>
+                            <div className="flex-1 flex flex-col gap-1">
+                                <label className="text-[10px] font-bold text-muted-foreground uppercase pl-1">To</label>
+                                <input
+                                    type="date"
+                                    min={customDateRange.from}
+                                    max={new Date().toISOString().split('T')[0]}
+                                    value={customDateRange.to}
+                                    onChange={(e) => onCustomDateChange({ ...customDateRange, to: e.target.value })}
+                                    className="w-full px-3 py-2 bg-background border border-border/50 rounded-xl text-xs font-bold focus:ring-1 focus:ring-primary outline-none text-center"
+                                />
+                            </div>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Expandable Tag Area - Absolute Positioned Dropdown */}
-            <AnimatePresence>
-                {showTags && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                        transition={{ duration: 0.15 }}
-                        className="absolute top-full right-0 mt-2 z-50 w-full md:w-auto md:min-w-[300px]"
+            {/* 2. Horizontal Tag Filter List */}
+            <div>
+                <div className="flex items-center justify-between mb-2 px-1">
+                    <label className="text-[11px] uppercase font-black text-muted-foreground/50 tracking-widest flex items-center gap-2">
+                        <Tag className="w-3 h-3" /> Filter by Tag
+                    </label>
+                    {selectedTags.length > 0 && (
+                        <button
+                            onClick={() => onTagsChange([])}
+                            className="text-[10px] font-bold text-red-500 hover:text-red-500/80 uppercase tracking-wider flex items-center gap-1 bg-red-500/10 px-2 py-0.5 rounded-md"
+                        >
+                            <X className="w-3 h-3" /> Clear ({selectedTags.length})
+                        </button>
+                    )}
+                </div>
+
+                <div className="flex overflow-visible overflow-x-auto p-4 -mx-4 -my-2 no-scrollbar gap-2">
+                    <motion.button
+                        layout
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => { if (selectedTags.length > 0) onTagsChange([]); }}
+                        className={cn(
+                            "flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-all border shrink-0",
+                            selectedTags.length === 0
+                                ? "bg-foreground text-background border-transparent"
+                                : "bg-muted/30 text-muted-foreground hover:bg-muted border-transparent"
+                        )}
                     >
-                        <div className="p-3 bg-popover text-popover-foreground border border-border shadow-md rounded-xl flex flex-col gap-2">
-                            <div className="flex items-center justify-between">
-                                <h4 className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Filter by Tags</h4>
-                                {selectedTags.length > 0 && (
-                                    <button
-                                        onClick={() => onTagsChange([])}
-                                        className="text-[10px] font-bold text-red-500 hover:text-red-600 uppercase tracking-wider flex items-center gap-1"
-                                    >
-                                        <X className="w-3 h-3" /> Clear All
-                                    </button>
+                        All
+                    </motion.button>
+
+                    {availableTags.map((tag) => {
+                        const isSelected = selectedTags.includes(tag.id);
+                        return (
+                            <motion.button
+                                key={tag.id}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={() => handleTagToggle(tag.id)}
+                                className={cn(
+                                    "flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5",
+                                    isSelected
+                                        ? "ring-1 ring-offset-1 ring-offset-background"
+                                        : "hover:bg-muted/50 border-transparent opacity-80 hover:opacity-100"
                                 )}
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {availableTags.map((tag) => {
-                                    const isSelected = selectedTags.includes(tag.id);
-                                    return (
-                                        <motion.button
-                                            key={tag.id}
-                                            whileHover={{ scale: 1.05 }}
-                                            whileTap={{ scale: 0.95 }}
-                                            onClick={() => handleTagToggle(tag.id)}
-                                            className={cn(
-                                                "relative px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border transition-all flex items-center gap-1.5",
-                                                isSelected
-                                                    ? "ring-1 ring-offset-1 ring-offset-background"
-                                                    : "bg-muted/50 hover:bg-muted border-transparent"
-                                            )}
-                                            style={{
-                                                backgroundColor: isSelected ? `${tag.color}20` : undefined,
-                                                color: tag.color,
-                                                borderColor: isSelected ? `${tag.color}40` : 'transparent',
-                                                boxShadow: isSelected ? `0 0 0 1px ${tag.color}` : 'none',
-                                            }}
-                                        >
-                                            {isSelected && <Check className="w-3 h-3" strokeWidth={3} />}
-                                            {tag.name}
-                                        </motion.button>
-                                    );
-                                })}
-                                {availableTags.length === 0 && (
-                                    <span className="text-[10px] text-muted-foreground italic">No tags created yet.</span>
-                                )}
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
+                                style={{
+                                    backgroundColor: isSelected ? `${tag.color}20` : `${tag.color}08`,
+                                    color: tag.color,
+                                    borderColor: isSelected ? `${tag.color}40` : 'transparent',
+                                    boxShadow: isSelected ? `0 0 0 1px ${tag.color}` : 'none',
+                                }}
+                            >
+                                {isSelected && <Check className="w-3 h-3" strokeWidth={3} />}
+                                {tag.name}
+                            </motion.button>
+                        );
+                    })}
+                    {availableTags.length === 0 && (
+                        <span className="text-xs text-muted-foreground italic pl-2 py-2">No tags available.</span>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

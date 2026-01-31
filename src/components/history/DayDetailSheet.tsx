@@ -47,6 +47,17 @@ export default function DayDetailSheet({
         setMounted(true);
     }, []);
 
+    useEffect(() => {
+        if (open) {
+            document.body.style.overflow = 'hidden';
+        } else {
+            document.body.style.overflow = '';
+        }
+        return () => {
+            document.body.style.overflow = '';
+        };
+    }, [open]);
+
     const completedCount = tasks.filter(t => t.completed).length;
     const totalCount = tasks.length;
     const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
