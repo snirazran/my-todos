@@ -81,7 +81,7 @@ export function useTaskData() {
         isLoading: isLoadingToday
     } = useSWR<TasksResponse>(todayKey, fetcher, {
         refreshInterval: 0,
-        revalidateOnFocus: true,
+        revalidateOnFocus: false,
     });
 
     const {
@@ -90,7 +90,7 @@ export function useTaskData() {
         isLoading: isLoadingBacklog
     } = useSWR<Task[]>(backlogKey, fetcher, {
         refreshInterval: 0,
-        revalidateOnFocus: true,
+        revalidateOnFocus: false,
     });
 
     // --- Cleanup Effect ---
@@ -150,52 +150,64 @@ export function useTaskData() {
      * Toggle Task Completion
      */
     const toggleTask = useCallback(async (taskId: string, forceState?: boolean) => {
-        if (!todayData) return;
 
-        const task = tasks.find((t) => t.id === taskId);
+        if (!todayData || !backlogData) return;
+        const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
-        const newCompleted = forceState !== undefined ? forceState : !task.completed;
+        const nextCompleted = forceState ?? !task.completed;
+        // Skip if no change
+        if (nextCompleted === task.completed) return;
 
-        // 1. Optimistic Update - only update completion state, don't sort yet
-        const updatedTasks = tasks.map(t =>
-            t.id === taskId ? { ...t, completed: newCompleted } : t
-        );
+        // Snapshot
+        const prevToday = todayData;
+        const prevBacklog = backlogData;
 
-        await mutateToday({
-            ...todayData,
-            tasks: updatedTasks // Don't sort - let server response handle it
-        }, { revalidate: false });
+        // Optimistic Update
+        const updatedTasks = tasks.map(t => {
+            if (t.id !== taskId) return t;
+            return { ...t, completed: nextCompleted };
+        });
 
-        // 2. API Call
+        const sortedTasks = sortTasks(updatedTasks);
+
+        mutateToday({ ...todayData, tasks: sortedTasks }, { revalidate: false });
+
         try {
-            let apiOrder: number | undefined;
-            if (newCompleted) {
-                const completedTasks = tasks.filter((t) => t.completed && t.id !== taskId);
-                const currentTask = tasks.find((t) => t.id === taskId);
-                if (currentTask && completedTasks.length > 0) {
-                    const maxOrder = Math.max(...completedTasks.map((t) => t.order ?? 0));
-                    apiOrder = maxOrder + 1;
-                }
-            }
+            const apiOrder = sortedTasks.findIndex(t => t.id === taskId);
 
-            await fetch('/api/tasks', {
+            const res = await fetch('/api/tasks', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     date: dateStr,
                     taskId,
-                    completed: newCompleted,
+                    completed: nextCompleted,
                     timezone: tz,
-                    order: apiOrder
+                    order: apiOrder // Sync order
                 }),
             });
-            await mutateToday();
+
+            const json = await res.json();
+
+            if (json.ok) {
+                // Update Fly/Hunger status if returned
+                if (json.flyStatus || json.hungerStatus) {
+                    mutateToday(curr => curr ? ({
+                        ...curr,
+                        flyStatus: json.flyStatus || curr.flyStatus,
+                        hungerStatus: json.hungerStatus || curr.hungerStatus
+                    }) : curr, { revalidate: false });
+                }
+            } else {
+                throw new Error(json.error || 'Failed to toggle');
+            }
+
         } catch (e) {
             console.error("Toggle failed", e);
-            await mutateToday(); // Rollback
+            mutateToday(prevToday, { revalidate: false });
         }
-    }, [dateStr, tasks, todayData, mutateToday, tz]);
+    }, [dateStr, tasks, todayData, backlogData, mutateToday, tz, sortTasks]);
 
     /**
      * Move Task: Today -> Backlog

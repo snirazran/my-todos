@@ -188,6 +188,7 @@ async function awardFlyForTask(
   const today = getZonedToday(tz);
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
+    statistics: 1, // Include statistics
   }).lean()) as LeanUser;
 
   if (!user) {
@@ -206,10 +207,69 @@ async function awardFlyForTask(
   const limitNotified = daily.limitNotified ?? false;
   let currentBalance = hungerUpdates['wardrobe.flies'] ?? wardrobe.flies ?? 0;
 
-  if (alreadyRewarded) {
-    if (Object.keys(hungerUpdates).length > 0) {
-      await UserModel.updateOne({ _id: user._id }, { $set: hungerUpdates });
+  // --- Statistics Logic (Merged from /api/statistics) ---
+  const currentStats = user.statistics?.daily ?? {
+    date: '',
+    dailyTasksCount: 0,
+    dailyMilestoneGifts: 0,
+    completedTaskIds: [],
+    taskCountAtLastGift: 0,
+  };
+  const isNewDay = currentStats.date !== today;
+  const alreadyCountedInStats = !isNewDay && currentStats.completedTaskIds.includes(taskId);
+
+  const statsUpdates: Record<string, any> = {};
+
+  if (!alreadyCountedInStats) {
+    if (isNewDay) {
+      statsUpdates['statistics.daily'] = {
+        date: today,
+        dailyTasksCount: 1,
+        dailyMilestoneGifts: 0,
+        completedTaskIds: [taskId],
+        taskCountAtLastGift: 0,
+      };
+    } else {
+      statsUpdates['statistics.daily.dailyTasksCount'] = currentStats.dailyTasksCount + 1;
+      // We use $push in the actual query construction if possible, or just set the new array/count?
+      // Since we are building a big $set object usually, let's try to use specific operators if we can, 
+      // or just compute the new values. 
+      // `awardFlyForTask` implementation below primarily builds a `setFields` object for `$set`.
+      // Mixing $set and $push in the same update is fine.
     }
+  }
+  // -----------------------------------------------------
+
+  if (alreadyRewarded) {
+    // Even if already rewarded (fly-wise), we might still need to update stats (if they drifted?).
+    // But usually if already rewarded, it implies we processed it.
+    // However, the user might be toggling completion. 
+    // If 'alreadyCountedInStats' is false (e.g. maybe different logic), we should still update stats.
+
+    const finalUpdates = { ...hungerUpdates };
+
+    // Merge stat updates
+    if (Object.keys(statsUpdates).length > 0) {
+      // We have strict sets for isNewDay
+      Object.assign(finalUpdates, statsUpdates);
+    }
+
+    const ops: any = { $set: finalUpdates };
+    if (!isNewDay && !alreadyCountedInStats) {
+      // If not new day, we need $inc and $push which are safer for concurrency
+      // But here we are operating inside a specific logic block.
+      // Let's just use $push for completedTaskIds if we aren't resetting the whole object.
+      ops.$inc = { ...(ops.$inc || {}), 'statistics.daily.dailyTasksCount': 1 };
+      ops.$push = { 'statistics.daily.completedTaskIds': taskId };
+
+      // Remove $set collisions if any
+      delete finalUpdates['statistics.daily.dailyTasksCount'];
+    }
+
+    if (Object.keys(finalUpdates).length > 0 || ops.$inc || ops.$push) {
+      await UserModel.updateOne({ _id: user._id }, ops);
+    }
+
     return {
       awarded: false,
       flyStatus: { balance: currentBalance, earnedToday: daily.earned, limit: DAILY_FLY_LIMIT, limitHit: atLimit },
@@ -217,15 +277,20 @@ async function awardFlyForTask(
     };
   }
 
-  // Calculate new hunger (capped at max), forgiving any negative debt
+  // Calculate new hunger
   let newHunger = Math.min(MAX_HUNGER_MS, Math.max(0, currentHungerState.hunger) + TASK_HUNGER_REWARD_MS);
   const finalHungerStatus = { ...currentHungerState, hunger: newHunger };
 
   const setFields: Record<string, any> = {
     ...hungerUpdates,
     'wardrobe.hunger': newHunger,
-    'wardrobe.lastHungerUpdate': new Date() // Ensure we don't double-drain
+    'wardrobe.lastHungerUpdate': new Date()
   };
+
+  // Merge simple stat sets (like new day reset)
+  if (statsUpdates['statistics.daily']) {
+    setFields['statistics.daily'] = statsUpdates['statistics.daily'];
+  }
 
   let nextEarned = daily.earned;
   let nextBalance = currentBalance;
@@ -250,7 +315,15 @@ async function awardFlyForTask(
   if (!user.wardrobe?.equipped) setFields['wardrobe.equipped'] = {};
   if (!user.wardrobe?.inventory) setFields['wardrobe.inventory'] = {};
 
-  await UserModel.updateOne({ _id: user._id }, { $set: setFields });
+  const ops: any = { $set: setFields };
+
+  // Handle incremental stats update
+  if (!isNewDay && !alreadyCountedInStats) {
+    ops.$inc = { ...(ops.$inc || {}), 'statistics.daily.dailyTasksCount': 1 };
+    ops.$push = { ...(ops.$push || {}), 'statistics.daily.completedTaskIds': taskId };
+  }
+
+  await UserModel.updateOne({ _id: user._id }, ops);
 
   return {
     awarded: awardedFly,

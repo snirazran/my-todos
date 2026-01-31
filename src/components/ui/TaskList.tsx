@@ -688,22 +688,6 @@ export default function TaskList({
     : 'regular';
 
   const handleTaskToggle = (task: Task, forceState?: boolean) => {
-    const isCompleting =
-      forceState === true || (forceState === undefined && !task.completed);
-
-    if (isCompleting) {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      fetch('/api/statistics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'complete_task',
-          taskId: task.id,
-          timezone: tz,
-        }),
-      }).catch((err) => console.error('Failed to update stats', err));
-    }
-
     toggle(task.id, forceState);
   };
 
