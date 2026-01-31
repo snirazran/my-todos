@@ -486,6 +486,15 @@ export function useTaskData() {
     }, [backlogData, todayData, tasks, mutateBacklog, mutateToday, tz]);
 
 
+    const {
+        data: tagsData,
+        mutate: mutateTags
+    } = useSWR<{ tags: { id: string; name: string; color: string }[] }>('/api/tags', fetcher, {
+        revalidateOnFocus: false,
+    });
+
+    const tags = tagsData?.tags || [];
+
     return {
         tasks,
         backlogTasks,
@@ -495,10 +504,12 @@ export function useTaskData() {
         hungerStatus,
         dailyGiftCount,
         weeklyIds,
+        tags,
         isLoading: isLoadingToday || isLoadingBacklog,
 
         mutateToday,
         mutateBacklog,
+        mutateTags,
         toggleTask,
         moveTaskToBacklog,
         moveTaskToToday,

@@ -94,7 +94,8 @@ export default function Home() {
     mutateBacklog,
     pendingToBacklog,
     pendingToToday,
-    toggleRepeat
+    toggleRepeat,
+    tags
   } = useTaskData();
 
   const frogRef = useRef<FrogHandle>(null);

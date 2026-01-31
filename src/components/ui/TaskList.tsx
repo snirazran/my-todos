@@ -513,6 +513,7 @@ export default function TaskList({
   onToggleRepeat,
   onEditTask,
   pendingToToday,
+  tags,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -533,12 +534,9 @@ export default function TaskList({
   onToggleRepeat?: (taskId: string) => Promise<void> | void;
   onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
   pendingToToday?: number;
+  tags?: { id: string; name: string; color: string }[];
 }) {
-  const { data: tagsData } = useSWR('/api/tags', (url) =>
-    fetch(url).then((r) => r.json())
-  );
-  const userTags: { id: string; name: string; color: string }[] =
-    tagsData?.tags || [];
+  const userTags = tags || [];
 
   const getTagDetails = (tagIdentifier: string) => {
     // Try to find by ID first

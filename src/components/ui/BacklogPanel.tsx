@@ -416,6 +416,7 @@ export default function BacklogPanel({
   onAddRequested,
   onEditTask,
   pendingToBacklog,
+  tags,
 }: {
   later: BacklogItem[];
   onRefreshToday: () => Promise<void> | void;
@@ -424,6 +425,7 @@ export default function BacklogPanel({
   onAddRequested: () => void;
   onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
   pendingToBacklog?: number;
+  tags?: { id: string; name: string; color: string }[];
 }) {
   const [menu, setMenu] = React.useState<{
     id: string;
@@ -447,13 +449,7 @@ export default function BacklogPanel({
     taskId: string | null;
   }>({ open: false, taskId: null });
 
-  // Fetch Tags for colors
-  const { data: tagsData } = useSWR('/api/tags', (url) =>
-    fetch(url).then((r) => r.json())
-  );
-
-  const userTags: { id: string; name: string; color: string }[] =
-    tagsData?.tags || [];
+  const userTags = tags || [];
 
   const getTagDetails = (tagIdentifier: string) => {
     // Try to find by ID first

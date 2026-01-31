@@ -18,7 +18,6 @@ export function useInventory(active: boolean = true) {
     active ? '/api/skins/inventory' : null,
     fetcher,
     {
-      refreshInterval: 60000, // Poll every minute to keep balance/inventory fresh-ish
       revalidateOnFocus: false,
     }
   );
