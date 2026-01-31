@@ -397,9 +397,13 @@ export function useTaskData() {
     const reorderTasks = useCallback(async (newTasks: Task[]) => {
         // Optimistic
         if (todayData) {
+            // CRITICAL: We must update the 'order' property on the tasks themselves,
+            // because TaskList now explicitly sorts by 'order'.
+            const reorderedOptimistic = newTasks.map((t, i) => ({ ...t, order: i }));
+
             await mutateToday({
                 ...todayData,
-                tasks: newTasks
+                tasks: reorderedOptimistic
             }, { revalidate: false });
         }
 
