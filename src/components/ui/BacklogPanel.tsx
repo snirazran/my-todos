@@ -607,7 +607,9 @@ export default function BacklogPanel({
         <TaskCounter count={later.length} pendingCount={pendingToBacklog} />
       </div>
 
-      <div className="pb-2 space-y-3 overflow-hidden min-h-[100px]">
+      <div
+        className={`pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)] ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+      >
         {later.length === 0 && !exitAction ? (
           <motion.div
             initial={{ opacity: 0 }}
