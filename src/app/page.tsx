@@ -216,7 +216,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen pb-24 md:pb-12 bg-background">
-      <div className="px-4 py-6 mx-auto max-w-7xl md:px-8">
+      <div className="px-4 pt-2 pb-6 mx-auto max-w-7xl md:px-8">
         <Header session={session} router={router} />
 
         <div className="relative grid items-start grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-8">
@@ -552,7 +552,7 @@ export default function Home() {
 // Compact Header
 function Header({ session, router }: { session: any; router: any }) {
   return (
-    <div className="flex flex-col gap-4 mb-2 md:mb-6 md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-4 mb-2 md:mb-4 md:flex-row md:items-center md:justify-between">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-5xl">
           {format(new Date(), 'EEEE')}
@@ -561,34 +561,6 @@ function Header({ session, router }: { session: any; router: any }) {
           <Calendar className="w-4 h-4 md:w-5 md:h-5" />
           {format(new Date(), 'MMMM d, yyyy')}
         </p>
-      </div>
-
-      <div className="self-start hidden gap-3 md:flex md:self-auto">
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <Link
-            href="/history"
-            className="group flex items-center gap-2.5 px-5 py-2.5 text-sm font-bold transition-all bg-card/80 backdrop-blur-xl rounded-2xl border border-border/50 shadow-sm text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-card active:shadow-inner"
-          >
-            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
-              <History className="w-4 h-4" strokeWidth={2.5} />
-            </div>
-            <span>History</span>
-          </Link>
-        </motion.div>
-
-        <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-          <button
-            onClick={() =>
-              session ? router.push('/manage-tasks') : router.push('/login')
-            }
-            className="group flex items-center gap-2.5 px-5 py-2.5 text-sm font-bold transition-all bg-card/80 backdrop-blur-xl rounded-2xl border border-border/50 shadow-sm text-muted-foreground hover:text-foreground hover:border-primary/30 hover:bg-card active:shadow-inner"
-          >
-            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary/10 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
-              <LayoutDashboard className="w-4 h-4" strokeWidth={2.5} />
-            </div>
-            <span>Weekly Tasks</span>
-          </button>
-        </motion.div>
       </div>
     </div>
   );
