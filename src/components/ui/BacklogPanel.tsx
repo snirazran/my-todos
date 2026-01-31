@@ -230,22 +230,22 @@ function BacklogTaskItem({
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onMenuOpen(e, item);
-            }}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
-            title="More options"
-          >
-            <EllipsisVertical className="w-5 h-5" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
               onDeleteRequest(item);
             }}
             className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors"
             title="Delete"
           >
             <Trash2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onMenuOpen(e, item);
+            }}
+            className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
+            title="More options"
+          >
+            <EllipsisVertical className="w-5 h-5" />
           </button>
         </div>
       )}
