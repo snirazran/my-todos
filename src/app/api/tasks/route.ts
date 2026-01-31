@@ -324,6 +324,73 @@ export async function PUT(req: NextRequest) {
   const body = await req.json();
   const tz = body.timezone || 'UTC';
   if (body && Object.prototype.hasOwnProperty.call(body, 'day')) return handleBoardPut(uid, body, tz);
+  // New: Handle "move" operation (atomic move between lists)
+  if (body.move) {
+    const { type, date: moveDate } = body.move;
+    const { taskId } = body; // Extract taskId here
+
+    if (!taskId) return NextResponse.json({ error: 'taskId is required' }, { status: 400 });
+    if (!type || (type === 'regular' && !moveDate)) return NextResponse.json({ error: 'Invalid move payload' }, { status: 400 });
+
+    const doc = await TaskModel.findOne({ userId: uid, id: taskId }).lean<TaskDoc>();
+    if (!doc) return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+
+    const now = new Date();
+    const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
+
+    // MOVING TO BACKLOG
+    if (type === 'backlog') {
+      const newOrder = await nextOrderBacklog(uid, weekStart);
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        {
+          $set: {
+            type: 'backlog',
+            weekStart,
+            order: newOrder,
+            updatedAt: now,
+            completed: false // Reset completion on move to backlog? Usually safer.
+          },
+          $unset: {
+            date: 1,
+            dayOfWeek: 1,
+            completedDates: 1,
+            suppressedDates: 1
+          }
+        }
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    // MOVING TO REGULAR (Today/Date)
+    if (type === 'regular') {
+      const weekday = dowFromYMD(moveDate); // 0..6
+      const newOrder = await nextOrderForDay(uid, weekday, moveDate);
+
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        {
+          $set: {
+            type: 'regular',
+            date: moveDate,
+            order: newOrder,
+            updatedAt: now
+            // We keep 'completed' state? If moving back to today, maybe keep it as is if it was completed? 
+            // Usually 'Do Later' implies it wasn't done. 'Move to Today' implies we want to do it.
+            // Let's assume we keep provided 'completed' or default to current.
+            // For now, let's NOT reset completed unless specified, but usually backlog items are not completed.
+          },
+          $unset: {
+            weekStart: 1,
+            dayOfWeek: 1,
+            suppressedDates: 1
+          }
+        }
+      );
+      return NextResponse.json({ ok: true });
+    }
+  }
+
   const { date, taskId, completed, tags, toggleType, order, text } = body ?? {};
   // Relaxed validation to allow text updates
   if ((!date && !tags && !text && typeof completed === 'undefined' && !toggleType && typeof order === 'undefined') || !taskId) return NextResponse.json({ error: 'taskId and update fields are required' }, { status: 400 });

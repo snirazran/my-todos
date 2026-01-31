@@ -44,6 +44,16 @@ type ExclusionSource = 'today' | 'backlog';
 // --- Fetcher ---
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
+// --- Helper for Optimistic Updates ---
+const sortTasks = (ts: Task[]) => {
+    return [...ts].sort((a, b) => {
+        if (!!a.completed !== !!b.completed) {
+            return a.completed ? 1 : -1; // Completed items at bottom
+        }
+        return (a.order ?? 0) - (b.order ?? 0);
+    });
+};
+
 export function useTaskData() {
     const { data: session } = useSession();
     const { showNotification } = useNotification();
@@ -134,16 +144,6 @@ export function useTaskData() {
     // Filter Backlog: Hide if excluded from 'backlog'
     const backlogTasks = (backlogData || []).filter(t => pendingExclusions.get(t.id) !== 'backlog');
 
-    // --- Helper for Optimistic Updates ---
-    const sortTasks = (ts: Task[]) => {
-        return [...ts].sort((a, b) => {
-            if (!!a.completed !== !!b.completed) {
-                return a.completed ? 1 : -1; // Completed items at bottom
-            }
-            return (a.order ?? 0) - (b.order ?? 0);
-        });
-    };
-
     // --- Actions ---
 
     /**
@@ -202,91 +202,69 @@ export function useTaskData() {
      */
     const moveTaskToBacklog = useCallback(async (taskIdOrTask: string | Task) => {
         if (!todayData || !backlogData) return;
-
-        // Normalize input - accept both task ID string or task object
         const taskId = typeof taskIdOrTask === 'string' ? taskIdOrTask : taskIdOrTask.id;
         const task = tasks.find(t => t.id === taskId);
         if (!task) return;
 
-        // Mark as pending removal from Today
-        setPendingToBacklog(prev => prev + 1);
-        setPendingExclusions(prev => new Map(prev).set(taskId, 'today'));
+        // Snapshot for rollback
+        const prevToday = todayData;
+        const prevBacklog = backlogData;
 
-        // No optimistic cache updates - let exclusion filter handle hiding
-        // API Call will move the task, revalidation will update lists
+        // 1. Manual Optimistic Update (No Revalidate)
+        // Remove from Today
+        mutateToday({
+            ...todayData,
+            tasks: todayData.tasks.filter(t => t.id !== taskId)
+        }, { revalidate: false });
 
-        // 2. API Call
+        // Add to Backlog (Append)
+        mutateBacklog([
+            ...backlogData,
+            { ...task, type: 'backlog', origin: 'regular', order: 9999 } // provisional order
+        ], { revalidate: false });
+
         try {
-            // POST to backlog
-            const postRes = await fetch('/api/tasks?view=board', {
-                method: 'POST',
+            await fetch('/api/tasks', {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    text: task.text,
-                    repeat: 'backlog',
-                    tags: task.tags,
+                    taskId,
+                    move: { type: 'backlog' },
+                    timezone: tz,
                 }),
-            });
-            const postJson = await postRes.json();
-            const newBacklogId = postJson.ids?.[0];
-
-            // DELETE from today
-            await fetch('/api/tasks', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ date: dateStr, taskId }),
             });
 
             showNotification("Moved to Saved Tasks", async () => {
-                // UNDO Logic - Clear exclusion immediately
-                setPendingExclusions(prev => {
-                    const next = new Map(prev);
-                    next.delete(taskId); // Remove from exclusions so it shows in Today
-                    return next;
-                });
+                // UNDO Logic: Reverse Manual Update
 
-                // API Undo - restore to today
-                const dow = new Date().getDay();
-                await fetch('/api/tasks?view=board', {
-                    method: 'POST',
+                // Re-add to Today
+                mutateToday(curr => curr ? ({
+                    ...curr,
+                    tasks: sortTasks([...curr.tasks, task]) // approximate sort
+                }) : curr, { revalidate: false });
+
+                // Remove from Backlog
+                mutateBacklog(curr => (curr || []).filter(t => t.id !== taskId), { revalidate: false });
+
+                // API Reverse
+                await fetch('/api/tasks', {
+                    method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        text: task.text,
-                        days: [dow],
-                        repeat: 'this-week',
-                        tags: task.tags,
+                        taskId,
+                        move: { type: 'regular', date: dateStr },
+                        timezone: tz,
                     }),
                 });
-
-                // Delete from backlog
-                if (newBacklogId) {
-                    await fetch('/api/tasks?view=board', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ day: -1, taskId: newBacklogId }),
-                    });
-                }
-
-                // Revalidate to sync with server
-                await Promise.all([mutateToday(), mutateBacklog()]);
             });
-
-            // Final revalidate
-            await Promise.all([mutateToday(), mutateBacklog()]);
 
         } catch (e) {
             console.error("Move to backlog failed", e);
-            setPendingExclusions(prev => {
-                const next = new Map(prev);
-                next.delete(taskId);
-                return next;
-            });
-            mutateToday();
-            mutateBacklog();
-        } finally {
-            setPendingToBacklog(prev => prev - 1);
+            // Rollback
+            mutateToday(prevToday, { revalidate: false });
+            mutateBacklog(prevBacklog, { revalidate: false });
         }
-    }, [todayData, backlogData, tasks, mutateToday, mutateBacklog, dateStr, showNotification]);
+    }, [todayData, backlogData, tasks, mutateToday, mutateBacklog, dateStr, showNotification, tz, sortTasks]);
 
     /**
      * Move Task: Backlog -> Today
@@ -294,84 +272,67 @@ export function useTaskData() {
     const moveTaskToToday = useCallback(async (item: { id: string; text: string; tags?: string[] }) => {
         if (!todayData || !backlogData) return;
 
-        // Mark as pending removal from Backlog
-        setPendingToToday(prev => prev + 1);
-        setPendingExclusions(prev => new Map(prev).set(item.id, 'backlog'));
+        // Snapshot
+        const prevToday = todayData;
+        const prevBacklog = backlogData;
 
-        // No optimistic cache updates - let exclusion filter handle hiding
-        // API Call will move the task, revalidation will update lists
+        // 1. Manual Optimistic Update (No Revalidate)
+        // Remove from Backlog
+        mutateBacklog(backlogData.filter(t => t.id !== item.id), { revalidate: false });
 
-        // 2. API Call
+        // Add to Today
+        mutateToday({
+            ...todayData,
+            tasks: [...todayData.tasks, {
+                ...item,
+                id: item.id,
+                completed: false,
+                type: 'regular',
+                order: 9999
+            } as Task]
+        }, { revalidate: false });
+
         try {
-            const dow = new Date().getDay();
-            // POST to Today
-            const postRes = await fetch('/api/tasks?view=board', {
-                method: 'POST',
+            await fetch('/api/tasks', {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    text: item.text,
-                    days: [dow],
-                    repeat: 'this-week',
-                    tags: item.tags,
+                    taskId: item.id,
+                    move: { type: 'regular', date: dateStr },
+                    timezone: tz,
                 }),
-            });
-            const postJson = await postRes.json();
-            const newTodayId = postJson.ids?.[0];
-
-            // DELETE from Backlog
-            await fetch('/api/tasks?view=board', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ day: -1, taskId: item.id }),
             });
 
             showNotification("Moved to Today", async () => {
-                // UNDO Logic - Clear exclusion immediately
-                setPendingExclusions(prev => {
-                    const next = new Map(prev);
-                    next.delete(item.id); // Remove from exclusions so it shows in Backlog
-                    return next;
-                });
+                // UNDO Logic: Reverse Manual Update
+                // Remove from Today
+                mutateToday(curr => curr ? ({
+                    ...curr,
+                    tasks: curr.tasks.filter(t => t.id !== item.id)
+                }) : curr, { revalidate: false });
 
-                // API Undo - restore to backlog
-                await fetch('/api/tasks?view=board', {
-                    method: 'POST',
+                // Add back to Backlog
+                mutateBacklog(curr => [...(curr || []), { ...item, id: item.id, completed: false, type: 'backlog' } as Task], { revalidate: false });
+
+                // Reverse move: Today -> Backlog
+                await fetch('/api/tasks', {
+                    method: 'PUT',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        text: item.text,
-                        repeat: 'backlog',
-                        tags: item.tags,
+                        taskId: item.id,
+                        move: { type: 'backlog' },
+                        timezone: tz,
                     }),
                 });
-
-                // Delete from today
-                if (newTodayId) {
-                    await fetch('/api/tasks', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ date: dateStr, taskId: newTodayId }),
-                    });
-                }
-
-                // Revalidate to sync with server
-                await Promise.all([mutateToday(), mutateBacklog()]);
             });
-
-            await Promise.all([mutateToday(), mutateBacklog()]);
 
         } catch (e) {
             console.error("Move to today failed", e);
-            setPendingExclusions(prev => {
-                const next = new Map(prev);
-                next.delete(item.id);
-                return next;
-            });
-            mutateToday();
-            mutateBacklog();
-        } finally {
-            setPendingToToday(prev => prev - 1);
+            // Rollback
+            mutateToday(prevToday, { revalidate: false });
+            mutateBacklog(prevBacklog, { revalidate: false });
         }
-    }, [todayData, backlogData, tasks, mutateToday, mutateBacklog, dateStr, showNotification]);
+    }, [todayData, backlogData, tasks, mutateToday, mutateBacklog, dateStr, showNotification, tz]);
 
     /**
      * Delete Task (Today)
