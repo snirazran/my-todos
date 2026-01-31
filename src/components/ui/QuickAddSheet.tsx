@@ -44,6 +44,7 @@ type Props = Readonly<{
   defaultRepeat?: RepeatChoice;
   defaultPickedDay?: number;
   defaultMode?: WhenChoice;
+  daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
 }>;
 
 type SavedTag = {
@@ -84,6 +85,7 @@ export default function QuickAddSheet({
   defaultRepeat = 'this-week',
   defaultPickedDay,
   defaultMode = 'pick',
+  daysOrder,
 }: Props) {
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
@@ -121,7 +123,9 @@ export default function QuickAddSheet({
       setText(initialText);
       setWhen(defaultMode);
       // Use defaultPickedDay if provided, otherwise fallback to today
-      const initialDay = defaultPickedDay !== undefined ? defaultPickedDay : todayDisplayIndex();
+      const initialDay = defaultPickedDay !== undefined
+        ? defaultPickedDay
+        : todayDisplayIndex(daysOrder);
       setPickedDays([initialDay as Exclude<DisplayDay, 7>]);
       setRepeat(defaultRepeat);
       setTags([]);
@@ -133,7 +137,7 @@ export default function QuickAddSheet({
     }
     // Always reset tag panel state when open changes to prevent animation flash
     setIsTagPanelOpen(false);
-  }, [open, initialText, defaultRepeat, defaultPickedDay, defaultMode]);
+  }, [open, initialText, defaultRepeat, defaultPickedDay, defaultMode, daysOrder]);
 
   const filteredTags = useMemo(() => {
     if (!tagInput) return savedTags;
@@ -146,10 +150,10 @@ export default function QuickAddSheet({
   const dayLabels = useMemo(
     () =>
       Array.from({ length: 7 }, (_, d) => {
-        const full = labelForDisplayDay(d as Exclude<DisplayDay, 7>);
+        const full = labelForDisplayDay(d as Exclude<DisplayDay, 7>, daysOrder);
         return { short: full.slice(0, 2), title: full };
       }),
-    []
+    [daysOrder]
   );
 
   const toggleDay = (d: Exclude<DisplayDay, 7>) =>
@@ -259,7 +263,7 @@ export default function QuickAddSheet({
     const apiDays: ApiDay[] =
       when === 'later'
         ? [-1]
-        : pickedDays.slice().sort().map((d) => apiDayFromDisplay(d));
+        : pickedDays.slice().sort().map((d) => apiDayFromDisplay(d, daysOrder));
 
     if (apiDays.length === 0) return;
 
@@ -483,8 +487,8 @@ export default function QuickAddSheet({
                                         type="button"
                                         onClick={() => setNewTagColor(c.value)}
                                         className={`w-8 h-8 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-card transition-all ${newTagColor === c.value
-                                            ? 'ring-primary scale-110'
-                                            : 'ring-transparent'
+                                          ? 'ring-primary scale-110'
+                                          : 'ring-transparent'
                                           }`}
                                         title={c.name}
                                       />
@@ -528,8 +532,8 @@ export default function QuickAddSheet({
                                     type="button"
                                     onClick={() => setManageTagsMode(!manageTagsMode)}
                                     className={`p-1.5 rounded-lg transition-colors ${manageTagsMode
-                                        ? 'bg-primary/10 text-primary'
-                                        : 'text-muted-foreground/50 hover:text-foreground hover:bg-muted'
+                                      ? 'bg-primary/10 text-primary'
+                                      : 'text-muted-foreground/50 hover:text-foreground hover:bg-muted'
                                       }`}
                                     title={manageTagsMode ? "Done editing" : "Manage tags"}
                                   >

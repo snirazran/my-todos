@@ -54,7 +54,7 @@ export default function TaskBoard({
     tags: string[];
   }) => Promise<void> | void;
   todayDisplayIndex: Exclude<DisplayDay, 7>;
-  daysOrder?: ReadonlyArray<number>; // New Prop
+  daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>; // New Prop
   onToggleRepeat?: (taskId: string, day: DisplayDay) => Promise<void> | void;
   onEditTask?: (day: DisplayDay, taskId: string, newText: string) => Promise<void>;
   onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
@@ -392,6 +392,15 @@ export default function TaskBoard({
     };
   }, [drag, onDrop]);
 
+  // Detect Mobile for QuickAdd Behavior
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   return (
     <div className="relative w-full h-full">
       {/* SCROLLER */}
@@ -413,7 +422,7 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex mx-auto gap-3 px-4 pt-16 pb-[calc(100px+env(safe-area-inset-bottom))]">
+        <div className="flex mx-auto gap-3 px-4 pt-16 md:pt-4 pb-[calc(100px+env(safe-area-inset-bottom))]">
           {/* Render only 0..6 (Exclude Backlog Column 7) */}
           {Array.from({ length: DAYS - 1 }, (_, day) => ({
             day: day as DisplayDay,
@@ -563,7 +572,8 @@ export default function TaskBoard({
         onOpenChange={setShowQuickAdd}
         initialText={quickText}
         defaultRepeat="this-week"
-        defaultPickedDay={pageIndex}
+        defaultPickedDay={isMobile ? pageIndex : todayDisplayIndex}
+        daysOrder={daysOrder}
         onSubmit={async ({ text, days, repeat, tags }) => {
           if (onQuickAdd) {
             await onQuickAdd({
