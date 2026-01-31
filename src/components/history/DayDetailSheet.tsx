@@ -33,6 +33,7 @@ export default function DayDetailSheet({
     setFlyRef
 }: DayDetailSheetProps) {
     const [mounted, setMounted] = useState(false);
+    const [wardrobeOpen, setWardrobeOpen] = useState(false);
     const frogRef = useRef<FrogHandle>(null);
     const frogBoxRef = useRef<HTMLDivElement>(null);
 
@@ -74,92 +75,90 @@ export default function DayDetailSheet({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 z-[999] bg-background/60 backdrop-blur-md"
+                        className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-md"
                     />
 
-                    {/* Sheet */}
-                    <motion.div
-                        initial={{ y: '100%' }}
-                        animate={{ y: 0 }}
-                        exit={{ y: '100%' }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                        className="fixed inset-x-0 bottom-0 z-[1000] h-[90vh] md:h-[85vh] flex flex-col bg-card/95 backdrop-blur-3xl rounded-t-[40px] shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.3)] border-t border-white/20 dark:border-white/10 overflow-hidden"
-                    >
-                        {/* Handle for dragging (visual only for now) */}
-                        <div className="w-full flex justify-center pt-4 pb-2" onClick={onClose}>
-                            <div className="w-16 h-1.5 bg-muted-foreground/20 rounded-full" />
-                        </div>
-
-                        {/* Header */}
-                        <div className="px-6 py-6 flex items-center justify-between">
-                            <div>
-                                <h2 className="text-3xl font-black tracking-tighter flex items-center gap-2 text-foreground">
-                                    <CalendarIcon className="w-7 h-7 text-primary" />
-                                    {format(new Date(date), 'MMMM do')}
-                                </h2>
-                                <p className="text-muted-foreground font-bold text-sm mt-1">
-                                    {completedCount} of {totalCount} completed
-                                </p>
+                    {/* Sheet Container */}
+                    <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center pointer-events-none p-0 sm:p-6">
+                        <motion.div
+                            initial={{ y: '100%', opacity: 0, scale: 0.96 }}
+                            animate={{ y: 0, opacity: 1, scale: 1 }}
+                            exit={{ y: '100%', opacity: 0, scale: 0.96 }}
+                            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+                            className="pointer-events-auto w-full sm:max-w-lg h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col bg-card/90 backdrop-blur-3xl rounded-t-[32px] sm:rounded-[40px] shadow-2xl border-t sm:border border-white/10 overflow-hidden"
+                        >
+                            {/* Header (Compact) */}
+                            <div className="flex-shrink-0 px-5 py-4 flex items-center justify-between border-b border-border/40 bg-background/20">
+                                <div>
+                                    <h2 className="text-2xl font-black tracking-tighter flex items-center gap-2 text-foreground">
+                                        <CalendarIcon className="w-6 h-6 text-primary" />
+                                        {format(new Date(date), 'MMMM do')}
+                                    </h2>
+                                    <p className="text-muted-foreground font-bold text-xs uppercase tracking-wider mt-1 opacity-80">
+                                        {completedCount} / {totalCount} Tasks Completed
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={onClose}
+                                    className="p-2 bg-muted/50 hover:bg-red-500/10 hover:text-red-500 rounded-full transition-all text-muted-foreground"
+                                >
+                                    <X className="w-5 h-5" strokeWidth={3} />
+                                </button>
                             </div>
-                            <button
-                                onClick={onClose}
-                                className="p-3 bg-muted/50 hover:bg-muted rounded-full transition-colors text-foreground"
-                            >
-                                <X className="w-6 h-6" />
-                            </button>
-                        </div>
 
-                        {/* Content Scrollable */}
-                        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 bg-gradient-to-b from-transparent to-background/50">
+                            {/* Content Scrollable */}
+                            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+                                {/* 1. Frog Display Section */}
+                                <div className="flex justify-center pb-4 border-b border-border/40 border-dashed">
+                                    <div className="scale-90 transform-origin-center">
+                                        <FrogDisplay
+                                            {...frogProps}
+                                            frogRef={frogRef}
+                                            frogBoxRef={frogBoxRef}
+                                            indices={indices}
+                                            rate={completionRate}
+                                            done={completedCount}
+                                            total={totalCount}
+                                            openWardrobe={wardrobeOpen}
+                                            onOpenChange={setWardrobeOpen}
+                                        />
+                                    </div>
+                                </div>
 
-                            {/* 1. Frog Display Section */}
-                            <div className="flex justify-center pb-8 border-b border-border/50 border-dashed">
-                                <div className="scale-90 md:scale-100">
-                                    <FrogDisplay
-                                        {...frogProps}
-                                        frogRef={frogRef}
-                                        frogBoxRef={frogBoxRef}
-                                        indices={indices}
-                                        rate={completionRate}
-                                        done={completedCount}
-                                        total={totalCount}
-                                    />
+                                {/* 2. Tasks List */}
+                                <div className="space-y-3 pb-12">
+                                    <h3 className="font-black text-muted-foreground/40 uppercase tracking-widest text-[10px] text-center mb-2">
+                                        Activity Log
+                                    </h3>
+
+                                    {tasks.length === 0 ? (
+                                        <div className="text-center py-10 px-4 text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border/50">
+                                            <p className="font-bold text-sm">No tasks recorded details for this day.</p>
+                                        </div>
+                                    ) : (
+                                        tasks.map(task => {
+                                            const uniqueKey = `${date}::${task.id}`;
+                                            return (
+                                                <HistoryTaskCard
+                                                    key={uniqueKey}
+                                                    id={task.id}
+                                                    text={task.text}
+                                                    completed={task.completed}
+                                                    type={task.type}
+                                                    tags={task.tags}
+                                                    date={date}
+                                                    onToggle={onToggleTask}
+                                                    setFlyRef={(el) => setFlyRef?.(uniqueKey, el)}
+                                                    isEaten={visuallyCompleted?.has(uniqueKey)}
+                                                    userTags={userTags}
+                                                />
+                                            );
+                                        })
+                                    )}
                                 </div>
                             </div>
-
-                            {/* 2. Tasks List */}
-                            <div className="max-w-2xl mx-auto w-full space-y-4 pb-24">
-                                <h3 className="font-black text-muted-foreground/50 uppercase tracking-widest text-xs mb-4 text-center">
-                                    Tasks & Activities
-                                </h3>
-
-                                {tasks.length === 0 ? (
-                                    <div className="text-center py-16 text-muted-foreground bg-muted/20 rounded-3xl border-2 border-dashed border-muted">
-                                        <p className="font-medium">No tasks recorded for this day.</p>
-                                    </div>
-                                ) : (
-                                    tasks.map(task => {
-                                        const uniqueKey = `${date}::${task.id}`;
-                                        return (
-                                            <HistoryTaskCard
-                                                key={uniqueKey}
-                                                id={task.id}
-                                                text={task.text}
-                                                completed={task.completed}
-                                                type={task.type}
-                                                tags={task.tags}
-                                                date={date}
-                                                onToggle={onToggleTask}
-                                                setFlyRef={(el) => setFlyRef?.(uniqueKey, el)}
-                                                isEaten={visuallyCompleted?.has(uniqueKey)}
-                                                userTags={userTags}
-                                            />
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </div>
-                    </motion.div>
+                        </motion.div>
+                    </div>
                 </>
             )}
         </AnimatePresence>,
