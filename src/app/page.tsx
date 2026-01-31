@@ -93,7 +93,8 @@ export default function Home() {
     mutateToday,
     mutateBacklog,
     pendingToBacklog,
-    pendingToToday
+    pendingToToday,
+    toggleRepeat
   } = useTaskData();
 
   const frogRef = useRef<FrogHandle>(null);
@@ -346,30 +347,7 @@ export default function Home() {
                     onDoLater={moveTaskToBacklog}
                     onReorder={reorderTasks}
                     pendingToToday={pendingToToday}
-                    onToggleRepeat={async (taskId) => {
-                      const task = tasks.find(t => t.id === taskId);
-                      if (!task) return;
-
-                      // Optimistic
-                      const isWeekly = task.type === 'weekly' || weeklyIds.has(taskId);
-                      const newType: 'regular' | 'weekly' = isWeekly ? 'regular' : 'weekly';
-                      const updated = tasks.map(t => t.id === taskId ? { ...t, type: newType } as Task : t);
-                      await mutateToday({ ...session!, flyStatus: flyStatus, tasks: updated }, { revalidate: false });
-
-                      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                      const dateStr = format(new Date(), 'yyyy-MM-dd');
-                      await fetch('/api/tasks', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          date: dateStr,
-                          taskId,
-                          toggleType: true,
-                          timezone: tz,
-                        }),
-                      });
-                      await mutateToday();
-                    }}
+                    onToggleRepeat={toggleRepeat}
                     onEditTask={(id, text) => editTask(id, text, false)}
                   />
                 </motion.div>

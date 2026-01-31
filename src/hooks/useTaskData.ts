@@ -349,24 +349,37 @@ export function useTaskData() {
     /**
      * Delete Task (Today)
      */
+    /**
+     * Delete Task (Today)
+     */
     const deleteTask = useCallback(async (taskId: string) => {
         setPendingExclusions(prev => new Map(prev).set(taskId, 'today'));
+        const prevToday = todayData;
 
         // Optimistic
         if (todayData) {
-            await mutateToday({
+            mutateToday({
                 ...todayData,
                 tasks: tasks.filter(t => t.id !== taskId)
             }, { revalidate: false });
         }
 
-        await fetch('/api/tasks', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ date: dateStr, taskId }),
-        });
-
-        mutateToday();
+        try {
+            await fetch('/api/tasks', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ date: dateStr, taskId }),
+            });
+        } catch (e) {
+            console.error("Delete failed", e);
+            // Rollback
+            if (prevToday) mutateToday(prevToday, { revalidate: false });
+            setPendingExclusions(prev => {
+                const next = new Map(prev);
+                next.delete(taskId);
+                return next;
+            });
+        }
     }, [todayData, tasks, mutateToday, dateStr]);
 
     /**
@@ -396,24 +409,80 @@ export function useTaskData() {
     /**
      * Edit Task Text
      */
-    const editTask = useCallback(async (taskId: string, newText: string, isBacklog: boolean) => {
-        if (isBacklog && backlogData) {
-            const updated = backlogData.map(t => t.id === taskId ? { ...t, text: newText } : t);
-            await mutateBacklog(updated, { revalidate: false });
-        } else if (!isBacklog && todayData) {
-            const updated = tasks.map(t => t.id === taskId ? { ...t, text: newText } : t);
-            await mutateToday({ ...todayData, tasks: updated }, { revalidate: false });
+    /**
+     * Toggle Repeat (Weekly <-> Regular)
+     */
+    const toggleRepeat = useCallback(async (taskId: string) => {
+        if (!todayData) return;
+        const task = tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        const prevToday = todayData;
+
+        // Optimistic
+        const isWeekly = task.type === 'weekly' || (todayData.weeklyIds || []).includes(taskId);
+        const newType: 'regular' | 'weekly' = isWeekly ? 'regular' : 'weekly';
+
+        const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, type: newType } as Task : t);
+
+        let newWeeklyIds = todayData.weeklyIds || [];
+        if (newType === 'weekly') {
+            if (!newWeeklyIds.includes(taskId)) newWeeklyIds = [...newWeeklyIds, taskId];
+        } else {
+            newWeeklyIds = newWeeklyIds.filter(id => id !== taskId);
         }
 
-        await fetch('/api/tasks', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ taskId, text: newText, timezone: tz }),
-        });
+        mutateToday({
+            ...todayData,
+            tasks: updatedTasks,
+            weeklyIds: newWeeklyIds
+        }, { revalidate: false });
 
-        if (isBacklog) mutateBacklog();
-        else mutateToday();
+        try {
+            await fetch('/api/tasks', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    date: dateStr,
+                    taskId,
+                    toggleType: true,
+                    timezone: tz,
+                }),
+            });
+        } catch (e) {
+            console.error("Toggle repeat failed", e);
+            mutateToday(prevToday, { revalidate: false });
+        }
+    }, [todayData, tasks, mutateToday, dateStr, tz]);
 
+    /**
+     * Edit Task Text
+     */
+    const editTask = useCallback(async (taskId: string, newText: string, isBacklog: boolean) => {
+        const prevToday = todayData;
+        const prevBacklog = backlogData;
+
+        // Optimistic Update
+        if (isBacklog && backlogData) {
+            const updated = backlogData.map(t => t.id === taskId ? { ...t, text: newText } : t);
+            mutateBacklog(updated, { revalidate: false });
+        } else if (!isBacklog && todayData) {
+            const updated = tasks.map(t => t.id === taskId ? { ...t, text: newText } : t);
+            mutateToday({ ...todayData, tasks: updated }, { revalidate: false });
+        }
+
+        try {
+            await fetch('/api/tasks', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskId, text: newText, timezone: tz }),
+            });
+        } catch (e) {
+            console.error("Edit failed", e);
+            // Rollback
+            if (isBacklog && prevBacklog) mutateBacklog(prevBacklog, { revalidate: false });
+            else if (!isBacklog && prevToday) mutateToday(prevToday, { revalidate: false });
+        }
     }, [backlogData, todayData, tasks, mutateBacklog, mutateToday, tz]);
 
 
@@ -436,5 +505,6 @@ export function useTaskData() {
         deleteTask,
         reorderTasks,
         editTask,
+        toggleRepeat,
     };
 }
