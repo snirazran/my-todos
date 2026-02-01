@@ -371,7 +371,7 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
           className={`
               relative flex items-center gap-1.5 px-2 py-3.5 
               transition-colors duration-200 rounded-xl 
-              bg-card 
+              bg-card
               border border-border/40 shadow-sm
               ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
               ${isHovered && isDesktop ? 'border-border shadow-md' : ''}
@@ -955,7 +955,7 @@ export default function TaskList({
     <>
       <div
         dir="ltr"
-        className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm"
+        className="px-6 pt-6 pb-4 overflow-visible rounded-[20px]"
       >
         <div className="flex flex-row items-center justify-between mb-6 gap-3">
           <div className="flex items-center gap-3">
@@ -1064,7 +1064,7 @@ export default function TaskList({
         </div>
 
         <div
-          className={`pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)] ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+          className={`pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
           

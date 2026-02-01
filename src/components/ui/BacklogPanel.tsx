@@ -595,7 +595,7 @@ export default function BacklogPanel({
     <div
       dir="ltr"
       // Added overflow-visible to allow menus to spill out if needed
-      className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm"
+      className="px-6 pt-6 pb-4 overflow-visible rounded-[20px]"
     >
       {/* Header */}
       <div className="flex items-center justify-between mb-6 min-h-[36px]">
@@ -609,7 +609,7 @@ export default function BacklogPanel({
       </div>
 
       <div
-        className={`pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)] ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+        className={`pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
       >
         {later.length === 0 && !exitAction ? (
           <motion.div
