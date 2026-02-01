@@ -542,7 +542,7 @@ async function handleDailyGet(req: NextRequest, userId: Types.ObjectId, tz: stri
   const tasks: TaskDoc[] = await TaskModel.find({ userId, deletedAt: { $exists: false }, $or: [{ type: 'weekly', dayOfWeek: dow }, { type: 'regular', date }] }).sort({ order: 1 }).lean<TaskDoc[]>().exec();
   const weeklyIdsForUI = new Set(tasks.filter((t: TaskDoc) => t.type === 'weekly').map((t: TaskDoc) => t.id));
   const filtered = tasks.filter((t: TaskDoc) => !(t.suppressedDates ?? []).includes(date));
-  const output = filtered.map((t: TaskDoc) => ({ id: t.id, text: t.text, order: t.order ?? 0, completed: (t.completedDates ?? []).includes(date) || (!!t.completed && t.type === 'regular'), origin: t.type as Origin, tags: t.tags ?? [] })).sort((a, b) => { if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1; return (a.order ?? 0) - (b.order ?? 0); });
+  const output = filtered.map((t: TaskDoc) => ({ id: t.id, text: t.text, order: t.order ?? 0, completed: (t.completedDates ?? []).includes(date) || (!!t.completed && t.type === 'regular'), origin: t.type as Origin, tags: t.tags ?? [] })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const { flyStatus, hungerStatus } = await currentFlyStatus(userId, tz);
   const userForStats = (await UserModel.findById(userId, { statistics: 1 }).lean()) as LeanUser;
   let dailyGiftCount = 0;
@@ -557,21 +557,21 @@ async function handleBoardGet(req: NextRequest, uid: Types.ObjectId, tz: string)
     const dayNum = Number(dayParam);
     if (dayNum === -1) {
       const later: TaskDoc[] = await TaskModel.find({ userId: uid, type: 'backlog', weekStart }).sort({ order: 1 }).lean<TaskDoc[]>().exec();
-      const out = later.map((t: TaskDoc) => ({ id: t.id, text: t.text, order: t.order, type: t.type, completed: !!t.completed, tags: t.tags ?? [] })).sort((a, b) => { if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1; return (a.order ?? 0) - (b.order ?? 0); });
+      const out = later.map((t: TaskDoc) => ({ id: t.id, text: t.text, order: t.order, type: t.type, completed: !!t.completed, tags: t.tags ?? [] })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       return NextResponse.json(out);
     }
     if (!isWeekday(dayNum)) return NextResponse.json({ error: 'day must be -1 or 0..6' }, { status: 400 });
     const docs: TaskDoc[] = await TaskModel.find({ userId: uid, deletedAt: { $exists: false }, $or: [{ type: 'weekly', dayOfWeek: dayNum }, { type: 'regular', date: weekDates[dayNum] }] }).sort({ order: 1 }).lean<TaskDoc[]>().exec();
-    const out = docs.map((t: TaskDoc) => ({ id: t.id, text: t.text, order: t.order, type: t.type, completed: (t.completedDates ?? []).includes(weekDates[dayNum]) || (!!t.completed && t.type === 'regular'), tags: t.tags ?? [] })).sort((a, b) => { if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1; return (a.order ?? 0) - (b.order ?? 0); });
+    const out = docs.map((t: TaskDoc) => ({ id: t.id, text: t.text, order: t.order, type: t.type, completed: (t.completedDates ?? []).includes(weekDates[dayNum]) || (!!t.completed && t.type === 'regular'), tags: t.tags ?? [] })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return NextResponse.json(out);
   }
   const week: any[][] = Array.from({ length: 8 }, () => []);
   for (let d: Weekday = 0; d <= 6; d = (d + 1) as Weekday) {
     const docs: TaskDoc[] = await TaskModel.find({ userId: uid, deletedAt: { $exists: false }, $or: [{ type: 'weekly', dayOfWeek: d }, { type: 'regular', date: weekDates[d] }] }).sort({ order: 1 }).lean<TaskDoc[]>().exec();
-    week[d] = docs.map((t: TaskDoc) => ({ id: t.id, text: t.text, order: t.order, type: t.type, completed: (t.completedDates ?? []).includes(weekDates[d]) || (!!t.completed && t.type === 'regular'), tags: t.tags ?? [] })).sort((a, b) => { if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1; return (a.order ?? 0) - (b.order ?? 0); });
+    week[d] = docs.map((t: TaskDoc) => ({ id: t.id, text: t.text, order: t.order, type: t.type, completed: (t.completedDates ?? []).includes(weekDates[d]) || (!!t.completed && t.type === 'regular'), tags: t.tags ?? [] })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }
   const backlogDocs: TaskDoc[] = await TaskModel.find({ userId: uid, type: 'backlog', weekStart }).sort({ order: 1 }).lean<TaskDoc[]>().exec();
-  week[7] = backlogDocs.map((t: TaskDoc) => ({ id: t.id, text: t.text, order: t.order, type: t.type, completed: !!t.completed, tags: t.tags ?? [] })).sort((a, b) => { if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1; return (a.order ?? 0) - (b.order ?? 0); });
+  week[7] = backlogDocs.map((t: TaskDoc) => ({ id: t.id, text: t.text, order: t.order, type: t.type, completed: !!t.completed, tags: t.tags ?? [] })).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   return NextResponse.json(week);
 }
 

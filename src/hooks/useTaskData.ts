@@ -47,9 +47,6 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 // --- Helper for Optimistic Updates ---
 const sortTasks = (ts: Task[]) => {
     return [...ts].sort((a, b) => {
-        if (!!a.completed !== !!b.completed) {
-            return a.completed ? 1 : -1; // Completed items at bottom
-        }
         return (a.order ?? 0) - (b.order ?? 0);
     });
 };
