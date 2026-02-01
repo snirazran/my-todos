@@ -109,8 +109,10 @@ export default function Home() {
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddMode, setQuickAddMode] = useState<'pick' | 'later'>('pick');
 
+  /* State */
   const [activeTab, setActiveTab] = useState<'today' | 'backlog'>('today');
   const [showReward, setShowReward] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(false);
 
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -267,7 +269,10 @@ export default function Home() {
               >
                 <CalendarCheck className={`w-4 h-4 ${activeTab === 'today' ? 'text-primary' : 'text-muted-foreground'}`} />
                 Today
-                <TaskCounter count={data.length} pendingCount={pendingToToday} />
+                <TaskCounter
+                   count={showCompleted ? data.length : data.filter(t => !t.completed).length}
+                   pendingCount={pendingToToday}
+                />
               </button>
               <button
                 onClick={() => setActiveTab('backlog')}
@@ -347,6 +352,9 @@ export default function Home() {
                     pendingToToday={pendingToToday}
                     onToggleRepeat={toggleRepeat}
                     onEditTask={(id, text) => editTask(id, text, false)}
+                    tags={tags}
+                    showCompleted={showCompleted}
+                    onToggleShowCompleted={() => setShowCompleted(!showCompleted)}
                   />
                 </motion.div>
               ) : (

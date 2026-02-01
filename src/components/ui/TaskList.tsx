@@ -7,6 +7,9 @@ import {
   RotateCcw,
   Trash2,
   Pencil,
+  Filter,
+  ChevronDown,
+  Check,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { AnimatePresence, motion, PanInfo, useMotionValue, useTransform, animate, useAnimation } from 'framer-motion';
@@ -530,6 +533,8 @@ export default function TaskList({
   onEditTask,
   pendingToToday,
   tags,
+  showCompleted: propsShowCompleted,
+  onToggleShowCompleted,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -551,6 +556,8 @@ export default function TaskList({
   onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
   pendingToToday?: number;
   tags?: { id: string; name: string; color: string }[];
+  showCompleted?: boolean;
+  onToggleShowCompleted?: () => void;
 }) {
   const userTags = tags || [];
 
@@ -583,11 +590,32 @@ export default function TaskList({
     open: boolean;
     taskId: string | null;
   }>({ open: false, taskId: null });
-  const [showCompleted, setShowCompleted] = useState(false);
+  // Local fallback if not provided via props (though page.tsx provides it)
+  const [localShowCompleted, setLocalShowCompleted] = useState(false);
+  const showCompleted = propsShowCompleted ?? localShowCompleted;
+  const setShowCompleted = (val: boolean) => {
+      if (onToggleShowCompleted) onToggleShowCompleted();
+      else setLocalShowCompleted(val);
+  };
+  
   const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(new Set());
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const [isAnyDragging, setIsAnyDragging] = useState(false);
   const activeAreaLimitsRef = React.useRef<{ top: number; bottom: number } | null>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Close header menu on scroll
+  useEffect(() => {
+    if (!isHeaderMenuOpen) return;
+
+    const handleScroll = () => {
+      setIsHeaderMenuOpen(false);
+    };
+
+    window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+    return () => window.removeEventListener('scroll', handleScroll, { capture: true });
+  }, [isHeaderMenuOpen]);
 
   React.useEffect(() => {
     if (isAnyDragging) {
@@ -734,14 +762,58 @@ export default function TaskList({
     toggle(task.id, forceState);
   };
 
-  // Active tasks + those currently in the "grace period" of completion
-  const visibleTasks = tasks.filter(t => 
-      !t.completed || vSet.has(t.id) ? true : delayedCompleted.has(t.id)
-  );
+  // Determine visible tasks
+  const visibleTasks = tasks.filter(t => {
+     const isTemporarilyVisible = delayedCompleted.has(t.id);
+     const isActuallyCompleted = t.completed && !vSet.has(t.id) && !isTemporarilyVisible;
+     
+     // 1. Completion Filter
+     if (isActuallyCompleted && !showCompleted) return false;
 
-  const activeTaskIds = visibleTasks.map((t) => t.id);
+     // 2. Tag Filter
+     if (selectedTags.length > 0) {
+        const tTags = t.tags || [];
+        // If task has NO tags, but we selected some, hide it? Or show if partial match?
+        // Usually filtering by tags means "Show tasks that have at least one of these tags" OR "All of these tags".
+        // Let's assume "Has ANY of the selected tags".
+        const hasMatch = tTags.some(tagId => selectedTags.includes(tagId));
+        if (!hasMatch) return false;
+     }
 
-  const completedTasks = tasks.filter(t => t.completed && !vSet.has(t.id) && !delayedCompleted.has(t.id));
+     return true;
+  });
+
+  // Sort: Active first, then Completed (if we are showing them in one list)
+  // BUT the user said "added to the bottom without separator".
+  // AND "remove reordering completely".
+  // This is contradictory. "Remove reordering" implies preserving `order`.
+  // "Added to bottom" implies a visual grouping.
+  // Reconciling: We will sort by `order` primarily. 
+  // IF the user wants completed at bottom, we might need a secondary sort.
+  // User said: "just make the task be added to the bottom of the list".
+  // Let's interpret this as: Active tasks sorted by order, THEN Completed tasks sorted by order.
+  const sortedVisibleTasks = [...visibleTasks].sort((a, b) => {
+      // 1. Completion status (Active top, Completed bottom)
+      // We consider "delayedCompleted" as active for this purpose, to keep them in place?
+      // User said "remove reordering" before.
+      // But now says "added to the bottom".
+      // "Added to bottom" wins as latest instruction.
+      // Grace period items (delayedCompleted) should conceptually stay in ACTIVE list until they vanish.
+      
+      const aIsCompleted = (a.completed && !vSet.has(a.id) && !delayedCompleted.has(a.id));
+      const bIsCompleted = (b.completed && !vSet.has(b.id) && !delayedCompleted.has(b.id));
+
+      if (aIsCompleted !== bIsCompleted) {
+          return aIsCompleted ? 1 : -1;
+      }
+      
+      return (a.order ?? 0) - (b.order ?? 0);
+  });
+
+  const activeTaskIds = sortedVisibleTasks.map((t) => t.id);
+
+  // We no longer need a separate completedTasks array for rendering elsewhere.
+  const completedCount = tasks.filter(t => t.completed && !vSet.has(t.id) && !delayedCompleted.has(t.id)).length;
 
   const handleDragStart = () => {
     setIsAnyDragging(true);
@@ -777,28 +849,17 @@ export default function TaskList({
     if (!over || !onReorder) return;
 
     if (active.id !== over.id) {
-       // We only reorder within the visible/active list
-      const oldIndex = visibleTasks.findIndex((t) => t.id === active.id);
-      
-      if (oldIndex === -1) return;
+      // We reorder within the sortedVisibleTasks list
+      const oldIndex = sortedVisibleTasks.findIndex((t) => t.id === active.id);
+      const newIndex = sortedVisibleTasks.findIndex((t) => t.id === over.id);
 
-      let newIndex = visibleTasks.findIndex((t) => t.id === over.id);
-
-      // If we are hovering over a completed task (which isn't in visibleTasks logic usually, 
-      // but might be if we change logic), handle it.
-      // In this new model, completed tasks disappear, so we mainly reorder active tasks.
-      if (newIndex === -1 && completedTasks.some(t => t.id === over.id)) {
-           // If dragged over to the completed list area (if sortable), 
-           // treat as end of list.
-           newIndex = visibleTasks.length - 1;
-      }
-
-      if (newIndex !== -1 && oldIndex !== newIndex) {
-        const newActiveTasks = arrayMove(visibleTasks, oldIndex, newIndex);
-        // We append the completed tasks at the end just to keep the full array structure,
-        // but really the parent container needs the full list.
-        // Actually, onReorder allows us to pass the full new state.
-        onReorder([...newActiveTasks, ...completedTasks]);
+      if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
+        const newOrder = arrayMove(sortedVisibleTasks, oldIndex, newIndex);
+        // We only persist the ordering of Active items usually, or all items?
+        // Since we are showing a unified list, `onReorder` should probably accept the whole list state
+        // or we filter it.
+        // Assuming onReorder handles the full payload or just needs the ID order.
+        onReorder(newOrder);
       }
     }
   };
@@ -877,19 +938,119 @@ export default function TaskList({
         dir="ltr"
         className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm"
       >
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-foreground">
-            <CalendarCheck className="w-6 h-6 md:w-7 md:h-7 text-primary" />
-            Your Tasks
-          </h2>
-          <TaskCounter count={tasks.length} pendingCount={pendingToToday} />
+        <div className="flex flex-row items-center justify-between mb-6 gap-3">
+          <div className="flex items-center gap-3">
+             <h2 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-foreground">
+               <CalendarCheck className="w-6 h-6 md:w-7 md:h-7 text-primary" />
+               Your Tasks
+             </h2>
+             <TaskCounter count={sortedVisibleTasks.length} pendingCount={pendingToToday} />
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-auto relative">
+             <button
+                onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)}
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+             >
+                <EllipsisVertical className="w-5 h-5" />
+             </button>
+
+             <AnimatePresence>
+                 {isHeaderMenuOpen && (
+                    <>
+                       <div className="fixed inset-0 z-40" onClick={() => setIsHeaderMenuOpen(false)} />
+                       <motion.div
+                         initial={{ opacity: 0, scale: 0.95, y: 10, x: 5 }}
+                         animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                         exit={{ opacity: 0, scale: 0.95, y: 10, x: 5 }}
+                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                         className="absolute right-0 top-full mt-2 z-50 w-72 bg-popover/85 backdrop-blur-xl rounded-[24px] ring-1 ring-border/80 shadow-[0_24px_48px_rgba(15,23,42,0.2)] p-4 flex flex-col gap-4 overflow-hidden"
+                         style={{ transformOrigin: 'top right' }}
+                       >
+                          {/* Show Finished Toggle */}
+                          <div className="flex items-center justify-between p-1">
+                             <span className="text-[15px] font-bold text-foreground">Show Completed</span>
+                             <button
+                                onClick={() => setShowCompleted(!showCompleted)}
+                                className={`w-12 h-7 rounded-full relative transition-all duration-300 ease-in-out ${showCompleted ? 'bg-primary shadow-[0_0_12px_rgba(var(--primary),0.4)]' : 'bg-muted/80'}`}
+                             >
+                                <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-background shadow-sm transition-transform duration-300 ${showCompleted ? 'translate-x-5' : 'translate-x-0'}`} />
+                             </button>
+                          </div>
+
+                          {/* Tag Filter Section */}
+                          {(() => {
+                             // Only show tags that are used in the current task list
+                             const usedTagIds = new Set(tasks.flatMap(t => t.tags || []));
+                             const visibleFilterTags = userTags.filter(tag => usedTagIds.has(tag.id));
+                             
+                             if (visibleFilterTags.length === 0) return null;
+
+                             return (
+                               <div className="flex flex-col gap-3 pt-3 border-t border-border/50">
+                                  <div className="flex items-center justify-between px-1">
+                                    <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Filter by Tags</span>
+                                    {selectedTags.length > 0 && (
+                                       <button
+                                         onClick={() => setSelectedTags([])}
+                                         className="text-[11px] font-bold text-primary hover:text-primary/80 transition-colors"
+                                       >
+                                          Clear
+                                       </button>
+                                    )}
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                     {visibleFilterTags.map(tag => {
+                                        const isSelected = selectedTags.includes(tag.id);
+                                        return (
+                                           <button
+                                              key={tag.id}
+                                              onClick={() => {
+                                                 setSelectedTags(prev => 
+                                                    prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id]
+                                                 );
+                                              }}
+                                              className={`
+                                                 relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all duration-200 border
+                                                 ${isSelected 
+                                                   ? 'ring-2 ring-offset-1 ring-offset-popover border-transparent' 
+                                                   : 'bg-muted/30 border-transparent hover:bg-muted/50 text-muted-foreground'
+                                                 }
+                                              `}
+                                              style={isSelected && tag.color ? { 
+                                                 backgroundColor: `${tag.color}20`, 
+                                                 color: tag.color,
+                                                 borderColor: 'transparent',
+                                                 boxShadow: `0 0 0 1px ${tag.color}` 
+                                              } : isSelected ? {
+                                                 backgroundColor: 'rgba(var(--primary), 0.1)',
+                                                 color: 'hsl(var(--primary))',
+                                                 boxShadow: '0 0 0 1px hsl(var(--primary))'
+                                              } : {}}
+                                           >
+                                              {isSelected && <Check className="w-3.5 h-3.5" />}
+                                              {tag.name}
+                                           </button>
+                                        );
+                                     })}
+                                  </div>
+                               </div>
+                             );
+                          })()}
+                       </motion.div>
+                    </>
+                 )}
+             </AnimatePresence>
+          </div>
         </div>
 
         <div
           className={`pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar [mask-image:linear-gradient(to_bottom,black_90%,transparent)] ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
-          {tasks.length === 0 && !exitAction && (
+          
+          {tasks.length === 0 && !exitAction ? (
+            /* Empty State: No Tasks at all */
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -908,34 +1069,58 @@ export default function TaskList({
                 </p>
               </button>
             </motion.div>
-          )}
+          ) : tasks.length > 0 && sortedVisibleTasks.length === 0 && !exitAction ? (
+             /* Empty State: Tasks exist but all filtered/completed */
+             <motion.div
+               initial={{ opacity: 0 }}
+               animate={{ opacity: 1 }}
+               transition={{ duration: 0.5 }}
+             >
+               <button
+                  onClick={() => onAddRequested('', null, { preselectToday: true })}
+                  className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+               >
+                  <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+                     <CalendarCheck className="w-8 h-8 text-primary" />
+                  </div>
+                  <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">You're all caught up!</p>
+                  <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+                     {selectedTags.length > 0 
+                        ? "No tasks match your filters"
+                        : "Great job! Tap to add more"}
+                  </p>
+               </button>
+             </motion.div>
+          ) : (
+             /* List Content */
+             <DndContext
+                sensors={sensors}
+                collisionDetection={closestCorners}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDragCancel={handleDragCancel}
+                modifiers={[restrictToActiveArea]}
+             >
+                <div className="relative">
+                  {/* Unified Tasks Container */}
+                  <div className="relative overflow-visible">
+                    <SortableContext
+                      items={activeTaskIds}
+                      strategy={verticalListSortingStrategy}
+                    >
+                      <AnimatePresence initial={false} mode="popLayout">
+                        {sortedVisibleTasks.map((task) => {
+                          const isCompleted = task.completed || vSet.has(task.id);
 
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCorners}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDragCancel={handleDragCancel}
-            modifiers={[restrictToActiveArea]}
-          >
-            <div className="relative">
-              {/* Unified Tasks Container */}
-              <div className="relative overflow-visible">
-                <SortableContext
-                  items={activeTaskIds}
-                  strategy={verticalListSortingStrategy}
-                >
-                  <AnimatePresence initial={false} mode="popLayout">
-                    {visibleTasks.map((task) => {
-                      const isCompleted = task.completed || vSet.has(task.id);
+                      // Use delayedCompleted to identify items in grace period
+                      // But for "isDone" visual state, we trust the task.completed unless it's in grace
+                      // Grace period items are technically completed, but displayed as if they were just receiving the check.
+                      
                       const isMenuOpen = menu?.id === task.id;
                       const isExitingLater =
                         exitAction?.id === task.id &&
                         exitAction.type === 'later';
                       
-                      // For tasks in grace period, they are technically completed but shown in active list.
-                      // acts 'isDone' for visual checkmark, but we want them to stay in place.
-
                       return (
                         <SortableTaskItem
                           key={task.id}
@@ -947,7 +1132,8 @@ export default function TaskList({
                           handleTaskToggle={handleTaskToggle}
                           onMenuOpen={openMenu}
                           getTagDetails={getTagDetails}
-                          // Disable drag if completed (grace period)
+                          // Disable drag if completed (grace period OR mostly settled)
+                          // Unless user wants to reorder completed tasks? Usually not.
                           isDragDisabled={isCompleted}
                           isWeekly={taskKind(task) === 'weekly'}
                           disableLayout={isAnyDragging}
@@ -963,51 +1149,9 @@ export default function TaskList({
               </div>
             </div>
           </DndContext>
+          )}
 
-           {/* Show Finished Toggle */}
-             {completedTasks.length > 0 && (
-                 <div className="mt-4 pb-8">
-                     <button
-                         onClick={() => setShowCompleted(!showCompleted)}
-                         className="flex items-center gap-2 mb-2 text-sm font-bold transition-colors text-muted-foreground hover:text-foreground"
-                     >
-                         {showCompleted ? 'Hide' : 'Show'} Finished
-                         <span className="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
-                             {completedTasks.length}
-                         </span>
-                     </button>
-                     
-                     <AnimatePresence>
-                         {showCompleted && (
-                             <motion.div
-                                 initial={{ height: 0, opacity: 0 }}
-                                 animate={{ height: "auto", opacity: 1 }}
-                                 exit={{ height: 0, opacity: 0 }}
-                                 className="overflow-hidden"
-                             >
-                                 <div className="flex flex-col gap-1 pb-4">
-                                     {completedTasks.map(task => (
-                                         <SortableTaskItem
-                                            key={task.id}
-                                            task={task}
-                                            isDone={true}
-                                            isMenuOpen={menu?.id === task.id}
-                                            isExitingLater={false}
-                                            renderBullet={renderBullet}
-                                            handleTaskToggle={handleTaskToggle}
-                                            onMenuOpen={openMenu}
-                                            getTagDetails={getTagDetails}
-                                            isDragDisabled={true} // Completed items usually fixed
-                                            isWeekly={taskKind(task) === 'weekly'}
-                                            disableLayout={isAnyDragging}
-                                         />
-                                     ))}
-                                 </div>
-                             </motion.div>
-                         )}
-                     </AnimatePresence>
-                 </div>
-             )}
+           {/* Show Finished Toggle (Removed from bottom) */}
         </div>
       </div>
 

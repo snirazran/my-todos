@@ -597,13 +597,14 @@ export default function BacklogPanel({
       className="px-6 pt-6 pb-4 overflow-visible rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-foreground">
-          <CalendarClock className="w-6 h-6 text-primary md:w-7 md:h-7" />
-          Saved Tasks
-        </h3>
-
-        <TaskCounter count={later.length} pendingCount={pendingToBacklog} />
+      <div className="flex items-center justify-between mb-6 min-h-[36px]">
+        <div className="flex items-center gap-3">
+          <h3 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-foreground">
+            <CalendarClock className="w-6 h-6 text-primary md:w-7 md:h-7" />
+            Saved Tasks
+          </h3>
+          <TaskCounter count={later.length} pendingCount={pendingToBacklog} />
+        </div>
       </div>
 
       <div
