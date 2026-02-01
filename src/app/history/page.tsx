@@ -20,15 +20,13 @@ export default function HistoryPage() {
    const router = useRouter();
 
    // --- State: Calendar View ---
-   const [viewDate, setViewDate] = useState(new Date());
+   const [viewDate, setViewDate] = useState(subDays(new Date(), 1));
    const [calendarData, setCalendarData] = useState<any[]>([]);
    const [loadingCalendar, setLoadingCalendar] = useState(false);
 
    // --- State: Selection (Day Popup) ---
    const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
-   // --- State: Stats Dialog ---
-   const [isStatsOpen, setIsStatsOpen] = useState(false);
    // Filters for Stats
    const [statsFilter, setStatsFilter] = useState<DateRangeOption>('7d');
    const [customFrom, setCustomFrom] = useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
@@ -82,7 +80,7 @@ export default function HistoryPage() {
 
    // --- 2. Fetch Stats Data (When needed) ---
    useEffect(() => {
-      if (!isStatsOpen || !session) return;
+      if (!session) return;
 
       const fetchStats = async () => {
          try {
@@ -115,7 +113,7 @@ export default function HistoryPage() {
       };
 
       fetchStats();
-   }, [isStatsOpen, statsFilter, customFrom, customTo, session]);
+   }, [statsFilter, customFrom, customTo, session]);
 
    // --- Helpers ---
    const selectedDayTasks = useMemo(() => {
@@ -205,13 +203,13 @@ export default function HistoryPage() {
 
    return (
       <main className="min-h-screen pb-12 bg-background flex flex-col items-center">
-         <div className="w-full max-w-6xl px-4 py-8 md:px-8">
+         <div className="w-full max-w-7xl px-4 py-8 md:px-8">
 
-            {/* Main Content - Constrained */}
-            <div className="flex flex-col items-center w-full max-w-2xl gap-6 mx-auto">
+            {/* Main Content - Grid Layout on Desktop */}
+            <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start w-full mx-auto">
 
-               {/* Calendar */}
-               <div className="w-full relative">
+               {/* Left Column: Calendar (Span 8) */}
+               <div className="lg:col-span-8 w-full relative mb-8 lg:mb-0">
                   {loadingCalendar && (
                      <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-3xl">
                         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -229,19 +227,21 @@ export default function HistoryPage() {
                   />
                </div>
 
-               {/* Insights Module */}
-               <div className="w-full">
-                  <HistoryInsights
-                     historyData={filteredStatsData}
-                     stats={statsSummary}
-                     dateRange={statsFilter}
-                     onDateRangeChange={setStatsFilter}
-                     customDateRange={{ from: customFrom, to: customTo }}
-                     onCustomDateChange={(r) => { setCustomFrom(r.from); setCustomTo(r.to); }}
-                     selectedTags={selectedTagIds}
-                     onTagsChange={setSelectedTagIds}
-                     availableTags={availableTags}
-                  />
+               {/* Right Column: Insights (Span 4) */}
+               <div className="lg:col-span-4 w-full">
+                  <div className="lg:sticky lg:top-8">
+                      <HistoryInsights
+                         historyData={filteredStatsData}
+                         stats={statsSummary}
+                         dateRange={statsFilter}
+                         onDateRangeChange={setStatsFilter}
+                         customDateRange={{ from: customFrom, to: customTo }}
+                         onCustomDateChange={(r) => { setCustomFrom(r.from); setCustomTo(r.to); }}
+                         selectedTags={selectedTagIds}
+                         onTagsChange={setSelectedTagIds}
+                         availableTags={availableTags}
+                      />
+                  </div>
                </div>
             </div>
 
@@ -254,9 +254,6 @@ export default function HistoryPage() {
                onToggleTask={handleToggleTask}
                frogProps={{
                   ...frogProps,
-                  // flyTargets no longer needed to be passed if managed internally or if passed as empty here (DayDetailSheet ignores it now)
-                  // But wait, the hook in DayDetailSheet uses local refs.
-                  // The FrogDisplay might need props, but DayDetailSheet handles the FrogDisplay wrapper.
                }}
             />
 

@@ -60,6 +60,15 @@ export default function DayDetailSheet({
     // Manage wardrobe locally if needed in popup, or passed down
     const { indices } = useWardrobeIndices(true);
 
+    // Responsive Check
+    const [isDesktop, setIsDesktop] = useState(false);
+    useEffect(() => {
+        const checkDesktop = () => setIsDesktop(window.matchMedia("(min-width: 640px)").matches);
+        checkDesktop();
+        window.addEventListener('resize', checkDesktop);
+        return () => window.removeEventListener('resize', checkDesktop);
+    }, []);
+
     useEffect(() => {
         setMounted(true);
     }, []);
@@ -95,6 +104,19 @@ export default function DayDetailSheet({
 
     if (!mounted) return null;
 
+    // Animation Variants
+    const mobileVariants = {
+        initial: { y: '100%', opacity: 0, scale: 0.96 },
+        animate: { y: 0, opacity: 1, scale: 1 },
+        exit: { y: '100%', opacity: 0, scale: 0.96 }
+    };
+
+    const desktopVariants = {
+        initial: { opacity: 0, scale: 0.95, y: 0 },
+        animate: { opacity: 1, scale: 1, y: 0 },
+        exit: { opacity: 0, scale: 0.95, y: 0 }
+    };
+
     return createPortal(
         <AnimatePresence>
             {open && (
@@ -111,9 +133,10 @@ export default function DayDetailSheet({
                     {/* Sheet Container */}
                     <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center pointer-events-none p-0 sm:p-6">
                         <motion.div
-                            initial={{ y: '100%', opacity: 0, scale: 0.96 }}
-                            animate={{ y: 0, opacity: 1, scale: 1 }}
-                            exit={{ y: '100%', opacity: 0, scale: 0.96 }}
+                            variants={isDesktop ? desktopVariants : mobileVariants}
+                            initial="initial"
+                            animate="animate"
+                            exit="exit"
                             transition={{ type: 'spring', damping: 28, stiffness: 320 }}
                             // Updated background to match requested "white like"
                             className="pointer-events-auto w-full sm:max-w-lg h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col bg-white/95 backdrop-blur-2xl rounded-t-[32px] sm:rounded-[40px] shadow-2xl border-t sm:border border-white/10 overflow-hidden"

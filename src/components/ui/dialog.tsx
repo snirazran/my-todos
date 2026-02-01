@@ -15,11 +15,11 @@ export function DialogContent({
 }: React.ComponentPropsWithoutRef<typeof RD.Content>) {
   return (
     <RD.Portal>
-      <RD.Overlay className="fixed inset-0 z-50 bg-black/30 backdrop-blur-sm" />
+      <RD.Overlay className="fixed inset-0 z-[1000] bg-black/30 backdrop-blur-sm" />
       <RD.Content
         {...props}
         className={cn(
-          'fixed left-1/2 top-1/2 z-50 w-[90vw] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:p-6',
+          'fixed left-1/2 top-1/2 z-[1001] w-[90vw] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl dark:border-slate-700 dark:bg-slate-900 sm:p-6',
           className
         )}
       >

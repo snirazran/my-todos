@@ -81,7 +81,7 @@ export default function HistoryCalendar({
     };
 
     return (
-        <div className="w-full max-w-4xl mx-auto bg-card/80 backdrop-blur-2xl border border-border/50 rounded-[32px] p-6 shadow-sm overflow-hidden">
+        <div className="w-full bg-card/80 backdrop-blur-2xl border border-border/50 rounded-[32px] p-6 shadow-sm overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-center mb-8 px-2 relative">
                 <div className="flex items-center gap-4">
@@ -166,7 +166,7 @@ export default function HistoryCalendar({
                         >
                             <span className={cn(
                                 "text-sm font-bold z-10",
-                                isTodayDate ? "text-primary" : "text-foreground",
+                                isTodayDate && !isDisabled ? "text-primary" : "text-foreground",
                                 !isCurrentMonth && "text-muted-foreground",
                                 isSelected && "text-primary scan-text",
                             )}>

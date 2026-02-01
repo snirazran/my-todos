@@ -36,7 +36,7 @@ export default function HistoryInsights({
 }: HistoryInsightsProps) {
 
     return (
-        <div className="w-full mt-4 bg-card/40 backdrop-blur-xl border border-border/50 rounded-[24px] p-4 shadow-sm">
+        <div className="w-full bg-card/40 backdrop-blur-xl border border-border/50 rounded-[24px] p-4 shadow-sm">
             {/* Header */}
             <div className="flex items-center justify-between mb-4 px-1">
                 <div>
