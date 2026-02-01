@@ -333,7 +333,7 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
         <motion.div
           drag={isDesktop ? false : "x"}
           dragListener={!isDragging}
-          dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
+          dragDirectionLock={false} // Allow some diagonal movement to not cancel swipe
           dragConstraints={{ left: -100, right: 70 }}
           dragElastic={0}
           dragMomentum={false}
@@ -349,6 +349,7 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
           style={{
             x: x,
             cursor: 'grab',
+            touchAction: 'pan-y', // Critical for coexistence with vertical scroll
             willChange: isExitingLater ? 'transform' : 'auto'
           }}
           transition={
