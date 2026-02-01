@@ -605,7 +605,10 @@ export default function TaskList({
   const activeAreaLimitsRef = React.useRef<{ top: number; bottom: number } | null>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
-  // Close header menu on scroll
+  const headerMenuRef = React.useRef<HTMLDivElement>(null);
+  const headerMenuBtnRef = React.useRef<HTMLButtonElement>(null);
+
+  // Close header menu on scroll or click outside
   useEffect(() => {
     if (!isHeaderMenuOpen) return;
 
@@ -613,8 +616,24 @@ export default function TaskList({
       setIsHeaderMenuOpen(false);
     };
 
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        headerMenuRef.current &&
+        !headerMenuRef.current.contains(e.target as Node) &&
+        headerMenuBtnRef.current &&
+        !headerMenuBtnRef.current.contains(e.target as Node)
+      ) {
+        setIsHeaderMenuOpen(false);
+      }
+    };
+
     window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
-    return () => window.removeEventListener('scroll', handleScroll, { capture: true });
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      window.removeEventListener('scroll', handleScroll, { capture: true });
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
   }, [isHeaderMenuOpen]);
 
   React.useEffect(() => {
@@ -949,6 +968,7 @@ export default function TaskList({
 
           <div className="flex items-center gap-2 self-end md:self-auto relative">
              <button
+                ref={headerMenuBtnRef}
                 onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)}
                 className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
              >
@@ -957,16 +977,15 @@ export default function TaskList({
 
              <AnimatePresence>
                  {isHeaderMenuOpen && (
-                    <>
-                       <div className="fixed inset-0 z-40" onClick={() => setIsHeaderMenuOpen(false)} />
-                       <motion.div
-                         initial={{ opacity: 0, scale: 0.95, y: 10, x: 5 }}
-                         animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                         exit={{ opacity: 0, scale: 0.95, y: 10, x: 5 }}
-                         transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                         className="absolute right-0 top-full mt-2 z-50 w-72 bg-popover/85 backdrop-blur-xl rounded-[24px] ring-1 ring-border/80 shadow-[0_24px_48px_rgba(15,23,42,0.2)] p-4 flex flex-col gap-4 overflow-hidden"
-                         style={{ transformOrigin: 'top right' }}
-                       >
+                    <motion.div
+                      ref={headerMenuRef}
+                      initial={{ opacity: 0, scale: 0.95, y: 10, x: 5 }}
+                      animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 10, x: 5 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                      className="absolute right-0 top-full mt-2 z-50 w-72 bg-popover/85 backdrop-blur-xl rounded-[24px] ring-1 ring-border/80 shadow-[0_24px_48px_rgba(15,23,42,0.2)] p-4 flex flex-col gap-4 overflow-hidden"
+                      style={{ transformOrigin: 'top right' }}
+                    >
                           {/* Show Finished Toggle */}
                           <div className="flex items-center justify-between p-1">
                              <span className="text-[15px] font-bold text-foreground">Show Completed</span>
@@ -1038,7 +1057,7 @@ export default function TaskList({
                              );
                           })()}
                        </motion.div>
-                    </>
+
                  )}
              </AnimatePresence>
           </div>

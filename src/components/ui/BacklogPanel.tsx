@@ -274,7 +274,7 @@ function BacklogTaskItem({
         drag={(isDesktop || isNudging) ? false : "x"}
         dragDirectionLock={true}
         dragConstraints={{ left: -70, right: 100 }} // Left: Plus (-70), Right: Trash (100)
-        dragElastic={0.1} // More elasticity for the "pull" feel
+        dragElastic={0} // Hard stop (no stretching)
         dragMomentum={false}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
@@ -316,7 +316,7 @@ function BacklogTaskItem({
               size={28}
               y={-4}
               x={-2}
-              className="text-primary transition-all opacity-70 grayscale md:group-hover:grayscale-0 md:group-hover:opacity-100"
+              className="text-primary transition-all"
             />
           </div>
 
@@ -620,7 +620,7 @@ export default function BacklogPanel({
               onClick={onAddRequested}
               className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
             >
-              <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+              <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10">
                 <Fly size={32} y={-4} />
               </div>
               <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">Start your backlog</p>
