@@ -272,7 +272,7 @@ function BacklogTaskItem({
       {/* Foreground Card */}
       <motion.div
         drag={(isDesktop || isNudging) ? false : "x"}
-        dragDirectionLock={false}
+        dragDirectionLock={true}
         dragConstraints={{ left: -70, right: 100 }} // Left: Plus (-70), Right: Trash (100)
         dragElastic={0.1} // More elasticity for the "pull" feel
         dragMomentum={false}
@@ -281,7 +281,6 @@ function BacklogTaskItem({
         initial={false}
         animate={{ x: isExiting ? (isDesktop ? -800 : -450) : (isOpen ? 100 : 0) }}
         style={{
-          touchAction: 'pan-y',
           willChange: isExiting ? 'transform' : 'auto',
           x: x // Always use motion value
         }}

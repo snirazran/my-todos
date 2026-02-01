@@ -113,10 +113,13 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
     isDragging,
   } = useSortable({ id: task.id, disabled: isDragDisabled || isOpen });
 
-  // Clear hover state when dragging starts
+  // Clear hover state and reset swipe position when dragging starts
   useEffect(() => {
-    if (isDragging) setIsHovered(false);
-  }, [isDragging]);
+    if (isDragging) {
+      setIsHovered(false);
+      x.set(0); // Force reset horizontal position
+    }
+  }, [isDragging, x]);
 
   // Transform values based on drag position x
   // Right Swipe (Positive X) -> Do Later (Indigo) - SWAPPED
@@ -183,6 +186,7 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
   };
 
   const handleDragEnd = (_: any, info: PanInfo) => {
+    // Small delay to prevent click triggering immediately after swipe
     setTimeout(() => {
       isDraggingRef.current = false;
       setIsSwiping(false);
@@ -331,9 +335,9 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
 
         {/* Foreground Card (Swipeable) */}
         <motion.div
-          drag={isDesktop ? false : "x"}
-          dragListener={!isDragging}
-          dragDirectionLock={false} // Allow some diagonal movement to not cancel swipe
+          drag={isDesktop || isDragging ? false : "x"} // Disable swipe if sorting/dragging
+          dragListener={!isDragging && !isDragDisabled} // Also ensure disabled listener logic matches
+          dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
           dragConstraints={{ left: -100, right: 70 }}
           dragElastic={0}
           dragMomentum={false}
@@ -349,7 +353,6 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
           style={{
             x: x,
             cursor: 'grab',
-            touchAction: 'pan-y', // Critical for coexistence with vertical scroll
             willChange: isExitingLater ? 'transform' : 'auto'
           }}
           transition={
@@ -606,7 +609,8 @@ export default function TaskList({
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        distance: 10,
+        delay: 250,
+        tolerance: 5,
       },
     }),
     useSensor(TouchSensor, {
