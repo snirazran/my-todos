@@ -169,7 +169,7 @@ export function FilterBar({
                 'text-sm font-bold whitespace-nowrap',
                 isActive
                   ? 'bg-primary border-primary text-primary-foreground shadow-primary/30'
-                  : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:text-primary'
+                  : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:bg-muted hover:text-foreground'
               )}
             >
               {conf.icon}

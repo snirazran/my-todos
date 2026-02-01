@@ -444,33 +444,33 @@ export function TradePanel({
 function getRarityColor(rarity: Rarity) {
   switch (rarity) {
     case 'common':
-      return 'text-slate-500';
+      return 'text-muted-foreground';
     case 'uncommon':
       return 'text-emerald-500';
     case 'rare':
-      return 'text-blue-500';
+      return 'text-sky-500';
     case 'epic':
-      return 'text-purple-500';
+      return 'text-violet-500';
     case 'legendary':
       return 'text-amber-500';
     default:
-      return 'text-slate-500';
+      return 'text-muted-foreground';
   }
 }
 
 function getRarityBg(rarity: Rarity) {
   switch (rarity) {
     case 'common':
-      return 'bg-slate-100 text-slate-600';
+      return 'bg-muted text-muted-foreground';
     case 'uncommon':
-      return 'bg-emerald-100 text-emerald-700';
+      return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
     case 'rare':
-      return 'bg-blue-100 text-blue-700';
+      return 'bg-sky-500/10 text-sky-600 dark:text-sky-400';
     case 'epic':
-      return 'bg-purple-100 text-purple-700';
+      return 'bg-violet-500/10 text-violet-600 dark:text-violet-400';
     case 'legendary':
-      return 'bg-amber-100 text-amber-700';
+      return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
     default:
-      return 'bg-slate-100';
+      return 'bg-muted';
   }
 }

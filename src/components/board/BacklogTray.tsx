@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, CalendarClock, CalendarRange, Trash2 } from 'lucide-react';
+import { X, FolderOpen, CalendarRange, Trash2 } from 'lucide-react';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
@@ -165,7 +165,7 @@ export default React.memo(function BacklogTray({
             <div className="flex items-center justify-between px-6 py-8 md:px-8 shrink-0">
               <div className="flex items-center gap-4">
                 <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 text-primary shadow-sm">
-                  <CalendarClock size={24} strokeWidth={2.5} />
+                  <FolderOpen size={24} strokeWidth={2.5} />
                 </div>
                 <div>
                   <h3 className="text-2xl font-black tracking-tight text-foreground uppercase">
@@ -193,7 +193,7 @@ export default React.memo(function BacklogTray({
               <AnimatePresence mode="popLayout">
                 {tasks.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
-                    <CalendarClock size={64} strokeWidth={1} />
+                    <FolderOpen size={64} strokeWidth={1} />
                     <p className="text-sm font-bold uppercase tracking-widest">No saved tasks</p>
                     </div>
                 ) : (

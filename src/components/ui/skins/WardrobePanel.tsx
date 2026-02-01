@@ -329,13 +329,13 @@ export function WardrobePanel({
                     'flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full transition-colors duration-300',
                     shakeBalance
                       ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-800'
-                      : 'bg-secondary border-border'
+                      : 'bg-secondary border-border dark:bg-slate-800/50 dark:border-slate-700'
                   )}
                 >
-                  <div className="flex items-center justify-center bg-background rounded-full shadow-sm w-7 h-7 md:w-9 md:h-9">
+                  <div className="flex items-center justify-center bg-background rounded-full shadow-sm w-7 h-7 md:w-10 md:h-10 dark:bg-slate-900">
                     <Fly
-                      size={16}
-                      className="text-muted-foreground md:w-6 md:h-6"
+                      size={24}
+                      className="text-muted-foreground md:w-8 md:h-8"
                     />
                   </div>
                   <AnimatedNumber
@@ -347,7 +347,7 @@ export function WardrobePanel({
                 {/* Desktop Close Button */}
                 <button
                   onClick={() => onOpenChange(false)}
-                  className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-secondary hover:bg-secondary/80 border-border"
+                  className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-secondary hover:bg-secondary/80 border-border dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
                 >
                   <X className="w-5 h-5 text-muted-foreground" />
                 </button>

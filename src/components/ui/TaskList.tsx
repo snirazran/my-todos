@@ -1021,6 +1021,7 @@ export default function TaskList({
                           onDoLater={onDoLater ? (t) => {
                              setExitAction({ id: t.id, type: 'later' });
                              setTimeout(() => onDoLater(t.id), 0);
+                             setTimeout(() => setExitAction(null), 800);
                           } : undefined}
                         />
                       );

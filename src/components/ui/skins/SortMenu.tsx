@@ -21,24 +21,24 @@ export function SortMenu({ value, onChange }: { value: SortOrder; onChange: (v: 
     <div className="relative">
       <Button 
         variant="outline" 
-        className="h-12 w-12 rounded-2xl p-0 border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-purple-400 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-slate-700 transition-all shadow-sm"
+        className="h-12 w-12 rounded-2xl p-0 border-2 border-border bg-card hover:border-primary/50 hover:bg-accent/50 transition-all shadow-sm"
         onClick={() => setOpen(!open)}
       >
-        <ArrowUpDown className="h-5 w-5 text-slate-600 dark:text-slate-300" />
+        <ArrowUpDown className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
       </Button>
       
       {open && (
         <>
           <div className="fixed inset-0 z-50" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 z-[60] w-52 p-2 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-xl animate-in fade-in zoom-in-95 duration-100">
+          <div className="absolute right-0 top-full mt-2 z-[60] w-52 p-2 rounded-2xl border-2 border-border bg-popover shadow-xl animate-in fade-in zoom-in-95 duration-100">
             {options.map((opt) => (
               <button
                 key={opt.val}
                 className={cn(
                   "w-full text-left px-4 py-3 text-sm font-bold rounded-xl transition-all",
                   value === opt.val 
-                    ? "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300" 
-                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                    ? "bg-primary/10 text-primary" 
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 )}
                 onClick={() => {
                   onChange(opt.val);
