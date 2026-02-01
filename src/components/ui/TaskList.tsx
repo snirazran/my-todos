@@ -443,7 +443,7 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
               {(isWeekly || (task.tags && task.tags.length > 0)) && (
                 <div className="flex flex-wrap gap-1 mb-1">
                   {isWeekly && (
-                    <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] md:text-[11px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
                       <RotateCcw className="w-3 h-3" />
                       Weekly
                     </span>
@@ -463,7 +463,7 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
                           exit={{ opacity: 0, scale: 0 }}
                           transition={{ duration: 0.2 }}
                           key={tagId}
-                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${!color
+                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${!color
                             ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
                             : ''
                             }`}

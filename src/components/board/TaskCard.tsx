@@ -225,7 +225,7 @@ export default function TaskCard({
             {isRepeating && (
               <span
                 title="Repeats weekly"
-                className="inline-flex items-center gap-1 rounded-md bg-purple-50/80 px-2 py-0.5 text-[11px] font-bold text-purple-600 dark:bg-purple-900/40 dark:text-purple-200 transition-colors"
+                className="inline-flex items-center gap-1 rounded-md bg-purple-50/80 px-2 py-0.5 text-[9px] font-bold text-purple-600 dark:bg-purple-900/40 dark:text-purple-200 transition-colors"
               >
                 <RotateCcw className="h-3 w-3" aria-hidden="true" />
                 <span className="tracking-wider uppercase">Weekly</span>
@@ -246,7 +246,7 @@ export default function TaskCard({
                   exit={{ opacity: 0, scale: 0 }}
                   transition={{ duration: 0.2 }}
                   key={tagId}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold tracking-wider uppercase transition-colors border shadow-sm"
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors border shadow-sm"
                   style={
                     color
                       ? {

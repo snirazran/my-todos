@@ -339,7 +339,7 @@ function BacklogTaskItem({
                         exit={{ opacity: 0, scale: 0 }}
                         transition={{ duration: 0.2 }}
                         key={tagId}
-                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${!color
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${!color
                           ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
                           : ''
                           }`}
