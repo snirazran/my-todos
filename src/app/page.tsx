@@ -377,6 +377,7 @@ export default function Home() {
                         setShowQuickAdd(true);
                       }}
                       onEditTask={(id, text) => editTask(id, text, true)}
+                      tags={tags}
                     />
                   ) : (
                     <div className="p-8 text-center text-muted-foreground bg-card/50 rounded-2xl">

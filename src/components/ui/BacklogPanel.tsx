@@ -302,6 +302,7 @@ function BacklogTaskItem({
             : `bg-card ${(isOpen || isDragging || isNudging) ? '' : ''}`
           }
                 ${isExiting ? 'pointer-events-none' : ''}
+                cursor-pointer
             `}
         onClick={() => {
           if (isNudging) return;
@@ -322,12 +323,8 @@ function BacklogTaskItem({
 
           {/* Text */}
           <div className="flex-1 min-w-0">
-            <span className="block text-base font-medium md:text-lg text-foreground">
-              {item.text}
-            </span>
-
             {item.tags && item.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-1">
+              <div className="flex flex-wrap gap-1 mb-1">
                 <AnimatePresence mode="popLayout">
                   {item.tags.map((tagId) => {
                     const tagDetails = getTagDetails(tagId);
@@ -342,7 +339,7 @@ function BacklogTaskItem({
                         exit={{ opacity: 0, scale: 0 }}
                         transition={{ duration: 0.2 }}
                         key={tagId}
-                        className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${!color
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] md:text-[11px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${!color
                           ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
                           : ''
                           }`}
@@ -363,6 +360,10 @@ function BacklogTaskItem({
                 </AnimatePresence>
               </div>
             )}
+
+            <span className="block text-base font-medium md:text-lg text-foreground">
+              {item.text}
+            </span>
           </div>
         </div>
 
