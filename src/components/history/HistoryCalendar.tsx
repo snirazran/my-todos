@@ -63,19 +63,21 @@ export default function HistoryCalendar({
     const handleNextMonth = () => onDateChange(addMonths(currentDate, 1));
 
     return (
-        <div className="w-full max-w-md mx-auto bg-card/80 backdrop-blur-2xl border border-border/50 rounded-[32px] p-6 shadow-sm overflow-hidden">
+        <div className="w-full max-w-4xl mx-auto bg-card/80 backdrop-blur-2xl border border-border/50 rounded-[32px] p-6 shadow-sm overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between mb-8 px-2">
-                <h2 className="text-2xl font-black text-foreground tracking-tight flex-1 text-center sm:text-left">
-                    {format(currentDate, 'MMMM yyyy')}
-                </h2>
-                <div className="flex gap-2">
+            <div className="flex items-center justify-center mb-8 px-2 relative">
+                <div className="flex items-center gap-4">
                     <button
                         onClick={handlePrevMonth}
                         className="p-2.5 bg-muted/50 hover:bg-muted rounded-xl transition-colors text-foreground"
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
+
+                    <h2 className="text-2xl font-black text-foreground tracking-tight text-center min-w-[200px]">
+                        {format(currentDate, 'MMMM yyyy')}
+                    </h2>
+
                     <button
                         onClick={handleNextMonth}
                         className="p-2.5 bg-muted/50 hover:bg-muted rounded-xl transition-colors text-foreground"

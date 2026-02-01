@@ -3,16 +3,14 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
-import { ArrowLeft, BarChart3, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { startOfMonth, endOfMonth, format, subDays, startOfToday } from 'date-fns';
-import Link from 'next/link';
 import useSWR from 'swr';
 
-import { Button } from '@/components/ui/button';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import HistoryCalendar from '@/components/history/HistoryCalendar';
 import DayDetailSheet from '@/components/history/DayDetailSheet';
-import StatsDialog from '@/components/history/StatsDialog';
+import HistoryInsights from '@/components/history/HistoryInsights';
 import { DateRangeOption } from '@/components/history/HistoryTimeSelector';
 import { useTaskData } from '@/hooks/useTaskData';
 
@@ -167,7 +165,6 @@ export default function HistoryPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ taskId, date, completed: !currentStatus })
          });
-         // Revalidate fly balance if needed (handled by SWR globally usually)
       } catch (error) {
          console.error("Toggle failed", error);
          // Revert
@@ -201,16 +198,10 @@ export default function HistoryPage() {
 
    return (
       <main className="min-h-screen pb-12 bg-background flex flex-col items-center">
-         <div className="w-full max-w-4xl px-4 py-6 md:px-8">
+         <div className="w-full max-w-6xl px-4 py-8 md:px-8">
 
             {/* Header */}
-            <div className="flex items-center justify-between mb-8 px-2">
-               <Link href="/">
-                  <Button variant="ghost" size="icon" className="w-10 h-10 rounded-full hover:bg-muted/50 transition-colors">
-                     <ArrowLeft className="w-5 h-5 text-muted-foreground" />
-                  </Button>
-               </Link>
-
+            <div className="flex items-center justify-center mb-10 px-2 relative">
                <div className="flex flex-col items-center">
                   <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/50">
                      Overview
@@ -219,19 +210,10 @@ export default function HistoryPage() {
                      History
                   </h1>
                </div>
-
-               <Button
-                  onClick={() => setIsStatsOpen(true)}
-                  variant="ghost"
-                  className="rounded-full hover:bg-muted/50 transition-colors text-muted-foreground hover:text-primary gap-2 h-10 px-2 md:px-4"
-               >
-                  <BarChart3 className="w-5 h-5" />
-                  <span className="hidden md:inline font-bold">Insights</span>
-               </Button>
             </div>
 
             {/* Calendar */}
-            <div className="relative">
+            <div className="relative mb-8">
                {loadingCalendar && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-3xl">
                      <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -243,26 +225,12 @@ export default function HistoryPage() {
                   selectedDate={selectedDate}
                   onSelectDate={setSelectedDate}
                   historyData={calendarData}
-                  disableSwipe={isStatsOpen || !!selectedDate}
+                  disableSwipe={!!selectedDate}
                />
             </div>
 
-            {/* Day Popup */}
-            <DayDetailSheet
-               open={!!selectedDate}
-               onClose={() => setSelectedDate(null)}
-               date={selectedDate || format(new Date(), 'yyyy-MM-dd')}
-               tasks={selectedDayTasks}
-               onToggleTask={handleToggleTask}
-               frogProps={frogProps}
-            // visuallyCompleted logic can be passed if we want tongue animation in history
-            // currently simplified.
-            />
-
-            {/* Stats Popup */}
-            <StatsDialog
-               open={isStatsOpen}
-               onClose={() => setIsStatsOpen(false)}
+            {/* Insights Module */}
+            <HistoryInsights
                historyData={filteredStatsData}
                stats={statsSummary}
                dateRange={statsFilter}
@@ -273,6 +241,17 @@ export default function HistoryPage() {
                onTagsChange={setSelectedTagIds}
                availableTags={availableTags}
             />
+
+            {/* Day Popup */}
+            <DayDetailSheet
+               open={!!selectedDate}
+               onClose={() => setSelectedDate(null)}
+               date={selectedDate || format(new Date(), 'yyyy-MM-dd')}
+               tasks={selectedDayTasks}
+               onToggleTask={handleToggleTask}
+               frogProps={frogProps}
+            />
+
          </div>
       </main>
    );
