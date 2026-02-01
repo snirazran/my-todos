@@ -630,23 +630,25 @@ export default function BacklogPanel({
             </button>
           </motion.div>
         ) : (
-          <AnimatePresence mode="popLayout">
-            {later.map((t, i) => (
-              <BacklogTaskItem
-                key={t.id}
-                item={t}
-                index={i}
-                menu={menu}
-                processingIds={processingIds}
-                exitAction={exitAction}
-                onAddToday={addToday}
-                onMenuOpen={handleMenuOpen}
-                onDeleteRequest={(item) => setConfirmId(item)}
-                getTagDetails={getTagDetails}
-                allowNudge={allowNudge}
-              />
-            ))}
-          </AnimatePresence>
+          <div className="relative">
+            <AnimatePresence mode="popLayout">
+              {later.map((t, i) => (
+                <BacklogTaskItem
+                  key={t.id}
+                  item={t}
+                  index={i}
+                  menu={menu}
+                  processingIds={processingIds}
+                  exitAction={exitAction}
+                  onAddToday={addToday}
+                  onMenuOpen={handleMenuOpen}
+                  onDeleteRequest={(item) => setConfirmId(item)}
+                  getTagDetails={getTagDetails}
+                  allowNudge={allowNudge}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
         )}
       </div>
 
