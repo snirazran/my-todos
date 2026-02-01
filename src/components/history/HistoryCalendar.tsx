@@ -12,7 +12,10 @@ import {
     isSameDay,
     addMonths,
     subMonths,
-    isToday
+    isToday,
+    isBefore,
+    isAfter,
+    startOfDay
 } from 'date-fns';
 import { ChevronLeft, ChevronRight, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -25,6 +28,8 @@ type HistoryCalendarProps = {
     onSelectDate: (date: string) => void;
     historyData: { date: string; tasks: any[] }[];
     disableSwipe?: boolean;
+    minDate?: Date; // User's join date
+    maxDate?: Date; // Yesterday (or current date limit)
 };
 
 export default function HistoryCalendar({
@@ -33,7 +38,9 @@ export default function HistoryCalendar({
     selectedDate,
     onSelectDate,
     historyData,
-    disableSwipe = false
+    disableSwipe = false,
+    minDate,
+    maxDate
 }: HistoryCalendarProps) {
 
     const monthStart = startOfMonth(currentDate);
@@ -62,6 +69,17 @@ export default function HistoryCalendar({
     const handlePrevMonth = () => onDateChange(subMonths(currentDate, 1));
     const handleNextMonth = () => onDateChange(addMonths(currentDate, 1));
 
+    // Check if navigation should be disabled
+    const isPrevDisabled = minDate ? isBefore(startOfMonth(subMonths(currentDate, 1)), startOfMonth(minDate)) : false;
+    const isNextDisabled = maxDate ? isAfter(endOfMonth(addMonths(currentDate, 1)), endOfMonth(maxDate)) : false;
+
+    // Helper to check if a date should be disabled
+    const isDateDisabled = (date: Date) => {
+        if (minDate && isBefore(startOfDay(date), startOfDay(minDate))) return true;
+        if (maxDate && isAfter(startOfDay(date), startOfDay(maxDate))) return true;
+        return false;
+    };
+
     return (
         <div className="w-full max-w-4xl mx-auto bg-card/80 backdrop-blur-2xl border border-border/50 rounded-[32px] p-6 shadow-sm overflow-hidden">
             {/* Header */}
@@ -69,7 +87,8 @@ export default function HistoryCalendar({
                 <div className="flex items-center gap-4">
                     <button
                         onClick={handlePrevMonth}
-                        className="p-2.5 bg-muted/50 hover:bg-muted rounded-xl transition-colors text-foreground"
+                        disabled={isPrevDisabled}
+                        className="p-2.5 bg-muted/50 hover:bg-muted rounded-xl transition-colors text-foreground disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-muted/50"
                     >
                         <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -80,7 +99,8 @@ export default function HistoryCalendar({
 
                     <button
                         onClick={handleNextMonth}
-                        className="p-2.5 bg-muted/50 hover:bg-muted rounded-xl transition-colors text-foreground"
+                        disabled={isNextDisabled}
+                        className="p-2.5 bg-muted/50 hover:bg-muted rounded-xl transition-colors text-foreground disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-muted/50"
                     >
                         <ChevronRight className="w-5 h-5" />
                     </button>
@@ -121,23 +141,27 @@ export default function HistoryCalendar({
                     const hasTasks = stats && stats.total > 0;
                     const isAllDone = hasTasks && stats?.completed === stats?.total;
                     const completionRate = hasTasks ? (stats!.completed / stats!.total) : 0;
+                    const isDisabled = isDateDisabled(day);
 
                     return (
                         <motion.button
                             key={day.toISOString()}
                             layout // helps with smooth transitions if layout changes
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: idx * 0.005 }} // Reduce delay for snappier feel
-                            onClick={() => onSelectDate(dateStr)}
+                            initial={false}
+                            onClick={() => !isDisabled && onSelectDate(dateStr)}
+                            disabled={isDisabled}
                             className={cn(
                                 "relative aspect-square flex flex-col items-center justify-center rounded-2xl transition-all border-2",
                                 !isCurrentMonth && "opacity-20 hover:opacity-100 border-transparent",
                                 isCurrentMonth && "border-transparent",
+                                // Disabled state
+                                isDisabled && "opacity-20 cursor-not-allowed",
+                                // No tasks - faded like other months
+                                !hasTasks && !isDisabled && isCurrentMonth && !isSelected && !isTodayDate && "opacity-20 hover:opacity-100",
                                 // Selection state
-                                isSelected ? "border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(var(--primary),0.2)]" : "hover:bg-muted/50",
+                                isSelected && !isDisabled ? "border-primary bg-primary/5 shadow-[0_0_0_2px_rgba(var(--primary),0.2)]" : !isDisabled && "hover:bg-muted/50",
                                 // Today state (if not selected)
-                                isTodayDate && !isSelected && "bg-muted/30 border-muted-foreground/20",
+                                isTodayDate && !isSelected && !isDisabled && "bg-muted/30 border-muted-foreground/20",
                             )}
                         >
                             <span className={cn(

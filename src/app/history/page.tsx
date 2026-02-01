@@ -4,7 +4,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { Loader2 } from 'lucide-react';
-import { startOfMonth, endOfMonth, format, subDays, startOfToday } from 'date-fns';
+import { startOfMonth, endOfMonth, format, subDays, startOfToday, startOfDay } from 'date-fns';
 import useSWR from 'swr';
 
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -38,6 +38,13 @@ export default function HistoryPage() {
 
    const { data: tagsData } = useSWR('/api/tags', (url) => fetch(url).then((r) => r.json()));
    const availableTags = tagsData?.tags || [];
+
+   // Fetch user data to get join date
+   const { data: userData } = useSWR(session ? '/api/user' : null, (url) => fetch(url).then((r) => r.json()));
+   
+   // Calculate date constraints
+   const minDate = userData?.createdAt ? startOfDay(new Date(userData.createdAt)) : undefined;
+   const maxDate = startOfDay(subDays(new Date(), 1)); // Yesterday
 
    // --- Auth Check ---
    useEffect(() => {
@@ -217,6 +224,8 @@ export default function HistoryPage() {
                      onSelectDate={setSelectedDate}
                      historyData={calendarData}
                      disableSwipe={!!selectedDate}
+                     minDate={minDate}
+                     maxDate={maxDate}
                   />
                </div>
 

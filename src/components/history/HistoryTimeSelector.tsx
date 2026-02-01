@@ -27,6 +27,8 @@ export default function HistoryTimeSelector({
     availableTags
 }: TimeSelectorProps) {
 
+    const [showTagFilters, setShowTagFilters] = useState(false);
+
     const dateOptions: { id: DateRangeOption; label: string; icon?: React.ElementType }[] = [
         { id: '7d', label: '7 Days' },
         { id: '30d', label: '30 Days' },
@@ -108,67 +110,99 @@ export default function HistoryTimeSelector({
                 )}
             </AnimatePresence>
 
-            {/* 2. Horizontal Tag Filter List */}
-            <div>
-                <div className="flex items-center justify-between mb-2 px-1">
-                    <label className="text-[11px] uppercase font-black text-muted-foreground/50 tracking-widest flex items-center gap-2">
-                        <Tag className="w-3 h-3" /> Filter by Tag
-                    </label>
-                    {selectedTags.length > 0 && (
-                        <button
-                            onClick={() => onTagsChange([])}
-                            className="text-[10px] font-bold text-red-500 hover:text-red-500/80 uppercase tracking-wider flex items-center gap-1 bg-red-500/10 px-2 py-0.5 rounded-md"
-                        >
-                            <X className="w-3 h-3" /> Clear ({selectedTags.length})
-                        </button>
-                    )}
-                </div>
-
-                <div className="flex overflow-visible overflow-x-auto p-4 -mx-4 -my-2 no-scrollbar gap-2">
-                    <motion.button
-                        layout
-                        whileTap={{ scale: 0.95 }}
-                        onClick={() => { if (selectedTags.length > 0) onTagsChange([]); }}
+            {/* 2. Collapsible Tag Filter Section */}
+            {availableTags.length > 0 && (
+                <div>
+                    <button
+                        onClick={() => setShowTagFilters(!showTagFilters)}
                         className={cn(
-                            "flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-all border shrink-0",
-                            selectedTags.length === 0
-                                ? "bg-foreground text-background border-transparent"
-                                : "bg-muted/30 text-muted-foreground hover:bg-muted border-transparent"
+                            "w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all border",
+                            showTagFilters
+                                ? "bg-primary/10 text-primary border-primary/20"
+                                : "bg-muted/30 text-muted-foreground border-border hover:bg-muted/50"
                         )}
                     >
-                        All
-                    </motion.button>
+                        <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-2">
+                            <Tag className="w-3.5 h-3.5" />
+                            Filter by Tags
+                            {selectedTags.length > 0 && (
+                                <span className="ml-1 px-1.5 py-0.5 rounded-md bg-primary/20 text-primary text-[10px]">
+                                    {selectedTags.length}
+                                </span>
+                            )}
+                        </span>
+                        <ChevronDown className={cn(
+                            "w-4 h-4 transition-transform",
+                            showTagFilters && "rotate-180"
+                        )} />
+                    </button>
 
-                    {availableTags.map((tag) => {
-                        const isSelected = selectedTags.includes(tag.id);
-                        return (
-                            <motion.button
-                                key={tag.id}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={() => handleTagToggle(tag.id)}
-                                className={cn(
-                                    "flex-shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5",
-                                    isSelected
-                                        ? "ring-1 ring-offset-1 ring-offset-background"
-                                        : "hover:bg-muted/50 border-transparent opacity-80 hover:opacity-100"
-                                )}
-                                style={{
-                                    backgroundColor: isSelected ? `${tag.color}20` : `${tag.color}08`,
-                                    color: tag.color,
-                                    borderColor: isSelected ? `${tag.color}40` : 'transparent',
-                                    boxShadow: isSelected ? `0 0 0 1px ${tag.color}` : 'none',
-                                }}
+                    <AnimatePresence>
+                        {showTagFilters && (
+                            <motion.div
+                                initial={{ height: 0, opacity: 0 }}
+                                animate={{ height: 'auto', opacity: 1 }}
+                                exit={{ height: 0, opacity: 0 }}
+                                className="overflow-hidden"
                             >
-                                {isSelected && <Check className="w-3 h-3" strokeWidth={3} />}
-                                {tag.name}
-                            </motion.button>
-                        );
-                    })}
-                    {availableTags.length === 0 && (
-                        <span className="text-xs text-muted-foreground italic pl-2 py-2">No tags available.</span>
-                    )}
+                                <div className="mt-3 p-3 bg-muted/20 rounded-xl border border-border/50">
+                                    {selectedTags.length > 0 && (
+                                        <button
+                                            onClick={() => onTagsChange([])}
+                                            className="mb-2 text-[10px] font-bold text-red-500 hover:text-red-500/80 uppercase tracking-wider flex items-center gap-1 bg-red-500/10 px-2 py-1 rounded-md"
+                                        >
+                                            <X className="w-3 h-3" /> Clear All ({selectedTags.length})
+                                        </button>
+                                    )}
+                                    
+                                    <div className="flex flex-wrap gap-2">
+                                        <motion.button
+                                            layout
+                                            whileTap={{ scale: 0.95 }}
+                                            onClick={() => { if (selectedTags.length > 0) onTagsChange([]); }}
+                                            className={cn(
+                                                "px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border shadow-sm",
+                                                selectedTags.length === 0
+                                                    ? "bg-foreground text-background border-transparent"
+                                                    : "bg-card text-muted-foreground hover:bg-muted border-border"
+                                            )}
+                                        >
+                                            All
+                                        </motion.button>
+
+                                        {availableTags.map((tag) => {
+                                            const isSelected = selectedTags.includes(tag.id);
+                                            return (
+                                                <motion.button
+                                                    key={tag.id}
+                                                    layout
+                                                    whileTap={{ scale: 0.95 }}
+                                                    onClick={() => handleTagToggle(tag.id)}
+                                                    className={cn(
+                                                        "px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-all border flex items-center gap-1 shadow-sm",
+                                                        isSelected
+                                                            ? "ring-2 ring-offset-1 ring-offset-background"
+                                                            : "hover:opacity-80 opacity-70 bg-card"
+                                                    )}
+                                                    style={{
+                                                        backgroundColor: isSelected ? `${tag.color}20` : undefined,
+                                                        color: tag.color,
+                                                        borderColor: isSelected ? `${tag.color}40` : `${tag.color}20`,
+                                                        boxShadow: isSelected ? `0 0 0 1px ${tag.color}` : 'none',
+                                                    }}
+                                                >
+                                                    {tag.name}
+                                                    {isSelected && <Check className="w-3 h-3" strokeWidth={3} />}
+                                                </motion.button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
-            </div>
+            )}
         </div>
     );
 }
