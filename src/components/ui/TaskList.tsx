@@ -58,7 +58,7 @@ interface SortableTaskItemProps {
   isMenuOpen: boolean;
   isExitingLater: boolean;
   renderBullet?: (task: Task, isVisuallyDone: boolean) => React.ReactNode;
-  handleTaskToggle: (task: Task, forceState?: boolean) => void;
+  handleTaskToggle: (task: Task, forceState?: boolean, skipDelay?: boolean) => void;
   onMenuOpen: (e: React.MouseEvent<HTMLButtonElement>, task: Task) => void;
   getTagDetails: (
     tagId: string
@@ -583,6 +583,8 @@ export default function TaskList({
     open: boolean;
     taskId: string | null;
   }>({ open: false, taskId: null });
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(new Set());
   const [isAnyDragging, setIsAnyDragging] = useState(false);
   const activeAreaLimitsRef = React.useRef<{ top: number; bottom: number } | null>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -701,13 +703,45 @@ export default function TaskList({
     ? dialog.kind === 'edit' ? 'edit' : taskKind(dialog.task)
     : 'regular';
 
-  const handleTaskToggle = (task: Task, forceState?: boolean) => {
+  const handleTaskToggle = (task: Task, forceState?: boolean, skipDelay?: boolean) => {
+    const isCompleting =
+      forceState === true || (forceState === undefined && !task.completed);
+
+    if (isCompleting) {
+      if (!skipDelay) {
+         setDelayedCompleted(prev => new Set(prev).add(task.id));
+         setTimeout(() => {
+             setDelayedCompleted(prev => {
+                 const next = new Set(prev);
+                 next.delete(task.id);
+                 return next;
+             });
+         }, 2000);
+      }
+      
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      fetch('/api/statistics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'complete_task',
+          taskId: task.id,
+          timezone: tz,
+        }),
+      }).catch((err) => console.error('Failed to update stats', err));
+    }
+  
     toggle(task.id, forceState);
   };
 
-  const activeTaskIds = tasks
-    .filter((t) => !t.completed && !vSet.has(t.id))
-    .map((t) => t.id);
+  // Active tasks + those currently in the "grace period" of completion
+  const visibleTasks = tasks.filter(t => 
+      !t.completed || vSet.has(t.id) ? true : delayedCompleted.has(t.id)
+  );
+
+  const activeTaskIds = visibleTasks.map((t) => t.id);
+
+  const completedTasks = tasks.filter(t => t.completed && !vSet.has(t.id) && !delayedCompleted.has(t.id));
 
   const handleDragStart = () => {
     setIsAnyDragging(true);
@@ -743,26 +777,28 @@ export default function TaskList({
     if (!over || !onReorder) return;
 
     if (active.id !== over.id) {
-      const activeTasks = tasks.filter((t) => !t.completed && !vSet.has(t.id));
-      const oldIndex = activeTasks.findIndex((t) => t.id === active.id);
-
+       // We only reorder within the visible/active list
+      const oldIndex = visibleTasks.findIndex((t) => t.id === active.id);
+      
       if (oldIndex === -1) return;
 
-      let newIndex = activeTasks.findIndex((t) => t.id === over.id);
+      let newIndex = visibleTasks.findIndex((t) => t.id === over.id);
 
-      // If we are hovering over a completed task (which isn't in activeTasks),
-      // we should treat it as dragging to the end of the active list.
-      if (newIndex === -1) {
-        const overTask = tasks.find((t) => t.id === over.id);
-        if (overTask && (overTask.completed || vSet.has(overTask.id))) {
-          newIndex = activeTasks.length - 1;
-        }
+      // If we are hovering over a completed task (which isn't in visibleTasks logic usually, 
+      // but might be if we change logic), handle it.
+      // In this new model, completed tasks disappear, so we mainly reorder active tasks.
+      if (newIndex === -1 && completedTasks.some(t => t.id === over.id)) {
+           // If dragged over to the completed list area (if sortable), 
+           // treat as end of list.
+           newIndex = visibleTasks.length - 1;
       }
 
       if (newIndex !== -1 && oldIndex !== newIndex) {
-        const newActiveTasks = arrayMove(activeTasks, oldIndex, newIndex);
-        const currentCompleted = tasks.filter((t) => t.completed || vSet.has(t.id));
-        onReorder([...newActiveTasks, ...currentCompleted]);
+        const newActiveTasks = arrayMove(visibleTasks, oldIndex, newIndex);
+        // We append the completed tasks at the end just to keep the full array structure,
+        // but really the parent container needs the full list.
+        // Actually, onReorder allows us to pass the full new state.
+        onReorder([...newActiveTasks, ...completedTasks]);
       }
     }
   };
@@ -890,50 +926,88 @@ export default function TaskList({
                   strategy={verticalListSortingStrategy}
                 >
                   <AnimatePresence initial={false} mode="popLayout">
-                    {(() => {
-                      const active = tasks
-                        .filter((t) => !t.completed && !vSet.has(t.id))
-                        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+                    {visibleTasks.map((task) => {
+                      const isCompleted = task.completed || vSet.has(task.id);
+                      const isMenuOpen = menu?.id === task.id;
+                      const isExitingLater =
+                        exitAction?.id === task.id &&
+                        exitAction.type === 'later';
+                      
+                      // For tasks in grace period, they are technically completed but shown in active list.
+                      // acts 'isDone' for visual checkmark, but we want them to stay in place.
 
-                      const done = tasks
-                        .filter((t) => t.completed || vSet.has(t.id))
-                        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-
-                      return [...active, ...done].map((task) => {
-                        const isCompleted = task.completed || vSet.has(task.id);
-                        const isMenuOpen = menu?.id === task.id;
-                        const isExitingLater =
-                          exitAction?.id === task.id &&
-                          exitAction.type === 'later';
-
-                        return (
-                          <SortableTaskItem
-                            key={task.id}
-                            task={task}
-                            isDone={isCompleted}
-                            isMenuOpen={isMenuOpen}
-                            isExitingLater={isExitingLater}
-                            renderBullet={renderBullet}
-                            handleTaskToggle={handleTaskToggle}
-                            onMenuOpen={openMenu}
-                            getTagDetails={getTagDetails}
-                            isDragDisabled={isCompleted}
-                            isWeekly={taskKind(task) === 'weekly'}
-                            disableLayout={isAnyDragging}
-                            onDoLater={onDoLater ? (t) => {
-                              setExitAction({ id: t.id, type: 'later' });
-                              setTimeout(() => onDoLater(t.id), 0);
-                              setTimeout(() => setExitAction(null), 800); // Clear after animation
-                            } : undefined}
-                          />
-                        );
-                      })
-                    })()}
+                      return (
+                        <SortableTaskItem
+                          key={task.id}
+                          task={task}
+                          isDone={isCompleted}
+                          isMenuOpen={isMenuOpen}
+                          isExitingLater={isExitingLater}
+                          renderBullet={renderBullet}
+                          handleTaskToggle={handleTaskToggle}
+                          onMenuOpen={openMenu}
+                          getTagDetails={getTagDetails}
+                          // Disable drag if completed (grace period)
+                          isDragDisabled={isCompleted}
+                          isWeekly={taskKind(task) === 'weekly'}
+                          disableLayout={isAnyDragging}
+                          onDoLater={onDoLater ? (t) => {
+                             setExitAction({ id: t.id, type: 'later' });
+                             setTimeout(() => onDoLater(t.id), 0);
+                          } : undefined}
+                        />
+                      );
+                    })}
                   </AnimatePresence>
                 </SortableContext>
               </div>
             </div>
           </DndContext>
+
+           {/* Show Finished Toggle */}
+             {completedTasks.length > 0 && (
+                 <div className="mt-4 pb-8">
+                     <button
+                         onClick={() => setShowCompleted(!showCompleted)}
+                         className="flex items-center gap-2 mb-2 text-sm font-bold transition-colors text-muted-foreground hover:text-foreground"
+                     >
+                         {showCompleted ? 'Hide' : 'Show'} Finished
+                         <span className="px-1.5 py-0.5 text-xs rounded-full bg-muted text-muted-foreground">
+                             {completedTasks.length}
+                         </span>
+                     </button>
+                     
+                     <AnimatePresence>
+                         {showCompleted && (
+                             <motion.div
+                                 initial={{ height: 0, opacity: 0 }}
+                                 animate={{ height: "auto", opacity: 1 }}
+                                 exit={{ height: 0, opacity: 0 }}
+                                 className="overflow-hidden"
+                             >
+                                 <div className="flex flex-col gap-1 pb-4">
+                                     {completedTasks.map(task => (
+                                         <SortableTaskItem
+                                            key={task.id}
+                                            task={task}
+                                            isDone={true}
+                                            isMenuOpen={menu?.id === task.id}
+                                            isExitingLater={false}
+                                            renderBullet={renderBullet}
+                                            handleTaskToggle={handleTaskToggle}
+                                            onMenuOpen={openMenu}
+                                            getTagDetails={getTagDetails}
+                                            isDragDisabled={true} // Completed items usually fixed
+                                            isWeekly={taskKind(task) === 'weekly'}
+                                            disableLayout={isAnyDragging}
+                                         />
+                                     ))}
+                                 </div>
+                             </motion.div>
+                         )}
+                     </AnimatePresence>
+                 </div>
+             )}
         </div>
       </div>
 

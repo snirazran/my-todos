@@ -179,10 +179,7 @@ export default function Home() {
         t.id === taskId ? { ...t, completed } : t
       );
       // Sort for guest
-      return [...toggled].sort((a, b) => {
-        if (!!a.completed !== !!b.completed) return a.completed ? 1 : -1;
-        return (a.order ?? 0) - (b.order ?? 0);
-      });
+      return [...toggled].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     });
   };
 
