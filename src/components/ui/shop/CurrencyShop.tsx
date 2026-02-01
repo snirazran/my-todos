@@ -1,18 +1,13 @@
 'use client';
 
-import React from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from '@/components/ui/dialog';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, Sparkles, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
-import { Sparkles, X, ShieldCheck } from 'lucide-react';
 
 const PACKS = [
   {
@@ -67,163 +62,230 @@ export function CurrencyShop({
   hunger,
   maxHunger,
 }: CurrencyShopProps) {
+  const [mounted, setMounted] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    const checkDesktop = () => setIsDesktop(window.matchMedia("(min-width: 640px)").matches);
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
+
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [open]);
+
+  if (!mounted) return null;
+
   const hungerPercent =
     typeof hunger === 'number' && typeof maxHunger === 'number' && maxHunger > 0
       ? Math.max(0, Math.min(100, (hunger / maxHunger) * 100))
       : 100;
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 overflow-hidden border-none bg-transparent shadow-none w-full sm:max-w-[95vw] md:max-w-5xl z-[1002]">
-        <div className="relative flex flex-col w-full bg-background border border-border shadow-2xl rounded-[32px] overflow-hidden max-h-[90vh]">
-          <div className="absolute top-0 left-0 right-0 h-32 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none" />
+  const mobileVariants = {
+    initial: { y: '100%', opacity: 0, scale: 0.96 },
+    animate: { y: 0, opacity: 1, scale: 1 },
+    exit: { y: '100%', opacity: 0, scale: 0.96 }
+  };
 
-          <DialogClose className="absolute right-4 top-4 z-50 p-2 rounded-full bg-background/50 hover:bg-muted transition-colors border border-border/40 shadow-sm backdrop-blur-sm">
-            <X className="w-4 h-4 text-foreground" />
-          </DialogClose>
+  const desktopVariants = {
+    initial: { opacity: 0, scale: 0.95, y: 0 },
+    animate: { opacity: 1, scale: 1, y: 0 },
+    exit: { opacity: 0, scale: 0.95, y: 0 }
+  };
 
-          <div className="relative z-10 px-6 pt-6 pb-2 shrink-0 text-center">
-            <DialogHeader className="mb-4">
-              <DialogTitle className="text-3xl font-black tracking-tight text-foreground flex items-center justify-center gap-2">
-                <span className="bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent dark:from-emerald-400 dark:to-teal-300">
-                  Fly Shop
-                </span>
-                <Sparkles className="w-5 h-5 text-amber-400 fill-amber-400 animate-pulse" />
-              </DialogTitle>
-            </DialogHeader>
+  const onClose = () => onOpenChange(false);
 
-            <div className="inline-flex items-center gap-4 p-2 pl-4 pr-4 rounded-full bg-card border border-border/60 shadow-sm mx-auto">
-              <div className="flex items-center gap-2">
-                <div className="w-5 h-5 flex items-center justify-center">
-                  <Fly size={20} y={-2} paused={false} />
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-md"
+          />
+
+          {/* Sheet Container */}
+          <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center pointer-events-none p-0 sm:p-6">
+            <motion.div
+              variants={isDesktop ? desktopVariants : mobileVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              drag={!isDesktop ? "y" : false}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.5 }}
+              onDragEnd={(e, { offset, velocity }) => {
+                if (offset.y > 100 || velocity.y > 500) {
+                  onClose();
+                }
+              }}
+              className="pointer-events-auto w-full sm:max-w-4xl h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col bg-background/95 backdrop-blur-2xl rounded-t-[32px] sm:rounded-[40px] shadow-2xl border-t sm:border border-border/40 overflow-hidden relative"
+            >
+              {/* Drag Handle (Mobile Only) */}
+              {!isDesktop && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full z-50" />
+              )}
+
+              {/* FIXED HEADER */}
+              <div className="flex-shrink-0 px-6 py-4 flex items-center justify-between border-b border-border/40 bg-background/20">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-primary/10">
+                    <Sparkles className="w-5 h-5 text-primary fill-primary/20 animate-pulse" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black tracking-tight text-foreground uppercase">
+                      Fly Shop
+                    </h2>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <Fly size={14} y={-1} paused={false} />
+                        <span className="text-[10px] font-black text-muted-foreground tabular-nums">
+                          {balance}
+                        </span>
+                      </div>
+                      <div className="w-[1px] h-2 bg-border/60" />
+                      <div className="flex items-center gap-1.5">
+                        <span className={cn("w-1.5 h-1.5 rounded-full", 
+                          hungerPercent > 50 ? "bg-emerald-500" : "bg-amber-500"
+                        )} />
+                        <span className="text-[10px] font-black text-muted-foreground tabular-nums">
+                          {Math.round(hungerPercent)}% HUNGER
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  Balance
-                </span>
-                <span className="text-sm font-black text-foreground tabular-nums leading-none">
-                  {balance}
-                </span>
-              </div>
-              <div className="h-3 w-[1px] bg-border" />
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                  Hunger
-                </span>
-                <span className={cn("text-xs font-black tabular-nums",
-                  hungerPercent > 80 ? 'text-emerald-500' :
-                    hungerPercent > 60 ? 'text-lime-500' :
-                      hungerPercent > 40 ? 'text-yellow-500' :
-                        hungerPercent > 20 ? 'text-amber-500' :
-                          'text-rose-500'
-                )}>
-                  {Math.round(hungerPercent)}%
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto no-scrollbar px-6 pb-8 pt-2 flex flex-row gap-4 snap-x snap-mandatory md:justify-center">
-            {PACKS.map((pack) => {
-              const isJar = pack.id === 'jar';
-              const isCrate = pack.id === 'crate';
-
-              return (
                 <button
-                  key={pack.id}
-                  className={cn(
-                    "group relative flex flex-col shrink-0 w-[75vw] sm:w-[260px] p-2 rounded-[32px] border transition-all duration-300 active:scale-[0.98] overflow-hidden text-center snap-center",
-                    isCrate
-                      ? "bg-gradient-to-b from-amber-500/10 to-transparent border-amber-500/50 shadow-xl hover:shadow-2xl hover:border-amber-500 hover:-translate-y-1"
-                      : isJar
-                        ? "bg-gradient-to-b from-violet-500/10 to-transparent border-violet-500/50 shadow-lg hover:shadow-xl hover:border-violet-500 hover:-translate-y-1"
-                        : "bg-card border-border hover:border-emerald-500/40 hover:bg-muted/30 shadow-md hover:-translate-y-1"
-                  )}
-                  onClick={() => { }}
+                  onClick={onClose}
+                  className="p-2 bg-muted/50 hover:bg-red-500/10 hover:text-red-500 rounded-full transition-all text-muted-foreground active:scale-90"
                 >
-                  <div className="flex flex-col items-center justify-center w-full px-2 pt-3 pb-2 gap-1.5 h-14">
-                    {pack.badge && (
-                      <div className={cn(
-                        "px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest shadow-sm whitespace-nowrap",
-                        pack.badgeClass
-                      )}>
-                        {pack.badge}
-                      </div>
-                    )}
-                    <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center line-clamp-1">
-                      {pack.name}
-                    </span>
-                  </div>
-
-                  {/* HERO VISUAL AREA */}
-                  <div className="relative w-full aspect-[4/3] flex flex-col items-center justify-center mb-4 mt-2 overflow-hidden rounded-[20px]">
-                    {/* 1. Base Gradient */}
-                    <div className={cn("absolute inset-0 opacity-100", pack.bgGradient)} />
-
-                    {/* 2. Kinetic Background (Universal Rays) - On top of gradient for visibility */}
-                    <div className="absolute inset-[-50%] opacity-40 pointer-events-none">
-                      <RotatingRays colorClass={pack.raysColor} />
-                    </div>
-
-                    {/* 3. The Loot Cluster - Perfect Text Alignment */}
-                    <div className="relative z-10 w-full h-full flex items-center justify-center gap-0">
-
-                      {/* Flies Group */}
-                      <div className="flex flex-col items-center gap-1 shrink-0 px-1">
-                        <div className="w-20 h-24 flex items-center justify-center relative filter drop-shadow-xl">
-                          <Fly size={60} y={-2} paused={false} />
-                        </div>
-                        <div className="flex flex-col items-center leading-tight">
-                          <span className="text-xl font-black text-foreground tabular-nums drop-shadow-sm">
-                            {pack.amount}
-                          </span>
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-80">
-                            Flies
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Gift Group */}
-                      {pack.giftCount > 0 && (
-                        <div className="flex flex-col items-center gap-1 shrink-0 px-1">
-                          <div className="w-20 h-24 flex items-center justify-center relative filter drop-shadow-xl -translate-y-3">
-                            <GiftRive width={96} height={96} />
-                          </div>
-                          <div className="flex flex-col items-center leading-tight">
-                            <span className="text-xl font-black text-rose-500 tabular-nums drop-shadow-sm">
-                              +{pack.giftCount}
-                            </span>
-                            <span className="text-[10px] font-bold text-rose-500/80 uppercase tracking-widest opacity-90">
-                              {pack.giftCount > 1 ? 'Gifts' : 'Gift'}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Price Button (Bottom) - Redesigned without shine */}
-                  <div className={cn(
-                    "w-full py-3.5 rounded-2xl font-black text-base uppercase tracking-widest transition-all mt-auto relative shadow-md border-b-4 active:border-b-0 active:translate-y-1 active:shadow-inner",
-                    pack.btnClass
-                  )}>
-                    <span className="relative z-10">{pack.price}</span>
-                  </div>
+                  <X className="w-5 h-5" strokeWidth={3} />
                 </button>
-              );
-            })}
-          </div>
+              </div>
 
-          <div className="px-6 pb-4 pt-2 text-center border-t border-border/40 bg-muted/20">
-            <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground mb-1">
-              <ShieldCheck className="w-3 h-3" />
-              <span>Secure Payment via App Store</span>
-            </div>
-            <p className="text-[9px] text-muted-foreground/40 font-medium">
-              Purchases support the developer & keep the frog happy!
-            </p>
+              {/* SCROLLABLE CONTENT */}
+              <div className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-hide">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto">
+                  {PACKS.map((pack) => {
+                    const isJar = pack.id === 'jar';
+                    const isCrate = pack.id === 'crate';
+
+                    return (
+                      <button
+                        key={pack.id}
+                        className={cn(
+                          "group relative flex flex-col shrink-0 w-full p-2 rounded-[32px] border transition-all duration-300 active:scale-[0.98] overflow-hidden text-center",
+                          isCrate
+                            ? "bg-gradient-to-b from-amber-500/10 to-transparent border-amber-500/50 shadow-xl hover:shadow-2xl hover:border-amber-500"
+                            : isJar
+                              ? "bg-gradient-to-b from-violet-500/10 to-transparent border-violet-500/50 shadow-lg hover:shadow-xl hover:border-violet-500"
+                              : "bg-card border-border hover:border-emerald-500/40 hover:bg-muted/30 shadow-md"
+                        )}
+                        onClick={() => { }}
+                      >
+                        <div className="flex flex-col items-center justify-center w-full px-2 pt-3 pb-2 gap-1.5 h-14">
+                          {pack.badge && (
+                            <div className={cn(
+                              "px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest shadow-sm whitespace-nowrap",
+                              pack.badgeClass
+                            )}>
+                              {pack.badge}
+                            </div>
+                          )}
+                          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center line-clamp-1">
+                            {pack.name}
+                          </span>
+                        </div>
+
+                        {/* HERO VISUAL AREA */}
+                        <div className="relative w-full aspect-[4/3] flex flex-col items-center justify-center mb-4 mt-2 overflow-hidden rounded-[20px]">
+                          {/* 1. Base Gradient */}
+                          <div className={cn("absolute inset-0 opacity-100", pack.bgGradient)} />
+
+                          {/* 2. Kinetic Background (Universal Rays) */}
+                          <div className="absolute inset-[-50%] opacity-40 pointer-events-none">
+                            <RotatingRays colorClass={pack.raysColor} />
+                          </div>
+
+                          {/* 3. The Loot Cluster */}
+                          <div className="relative z-10 w-full h-full flex items-center justify-center gap-0">
+                            {/* Flies Group */}
+                            <div className="flex flex-col items-center gap-1 shrink-0 px-1">
+                              <div className="w-16 h-20 flex items-center justify-center relative filter drop-shadow-xl">
+                                <Fly size={50} y={-2} paused={false} />
+                              </div>
+                              <div className="flex flex-col items-center leading-tight">
+                                <span className="text-xl font-black text-foreground tabular-nums drop-shadow-sm">
+                                  {pack.amount}
+                                </span>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-80">
+                                  Flies
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Gift Group */}
+                            {pack.giftCount > 0 && (
+                              <div className="flex flex-col items-center gap-1 shrink-0 px-1">
+                                <div className="w-16 h-20 flex items-center justify-center relative filter drop-shadow-xl -translate-y-3">
+                                  <GiftRive width={80} height={80} />
+                                </div>
+                                <div className="flex flex-col items-center leading-tight">
+                                  <span className="text-xl font-black text-rose-500 tabular-nums drop-shadow-sm">
+                                    +{pack.giftCount}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-rose-500/80 uppercase tracking-widest opacity-90">
+                                    {pack.giftCount > 1 ? 'Gifts' : 'Gift'}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Price Button */}
+                        <div className={cn(
+                          "w-full py-3.5 rounded-2xl font-black text-base uppercase tracking-widest transition-all mt-auto relative shadow-md border-b-4 active:border-b-0 active:translate-y-1 active:shadow-inner",
+                          pack.btnClass
+                        )}>
+                          <span className="relative z-10">{pack.price}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Footer Info */}
+                <div className="mt-8 text-center space-y-2 pb-8">
+                  <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
+                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                    <span>Secure Store Payment</span>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground/40 font-bold max-w-xs mx-auto">
+                    Purchases support development and keep the frog fed. Thank you for your support!
+                  </p>
+                </div>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body
   );
 }

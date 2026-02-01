@@ -44,6 +44,14 @@ export default React.memo(function BacklogTray({
   const scrollLeft = useRef(0);
   const [isDragging, setIsDragging] = useState(false);
 
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const checkDesktop = () => setIsDesktop(window.matchMedia("(min-width: 768px)").matches);
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
+
   // Menu & Dialog State
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [confirmItem, setConfirmItem] = useState<Task | null>(null);
@@ -121,6 +129,26 @@ export default React.memo(function BacklogTray({
 
   // Auto-hide when dragging FROM the tray
   const isDraggingAny = !!activeDragId;
+
+  const mobileVariants = {
+    initial: { y: '100%', opacity: 0 },
+    animate: { 
+        y: `${closeProgress * 100}%`, 
+        opacity: isDraggingAny ? 0 : 1,
+        scale: isDraggingAny ? 0.95 : 1
+    },
+    exit: { y: '100%', opacity: 0 }
+  };
+
+  const desktopVariants = {
+    initial: { x: '-100%', opacity: 0 },
+    animate: { 
+        x: '0%', 
+        opacity: isDraggingAny ? 0 : 1,
+        scale: isDraggingAny ? 0.95 : 1
+    },
+    exit: { x: '-100%', opacity: 0 }
+  };
   
   return (
     <AnimatePresence>
@@ -140,14 +168,18 @@ export default React.memo(function BacklogTray({
           {/* The Vertical Tray/Drawer */}
           <motion.div
             ref={trayRef}
-            initial={{ x: '-100%', opacity: 0 }} // Desktop: Slide from Left
-            animate={{ 
-                x: typeof window !== 'undefined' && window.innerWidth >= 768 ? '0%' : '0%', // Desktop: Slide In (0%)
-                y: typeof window !== 'undefined' && window.innerWidth >= 768 ? '0%' : `${closeProgress * 100}%`, // Mobile: Slide Up (Bottom)
-                opacity: isDraggingAny ? 0 : 1,
-                scale: isDraggingAny ? 0.95 : 1
+            variants={isDesktop ? desktopVariants : mobileVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            drag={!isDesktop && !isDraggingAny ? "y" : false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.5 }}
+            onDragEnd={(e, { offset, velocity }) => {
+                if (offset.y > 100 || velocity.y > 500) {
+                    onClose();
+                }
             }}
-            exit={{ x: '-100%', opacity: 0 }} // Desktop: Slide out Left
             transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
             className={`
                 fixed z-[90] flex flex-col bg-card/95 border-r border-border/50 shadow-2xl backdrop-blur-3xl overflow-hidden
@@ -161,6 +193,11 @@ export default React.memo(function BacklogTray({
             onClick={(e) => e.stopPropagation()}
             style={{ pointerEvents: isDraggingAny ? 'none' : 'auto' }}
           >
+            {/* Drag Handle (Mobile Only) */}
+            {!isDesktop && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full z-50 pointer-events-none" />
+            )}
+
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-8 md:px-8 shrink-0">
               <div className="flex items-center gap-4">
