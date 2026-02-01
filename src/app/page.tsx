@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Calendar, History, LayoutDashboard, CalendarCheck, CalendarClock } from 'lucide-react';
+import { Calendar, History, LayoutDashboard, CalendarCheck, CalendarClock, EllipsisVertical, Check, FolderOpen } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 //fix
 import { signIn, useSession } from 'next-auth/react';
@@ -113,6 +113,25 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'today' | 'backlog'>('today');
   const [showReward, setShowReward] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
+  const headerMenuBtnRef = useRef<HTMLButtonElement>(null);
+  const headerMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close menu on click outside
+  useEffect(() => {
+    if (!isHeaderMenuOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node) &&
+        headerMenuBtnRef.current && !headerMenuBtnRef.current.contains(e.target as Node)
+      ) {
+         setIsHeaderMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isHeaderMenuOpen]);
 
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -256,7 +275,7 @@ export default function Home() {
             className="flex flex-col gap-4 lg:col-span-8 lg:gap-6"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
-            <div className="flex self-start w-full p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm md:w-auto">
+            <div className="flex items-center self-start w-[calc(100%-3rem)] mx-6 md:w-auto md:mx-0 p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative group z-20">
               <button
                 onClick={() => setActiveTab('today')}
                 className={`
@@ -284,10 +303,109 @@ export default function Home() {
                   }
       `}
               >
-                <CalendarClock className={`w-4 h-4 ${activeTab === 'backlog' ? 'text-primary' : 'text-muted-foreground'}`} />
+                <FolderOpen className={`w-4 h-4 ${activeTab === 'backlog' ? 'text-primary' : 'text-muted-foreground'}`} />
                 Saved Tasks
                 <TaskCounter count={laterThisWeek.length} pendingCount={pendingToBacklog} />
               </button>
+              
+               {/* 3-DOTS MENU ADDED HERE */}
+               <div className="w-[1px] h-6 bg-border/50 mx-1" />
+               <button
+                  ref={headerMenuBtnRef}
+                  onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)}
+                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+               >
+                  <EllipsisVertical className="w-5 h-5" />
+               </button>
+
+               <AnimatePresence>
+                  {isHeaderMenuOpen && (
+                     <motion.div
+                       ref={headerMenuRef}
+                       initial={{ opacity: 0, scale: 0.95, y: 10, x: 5 }}
+                       animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                       exit={{ opacity: 0, scale: 0.95, y: 10, x: 5 }}
+                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                       className="absolute left-0 top-full mt-2 z-50 w-72 bg-popover backdrop-blur-xl rounded-[24px] ring-1 ring-border/80 shadow-[0_24px_48px_rgba(15,23,42,0.2)] p-4 flex flex-col gap-4 overflow-hidden"
+                       style={{ transformOrigin: 'top left' }}
+                     >
+                           {/* Show Finished Toggle */}
+                           <div className="flex items-center justify-between p-1">
+                              <span className="text-[15px] font-bold text-foreground">Show Completed</span>
+                              <button
+                                 onClick={() => setShowCompleted(!showCompleted)}
+                                 className={`w-12 h-7 rounded-full relative transition-all duration-300 ease-in-out ${showCompleted ? 'bg-primary shadow-[0_0_12px_rgba(var(--primary),0.4)]' : 'bg-muted/80'}`}
+                              >
+                                 <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-background shadow-sm transition-transform duration-300 ${showCompleted ? 'translate-x-5' : 'translate-x-0'}`} />
+                              </button>
+                           </div>
+ 
+                           {/* Tag Filter Section */}
+                           {(() => {
+                              // Filter logic: Only show tags used in TODAY's tasks (or all tags? Let's use all user tags for broader filtering capability, OR just relevant ones. TaskList used relevant ones. Let's start with ALL user tags for simplicity, or we can filter like TaskList did)
+                              // TaskList did: const usedTagIds = new Set(tasks.flatMap(t => t.tags || []));
+                              // Let's replicate that if we want strictly relevant tags.
+                              const currentList = activeTab === 'today' ? data : backlogTasks;
+                              const usedTagIds = new Set(currentList.flatMap(t => t.tags || []));
+                              const visibleFilterTags = (tags || []).filter(tag => usedTagIds.has(tag.id));
+                              
+                              if (visibleFilterTags.length === 0) return null;
+ 
+                              return (
+                                <div className="flex flex-col gap-3 pt-3 border-t border-border/50">
+                                   <div className="flex items-center justify-between px-1">
+                                     <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Filter by Tags</span>
+                                     {selectedTags.length > 0 && (
+                                        <button
+                                          onClick={() => setSelectedTags([])}
+                                          className="text-[11px] font-bold text-primary hover:text-primary/80 transition-colors"
+                                        >
+                                           Clear
+                                        </button>
+                                     )}
+                                   </div>
+                                   <div className="flex flex-wrap gap-2">
+                                      {visibleFilterTags.map(tag => {
+                                         const isSelected = selectedTags.includes(tag.id);
+                                         return (
+                                            <button
+                                               key={tag.id}
+                                               onClick={() => {
+                                                  setSelectedTags(prev => 
+                                                     prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id]
+                                                  );
+                                               }}
+                                               className={`
+                                                  relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all duration-200 border
+                                                  ${isSelected 
+                                                    ? 'ring-2 ring-offset-1 ring-offset-popover border-transparent' 
+                                                    : 'bg-muted/30 border-transparent hover:bg-muted/50 text-muted-foreground'
+                                                  }
+                                               `}
+                                               style={isSelected && tag.color ? { 
+                                                  backgroundColor: `${tag.color}20`, 
+                                                  color: tag.color,
+                                                  borderColor: 'transparent',
+                                                  boxShadow: `0 0 0 1px ${tag.color}` 
+                                               } : isSelected ? {
+                                                  backgroundColor: 'rgba(var(--primary), 0.1)',
+                                                  color: 'hsl(var(--primary))',
+                                                  boxShadow: '0 0 0 1px hsl(var(--primary))'
+                                               } : {}}
+                                            >
+                                               {isSelected && <Check className="w-3.5 h-3.5" />}
+                                               {tag.name}
+                                            </button>
+                                         );
+                                      })}
+                                   </div>
+                                </div>
+                              );
+                           })()}
+                        </motion.div>
+ 
+                  )}
+              </AnimatePresence>
             </div>
 
             <div className="min-h-[400px] pb-20">
@@ -354,7 +472,8 @@ export default function Home() {
                     onEditTask={(id, text) => editTask(id, text, false)}
                     tags={tags}
                     showCompleted={showCompleted}
-                    onToggleShowCompleted={() => setShowCompleted(!showCompleted)}
+                    selectedTags={selectedTags}
+                    onSetSelectedTags={setSelectedTags}
                   />
                 </motion.div>
               ) : (

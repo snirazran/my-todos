@@ -595,18 +595,8 @@ export default function BacklogPanel({
     <div
       dir="ltr"
       // Added overflow-visible to allow menus to spill out if needed
-      className="px-6 pt-6 pb-4 overflow-visible rounded-[20px]"
+      className="px-6 pt-0 pb-4 overflow-visible rounded-[20px]"
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6 min-h-[36px]">
-        <div className="flex items-center gap-3">
-          <h3 className="flex items-center gap-3 text-xl font-black tracking-tight uppercase text-foreground">
-            <CalendarClock className="w-6 h-6 text-primary md:w-7 md:h-7" />
-            Saved Tasks
-          </h3>
-          <TaskCounter count={later.length} pendingCount={pendingToBacklog} />
-        </div>
-      </div>
 
       <div
         className={`pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
