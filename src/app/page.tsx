@@ -275,7 +275,8 @@ export default function Home() {
             className="flex flex-col gap-4 lg:col-span-8 lg:gap-6"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
-            <div className="flex items-center self-start w-[calc(100%-3rem)] mx-6 md:w-auto md:mx-0 p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative group z-20">
+            <div className="flex items-center justify-center w-full px-4 md:px-0 md:w-auto md:justify-start">
+              <div className="flex items-center w-full max-w-[calc(100vw-2rem)] md:max-w-none md:w-auto p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative group z-20">
               <button
                 onClick={() => setActiveTab('today')}
                 className={`
@@ -406,6 +407,7 @@ export default function Home() {
  
                   )}
               </AnimatePresence>
+              </div>
             </div>
 
             <div className="min-h-[400px] pb-20">
