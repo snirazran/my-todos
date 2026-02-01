@@ -139,7 +139,7 @@ export default function DayDetailSheet({
                             exit="exit"
                             transition={{ type: 'spring', damping: 28, stiffness: 320 }}
                             // Updated background to match requested "white like"
-                            className="pointer-events-auto w-full sm:max-w-lg h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col bg-white/95 backdrop-blur-2xl rounded-t-[32px] sm:rounded-[40px] shadow-2xl border-t sm:border border-white/10 overflow-hidden"
+                            className="pointer-events-auto w-full sm:max-w-lg h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col bg-background/95 backdrop-blur-2xl rounded-t-[32px] sm:rounded-[40px] shadow-2xl border-t sm:border border-border/40 overflow-hidden"
                         >
                             {/* Header (Compact) */}
                             <div className="flex-shrink-0 px-4 py-3 flex items-center justify-between border-b border-border/40 bg-background/20">

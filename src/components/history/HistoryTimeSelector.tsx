@@ -175,7 +175,6 @@ export default function HistoryTimeSelector({
                                             return (
                                                 <motion.button
                                                     key={tag.id}
-                                                    layout
                                                     whileTap={{ scale: 0.95 }}
                                                     onClick={() => handleTagToggle(tag.id)}
                                                     className={cn(

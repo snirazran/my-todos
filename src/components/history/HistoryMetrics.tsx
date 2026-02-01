@@ -21,7 +21,7 @@ type HistoryMetricsProps = {
     className?: string; // Allow minimal styling injection
 };
 
-export default function HistoryMetrics({
+const HistoryMetrics = React.memo(function HistoryMetrics({
     historyData,
     completedTasks,
     completionRate,
@@ -119,7 +119,9 @@ export default function HistoryMetrics({
             </div>
         </div>
     );
-}
+});
+
+export default HistoryMetrics;
 
 function StatCard({ label, value, subValue, suffix, icon: Icon, color, bg }: any) {
     return (

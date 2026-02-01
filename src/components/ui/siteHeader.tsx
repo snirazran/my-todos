@@ -251,7 +251,7 @@ function RightActions({ session, status, onSignIn, onSignOut }: { session: any, 
                 >
                   <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">Color Mode</span>
                   <div className="relative h-9 w-9 flex items-center justify-center">
-                    <AnimatePresence mode="wait" initial={false}>
+                    <AnimatePresence mode="popLayout" initial={false}>
                       {theme === 'dark' ? (
                         <motion.div
                           key="moon"
@@ -370,7 +370,7 @@ function MobileSheet({ isOpen, onClose, onSignOut, user, showAuth, theme, setThe
                 >
                   <span className="font-bold text-sm group-hover:text-foreground transition-colors">Color Mode</span>
                   <div className="relative h-9 w-9 flex items-center justify-center">
-                    <AnimatePresence mode="wait" initial={false}>
+                    <AnimatePresence mode="popLayout" initial={false}>
                       {theme === 'dark' ? (
                         <motion.div
                           key="moon"

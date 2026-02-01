@@ -1,23 +1,29 @@
 'use client';
 
-import { motion, useSpring, useTransform } from 'framer-motion';
-import { useEffect } from 'react';
+import { useSpring } from 'framer-motion';
+import { useEffect, useRef, memo } from 'react';
 
-export function AnimatedNumber({
+export const AnimatedNumber = memo(function AnimatedNumber({
   value,
   className,
 }: {
   value: number;
   className?: string;
 }) {
+  const ref = useRef<HTMLSpanElement>(null);
   const spring = useSpring(value, { mass: 0.8, stiffness: 75, damping: 15 });
-  const display = useTransform(spring, (current) =>
-    Math.round(current).toLocaleString()
-  );
 
   useEffect(() => {
     spring.set(value);
   }, [value, spring]);
 
-  return <motion.span className={className}>{display}</motion.span>;
-}
+  useEffect(() => {
+    return spring.on('change', (latest) => {
+      if (ref.current) {
+        ref.current.textContent = Math.round(latest).toLocaleString();
+      }
+    });
+  }, [spring]);
+
+  return <span className={className} ref={ref}>{Math.round(value).toLocaleString()}</span>;
+});
