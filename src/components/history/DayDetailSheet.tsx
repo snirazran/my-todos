@@ -10,6 +10,13 @@ import { type FrogHandle } from '@/components/ui/frog';
 import HistoryTaskCard from './HistoryTaskCard';
 import useSWR from 'swr';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import {
+    useFrogTongue,
+    HIT_AT,
+    OFFSET_MS,
+    TONGUE_MS,
+    TONGUE_STROKE,
+} from '@/hooks/useFrogTongue';
 
 type DayDetailSheetProps = {
     open: boolean;
@@ -18,8 +25,6 @@ type DayDetailSheetProps = {
     tasks: any[];
     onToggleTask: (id: string, date: string, currentStatus: boolean) => void;
     frogProps: any; // Props for FrogDisplay
-    visuallyCompleted?: Set<string>;
-    setFlyRef?: (key: string, el: HTMLDivElement | null) => void;
 };
 
 export default function DayDetailSheet({
@@ -29,13 +34,24 @@ export default function DayDetailSheet({
     tasks,
     onToggleTask,
     frogProps,
-    visuallyCompleted,
-    setFlyRef
 }: DayDetailSheetProps) {
     const [mounted, setMounted] = useState(false);
     const [wardrobeOpen, setWardrobeOpen] = useState(false);
     const frogRef = useRef<FrogHandle>(null);
     const frogBoxRef = useRef<HTMLDivElement>(null);
+
+    // Animation State
+    const flyRefs = useRef<Record<string, HTMLElement | null>>({});
+    const {
+        vp,
+        cinematic,
+        grab,
+        tip,
+        tipVisible,
+        tonguePathEl,
+        triggerTongue,
+        visuallyDone,
+    } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
     // Need to get tag data for tasks
     const { data: tagsData } = useSWR('/api/tags', (url) => fetch(url).then((r) => r.json()));
@@ -63,6 +79,20 @@ export default function DayDetailSheet({
     const totalCount = tasks.length;
     const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
+    const handleToggleProxy = async (id: string, date: string, currentStatus: boolean) => {
+        // If we are marking as COMPLETE (currentStatus is false), trigger animation
+        if (!currentStatus) {
+            await triggerTongue({
+                key: `${date}::${id}`,
+                completed: true,
+                onPersist: () => onToggleTask(id, date, currentStatus)
+            });
+        } else {
+            // Uncheck immediately
+            onToggleTask(id, date, currentStatus);
+        }
+    };
+
     if (!mounted) return null;
 
     return createPortal(
@@ -85,32 +115,33 @@ export default function DayDetailSheet({
                             animate={{ y: 0, opacity: 1, scale: 1 }}
                             exit={{ y: '100%', opacity: 0, scale: 0.96 }}
                             transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-                            className="pointer-events-auto w-full sm:max-w-lg h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col bg-card/90 backdrop-blur-3xl rounded-t-[32px] sm:rounded-[40px] shadow-2xl border-t sm:border border-white/10 overflow-hidden"
+                            // Updated background to match requested "white like"
+                            className="pointer-events-auto w-full sm:max-w-lg h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col bg-white/95 backdrop-blur-2xl rounded-t-[32px] sm:rounded-[40px] shadow-2xl border-t sm:border border-white/10 overflow-hidden"
                         >
                             {/* Header (Compact) */}
-                            <div className="flex-shrink-0 px-5 py-4 flex items-center justify-between border-b border-border/40 bg-background/20">
+                            <div className="flex-shrink-0 px-4 py-3 flex items-center justify-between border-b border-border/40 bg-background/20">
                                 <div>
-                                    <h2 className="text-2xl font-black tracking-tighter flex items-center gap-2 text-foreground">
-                                        <CalendarIcon className="w-6 h-6 text-primary" />
+                                    <h2 className="text-xl font-black tracking-tighter flex items-center gap-2 text-foreground">
+                                        <CalendarIcon className="w-5 h-5 text-primary" />
                                         {format(new Date(date), 'MMMM do')}
                                     </h2>
-                                    <p className="text-muted-foreground font-bold text-xs uppercase tracking-wider mt-1 opacity-80">
+                                    <p className="text-muted-foreground font-bold text-[10px] uppercase tracking-wider mt-0.5 opacity-80">
                                         {completedCount} / {totalCount} Tasks Completed
                                     </p>
                                 </div>
                                 <button
                                     onClick={onClose}
-                                    className="p-2 bg-muted/50 hover:bg-red-500/10 hover:text-red-500 rounded-full transition-all text-muted-foreground"
+                                    className="p-1.5 bg-muted/50 hover:bg-red-500/10 hover:text-red-500 rounded-full transition-all text-muted-foreground"
                                 >
-                                    <X className="w-5 h-5" strokeWidth={3} />
+                                    <X className="w-4 h-4" strokeWidth={3} />
                                 </button>
                             </div>
 
                             {/* Content Scrollable */}
-                            <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-hide">
+                            <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-hide">
                                 {/* 1. Frog Display Section */}
-                                <div className="flex justify-center pb-4 border-b border-border/40 border-dashed">
-                                    <div className="scale-90 transform-origin-center">
+                                <div className="flex justify-center pb-0 border-b border-border/40 border-dashed">
+                                    <div className="scale-100 transform-origin-center -my-1">
                                         <FrogDisplay
                                             {...frogProps}
                                             frogRef={frogRef}
@@ -121,13 +152,15 @@ export default function DayDetailSheet({
                                             total={totalCount}
                                             openWardrobe={wardrobeOpen}
                                             onOpenChange={setWardrobeOpen}
+                                            mouthOpen={!!grab} // Open mouth when grabbing
+                                            mouthOffset={{ y: -4 }}
                                         />
                                     </div>
                                 </div>
 
                                 {/* 2. Tasks List */}
-                                <div className="space-y-3 pb-12">
-                                    <h3 className="font-black text-muted-foreground/40 uppercase tracking-widest text-[10px] text-center mb-2">
+                                <div className="space-y-1 pb-8">
+                                    <h3 className="font-black text-muted-foreground/40 uppercase tracking-widest text-[9px] text-center mb-0">
                                         Activity Log
                                     </h3>
 
@@ -147,9 +180,12 @@ export default function DayDetailSheet({
                                                     type={task.type}
                                                     tags={task.tags}
                                                     date={date}
-                                                    onToggle={onToggleTask}
-                                                    setFlyRef={(el) => setFlyRef?.(uniqueKey, el)}
-                                                    isEaten={visuallyCompleted?.has(uniqueKey)}
+                                                    onToggle={handleToggleProxy}
+                                                    setFlyRef={(el) => {
+                                                        if (el) flyRefs.current[uniqueKey] = el;
+                                                        else delete flyRefs.current[uniqueKey];
+                                                    }}
+                                                    isEaten={visuallyDone?.has(uniqueKey)}
                                                     userTags={userTags}
                                                 />
                                             );
@@ -159,6 +195,56 @@ export default function DayDetailSheet({
                             </div>
                         </motion.div>
                     </div>
+
+                    {/* SVG Tongue Overlay (Z-index high to overlap sheet) */}
+                    {grab && (
+                        <svg
+                            key={grab.startAt}
+                            className="fixed inset-0 z-[1100] pointer-events-none"
+                            width={vp.w}
+                            height={vp.h}
+                            viewBox={`0 0 ${vp.w} ${vp.h}`}
+                            preserveAspectRatio="none"
+                            style={{ width: vp.w, height: vp.h }}
+                        >
+                            <defs>
+                                <linearGradient id="tongue-grad-history" x1="0" y1="0" x2="0" y2="1">
+                                    <stop stopColor="#ff6b6b" />
+                                    <stop offset="1" stopColor="#f43f5e" />
+                                </linearGradient>
+                            </defs>
+                            <motion.path
+                                key={`tongue-${grab.startAt}`}
+                                ref={tonguePathEl}
+                                d="M0 0 L0 0"
+                                fill="none"
+                                stroke="url(#tongue-grad-history)"
+                                strokeWidth={TONGUE_STROKE}
+                                strokeLinecap="round"
+                                vectorEffect="non-scaling-stroke"
+                                initial={{ pathLength: 0 }}
+                                animate={{ pathLength: [0, 1, 0] }}
+                                transition={{
+                                    delay: OFFSET_MS / 1000,
+                                    duration: TONGUE_MS / 1000,
+                                    times: [0, HIT_AT, 1],
+                                    ease: 'linear',
+                                }}
+                            />
+                            {tipVisible && tip && (
+                                <g transform={`translate(${tip.x}, ${tip.y})`}>
+                                    <circle r={10} fill="transparent" />
+                                    <image
+                                        href="/fly.svg"
+                                        x={-24 / 2}
+                                        y={-24 / 2}
+                                        width={24}
+                                        height={24}
+                                    />
+                                </g>
+                            )}
+                        </svg>
+                    )}
                 </>
             )}
         </AnimatePresence>,

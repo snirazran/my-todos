@@ -144,7 +144,7 @@ export default function HistoryPage() {
 
    // Refactored Toggle for Popup
    const handleToggleTask = async (taskId: string, date: string, currentStatus: boolean) => {
-      // Optimistic update in both Calendar Data and Stats Data
+      // Optimistic update
       const updateData = (prev: any[]) => prev.map(day => {
          if (day.date !== date) return day;
          return {
@@ -200,47 +200,41 @@ export default function HistoryPage() {
       <main className="min-h-screen pb-12 bg-background flex flex-col items-center">
          <div className="w-full max-w-6xl px-4 py-8 md:px-8">
 
-            {/* Header */}
-            <div className="flex items-center justify-center mb-10 px-2 relative">
-               <div className="flex flex-col items-center">
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground/50">
-                     Overview
-                  </span>
-                  <h1 className="text-xl font-black tracking-tight text-foreground">
-                     History
-                  </h1>
+            {/* Main Content - Constrained */}
+            <div className="flex flex-col items-center w-full max-w-2xl gap-6 mx-auto">
+
+               {/* Calendar */}
+               <div className="w-full relative">
+                  {loadingCalendar && (
+                     <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-3xl">
+                        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                     </div>
+                  )}
+                  <HistoryCalendar
+                     currentDate={viewDate}
+                     onDateChange={setViewDate}
+                     selectedDate={selectedDate}
+                     onSelectDate={setSelectedDate}
+                     historyData={calendarData}
+                     disableSwipe={!!selectedDate}
+                  />
+               </div>
+
+               {/* Insights Module */}
+               <div className="w-full">
+                  <HistoryInsights
+                     historyData={filteredStatsData}
+                     stats={statsSummary}
+                     dateRange={statsFilter}
+                     onDateRangeChange={setStatsFilter}
+                     customDateRange={{ from: customFrom, to: customTo }}
+                     onCustomDateChange={(r) => { setCustomFrom(r.from); setCustomTo(r.to); }}
+                     selectedTags={selectedTagIds}
+                     onTagsChange={setSelectedTagIds}
+                     availableTags={availableTags}
+                  />
                </div>
             </div>
-
-            {/* Calendar */}
-            <div className="relative mb-8">
-               {loadingCalendar && (
-                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-3xl">
-                     <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                  </div>
-               )}
-               <HistoryCalendar
-                  currentDate={viewDate}
-                  onDateChange={setViewDate}
-                  selectedDate={selectedDate}
-                  onSelectDate={setSelectedDate}
-                  historyData={calendarData}
-                  disableSwipe={!!selectedDate}
-               />
-            </div>
-
-            {/* Insights Module */}
-            <HistoryInsights
-               historyData={filteredStatsData}
-               stats={statsSummary}
-               dateRange={statsFilter}
-               onDateRangeChange={setStatsFilter}
-               customDateRange={{ from: customFrom, to: customTo }}
-               onCustomDateChange={(r) => { setCustomFrom(r.from); setCustomTo(r.to); }}
-               selectedTags={selectedTagIds}
-               onTagsChange={setSelectedTagIds}
-               availableTags={availableTags}
-            />
 
             {/* Day Popup */}
             <DayDetailSheet
@@ -249,7 +243,12 @@ export default function HistoryPage() {
                date={selectedDate || format(new Date(), 'yyyy-MM-dd')}
                tasks={selectedDayTasks}
                onToggleTask={handleToggleTask}
-               frogProps={frogProps}
+               frogProps={{
+                  ...frogProps,
+                  // flyTargets no longer needed to be passed if managed internally or if passed as empty here (DayDetailSheet ignores it now)
+                  // But wait, the hook in DayDetailSheet uses local refs.
+                  // The FrogDisplay might need props, but DayDetailSheet handles the FrogDisplay wrapper.
+               }}
             />
 
          </div>

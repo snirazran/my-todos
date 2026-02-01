@@ -57,7 +57,8 @@ export default function HistoryTaskCard({
             className={cn(
                 "group relative flex items-center gap-1.5 px-2 py-3.5 transition-all duration-200 rounded-xl border shadow-sm select-none cursor-pointer",
                 "bg-card border-border/40 md:hover:border-border md:hover:shadow-md",
-                displayedCompleted && "bg-muted/30"
+                // Remove custom bg for completed to match standard list behavior or keep subtle if desired
+                // Standard list doesn't grey out background, just text opacity
             )}
             onClick={handleToggle}
         >

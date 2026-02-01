@@ -36,12 +36,12 @@ export default function HistoryInsights({
 }: HistoryInsightsProps) {
 
     return (
-        <div className="w-full max-w-4xl mx-auto mt-8 bg-card/40 backdrop-blur-xl border border-border/50 rounded-[32px] p-6 shadow-sm">
+        <div className="w-full mt-4 bg-card/40 backdrop-blur-xl border border-border/50 rounded-[24px] p-4 shadow-sm">
             {/* Header */}
-            <div className="flex items-center justify-between mb-6 px-2">
+            <div className="flex items-center justify-between mb-4 px-1">
                 <div>
-                    <h2 className="text-2xl font-black tracking-tight flex items-center gap-2 text-foreground">
-                        <BarChart3 className="w-6 h-6 text-primary" />
+                    <h2 className="text-lg font-black tracking-tight flex items-center gap-2 text-foreground">
+                        <BarChart3 className="w-5 h-5 text-primary" />
                         Insights
                     </h2>
                     <p className="text-xs font-bold text-muted-foreground/60 uppercase tracking-widest mt-0.5">
