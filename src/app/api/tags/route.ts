@@ -16,9 +16,18 @@ export async function GET(req: NextRequest) {
   }
 
   await connectMongo();
-  const user = await UserModel.findById(session.user.id, { tags: 1 }).lean();
-  // Ensure tags is always an array
-  return NextResponse.json({ tags: user?.tags ?? [] });
+  const user = await UserModel.findById(session.user.id, { tags: 1, premiumUntil: 1 }).lean();
+  
+  const now = new Date();
+  const isPremium = user?.premiumUntil ? new Date(user.premiumUntil) > now : false;
+  const freeLimit = 3;
+
+  const tags = (user?.tags ?? []).map((tag: any, index: number) => ({
+    ...tag,
+    disabled: !isPremium && index >= freeLimit
+  }));
+
+  return NextResponse.json({ tags, isPremium });
 }
 
 export async function POST(req: NextRequest) {
@@ -39,9 +48,16 @@ export async function POST(req: NextRequest) {
 
   await connectMongo();
   
-  const user = await UserModel.findById(session.user.id, { tags: 1 }).lean();
-  if (user?.tags && user.tags.length >= 15) {
-    return NextResponse.json({ error: 'Tag limit reached (max 15)' }, { status: 400 });
+  const user = await UserModel.findById(session.user.id, { tags: 1, premiumUntil: 1 }).lean();
+
+  const now = new Date();
+  const isPremium = user?.premiumUntil ? new Date(user.premiumUntil) > now : false;
+  const TAG_LIMIT = isPremium ? 50 : 3;
+
+  if (user?.tags && user.tags.length >= TAG_LIMIT) {
+    return NextResponse.json({ 
+      error: `Tag limit reached (${user.tags.length}/${TAG_LIMIT}). ${!isPremium ? 'Upgrade to Premium for more!' : ''}` 
+    }, { status: 400 });
   }
   
   const newTag = {

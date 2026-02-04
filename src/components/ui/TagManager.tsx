@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import useSWR, { mutate } from 'swr';
-import { Tag, Palette, Plus, X, Loader2, Pencil, Check } from 'lucide-react';
+import { Tag, Palette, Plus, X, Loader2, Pencil, Check, Lock } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const TAG_COLORS = [
@@ -25,7 +25,7 @@ const TAG_COLORS = [
 ];
 
 const TAG_MAX_LENGTH = 20;
-const MAX_SAVED_TAGS = 15;
+const MAX_SAVED_TAGS = 50;
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -33,6 +33,7 @@ type SavedTag = {
   id: string;
   name: string;
   color: string;
+  disabled?: boolean;
 };
 
 interface TagManagerProps {
@@ -42,6 +43,8 @@ interface TagManagerProps {
   onOpenChange: (open: boolean) => void;
 }
 
+import { PremiumLimitDialog } from './PremiumLimitDialog';
+
 export default function TagManager({ selectedTags, onTagsChange, open, onOpenChange }: TagManagerProps) {
   const { data: tagsData } = useSWR('/api/tags', fetcher);
   const savedTags: SavedTag[] = tagsData?.tags || [];
@@ -50,6 +53,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [newTagColor, setNewTagColor] = useState(TAG_COLORS[5].value);
   const [manageTagsMode, setManageTagsMode] = useState(false);
+  const [showPremiumLimit, setShowPremiumLimit] = useState(false);
   
   const [isCreatingTag, setIsCreatingTag] = useState(false);
 
@@ -86,7 +90,11 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
         setShowColorPicker(false);
     } else {
         // New tag
-        if (savedTags.length >= MAX_SAVED_TAGS) {
+        const isPremium = tagsData?.isPremium;
+        const limit = isPremium ? 50 : 3;
+        
+        if (savedTags.length >= limit) {
+            setShowPremiumLimit(true);
             return;
         }
 
@@ -103,7 +111,13 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
     const trimmed = tagInput.trim();
     if (!trimmed) return;
 
-    if (savedTags.length >= MAX_SAVED_TAGS) return;
+    const isPremium = tagsData?.isPremium;
+    const limit = isPremium ? 50 : 3;
+
+    if (savedTags.length >= limit) {
+        setShowPremiumLimit(true);
+        return;
+    }
 
     setIsCreatingTag(true);
     try {
@@ -192,7 +206,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                     <button
                         type="button"
                         onClick={handleAddTag}
-                        disabled={!tagInput || (!savedTags.find(t => t.name.toLowerCase() === tagInput.trim().toLowerCase()) && savedTags.length >= MAX_SAVED_TAGS)}
+                        disabled={!tagInput}
                         className="absolute right-1.5 p-1.5 bg-primary/10 text-primary rounded-lg hover:bg-primary/20 disabled:opacity-30 disabled:cursor-not-allowed transition-opacity"
                     >
                         {showColorPicker ? <Palette className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
@@ -257,7 +271,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
                                 <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                                    Available Tags <span className={savedTags.length >= MAX_SAVED_TAGS ? "text-destructive" : ""}>({savedTags.length}/{MAX_SAVED_TAGS})</span>
+                                    Available Tags <span className={savedTags.length >= (tagsData?.isPremium ? 50 : 3) ? "text-destructive" : ""}>({savedTags.length}/{tagsData?.isPremium ? 50 : 3})</span>
                                 </span>
                                 {!manageTagsMode && (
                                     <span className="hidden sm:inline text-[10px] text-muted-foreground/50 italic">
@@ -312,6 +326,11 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                                 deleteSavedTag(st.id, st.name, e);
                                                 return;
                                             }
+                                            if (st.disabled) {
+                                                setShowPremiumLimit(true);
+                                                return;
+                                            }
+
                                             if (isSelected) removeTag(st.id);
                                             else onTagsChange([...selectedTags, st.id]);
                                         }}
@@ -322,18 +341,21 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                             ${
                                             isSelected
                                                 ? 'ring-2 ring-offset-1 ring-offset-background'
-                                                : 'hover:opacity-80 opacity-70 bg-card'
+                                                : st.disabled
+                                                    ? 'opacity-60 grayscale-[0.8] cursor-pointer bg-muted/50 border-dashed hover:opacity-80 hover:bg-muted'
+                                                    : 'hover:opacity-80 opacity-70 bg-card'
                                             }
                                         `}
                                         style={{
                                             backgroundColor: isSelected ? `${st.color}20` : undefined,
                                             color: manageTagsMode ? '#ef4444' : st.color,
-                                            borderColor: manageTagsMode ? '#ef4444' : (isSelected ? `${st.color}40` : `${st.color}20`),
+                                            borderColor: manageTagsMode ? '#ef4444' : (isSelected ? `${st.color}40` : st.disabled ? 'currentColor' : `${st.color}20`),
                                             boxShadow: isSelected ? `0 0 0 1px ${st.color}` : 'none',
                                             opacity: manageTagsMode && !isSelected ? 1 : undefined
                                         }}
                                     >
                                         {st.name}
+                                        {st.disabled && <Lock className="w-3 h-3 ml-1.5 opacity-70" />}
                                         {manageTagsMode && (
                                             <div className="absolute -top-2 -left-2 bg-red-500 text-white rounded-full p-0.5 shadow-sm z-10">
                                                 <X className="w-3 h-3" />
@@ -349,6 +371,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
             </div>
         </motion.div>
       )}
+      <PremiumLimitDialog open={showPremiumLimit} onClose={() => setShowPremiumLimit(false)} />
     </AnimatePresence>
   );
 }
