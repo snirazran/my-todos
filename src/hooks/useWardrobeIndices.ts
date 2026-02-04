@@ -24,6 +24,8 @@ export function useWardrobeIndices(enabled: boolean) {
       hat: getIndex(eq.hat),
       scarf: getIndex(eq.scarf),
       hand_item: getIndex(eq.hand_item),
+      glasses: getIndex(eq.glasses),
+      mood: 0, // Default 0 for now
     },
     wardrobeData: data,
   };

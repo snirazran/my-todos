@@ -115,6 +115,8 @@ export function ItemCard({
     hat: 0,
     scarf: 0,
     hand_item: 0,
+    glasses: 0,
+    mood: 0,
     [item.slot]: item.riveIndex,
   };
 

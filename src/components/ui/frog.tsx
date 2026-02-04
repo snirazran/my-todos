@@ -27,6 +27,8 @@ const INPUTS = {
   hat: 'hat',
   scarf: 'scarf',
   hand_item: 'hand_item',
+  glasses: 'glasses',
+  mood: 'mood',
 } as const;
 
 export type WardrobeSlot = keyof typeof INPUTS;
@@ -93,6 +95,8 @@ const Frog = memo(
       STATE_MACHINE,
       INPUTS.hand_item
     );
+    const glassesInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.glasses);
+    const moodInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.mood);
 
     /* ---- mouth trigger ---- */
     useEffect(() => {
@@ -110,7 +114,11 @@ const Frog = memo(
         scarfInput.value = indices.scarf;
       if (typeof indices.hand_item === 'number' && handItemInput)
         handItemInput.value = indices.hand_item;
-    }, [indices, skinInput, hatInput, scarfInput, handItemInput]);
+      if (typeof indices.glasses === 'number' && glassesInput)
+        glassesInput.value = indices.glasses;
+      if (typeof indices.mood === 'number' && moodInput)
+        moodInput.value = indices.mood;
+    }, [indices, skinInput, hatInput, scarfInput, handItemInput, glassesInput, moodInput]);
 
     /* ---- expose helpers to parent ---- */
     useImperativeHandle(ref, () => ({
@@ -142,6 +150,8 @@ const Frog = memo(
         if (slot === 'hat' && hatInput) hatInput.value = index;
         if (slot === 'scarf' && scarfInput) scarfInput.value = index;
         if (slot === 'hand_item' && handItemInput) handItemInput.value = index;
+        if (slot === 'glasses' && glassesInput) glassesInput.value = index;
+        if (slot === 'mood' && moodInput) moodInput.value = index;
       },
     }));
 

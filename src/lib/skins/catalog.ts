@@ -1,5 +1,5 @@
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
-export type WardrobeSlot = 'skin' | 'hat' | 'scarf' | 'hand_item' | 'container';
+export type WardrobeSlot = 'skin' | 'hat' | 'scarf' | 'hand_item' | 'glasses' | 'container';
 
 export type ItemDef = {
   id: string;
@@ -30,8 +30,8 @@ export const rarityRank: Record<Rarity, number> = {
 export const CATALOG: Readonly<ItemDef[]> = [
   // --- SKINS ---
   {
-    id: 'skin_teal',
-    name: 'Teal Frog',
+    id: 'skin_blue',
+    name: 'Blue Frog',
     slot: 'skin',
     rarity: 'uncommon',
     riveIndex: 1,
@@ -67,6 +67,35 @@ export const CATALOG: Readonly<ItemDef[]> = [
     icon: '/skins/hat/hat2.png', // Placeholder path
     priceFlies: 1500,
   },
+  {
+    id: 'hat_headphones',
+    name: 'Headphones',
+    slot: 'hat',
+    rarity: 'epic',
+    riveIndex: 3,
+    icon: '/skins/hat/hat3.png', // Placeholder path
+    priceFlies: 1800,
+  },
+  {
+    id: 'hat_pirate',
+    name: 'Pirate Hat',
+    slot: 'hat',
+    rarity: 'rare',
+    riveIndex: 4,
+    icon: '/skins/hat/hat4.png', // Placeholder path
+    priceFlies: 1500,
+  },
+
+  // --- GLASSES ---
+  {
+    id: 'glasses_patch',
+    name: 'Eye Patch',
+    slot: 'glasses',
+    rarity: 'rare',
+    riveIndex: 1,
+    icon: '/skins/glasses/glasses1.png', // Placeholder path
+    priceFlies: 1200,
+  },
 
   // --- SCARVES ---
   {
@@ -85,9 +114,27 @@ export const CATALOG: Readonly<ItemDef[]> = [
     name: 'Wizard Wand',
     slot: 'hand_item',
     rarity: 'legendary',
-    riveIndex: 3,
+    riveIndex: 1,
     icon: '/skins/hand/hand1.png', // Placeholder path
     priceFlies: 3000,
+  },
+  {
+    id: 'hand_controller',
+    name: 'Controller',
+    slot: 'hand_item',
+    rarity: 'epic',
+    riveIndex: 2,
+    icon: '/skins/hand/hand2.png', // Placeholder path
+    priceFlies: 2000,
+  },
+  {
+    id: 'hand_sword',
+    name: 'Pirate Sword',
+    slot: 'hand_item',
+    rarity: 'rare',
+    riveIndex: 3,
+    icon: '/skins/hand/hand3.png', // Placeholder path
+    priceFlies: 1600,
   },
 
   // --- CONTAINERS ---
