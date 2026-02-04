@@ -270,6 +270,16 @@ export function CurrencyShop({
                   })}
                 </div>
 
+                {/* Premium Management Section (Admin/Debug) */}
+                <div className="mt-8 p-4 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-2xl border border-indigo-500/20">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-indigo-500 mb-3 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    Premium Status
+                  </h3>
+                  
+                  <PremiumControls />
+                </div>
+
                 {/* Footer Info */}
                 <div className="mt-8 text-center space-y-2 pb-8">
                   <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
@@ -287,5 +297,90 @@ export function CurrencyShop({
       )}
     </AnimatePresence>,
     document.body
+  );
+}
+
+function PremiumControls() {
+  const [premiumUntil, setPremiumUntil] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Fetch status on mount
+  useEffect(() => {
+    fetch('/api/user')
+      .then(res => res.json())
+      .then(data => {
+        setPremiumUntil(data.premiumUntil);
+      })
+      .catch(err => console.error("Failed to fetch user data", err));
+  }, []);
+
+  const handleUpdate = async (action: 'add' | 'remove', days?: number) => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/user/premium', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, days }),
+      });
+      const data = await res.json();
+      if (data.success) {
+         setPremiumUntil(data.premiumUntil);
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isPremium = premiumUntil && new Date(premiumUntil) > new Date();
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+         <span className={cn(
+           "text-xs font-bold px-2 py-1 rounded-lg border",
+           isPremium ? "bg-indigo-500 text-white border-indigo-600" : "bg-muted text-muted-foreground border-border"
+         )}>
+           {isPremium ? "PREMIUM ACTIVE" : "FREE PLAN"}
+         </span>
+         {isPremium && (
+           <span className="text-[10px] font-medium text-muted-foreground">
+             Expires: {new Date(premiumUntil!).toLocaleDateString()}
+           </span>
+         )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          disabled={loading}
+          onClick={() => handleUpdate('add', 7)}
+          className="p-2 bg-card border border-border rounded-xl text-[10px] font-bold hover:bg-indigo-500/10 hover:border-indigo-500/50 transition-all"
+        >
+          + 7 Days Free
+        </button>
+        <button
+           disabled={loading}
+           onClick={() => handleUpdate('add', 30)}
+           className="p-2 bg-card border border-border rounded-xl text-[10px] font-bold hover:bg-purple-500/10 hover:border-purple-500/50 transition-all"
+        >
+          + 1 Month
+        </button>
+        <button
+           disabled={loading}
+           onClick={() => handleUpdate('add', 1/1440)}
+           className="p-2 bg-card border border-border rounded-xl text-[10px] font-bold hover:bg-yellow-500/10 hover:border-yellow-500/50 transition-all"
+        >
+          + 1 Min (Test)
+        </button>
+        <button
+           disabled={loading}
+           onClick={() => handleUpdate('remove')}
+           className="col-span-2 p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-[10px] font-bold hover:bg-red-500/20 hover:border-red-500/40 transition-all"
+        >
+          Remove Premium
+        </button>
+      </div>
+    </div>
   );
 }

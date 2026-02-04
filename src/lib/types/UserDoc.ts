@@ -57,4 +57,5 @@ export type UserDoc = {
   skins?: UserSkins;
   statistics?: UserStatistics;
   tags?: UserTag[];
+  premiumUntil?: Date;
 };

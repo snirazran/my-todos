@@ -12,14 +12,19 @@ export async function GET(req: NextRequest) {
 
   try {
     await connectMongo();
-    const user = await UserModel.findById(session.user.id).select('createdAt').lean();
+    const user = await UserModel.findById(session.user.id).select('createdAt premiumUntil').lean();
     
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    const now = new Date();
+    const isPremium = user.premiumUntil ? new Date(user.premiumUntil) > now : false;
+
     return NextResponse.json({
       createdAt: user.createdAt.toISOString(),
+      premiumUntil: user.premiumUntil,
+      isPremium,
     });
   } catch (error) {
     console.error('Error fetching user data:', error);

@@ -44,6 +44,7 @@ const UserSchema = new Schema<UserDoc>(
       ],
       default: [],
     },
+    premiumUntil: { type: Date },
   },
   { collection: 'users' }
 );
