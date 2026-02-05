@@ -347,12 +347,16 @@ export function WardrobePanel({
   }, [data, activeFilter, sortBy]);
 
   const balance = data?.wardrobe?.flies ?? 0;
+  
+  // Track if touch started from right edge (for drag-to-close gesture)
+  const [isDragEnabled, setIsDragEnabled] = useState(false);
+  const EDGE_THRESHOLD = 80; // pixels from right edge
 
   if (!mounted) return null;
 
   const mobileVariants = {
     initial: { x: '-100%', opacity: 1 },
-    animate: { x: '0%', opacity: 1 },
+    animate: { x: 0, opacity: 1 },
     exit: { x: '-100%', opacity: 1 }
   };
 
@@ -390,14 +394,44 @@ export function WardrobePanel({
                 dragElastic={{ right: 0, left: 1 }}
                 dragMomentum={false}
                 dragSnapToOrigin
+                dragDirectionLock
+                onPointerDown={(e) => {
+                  if (isDesktop) return;
+                  // Track if touch started from right edge
+                  const touchX = e.clientX;
+                  const windowWidth = window.innerWidth;
+                  const distanceFromRight = windowWidth - touchX;
+                  setIsDragEnabled(distanceFromRight <= EDGE_THRESHOLD);
+                }}
+                onDragStart={(e, info) => {
+                  // Cancel drag if it didn't start from the right edge
+                  if (!isDragEnabled) {
+                    return false; // This prevents the drag from starting
+                  }
+                }}
+                onDirectionLock={(axis) => {
+                  // If user is scrolling vertically, disable future drags
+                  if (axis === "y") {
+                    setIsDragEnabled(false);
+                    return;
+                  }
+                }}
                 onDragEnd={(e, { offset, velocity }) => {
                   // Easier close threshold
                   if (offset.x < -50 || velocity.x < -200) {
                     onOpenChange(false);
                   }
+                  setIsDragEnabled(false);
                 }}
-                transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-                style={{ touchAction: 'pan-y' }} // Allow vertical scroll, capture horizontal for drag
+                onPointerUp={() => {
+                  setIsDragEnabled(false);
+                }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
+                style={{ 
+                  touchAction: 'pan-y',
+                  willChange: 'transform',
+                  transform: 'translateZ(0)' // Force GPU acceleration
+                }}
                 className={cn(
                   "pointer-events-auto w-full sm:max-w-[95vw] lg:max-w-[1200px] h-[100dvh] sm:h-[90vh] flex flex-col bg-background shadow-2xl overflow-hidden relative",
                   "rounded-none sm:rounded-[40px] border-r sm:border border-border/40"
