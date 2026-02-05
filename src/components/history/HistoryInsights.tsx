@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { BarChart3 } from 'lucide-react';
-import HistoryMetrics from './HistoryMetrics';
+import InsightsGrid from './InsightsGrid';
 import HistoryTimeSelector, { DateRangeOption } from './HistoryTimeSelector';
 
 type HistoryInsightsProps = {
@@ -64,13 +64,12 @@ export default function HistoryInsights({
                     />
                 </div>
 
-                {/* Metrics Section */}
+                {/* Metrics Section (Now Customizable Grid) */}
                 <div className="space-y-4">
-                    <HistoryMetrics
+                    <InsightsGrid
                         historyData={historyData}
-                        completedTasks={stats.completed}
-                        completionRate={stats.completionRate}
-                        totalTasks={stats.total}
+                        stats={stats}
+                        dateRange={dateRange}
                     />
                 </div>
             </div>
