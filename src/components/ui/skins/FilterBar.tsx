@@ -9,6 +9,7 @@ import {
   Ghost,
   Ribbon,
   Gift,
+  Glasses,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ export type FilterCategory =
   | 'scarf'
   | 'body'
   | 'held'
+  | 'glasses'
   | 'costume';
 
 const CATEGORY_CONFIG: Record<
@@ -31,6 +33,7 @@ const CATEGORY_CONFIG: Record<
   scarf: { label: 'Scarves', icon: <Ribbon className="w-5 h-5" /> },
   body: { label: 'Body', icon: <Shirt className="w-5 h-5" /> },
   held: { label: 'Held', icon: <Hand className="w-5 h-5" /> },
+  glasses: { label: 'Glasses', icon: <Glasses className="w-5 h-5" /> },
   costume: { label: 'Costumes', icon: <Ghost className="w-5 h-5" /> },
 };
 
@@ -58,6 +61,7 @@ export function FilterBar({
     'scarf',
     'body',
     'held',
+    'glasses',
     'costume',
   ];
 
@@ -168,8 +172,8 @@ export function FilterBar({
                 'relative flex-none flex items-center gap-2 px-5 py-3 rounded-2xl transition-all duration-200 border-[2px] shadow-sm select-none',
                 'text-sm font-bold whitespace-nowrap',
                 isActive
-                  ? 'bg-primary border-primary text-primary-foreground shadow-primary/30'
-                  : 'bg-card text-muted-foreground border-border hover:border-primary/50 hover:bg-muted hover:text-foreground'
+                  ? 'bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/20 shadow-none'
+                  : 'bg-muted/40 text-muted-foreground border-transparent hover:bg-muted/60 hover:text-foreground'
               )}
             >
               {conf.icon}

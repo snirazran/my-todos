@@ -36,7 +36,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'uncommon',
     riveIndex: 1,
     icon: '/skins/skin/skin1.png', // Placeholder path
-    priceFlies: 400,
+    priceFlies: 200,
   },
   {
     id: 'skin_pink',
@@ -45,7 +45,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'rare',
     riveIndex: 2,
     icon: '/skins/skin/skin3.png', // Placeholder path
-    priceFlies: 900,
+    priceFlies: 500,
   },
 
   // --- HATS ---
@@ -65,7 +65,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'epic',
     riveIndex: 2,
     icon: '/skins/hat/hat2.png', // Placeholder path
-    priceFlies: 1500,
+    priceFlies: 1200,
   },
   {
     id: 'hat_headphones',
@@ -74,7 +74,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'epic',
     riveIndex: 3,
     icon: '/skins/hat/hat3.png', // Placeholder path
-    priceFlies: 1800,
+    priceFlies: 1400,
   },
   {
     id: 'hat_pirate',
@@ -83,7 +83,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'rare',
     riveIndex: 4,
     icon: '/skins/hat/hat4.png', // Placeholder path
-    priceFlies: 1500,
+    priceFlies: 600,
   },
 
   // --- GLASSES ---
@@ -94,7 +94,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'rare',
     riveIndex: 1,
     icon: '/skins/glasses/glasses1.png', // Placeholder path
-    priceFlies: 1200,
+    priceFlies: 550,
   },
 
   // --- SCARVES ---
@@ -105,7 +105,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'common',
     riveIndex: 1,
     icon: '/skins/scarf/scarf1.png', // Placeholder path
-    priceFlies: 250,
+    priceFlies: 50,
   },
 
   // --- HAND ---
@@ -116,7 +116,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'legendary',
     riveIndex: 1,
     icon: '/skins/hand/hand1.png', // Placeholder path
-    priceFlies: 3000,
+    priceFlies: 2800,
   },
   {
     id: 'hand_controller',
@@ -125,7 +125,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'epic',
     riveIndex: 2,
     icon: '/skins/hand/hand2.png', // Placeholder path
-    priceFlies: 2000,
+    priceFlies: 1500,
   },
   {
     id: 'hand_sword',
@@ -134,7 +134,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'rare',
     riveIndex: 3,
     icon: '/skins/hand/hand3.png', // Placeholder path
-    priceFlies: 1600,
+    priceFlies: 650,
   },
 
   // --- CONTAINERS ---
@@ -145,7 +145,7 @@ export const CATALOG: Readonly<ItemDef[]> = [
     rarity: 'common',
     riveIndex: 0,
     icon: '/skins/container/gift.png',
-    priceFlies: 500,
+    priceFlies: 100,
   },
 ];
 

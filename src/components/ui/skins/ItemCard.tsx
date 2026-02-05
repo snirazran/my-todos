@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Check } from 'lucide-react';
+import { Check, Lock, Loader2, CircleDollarSign } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { ItemDef } from '@/lib/skins/catalog';
@@ -94,13 +94,15 @@ export function ItemCard({
   mode,
   selectedCount,
   isNew,
+  onSell, // NEW
 }: {
   item: ItemDef;
   ownedCount: number;
   isEquipped: boolean;
   canAfford: boolean;
-  onAction: (e?: React.MouseEvent) => void;
-  actionLabel: React.ReactNode;
+  onAction?: (e: React.MouseEvent) => void;
+  onSell?: () => void; // NEW
+  actionLabel?: React.ReactNode;
   actionLoading: boolean;
   mode: 'inventory' | 'shop' | 'trade';
   selectedCount?: number;
@@ -126,7 +128,7 @@ export function ItemCard({
       setTimeout(() => setShake(false), 500);
       return;
     }
-    if (!actionLoading) {
+    if (!actionLoading && onAction && e) {
       onAction(e);
     }
   };
@@ -143,7 +145,7 @@ export function ItemCard({
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
       className={cn(
-        'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl md:rounded-[24px] border-[3px] overflow-hidden cursor-pointer active:scale-[0.98] w-full max-w-[240px] mx-auto',
+        'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl md:rounded-[32px] border-[3px] overflow-hidden cursor-pointer active:scale-95 w-full max-w-[240px] mx-auto',
         config.border,
         config.bg,
         isEquipped
@@ -191,10 +193,9 @@ export function ItemCard({
         {config.label}
       </div>
 
-      {/* Icon Container */}
       <div
         className={cn(
-          'mt-4 mb-2 md:mt-5 md:mb-3 mx-auto w-full aspect-[1.1/1] md:aspect-[1.2/1] rounded-xl md:rounded-2xl flex items-center justify-center relative overflow-hidden',
+          'mt-4 mb-2 md:mt-5 md:mb-3 mx-auto w-full aspect-[1.1/1] md:aspect-[1.2/1] rounded-xl md:rounded-[24px] flex items-center justify-center relative overflow-hidden',
           'bg-gradient-to-br shadow-inner',
           config.gradient
         )}
@@ -236,20 +237,7 @@ export function ItemCard({
           {item.name}
         </h4>
 
-        {mode === 'shop' && (
-          <div className="flex items-center justify-center gap-1 text-[10px] md:text-sm font-black bg-black/5 dark:bg-white/10 px-2 py-0.5 rounded-full">
-            <Fly size={14} className="md:w-4 md:h-4" />
-            <span
-              className={
-                canAfford
-                  ? 'text-foreground'
-                  : 'text-destructive'
-              }
-            >
-              {item.priceFlies}
-            </span>
-          </div>
-        )}
+
       </div>
 
       {/* Actions */}
@@ -279,45 +267,57 @@ export function ItemCard({
           </div>
         )}
 
+        {/* Shop Button */}
         {mode === 'shop' && (
-          <MotionButton
-            size="sm"
-            // Remove disabled attribute to allow click events for shake animation
-            // We handle the logic in handleAction
-            className={cn(
-              'h-7 md:h-8 w-full font-black rounded-lg text-[10px] md:text-xs uppercase tracking-wide shadow-md overflow-hidden relative',
-              canAfford
-                ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                : 'bg-muted text-muted-foreground'
-            )}
+          <Button
+            key="buy"
+            variant="secondary"
             onClick={(e) => {
               e.stopPropagation();
-              handleAction(e);
+              onAction?.(e);
             }}
-            whileTap={canAfford ? { scale: 0.95 } : {}}
+            disabled={!canAfford || actionLoading}
+            className={cn(
+              'w-full font-bold transition-all duration-300 shadow-sm active:scale-95 h-7 md:h-8 rounded-lg text-[10px] md:text-xs uppercase tracking-wide',
+              canAfford
+                ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/25'
+                : 'bg-secondary text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 cursor-not-allowed opacity-100', // High contrast error state
+              actionLoading && 'opacity-80 cursor-wait'
+            )}
           >
-            <AnimatePresence mode="wait">
-              {actionLoading ? (
-                <motion.div
-                  key="loading"
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -20, opacity: 0 }}
-                >
-                  ...
-                </motion.div>
-              ) : (
-                <motion.span
-                  key="buy"
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -20, opacity: 0 }}
-                >
-                  Buy
-                </motion.span>
-              )}
-            </AnimatePresence>
-          </MotionButton>
+            {actionLoading ? (
+              <span>...</span>
+            ) : (
+              <span className="flex items-center gap-1">
+                {ownedCount > 0 ? 'Buy' : 'Buy'}
+                <span className={cn("mx-1", canAfford ? "opacity-40" : "opacity-40 text-red-400")}>|</span>
+                <Fly size={18} className={cn(canAfford ? "opacity-80" : "opacity-100")} y={-2} />
+                <span className={cn(canAfford ? "" : "font-black")}>{item.priceFlies}</span>
+              </span>
+            )}
+          </Button>
+        )}
+
+        {/* Sell Button (Inventory Mode) */}
+        {mode === 'inventory' && onSell && (item.priceFlies ?? 0) > 0 && (
+          <div className="mt-2 text-center w-full">
+            <Button
+              variant="ghost"
+              size="sm"
+               onClick={(e) => {
+                 e.stopPropagation();
+                 onSell();
+               }}
+               className="w-full h-7 rounded-lg text-[10px] font-bold uppercase tracking-wide text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900 transition-all shadow-none hover:shadow-sm active:scale-95 gap-1.5"
+            >
+              <span className="flex items-center gap-1">
+                Sell
+                <span className="mx-1 opacity-40">|</span>
+                <Fly size={18} className="opacity-80" y={-3} />
+                +{Math.floor((item.priceFlies || 0) / 2)}
+              </span>
+            </Button>
+          </div>
         )}
       </div>
     </motion.div>
