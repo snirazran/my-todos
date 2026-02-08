@@ -89,13 +89,21 @@ export async function POST(req: NextRequest) {
     return json({ error: 'You do not have any gift boxes to open' }, 403);
   }
 
-  // 2. Atomic swap: decrement box, increment prize
+  // 2. Atomic swap: decrement box, increment prize & update unseen items
+  // We calculate the new unseen list to avoid conflicting $pull and $addToSet on the same field
+  const currentUnseen = user.wardrobe?.unseenItems || [];
+  const nextUnseen = currentUnseen.filter((id) => id !== giftBoxId);
+  // Add prize if not already present (though $addToSet logic implies set behavior, we do it manually for $set)
+  if (!nextUnseen.includes(prize.id)) {
+    nextUnseen.push(prize.id);
+  }
+
   const update: any = {
     $inc: { 
         [`wardrobe.inventory.${giftBoxId}`]: -1,
         [`wardrobe.inventory.${prize.id}`]: 1
     },
-    $addToSet: { 'wardrobe.unseenItems': prize.id }
+    $set: { 'wardrobe.unseenItems': nextUnseen }
   };
 
   await UserModel.updateOne(
