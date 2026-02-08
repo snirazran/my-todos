@@ -387,7 +387,7 @@ export function WardrobePanel({
               <motion.div
                 variants={isDesktop ? desktopVariants : mobileVariants}
                 initial="initial"
-                animate={{ ...desktopVariants.animate, x: 0 }}
+                animate={isDesktop ? { ...desktopVariants.animate, x: 0 } : mobileVariants.animate}
                 exit="exit"
                 drag={!isDesktop ? "x" : false}
                 dragConstraints={{ right: 0, left: -1000 }}
@@ -426,11 +426,10 @@ export function WardrobePanel({
                 onPointerUp={() => {
                   setIsDragEnabled(false);
                 }}
-                transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
+                transition={{ type: 'tween', ease: 'circOut', duration: 0.3 }}
                 style={{ 
                   touchAction: 'pan-y',
-                  willChange: 'transform',
-                  transform: 'translateZ(0)' // Force GPU acceleration
+                  willChange: 'transform'
                 }}
                 className={cn(
                   "pointer-events-auto w-full sm:max-w-[95vw] lg:max-w-[1200px] h-[100dvh] sm:h-[90vh] flex flex-col bg-background shadow-2xl overflow-hidden relative",
@@ -438,7 +437,10 @@ export function WardrobePanel({
                 )}
               >
                 {/* --- HEADER --- */}
-                <div className="relative z-20 px-4 py-4 md:px-8 md:py-6 bg-background/50 backdrop-blur-xl shrink-0 border-b border-border/40">
+                <div className={cn(
+                  "relative z-20 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-border/40",
+                  isDesktop ? "bg-background/50 backdrop-blur-xl" : "bg-background"
+                )}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div>
@@ -496,13 +498,19 @@ export function WardrobePanel({
                 </div>
 
                 {/* --- MAIN CONTENT WRAPPER --- */}
-                <div className="flex flex-col flex-1 min-h-0 bg-background/50 backdrop-blur-2xl">
+                <div className={cn(
+                  "flex flex-col flex-1 min-h-0",
+                  isDesktop ? "bg-background/50 backdrop-blur-2xl" : "bg-background"
+                )}>
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
                     {/* Controls Area (Tabs + Filter) */}
                     <div className="px-4 pt-4 space-y-4 shrink-0 md:px-6 md:pt-5">
                       <div className="flex items-center justify-between gap-2 md:gap-4">
                         {/* NEW TAB DESIGN */}
-                        <TabsList className="flex-1 h-12 md:h-14 p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm flex items-center gap-1">
+                        <TabsList className={cn(
+                          "flex-1 h-12 md:h-14 p-1 rounded-[20px] border border-border/50 shadow-sm flex items-center gap-1",
+                          isDesktop ? "bg-card/80 backdrop-blur-2xl" : "bg-muted/30"
+                        )}>
                           <TabsTrigger
                             value="inventory"
                             className="
@@ -570,13 +578,14 @@ export function WardrobePanel({
                   */}
                     {/* Content Area (Grid) */}
                     <div
-                      className="
-                        flex-1 relative mt-4 overflow-hidden 
+                      className={cn(
+                        "flex-1 relative mt-4 overflow-hidden",
                         /* Mobile Styles */
-                        rounded-t-[32px] border-t border-border/40 bg-card/40 backdrop-blur-md
+                        "rounded-t-[32px] border-t border-border/40",
+                        isDesktop ? "bg-card/40 backdrop-blur-md" : "bg-card/20",
                         /* Desktop Styles */
-                        md:mx-8 md:mb-8 md:rounded-[32px] md:border md:border-border/40 md:shadow-inner
-                      "
+                        "md:mx-8 md:mb-8 md:rounded-[32px] md:border md:border-border/40 md:shadow-inner"
+                      )}
                     >
                       <TabsContent
                         value="inventory"
