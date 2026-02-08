@@ -36,7 +36,7 @@ export function TagDistributionWidget(props: WidgetProps) {
     }, [props.historyData, allTags]);
 
     return (
-        <WidgetBase {...props} className={cn("col-span-2 sm:col-span-1 bg-card/60 backdrop-blur-md border border-border/50 rounded-[20px] shadow-sm hover:bg-muted/30 transition-colors", props.className)}>
+        <WidgetBase {...props} className={cn("col-span-2 sm:col-span-1 shadow-sm hover:bg-muted/30 transition-colors", props.className)}>
             <div className="p-4 flex flex-col h-full gap-3">
                  <div className="flex items-center gap-2 mb-1">
                     <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-indigo-500/10 text-indigo-500">

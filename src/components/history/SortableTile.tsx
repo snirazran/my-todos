@@ -63,7 +63,7 @@ export function SortableTile({ id, children, editMode, onRemove, className }: So
 
             {/* Content Container */}
             <div className={cn(
-                "h-full w-full overflow-hidden rounded-[24px] border border-border/50 bg-card transition-transform",
+                "h-full w-full overflow-hidden rounded-[24px] border border-border bg-card transition-transform",
                 editMode && "scale-95 ring-2 ring-primary/20" // Shrink slightly in edit mode
             )}>
                 {/* Pointer events disabler in edit mode to prevent interacting with widget contents */}

@@ -11,7 +11,7 @@ export function CompletionRateWidget(props: WidgetProps) {
     const rate = props.stats?.completionRate || 0;
 
     return (
-        <WidgetBase {...props} className={cn("col-span-2 sm:col-span-2 bg-card/60 backdrop-blur-md border border-border/50 rounded-[24px] p-6 flex flex-col items-center justify-center text-center gap-2", props.className)}>
+        <WidgetBase {...props} className={cn("col-span-2 sm:col-span-2 p-6 flex flex-col items-center justify-center text-center gap-2", props.className)}>
             <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
                 <Target className="w-24 h-24" />
             </div>

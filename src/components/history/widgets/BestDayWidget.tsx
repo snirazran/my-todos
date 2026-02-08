@@ -23,7 +23,7 @@ export function BestDayWidget(props: WidgetProps) {
     const dateLabel = bestDay ? format(parseISO(bestDay.date), 'MMM d') : '-';
 
     return (
-        <WidgetBase {...props} className={cn("bg-card/60 backdrop-blur-md border border-border/50 rounded-[20px] shadow-sm hover:bg-muted/30 transition-colors", props.className)}>
+        <WidgetBase {...props} className={cn("shadow-sm hover:bg-muted/30 transition-colors", props.className)}>
             <div className="p-4 flex flex-col justify-between h-full gap-3">
                 <div className="w-8 h-8 rounded-xl flex items-center justify-center mb-1 bg-amber-500/10 text-amber-500">
                     <Trophy className="w-4 h-4" strokeWidth={3} />
