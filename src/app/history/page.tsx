@@ -240,6 +240,7 @@ export default function HistoryPage() {
                          selectedTags={selectedTagIds}
                          onTagsChange={setSelectedTagIds}
                          availableTags={availableTags}
+                         isPremium={userData?.isPremium || false}
                       />
                   </div>
                </div>

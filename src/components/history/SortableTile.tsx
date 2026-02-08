@@ -38,7 +38,7 @@ export function SortableTile({ id, children, editMode, onRemove, className }: So
             ref={setNodeRef}
             style={style}
             className={cn(
-                "relative h-full touch-none", // touch-none essential for dragging
+                "relative h-full", // Removed touch-none to allow scrolling
                 className,
                 // Shake animation when in edit mode, but NOT when dragging
                 editMode && !isDragging && "",
