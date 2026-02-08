@@ -349,15 +349,15 @@ export function WardrobePanel({
   const balance = data?.wardrobe?.flies ?? 0;
   
   // Track if touch started from right edge (for drag-to-close gesture)
-  const [isDragEnabled, setIsDragEnabled] = useState(false);
-  const EDGE_THRESHOLD = 80; // pixels from right edge
+  // const [isDragEnabled, setIsDragEnabled] = useState(false);
+  // const EDGE_THRESHOLD = 80; // pixels from right edge
 
   if (!mounted) return null;
 
   const mobileVariants = {
-    initial: { x: '-100%', opacity: 1 },
-    animate: { x: 0, opacity: 1 },
-    exit: { x: '-100%', opacity: 1 }
+    initial: { y: '100%', opacity: 0, scale: 0.96 },
+    animate: { y: 0, opacity: 1, scale: 1 },
+    exit: { y: '100%', opacity: 0, scale: 0.96 }
   };
 
   const desktopVariants = {
@@ -389,57 +389,38 @@ export function WardrobePanel({
                 initial="initial"
                 animate={isDesktop ? { ...desktopVariants.animate, x: 0 } : mobileVariants.animate}
                 exit="exit"
-                drag={!isDesktop ? "x" : false}
-                dragConstraints={{ right: 0, left: -1000 }}
-                dragElastic={{ right: 0, left: 1 }}
+                transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+                drag={!isDesktop ? "y" : false}
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={{ top: 0, bottom: 0.5 }}
                 dragMomentum={false}
                 dragSnapToOrigin
                 dragDirectionLock
-                onPointerDown={(e) => {
-                  if (isDesktop) return;
-                  // Track if touch started from right edge
-                  const touchX = e.clientX;
-                  const windowWidth = window.innerWidth;
-                  const distanceFromRight = windowWidth - touchX;
-                  setIsDragEnabled(distanceFromRight <= EDGE_THRESHOLD);
-                }}
-                onDragStart={(e, info) => {
-                  // Cancel drag if it didn't start from the right edge
-                  if (!isDragEnabled) {
-                    return false; // This prevents the drag from starting
-                  }
-                }}
-                onDirectionLock={(axis) => {
-                  // If user is scrolling vertically, disable future drags
-                  if (axis === "y") {
-                    setIsDragEnabled(false);
-                    return;
-                  }
-                }}
                 onDragEnd={(e, { offset, velocity }) => {
                   // Easier close threshold
-                  if (offset.x < -50 || velocity.x < -200) {
+                  if (offset.y > 100 || velocity.y > 500) {
                     onOpenChange(false);
                   }
-                  setIsDragEnabled(false);
                 }}
-                onPointerUp={() => {
-                  setIsDragEnabled(false);
-                }}
-                transition={{ type: 'tween', ease: 'circOut', duration: 0.3 }}
                 style={{ 
                   touchAction: 'pan-y',
-                  willChange: 'transform'
+                  transform: 'translate3d(0,0,0)' // Fixes border-radius clipping on mobile
                 }}
+                // Added rounded-t-[32px] for sheet look on mobile
                 className={cn(
-                  "pointer-events-auto w-full sm:max-w-[95vw] lg:max-w-[1200px] h-[100dvh] sm:h-[90vh] flex flex-col bg-background shadow-2xl overflow-hidden relative",
-                  "rounded-none sm:rounded-[40px] border-r sm:border border-border/40"
+                  "pointer-events-auto w-full sm:max-w-[95vw] lg:max-w-[1200px] h-[90vh] sm:h-[90vh] flex flex-col bg-background shadow-2xl overflow-hidden relative select-none",
+                  "rounded-t-[32px] sm:rounded-[40px] border-t sm:border border-border/40"
                 )}
               >
+                {/* Drag Handle (Mobile Only) */}
+                {!isDesktop && (
+                  <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full z-50" />
+                )}
+
                 {/* --- HEADER --- */}
                 <div className={cn(
                   "relative z-20 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-border/40",
-                  isDesktop ? "bg-background/50 backdrop-blur-xl" : "bg-background"
+                  isDesktop ? "bg-background/50 backdrop-blur-xl" : "bg-transparent"
                 )}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -478,12 +459,12 @@ export function WardrobePanel({
                     </div>
 
                     <div className="flex items-center gap-3">
-                      {/* Mobile Back Button - moved to right */}
+                      {/* Mobile Close Button (X) */}
                       <button
                         onClick={() => onOpenChange(false)}
                         className="flex items-center justify-center w-10 h-10 rounded-full md:hidden bg-secondary/80 text-foreground"
                       >
-                        <ArrowLeft className="w-5 h-5" />
+                        <X className="w-5 h-5" />
                       </button>
 
                       {/* Desktop Close Button */}
@@ -500,7 +481,7 @@ export function WardrobePanel({
                 {/* --- MAIN CONTENT WRAPPER --- */}
                 <div className={cn(
                   "flex flex-col flex-1 min-h-0",
-                  isDesktop ? "bg-background/50 backdrop-blur-2xl" : "bg-background"
+                  isDesktop ? "bg-background/50 backdrop-blur-2xl" : "bg-transparent"
                 )}>
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
                     {/* Controls Area (Tabs + Filter) */}
