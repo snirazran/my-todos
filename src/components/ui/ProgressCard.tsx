@@ -10,6 +10,7 @@ interface ProgressCardProps {
   total: number;
   giftsClaimed: number;
   onAddRequested?: () => void;
+  onGiftClick?: () => void;
 }
 
 export default function ProgressCard({
@@ -18,6 +19,7 @@ export default function ProgressCard({
   total,
   giftsClaimed = 0,
   onAddRequested,
+  onGiftClick,
 }: ProgressCardProps) {
   // === LOGIC: REWARD TRACK ===
   const slots = useProgressLogic(done, total, giftsClaimed);
@@ -117,22 +119,28 @@ export default function ProgressCard({
                 return (
                   <div
                     key={idx}
-                    className={`${cardBase} bg-card border-primary shadow-lg scale-105 z-10`}
+                    onClick={onGiftClick}
+                    className={`${cardBase} relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary shadow-[0_0_20px_rgba(var(--primary),0.3)] z-10 cursor-pointer transition-all duration-300 hover:shadow-[0_0_30px_rgba(var(--primary),0.5)] hover:border-primary/80`}
                   >
-                    <div className="flex items-center justify-center w-full h-14">
-                      <div className="relative -top-4">
+                    {/* Animated shimmer effect */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+                    
+                    {/* Animated glow pulse */}
+                    <div className="absolute inset-0 bg-primary/5 animate-pulse" />
+                    
+                    <div className="relative flex items-center justify-center h-14">
+                      <div className="relative -top-4 filter drop-shadow-[0_0_8px_rgba(var(--primary),0.4)]">
                         <GiftRive
                           key="milestone-ready"
                           width={90}
                           height={90}
-                          isMilestone={true}
                         />
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-center mt-1">
-                      <span className="text-[10px] xl:text-xs font-black text-primary uppercase animate-pulse leading-tight">
-                        Open!
+                    <div className="relative flex flex-col items-center mt-1">
+                      <span className="text-[10px] xl:text-xs font-black text-primary uppercase leading-tight animate-pulse">
+                        Click to Open!
                       </span>
                       <div className="h-2" /> {/* Spacer to match bar */}
                     </div>

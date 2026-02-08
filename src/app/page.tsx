@@ -155,32 +155,8 @@ export default function Home() {
   const flyBalance = session ? flyStatus.balance : 5;
   const laterThisWeek = session ? backlogTasks : [];
 
-  // Trigger Logic
-  useEffect(() => {
-    // 1. SAFETY LOCK: Don't do anything while loading
-    if (isLoading && session) return;
-
-    // 2. SAFETY LOCK: If this is the very first time data loaded,
-    // simply "acknowledge" the current state but DO NOT trigger the popup.
-    if (isInitialLoad.current) {
-      isInitialLoad.current = false;
-      return;
-    }
-
-    const milestones = getMilestones(data.length);
-    const nextMilestoneTarget = milestones[dailyGiftCount];
-
-    if (
-      data.length > 0 &&
-      !showReward &&
-      dailyGiftCount < 3 &&
-      nextMilestoneTarget !== undefined &&
-      doneCount >= nextMilestoneTarget
-    ) {
-      setShowReward(true);
-    }
-    // IMPORTANT: Add 'isLoading' to the dependency array
-  }, [doneCount, data.length, dailyGiftCount, showReward, isLoading, session]);
+  // Milestone gift trigger removed - users must click the gift in ProgressCard to claim rewards
+  // The RewardPopup will only show when setShowReward(true) is called from the gift click handler
 
   // Block Scrolling during cinematic
   useEffect(() => {
@@ -266,6 +242,12 @@ export default function Home() {
                   setQuickText('');
                   setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
                   setShowQuickAdd(true);
+                }}
+                onGiftClick={() => {
+                  // Only show reward popup if user hasn't claimed all 3 gifts yet
+                  if (dailyGiftCount < 3) {
+                    setShowReward(true);
+                  }
                 }}
               />
             </div>
