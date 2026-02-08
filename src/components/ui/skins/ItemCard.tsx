@@ -195,7 +195,7 @@ export function ItemCard({
 
       <div
         className={cn(
-          'mt-4 mb-2 md:mt-5 md:mb-3 mx-auto w-full aspect-[1.1/1] md:aspect-[1.2/1] rounded-xl md:rounded-[24px] flex items-center justify-center relative overflow-hidden',
+          'mt-4 mb-2 md:mt-5 md:mb-3 mx-auto w-full aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl md:rounded-[24px] flex items-center justify-center relative overflow-hidden',
           'bg-gradient-to-br shadow-inner',
           config.gradient
         )}
@@ -216,7 +216,7 @@ export function ItemCard({
             </div>
           ) : (
             <Frog
-              className="w-[125%] h-[125%] object-contain translate-y-[15%] md:translate-y-[10%]"
+              className="w-[125%] h-[125%] object-contain translate-y-[5%] md:translate-y-[10%]"
               indices={previewIndices}
               width={180}
               height={180}
@@ -225,7 +225,7 @@ export function ItemCard({
         </div>
 
         {ownedCount > 0 && (
-          <div className="absolute bottom-1 right-1 md:bottom-1.5 md:right-1.5 bg-black/50 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-md md:rounded-lg shadow-sm border border-white/10 z-20">
+          <div className="absolute top-1 right-1 md:top-1.5 md:right-1.5 bg-black/50 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-md md:rounded-lg shadow-sm border border-white/10 z-20">
             x{ownedCount}
           </div>
         )}

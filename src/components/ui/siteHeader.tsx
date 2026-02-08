@@ -137,13 +137,15 @@ export default function SiteHeader() {
 
 // ─── Sub-Components ───
 
-import { Menu, X, Check, Laptop, Moon, Sun, User } from 'lucide-react';
+import { Menu, X, Check, Laptop, Moon, Sun, User, Settings } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { AdminSettingsDialog } from '@/components/ui/AdminSettingsDialog';
 
 function RightActions({ session, status, onSignIn, onSignOut }: { session: any, status: string, onSignIn: () => void, onSignOut: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -281,6 +283,17 @@ function RightActions({ session, status, onSignIn, onSignOut }: { session: any, 
 
                 <button
                   onClick={() => {
+                    setAdminDialogOpen(true);
+                    setIsOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                >
+                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">Admin Settings</span>
+                  <Settings className="h-[1.2rem] w-[1.2rem] text-amber-500" />
+                </button>
+
+                <button
+                  onClick={() => {
                     onSignOut();
                     setIsOpen(false);
                   }}
@@ -304,7 +317,12 @@ function RightActions({ session, status, onSignIn, onSignOut }: { session: any, 
         showAuth={true}
         theme={theme}
         setTheme={setTheme}
+        adminDialogOpen={adminDialogOpen}
+        setAdminDialogOpen={setAdminDialogOpen}
       />
+
+      {/* Admin Settings Dialog - Rendered at component level */}
+      <AdminSettingsDialog open={adminDialogOpen} onOpenChange={setAdminDialogOpen} />
     </div>
   );
 }
@@ -320,7 +338,7 @@ function MobileMenuButton({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (
   );
 }
 
-function MobileSheet({ isOpen, onClose, onSignOut, user, showAuth, theme, setTheme }: any) {
+function MobileSheet({ isOpen, onClose, onSignOut, user, showAuth, theme, setTheme, adminDialogOpen, setAdminDialogOpen }: any) {
   return (
     <AnimatePresence>
       {isOpen && (
@@ -396,6 +414,17 @@ function MobileSheet({ isOpen, onClose, onSignOut, user, showAuth, theme, setThe
                       )}
                     </AnimatePresence>
                   </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setAdminDialogOpen(true);
+                    onClose();
+                  }}
+                  className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
+                >
+                  <span className="font-bold text-sm group-hover:text-foreground transition-colors">Admin Settings</span>
+                  <Settings className="h-5 w-5 text-amber-500" />
                 </button>
               </div>
             </div>
