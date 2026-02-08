@@ -194,20 +194,70 @@ export default function ProgressCard({
         )}
 
         {allGiftsClaimed && (
-          <div className="flex items-center gap-3 p-3 border border-green-100 bg-green-50 dark:bg-green-900/20 rounded-xl dark:border-green-900/50">
-            <div className="p-2 text-green-600 bg-green-100 rounded-full dark:bg-green-800 dark:text-green-300">
-              <Gift className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-green-800 dark:text-green-200">
-                All Gifts Collected!
-              </p>
-              <p className="text-xs text-green-600 dark:text-green-400">
-                Great work today.
-              </p>
-            </div>
-          </div>
+          <AllGiftsCollected />
         )}
+      </div>
+    </div>
+  );
+}
+
+function AllGiftsCollected() {
+  const [timeLeft, setTimeLeft] = React.useState('');
+
+  React.useEffect(() => {
+    function updateTimer() {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setHours(24, 0, 0, 0);
+      const diff = tomorrow.getTime() - now.getTime();
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setTimeLeft(
+        `${hours.toString().padStart(2, '0')}:${minutes
+          .toString()
+          .padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      );
+    }
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-muted/50 via-muted/30 to-muted/50 border border-border/50 p-4 transition-all duration-500 hover:border-primary/20">
+      
+      {/* Subtle shine effect */}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent skew-x-12 opactiy-0 group-hover:opacity-100 transition-opacity duration-700" style={{ transform: 'translateX(-100%)' }} />
+
+      <div className="flex items-center justify-between gap-4 relative z-10">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary ring-1 ring-primary/20 shadow-[0_0_15px_rgba(var(--primary),0.15)] animate-pulse-slow">
+            <Gift className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-sm font-black text-foreground tracking-tight">
+              Daily Limit Reached
+            </p>
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+              Resets in <span className="text-primary font-bold font-mono ml-0.5">{timeLeft}</span>
+            </p>
+          </div>
+        </div>
+        
+        <div className="text-right hidden sm:block">
+          <p className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest mb-0.5">
+            Keep the momentum!
+          </p>
+          <div className="flex items-center justify-end gap-1.5 opacity-60">
+            <span className="w-1 h-1 rounded-full bg-primary/40" />
+            <span className="w-1.5 h-1.5 rounded-full bg-primary/60" />
+            <span className="w-2 h-2 rounded-full bg-primary" />
+          </div>
+        </div>
       </div>
     </div>
   );
