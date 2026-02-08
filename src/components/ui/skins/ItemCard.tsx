@@ -216,7 +216,7 @@ export function ItemCard({
             </div>
           ) : (
             <Frog
-              className="w-[125%] h-[125%] object-contain translate-y-[5%] md:translate-y-[10%]"
+              className="w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[10%]"
               indices={previewIndices}
               width={180}
               height={180}
