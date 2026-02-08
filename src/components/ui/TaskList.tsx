@@ -837,12 +837,16 @@ export default function TaskList({
       const newIndex = sortedVisibleTasks.findIndex((t) => t.id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        const newOrder = arrayMove(sortedVisibleTasks, oldIndex, newIndex);
-        // We only persist the ordering of Active items usually, or all items?
-        // Since we are showing a unified list, `onReorder` should probably accept the whole list state
-        // or we filter it.
-        // Assuming onReorder handles the full payload or just needs the ID order.
-        onReorder(newOrder);
+        const reorderedVisible = arrayMove(sortedVisibleTasks, oldIndex, newIndex);
+        
+        // Fix: Ensure we don't lose hidden/filtered tasks
+        const visibleIds = new Set(sortedVisibleTasks.map(t => t.id));
+        const hiddenTasks = tasks.filter(t => !visibleIds.has(t.id));
+        
+        // New order = Reordered Visible + Hidden (appended to bottom)
+        const finalOrder = [...reorderedVisible, ...hiddenTasks];
+        
+        onReorder(finalOrder);
       }
     }
   };
