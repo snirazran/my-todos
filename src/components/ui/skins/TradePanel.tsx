@@ -234,7 +234,7 @@ export function TradePanel({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-background/90 backdrop-blur-sm"
+              className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
             />
 
             {/* Dynamic God Rays for Reveal */}
@@ -247,7 +247,7 @@ export function TradePanel({
               <RotatingRays colorClass={GIFT_RARITY_CONFIG[tradeResult.rarity].rays} />
               <div
                 className={cn(
-                  'absolute inset-0 bg-radial-gradient from-transparent to-background/80'
+                  'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80'
                 )}
               />
             </motion.div>

@@ -665,6 +665,14 @@ export function WardrobePanel({
         item={itemToSell}
         ownedCount={itemToSell ? (data?.wardrobe?.inventory?.[itemToSell.id] ?? 0) : 0}
       />
+
+      {openingGiftId && (
+        <GiftBoxOpening
+          giftBoxId={openingGiftId}
+          onClose={() => setOpeningGiftId(null)}
+          onWin={() => mutate()}
+        />
+      )}
     </>,
     document.body
   );

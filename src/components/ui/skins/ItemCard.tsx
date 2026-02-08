@@ -145,7 +145,7 @@ export function ItemCard({
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
       className={cn(
-        'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl md:rounded-[32px] border-[3px] overflow-hidden cursor-pointer active:scale-95 w-full max-w-[240px] mx-auto',
+        'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl border-[3px] overflow-hidden cursor-pointer active:scale-95 w-full max-w-[240px] mx-auto',
         config.border,
         config.bg,
         isEquipped
@@ -195,7 +195,7 @@ export function ItemCard({
 
       <div
         className={cn(
-          'mt-4 mb-2 md:mt-5 md:mb-3 mx-auto w-full aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl md:rounded-[24px] flex items-center justify-center relative overflow-hidden',
+          'mt-4 mb-2 md:mt-5 md:mb-3 mx-auto w-full aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl flex items-center justify-center relative overflow-hidden',
           'bg-gradient-to-br shadow-inner',
           config.gradient
         )}
