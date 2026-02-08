@@ -34,11 +34,11 @@ export default function ProgressCard({
   if (allGiftsClaimed) return null;
 
   return (
-    <div className="relative z-10 flex flex-col gap-2 mb-4">
+    <div className="relative z-10 flex flex-col lg:items-center gap-2 mb-4">
       {/* 2. Main Card */}
       <div
         dir="ltr"
-        className={`relative ${allGiftsClaimed ? 'py-2 px-3' : 'py-3 px-4'} rounded-[24px] bg-card/80 backdrop-blur-xl border border-border/40 shadow-sm overflow-visible transition-all duration-500`}
+        className={`relative w-full lg:max-w-[340px] ${allGiftsClaimed ? 'py-2 px-3' : 'py-3 px-4'} rounded-[24px] bg-card/80 backdrop-blur-xl border border-border/40 shadow-sm overflow-visible transition-all duration-500`}
       >
         {/* Header Row - Only show if not all claimed */}
         {!allGiftsClaimed && (
@@ -63,7 +63,7 @@ export default function ProgressCard({
               // Common card styles
 
               const cardBase =
-                'relative flex flex-col items-center justify-center py-2 px-1 rounded-2xl border transition-all duration-300 min-h-[90px]';
+                'relative flex flex-col items-center justify-center py-1 px-1 rounded-2xl border transition-all duration-300 min-h-[65px] md:min-h-[75px]';
 
               if (isClaimed) {
                 return (
@@ -71,8 +71,8 @@ export default function ProgressCard({
                     key={idx}
                     className={`${cardBase} bg-green-50/50 dark:bg-green-900/10 border-green-200/50 dark:border-green-800/30`}
                   >
-                    <div className="flex items-center justify-center w-full h-14">
-                      <div className="flex items-center justify-center bg-green-100 rounded-full shadow-sm h-11 w-11 dark:bg-green-500/20">
+                    <div className="flex items-center justify-center w-full h-12">
+                      <div className="flex items-center justify-center bg-green-100 rounded-full shadow-sm h-11 w-11 dark:bg-green-500/20 translate-y-2">
                         <Check
                           className="w-5 h-5 text-green-600 dark:text-green-400"
                           strokeWidth={4}
@@ -80,11 +80,11 @@ export default function ProgressCard({
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-center mt-1">
-                      <span className="text-[10px] xl:text-xs font-bold text-green-700 dark:text-green-300 uppercase tracking-wider leading-tight">
+                    <div className="flex flex-col items-center mt-3">
+                      <span className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-wide whitespace-nowrap leading-tight">
                         Collected
                       </span>
-                      <div className="h-2" /> {/* Spacer to match bar */}
+                      <div className="h-1" /> {/* Spacer to match bar */}
                     </div>
                   </div>
                 );
@@ -95,16 +95,16 @@ export default function ProgressCard({
                   <div
                     key={idx}
                     onClick={onGiftClick}
-                    className={`${cardBase} relative overflow-hidden bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-2 border-primary shadow-[0_0_20px_rgba(var(--primary),0.3)] z-10 cursor-pointer transition-all duration-300 hover:shadow-[0_0_30px_rgba(var(--primary),0.5)] hover:border-primary/80`}
+                    className={`${cardBase} relative overflow-hidden bg-gradient-to-br from-primary/25 via-primary/15 to-transparent border-2 border-primary shadow-[0_0_25px_rgba(var(--primary),0.4)] z-10 cursor-pointer transition-all duration-300 hover:shadow-[0_0_35px_rgba(var(--primary),0.6)] hover:border-primary/80`}
                   >
                     {/* Animated shimmer effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-shimmer" style={{ backgroundSize: '200% 100%' }} />
                     
                     {/* Animated glow pulse */}
                     <div className="absolute inset-0 bg-primary/5 animate-pulse" />
                     
-                    <div className="relative flex items-center justify-center h-14">
-                      <div className="relative -top-4 filter drop-shadow-[0_0_8px_rgba(var(--primary),0.4)]">
+                    <div className="relative flex items-center justify-center h-12">
+                      <div className="relative -top-2 filter drop-shadow-[0_0_15px_rgba(var(--primary),0.4)]">
                         <GiftRive
                           key="milestone-ready"
                           width={90}
@@ -113,11 +113,11 @@ export default function ProgressCard({
                       </div>
                     </div>
 
-                    <div className="relative flex flex-col items-center mt-1">
-                      <span className="text-[10px] xl:text-xs font-black text-primary uppercase leading-tight animate-pulse">
-                        Click to Open!
+                    <div className="relative flex flex-col items-center mt-3">
+                      <span className="text-[10px] font-black text-primary uppercase leading-tight animate-pulse tracking-wide whitespace-nowrap">
+                        CLAIM
                       </span>
-                      <div className="h-2" /> {/* Spacer to match bar */}
+                      <div className="h-1" /> {/* Spacer to match bar */}
                     </div>
                   </div>
                 );
@@ -130,18 +130,18 @@ export default function ProgressCard({
                     onClick={() => onGiftInfoClick?.(slot)}
                     className={`${cardBase} bg-muted/30 border-dashed border-2 border-muted-foreground/20 cursor-pointer hover:bg-muted/50 hover:border-muted-foreground/40 group`}
                   >
-                    <div className="flex items-center justify-center w-full h-14">
+                    <div className="flex items-center justify-center w-full h-12">
                       <div className="flex items-center justify-center transition-all border rounded-full h-11 w-11 bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
                         <Fly size={24} y={-3} />
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-center mt-1">
-                      <span className="text-[10px] xl:text-xs font-bold text-muted-foreground uppercase leading-tight text-center px-0.5">
+                    <div className="flex flex-col items-center mt-3">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase leading-tight text-center px-0.5 whitespace-nowrap tracking-wide">
                         ADD +{slot.neededToUnlock} Task
                         {slot.neededToUnlock > 1 ? 's' : ''}
                       </span>
-                      <div className="h-2" /> {/* Spacer to match bar */}
+                      <div className="h-1" /> {/* Spacer to match bar */}
                     </div>
                   </div>
                 );
@@ -155,8 +155,8 @@ export default function ProgressCard({
                   onClick={() => onGiftInfoClick?.(slot)}
                   className={`${cardBase} bg-card border-border/60 cursor-pointer hover:border-primary/30 transition-colors`}
                 >
-                  <div className="flex items-center justify-center h-14">
-                    <div className="relative -top-4">
+                  <div className="flex items-center justify-center h-12">
+                    <div className="relative -top-2">
                       <GiftRive
                         key={`pending-${idx}`}
                         width={90}
@@ -166,9 +166,9 @@ export default function ProgressCard({
                     </div>
                   </div>
 
-                  <div className="flex flex-col items-center mt-1">
-                    <span className="text-[10px] xl:text-xs font-bold text-foreground leading-tight">
-                      {slot.tasksLeft} Task{slot.tasksLeft > 1 ? 's' : ''} Left
+                  <div className="flex flex-col items-center mt-3">
+                    <span className="text-[10px] font-black text-muted-foreground/80 uppercase tracking-wide whitespace-nowrap leading-tight">
+                      {slot.tasksLeft} TASK{slot.tasksLeft > 1 ? 'S' : ''} LEFT
                     </span>
 
                     {/* Mini Bar */}

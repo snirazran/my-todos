@@ -296,25 +296,25 @@ export default function Home() {
                   <EllipsisVertical className="w-5 h-5" />
                </button>
 
-               <AnimatePresence>
+                  <AnimatePresence>
                   {isHeaderMenuOpen && (
                      <motion.div
                        ref={headerMenuRef}
-                       initial={{ opacity: 0, scale: 0.95, y: 10, x: 5 }}
+                       initial={{ opacity: 0, scale: 0.95, y: -4, x: 0 }}
                        animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                       exit={{ opacity: 0, scale: 0.95, y: 10, x: 5 }}
-                       transition={{ type: "spring", stiffness: 400, damping: 30 }}
-                       className="absolute left-0 top-full mt-2 z-50 w-72 bg-popover backdrop-blur-xl rounded-[24px] ring-1 ring-border/80 shadow-[0_24px_48px_rgba(15,23,42,0.2)] p-4 flex flex-col gap-4 overflow-hidden"
-                       style={{ transformOrigin: 'top left' }}
+                       exit={{ opacity: 0, scale: 0.95, y: -4, x: 0 }}
+                       transition={{ duration: 0.15, ease: 'easeOut' }}
+                       className="absolute right-0 top-full mt-2 z-50 w-64 bg-popover rounded-xl border border-border shadow-lg shadow-black/5 ring-1 ring-black/5 p-1 flex flex-col gap-1 overflow-hidden"
+                       style={{ transformOrigin: 'top right' }}
                      >
                            {/* Show Finished Toggle */}
-                           <div className="flex items-center justify-between p-1">
-                              <span className="text-[15px] font-bold text-foreground">Show Completed</span>
+                           <div className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50 transition-colors">
+                              <span className="text-sm font-medium text-foreground">Show Completed</span>
                               <button
                                  onClick={() => setShowCompleted(!showCompleted)}
-                                 className={`w-12 h-7 rounded-full relative transition-all duration-300 ease-in-out ${showCompleted ? 'bg-primary shadow-[0_0_12px_rgba(var(--primary),0.4)]' : 'bg-muted/80'}`}
+                                 className={`w-9 h-5 rounded-full relative transition-all duration-300 ease-in-out ${showCompleted ? 'bg-primary' : 'bg-muted-foreground/30'}`}
                               >
-                                 <span className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-background shadow-sm transition-transform duration-300 ${showCompleted ? 'translate-x-5' : 'translate-x-0'}`} />
+                                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-background shadow-sm transition-transform duration-300 ${showCompleted ? 'translate-x-4' : 'translate-x-0'}`} />
                               </button>
                            </div>
  
@@ -330,19 +330,19 @@ export default function Home() {
                               if (visibleFilterTags.length === 0) return null;
  
                               return (
-                                <div className="flex flex-col gap-3 pt-3 border-t border-border/50">
-                                   <div className="flex items-center justify-between px-1">
-                                     <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Filter by Tags</span>
+                                <div className="flex flex-col gap-2 pt-2 border-t border-border/50 px-1">
+                                   <div className="flex items-center justify-between px-2">
+                                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filter by Tags</span>
                                      {selectedTags.length > 0 && (
                                         <button
                                           onClick={() => setSelectedTags([])}
-                                          className="text-[11px] font-bold text-primary hover:text-primary/80 transition-colors"
+                                          className="text-[10px] font-bold text-primary hover:text-primary/80 transition-colors"
                                         >
                                            Clear
                                         </button>
                                      )}
                                    </div>
-                                   <div className="flex flex-wrap gap-2">
+                                   <div className="flex flex-wrap gap-1.5 px-1 pb-1">
                                       {visibleFilterTags.map(tag => {
                                          const isSelected = selectedTags.includes(tag.id);
                                          return (
@@ -354,24 +354,24 @@ export default function Home() {
                                                   );
                                                }}
                                                className={`
-                                                  relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[12px] font-bold uppercase tracking-wider transition-all duration-200 border
+                                                  relative inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all duration-200 border
                                                   ${isSelected 
-                                                    ? 'ring-2 ring-offset-1 ring-offset-popover border-transparent' 
-                                                    : 'bg-muted/30 border-transparent hover:bg-muted/50 text-muted-foreground'
+                                                    ? 'ring-1 ring-offset-0 ring-primary border-transparent' 
+                                                    : 'bg-muted/40 border-transparent hover:bg-muted/70 text-muted-foreground'
                                                   }
                                                `}
                                                style={isSelected && tag.color ? { 
-                                                  backgroundColor: `${tag.color}20`, 
+                                                  backgroundColor: `${tag.color}15`, 
                                                   color: tag.color,
-                                                  borderColor: 'transparent',
-                                                  boxShadow: `0 0 0 1px ${tag.color}` 
+                                                  borderColor: tag.color, // Use border for selected state color
+                                                  boxShadow: 'none'
                                                } : isSelected ? {
                                                   backgroundColor: 'rgba(var(--primary), 0.1)',
                                                   color: 'hsl(var(--primary))',
-                                                  boxShadow: '0 0 0 1px hsl(var(--primary))'
+                                                  borderColor: 'hsl(var(--primary))'
                                                } : {}}
                                             >
-                                               {isSelected && <Check className="w-3.5 h-3.5" />}
+                                               {isSelected && <Check className="w-3 h-3" />}
                                                {tag.name}
                                             </button>
                                          );
