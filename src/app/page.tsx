@@ -20,6 +20,7 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { RewardPopup } from '@/components/ui/gift-box/RewardPopup';
+import { GiftInfoPopup } from '@/components/ui/GiftInfoPopup';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { mutate } from 'swr';
 import {
@@ -49,25 +50,13 @@ const demoTasks: Task[] = [
 ];
 
 function getMilestones(totalTasks: number): number[] {
-  if (totalTasks < 2) return [];
-
-  // 2-3 tasks -> 1 gift at the end
-  if (totalTasks <= 3) {
-    return [totalTasks];
-  }
-
-  // 4-5 tasks -> 2 gifts: at task 2 and at the end
-  if (totalTasks <= 5) {
-    return [2, totalTasks];
-  }
-
-  // 6+ tasks -> 3 gifts spread out
-  const milestones: number[] = [];
-  milestones.push(Math.round(totalTasks / 3));
-  milestones.push(Math.round((totalTasks * 2) / 3));
-  milestones.push(totalTasks);
-
-  return Array.from(new Set(milestones)).sort((a, b) => a - b);
+  // Fixed milestones at 2, 4, and 6 completed tasks
+  const fixedMilestones = [2, 4, 6];
+  
+  // Only return milestones that are achievable with current total tasks
+  // But the milestone is based on COMPLETED tasks, not total tasks
+  // So we return all 3 milestones regardless of total
+  return fixedMilestones;
 }
 
 export default function Home() {
@@ -114,6 +103,8 @@ export default function Home() {
   const [showReward, setShowReward] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [showGiftInfo, setShowGiftInfo] = useState(false);
+  const [selectedGiftSlot, setSelectedGiftSlot] = useState<{ status: string; target: number; tasksLeft: number; neededToUnlock: number } | null>(null);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const headerMenuBtnRef = useRef<HTMLButtonElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
@@ -248,6 +239,10 @@ export default function Home() {
                   if (dailyGiftCount < 3) {
                     setShowReward(true);
                   }
+                }}
+                onGiftInfoClick={(slot) => {
+                  setSelectedGiftSlot(slot);
+                  setShowGiftInfo(true);
                 }}
               />
             </div>
@@ -654,6 +649,18 @@ export default function Home() {
           />
         </div>
       </div>
+
+      {/* Gift Info Popup */}
+      <GiftInfoPopup
+        show={showGiftInfo}
+        onClose={() => setShowGiftInfo(false)}
+        slot={selectedGiftSlot}
+        onAddTask={() => {
+          setQuickText('');
+          setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
+          setShowQuickAdd(true);
+        }}
+      />
     </main>
   );
 }

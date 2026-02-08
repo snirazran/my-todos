@@ -11,6 +11,7 @@ interface ProgressCardProps {
   giftsClaimed: number;
   onAddRequested?: () => void;
   onGiftClick?: () => void;
+  onGiftInfoClick?: (slot: { status: string; target: number; tasksLeft: number; neededToUnlock: number }) => void;
 }
 
 export default function ProgressCard({
@@ -20,6 +21,7 @@ export default function ProgressCard({
   giftsClaimed = 0,
   onAddRequested,
   onGiftClick,
+  onGiftInfoClick,
 }: ProgressCardProps) {
   // === LOGIC: REWARD TRACK ===
   const slots = useProgressLogic(done, total, giftsClaimed);
@@ -39,7 +41,7 @@ export default function ProgressCard({
         {/* Header Row */}
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-sm font-bold tracking-wider uppercase md:text-sm text-muted-foreground">
-            Daily Goals
+            Daily Rewards
           </h2>
           <div className="flex items-baseline gap-1">
             <span className="text-2xl font-black md:text-2xl text-foreground">
@@ -152,7 +154,7 @@ export default function ProgressCard({
                 return (
                   <div
                     key={idx}
-                    onClick={onAddRequested}
+                    onClick={() => onGiftInfoClick?.(slot)}
                     className={`${cardBase} bg-muted/30 border-dashed border-2 border-muted-foreground/20 cursor-pointer hover:bg-muted/50 hover:border-muted-foreground/40 group`}
                   >
                     <div className="flex items-center justify-center w-full h-14">
@@ -177,7 +179,8 @@ export default function ProgressCard({
               return (
                 <div
                   key={idx}
-                  className={`${cardBase} bg-card border-border/60`}
+                  onClick={() => onGiftInfoClick?.(slot)}
+                  className={`${cardBase} bg-card border-border/60 cursor-pointer hover:border-primary/30 transition-colors`}
                 >
                   <div className="flex items-center justify-center h-14">
                     <div className="relative -top-4">
