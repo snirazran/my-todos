@@ -13,7 +13,7 @@ import { FilterBar, FilterCategory } from './FilterBar';
 import { SortMenu, SortOrder } from './SortMenu';
 import { cn } from '@/lib/utils';
 import confetti from 'canvas-confetti';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 
 import { TradePanel } from './TradePanel';
@@ -60,6 +60,7 @@ export function WardrobePanel({
 
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const dragControls = useDragControls();
   
 
   // --- Sell Dialog Logic ---
@@ -391,6 +392,8 @@ export function WardrobePanel({
                 exit="exit"
                 transition={{ type: 'spring', damping: 28, stiffness: 320 }}
                 drag={!isDesktop ? "y" : false}
+                dragControls={dragControls}
+                dragListener={false} // Disable drag from anywhere
                 dragConstraints={{ top: 0, bottom: 0 }}
                 dragElastic={{ top: 0, bottom: 0.5 }}
                 dragMomentum={false}
@@ -403,7 +406,7 @@ export function WardrobePanel({
                   }
                 }}
                 style={{ 
-                  touchAction: 'pan-y',
+                  touchAction: 'none', // Prevent scrolling on the drag handle
                   transform: 'translate3d(0,0,0)' // Fixes border-radius clipping on mobile
                 }}
                 // Added rounded-t-[32px] for sheet look on mobile
@@ -414,7 +417,12 @@ export function WardrobePanel({
               >
                 {/* Drag Handle (Mobile Only) */}
                 {!isDesktop && (
-                  <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full z-50" />
+                  <div 
+                    className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center z-50 touch-none"
+                    onPointerDown={(e) => dragControls.start(e)}
+                  >
+                    <div className="w-12 h-1.5 bg-muted-foreground/20 rounded-full" />
+                  </div>
                 )}
 
                 {/* --- HEADER --- */}
