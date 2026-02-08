@@ -157,21 +157,21 @@ export function FrogSpeechBubble({
     <AnimatePresence>
       {isVisible && message && (
         <motion.div
-          initial={{ opacity: 0, y: 10, scale: 0.9 }}
+          initial={{ opacity: 1, y: 10, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 5, scale: 0.9 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           className={`absolute ${
-            isLongMessage ? '-top-10' : '-top-4'
-          } -left-[5%] -translate-x-1/2 z-50 w-72 pointer-events-none`}
+            isLongMessage ? '-top-6' : 'top-0'
+          } -left-[8%] -translate-x-1/2 z-50 w-72 pointer-events-none`}
         >
-          <div className="relative bg-card/80 backdrop-blur-2xl rounded-[20px] p-4 shadow-sm border border-border/50">
+          <div className="relative p-4 border shadow-sm bg-card rounded-[20px] border-border/50">
             <p className="text-sm font-bold leading-snug text-center text-foreground">
               {message}
             </p>
 
             {/* Speech Bubble Arrow */}
-            <div className="absolute w-4 h-4 transform rotate-45 -translate-x-1/2 border-b border-r -bottom-2 left-1/2 bg-card/80 backdrop-blur-xl border-border/50" />
+            <div className="absolute w-4 h-4 transform rotate-45 -translate-x-1/2 border-b border-r -bottom-2 left-1/2 bg-card border-border/50" />
           </div>
         </motion.div>
       )}
