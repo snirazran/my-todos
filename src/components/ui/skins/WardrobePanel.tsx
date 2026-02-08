@@ -411,18 +411,17 @@ export function WardrobePanel({
                 }}
                 // Added rounded-t-[32px] for sheet look on mobile
                 className={cn(
-                  "pointer-events-auto w-full sm:max-w-[95vw] lg:max-w-[1200px] h-[90vh] sm:h-[90vh] flex flex-col bg-background shadow-2xl overflow-hidden relative select-none",
+                  "pointer-events-auto w-full sm:max-w-[95vw] lg:max-w-[1200px] h-[90vh] sm:h-[90vh] flex flex-col bg-background overflow-hidden relative select-none",
+                  isDesktop && "shadow-2xl", // Only show shadow on desktop to reduce lag on mobile
                   "rounded-t-[32px] sm:rounded-[40px] border-t sm:border border-border/40"
                 )}
               >
-                {/* Drag Handle (Mobile Only) */}
+                {/* Drag Handle (Mobile Only) - Invisible Hit Area */}
                 {!isDesktop && (
                   <div 
-                    className="absolute top-0 left-0 right-0 h-8 flex items-center justify-center z-50 touch-none"
+                    className="absolute top-0 left-0 right-0 h-8 z-50 touch-none"
                     onPointerDown={(e) => dragControls.start(e)}
-                  >
-                    <div className="w-12 h-1.5 bg-muted-foreground/20 rounded-full" />
-                  </div>
+                  />
                 )}
 
                 {/* --- HEADER --- */}
