@@ -58,6 +58,9 @@ export function WardrobePanel({
   const [shakeBalance, setShakeBalance] = useState(false);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
 
+  // Deferred rendering state for smooth open animation
+  const [isReady, setIsReady] = useState(false);
+
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const dragControls = useDragControls();
@@ -72,6 +75,15 @@ export function WardrobePanel({
       setItemToSell(null);
     }
   };
+
+  // Reset deferred loading when opening
+  useEffect(() => {
+    if (open) {
+      setIsReady(false);
+      const timer = setTimeout(() => setIsReady(true), 300); // Wait for slide-up
+      return () => clearTimeout(timer);
+    }
+  }, [open]);
 
 
   // Re-added sellItem
@@ -579,15 +591,25 @@ export function WardrobePanel({
                         value="inventory"
                         className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
                       >
-                        {inventoryItems.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center h-full opacity-50">
+                        {!isReady ? (
+                          // SKELETON LOADING STATE (during animation)
+                          <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                            {Array.from({ length: 12 }).map((_, i) => (
+                              <div 
+                                key={i} 
+                                className="w-full aspect-[1/1.2] rounded-2xl bg-muted/20 animate-pulse border border-border/10" 
+                              />
+                            ))}
+                          </div>
+                        ) : inventoryItems.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center h-full opacity-50 animate-in fade-in duration-300">
                             <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
                               <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
                             </div>
                             <p className="text-lg font-black text-muted-foreground">Empty</p>
                           </div>
                         ) : (
-                          <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                          <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4 animate-in fade-in zoom-in-95 duration-300">
                             {inventoryItems.map((item) => (
                               <ItemCard
                                 key={item.id}
@@ -598,7 +620,9 @@ export function WardrobePanel({
                                 canAfford={true}
                                 actionLoading={actionId === item.id}
                                 onAction={() => handleItemAction(item)}
-                                onSell={() => setItemToSell(item)}
+                                onSell={() => {
+                                    setItemToSell(item);
+                                }}
                                 actionLabel={null}
                                 isNew={unseenItems.includes(item.id)}
                               />
