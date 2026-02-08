@@ -80,9 +80,12 @@ export async function POST(req: NextRequest) {
         return json({ error: 'Daily gift limit reached (3/3)' }, 403);
       }
 
-      // Rule 2: Must have done NEW work
-      const lastCount = currentStats.taskCountAtLastGift || 0;
-      if (currentStats.dailyTasksCount <= lastCount) {
+      // Rule 2: Must have reached the next milestone
+      // Milestones are at 2, 4, and 6 completed tasks
+      const milestones = [2, 4, 6];
+      const nextMilestone = milestones[currentStats.dailyMilestoneGifts];
+      
+      if (!nextMilestone || currentStats.dailyTasksCount < nextMilestone) {
         return json({ error: 'No new tasks completed since last reward' }, 403);
       }
 

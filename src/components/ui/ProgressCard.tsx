@@ -43,37 +43,6 @@ export default function ProgressCard({
           <h2 className="text-sm font-bold tracking-wider uppercase md:text-sm text-muted-foreground">
             Daily Rewards
           </h2>
-          <div className="flex items-baseline gap-1">
-            <span className="text-2xl font-black md:text-2xl text-foreground">
-              {done}
-            </span>
-            <span className="text-sm font-bold md:text-base text-muted-foreground">
-              / {total}
-            </span>
-          </div>
-        </div>
-
-        {/* Global Progress Bar */}
-        <div className="relative w-full h-3 mb-4 overflow-hidden rounded-full bg-muted">
-          {/* Animated Progress Fill */}
-          <div
-            className={`absolute top-0 left-0 h-full transition-all duration-700 ease-out rounded-full overflow-hidden
-              ${
-                isGold
-                  ? 'bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-500 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
-                  : 'bg-gradient-to-r from-primary to-emerald-400'
-              }
-            `}
-            style={{ width: `${rate}%` }}
-          >
-            {/* Shimmer effect for Gold state */}
-            {isGold && (
-              <div
-                className="absolute inset-0 w-full h-full bg-[linear-gradient(110deg,transparent,rgba(255,255,255,0.4),transparent)] animate-shimmer"
-                style={{ backgroundSize: '200% 100%' }}
-              />
-            )}
-          </div>
         </div>
 
         {/* Rewards Grid */}
