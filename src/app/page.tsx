@@ -506,8 +506,18 @@ export default function Home() {
                       setShowQuickAdd(true);
                     }}
                     weeklyIds={weeklyIds}
-                    onDeleteToday={deleteTask}
+                    onDeleteToday={(id) => {
+                      if (!session) {
+                        router.push('/login');
+                        return;
+                      }
+                      deleteTask(id);
+                    }}
                     onDeleteFromWeek={async (taskId) => {
+                      if (!session) {
+                        router.push('/login');
+                        return;
+                      }
                       const dow = new Date().getDay();
                       await fetch('/api/tasks?view=board', {
                         method: 'DELETE',
@@ -516,11 +526,30 @@ export default function Home() {
                       });
                       deleteTask(taskId);
                     }}
-                    onDoLater={moveTaskToBacklog}
+                    onDoLater={(id) => {
+                      if (!session) {
+                        router.push('/login');
+                        return;
+                      }
+                      moveTaskToBacklog(id);
+                    }}
                     onReorder={reorderTasks}
                     pendingToToday={pendingToToday}
-                    onToggleRepeat={toggleRepeat}
-                    onEditTask={(id, text) => editTask(id, text, false)}
+                    onToggleRepeat={(id) => {
+                      if (!session) {
+                        router.push('/login');
+                        return;
+                      }
+                      toggleRepeat(id);
+                    }}
+                    onEditTask={(id, text) => {
+                      if (!session) {
+                        router.push('/login');
+                        return;
+                      }
+                      editTask(id, text, false);
+                    }}
+                    isGuest={!session}
                     tags={tags}
                     showCompleted={showCompleted}
                     selectedTags={selectedTags}
@@ -542,7 +571,13 @@ export default function Home() {
                     onRefreshBacklog={async () => {
                       if (session) await mutateBacklog();
                     }}
-                    onMoveToToday={moveTaskToToday}
+                    onMoveToToday={(item) => {
+                      if (!session) {
+                        router.push('/login');
+                        return;
+                      }
+                      moveTaskToToday(item);
+                    }}
                     pendingToBacklog={pendingToBacklog}
                     onAddRequested={() => {
                       if (!session) {
@@ -553,7 +588,14 @@ export default function Home() {
                       setQuickAddMode('later');
                       setShowQuickAdd(true);
                     }}
-                    onEditTask={(id, text) => editTask(id, text, true)}
+                    onEditTask={(id, text) => {
+                      if (!session) {
+                        router.push('/login');
+                        return;
+                      }
+                      editTask(id, text, true);
+                    }}
+                    isGuest={!session}
                     tags={tags}
                   />
                 </motion.div>

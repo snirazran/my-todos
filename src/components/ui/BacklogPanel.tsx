@@ -2,6 +2,8 @@
 
 import * as React from 'react';
 
+import { useRouter } from 'next/navigation';
+
 import {
   EllipsisVertical,
   CalendarClock,
@@ -39,6 +41,7 @@ function BacklogTaskItem({
   onDeleteRequest,
   getTagDetails,
   allowNudge,
+  isGuest,
 }: {
   item: BacklogItem;
   index: number;
@@ -50,7 +53,9 @@ function BacklogTaskItem({
   onDeleteRequest: (item: BacklogItem) => void;
   getTagDetails: (id: string) => { name: string; color: string } | undefined;
   allowNudge: boolean;
+  isGuest?: boolean;
 }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
   const [isDesktop, setIsDesktop] = React.useState(false);
   const isDraggingRef = React.useRef(false);
@@ -258,17 +263,26 @@ function BacklogTaskItem({
           aria-hidden={!isOpen || isExiting || hasTriggeredExit}
         >
           <button
+            title="Delete"
             onClick={(e) => {
+              if (isGuest) {
+                e.stopPropagation();
+                router.push('/login');
+                return;
+              }
               e.stopPropagation();
               onDeleteRequest(item);
             }}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors"
-            title="Delete"
           >
             <Trash2 className="w-4 h-4" />
           </button>
           <button
             onClick={(e) => {
+              if (isGuest) {
+                e.stopPropagation();
+                router.push('/login');
+                return;
+              }
               e.stopPropagation();
               onMenuOpen(e, item);
             }}
@@ -448,6 +462,7 @@ export default function BacklogPanel({
   onEditTask,
   pendingToBacklog,
   tags,
+  isGuest,
 }: {
   later: BacklogItem[];
   onRefreshToday: () => Promise<void> | void;
@@ -457,7 +472,9 @@ export default function BacklogPanel({
   onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
   pendingToBacklog?: number;
   tags?: { id: string; name: string; color: string }[];
+  isGuest?: boolean;
 }) {
+  const router = useRouter(); // Import might be needed if not present
   const [menu, setMenu] = React.useState<{
     id: string;
     top: number;
@@ -667,6 +684,7 @@ export default function BacklogPanel({
                   onDeleteRequest={(item) => setConfirmId(item)}
                   getTagDetails={getTagDetails}
                   allowNudge={allowNudge}
+                  isGuest={isGuest}
                 />
               ))}
             </AnimatePresence>
@@ -677,9 +695,21 @@ export default function BacklogPanel({
       <TaskMenu
         menu={menu}
         onClose={() => setMenu(null)}
-        onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
+        onAddTags={(id) => {
+          if (isGuest) {
+            router.push('/login');
+            setMenu(null);
+            return;
+          }
+          setTagPopup({ open: true, taskId: id });
+        }}
         addTagsPosition="first"
         onDelete={() => {
+          if (isGuest) {
+            router.push('/login');
+            setMenu(null);
+            return;
+          }
           if (menu) {
             const t = later.find((it) => it.id === menu.id);
             if (t) setConfirmId(t);
@@ -687,16 +717,23 @@ export default function BacklogPanel({
           setMenu(null);
         }}
         onEdit={(taskId) => {
+          if (isGuest) {
+            router.push('/login');
+            setMenu(null);
+            return;
+          }
           const t = later.find((it) => it.id === taskId);
           if (t) {
-            // HACK: Use confirmId state but prefix ID to distinguish Edit vs Delete
-            // Or add separate state. Let's add separate state if possible? No, reusing is cleaner for this quick implementation?
-            // Actually, let's just make a new object:
             setConfirmId({ ...t, id: `EDIT-${t.id}` });
           }
           setMenu(null);
         }}
         onDoToday={() => {
+          if (isGuest) {
+            router.push('/login');
+            setMenu(null);
+            return;
+          }
           if (menu) {
             const t = later.find((it) => it.id === menu.id);
             if (t) addToday(t);

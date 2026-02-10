@@ -22,6 +22,7 @@ import {
   useAnimation,
 } from 'framer-motion';
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import {
   DndContext,
@@ -82,6 +83,7 @@ interface SortableTaskItemProps {
   isWeekly?: boolean;
   disableLayout?: boolean;
   onDoLater?: (task: Task) => void;
+  isGuest?: boolean;
 }
 
 const SortableTaskItem = React.forwardRef<
@@ -593,6 +595,7 @@ export default function TaskList({
   showCompleted,
   selectedTags,
   onSetSelectedTags,
+  isGuest,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -617,7 +620,9 @@ export default function TaskList({
   showCompleted: boolean;
   selectedTags: string[];
   onSetSelectedTags: (tags: string[]) => void;
+  isGuest?: boolean;
 }) {
+  const router = useRouter(); // Import might be needed if not present
   const userTags = tags || [];
 
   const getTagDetails = (tagIdentifier: string) => {
@@ -705,6 +710,10 @@ export default function TaskList({
     };
 
     const handleDeleteRequest = (e: Event) => {
+      if (isGuest) {
+        router.push('/login');
+        return;
+      }
       const id = (e as CustomEvent<{ id: string }>).detail?.id;
       const task = tasks.find((t) => t.id === id);
       if (task) {
@@ -1156,11 +1165,19 @@ export default function TaskList({
               vSet.has(menu.id)
             : false
         }
-        onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
+        onAddTags={(id) => {
+          if (isGuest) {
+            router.push('/login');
+            setMenu(null);
+            return;
+          }
+          setTagPopup({ open: true, taskId: id });
+        }}
         addTagsPosition="second"
         onDoLater={
           onDoLater
             ? () => {
+                // onDoLater prop is already wrapped in page.tsx for auth check
                 if (menu) {
                   const id = menu.id;
                   setExitAction({ id, type: 'later' });
@@ -1173,10 +1190,9 @@ export default function TaskList({
         onToggleRepeat={
           onToggleRepeat
             ? () => {
+                // onToggleRepeat prop is already wrapped in page.tsx for auth check
                 if (menu) {
                   const id = menu.id;
-                  // Don't close immediately if we want to show loading, but UI usually optimistic.
-                  // Closing menu feels snappier.
                   onToggleRepeat(id);
                   setMenu(null);
                 }
@@ -1190,6 +1206,11 @@ export default function TaskList({
             : false
         }
         onDelete={() => {
+          if (isGuest) {
+            router.push('/login');
+            setMenu(null);
+            return;
+          }
           if (menu) {
             const t = tasks.find((it) => it.id === menu.id);
             if (t) {
@@ -1202,6 +1223,11 @@ export default function TaskList({
           setMenu(null);
         }}
         onEdit={(taskId) => {
+          if (isGuest) {
+            router.push('/login');
+            setMenu(null);
+            return;
+          }
           if (menu) {
             const t = tasks.find((it) => it.id === menu.id);
             if (t) {
