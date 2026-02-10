@@ -330,8 +330,8 @@ function BacklogTaskItem({
                 relative flex items-center gap-1.5 px-2 py-3.5 
                 transition-colors duration-200 rounded-xl 
                 bg-card
-                border border-border/40 shadow-sm
-                ${isDesktop && isHovered ? 'border-border shadow-md' : ''}
+                border border-border/40
+                ${isDesktop && isHovered ? 'border-border' : ''}
                 ${isExiting ? 'pointer-events-none' : ''}
                 cursor-pointer
             `}
