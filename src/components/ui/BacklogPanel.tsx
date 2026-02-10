@@ -2,8 +2,23 @@
 
 import * as React from 'react';
 
-import { EllipsisVertical, CalendarClock, CalendarCheck, Plus, Loader2, Trash2 } from 'lucide-react';
-import { animate, useMotionValue, useTransform, motion, AnimatePresence, useAnimation, PanInfo } from "framer-motion";
+import {
+  EllipsisVertical,
+  CalendarClock,
+  CalendarCheck,
+  Plus,
+  Loader2,
+  Trash2,
+} from 'lucide-react';
+import {
+  animate,
+  useMotionValue,
+  useTransform,
+  motion,
+  AnimatePresence,
+  useAnimation,
+  PanInfo,
+} from 'framer-motion';
 import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TaskMenu from '../board/TaskMenu';
@@ -51,10 +66,18 @@ function BacklogTaskItem({
   const doTodayScale = useTransform(x, [0, -swipeThreshold], [0.8, 1.2]);
   // Instant color snap at threshold
   // Dynamic color snap at threshold (Gray -> Green)
-  const dynaColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#9ca3af", "#16a34a"]);
-  const doTodayColor = isNudging ? "#16a34a" : dynaColor;
+  const dynaColor = useTransform(
+    x,
+    [-swipeThreshold + 1, -swipeThreshold],
+    ['#9ca3af', '#16a34a'],
+  );
+  const doTodayColor = isNudging ? '#16a34a' : dynaColor;
 
-  const doTodayTextColor = useTransform(x, [-swipeThreshold + 1, -swipeThreshold], ["#ffffff", "#ffffff"]);
+  const doTodayTextColor = useTransform(
+    x,
+    [-swipeThreshold + 1, -swipeThreshold],
+    ['#ffffff', '#ffffff'],
+  );
   const doTodayBgOpacity = useTransform(x, [-40, -swipeThreshold], [0, 1]);
 
   const isMenuOpen = menu?.id === item.id;
@@ -75,26 +98,29 @@ function BacklogTaskItem({
     // checking initialIndex ensures we don't nudge items that *slide into* the top spots later
     // allowNudge ensures we don't nudge items that are added later (after the panel is already open)
     if (!isDesktop && initialIndex.current < 2 && allowNudge) {
-      const timeout = setTimeout(() => {
-        setIsNudging(true);
-        // Peek: Slide to -60px (Left) - MUCH slower/smoother
-        animate(x, -60, {
-          type: "spring",
-          stiffness: 150,
-          damping: 25
-        });
-
-        // Snap back with a longer stay
-        setTimeout(() => {
-          animate(x, 0, {
-            type: "spring",
+      const timeout = setTimeout(
+        () => {
+          setIsNudging(true);
+          // Peek: Slide to -60px (Left) - MUCH slower/smoother
+          animate(x, -60, {
+            type: 'spring',
             stiffness: 150,
-            damping: 25
+            damping: 25,
           });
-          // Reset nudging after snap back completes (longer timeout to match slower spring)
-          setTimeout(() => setIsNudging(false), 500);
-        }, 800);
-      }, 800 + (initialIndex.current * 200));
+
+          // Snap back with a longer stay
+          setTimeout(() => {
+            animate(x, 0, {
+              type: 'spring',
+              stiffness: 150,
+              damping: 25,
+            });
+            // Reset nudging after snap back completes (longer timeout to match slower spring)
+            setTimeout(() => setIsNudging(false), 500);
+          }, 800);
+        },
+        800 + initialIndex.current * 200,
+      );
 
       return () => clearTimeout(timeout);
     }
@@ -111,7 +137,10 @@ function BacklogTaskItem({
 
     const handleGlobalClick = (e: MouseEvent) => {
       if (!isOpen) return;
-      if (containerRef.current && containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        containerRef.current.contains(e.target as Node)
+      ) {
         return;
       }
       setIsOpen(false);
@@ -125,11 +154,16 @@ function BacklogTaskItem({
       const handleScroll = () => {
         setIsOpen(false);
       };
-      window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+      window.addEventListener('scroll', handleScroll, {
+        capture: true,
+        passive: true,
+      });
 
       return () => {
         window.removeEventListener('task-swipe-open', handleOtherSwipe);
-        window.removeEventListener('click', handleGlobalClick, { capture: true });
+        window.removeEventListener('click', handleGlobalClick, {
+          capture: true,
+        });
         window.removeEventListener('scroll', handleScroll, { capture: true });
       };
     }
@@ -141,6 +175,7 @@ function BacklogTaskItem({
 
   // State to track dragging for visual updates (e.g. keeping icons visible during drag)
   const [isDragging, setIsDragging] = React.useState(false);
+  const [isHovered, setIsHovered] = React.useState(false);
   const [hasTriggeredExit, setHasTriggeredExit] = React.useState(false); // Immediate exit tracking
 
   // Sync exit state
@@ -154,8 +189,6 @@ function BacklogTaskItem({
     isDraggingRef.current = true;
     setIsDragging(true);
   };
-
-
 
   const handleDragEnd = (_: any, info: PanInfo) => {
     setTimeout(() => {
@@ -173,7 +206,7 @@ function BacklogTaskItem({
         setIsOpen(false);
       } else {
         // Snap back to 100 (Trash visible)
-        animate(x, 100, { type: "spring", stiffness: 600, damping: 28 });
+        animate(x, 100, { type: 'spring', stiffness: 600, damping: 28 });
       }
     } else {
       // Closed state
@@ -182,7 +215,9 @@ function BacklogTaskItem({
       if (offset > 60 || velocity > 200) {
         setIsOpen(true);
         window.dispatchEvent(
-          new CustomEvent('task-swipe-open', { detail: { id: `backlog:${item.id}` } })
+          new CustomEvent('task-swipe-open', {
+            detail: { id: `backlog:${item.id}` },
+          }),
         );
       }
       // Check for Left Swipe (Plus) -> Negative Offset
@@ -191,17 +226,16 @@ function BacklogTaskItem({
         setHasTriggeredExit(true); // Immediately hide menu
         setIsOpen(false); // Close menu immediately for clean exit
         window.dispatchEvent(
-          new CustomEvent('task-swipe-open', { detail: { id: null } })
+          new CustomEvent('task-swipe-open', { detail: { id: null } }),
         );
         onAddToday(item);
         // Continue the movement outwards with smooth timing
         // Use larger distance for desktop (wider container) vs mobile
         const exitDistance = isDesktop ? -800 : -450;
         animate(x, exitDistance, { duration: 0.8, ease: [0.22, 1, 0.36, 1] });
-      }
-      else {
+      } else {
         // Not enough swipe - Snap back
-        animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
+        animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
       }
     }
   };
@@ -212,11 +246,7 @@ function BacklogTaskItem({
       layout={!isDragging && !isExiting}
       initial={false}
       animate={{ opacity: 1, x: 0, y: 0 }}
-      exit={
-        isExiting
-          ? { opacity: 1 }
-          : { opacity: 0, scale: 0.95 }
-      }
+      exit={isExiting ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
       transition={{ delay: index * 0.05 }}
       className={`group relative mb-3 rounded-xl ${isOpen ? 'z-20' : isMenuOpen ? 'z-50' : isExiting ? 'z-0' : 'z-auto'} ${isDesktop ? '' : 'overflow-hidden bg-muted/50'} ${isExiting ? 'will-change-transform' : ''}`}
       style={{ zIndex: isMenuOpen ? 50 : isExiting ? 0 : isOpen ? 20 : 1 }}
@@ -224,7 +254,7 @@ function BacklogTaskItem({
       {/* Swipe Actions Layer (Left - for Right Swipe - Trash) */}
       {!isDesktop && (
         <div
-          className={`absolute inset-y-0 left-0 flex items-center pl-2 gap-2 transition-opacity ${!(isExiting || hasTriggeredExit) && (isOpen || isDragging) ? 'opacity-100 duration-200' : (isExiting || hasTriggeredExit) ? 'opacity-0 duration-0' : 'opacity-0 duration-200 delay-200'}`}
+          className={`absolute inset-y-0 left-0 flex items-center pl-2 gap-2 transition-opacity ${!(isExiting || hasTriggeredExit) && (isOpen || isDragging) ? 'opacity-100 duration-200' : isExiting || hasTriggeredExit ? 'opacity-0 duration-0' : 'opacity-0 duration-200 delay-200'}`}
           aria-hidden={!isOpen || isExiting || hasTriggeredExit}
         >
           <button
@@ -252,16 +282,14 @@ function BacklogTaskItem({
 
       {/* Swipe Actions Layer (Right - for Left Swipe - Plus) */}
       {!isDesktop && (
-        <div
-          className="absolute inset-y-0 right-0 flex items-center pr-4"
-        >
+        <div className="absolute inset-y-0 right-0 flex items-center pr-4">
           <motion.div
             className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
             style={{
               opacity: doTodayOpacity,
               scale: doTodayScale,
               color: doTodayTextColor,
-              backgroundColor: doTodayColor
+              backgroundColor: doTodayColor,
             }}
           >
             <CalendarCheck className="w-5 h-5" />
@@ -271,36 +299,39 @@ function BacklogTaskItem({
 
       {/* Foreground Card */}
       <motion.div
-        drag={(isDesktop || isNudging) ? false : "x"}
+        drag={isDesktop || isNudging ? false : 'x'}
         dragDirectionLock={true}
         dragConstraints={{ left: -70, right: 100 }} // Left: Plus (-70), Right: Trash (100)
         dragElastic={0} // Hard stop (no stretching)
         dragMomentum={false}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
+        // Hover handlers for robust desktop behavior
+        onMouseEnter={() => isDesktop && !isDragging && setIsHovered(true)}
+        onMouseLeave={() => isDesktop && setIsHovered(false)}
         initial={false}
-        animate={{ x: isExiting ? (isDesktop ? -800 : -450) : (isOpen ? 100 : 0) }}
+        animate={{
+          x: isExiting ? (isDesktop ? -800 : -450) : isOpen ? 100 : 0,
+        }}
         style={{
           willChange: isExiting ? 'transform' : 'auto',
-          x: x // Always use motion value
+          x: x, // Always use motion value
         }}
         transition={
           isExiting
             ? {
-              type: "tween",
-              duration: 0.8,
-              ease: [0.22, 1, 0.36, 1]
-            }
-            : { type: "spring", stiffness: 600, damping: 28, mass: 1 }
+                type: 'tween',
+                duration: 0.8,
+                ease: [0.22, 1, 0.36, 1],
+              }
+            : { type: 'spring', stiffness: 600, damping: 28, mass: 1 }
         }
         className={`
                 relative flex items-center gap-1.5 px-2 py-3.5 
                 transition-colors duration-200 rounded-xl 
+                bg-card
                 border border-border/40 shadow-sm
-                ${isDesktop
-            ? `md:hover:bg-card md:hover:border-border ${isMenuOpen ? 'bg-card border-border shadow-md' : 'bg-transparent'}`
-            : `bg-card ${(isOpen || isDragging || isNudging) ? '' : ''}`
-          }
+                ${isDesktop && isHovered ? 'border-border shadow-md' : ''}
                 ${isExiting ? 'pointer-events-none' : ''}
                 cursor-pointer
             `}
@@ -339,17 +370,18 @@ function BacklogTaskItem({
                         exit={{ opacity: 0, scale: 0 }}
                         transition={{ duration: 0.2 }}
                         key={tagId}
-                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${!color
-                          ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
-                          : ''
-                          }`}
+                        className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
+                          !color
+                            ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
+                            : ''
+                        }`}
                         style={
                           color
                             ? {
-                              backgroundColor: `${color}20`,
-                              color: color,
-                              borderColor: `${color}40`,
-                            }
+                                backgroundColor: `${color}20`,
+                                color: color,
+                                borderColor: `${color}40`,
+                              }
                             : undefined
                         }
                       >
@@ -367,41 +399,40 @@ function BacklogTaskItem({
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="relative flex items-center gap-1 shrink-0">
-          {/* Desktop Group: Add Today + Menu */}
-          <div className={`
-                    hidden md:flex items-center gap-1 transition-opacity duration-200
-                    ${isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
-                `}>
-            {/* Hover Toggle "Do Today" Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onAddToday(item);
-              }}
-              disabled={processingIds.has(item.id)}
-              className="p-2 rounded-lg text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
-              title="Do Today"
-            >
-              {processingIds.has(item.id) ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <Plus className="w-5 h-5" />
-              )}
-            </button>
+        {/* Actions - Absolute on Desktop to match TaskList */}
+        <div
+          className={`
+             hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 items-center gap-1 transition-opacity duration-200 z-10
+             ${isMenuOpen ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}
+        `}
+        >
+          {/* Hover Toggle "Do Today" Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToday(item);
+            }}
+            disabled={processingIds.has(item.id)}
+            className="p-1.5 rounded-lg text-muted-foreground hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
+            title="Do Today"
+          >
+            {processingIds.has(item.id) ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Plus className="w-5 h-5" />
+            )}
+          </button>
 
-            {/* 3-Dots Menu */}
-            <button
-              className={`
-                            p-2 rounded-lg transition-colors
+          {/* 3-Dots Menu */}
+          <button
+            className={`
+                            p-1.5 rounded-lg transition-colors
                             ${isMenuOpen ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}
                         `}
-              onClick={(e) => onMenuOpen(e, item)}
-            >
-              <EllipsisVertical className="w-5 h-5" />
-            </button>
-          </div>
+            onClick={(e) => onMenuOpen(e, item)}
+          >
+            <EllipsisVertical className="w-5 h-5" />
+          </button>
         </div>
       </motion.div>
     </motion.div>
@@ -436,7 +467,7 @@ export default function BacklogPanel({
   const [confirmId, setConfirmId] = React.useState<BacklogItem | null>(null);
   const [busy, setBusy] = React.useState(false);
   const [processingIds, setProcessingIds] = React.useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   const [exitAction, setExitAction] = React.useState<{
@@ -469,12 +500,11 @@ export default function BacklogPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           taskId: taskId,
-          tags: newTags
+          tags: newTags,
         }),
       });
-
     } catch (e) {
-      console.error("Failed to update tags", e);
+      console.error('Failed to update tags', e);
     }
   };
 
@@ -496,7 +526,7 @@ export default function BacklogPanel({
     return () =>
       window.removeEventListener(
         'task-menu-open',
-        closeIfOther as EventListener
+        closeIfOther as EventListener,
       );
   }, []);
 
@@ -565,7 +595,7 @@ export default function BacklogPanel({
     window.dispatchEvent(
       new CustomEvent('task-menu-open', {
         detail: { id },
-      })
+      }),
     );
 
     setMenu((prev) => {
@@ -578,10 +608,7 @@ export default function BacklogPanel({
       const vh = window.innerHeight;
 
       let left = rect.left + rect.width / 2 - MENU_W / 2;
-      left = Math.max(
-        MARGIN,
-        Math.min(left, vw - MENU_W - MARGIN)
-      );
+      left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
 
       let top = rect.bottom + GAP;
       if (top + MENU_H > vh - MARGIN) {
@@ -597,7 +624,9 @@ export default function BacklogPanel({
       // Added overflow-visible to allow menus to spill out if needed
       className="px-6 pt-0 pb-4 overflow-visible rounded-[20px]"
     >
-
+      <div className="flex flex-row items-center justify-end mb-2 gap-3 relative">
+        {/* Header Menu Removed - Moved to Page */}
+      </div>
       <div
         className={`pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
       >
@@ -614,7 +643,9 @@ export default function BacklogPanel({
               <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10">
                 <Fly size={32} y={-4} />
               </div>
-              <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">Start your backlog</p>
+              <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                Start your backlog
+              </p>
               <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
                 Tap to save a task for later
               </p>
@@ -686,7 +717,9 @@ export default function BacklogPanel({
       {/* For Backlog, we only have one delete variant. Let's add Edit Dialog separately */}
       <EditTaskDialog
         open={!!confirmId && confirmId.id.startsWith('EDIT-')}
-        initialText={confirmId && confirmId.id.startsWith('EDIT-') ? confirmId.text : ''}
+        initialText={
+          confirmId && confirmId.id.startsWith('EDIT-') ? confirmId.text : ''
+        }
         busy={busy}
         onClose={() => setConfirmId(null)}
         onSave={async (newText) => {
@@ -732,7 +765,13 @@ export default function BacklogPanel({
 }
 // Helper component for add-only animation
 // Helper component for add-only animation
-function TaskCounter({ count, pendingCount }: { count: number; pendingCount?: number }) {
+function TaskCounter({
+  count,
+  pendingCount,
+}: {
+  count: number;
+  pendingCount?: number;
+}) {
   const controls = useAnimation();
   const prevCount = React.useRef(count);
 
@@ -741,8 +780,12 @@ function TaskCounter({ count, pendingCount }: { count: number; pendingCount?: nu
       // Only animate if count INCREASED
       controls.start({
         scale: [1, 1.35, 1],
-        color: ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"],
-        transition: { duration: 0.3, ease: "easeInOut" }
+        color: [
+          'hsl(var(--muted-foreground))',
+          'hsl(var(--primary))',
+          'hsl(var(--muted-foreground))',
+        ],
+        transition: { duration: 0.3, ease: 'easeInOut' },
       });
     }
     prevCount.current = count;
@@ -761,9 +804,25 @@ function TaskCounter({ count, pendingCount }: { count: number; pendingCount?: nu
         </motion.span>
       )}
       {(pendingCount ?? 0) > 0 && (
-        <svg className="w-3.5 h-3.5 animate-spin text-muted-foreground/60" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        <svg
+          className="w-3.5 h-3.5 animate-spin text-muted-foreground/60"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
         </svg>
       )}
     </div>

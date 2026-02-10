@@ -12,7 +12,15 @@ import {
   Check,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
-import { AnimatePresence, motion, PanInfo, useMotionValue, useTransform, animate, useAnimation } from 'framer-motion';
+import {
+  AnimatePresence,
+  motion,
+  PanInfo,
+  useMotionValue,
+  useTransform,
+  animate,
+  useAnimation,
+} from 'framer-motion';
 import React, { useState, useEffect } from 'react';
 import useSWR from 'swr';
 import {
@@ -61,10 +69,14 @@ interface SortableTaskItemProps {
   isMenuOpen: boolean;
   isExitingLater: boolean;
   renderBullet?: (task: Task, isVisuallyDone: boolean) => React.ReactNode;
-  handleTaskToggle: (task: Task, forceState?: boolean, skipDelay?: boolean) => void;
+  handleTaskToggle: (
+    task: Task,
+    forceState?: boolean,
+    skipDelay?: boolean,
+  ) => void;
   onMenuOpen: (e: React.MouseEvent<HTMLButtonElement>, task: Task) => void;
   getTagDetails: (
-    tagId: string
+    tagId: string,
   ) => { id: string; name: string; color: string } | undefined;
   isDragDisabled?: boolean;
   isWeekly?: boolean;
@@ -72,303 +84,335 @@ interface SortableTaskItemProps {
   onDoLater?: (task: Task) => void;
 }
 
-const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>(({
-  task,
-  isDone,
-  isMenuOpen,
-  isExitingLater,
-  renderBullet,
-  handleTaskToggle,
-  onMenuOpen,
-  getTagDetails,
-  isDragDisabled,
-  isWeekly,
-  disableLayout,
-  onDoLater,
-}, ref) => {
-  /* Swipe Logic */
-  const [isOpen, setIsOpen] = useState(false);
-  const [isSwiping, setIsSwiping] = useState(false);
-  const [hasTriggeredExit, setHasTriggeredExit] = useState(false); // Immediate exit tracking
-  const isDraggingRef = React.useRef(false);
-  const hasActionTriggeredRef = React.useRef(false);
-  const containerRef = React.useRef<HTMLDivElement>(null);
-  const [isDesktop, setIsDesktop] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
+const SortableTaskItem = React.forwardRef<
+  HTMLDivElement,
+  SortableTaskItemProps
+>(
+  (
+    {
+      task,
+      isDone,
+      isMenuOpen,
+      isExitingLater,
+      renderBullet,
+      handleTaskToggle,
+      onMenuOpen,
+      getTagDetails,
+      isDragDisabled,
+      isWeekly,
+      disableLayout,
+      onDoLater,
+    },
+    ref,
+  ) => {
+    /* Swipe Logic */
+    const [isOpen, setIsOpen] = useState(false);
+    const [isSwiping, setIsSwiping] = useState(false);
+    const [hasTriggeredExit, setHasTriggeredExit] = useState(false); // Immediate exit tracking
+    const isDraggingRef = React.useRef(false);
+    const hasActionTriggeredRef = React.useRef(false);
+    const containerRef = React.useRef<HTMLDivElement>(null);
+    const [isDesktop, setIsDesktop] = useState(false);
+    const [isHovered, setIsHovered] = useState(false);
 
-  // Motion Values for Swipe
-  const x = useMotionValue(0);
-  const swipeThreshold = 60;
+    // Motion Values for Swipe
+    const x = useMotionValue(0);
+    const swipeThreshold = 60;
 
-  useEffect(() => {
-    const checkDesktop = () => setIsDesktop(window.innerWidth >= 768);
-    checkDesktop();
-    window.addEventListener('resize', checkDesktop);
-    return () => window.removeEventListener('resize', checkDesktop);
-  }, []);
+    useEffect(() => {
+      const checkDesktop = () => setIsDesktop(window.innerWidth >= 768);
+      checkDesktop();
+      window.addEventListener('resize', checkDesktop);
+      return () => window.removeEventListener('resize', checkDesktop);
+    }, []);
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: task.id, disabled: isDragDisabled || isOpen });
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({ id: task.id, disabled: isDragDisabled || isOpen });
 
-  // Clear hover state and reset swipe position when dragging starts
-  useEffect(() => {
-    if (isDragging) {
-      setIsHovered(false);
-      x.set(0); // Force reset horizontal position
-    }
-  }, [isDragging, x]);
-
-  // Transform values based on drag position x
-  // Right Swipe (Positive X) -> Do Later (Indigo) - SWAPPED
-  const doLaterOpacity = useTransform(x, [0, 25], [0, 1]);
-  const doLaterScale = useTransform(x, [0, swipeThreshold], [0.8, 1.2]);
-  // Instant color snap at threshold
-  const doLaterColor = useTransform(x, [swipeThreshold - 1, swipeThreshold], ["#9ca3af", "#6366f1"]); // Slate to Indigo
-  const doLaterTextColor = useTransform(x, [swipeThreshold - 1, swipeThreshold], ["#ffffff", "#ffffff"]);
-
-  // Sync exit state
-  useEffect(() => {
-    if (isExitingLater) {
-      setHasTriggeredExit(true);
-    }
-  }, [isExitingLater]);
-
-  useEffect(() => {
-    const handleOtherSwipe = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail.id !== task.id) {
-        setIsOpen(false);
+    // Clear hover state and reset swipe position when dragging starts
+    useEffect(() => {
+      if (isDragging) {
+        setIsHovered(false);
+        x.set(0); // Force reset horizontal position
       }
-    };
+    }, [isDragging, x]);
 
-    // Global click listener to close on outside click
-    const handleGlobalClick = (e: MouseEvent) => {
-      if (!isOpen) return;
+    // Transform values based on drag position x
+    // Right Swipe (Positive X) -> Do Later (Indigo) - SWAPPED
+    const doLaterOpacity = useTransform(x, [0, 25], [0, 1]);
+    const doLaterScale = useTransform(x, [0, swipeThreshold], [0.8, 1.2]);
+    // Instant color snap at threshold
+    const doLaterColor = useTransform(
+      x,
+      [swipeThreshold - 1, swipeThreshold],
+      ['#9ca3af', '#6366f1'],
+    ); // Slate to Indigo
+    const doLaterTextColor = useTransform(
+      x,
+      [swipeThreshold - 1, swipeThreshold],
+      ['#ffffff', '#ffffff'],
+    );
 
-      // If clicking inside THIS task's actions or card, don't close via this handler
-      if (containerRef.current && containerRef.current.contains(e.target as Node)) {
-        return;
+    // Sync exit state
+    useEffect(() => {
+      if (isExitingLater) {
+        setHasTriggeredExit(true);
       }
+    }, [isExitingLater]);
 
-      setIsOpen(false);
-    };
+    useEffect(() => {
+      const handleOtherSwipe = (e: Event) => {
+        const detail = (e as CustomEvent).detail;
+        if (detail.id !== task.id) {
+          setIsOpen(false);
+        }
+      };
 
-    window.addEventListener('task-swipe-open', handleOtherSwipe);
+      // Global click listener to close on outside click
+      const handleGlobalClick = (e: MouseEvent) => {
+        if (!isOpen) return;
 
-    // Only attach click listener if open, using capture to ensure we get it
-    if (isOpen) {
-      window.addEventListener('click', handleGlobalClick, { capture: true });
+        // If clicking inside THIS task's actions or card, don't close via this handler
+        if (
+          containerRef.current &&
+          containerRef.current.contains(e.target as Node)
+        ) {
+          return;
+        }
 
-      // Also close on scroll
-      const handleScroll = () => {
         setIsOpen(false);
       };
-      window.addEventListener('scroll', handleScroll, { capture: true, passive: true });
+
+      window.addEventListener('task-swipe-open', handleOtherSwipe);
+
+      // Only attach click listener if open, using capture to ensure we get it
+      if (isOpen) {
+        window.addEventListener('click', handleGlobalClick, { capture: true });
+
+        // Also close on scroll
+        const handleScroll = () => {
+          setIsOpen(false);
+        };
+        window.addEventListener('scroll', handleScroll, {
+          capture: true,
+          passive: true,
+        });
+
+        return () => {
+          window.removeEventListener('task-swipe-open', handleOtherSwipe);
+          window.removeEventListener('click', handleGlobalClick, {
+            capture: true,
+          });
+          window.removeEventListener('scroll', handleScroll, { capture: true });
+        };
+      }
 
       return () => {
         window.removeEventListener('task-swipe-open', handleOtherSwipe);
-        window.removeEventListener('click', handleGlobalClick, { capture: true });
-        window.removeEventListener('scroll', handleScroll, { capture: true });
       };
-    }
+    }, [task.id, isOpen]);
 
-    return () => {
-      window.removeEventListener('task-swipe-open', handleOtherSwipe);
+    const handleDragStart = () => {
+      isDraggingRef.current = true;
+      setIsSwiping(true);
     };
-  }, [task.id, isOpen]);
 
-  const handleDragStart = () => {
-    isDraggingRef.current = true;
-    setIsSwiping(true);
-  };
+    const handleDragEnd = (_: any, info: PanInfo) => {
+      // Small delay to prevent click triggering immediately after swipe
+      setTimeout(() => {
+        isDraggingRef.current = false;
+        setIsSwiping(false);
+      }, 100);
 
-  const handleDragEnd = (_: any, info: PanInfo) => {
-    // Small delay to prevent click triggering immediately after swipe
-    setTimeout(() => {
-      isDraggingRef.current = false;
-      setIsSwiping(false);
-    }, 100);
+      const offset = info.offset.x;
+      const velocity = info.velocity.x;
 
-    const offset = info.offset.x;
-    const velocity = info.velocity.x;
-
-    // Strict Spotify-like snap logic (Swapped again: Open is now Left/Negative)
-    if (isOpen) {
-      // If already open (Left Swipe state -> Menu), closing needs Right motion (Positive)
-      if (offset > 15 || velocity > 100) {
-        setIsOpen(false);
-        window.dispatchEvent(
-          new CustomEvent('task-swipe-open', { detail: { id: null } })
-        );
+      // Strict Spotify-like snap logic (Swapped again: Open is now Left/Negative)
+      if (isOpen) {
+        // If already open (Left Swipe state -> Menu), closing needs Right motion (Positive)
+        if (offset > 15 || velocity > 100) {
+          setIsOpen(false);
+          window.dispatchEvent(
+            new CustomEvent('task-swipe-open', { detail: { id: null } }),
+          );
+        } else {
+          // Snap back to open (Negative X)
+          animate(x, -100, { type: 'spring', stiffness: 600, damping: 28 });
+        }
       } else {
-        // Snap back to open (Negative X)
-        animate(x, -100, { type: "spring", stiffness: 600, damping: 28 });
+        // Closed state
+
+        // Action: Swipe Right (Positive) -> Do Later - SWAPPED
+        if (offset > swipeThreshold && onDoLater) {
+          hasActionTriggeredRef.current = true;
+          setHasTriggeredExit(true); // Immediately hide menu
+          setIsOpen(false); // Close menu immediately for clean exit
+          window.dispatchEvent(
+            new CustomEvent('task-swipe-open', { detail: { id: null } }),
+          );
+          onDoLater(task);
+          // Continue the movement outwards with smooth timing
+          // Use larger distance for desktop (wider container) vs mobile
+          const exitDistance = isDesktop ? 800 : 450;
+          animate(x, exitDistance, { duration: 0.8, ease: [0.22, 1, 0.36, 1] });
+        }
+        // Opening: Swipe Left (Negative) -> Edit/Trash - SWAPPED
+        else if (offset < -60 || velocity < -200) {
+          setIsOpen(true);
+          window.dispatchEvent(
+            new CustomEvent('task-swipe-open', { detail: { id: task.id } }),
+          );
+          animate(x, -100, { type: 'spring', stiffness: 600, damping: 28 });
+        } else {
+          // Snap back
+          animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
+        }
       }
-    } else {
-      // Closed state
+    };
 
-      // Action: Swipe Right (Positive) -> Do Later - SWAPPED
-      if (offset > swipeThreshold && onDoLater) {
-        hasActionTriggeredRef.current = true;
-        setHasTriggeredExit(true); // Immediately hide menu
-        setIsOpen(false); // Close menu immediately for clean exit
-        window.dispatchEvent(
-          new CustomEvent('task-swipe-open', { detail: { id: null } })
-        );
-        onDoLater(task);
-        // Continue the movement outwards with smooth timing
-        // Use larger distance for desktop (wider container) vs mobile
-        const exitDistance = isDesktop ? 800 : 450;
-        animate(x, exitDistance, { duration: 0.8, ease: [0.22, 1, 0.36, 1] });
+    const handleCardClick = (e: React.MouseEvent) => {
+      if (isDraggingRef.current) return;
+      if (isExitingLater || hasActionTriggeredRef.current) return;
+
+      if (isOpen) {
+        setIsOpen(false);
+        return;
       }
-      // Opening: Swipe Left (Negative) -> Edit/Trash - SWAPPED
-      else if (offset < -60 || velocity < -200) {
-        setIsOpen(true);
-        window.dispatchEvent(
-          new CustomEvent('task-swipe-open', { detail: { id: task.id } })
-        );
-        animate(x, -100, { type: "spring", stiffness: 600, damping: 28 });
-      }
-      else {
-        // Snap back
-        animate(x, 0, { type: "spring", stiffness: 600, damping: 28 });
-      }
-    }
-  };
+      handleTaskToggle(task);
+    };
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    if (isDraggingRef.current) return;
-    if (isExitingLater || hasActionTriggeredRef.current) return;
+    const style = {
+      transform: CSS.Translate.toString(transform),
+      transition,
+      zIndex: isDragging
+        ? 100
+        : isOpen
+          ? 20
+          : isMenuOpen
+            ? 50
+            : isExitingLater
+              ? 0
+              : 1,
+    };
 
-    if (isOpen) {
-      setIsOpen(false);
-      return;
-    }
-    handleTaskToggle(task);
-  };
-
-  const style = {
-    transform: CSS.Translate.toString(transform),
-    transition,
-    zIndex: isDragging ? 100 : isOpen ? 20 : isMenuOpen ? 50 : isExitingLater ? 0 : 1,
-  };
-
-  return (
-    <div
-      ref={(node: HTMLDivElement | null) => {
-        setNodeRef(node);
-        (containerRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-        // Handle forwarded ref
-        if (typeof ref === 'function') ref(node);
-        else if (ref) (ref as React.MutableRefObject<HTMLDivElement | null>).current = node;
-      }}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className={`relative mb-3 ${isDragging ? 'z-[100]' : 'z-auto'}`}
-      data-is-active={!isDone}
-    >
-      <motion.div
-        layout={!disableLayout && !isDragging && !isExitingLater}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, x: 0, y: 0 }}
-        exit={isExitingLater ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
-
-        transition={{
-          layout: { type: 'spring', stiffness: 250, damping: 25 },
+    return (
+      <div
+        ref={(node: HTMLDivElement | null) => {
+          setNodeRef(node);
+          (
+            containerRef as React.MutableRefObject<HTMLDivElement | null>
+          ).current = node;
+          // Handle forwarded ref
+          if (typeof ref === 'function') ref(node);
+          else if (ref)
+            (ref as React.MutableRefObject<HTMLDivElement | null>).current =
+              node;
         }}
-        className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : isExitingLater ? 'overflow-visible' : 'overflow-hidden bg-muted/50'} ${isExitingLater ? 'will-change-transform' : ''}`}
+        style={style}
+        {...attributes}
+        {...listeners}
+        className={`relative mb-3 ${isDragging ? 'z-[100]' : 'z-auto'}`}
+        data-is-active={!isDone}
       >
-        {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
-        {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
-        {/* Positioned on Left to be revealed by Right drag */}
-        <div
-          className="absolute inset-y-0 left-0 flex items-center pl-4"
-        >
-          <motion.div
-            className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
-            style={{
-              opacity: doLaterOpacity,
-              scale: doLaterScale,
-              color: doLaterTextColor,
-              backgroundColor: doLaterColor
-            }}
-          >
-            <CalendarClock className="w-5 h-5" />
-          </motion.div>
-        </div>
-
-        {/* Swipe (Menu) Actions Layer */}
-        <div
-          className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity ${!(isExitingLater || hasTriggeredExit) && (isOpen || isSwiping) ? 'opacity-100 duration-200' : (isExitingLater || hasTriggeredExit) ? 'opacity-0 duration-0' : 'opacity-0 duration-200 delay-200'}`}
-          aria-hidden={!isOpen || isExitingLater || hasTriggeredExit}
-        >
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.nativeEvent.stopImmediatePropagation();
-              onMenuOpen(e, task);
-            }}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
-            title="More options"
-            tabIndex={isOpen ? 0 : -1}
-          >
-            <EllipsisVertical className="w-5 h-5" />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              e.nativeEvent.stopImmediatePropagation();
-              const event = new CustomEvent('task-delete-request', { detail: { id: task.id } });
-              window.dispatchEvent(event);
-            }}
-            className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors"
-            title="Delete"
-            tabIndex={isOpen ? 0 : -1}
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Foreground Card (Swipeable) */}
         <motion.div
-          drag={isDesktop || isDragging ? false : "x"} // Disable swipe if sorting/dragging
-          dragListener={!isDragging && !isDragDisabled} // Also ensure disabled listener logic matches
-          dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
-          dragConstraints={{ left: -100, right: 70 }}
-          dragElastic={0}
-          dragMomentum={false}
-
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-          // Hover handlers for robust desktop behavior
-          onMouseEnter={() => isDesktop && !isDragging && setIsHovered(true)}
-          onMouseLeave={() => isDesktop && setIsHovered(false)}
-
-          initial={false}
-          animate={{ x: isExitingLater ? (isDesktop ? 800 : 450) : (isOpen ? -100 : 0) }}
-          style={{
-            x: x,
-            cursor: 'grab',
-            willChange: isExitingLater ? 'transform' : 'auto'
+          layout={!disableLayout && !isDragging && !isExitingLater}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, x: 0, y: 0 }}
+          exit={isExitingLater ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
+          transition={{
+            layout: { type: 'spring', stiffness: 250, damping: 25 },
           }}
-          transition={
-            isExitingLater
-              ? {
-                type: "tween",
-                duration: 0.8,
-                ease: [0.22, 1, 0.36, 1]
-              }
-              : { type: "spring", stiffness: 600, damping: 28, mass: 1 }
-          }
+          className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : isExitingLater ? 'overflow-visible' : 'overflow-hidden bg-muted/50'} ${isExitingLater ? 'will-change-transform' : ''}`}
+        >
+          {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
+          {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
+          {/* Positioned on Left to be revealed by Right drag */}
+          <div className="absolute inset-y-0 left-0 flex items-center pl-4">
+            <motion.div
+              className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
+              style={{
+                opacity: doLaterOpacity,
+                scale: doLaterScale,
+                color: doLaterTextColor,
+                backgroundColor: doLaterColor,
+              }}
+            >
+              <CalendarClock className="w-5 h-5" />
+            </motion.div>
+          </div>
 
-          className={`
+          {/* Swipe (Menu) Actions Layer */}
+          <div
+            className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity ${!(isExitingLater || hasTriggeredExit) && (isOpen || isSwiping) ? 'opacity-100 duration-200' : isExitingLater || hasTriggeredExit ? 'opacity-0 duration-0' : 'opacity-0 duration-200 delay-200'}`}
+            aria-hidden={!isOpen || isExitingLater || hasTriggeredExit}
+          >
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+                onMenuOpen(e, task);
+              }}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
+              title="More options"
+              tabIndex={isOpen ? 0 : -1}
+            >
+              <EllipsisVertical className="w-5 h-5" />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                e.nativeEvent.stopImmediatePropagation();
+                const event = new CustomEvent('task-delete-request', {
+                  detail: { id: task.id },
+                });
+                window.dispatchEvent(event);
+              }}
+              className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors"
+              title="Delete"
+              tabIndex={isOpen ? 0 : -1}
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Foreground Card (Swipeable) */}
+          <motion.div
+            drag={isDesktop || isDragging ? false : 'x'} // Disable swipe if sorting/dragging
+            dragListener={!isDragging && !isDragDisabled} // Also ensure disabled listener logic matches
+            dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
+            dragConstraints={{ left: -100, right: 70 }}
+            dragElastic={0}
+            dragMomentum={false}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            // Hover handlers for robust desktop behavior
+            onMouseEnter={() => isDesktop && !isDragging && setIsHovered(true)}
+            onMouseLeave={() => isDesktop && setIsHovered(false)}
+            initial={false}
+            animate={{
+              x: isExitingLater ? (isDesktop ? 800 : 450) : isOpen ? -100 : 0,
+            }}
+            style={{
+              x: x,
+              cursor: 'grab',
+              willChange: isExitingLater ? 'transform' : 'auto',
+            }}
+            transition={
+              isExitingLater
+                ? {
+                    type: 'tween',
+                    duration: 0.8,
+                    ease: [0.22, 1, 0.36, 1],
+                  }
+                : { type: 'spring', stiffness: 600, damping: 28, mass: 1 }
+            }
+            className={`
               relative flex items-center gap-1.5 px-2 py-3.5 
               transition-colors duration-200 rounded-xl 
               bg-card
@@ -381,141 +425,154 @@ const SortableTaskItem = React.forwardRef<HTMLDivElement, SortableTaskItemProps>
               ${isDone && !isDragging && isHovered && isDesktop ? 'bg-accent/50' : ''} 
               cursor-pointer
             `}
-          // Note: We are using 'style' prop for x motion value to avoid re-renders
-          // combined with the style object above, so we pass x via the style prop on the motion component directly
-          onClick={handleCardClick}
-        >
-          <div className={`flex items-center flex-1 min-w-0 gap-3 pl-2 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}>
-            {/* Bullet */}
-            <div className="relative flex-shrink-0 w-7 h-7">
-              <AnimatePresence initial={false}>
-                {!isDone ? (
-                  <motion.div
-                    key="fly"
-                    className="absolute inset-0"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.18 }}
-                  >
-                    {renderBullet ? (
-                      renderBullet(task, false)
-                    ) : (
+            // Note: We are using 'style' prop for x motion value to avoid re-renders
+            // combined with the style object above, so we pass x via the style prop on the motion component directly
+            onClick={handleCardClick}
+          >
+            <div
+              className={`flex items-center flex-1 min-w-0 gap-3 pl-2 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
+            >
+              {/* Bullet */}
+              <div className="relative flex-shrink-0 w-7 h-7">
+                <AnimatePresence initial={false}>
+                  {!isDone ? (
+                    <motion.div
+                      key="fly"
+                      className="absolute inset-0"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.18 }}
+                    >
+                      {renderBullet ? (
+                        renderBullet(task, false)
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (
+                              isExitingLater ||
+                              isSwiping ||
+                              isDraggingRef.current ||
+                              hasActionTriggeredRef.current
+                            )
+                              return;
+                            handleTaskToggle(task, true);
+                          }}
+                          className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 md:hover:text-primary"
+                        >
+                          <Circle className="w-6 h-6" />
+                        </button>
+                      )}
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="check"
+                      className="absolute inset-0"
+                      initial={{ opacity: 0, scale: 0.6 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.6 }}
+                      transition={{
+                        type: 'spring',
+                        stiffness: 400,
+                        damping: 25,
+                      }}
+                    >
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (isExitingLater || isSwiping || isDraggingRef.current || hasActionTriggeredRef.current) return;
-                          handleTaskToggle(task, true);
+                          handleTaskToggle(task, false);
                         }}
-                        className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 md:hover:text-primary"
                       >
-                        <Circle className="w-6 h-6" />
+                        <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
                       </button>
-                    )}
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="check"
-                    className="absolute inset-0"
-                    initial={{ opacity: 0, scale: 0.6 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.6 }}
-                    transition={{
-                      type: 'spring',
-                      stiffness: 400,
-                      damping: 25,
-                    }}
-                  >
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTaskToggle(task, false);
-                      }}
-                    >
-                      <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-
-            <div className="flex-1 min-w-0">
-              {(isWeekly || (task.tags && task.tags.length > 0)) && (
-                <div className="flex flex-wrap gap-1 mb-1">
-                  {isWeekly && (
-                    <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
-                      <RotateCcw className="w-3 h-3" />
-                      Weekly
-                    </span>
+                    </motion.div>
                   )}
-                  <AnimatePresence mode="popLayout">
-                    {task.tags?.map((tagId) => {
-                      const tagDetails = getTagDetails(tagId);
-                      if (!tagDetails) return null;
+                </AnimatePresence>
+              </div>
 
-                      const color = tagDetails.color;
-                      const name = tagDetails.name;
+              <div className="flex-1 min-w-0">
+                {(isWeekly || (task.tags && task.tags.length > 0)) && (
+                  <div className="flex flex-wrap gap-1 mb-1">
+                    {isWeekly && (
+                      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
+                        <RotateCcw className="w-3 h-3" />
+                        Weekly
+                      </span>
+                    )}
+                    <AnimatePresence mode="popLayout">
+                      {task.tags?.map((tagId) => {
+                        const tagDetails = getTagDetails(tagId);
+                        if (!tagDetails) return null;
 
-                      return (
-                        <motion.span
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0 }}
-                          transition={{ duration: 0.2 }}
-                          key={tagId}
-                          className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${!color
-                            ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
-                            : ''
+                        const color = tagDetails.color;
+                        const name = tagDetails.name;
+
+                        return (
+                          <motion.span
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0 }}
+                            transition={{ duration: 0.2 }}
+                            key={tagId}
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
+                              !color
+                                ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
+                                : ''
                             }`}
-                          style={
-                            color
-                              ? {
-                                backgroundColor: `${color}20`,
-                                color: color,
-                                borderColor: `${color}40`,
-                              }
-                              : undefined
-                          }
-                        >
-                          {name}
-                        </motion.span>
-                      );
-                    })}
-                  </AnimatePresence>
-                </div>
-              )}
-              <motion.span
-                className={`block text-base font-medium md:text-lg transition-colors duration-200 ${isDone
-                  ? 'text-muted-foreground line-through'
-                  : 'text-foreground'
+                            style={
+                              color
+                                ? {
+                                    backgroundColor: `${color}20`,
+                                    color: color,
+                                    borderColor: `${color}40`,
+                                  }
+                                : undefined
+                            }
+                          >
+                            {name}
+                          </motion.span>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                )}
+                <motion.span
+                  className={`block text-base font-medium md:text-lg transition-colors duration-200 ${
+                    isDone
+                      ? 'text-muted-foreground line-through'
+                      : 'text-foreground'
                   }`}
-                animate={{
-                  opacity: isDone ? 0.8 : 1, // Double ensure text is dimmed
-                }}
-                transition={{ duration: 0.2 }}
-              >
-                {task.text}
-              </motion.span>
+                  animate={{
+                    opacity: isDone ? 0.8 : 1, // Double ensure text is dimmed
+                  }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {task.text}
+                </motion.span>
+              </div>
             </div>
-          </div>
-          {/* Grab handle area for mobile if needed, or just edge drag */}
+            {/* Grab handle area for mobile if needed, or just edge drag */}
 
-          {/* Desktop Hover Menu (3 Dots) */}
-          <div className={`hidden md:group-hover:block absolute right-2 top-1/2 -translate-y-1/2 transition-opacity ${isDragging ? 'opacity-0' : 'opacity-100'}`}>
-            <button
-              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
-              onClick={(e) => onMenuOpen(e, task)}
-              onPointerDown={(e) => e.stopPropagation()}
-              title="Options"
+            {/* Desktop Hover Menu (3 Dots) */}
+            <div
+              className={`hidden md:group-hover:block absolute right-2 top-1/2 -translate-y-1/2 transition-opacity ${isDragging ? 'opacity-0' : 'opacity-100'}`}
             >
-              <EllipsisVertical className="w-5 h-5" />
-            </button>
-          </div>
+              <button
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
+                onClick={(e) => onMenuOpen(e, task)}
+                onPointerDown={(e) => e.stopPropagation()}
+                title="Options"
+              >
+                <EllipsisVertical className="w-5 h-5" />
+              </button>
+            </div>
+          </motion.div>
         </motion.div>
-      </motion.div>
-    </div>
-  );
-});
+      </div>
+    );
+  },
+);
 
 export default function TaskList({
   tasks,
@@ -545,7 +602,7 @@ export default function TaskList({
   onAddRequested: (
     prefill: string,
     insertAfterIndex: number | null,
-    opts?: { preselectToday?: boolean }
+    opts?: { preselectToday?: boolean },
   ) => void;
 
   weeklyIds?: Set<string>;
@@ -593,11 +650,14 @@ export default function TaskList({
     taskId: string | null;
   }>({ open: false, taskId: null });
 
-  
-  
-  const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(new Set());
+  const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(
+    new Set(),
+  );
   const [isAnyDragging, setIsAnyDragging] = useState(false);
-  const activeAreaLimitsRef = React.useRef<{ top: number; bottom: number } | null>(null);
+  const activeAreaLimitsRef = React.useRef<{
+    top: number;
+    bottom: number;
+  } | null>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
@@ -634,7 +694,7 @@ export default function TaskList({
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   // Listen for other menus opening to auto-close this one
@@ -646,7 +706,7 @@ export default function TaskList({
 
     const handleDeleteRequest = (e: Event) => {
       const id = (e as CustomEvent<{ id: string }>).detail?.id;
-      const task = tasks.find(t => t.id === id);
+      const task = tasks.find((t) => t.id === id);
       if (task) {
         setDialog({ task, kind: taskKind(task) });
         setMenu(null); // Close any open menu
@@ -654,11 +714,20 @@ export default function TaskList({
     };
 
     window.addEventListener('task-menu-open', closeIfOther as EventListener);
-    window.addEventListener('task-delete-request', handleDeleteRequest as EventListener);
+    window.addEventListener(
+      'task-delete-request',
+      handleDeleteRequest as EventListener,
+    );
 
     return () => {
-      window.removeEventListener('task-menu-open', closeIfOther as EventListener);
-      window.removeEventListener('task-delete-request', handleDeleteRequest as EventListener);
+      window.removeEventListener(
+        'task-menu-open',
+        closeIfOther as EventListener,
+      );
+      window.removeEventListener(
+        'task-delete-request',
+        handleDeleteRequest as EventListener,
+      );
     };
   }, [tasks]); // Added tasks dependency to find task
 
@@ -672,7 +741,7 @@ export default function TaskList({
 
       window.dispatchEvent(new Event('tags-updated'));
     } catch (e) {
-      console.error("Failed to update tags", e);
+      console.error('Failed to update tags', e);
     }
   };
 
@@ -711,25 +780,31 @@ export default function TaskList({
   };
 
   const dialogVariant: 'regular' | 'weekly' | 'backlog' | 'edit' = dialog
-    ? dialog.kind === 'edit' ? 'edit' : taskKind(dialog.task)
+    ? dialog.kind === 'edit'
+      ? 'edit'
+      : taskKind(dialog.task)
     : 'regular';
 
-  const handleTaskToggle = (task: Task, forceState?: boolean, skipDelay?: boolean) => {
+  const handleTaskToggle = (
+    task: Task,
+    forceState?: boolean,
+    skipDelay?: boolean,
+  ) => {
     const isCompleting =
       forceState === true || (forceState === undefined && !task.completed);
 
     if (isCompleting) {
       if (!skipDelay) {
-         setDelayedCompleted(prev => new Set(prev).add(task.id));
-         setTimeout(() => {
-             setDelayedCompleted(prev => {
-                 const next = new Set(prev);
-                 next.delete(task.id);
-                 return next;
-             });
-         }, 2000);
+        setDelayedCompleted((prev) => new Set(prev).add(task.id));
+        setTimeout(() => {
+          setDelayedCompleted((prev) => {
+            const next = new Set(prev);
+            next.delete(task.id);
+            return next;
+          });
+        }, 3000);
       }
-      
+
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       fetch('/api/statistics', {
         method: 'POST',
@@ -741,29 +816,30 @@ export default function TaskList({
         }),
       }).catch((err) => console.error('Failed to update stats', err));
     }
-  
+
     toggle(task.id, forceState);
   };
 
   // Determine visible tasks
-  const visibleTasks = tasks.filter(t => {
-     const isTemporarilyVisible = delayedCompleted.has(t.id);
-     const isActuallyCompleted = t.completed && !vSet.has(t.id) && !isTemporarilyVisible;
-     
-     // 1. Completion Filter
-     if (isActuallyCompleted && !showCompleted) return false;
+  const visibleTasks = tasks.filter((t) => {
+    const isTemporarilyVisible = delayedCompleted.has(t.id);
+    const isActuallyCompleted =
+      t.completed && !vSet.has(t.id) && !isTemporarilyVisible;
 
-     // 2. Tag Filter
-     if (selectedTags.length > 0) {
-        const tTags = t.tags || [];
-        // If task has NO tags, but we selected some, hide it? Or show if partial match?
-        // Usually filtering by tags means "Show tasks that have at least one of these tags" OR "All of these tags".
-        // Let's assume "Has ANY of the selected tags".
-        const hasMatch = tTags.some(tagId => selectedTags.includes(tagId));
-        if (!hasMatch) return false;
-     }
+    // 1. Completion Filter
+    if (isActuallyCompleted && !showCompleted) return false;
 
-     return true;
+    // 2. Tag Filter
+    if (selectedTags.length > 0) {
+      const tTags = t.tags || [];
+      // If task has NO tags, but we selected some, hide it? Or show if partial match?
+      // Usually filtering by tags means "Show tasks that have at least one of these tags" OR "All of these tags".
+      // Let's assume "Has ANY of the selected tags".
+      const hasMatch = tTags.some((tagId) => selectedTags.includes(tagId));
+      if (!hasMatch) return false;
+    }
+
+    return true;
   });
 
   // Sort: Active first, then Completed (if we are showing them in one list)
@@ -771,32 +847,36 @@ export default function TaskList({
   // AND "remove reordering completely".
   // This is contradictory. "Remove reordering" implies preserving `order`.
   // "Added to bottom" implies a visual grouping.
-  // Reconciling: We will sort by `order` primarily. 
+  // Reconciling: We will sort by `order` primarily.
   // IF the user wants completed at bottom, we might need a secondary sort.
   // User said: "just make the task be added to the bottom of the list".
   // Let's interpret this as: Active tasks sorted by order, THEN Completed tasks sorted by order.
   const sortedVisibleTasks = [...visibleTasks].sort((a, b) => {
-      // 1. Completion status (Active top, Completed bottom)
-      // We consider "delayedCompleted" as active for this purpose, to keep them in place?
-      // User said "remove reordering" before.
-      // But now says "added to the bottom".
-      // "Added to bottom" wins as latest instruction.
-      // Grace period items (delayedCompleted) should conceptually stay in ACTIVE list until they vanish.
-      
-      const aIsCompleted = (a.completed && !vSet.has(a.id) && !delayedCompleted.has(a.id));
-      const bIsCompleted = (b.completed && !vSet.has(b.id) && !delayedCompleted.has(b.id));
+    // 1. Completion status (Active top, Completed bottom)
+    // We consider "delayedCompleted" as active for this purpose, to keep them in place?
+    // User said "remove reordering" before.
+    // But now says "added to the bottom".
+    // "Added to bottom" wins as latest instruction.
+    // Grace period items (delayedCompleted) should conceptually stay in ACTIVE list until they vanish.
 
-      if (aIsCompleted !== bIsCompleted) {
-          return aIsCompleted ? 1 : -1;
-      }
-      
-      return (a.order ?? 0) - (b.order ?? 0);
+    const aIsCompleted =
+      a.completed && !vSet.has(a.id) && !delayedCompleted.has(a.id);
+    const bIsCompleted =
+      b.completed && !vSet.has(b.id) && !delayedCompleted.has(b.id);
+
+    if (aIsCompleted !== bIsCompleted) {
+      return aIsCompleted ? 1 : -1;
+    }
+
+    return (a.order ?? 0) - (b.order ?? 0);
   });
 
   const activeTaskIds = sortedVisibleTasks.map((t) => t.id);
 
   // We no longer need a separate completedTasks array for rendering elsewhere.
-  const completedCount = tasks.filter(t => t.completed && !vSet.has(t.id) && !delayedCompleted.has(t.id)).length;
+  const completedCount = tasks.filter(
+    (t) => t.completed && !vSet.has(t.id) && !delayedCompleted.has(t.id),
+  ).length;
 
   const handleDragStart = () => {
     setIsAnyDragging(true);
@@ -806,12 +886,18 @@ export default function TaskList({
 
     if (activeNodes.length > 0 && container) {
       const containerRect = container.getBoundingClientRect();
-      const rects = Array.from(activeNodes).map(n => n.getBoundingClientRect());
+      const rects = Array.from(activeNodes).map((n) =>
+        n.getBoundingClientRect(),
+      );
 
       // Calculate limits relative to the container's *content* top
       // We add scrollTop because we want the position relative to the start of the scrollable content
-      const top = Math.min(...rects.map(r => r.top - containerRect.top + container.scrollTop));
-      const bottom = Math.max(...rects.map(r => r.bottom - containerRect.top + container.scrollTop));
+      const top = Math.min(
+        ...rects.map((r) => r.top - containerRect.top + container.scrollTop),
+      );
+      const bottom = Math.max(
+        ...rects.map((r) => r.bottom - containerRect.top + container.scrollTop),
+      );
 
       activeAreaLimitsRef.current = { top, bottom };
     } else {
@@ -837,15 +923,19 @@ export default function TaskList({
       const newIndex = sortedVisibleTasks.findIndex((t) => t.id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        const reorderedVisible = arrayMove(sortedVisibleTasks, oldIndex, newIndex);
-        
+        const reorderedVisible = arrayMove(
+          sortedVisibleTasks,
+          oldIndex,
+          newIndex,
+        );
+
         // Fix: Ensure we don't lose hidden/filtered tasks
-        const visibleIds = new Set(sortedVisibleTasks.map(t => t.id));
-        const hiddenTasks = tasks.filter(t => !visibleIds.has(t.id));
-        
+        const visibleIds = new Set(sortedVisibleTasks.map((t) => t.id));
+        const hiddenTasks = tasks.filter((t) => !visibleIds.has(t.id));
+
         // New order = Reordered Visible + Hidden (appended to bottom)
         const finalOrder = [...reorderedVisible, ...hiddenTasks];
-        
+
         onReorder(finalOrder);
       }
     }
@@ -858,7 +948,7 @@ export default function TaskList({
     window.dispatchEvent(
       new CustomEvent('task-menu-open', {
         detail: { id },
-      })
+      }),
     );
 
     setMenu((prev) => {
@@ -886,8 +976,14 @@ export default function TaskList({
     const container = scrollContainerRef.current;
 
     // Apply parent restriction first
-    const parentRestricted = restrictToParentElement({ transform, draggingNodeRect } as any);
-    const verticalRestricted = restrictToVerticalAxis({ transform: parentRestricted, draggingNodeRect } as any);
+    const parentRestricted = restrictToParentElement({
+      transform,
+      draggingNodeRect,
+    } as any);
+    const verticalRestricted = restrictToVerticalAxis({
+      transform: parentRestricted,
+      draggingNodeRect,
+    } as any);
 
     if (limits !== null && draggingNodeRect && container) {
       const containerRect = container.getBoundingClientRect();
@@ -913,7 +1009,7 @@ export default function TaskList({
 
       return {
         ...verticalRestricted,
-        y: newY
+        y: newY,
       };
     }
     return verticalRestricted;
@@ -921,19 +1017,15 @@ export default function TaskList({
 
   return (
     <>
-      <div
-        dir="ltr"
-        className="px-6 pt-0 pb-4 overflow-visible rounded-[20px]"
-      >
+      <div dir="ltr" className="px-6 pt-0 pb-4 overflow-visible rounded-[20px]">
         <div className="flex flex-row items-center justify-end mb-2 gap-3 relative">
-             {/* Header Menu Removed - Moved to Page */}
+          {/* Header Menu Removed - Moved to Page */}
         </div>
 
         <div
           className={`pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
-          
           {tasks.length === 0 && !exitAction ? (
             /* Empty State: No Tasks at all */
             <motion.div
@@ -942,102 +1034,116 @@ export default function TaskList({
               transition={{ duration: 0.5 }}
             >
               <button
-                onClick={() => onAddRequested('', null, { preselectToday: true })}
+                onClick={() =>
+                  onAddRequested('', null, { preselectToday: true })
+                }
                 className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
               >
                 <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
                   <Fly size={32} y={-4} />
                 </div>
-                <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">Start your day</p>
+                <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                  Start your day
+                </p>
                 <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
                   Tap to add your first task
                 </p>
               </button>
             </motion.div>
-          ) : tasks.length > 0 && sortedVisibleTasks.length === 0 && !exitAction ? (
-             /* Empty State: Tasks exist but all filtered/completed */
-             <motion.div
-               initial={{ opacity: 0 }}
-               animate={{ opacity: 1 }}
-               transition={{ duration: 0.5 }}
-             >
-               <button
-                  onClick={() => onAddRequested('', null, { preselectToday: true })}
-                  className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
-               >
-                  <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
-                     <CalendarCheck className="w-8 h-8 text-primary" />
-                  </div>
-                  <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">You're all caught up!</p>
-                  <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
-                     {selectedTags.length > 0 
-                        ? "No tasks match your filters"
-                        : "Great job! Tap to add more"}
-                  </p>
-               </button>
-             </motion.div>
+          ) : tasks.length > 0 &&
+            sortedVisibleTasks.length === 0 &&
+            !exitAction ? (
+            /* Empty State: Tasks exist but all filtered/completed */
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+            >
+              <button
+                onClick={() =>
+                  onAddRequested('', null, { preselectToday: true })
+                }
+                className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+                  <CalendarCheck className="w-8 h-8 text-primary" />
+                </div>
+                <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                  You're all caught up!
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+                  {selectedTags.length > 0
+                    ? 'No tasks match your filters'
+                    : 'Great job! Tap to add more'}
+                </p>
+              </button>
+            </motion.div>
           ) : (
-             /* List Content */
-             <DndContext
-                sensors={sensors}
-                collisionDetection={closestCorners}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                onDragCancel={handleDragCancel}
-                modifiers={[restrictToActiveArea]}
-             >
-                <div className="relative">
-                  {/* Unified Tasks Container */}
-                  <div className="relative overflow-visible">
-                    <SortableContext
-                      items={activeTaskIds}
-                      strategy={verticalListSortingStrategy}
-                    >
-                      <AnimatePresence initial={false} mode="popLayout">
-                        {sortedVisibleTasks.map((task) => {
-                          const isCompleted = task.completed || vSet.has(task.id);
+            /* List Content */
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
+              modifiers={[restrictToActiveArea]}
+            >
+              <div className="relative">
+                {/* Unified Tasks Container */}
+                <div className="relative overflow-visible">
+                  <SortableContext
+                    items={activeTaskIds}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    <AnimatePresence initial={false} mode="popLayout">
+                      {sortedVisibleTasks.map((task) => {
+                        const isCompleted = task.completed || vSet.has(task.id);
 
-                      // Use delayedCompleted to identify items in grace period
-                      // But for "isDone" visual state, we trust the task.completed unless it's in grace
-                      // Grace period items are technically completed, but displayed as if they were just receiving the check.
-                      
-                      const isMenuOpen = menu?.id === task.id;
-                      const isExitingLater =
-                        exitAction?.id === task.id &&
-                        exitAction.type === 'later';
-                      
-                      return (
-                        <SortableTaskItem
-                          key={task.id}
-                          task={task}
-                          isDone={isCompleted}
-                          isMenuOpen={isMenuOpen}
-                          isExitingLater={isExitingLater}
-                          renderBullet={renderBullet}
-                          handleTaskToggle={handleTaskToggle}
-                          onMenuOpen={openMenu}
-                          getTagDetails={getTagDetails}
-                          // Disable drag if completed (grace period OR mostly settled)
-                          // Unless user wants to reorder completed tasks? Usually not.
-                          isDragDisabled={isCompleted}
-                          isWeekly={taskKind(task) === 'weekly'}
-                          disableLayout={isAnyDragging}
-                          onDoLater={onDoLater ? (t) => {
-                             setExitAction({ id: t.id, type: 'later' });
-                             setTimeout(() => onDoLater(t.id), 0);
-                             setTimeout(() => setExitAction(null), 800);
-                          } : undefined}
-                        />
-                      );
-                    })}
-                  </AnimatePresence>
-                </SortableContext>
+                        // Use delayedCompleted to identify items in grace period
+                        // But for "isDone" visual state, we trust the task.completed unless it's in grace
+                        // Grace period items are technically completed, but displayed as if they were just receiving the check.
+
+                        const isMenuOpen = menu?.id === task.id;
+                        const isExitingLater =
+                          exitAction?.id === task.id &&
+                          exitAction.type === 'later';
+
+                        return (
+                          <SortableTaskItem
+                            key={task.id}
+                            task={task}
+                            isDone={isCompleted}
+                            isMenuOpen={isMenuOpen}
+                            isExitingLater={isExitingLater}
+                            renderBullet={renderBullet}
+                            handleTaskToggle={handleTaskToggle}
+                            onMenuOpen={openMenu}
+                            getTagDetails={getTagDetails}
+                            // Disable drag if completed (grace period OR mostly settled)
+                            // Unless user wants to reorder completed tasks? Usually not.
+                            isDragDisabled={isCompleted}
+                            isWeekly={taskKind(task) === 'weekly'}
+                            disableLayout={isAnyDragging}
+                            onDoLater={
+                              onDoLater
+                                ? (t) => {
+                                    setExitAction({ id: t.id, type: 'later' });
+                                    setTimeout(() => onDoLater(t.id), 0);
+                                    setTimeout(() => setExitAction(null), 800);
+                                  }
+                                : undefined
+                            }
+                          />
+                        );
+                      })}
+                    </AnimatePresence>
+                  </SortableContext>
+                </div>
               </div>
-            </div>
-          </DndContext>
+            </DndContext>
           )}
 
-           {/* Show Finished Toggle (Removed from bottom) */}
+          {/* Show Finished Toggle (Removed from bottom) */}
         </div>
       </div>
 
@@ -1047,7 +1153,7 @@ export default function TaskList({
         isDone={
           menu
             ? tasks.find((t) => t.id === menu.id)?.completed ||
-            vSet.has(menu.id)
+              vSet.has(menu.id)
             : false
         }
         onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
@@ -1055,32 +1161,32 @@ export default function TaskList({
         onDoLater={
           onDoLater
             ? () => {
-              if (menu) {
-                const id = menu.id;
-                setExitAction({ id, type: 'later' });
-                setTimeout(() => onDoLater(id), 0);
-                setTimeout(() => setExitAction(null), 800); // Clear after animation
+                if (menu) {
+                  const id = menu.id;
+                  setExitAction({ id, type: 'later' });
+                  setTimeout(() => onDoLater(id), 0);
+                  setTimeout(() => setExitAction(null), 800); // Clear after animation
+                }
               }
-            }
             : undefined
         }
         onToggleRepeat={
           onToggleRepeat
             ? () => {
-              if (menu) {
-                const id = menu.id;
-                // Don't close immediately if we want to show loading, but UI usually optimistic.
-                // Closing menu feels snappier.
-                onToggleRepeat(id);
-                setMenu(null);
+                if (menu) {
+                  const id = menu.id;
+                  // Don't close immediately if we want to show loading, but UI usually optimistic.
+                  // Closing menu feels snappier.
+                  onToggleRepeat(id);
+                  setMenu(null);
+                }
               }
-            }
             : undefined
         }
         isWeekly={
           menu
             ? tasks.find((t) => t.id === menu.id)?.type === 'weekly' ||
-            (menu && weeklyIds.has(menu.id))
+              (menu && weeklyIds.has(menu.id))
             : false
         }
         onDelete={() => {
@@ -1114,22 +1220,25 @@ export default function TaskList({
         onSave={handleTagSave}
       />
 
-      {dialog && dialogVariant !== 'regular' && dialogVariant !== 'weekly' && dialogVariant !== 'backlog' && (
-        <EditTaskDialog
-          open={!!dialog && dialog.kind === 'edit'}
-          initialText={dialog.task.text}
-          busy={busy}
-          onClose={() => setDialog(null)}
-          onSave={async (newText) => {
-            if (onEditTask) {
-              setBusy(true);
-              await onEditTask(dialog.task.id, newText);
-              setBusy(false);
-              setDialog(null);
-            }
-          }}
-        />
-      )}
+      {dialog &&
+        dialogVariant !== 'regular' &&
+        dialogVariant !== 'weekly' &&
+        dialogVariant !== 'backlog' && (
+          <EditTaskDialog
+            open={!!dialog && dialog.kind === 'edit'}
+            initialText={dialog.task.text}
+            busy={busy}
+            onClose={() => setDialog(null)}
+            onSave={async (newText) => {
+              if (onEditTask) {
+                setBusy(true);
+                await onEditTask(dialog.task.id, newText);
+                setBusy(false);
+                setDialog(null);
+              }
+            }}
+          />
+        )}
 
       <DeleteDialog
         open={!!dialog && dialog.kind !== 'edit'}
@@ -1138,7 +1247,9 @@ export default function TaskList({
         busy={busy}
         onClose={() => setDialog(null)}
         onDeleteToday={
-          dialogVariant !== 'backlog' && dialogVariant !== 'edit' ? confirmDeleteToday : undefined
+          dialogVariant !== 'backlog' && dialogVariant !== 'edit'
+            ? confirmDeleteToday
+            : undefined
         }
         onDeleteAll={
           dialogVariant === 'weekly'
@@ -1165,7 +1276,13 @@ export default function TaskList({
   );
 }
 // Helper component for add-only animation
-function TaskCounter({ count, pendingCount }: { count: number; pendingCount?: number }) {
+function TaskCounter({
+  count,
+  pendingCount,
+}: {
+  count: number;
+  pendingCount?: number;
+}) {
   const controls = useAnimation();
   const prevCount = React.useRef(count);
 
@@ -1174,8 +1291,12 @@ function TaskCounter({ count, pendingCount }: { count: number; pendingCount?: nu
       // Only animate if count INCREASED
       controls.start({
         scale: [1, 1.35, 1],
-        color: ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"],
-        transition: { duration: 0.3, ease: "easeInOut" }
+        color: [
+          'hsl(var(--muted-foreground))',
+          'hsl(var(--primary))',
+          'hsl(var(--muted-foreground))',
+        ],
+        transition: { duration: 0.3, ease: 'easeInOut' },
       });
     }
     prevCount.current = count;
@@ -1194,9 +1315,25 @@ function TaskCounter({ count, pendingCount }: { count: number; pendingCount?: nu
         </motion.span>
       )}
       {(pendingCount ?? 0) > 0 && (
-        <svg className="w-3.5 h-3.5 animate-spin text-muted-foreground/60" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        <svg
+          className="w-3.5 h-3.5 animate-spin text-muted-foreground/60"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
         </svg>
       )}
     </div>
