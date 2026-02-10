@@ -30,6 +30,7 @@ type Props = {
   animateHunger?: boolean;
   hunger?: number;
   maxHunger?: number;
+  isGuest?: boolean;
 };
 
 export function FrogDisplay({
@@ -51,6 +52,7 @@ export function FrogDisplay({
   animateHunger = true,
   hunger,
   maxHunger,
+  isGuest,
 }: Props) {
   const { unseenCount } = useInventory();
   const [clickedAt, setClickedAt] = React.useState(0);
@@ -68,109 +70,89 @@ export function FrogDisplay({
 
   // Constant visual decay
   React.useEffect(() => {
-    if (displayedHunger <= 0) return;
+    if (!animateHunger || displayedHunger <= 0) return;
 
     const interval = setInterval(() => {
-      setDisplayedHunger(prev => Math.max(0, prev - 1000));
+      setDisplayedHunger((prev) => Math.max(0, prev - 1000));
     }, 1000);
 
     return () => clearInterval(interval);
   }, [displayedHunger]);
 
-  const hungerPercent = (typeof displayedHunger === 'number' && typeof maxHunger === 'number')
-    ? Math.max(0, Math.min(100, (displayedHunger / maxHunger) * 100))
-    : 100;
+  const hungerPercent =
+    typeof displayedHunger === 'number' && typeof maxHunger === 'number'
+      ? Math.max(0, Math.min(100, (displayedHunger / maxHunger) * 100))
+      : 100;
 
   // Expanded hunger states for better transition
   const getHungerState = (p: number) => {
-    if (p > 80) return { bg: 'bg-emerald-500', text: 'text-emerald-500', label: 'FULL TUMMY' };
-    if (p > 60) return { bg: 'bg-lime-500', text: 'text-lime-500', label: 'HAPPY' };
-    if (p > 40) return { bg: 'bg-yellow-500', text: 'text-yellow-500', label: 'PECKISH' };
-    if (p > 20) return { bg: 'bg-amber-500', text: 'text-amber-500', label: 'GRUMPY' };
+    if (p > 80)
+      return {
+        bg: 'bg-emerald-500',
+        text: 'text-emerald-500',
+        label: 'FULL TUMMY',
+      };
+    if (p > 60)
+      return { bg: 'bg-lime-500', text: 'text-lime-500', label: 'HAPPY' };
+    if (p > 40)
+      return { bg: 'bg-yellow-500', text: 'text-yellow-500', label: 'PECKISH' };
+    if (p > 20)
+      return { bg: 'bg-amber-500', text: 'text-amber-500', label: 'GRUMPY' };
     return { bg: 'bg-rose-500', text: 'text-rose-500', label: 'HANGRY!!' };
   };
 
-  const { bg: hungerColor, text: hungerTextColor, label: hungerStatus } = getHungerState(hungerPercent);
-
-
+  const {
+    bg: hungerColor,
+    text: hungerTextColor,
+    label: hungerStatus,
+  } = getHungerState(hungerPercent);
 
   return (
-
     // Added mb-12 to create the requested space from the tabs below
 
-    <div className={`${className} flex flex-col items-center mb-6 md:mb-12 relative`}>
-
+    <div
+      className={`${className} flex flex-col items-center mb-6 md:mb-12 relative`}
+    >
       <CurrencyShop
-
         open={shopOpen}
-
         onOpenChange={setShopOpen}
-
         balance={flyBalance ?? 0}
-
         hunger={displayedHunger}
-
         maxHunger={maxHunger ?? 100}
-
       />
 
-
-
       <div
-
         ref={frogBoxRef}
-
         className="relative z-20 transition-transform duration-500 -translate-y-3.5 pointer-events-none "
-
       >
-
         <div
-
           className="pointer-events-auto cursor-pointer"
-
           onClick={() => setClickedAt(Date.now())}
-
         >
-
           <Frog
-
             ref={frogRef}
-
             mouthOpen={!!mouthOpen}
-
             mouthOffset={mouthOffset}
-
             indices={indices}
-
           />
-
         </div>
 
         {/* SPEECH BUBBLE - NOW INSIDE FROG'S CONTAINER */}
 
-        {typeof rate === 'number' && typeof done === 'number' && typeof total === 'number' && typeof giftsClaimed === 'number' && (
-
-          <FrogSpeechBubble
-
-            rate={rate}
-
-            done={done}
-
-            total={total}
-
-            giftsClaimed={giftsClaimed}
-
-            isCatching={isCatching}
-
-            clickedAt={clickedAt}
-
-          />
-
-        )}
-
+        {typeof rate === 'number' &&
+          typeof done === 'number' &&
+          typeof total === 'number' &&
+          typeof giftsClaimed === 'number' && (
+            <FrogSpeechBubble
+              rate={rate}
+              done={done}
+              total={total}
+              giftsClaimed={giftsClaimed}
+              isCatching={isCatching}
+              clickedAt={clickedAt}
+            />
+          )}
       </div>
-
-
 
       {/* 2. THE CONTROL DECK 
 
@@ -181,7 +163,6 @@ export function FrogDisplay({
             */}
 
       <div
-
         className="relative z-10 -mt-6 flex items-center justify-between 
 
               w-[340px] max-w-[92vw] h-[76px] px-3
@@ -195,114 +176,83 @@ export function FrogDisplay({
               border border-border/50
 
               shadow-sm"
-
       >
-
         {/* Decorative Top Highlight to simulate glass edge light */}
-
         <div className="absolute inset-x-4 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/80 to-transparent opacity-50" />
-
-
-
         {/* Left Section: Unified Balance & Hunger Pill */}
-
         <div className="relative flex items-center ml-1">
-
           {typeof flyBalance === 'number' ? (
-
             <div
-
-              onClick={() => setShopOpen(true)}
-
+              onClick={() => {
+                if (!isGuest) setShopOpen(true);
+              }}
               className={cn(
-
-                "group relative overflow-hidden flex items-center gap-3 pl-2.5 pr-5 py-2 h-[60px] rounded-[18px] bg-muted/50 shadow-inner border border-border/30 transition-all hover:bg-muted/80 cursor-pointer active:scale-95 duration-200",
-
-                hungerPercent <= 20 && "ring-2 ring-rose-500/20"
-
+                'group relative overflow-hidden flex items-center gap-3 pl-2.5 pr-5 py-2 h-[60px] rounded-[18px] bg-muted/50 shadow-inner border border-border/30 transition-all cursor-pointer active:scale-95 duration-200',
+                !isGuest && 'hover:bg-muted/80',
+                hungerPercent <= 20 && 'ring-2 ring-rose-500/20',
+                isGuest && 'cursor-default active:scale-100 hover:bg-muted/50',
               )}
-
             >
-
               {/* Hunger Fill Background */}
 
               <div
-
-                className={cn("absolute bottom-0 left-0 right-0 z-0 opacity-20", animateHunger && "transition-all duration-1000 ease-in-out", hungerColor)}
-
+                className={cn(
+                  'absolute bottom-0 left-0 right-0 z-0 opacity-20',
+                  animateHunger && 'transition-all duration-1000 ease-in-out',
+                  hungerColor,
+                )}
                 style={{ height: `${hungerPercent}%` }}
-
               />
-
-
 
               {/* Icon Container */}
 
               <div className="relative z-10 flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0">
-
                 <Fly
-
                   size={24}
-
                   y={-2}
-
-                  className={cn("transition-transform duration-300 text-muted-foreground", animateBalance && "group-hover:rotate-12")}
-
+                  className={cn(
+                    'transition-transform duration-300 text-muted-foreground',
+                    animateBalance && 'group-hover:rotate-12',
+                  )}
                 />
-
               </div>
 
-
-
               <div className="relative z-10 flex flex-col justify-center">
-
                 {/* Hunger Status - Integrated Line at the top */}
 
                 <div className="flex items-center gap-1.5 mb-1">
+                  <div
+                    className={cn(
+                      'w-1.5 h-1.5 rounded-full ring-1 ring-white/10 shadow-sm',
+                      hungerColor,
+                    )}
+                  />
 
-                  <div className={cn("w-1.5 h-1.5 rounded-full ring-1 ring-white/10 shadow-sm", hungerColor)} />
+                  <span
+                    className={cn(
+                      'text-[8px] font-black uppercase tracking-[0.15em]',
 
-                  <span className={cn(
-
-                    "text-[8px] font-black uppercase tracking-[0.15em]",
-
-                    hungerTextColor
-
-                  )}>
-
+                      hungerTextColor,
+                    )}
+                  >
                     {hungerStatus}
-
                   </span>
-
                 </div>
 
-
-
                 <span className="text-2xl font-black leading-none text-foreground tabular-nums tracking-tight">
-
                   {flyBalance}
-
                 </span>
-
               </div>
-
             </div>
-
           ) : (
-
             <div className="w-24" />
-
           )}
-
         </div>
-
         {/* Center: Invisible Grip Area for Frog Paws */}
         <div className="flex-1" />
-
         {/* Right: Wardrobe Button (Floating Key Look) */}
         {/* Center: Invisible Grip Area for Frog Paws */}
         <div className="flex-1" />
-
         {/* Right: Wardrobe Button (Floating Key Look) */}
         <button
           onClick={() => onOpenChange(true)}
@@ -322,7 +272,8 @@ export function FrogDisplay({
               {unseenCount > 9 ? '9+' : unseenCount}
             </span>
           )}
-        </button>      </div>
+        </button>{' '}
+      </div>
 
       <WardrobePanel open={openWardrobe} onOpenChange={onOpenChange} />
     </div>

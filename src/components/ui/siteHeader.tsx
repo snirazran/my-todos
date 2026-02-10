@@ -4,7 +4,15 @@
 import Link from 'next/link';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, History, LayoutDashboard, Shirt, Sparkles, LogIn, LogOut } from 'lucide-react';
+import {
+  Home,
+  History,
+  LayoutDashboard,
+  Shirt,
+  Sparkles,
+  LogIn,
+  LogOut,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useUIStore } from '@/lib/uiStore';
@@ -73,9 +81,10 @@ export default function SiteHeader() {
 
             const buttonClass = `
               relative flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all
-              ${isActive
-                ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              ${
+                isActive
+                  ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
               }
             `;
 
@@ -97,12 +106,21 @@ export default function SiteHeader() {
               );
             }
 
+            if (item.protected && !session) {
+              return (
+                <button
+                  key={item.label}
+                  onClick={() => signIn()}
+                  className={buttonClass}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            }
+
             return (
-              <Link
-                key={item.href}
-                href={item.href!}
-                className={buttonClass}
-              >
+              <Link key={item.href} href={item.href!} className={buttonClass}>
                 <Icon className="w-4 h-4" />
                 <span>{item.label}</span>
               </Link>
@@ -120,16 +138,16 @@ export default function SiteHeader() {
           />
         </div>
         <style jsx>{`
-        @keyframes float {
-          0%,
-          100% {
-            transform: translateY(0);
+          @keyframes float {
+            0%,
+            100% {
+              transform: translateY(0);
+            }
+            50% {
+              transform: translateY(-4px);
+            }
           }
-          50% {
-            transform: translateY(-4px);
-          }
-        }
-      `}</style>
+        `}</style>
       </div>
     </header>
   );
@@ -137,13 +155,33 @@ export default function SiteHeader() {
 
 // ─── Sub-Components ───
 
-import { Menu, X, Check, Laptop, Moon, Sun, User, Settings } from 'lucide-react';
+import {
+  Menu,
+  X,
+  Check,
+  Laptop,
+  Moon,
+  Sun,
+  User,
+  Settings,
+} from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
 import { AdminSettingsDialog } from '@/components/ui/AdminSettingsDialog';
 
-function RightActions({ session, status, onSignIn, onSignOut }: { session: any, status: string, onSignIn: () => void, onSignOut: () => void }) {
+function RightActions({
+  session,
+  status,
+  onSignIn,
+  onSignOut,
+}: {
+  session: any;
+  status: string;
+  onSignIn: () => void;
+  onSignOut: () => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const { theme, setTheme } = useTheme();
@@ -166,11 +204,23 @@ function RightActions({ session, status, onSignIn, onSignOut }: { session: any, 
     setTheme(modes[nextIndex]);
   };
 
-  const currentIcon = theme === 'system' ? Laptop : theme === 'dark' ? Moon : Sun;
-  const currentLabel = theme === 'system' ? 'System' : theme === 'dark' ? 'Dark Mode' : 'Light Mode';
-  const currentColor = theme === 'system' ? '' : theme === 'dark' ? 'text-violet-400' : 'text-amber-500';
+  const currentIcon =
+    theme === 'system' ? Laptop : theme === 'dark' ? Moon : Sun;
+  const currentLabel =
+    theme === 'system'
+      ? 'System'
+      : theme === 'dark'
+        ? 'Dark Mode'
+        : 'Light Mode';
+  const currentColor =
+    theme === 'system'
+      ? ''
+      : theme === 'dark'
+        ? 'text-violet-400'
+        : 'text-amber-500';
 
-  if (status === 'loading') return <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />;
+  if (status === 'loading')
+    return <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />;
 
   // NOT AUTHENTICATED
   if (!session) {
@@ -195,6 +245,7 @@ function RightActions({ session, status, onSignIn, onSignOut }: { session: any, 
             isOpen={isOpen}
             onClose={() => setIsOpen(false)}
             onSignOut={onSignOut}
+            onSignIn={onSignIn}
             showAuth={false}
             theme={theme}
             setTheme={setTheme}
@@ -214,14 +265,34 @@ function RightActions({ session, status, onSignIn, onSignOut }: { session: any, 
       >
         <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm group-hover:shadow-md transition-all">
           {session.user?.image ? (
-            <img src={session.user.image} alt="User" className="w-full h-full rounded-full object-cover" />
+            <img
+              src={session.user.image}
+              alt="User"
+              className="w-full h-full rounded-full object-cover"
+            />
           ) : (
             <span>{session.user?.name?.[0] || 'U'}</span>
           )}
         </div>
-        <div className={`mr-2 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}>
+        <div
+          className={`mr-2 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+        >
           <span className="sr-only">Open menu</span>
-          <svg width="10" height="6" viewBox="0 0 10 6" fill="none" className="text-muted-foreground"><path d="M1 1L5 5L9 1" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <svg
+            width="10"
+            height="6"
+            viewBox="0 0 10 6"
+            fill="none"
+            className="text-muted-foreground"
+          >
+            <path
+              d="M1 1L5 5L9 1"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </div>
       </button>
 
@@ -242,8 +313,12 @@ function RightActions({ session, status, onSignIn, onSignOut }: { session: any, 
               className="p-3 bg-popover border border-border rounded-2xl shadow-xl ring-1 ring-black/5"
             >
               <div className="px-2 py-1.5 mb-2 border-b border-border/50">
-                <p className="font-bold text-sm text-foreground truncate">{session.user?.name}</p>
-                <p className="text-xs text-muted-foreground truncate">{session.user?.email}</p>
+                <p className="font-bold text-sm text-foreground truncate">
+                  {session.user?.name}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {session.user?.email}
+                </p>
               </div>
 
               <div className="space-y-1">
@@ -251,7 +326,9 @@ function RightActions({ session, status, onSignIn, onSignOut }: { session: any, 
                   onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                   className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
                 >
-                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">Color Mode</span>
+                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
+                    Color Mode
+                  </span>
                   <div className="relative h-9 w-9 flex items-center justify-center">
                     <AnimatePresence mode="popLayout" initial={false}>
                       {theme === 'dark' ? (
@@ -288,7 +365,9 @@ function RightActions({ session, status, onSignIn, onSignOut }: { session: any, 
                   }}
                   className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
                 >
-                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">Admin Settings</span>
+                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
+                    Admin Settings
+                  </span>
                   <Settings className="h-[1.2rem] w-[1.2rem] text-amber-500" />
                 </button>
 
@@ -317,17 +396,27 @@ function RightActions({ session, status, onSignIn, onSignOut }: { session: any, 
         showAuth={true}
         theme={theme}
         setTheme={setTheme}
+        onSignIn={onSignIn}
         adminDialogOpen={adminDialogOpen}
         setAdminDialogOpen={setAdminDialogOpen}
       />
 
       {/* Admin Settings Dialog - Rendered at component level */}
-      <AdminSettingsDialog open={adminDialogOpen} onOpenChange={setAdminDialogOpen} />
+      <AdminSettingsDialog
+        open={adminDialogOpen}
+        onOpenChange={setAdminDialogOpen}
+      />
     </div>
   );
 }
 
-function MobileMenuButton({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (v: boolean) => void }) {
+function MobileMenuButton({
+  isOpen,
+  setIsOpen,
+}: {
+  isOpen: boolean;
+  setIsOpen: (v: boolean) => void;
+}) {
   return (
     <button
       onClick={() => setIsOpen(!isOpen)}
@@ -338,8 +427,23 @@ function MobileMenuButton({ isOpen, setIsOpen }: { isOpen: boolean, setIsOpen: (
   );
 }
 
-function MobileSheet({ isOpen, onClose, onSignOut, user, showAuth, theme, setTheme, adminDialogOpen, setAdminDialogOpen }: any) {
-  return (
+function MobileSheet({
+  isOpen,
+  onClose,
+  onSignOut,
+  onSignIn,
+  user,
+  showAuth,
+  theme,
+  setTheme,
+  adminDialogOpen,
+  setAdminDialogOpen,
+}: any) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -348,45 +452,60 @@ function MobileSheet({ isOpen, onClose, onSignOut, user, showAuth, theme, setThe
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="md:hidden fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm"
           />
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="md:hidden fixed z-[101] top-0 right-0 bottom-0 w-[85%] max-w-xs bg-background border-l border-border/50 shadow-2xl p-6 flex flex-col gap-6 h-[100dvh]"
+            className="fixed z-[101] top-0 right-0 bottom-0 w-[85%] max-w-xs bg-background border-l border-border/50 shadow-2xl p-6 flex flex-col gap-6 h-[100dvh]"
             style={{ backgroundColor: 'hsl(var(--background))' }} // Force solid background using valid HSL
           >
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-black tracking-tight">Menu</h2>
-              <button onClick={onClose} className="p-2 -mr-2 rounded-full hover:bg-muted"><X className="w-5 h-5" /></button>
+              <button
+                onClick={onClose}
+                className="p-2 -mr-2 rounded-full hover:bg-muted"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
 
             {showAuth && user && (
               <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm text-lg">
                   {user.image ? (
-                    <img src={user.image} alt="User" className="w-full h-full rounded-full object-cover" />
+                    <img
+                      src={user.image}
+                      alt="User"
+                      className="w-full h-full rounded-full object-cover"
+                    />
                   ) : (
                     <span>{user.name?.[0] || 'U'}</span>
                   )}
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-sm truncate">{user.name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {user.email}
+                  </p>
                 </div>
               </div>
             )}
 
             <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Appearance</label>
+                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                  Appearance
+                </label>
                 <button
                   onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                   className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
                 >
-                  <span className="font-bold text-sm group-hover:text-foreground transition-colors">Color Mode</span>
+                  <span className="font-bold text-sm group-hover:text-foreground transition-colors">
+                    Color Mode
+                  </span>
                   <div className="relative h-9 w-9 flex items-center justify-center">
                     <AnimatePresence mode="popLayout" initial={false}>
                       {theme === 'dark' ? (
@@ -423,7 +542,9 @@ function MobileSheet({ isOpen, onClose, onSignOut, user, showAuth, theme, setThe
                   }}
                   className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
                 >
-                  <span className="font-bold text-sm group-hover:text-foreground transition-colors">Admin Settings</span>
+                  <span className="font-bold text-sm group-hover:text-foreground transition-colors">
+                    Admin Settings
+                  </span>
                   <Settings className="h-5 w-5 text-amber-500" />
                 </button>
               </div>
@@ -442,10 +563,23 @@ function MobileSheet({ isOpen, onClose, onSignOut, user, showAuth, theme, setThe
                   Sign Out
                 </button>
               )}
+              {!showAuth && (
+                <button
+                  onClick={() => {
+                    onSignIn();
+                    onClose();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 p-4 rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+                >
+                  <LogIn className="w-5 h-5" />
+                  Sign In
+                </button>
+              )}
             </div>
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

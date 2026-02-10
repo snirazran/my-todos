@@ -242,8 +242,10 @@ export default function Home() {
               total={data.length}
               giftsClaimed={dailyGiftCount}
               isCatching={cinematic}
-              hunger={hungerStatus.hunger}
-              maxHunger={hungerStatus.maxHunger}
+              hunger={session ? hungerStatus.hunger : 1000}
+              maxHunger={session ? hungerStatus.maxHunger : 10000}
+              animateHunger={!!session}
+              isGuest={!session}
             />
             <div className="w-full">
               <ProgressCard
