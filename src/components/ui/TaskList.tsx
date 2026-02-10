@@ -423,7 +423,11 @@ const SortableTaskItem = React.forwardRef<
               border border-border/40 shadow-sm
               ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
               ${isHovered && isDesktop ? 'border-border shadow-md' : ''}
-              ${isGlowActive && !isDone ? 'ring-2 ring-primary shadow-[0_0_20px_rgba(var(--primary),0.6)] bg-primary/5' : ''}
+              ${
+                isGlowActive && !isDone
+                  ? 'ring-2 ring-primary shadow-[0_0_30px_rgba(var(--primary),0.3)]'
+                  : ''
+              }
 
               select-none
               ${isDragging ? 'z-[100] opacity-100' : ''}
@@ -434,8 +438,16 @@ const SortableTaskItem = React.forwardRef<
             // combined with the style object above, so we pass x via the style prop on the motion component directly
             onClick={handleCardClick}
           >
+            {/* Glow Animation Overlay */}
+            {isGlowActive && !isDone && (
+              <div
+                className="absolute inset-0 z-0 pointer-events-none bg-gradient-to-r from-transparent via-primary/10 to-transparent animate-shimmer"
+                style={{ backgroundSize: '200% 100%' }}
+              />
+            )}
+
             <div
-              className={`flex items-center flex-1 min-w-0 gap-3 pl-2 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
+              className={`relative z-10 flex items-center flex-1 min-w-0 gap-3 pl-2 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
             >
               {/* Bullet */}
               <div className="relative flex-shrink-0 w-7 h-7">
