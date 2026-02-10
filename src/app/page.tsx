@@ -128,6 +128,11 @@ export default function Home() {
   const headerMenuBtnRef = useRef<HTMLButtonElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
 
+  // Ref for scrolling to task list
+  const taskListRef = useRef<HTMLDivElement>(null);
+  // State for task glow effect
+  const [isTaskGlow, setIsTaskGlow] = useState(false);
+
   // Close menu on click outside
   useEffect(() => {
     if (!isHeaderMenuOpen) return;
@@ -269,8 +274,33 @@ export default function Home() {
                   }
                 }}
                 onGiftInfoClick={(slot) => {
-                  setSelectedGiftSlot(slot);
-                  setShowGiftInfo(true);
+                  if (slot.status === 'PENDING') {
+                    // Check if there are tasks in 'today' (using 'tasks' from useTaskData or 'data' which handles guest/session)
+                    const hasTasks = data.length > 0;
+
+                    // Switch to Today if needed
+                    if (activeTab !== 'today') {
+                      setActiveTab('today');
+                    }
+
+                    // Scroll to TaskList area
+                    // Timeout allows for state update/render (e.g. tab switch) to complete
+                    setTimeout(() => {
+                      taskListRef.current?.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'center', // Center it for better visibility
+                      });
+                    }, 50);
+
+                    // Trigger glow if there are tasks
+                    if (hasTasks) {
+                      setIsTaskGlow(true);
+                      setTimeout(() => setIsTaskGlow(false), 2000);
+                    }
+                  } else {
+                    setSelectedGiftSlot(slot);
+                    setShowGiftInfo(true);
+                  }
                 }}
               />
             </div>
@@ -453,7 +483,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="min-h-[400px] pb-20">
+            <div className="min-h-[400px] pb-20" ref={taskListRef}>
               {activeTab === 'today' ? (
                 <motion.div
                   initial={{ opacity: 0, x: -10 }}
@@ -556,6 +586,7 @@ export default function Home() {
                     showCompleted={showCompleted}
                     selectedTags={selectedTags}
                     onSetSelectedTags={setSelectedTags}
+                    isGlowActive={isTaskGlow}
                   />
                 </motion.div>
               ) : (

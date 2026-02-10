@@ -84,6 +84,7 @@ interface SortableTaskItemProps {
   disableLayout?: boolean;
   onDoLater?: (task: Task) => void;
   isGuest?: boolean;
+  isGlowActive?: boolean;
 }
 
 const SortableTaskItem = React.forwardRef<
@@ -104,6 +105,7 @@ const SortableTaskItem = React.forwardRef<
       isWeekly,
       disableLayout,
       onDoLater,
+      isGlowActive,
     },
     ref,
   ) => {
@@ -330,7 +332,7 @@ const SortableTaskItem = React.forwardRef<
           transition={{
             layout: { type: 'spring', stiffness: 250, damping: 25 },
           }}
-          className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : isExitingLater ? 'overflow-visible' : 'overflow-hidden bg-muted/50'} ${isExitingLater ? 'will-change-transform' : ''}`}
+          className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : isExitingLater ? 'overflow-visible' : isGlowActive && !isDone ? 'overflow-visible' : 'overflow-hidden bg-muted/50'} ${isExitingLater ? 'will-change-transform' : ''}`}
         >
           {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
           {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
@@ -421,6 +423,7 @@ const SortableTaskItem = React.forwardRef<
               border border-border/40 shadow-sm
               ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
               ${isHovered && isDesktop ? 'border-border shadow-md' : ''}
+              ${isGlowActive && !isDone ? 'ring-2 ring-primary shadow-[0_0_20px_rgba(var(--primary),0.6)] bg-primary/5' : ''}
 
               select-none
               ${isDragging ? 'z-[100] opacity-100' : ''}
@@ -596,6 +599,7 @@ export default function TaskList({
   selectedTags,
   onSetSelectedTags,
   isGuest,
+  isGlowActive,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -621,6 +625,7 @@ export default function TaskList({
   selectedTags: string[];
   onSetSelectedTags: (tags: string[]) => void;
   isGuest?: boolean;
+  isGlowActive?: boolean;
 }) {
   const router = useRouter(); // Import might be needed if not present
   const userTags = tags || [];
@@ -1132,6 +1137,7 @@ export default function TaskList({
                             // Unless user wants to reorder completed tasks? Usually not.
                             isDragDisabled={isCompleted}
                             isWeekly={taskKind(task) === 'weekly'}
+                            isGlowActive={isGlowActive}
                             disableLayout={isAnyDragging}
                             onDoLater={
                               onDoLater
