@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
+import { useProgressLogic } from '@/hooks/useProgressLogic';
 import {
   Calendar,
   History,
@@ -174,6 +175,19 @@ export default function Home() {
 
   // Milestone gift trigger removed - users must click the gift in ProgressCard to claim rewards
   // The RewardPopup will only show when setShowReward(true) is called from the gift click handler
+
+  // -- AUTO-OPEN POPUP LOGIC FOR GUEST --
+  const slots = useProgressLogic(doneCount, data.length, dailyGiftCount);
+  const readyCount = slots.filter((s) => s.status === 'READY').length;
+  const prevReadyCount = useRef(readyCount);
+
+  useEffect(() => {
+    // If not signed in (guest) and we see MORE ready gifts than before, open popup
+    if (!session && readyCount > prevReadyCount.current) {
+      setShowReward(true);
+    }
+    prevReadyCount.current = readyCount;
+  }, [readyCount, session]);
 
   // Block Scrolling during cinematic
   useEffect(() => {

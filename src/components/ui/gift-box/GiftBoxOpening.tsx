@@ -28,8 +28,8 @@ export default function GiftBoxOpening({
   const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
   const [prize, setPrize] = useState<ItemDef | null>(null);
   const [claiming, setClaiming] = useState(false);
-  const [loadingText, setLoadingText] = useState(() => 
-    FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)]
+  const [loadingText, setLoadingText] = useState(
+    () => FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)],
   );
   const [mounted, setMounted] = useState(false);
   const [showGuestPrompt, setShowGuestPrompt] = useState(false);
@@ -46,14 +46,14 @@ export default function GiftBoxOpening({
     // Cycle funny sentences
     const interval = setInterval(() => {
       setLoadingText(
-        FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)]
+        FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)],
       );
     }, 2000);
 
     try {
       // 1. Minimum animation time promise
       const animationPromise = new Promise((resolve) =>
-        setTimeout(resolve, 2000)
+        setTimeout(resolve, 2000),
       );
 
       // GUEST MODE: Skip API
@@ -131,15 +131,15 @@ export default function GiftBoxOpening({
             <RotatingRays colorClass={config.rays} />
             <div
               className={cn(
-                'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80'
+                'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80',
               )}
             />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Close Button */}
-      {phase === 'idle' && (
+      {/* Close Button - Only for signed in users */}
+      {phase === 'idle' && session && (
         <button
           onClick={onClose}
           className="absolute z-50 p-3 transition-all rounded-full top-4 right-4 md:top-8 md:right-8 bg-black/20 hover:bg-black/40 text-white/70 hover:text-white backdrop-blur-md"
@@ -152,7 +152,7 @@ export default function GiftBoxOpening({
       <div
         className={cn(
           'relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6 transition-transform duration-500',
-          phase !== 'revealed' && '-translate-y-20'
+          phase !== 'revealed' && '-translate-y-20',
         )}
       >
         <AnimatePresence mode="wait">
@@ -204,7 +204,11 @@ export default function GiftBoxOpening({
                   Save Your Prize!
                 </h3>
                 <p className="mb-6 text-slate-500 dark:text-slate-400">
-                  To add this <span className="font-bold text-amber-500">Legendary Wizard Hat</span> to your collection, you need to sign in.
+                  To add this{' '}
+                  <span className="font-bold text-amber-500">
+                    Legendary Wizard Hat
+                  </span>{' '}
+                  to your collection, you need to sign in.
                 </p>
                 <div className="flex flex-col gap-3">
                   <button
@@ -220,6 +224,6 @@ export default function GiftBoxOpening({
         )}
       </AnimatePresence>
     </div>,
-    document.body
+    document.body,
   );
 }
