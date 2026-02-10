@@ -644,7 +644,7 @@ export default function BacklogPanel({
                 <Fly size={32} y={-4} />
               </div>
               <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
-                Start your backlog
+                Save a task
               </p>
               <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
                 Tap to save a task for later

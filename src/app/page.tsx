@@ -252,6 +252,10 @@ export default function Home() {
                 total={data.length}
                 giftsClaimed={dailyGiftCount}
                 onAddRequested={() => {
+                  if (!session) {
+                    router.push('/login');
+                    return;
+                  }
                   setQuickText('');
                   setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
                   setShowQuickAdd(true);
@@ -493,6 +497,10 @@ export default function Home() {
                       )
                     }
                     onAddRequested={(prefill) => {
+                      if (!session) {
+                        router.push('/login');
+                        return;
+                      }
                       setQuickText(prefill || '');
                       setQuickAddMode('pick');
                       setShowQuickAdd(true);
@@ -526,30 +534,28 @@ export default function Home() {
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2 }}
                 >
-                  {session ? (
-                    <BacklogPanel
-                      later={laterThisWeek}
-                      onRefreshToday={async () => {
-                        await mutateToday();
-                      }}
-                      onRefreshBacklog={async () => {
-                        await mutateBacklog();
-                      }}
-                      onMoveToToday={moveTaskToToday}
-                      pendingToBacklog={pendingToBacklog}
-                      onAddRequested={() => {
-                        setQuickText('');
-                        setQuickAddMode('later');
-                        setShowQuickAdd(true);
-                      }}
-                      onEditTask={(id, text) => editTask(id, text, true)}
-                      tags={tags}
-                    />
-                  ) : (
-                    <div className="p-8 text-center text-muted-foreground bg-card/50 rounded-2xl">
-                      Sign in to use the Backlog feature!
-                    </div>
-                  )}
+                  <BacklogPanel
+                    later={laterThisWeek}
+                    onRefreshToday={async () => {
+                      if (session) await mutateToday();
+                    }}
+                    onRefreshBacklog={async () => {
+                      if (session) await mutateBacklog();
+                    }}
+                    onMoveToToday={moveTaskToToday}
+                    pendingToBacklog={pendingToBacklog}
+                    onAddRequested={() => {
+                      if (!session) {
+                        router.push('/login');
+                        return;
+                      }
+                      setQuickText('');
+                      setQuickAddMode('later');
+                      setShowQuickAdd(true);
+                    }}
+                    onEditTask={(id, text) => editTask(id, text, true)}
+                    tags={tags}
+                  />
                 </motion.div>
               )}
             </div>
@@ -719,6 +725,10 @@ export default function Home() {
         <div className="pointer-events-auto mx-auto w-full max-w-[420px] flex justify-center">
           <AddTaskButton
             onClick={() => {
+              if (!session) {
+                router.push('/login');
+                return;
+              }
               setQuickText('');
               setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
               setShowQuickAdd(true);
@@ -734,6 +744,10 @@ export default function Home() {
         onClose={() => setShowGiftInfo(false)}
         slot={selectedGiftSlot}
         onAddTask={() => {
+          if (!session) {
+            router.push('/login');
+            return;
+          }
           setQuickText('');
           setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
           setShowQuickAdd(true);
