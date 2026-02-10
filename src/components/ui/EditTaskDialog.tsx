@@ -34,14 +34,14 @@ export function EditTaskDialog({
   if (typeof document === 'undefined') return null;
 
   const handleSave = () => {
-      if (text.trim()) {
-          onSave(text.trim());
-      }
+    if (text.trim()) {
+      onSave(text.trim());
+    }
   };
 
   const dialogContent = (
     <div
-      className="fixed inset-0 z-[10001] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm px-4"
+      className="fixed inset-0 z-[10001] flex items-center justify-center bg-slate-950/70 backdrop-blur-[2px] px-4"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
@@ -49,62 +49,77 @@ export function EditTaskDialog({
       }}
     >
       <div
-        className="w-[440px] max-w-[calc(100vw-2rem)] rounded-2xl bg-white/90 dark:bg-slate-900/85 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)] border border-slate-200/80 dark:border-slate-800/70 backdrop-blur-xl"
+        className="w-[440px] max-w-[calc(100vw-2rem)] rounded-[28px] bg-popover/95 backdrop-blur-2xl p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)] ring-1 ring-border/80"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 mb-4">
           <div className="mt-1 h-8 w-8 flex items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
             <Pencil className="w-4 h-4" />
           </div>
-          <div className="flex-1 space-y-1">
-            <h4 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Edit Task
-            </h4>
-            <p className="text-sm text-slate-600 dark:text-slate-300">
-               make changes to your task below.
+          <div className="flex-1 space-y-0.5">
+            <h4 className="text-lg font-bold text-foreground">Edit Task</h4>
+            <p className="text-sm font-medium text-muted-foreground">
+              Make changes to your task below.
             </p>
           </div>
           <button
-            className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-rose-300/70"
+            className="p-2 rounded-full hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
             onClick={onClose}
             aria-label="Close"
             title="Close"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 text-muted-foreground" />
           </button>
         </div>
 
-        <div className="mt-5 space-y-4">
-             <input
-                ref={inputRef}
-                type="text"
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSave();
-                    if (e.key === 'Escape') onClose();
-                }}
-                className="w-full px-3 py-2 text-lg bg-transparent border-b-2 border-border focus:border-primary focus:outline-none transition-colors"
-                placeholder="Task description..."
-                disabled={busy}
-             />
+        <div className="space-y-4">
+          <div className="relative">
+            <input
+              ref={inputRef}
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSave();
+                if (e.key === 'Escape') onClose();
+              }}
+              maxLength={45}
+              className="w-full h-12 px-4 rounded-[16px] bg-muted/50 text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 text-lg font-medium placeholder:text-muted-foreground/50 transition-all"
+              placeholder="Task description..."
+              disabled={busy}
+            />
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold pointer-events-none">
+              <span
+                className={
+                  text.length >= 40
+                    ? 'text-rose-500'
+                    : 'text-muted-foreground/40'
+                }
+              >
+                {text.length}/45
+              </span>
+            </div>
+          </div>
 
-             <div className="flex justify-end gap-2 pt-2">
-                 <button
-                    onClick={onClose}
-                    className="px-4 py-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-                    disabled={busy}
-                 >
-                     Cancel
-                 </button>
-                 <button
-                    onClick={handleSave}
-                    disabled={busy || !text.trim()}
-                    className="px-4 py-2 text-sm font-bold text-primary-foreground bg-primary rounded-lg hover:brightness-110 disabled:opacity-50 transition-all"
-                 >
-                     {busy ? 'Saving...' : 'Save Changes'}
-                 </button>
-             </div>
+          <div className="grid grid-cols-2 gap-3 pt-2">
+            <button
+              onClick={handleSave}
+              disabled={busy || !text.trim()}
+              className="relative h-11 w-full rounded-full text-[14px] font-bold text-primary-foreground bg-primary shadow-sm ring-1 ring-white/20 hover:brightness-105 active:scale-[0.98] disabled:opacity-50 disabled:grayscale transition-all overflow-hidden"
+            >
+              <span className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
+              <span className="relative z-10">
+                {busy ? 'Saving...' : 'Save Changes'}
+              </span>
+            </button>
+            <button
+              onClick={onClose}
+              className="h-11 w-full rounded-full text-[14px] font-semibold text-secondary-foreground bg-secondary ring-1 ring-border hover:bg-secondary/80 active:scale-[0.98] transition-all"
+              disabled={busy}
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </div>
