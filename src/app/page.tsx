@@ -4,7 +4,16 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { Calendar, History, LayoutDashboard, CalendarCheck, CalendarClock, EllipsisVertical, Check, FolderOpen } from 'lucide-react';
+import {
+  Calendar,
+  History,
+  LayoutDashboard,
+  CalendarCheck,
+  CalendarClock,
+  EllipsisVertical,
+  Check,
+  FolderOpen,
+} from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 //fix
 import { signIn, useSession } from 'next-auth/react';
@@ -31,7 +40,12 @@ import {
   TONGUE_STROKE,
 } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
-import { useTaskData, Task, FlyStatus, HungerStatus } from '@/hooks/useTaskData';
+import {
+  useTaskData,
+  Task,
+  FlyStatus,
+  HungerStatus,
+} from '@/hooks/useTaskData';
 
 const FLY_PX = 24;
 
@@ -52,7 +66,7 @@ const demoTasks: Task[] = [
 function getMilestones(totalTasks: number): number[] {
   // Fixed milestones at 2, 4, and 6 completed tasks
   const fixedMilestones = [2, 4, 6];
-  
+
   // Only return milestones that are achievable with current total tasks
   // But the milestone is based on COMPLETED tasks, not total tasks
   // So we return all 3 milestones regardless of total
@@ -84,7 +98,7 @@ export default function Home() {
     pendingToBacklog,
     pendingToToday,
     toggleRepeat,
-    tags
+    tags,
   } = useTaskData();
 
   const frogRef = useRef<FrogHandle>(null);
@@ -101,10 +115,15 @@ export default function Home() {
   /* State */
   const [activeTab, setActiveTab] = useState<'today' | 'backlog'>('today');
   const [showReward, setShowReward] = useState(false);
-  const [showCompleted, setShowCompleted] = useState(false);
+  const [showCompleted, setShowCompleted] = useState(true);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showGiftInfo, setShowGiftInfo] = useState(false);
-  const [selectedGiftSlot, setSelectedGiftSlot] = useState<{ status: string; target: number; tasksLeft: number; neededToUnlock: number } | null>(null);
+  const [selectedGiftSlot, setSelectedGiftSlot] = useState<{
+    status: string;
+    target: number;
+    tasksLeft: number;
+    neededToUnlock: number;
+  } | null>(null);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const headerMenuBtnRef = useRef<HTMLButtonElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
@@ -114,10 +133,12 @@ export default function Home() {
     if (!isHeaderMenuOpen) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (
-        headerMenuRef.current && !headerMenuRef.current.contains(e.target as Node) &&
-        headerMenuBtnRef.current && !headerMenuBtnRef.current.contains(e.target as Node)
+        headerMenuRef.current &&
+        !headerMenuRef.current.contains(e.target as Node) &&
+        headerMenuBtnRef.current &&
+        !headerMenuBtnRef.current.contains(e.target as Node)
       ) {
-         setIsHeaderMenuOpen(false);
+        setIsHeaderMenuOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -164,7 +185,7 @@ export default function Home() {
   const persistGuestTask = (taskId: string, completed: boolean) => {
     setGuestTasks((prev) => {
       const toggled = prev.map((t) =>
-        t.id === taskId ? { ...t, completed } : t
+        t.id === taskId ? { ...t, completed } : t,
       );
       // Sort for guest
       return [...toggled].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -175,7 +196,8 @@ export default function Home() {
     if (cinematic || grab) return;
     const task = data.find((t) => t.id === taskId);
     if (!task) return;
-    const completed = explicitCompleted !== undefined ? explicitCompleted : !task.completed;
+    const completed =
+      explicitCompleted !== undefined ? explicitCompleted : !task.completed;
 
     if (!completed) {
       if (session) toggleTask(taskId, false);
@@ -254,136 +276,174 @@ export default function Home() {
           >
             <div className="flex items-center justify-center w-full px-4 md:px-0 md:w-auto md:justify-start">
               <div className="flex items-center w-full max-w-[calc(100vw-2rem)] md:max-w-none md:w-auto p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative group z-20">
-              <button
-                onClick={() => setActiveTab('today')}
-                className={`
+                <button
+                  onClick={() => setActiveTab('today')}
+                  className={`
         flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap
-        ${activeTab === 'today'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                  }
+        ${
+          activeTab === 'today'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        }
       `}
-              >
-                <CalendarCheck className={`w-4 h-4 ${activeTab === 'today' ? 'text-primary' : 'text-muted-foreground'}`} />
-                Today
-                <TaskCounter
-                   count={showCompleted ? data.length : data.filter(t => !t.completed).length}
-                   pendingCount={pendingToToday}
-                />
-              </button>
-              <button
-                onClick={() => setActiveTab('backlog')}
-                className={`
+                >
+                  <CalendarCheck
+                    className={`w-4 h-4 ${activeTab === 'today' ? 'text-primary' : 'text-muted-foreground'}`}
+                  />
+                  Today
+                  <TaskCounter
+                    count={
+                      showCompleted
+                        ? data.length
+                        : data.filter((t) => !t.completed).length
+                    }
+                    pendingCount={pendingToToday}
+                  />
+                </button>
+                <button
+                  onClick={() => setActiveTab('backlog')}
+                  className={`
         flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap
-        ${activeTab === 'backlog'
-                    ? 'bg-background text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                  }
+        ${
+          activeTab === 'backlog'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        }
       `}
-              >
-                <FolderOpen className={`w-4 h-4 ${activeTab === 'backlog' ? 'text-primary' : 'text-muted-foreground'}`} />
-                Saved Tasks
-                <TaskCounter count={laterThisWeek.length} pendingCount={pendingToBacklog} />
-              </button>
-              
-               {/* 3-DOTS MENU ADDED HERE */}
-               <div className="w-[1px] h-6 bg-border/50 mx-1" />
-               <button
+                >
+                  <FolderOpen
+                    className={`w-4 h-4 ${activeTab === 'backlog' ? 'text-primary' : 'text-muted-foreground'}`}
+                  />
+                  Saved Tasks
+                  <TaskCounter
+                    count={laterThisWeek.length}
+                    pendingCount={pendingToBacklog}
+                  />
+                </button>
+
+                {/* 3-DOTS MENU ADDED HERE */}
+                <div className="w-[1px] h-6 bg-border/50 mx-1" />
+                <button
                   ref={headerMenuBtnRef}
                   onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)}
                   className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
-               >
+                >
                   <EllipsisVertical className="w-5 h-5" />
-               </button>
+                </button>
 
-                  <AnimatePresence>
+                <AnimatePresence>
                   {isHeaderMenuOpen && (
-                     <motion.div
-                       ref={headerMenuRef}
-                       initial={{ opacity: 0, scale: 0.95, y: -4, x: 0 }}
-                       animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                       exit={{ opacity: 0, scale: 0.95, y: -4, x: 0 }}
-                       transition={{ duration: 0.15, ease: 'easeOut' }}
-                       className="absolute right-0 top-full mt-2 z-50 w-64 bg-popover rounded-xl border border-border shadow-lg shadow-black/5 ring-1 ring-black/5 p-1 flex flex-col gap-1 overflow-hidden"
-                       style={{ transformOrigin: 'top right' }}
-                     >
-                           {/* Show Finished Toggle */}
-                           <div className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50 transition-colors">
-                              <span className="text-sm font-medium text-foreground">Show Completed</span>
-                              <button
-                                 onClick={() => setShowCompleted(!showCompleted)}
-                                 className={`w-9 h-5 rounded-full relative transition-all duration-300 ease-in-out ${showCompleted ? 'bg-primary' : 'bg-muted-foreground/30'}`}
-                              >
-                                 <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-background shadow-sm transition-transform duration-300 ${showCompleted ? 'translate-x-4' : 'translate-x-0'}`} />
-                              </button>
-                           </div>
- 
-                           {/* Tag Filter Section */}
-                           {(() => {
-                              // Filter logic: Only show tags used in TODAY's tasks (or all tags? Let's use all user tags for broader filtering capability, OR just relevant ones. TaskList used relevant ones. Let's start with ALL user tags for simplicity, or we can filter like TaskList did)
-                              // TaskList did: const usedTagIds = new Set(tasks.flatMap(t => t.tags || []));
-                              // Let's replicate that if we want strictly relevant tags.
-                              const currentList = activeTab === 'today' ? data : backlogTasks;
-                              const usedTagIds = new Set(currentList.flatMap(t => t.tags || []));
-                              const visibleFilterTags = (tags || []).filter(tag => usedTagIds.has(tag.id));
-                              
-                              if (visibleFilterTags.length === 0) return null;
- 
-                              return (
-                                <div className="flex flex-col gap-2 pt-2 border-t border-border/50 px-1">
-                                   <div className="flex items-center justify-between px-2">
-                                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Filter by Tags</span>
-                                     {selectedTags.length > 0 && (
-                                        <button
-                                          onClick={() => setSelectedTags([])}
-                                          className="text-[10px] font-bold text-primary hover:text-primary/80 transition-colors"
-                                        >
-                                           Clear
-                                        </button>
-                                     )}
-                                   </div>
-                                   <div className="flex flex-wrap gap-1.5 px-1 pb-1">
-                                      {visibleFilterTags.map(tag => {
-                                         const isSelected = selectedTags.includes(tag.id);
-                                         return (
-                                            <button
-                                               key={tag.id}
-                                               onClick={() => {
-                                                  setSelectedTags(prev => 
-                                                     prev.includes(tag.id) ? prev.filter(id => id !== tag.id) : [...prev, tag.id]
-                                                  );
-                                               }}
-                                               className={`
+                    <motion.div
+                      ref={headerMenuRef}
+                      initial={{ opacity: 0, scale: 0.95, y: -4, x: 0 }}
+                      animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -4, x: 0 }}
+                      transition={{ duration: 0.15, ease: 'easeOut' }}
+                      className="absolute right-0 top-full mt-2 z-50 w-64 bg-popover rounded-xl border border-border shadow-lg shadow-black/5 ring-1 ring-black/5 p-1 flex flex-col gap-1 overflow-hidden"
+                      style={{ transformOrigin: 'top right' }}
+                    >
+                      {/* Show Finished Toggle */}
+                      <div className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50 transition-colors">
+                        <span className="text-sm font-medium text-foreground">
+                          Show Completed
+                        </span>
+                        <button
+                          onClick={() => setShowCompleted(!showCompleted)}
+                          className={`w-9 h-5 rounded-full relative transition-all duration-300 ease-in-out ${showCompleted ? 'bg-primary' : 'bg-muted-foreground/30'}`}
+                        >
+                          <span
+                            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-background shadow-sm transition-transform duration-300 ${showCompleted ? 'translate-x-4' : 'translate-x-0'}`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Tag Filter Section */}
+                      {(() => {
+                        // Filter logic: Only show tags used in TODAY's tasks (or all tags? Let's use all user tags for broader filtering capability, OR just relevant ones. TaskList used relevant ones. Let's start with ALL user tags for simplicity, or we can filter like TaskList did)
+                        // TaskList did: const usedTagIds = new Set(tasks.flatMap(t => t.tags || []));
+                        // Let's replicate that if we want strictly relevant tags.
+                        const currentList =
+                          activeTab === 'today' ? data : backlogTasks;
+                        const usedTagIds = new Set(
+                          currentList.flatMap((t) => t.tags || []),
+                        );
+                        const visibleFilterTags = (tags || []).filter((tag) =>
+                          usedTagIds.has(tag.id),
+                        );
+
+                        if (visibleFilterTags.length === 0) return null;
+
+                        return (
+                          <div className="flex flex-col gap-2 pt-2 border-t border-border/50 px-1">
+                            <div className="flex items-center justify-between px-2">
+                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
+                                Filter by Tags
+                              </span>
+                              {selectedTags.length > 0 && (
+                                <button
+                                  onClick={() => setSelectedTags([])}
+                                  className="text-[10px] font-bold text-primary hover:text-primary/80 transition-colors"
+                                >
+                                  Clear
+                                </button>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 px-1 pb-1">
+                              {visibleFilterTags.map((tag) => {
+                                const isSelected = selectedTags.includes(
+                                  tag.id,
+                                );
+                                return (
+                                  <button
+                                    key={tag.id}
+                                    onClick={() => {
+                                      setSelectedTags((prev) =>
+                                        prev.includes(tag.id)
+                                          ? prev.filter((id) => id !== tag.id)
+                                          : [...prev, tag.id],
+                                      );
+                                    }}
+                                    className={`
                                                   relative inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all duration-200 border
-                                                  ${isSelected 
-                                                    ? 'ring-1 ring-offset-0 ring-primary border-transparent' 
-                                                    : 'bg-muted/40 border-transparent hover:bg-muted/70 text-muted-foreground'
+                                                  ${
+                                                    isSelected
+                                                      ? 'ring-1 ring-offset-0 ring-primary border-transparent'
+                                                      : 'bg-muted/40 border-transparent hover:bg-muted/70 text-muted-foreground'
                                                   }
                                                `}
-                                               style={isSelected && tag.color ? { 
-                                                  backgroundColor: `${tag.color}15`, 
-                                                  color: tag.color,
-                                                  borderColor: tag.color, // Use border for selected state color
-                                                  boxShadow: 'none'
-                                               } : isSelected ? {
-                                                  backgroundColor: 'rgba(var(--primary), 0.1)',
-                                                  color: 'hsl(var(--primary))',
-                                                  borderColor: 'hsl(var(--primary))'
-                                               } : {}}
-                                            >
-                                               {isSelected && <Check className="w-3 h-3" />}
-                                               {tag.name}
-                                            </button>
-                                         );
-                                      })}
-                                   </div>
-                                </div>
-                              );
-                           })()}
-                        </motion.div>
- 
+                                    style={
+                                      isSelected && tag.color
+                                        ? {
+                                            backgroundColor: `${tag.color}15`,
+                                            color: tag.color,
+                                            borderColor: tag.color, // Use border for selected state color
+                                            boxShadow: 'none',
+                                          }
+                                        : isSelected
+                                          ? {
+                                              backgroundColor:
+                                                'rgba(var(--primary), 0.1)',
+                                              color: 'hsl(var(--primary))',
+                                              borderColor:
+                                                'hsl(var(--primary))',
+                                            }
+                                          : {}
+                                    }
+                                  >
+                                    {isSelected && (
+                                      <Check className="w-3 h-3" />
+                                    )}
+                                    {tag.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </motion.div>
                   )}
-              </AnimatePresence>
+                </AnimatePresence>
               </div>
             </div>
 
@@ -396,17 +456,21 @@ export default function Home() {
                   transition={{ duration: 0.2 }}
                 >
                   {!session && (
-                    <div className="flex items-center gap-3 p-3 mb-4 border border-indigo-100 rounded-xl bg-indigo-50/50 dark:bg-indigo-900/20 dark:border-indigo-800/50">
-                      <div className="flex items-center justify-center w-8 h-8 bg-white rounded-full shadow-sm dark:bg-slate-800 text-xl animate-bounce">
-                        🍽️
-                      </div>
-                      <div>
-                        <p className="text-sm font-bold text-indigo-900 dark:text-indigo-200">
-                          The Frog is Hungry!
-                        </p>
-                        <p className="text-xs text-indigo-700 dark:text-indigo-400">
-                          Catch a fly to make her happy and unlock a special <span className="font-bold">Gift</span>!
-                        </p>
+                    <div className="relative overflow-hidden mb-3 rounded-xl bg-primary/5 border border-primary/10 shadow-sm">
+                      <div className="relative flex items-center gap-4 p-4">
+                        <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-background text-primary shadow-sm ring-1 ring-primary/20">
+                          <span className="text-xl animate-bounce">🍽️</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-black text-foreground tracking-tight mb-0.5">
+                            The Frog is Hungry!
+                          </h3>
+                          <p className="text-xs font-medium text-muted-foreground leading-relaxed">
+                            Catch a fly to make her happy and unlock a special{' '}
+                            <span className="text-primary font-bold">Gift</span>
+                            !
+                          </p>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -465,8 +529,12 @@ export default function Home() {
                   {session ? (
                     <BacklogPanel
                       later={laterThisWeek}
-                      onRefreshToday={async () => { await mutateToday(); }}
-                      onRefreshBacklog={async () => { await mutateBacklog(); }}
+                      onRefreshToday={async () => {
+                        await mutateToday();
+                      }}
+                      onRefreshBacklog={async () => {
+                        await mutateBacklog();
+                      }}
                       onMoveToToday={moveTaskToToday}
                       pendingToBacklog={pendingToBacklog}
                       onAddRequested={() => {
@@ -562,25 +630,35 @@ export default function Home() {
             if (session && data.ok && data.tasks) {
               const newTasks = data.tasks;
               // Check backlog based on days array or repeat type if casted
-              const isBacklog = (repeat as string) === 'backlog' || (Array.isArray(days) && days.includes(-1));
+              const isBacklog =
+                (repeat as string) === 'backlog' ||
+                (Array.isArray(days) && days.includes(-1));
 
               if (isBacklog) {
-                mutateBacklog((curr) => {
-                  if (!curr) return newTasks;
-                  return [...curr, ...newTasks];
-                }, { revalidate: false });
+                mutateBacklog(
+                  (curr) => {
+                    if (!curr) return newTasks;
+                    return [...curr, ...newTasks];
+                  },
+                  { revalidate: false },
+                );
               } else {
-                mutateToday((curr) => {
-                  if (!curr) return undefined;
-                  return {
-                    ...curr,
-                    tasks: [...curr.tasks, ...newTasks]
-                  };
-                }, { revalidate: false });
+                mutateToday(
+                  (curr) => {
+                    if (!curr) return undefined;
+                    return {
+                      ...curr,
+                      tasks: [...curr.tasks, ...newTasks],
+                    };
+                  },
+                  { revalidate: false },
+                );
               }
             } else if (session) {
               // Fallback
-              const isBacklog = (repeat as string) === 'backlog' || (Array.isArray(days) && days.includes(-1));
+              const isBacklog =
+                (repeat as string) === 'backlog' ||
+                (Array.isArray(days) && days.includes(-1));
               if (isBacklog) mutateBacklog();
               else mutateToday();
             } else {
@@ -609,7 +687,7 @@ export default function Home() {
                   dailyGiftCount: (current.dailyGiftCount || 0) + 1,
                 };
               },
-              { revalidate: false }
+              { revalidate: false },
             );
           }
 
@@ -628,7 +706,7 @@ export default function Home() {
         stolenFlies={hungerStatus.stolenFlies}
         indices={indices}
         onAcknowledge={async () => {
-          // Optimistic clear handled in hook? No, exposure should be in hook if commonly used, 
+          // Optimistic clear handled in hook? No, exposure should be in hook if commonly used,
           // but here we can just do manual fetch or add 'acknowledgeHunger' to hook.
           // For now, manual fetch + mutate.
           await fetch('/api/hunger/acknowledge', { method: 'POST' });
@@ -684,7 +762,13 @@ function Header({ session, router }: { session: any; router: any }) {
 
 // Helper component for add-only animation
 // Helper component for add-only animation
-function TaskCounter({ count, pendingCount }: { count: number; pendingCount?: number }) {
+function TaskCounter({
+  count,
+  pendingCount,
+}: {
+  count: number;
+  pendingCount?: number;
+}) {
   const controls = useAnimation();
   const prevCount = React.useRef(count);
 
@@ -693,11 +777,15 @@ function TaskCounter({ count, pendingCount }: { count: number; pendingCount?: nu
       // Only animate if count INCREASED
       controls.start({
         scale: [1, 1.35, 1],
-        color: ["hsl(var(--muted-foreground))", "hsl(var(--primary))", "hsl(var(--muted-foreground))"],
+        color: [
+          'hsl(var(--muted-foreground))',
+          'hsl(var(--primary))',
+          'hsl(var(--muted-foreground))',
+        ],
         transition: {
           duration: 0.3,
-          ease: "easeInOut",
-        }
+          ease: 'easeInOut',
+        },
       });
     }
     prevCount.current = count;
@@ -716,9 +804,25 @@ function TaskCounter({ count, pendingCount }: { count: number; pendingCount?: nu
         </motion.span>
       )}
       {(pendingCount ?? 0) > 0 && (
-        <svg className="w-3.5 h-3.5 animate-spin text-muted-foreground/60" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        <svg
+          className="w-3.5 h-3.5 animate-spin text-muted-foreground/60"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          ></circle>
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+          ></path>
         </svg>
       )}
     </div>
