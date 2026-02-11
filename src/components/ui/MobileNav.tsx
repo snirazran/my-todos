@@ -14,6 +14,8 @@ export default function MobileNav() {
   const { openWardrobe } = useUIStore();
   const { unseenCount } = useInventory(); // Always fetch
 
+  if (pathname === '/login' || pathname === '/register') return null;
+
   const handleNavigation = (path: string) => {
     if (!user) {
       router.push('/login');

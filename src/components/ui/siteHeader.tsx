@@ -189,6 +189,7 @@ function RightActions({
   const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const menuRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
 
   // Close on click outside
   useEffect(() => {
@@ -238,14 +239,16 @@ function RightActions({
         <div className="hidden md:block">
           <ThemeToggle />
         </div>
-        <Button
-          onClick={onSignIn}
-          className="gap-2 font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 rounded-full"
-          size="sm"
-        >
-          <LogIn className="w-4 h-4" />
-          Sign in
-        </Button>
+        {pathname !== '/login' && (
+          <Button
+            onClick={onSignIn}
+            className="gap-2 font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 rounded-full"
+            size="sm"
+          >
+            <LogIn className="w-4 h-4" />
+            Sign in
+          </Button>
+        )}
         {/* Mobile: Hamburger for Theme (since Sign In is visible) */}
         <div className="md:hidden">
           <MobileMenuButton isOpen={isOpen} setIsOpen={setIsOpen} />
