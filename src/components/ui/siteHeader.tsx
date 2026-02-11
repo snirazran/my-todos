@@ -2,7 +2,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useSession, signIn, signOut } from 'next-auth/react';
+import { useAuth } from '@/components/auth/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
@@ -19,7 +19,7 @@ import { useUIStore } from '@/lib/uiStore';
 import { useInventory } from '@/hooks/useInventory';
 
 export default function SiteHeader() {
-  const { data: session, status } = useSession();
+  const { user, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   const { openWardrobe } = useUIStore();
@@ -106,11 +106,11 @@ export default function SiteHeader() {
               );
             }
 
-            if (item.protected && !session) {
+            if (item.protected && !user) {
               return (
                 <button
                   key={item.label}
-                  onClick={() => signIn()}
+                  onClick={() => router.push('/login')}
                   className={buttonClass}
                 >
                   <Icon className="w-4 h-4" />
@@ -131,10 +131,10 @@ export default function SiteHeader() {
         {/* ───────── Right Side (Desktop: User Menu, Mobile: Hamburger) ───────── */}
         <div className="flex items-center gap-2 shrink-0">
           <RightActions
-            session={session}
-            status={status}
-            onSignIn={() => signIn()}
-            onSignOut={() => signOut()}
+            user={user}
+            loading={loading}
+            onSignIn={() => router.push('/login')}
+            onSignOut={() => (document.cookie = 'token=; path=/; max-age=0;')} // AuthContext handles state but manual cleanup helps
           />
         </div>
         <style jsx>{`
@@ -171,14 +171,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { AdminSettingsDialog } from '@/components/ui/AdminSettingsDialog';
 
+import { auth } from '@/lib/firebase';
+import { signOut } from 'firebase/auth';
+
 function RightActions({
-  session,
-  status,
+  user,
+  loading,
   onSignIn,
   onSignOut,
 }: {
-  session: any;
-  status: string;
+  user: any;
+  loading: boolean;
   onSignIn: () => void;
   onSignOut: () => void;
 }) {
@@ -197,6 +200,11 @@ function RightActions({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  const handleSignOut = async () => {
+    await signOut(auth);
+    onSignOut();
+  };
 
   const cycleTheme = () => {
     const modes = ['light', 'dark', 'system'];
@@ -219,11 +227,11 @@ function RightActions({
         ? 'text-violet-400'
         : 'text-amber-500';
 
-  if (status === 'loading')
+  if (loading)
     return <div className="w-8 h-8 rounded-full bg-muted animate-pulse" />;
 
   // NOT AUTHENTICATED
-  if (!session) {
+  if (!user) {
     return (
       <div className="flex items-center gap-2">
         {/* Desktop: Theme Toggle adjacent to Sign In */}
@@ -244,7 +252,7 @@ function RightActions({
           <MobileSheet
             isOpen={isOpen}
             onClose={() => setIsOpen(false)}
-            onSignOut={onSignOut}
+            onSignOut={handleSignOut}
             onSignIn={onSignIn}
             showAuth={false}
             theme={theme}
@@ -264,15 +272,17 @@ function RightActions({
         className="hidden md:flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border border-border/50 bg-background hover:bg-accent/50 transition-all group"
       >
         <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm group-hover:shadow-md transition-all">
-          {session.user?.image ? (
-            <img
-              src={session.user.image}
-              alt="User"
-              className="w-full h-full rounded-full object-cover"
-            />
-          ) : (
-            <span>{session.user?.name?.[0] || 'U'}</span>
-          )}
+          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm group-hover:shadow-md transition-all">
+            {user.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt="User"
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : (
+              <span>{user.displayName?.[0] || 'U'}</span>
+            )}
+          </div>
         </div>
         <div
           className={`mr-2 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
@@ -314,10 +324,10 @@ function RightActions({
             >
               <div className="px-2 py-1.5 mb-2 border-b border-border/50">
                 <p className="font-bold text-sm text-foreground truncate">
-                  {session.user?.name}
+                  {user.displayName}
                 </p>
                 <p className="text-xs text-muted-foreground truncate">
-                  {session.user?.email}
+                  {user.email}
                 </p>
               </div>
 
@@ -391,8 +401,8 @@ function RightActions({
       <MobileSheet
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
-        onSignOut={onSignOut}
-        user={session.user}
+        onSignOut={handleSignOut}
+        user={user}
         showAuth={true}
         theme={theme}
         setTheme={setTheme}
@@ -475,18 +485,20 @@ function MobileSheet({
             {showAuth && user && (
               <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm text-lg">
-                  {user.image ? (
+                  {user.photoURL ? (
                     <img
-                      src={user.image}
+                      src={user.photoURL}
                       alt="User"
                       className="w-full h-full rounded-full object-cover"
                     />
                   ) : (
-                    <span>{user.name?.[0] || 'U'}</span>
+                    <span>{user.displayName?.[0] || 'U'}</span>
                   )}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-sm truncate">{user.name}</p>
+                  <p className="font-bold text-sm truncate">
+                    {user.displayName}
+                  </p>
                   <p className="text-xs text-muted-foreground truncate">
                     {user.email}
                   </p>

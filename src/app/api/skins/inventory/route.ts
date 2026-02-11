@@ -49,6 +49,41 @@ async function ensureWardrobe(uid: string) {
 export async function GET() {
   try {
     const userId = await requireUserId();
+
+    // Auto-create user if missing (fallback for existing sessions)
+    // We can reuse the logic from POST /api/user or just call ensureWardrobe which updates it
+    // But ensureWardrobe returns null if user is missing.
+    // Let's first check if user exists, if not create basic one.
+
+    const userExists = await UserModel.exists({ _id: userId });
+    if (!userExists) {
+      // Create basic user record if it doesn't exist
+      const now = new Date();
+      await UserModel.create({
+        _id: userId,
+        email: '', // We don't have email here easily without requireAuth(), but that is fine
+        name: 'Anonymous Frog',
+        createdAt: now,
+        wardrobe: {
+          equipped: {},
+          inventory: {},
+          flies: 0,
+          hunger: 86400000,
+          lastHungerUpdate: now,
+          stolenFlies: 0,
+        },
+        statistics: {
+          daily: {
+            date: '',
+            dailyTasksCount: 0,
+            dailyMilestoneGifts: 0,
+            completedTaskIds: [],
+            taskCountAtLastGift: 0,
+          },
+        },
+      });
+    }
+
     const wardrobe = await ensureWardrobe(userId);
     if (!wardrobe) return json({ error: 'User not found' }, 404);
     return json({ wardrobe, catalog: CATALOG });

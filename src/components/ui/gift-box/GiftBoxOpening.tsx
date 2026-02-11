@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/components/auth/AuthContext';
 import { useRouter } from 'next/navigation';
 import { X } from 'lucide-react';
 import { ItemDef, byId } from '@/lib/skins/catalog';
@@ -23,7 +23,7 @@ export default function GiftBoxOpening({
   onWin?: (item: ItemDef) => void;
   giftBoxId?: string;
 }) {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const router = useRouter();
   const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
   const [prize, setPrize] = useState<ItemDef | null>(null);
@@ -57,7 +57,7 @@ export default function GiftBoxOpening({
       );
 
       // GUEST MODE: Skip API
-      if (!session) {
+      if (!user) {
         await animationPromise;
         // Guest always wins Wizard Hat
         const guestPrize = byId['hat_wizard'] || byId['skin_teal'];
@@ -96,7 +96,7 @@ export default function GiftBoxOpening({
   };
 
   const handleClaim = () => {
-    if (!session) {
+    if (!user) {
       setShowGuestPrompt(true);
       return;
     }
@@ -139,7 +139,7 @@ export default function GiftBoxOpening({
       </AnimatePresence>
 
       {/* Close Button - Only for signed in users */}
-      {phase === 'idle' && session && (
+      {phase === 'idle' && user && (
         <button
           onClick={onClose}
           className="absolute z-50 p-3 transition-all rounded-full top-4 right-4 md:top-8 md:right-8 bg-black/20 hover:bg-black/40 text-white/70 hover:text-white backdrop-blur-md"

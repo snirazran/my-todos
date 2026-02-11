@@ -42,6 +42,11 @@ export default function LoginPage() {
       // Set cookie for middleware
       document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
 
+      // Sync user to MongoDB
+      await fetch('/api/user', {
+        method: 'POST',
+      });
+
       // Redirect
       router.push('/');
     } catch (err: any) {

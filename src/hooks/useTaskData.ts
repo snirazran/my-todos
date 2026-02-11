@@ -1,7 +1,7 @@
 import useSWR, { mutate } from 'swr';
 import { useCallback, useState, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
 
 // --- Types ---
@@ -52,7 +52,7 @@ const sortTasks = (ts: Task[]) => {
 };
 
 export function useTaskData() {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const { showNotification } = useNotification();
 
   const today = new Date();
@@ -70,10 +70,10 @@ export function useTaskData() {
   const [pendingToToday, setPendingToToday] = useState(0);
 
   // --- SWR Keys ---
-  const todayKey = session
+  const todayKey = user
     ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`
     : null;
-  const backlogKey = session ? `/api/tasks?view=board&day=-1` : null;
+  const backlogKey = user ? `/api/tasks?view=board&day=-1` : null;
 
   // --- Data Fetching ---
   const {
@@ -150,7 +150,7 @@ export function useTaskData() {
     stolenFlies: 0,
     maxHunger: 0,
   };
-  const dailyGiftCount = todayData?.dailyGiftCount ?? (session ? 0 : 2);
+  const dailyGiftCount = todayData?.dailyGiftCount ?? (user ? 0 : 2);
 
   // Filter Backlog: Hide if excluded from 'backlog'
   const backlogTasks = (backlogData || []).filter(

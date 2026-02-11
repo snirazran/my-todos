@@ -37,6 +37,11 @@ export default function RegisterPage() {
       const token = await result.user.getIdToken();
       document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
 
+      // Create/Sync user in MongoDB
+      await fetch('/api/user', {
+        method: 'POST',
+      });
+
       router.push('/');
     } catch (err: any) {
       console.error(err);

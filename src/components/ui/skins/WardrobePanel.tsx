@@ -2,7 +2,7 @@ import { useInventory } from '@/hooks/useInventory';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Lock, Shirt, X, ArrowLeft, ShoppingBag, Repeat } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
@@ -41,14 +41,15 @@ export function WardrobePanel({
   onOpenChange: (v: boolean) => void;
   defaultTab?: 'inventory' | 'shop' | 'trade';
 }) {
-  const { data: session } = useSession();
-  const { data, mutate, unseenItems, markItemSeen, markAllSeen } = useInventory(); // Always active
+  const { user } = useAuth();
+  const { data, mutate, unseenItems, markItemSeen, markAllSeen } =
+    useInventory(); // Always active
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
-  const [visitedCategories, setVisitedCategories] = useState<Set<FilterCategory>>(
-    new Set<FilterCategory>(['all'])
-  );
+  const [visitedCategories, setVisitedCategories] = useState<
+    Set<FilterCategory>
+  >(new Set<FilterCategory>(['all']));
   const [actionId, setActionId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOrder>('rarity_desc');
   const [notif, setNotif] = useState<{
@@ -64,7 +65,6 @@ export function WardrobePanel({
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const dragControls = useDragControls();
-  
 
   // --- Sell Dialog Logic ---
   const [itemToSell, setItemToSell] = useState<ItemDef | null>(null);
@@ -85,10 +85,9 @@ export function WardrobePanel({
     }
   }, [open]);
 
-
   // Re-added sellItem
   const sellItem = async (item: ItemDef, qty: number = 1) => {
-    if (!session || !data?.wardrobe) return;
+    if (!user || !data?.wardrobe) return;
 
     const currentCount = data.wardrobe.inventory[item.id] ?? 0;
     const refund = Math.floor((item.priceFlies ?? 0) / 2);
@@ -137,7 +136,8 @@ export function WardrobePanel({
 
   useEffect(() => {
     setMounted(true);
-    const checkDesktop = () => setIsDesktop(window.matchMedia("(min-width: 640px)").matches);
+    const checkDesktop = () =>
+      setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
     checkDesktop();
     window.addEventListener('resize', checkDesktop);
     return () => window.removeEventListener('resize', checkDesktop);
@@ -195,7 +195,8 @@ export function WardrobePanel({
       else if (item.slot === 'hand_item') cat = 'held';
       else if (item.slot === 'glasses') cat = 'glasses';
       else if (item.slot === 'skin') {
-        if (item.rarity === 'epic' || item.rarity === 'legendary') cat = 'costume';
+        if (item.rarity === 'epic' || item.rarity === 'legendary')
+          cat = 'costume';
         else cat = 'body';
       }
 
@@ -219,12 +220,14 @@ export function WardrobePanel({
         result = result.filter(
           (i) =>
             i.slot === 'skin' &&
-            (i.rarity === 'epic' || i.rarity === 'legendary')
+            (i.rarity === 'epic' || i.rarity === 'legendary'),
         );
       } else if (activeFilter === 'body') {
         result = result.filter(
           (i) =>
-            i.slot === 'skin' && i.rarity !== 'epic' && i.rarity !== 'legendary'
+            i.slot === 'skin' &&
+            i.rarity !== 'epic' &&
+            i.rarity !== 'legendary',
         );
       } else if (activeFilter === 'held') {
         result = result.filter((i) => i.slot === 'hand_item');
@@ -264,7 +267,7 @@ export function WardrobePanel({
   };
 
   const handleItemAction = (item: ItemDef) => {
-    if (!session) {
+    if (!user) {
       setNotif({ msg: 'Sign in to equip items!', type: 'error' });
       return;
     }
@@ -281,7 +284,7 @@ export function WardrobePanel({
   };
 
   const buyItem = async (item: ItemDef, e?: React.MouseEvent) => {
-    if (!session) {
+    if (!user) {
       setNotif({ msg: 'Sign in to buy items!', type: 'error' });
       return;
     }
@@ -310,10 +313,12 @@ export function WardrobePanel({
     };
     mutate(newData, false);
 
-    const origin = e ? {
-      x: e.clientX / window.innerWidth,
-      y: e.clientY / window.innerHeight
-    } : { y: 0.6 };
+    const origin = e
+      ? {
+          x: e.clientX / window.innerWidth,
+          y: e.clientY / window.innerHeight,
+        }
+      : { y: 0.6 };
 
     confetti({
       particleCount: 40,
@@ -339,7 +344,7 @@ export function WardrobePanel({
       }
     } catch (e) {
       setNotif({ msg: 'Purchase failed.', type: 'error' });
-      mutate(); 
+      mutate();
     } finally {
       setActionId(null);
     }
@@ -348,7 +353,7 @@ export function WardrobePanel({
   const inventoryItems = useMemo(() => {
     if (!data?.wardrobe?.inventory) return [];
     const ownedIds = Object.keys(data.wardrobe.inventory).filter(
-      (id) => (data.wardrobe.inventory[id] ?? 0) > 0
+      (id) => (data.wardrobe.inventory[id] ?? 0) > 0,
     );
     const owned = (data.catalog || []).filter((i) => ownedIds.includes(i.id));
     return getFilteredItems(owned);
@@ -360,7 +365,7 @@ export function WardrobePanel({
   }, [data, activeFilter, sortBy]);
 
   const balance = data?.wardrobe?.flies ?? 0;
-  
+
   // Track if touch started from right edge (for drag-to-close gesture)
   // const [isDragEnabled, setIsDragEnabled] = useState(false);
   // const EDGE_THRESHOLD = 80; // pixels from right edge
@@ -370,16 +375,14 @@ export function WardrobePanel({
   const mobileVariants = {
     initial: { y: '100%', opacity: 0, scale: 0.96 },
     animate: { y: 0, opacity: 1, scale: 1 },
-    exit: { y: '100%', opacity: 0, scale: 0.96 }
+    exit: { y: '100%', opacity: 0, scale: 0.96 },
   };
 
   const desktopVariants = {
     initial: { opacity: 0, scale: 0.95, y: 0 },
     animate: { opacity: 1, scale: 1, y: 0 },
-    exit: { opacity: 0, scale: 0.95, y: 0 }
+    exit: { opacity: 0, scale: 0.95, y: 0 },
   };
-
-
 
   return createPortal(
     <>
@@ -400,10 +403,14 @@ export function WardrobePanel({
               <motion.div
                 variants={isDesktop ? desktopVariants : mobileVariants}
                 initial="initial"
-                animate={isDesktop ? { ...desktopVariants.animate, x: 0 } : mobileVariants.animate}
+                animate={
+                  isDesktop
+                    ? { ...desktopVariants.animate, x: 0 }
+                    : mobileVariants.animate
+                }
                 exit="exit"
                 transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-                drag={!isDesktop ? "y" : false}
+                drag={!isDesktop ? 'y' : false}
                 dragControls={dragControls}
                 dragListener={false} // Disable drag from anywhere
                 dragConstraints={{ top: 0, bottom: 0 }}
@@ -417,30 +424,34 @@ export function WardrobePanel({
                     onOpenChange(false);
                   }
                 }}
-                style={{ 
+                style={{
                   touchAction: 'none', // Prevent scrolling on the drag handle
-                  transform: 'translate3d(0,0,0)' // Fixes border-radius clipping on mobile
+                  transform: 'translate3d(0,0,0)', // Fixes border-radius clipping on mobile
                 }}
                 // Added rounded-t-[32px] for sheet look on mobile
                 className={cn(
-                  "pointer-events-auto w-full sm:max-w-[95vw] lg:max-w-[1200px] h-[90vh] sm:h-[90vh] flex flex-col bg-background overflow-hidden relative select-none",
-                  isDesktop && "shadow-2xl", // Only show shadow on desktop to reduce lag on mobile
-                  "rounded-t-[32px] sm:rounded-[40px] border-t sm:border border-border/40"
+                  'pointer-events-auto w-full sm:max-w-[95vw] lg:max-w-[1200px] h-[90vh] sm:h-[90vh] flex flex-col bg-background overflow-hidden relative select-none',
+                  isDesktop && 'shadow-2xl', // Only show shadow on desktop to reduce lag on mobile
+                  'rounded-t-[32px] sm:rounded-[40px] border-t sm:border border-border/40',
                 )}
               >
                 {/* Drag Handle (Mobile Only) - Invisible Hit Area */}
                 {!isDesktop && (
-                  <div 
+                  <div
                     className="absolute top-0 left-0 right-0 h-8 z-50 touch-none"
                     onPointerDown={(e) => dragControls.start(e)}
                   />
                 )}
 
                 {/* --- HEADER --- */}
-                <div className={cn(
-                  "relative z-20 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-border/40",
-                  isDesktop ? "bg-background/50 backdrop-blur-xl" : "bg-transparent"
-                )}>
+                <div
+                  className={cn(
+                    'relative z-20 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-border/40',
+                    isDesktop
+                      ? 'bg-background/50 backdrop-blur-xl'
+                      : 'bg-transparent',
+                  )}
+                >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div>
@@ -451,16 +462,16 @@ export function WardrobePanel({
                           Customize Your Companion
                         </p>
                       </div>
-                      
+
                       {/* Balance Badge - moved here */}
                       <motion.div
                         animate={shakeBalance ? { x: [-5, 5, -5, 5, 0] } : {}}
                         transition={{ duration: 0.4 }}
                         className={cn(
-                          "flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full transition-colors duration-300",
+                          'flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full transition-colors duration-300',
                           shakeBalance
-                            ? "bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-800"
-                            : "bg-secondary border-border dark:bg-slate-800/50 dark:border-slate-700"
+                            ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-800'
+                            : 'bg-secondary border-border dark:bg-slate-800/50 dark:border-slate-700',
                         )}
                       >
                         <div className="flex items-center justify-center bg-background rounded-full shadow-sm w-7 h-7 md:w-10 md:h-10 dark:bg-slate-900">
@@ -498,19 +509,31 @@ export function WardrobePanel({
                 </div>
 
                 {/* --- MAIN CONTENT WRAPPER --- */}
-                <div className={cn(
-                  "flex flex-col flex-1 min-h-0",
-                  isDesktop ? "bg-background/50 backdrop-blur-2xl" : "bg-transparent"
-                )}>
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
+                <div
+                  className={cn(
+                    'flex flex-col flex-1 min-h-0',
+                    isDesktop
+                      ? 'bg-background/50 backdrop-blur-2xl'
+                      : 'bg-transparent',
+                  )}
+                >
+                  <Tabs
+                    value={activeTab}
+                    onValueChange={setActiveTab}
+                    className="flex flex-col h-full"
+                  >
                     {/* Controls Area (Tabs + Filter) */}
                     <div className="px-4 pt-4 space-y-4 shrink-0 md:px-6 md:pt-5">
                       <div className="flex items-center justify-between gap-2 md:gap-4">
                         {/* NEW TAB DESIGN */}
-                        <TabsList className={cn(
-                          "flex-1 h-12 md:h-14 p-1 rounded-[20px] border border-border/50 shadow-sm flex items-center gap-1",
-                          isDesktop ? "bg-card/80 backdrop-blur-2xl" : "bg-muted/30"
-                        )}>
+                        <TabsList
+                          className={cn(
+                            'flex-1 h-12 md:h-14 p-1 rounded-[20px] border border-border/50 shadow-sm flex items-center gap-1',
+                            isDesktop
+                              ? 'bg-card/80 backdrop-blur-2xl'
+                              : 'bg-muted/30',
+                          )}
+                        >
                           <TabsTrigger
                             value="inventory"
                             className="
@@ -555,10 +578,9 @@ export function WardrobePanel({
                             <span>Trade</span>
                           </TabsTrigger>
                         </TabsList>
-                        
-                           <SortMenu value={sortBy} onChange={setSortBy} />
-                        </div>
 
+                        <SortMenu value={sortBy} onChange={setSortBy} />
+                      </div>
 
                       {/* UPDATED WRAPPER: Just a plain container, FilterBar handles the bleeding */}
                       {activeTab !== 'trade' && (
@@ -579,12 +601,14 @@ export function WardrobePanel({
                     {/* Content Area (Grid) */}
                     <div
                       className={cn(
-                        "flex-1 relative mt-4 overflow-hidden",
+                        'flex-1 relative mt-4 overflow-hidden',
                         /* Mobile Styles */
-                        "rounded-t-[32px] border-t border-border/40",
-                        isDesktop ? "bg-card/40 backdrop-blur-md" : "bg-card/20",
+                        'rounded-t-[32px] border-t border-border/40',
+                        isDesktop
+                          ? 'bg-card/40 backdrop-blur-md'
+                          : 'bg-card/20',
                         /* Desktop Styles */
-                        "md:mx-8 md:mb-8 md:rounded-[32px] md:border md:border-border/40 md:shadow-inner"
+                        'md:mx-8 md:mb-8 md:rounded-[32px] md:border md:border-border/40 md:shadow-inner',
                       )}
                     >
                       <TabsContent
@@ -595,9 +619,9 @@ export function WardrobePanel({
                           // SKELETON LOADING STATE (during animation)
                           <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
                             {Array.from({ length: 12 }).map((_, i) => (
-                              <div 
-                                key={i} 
-                                className="w-full aspect-[1/1.2] rounded-2xl bg-muted/20 animate-pulse border border-border/10" 
+                              <div
+                                key={i}
+                                className="w-full aspect-[1/1.2] rounded-2xl bg-muted/20 animate-pulse border border-border/10"
                               />
                             ))}
                           </div>
@@ -606,7 +630,9 @@ export function WardrobePanel({
                             <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
                               <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
                             </div>
-                            <p className="text-lg font-black text-muted-foreground">Empty</p>
+                            <p className="text-lg font-black text-muted-foreground">
+                              Empty
+                            </p>
                           </div>
                         ) : (
                           <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4 animate-in fade-in zoom-in-95 duration-300">
@@ -615,13 +641,18 @@ export function WardrobePanel({
                                 key={item.id}
                                 item={item}
                                 mode="inventory"
-                                ownedCount={data?.wardrobe?.inventory?.[item.id] ?? 0}
-                                isEquipped={data?.wardrobe?.equipped?.[item.slot] === item.id}
+                                ownedCount={
+                                  data?.wardrobe?.inventory?.[item.id] ?? 0
+                                }
+                                isEquipped={
+                                  data?.wardrobe?.equipped?.[item.slot] ===
+                                  item.id
+                                }
                                 canAfford={true}
                                 actionLoading={actionId === item.id}
                                 onAction={() => handleItemAction(item)}
                                 onSell={() => {
-                                    setItemToSell(item);
+                                  setItemToSell(item);
                                 }}
                                 actionLabel={null}
                                 isNew={unseenItems.includes(item.id)}
@@ -637,7 +668,8 @@ export function WardrobePanel({
                       >
                         <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
                           {shopItems.map((item) => {
-                            const count = data?.wardrobe?.inventory?.[item.id] ?? 0;
+                            const count =
+                              data?.wardrobe?.inventory?.[item.id] ?? 0;
                             return (
                               <ItemCard
                                 key={item.id}
@@ -684,7 +716,9 @@ export function WardrobePanel({
         onClose={() => setItemToSell(null)}
         onConfirm={confirmSell}
         item={itemToSell}
-        ownedCount={itemToSell ? (data?.wardrobe?.inventory?.[itemToSell.id] ?? 0) : 0}
+        ownedCount={
+          itemToSell ? (data?.wardrobe?.inventory?.[itemToSell.id] ?? 0) : 0
+        }
       />
 
       {openingGiftId && (
@@ -695,6 +729,6 @@ export function WardrobePanel({
         />
       )}
     </>,
-    document.body
+    document.body,
   );
 }

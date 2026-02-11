@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/components/auth/AuthContext';
 import { RotatingRays } from './RotatingRays';
 import { RewardCard } from './RewardCard';
 import { byId } from '@/lib/skins/catalog';
@@ -22,7 +22,7 @@ export function RewardPopup({
   onClose,
   dailyGiftCount = 0,
 }: RewardPopupProps) {
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export function RewardPopup({
 
     try {
       // GUEST MODE: Skip API call
-      if (!session) {
+      if (!user) {
         if (openNow) {
           setOpeningGiftId(giftId);
         } else {
@@ -134,7 +134,7 @@ export function RewardPopup({
                 <RotatingRays colorClass={giftConfig.rays} />
                 <div
                   className={cn(
-                    'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80'
+                    'absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80',
                   )}
                 />
               </motion.div>
@@ -170,7 +170,7 @@ export function RewardPopup({
             </div>
           )}
         </AnimatePresence>,
-        document.body
+        document.body,
       )}
 
       {openingGiftId && (

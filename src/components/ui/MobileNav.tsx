@@ -3,19 +3,19 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Home, History, LayoutDashboard, Shirt } from 'lucide-react';
-import { useSession } from 'next-auth/react';
+import { useAuth } from '@/components/auth/AuthContext';
 import { useUIStore } from '@/lib/uiStore';
 import { useInventory } from '@/hooks/useInventory';
 
 export default function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
-  const { data: session } = useSession();
+  const { user } = useAuth();
   const { openWardrobe } = useUIStore();
   const { unseenCount } = useInventory(); // Always fetch
 
   const handleNavigation = (path: string) => {
-    if (!session) {
+    if (!user) {
       router.push('/login');
       return;
     }
@@ -49,7 +49,7 @@ export default function MobileNav() {
         if (pathname !== '/') router.push('/');
         openWardrobe();
       },
-      isActive: false, 
+      isActive: false,
     },
   ];
 
@@ -59,11 +59,13 @@ export default function MobileNav() {
         {navItems.map((item) => {
           const isActive = item.href ? pathname === item.href : item.isActive;
           const Icon = item.icon;
-          
+
           const content = (
             <>
               <div className="relative">
-                <Icon className={`w-6 h-6 mb-1 ${isActive ? 'fill-current/20' : ''}`} />
+                <Icon
+                  className={`w-6 h-6 mb-1 ${isActive ? 'fill-current/20' : ''}`}
+                />
                 {item.label === 'Inventory' && unseenCount > 0 && (
                   <span className="absolute -top-1 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
                     {unseenCount > 9 ? '9+' : unseenCount}
@@ -96,7 +98,7 @@ export default function MobileNav() {
             <button
               key={item.href}
               onClick={() => {
-                if (item.protected && !session) {
+                if (item.protected && !user) {
                   router.push('/login');
                 } else {
                   router.push(item.href!);

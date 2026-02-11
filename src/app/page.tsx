@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import BacklogPanel from '@/components/ui/BacklogPanel';
 //fix
-import { signIn, useSession } from 'next-auth/react';
+import { useAuth } from '@/components/auth/AuthContext';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { useUIStore } from '@/lib/uiStore';
 import { type FrogHandle } from '@/components/ui/frog';
@@ -75,8 +75,8 @@ function getMilestones(totalTasks: number): number[] {
 }
 
 export default function Home() {
-  const { data: session, status } = useSession();
-  const sessionLoading = status === 'loading';
+  const { user, loading } = useAuth();
+  const sessionLoading = loading;
   const router = useRouter();
 
   // -- NEW STATE HOOK --
@@ -166,12 +166,12 @@ export default function Home() {
   const { showNotification } = useNotification();
 
   // Data Switching
-  const data = session ? tasks : guestTasks;
+  const data = user ? tasks : guestTasks;
   const doneCount = data.filter((t) => t.completed).length;
   // Note: We don't rely purely on 'rate' anymore for triggering, but we keep it for the progress bar
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
-  const flyBalance = session ? flyStatus.balance : 5;
-  const laterThisWeek = session ? backlogTasks : [];
+  const flyBalance = user ? flyStatus.balance : 5;
+  const laterThisWeek = user ? backlogTasks : [];
 
   // Milestone gift trigger removed - users must click the gift in ProgressCard to claim rewards
   // The RewardPopup will only show when setShowReward(true) is called from the gift click handler
@@ -183,11 +183,11 @@ export default function Home() {
 
   useEffect(() => {
     // If not signed in (guest) and we see MORE ready gifts than before, open popup
-    if (!session && readyCount > prevReadyCount.current) {
+    if (!user && readyCount > prevReadyCount.current) {
       setShowReward(true);
     }
     prevReadyCount.current = readyCount;
-  }, [readyCount, session]);
+  }, [readyCount, user]);
 
   // Block Scrolling during cinematic
   useEffect(() => {
@@ -219,7 +219,7 @@ export default function Home() {
       explicitCompleted !== undefined ? explicitCompleted : !task.completed;
 
     if (!completed) {
-      if (session) toggleTask(taskId, false);
+      if (user) toggleTask(taskId, false);
       else persistGuestTask(taskId, false);
       return;
     }
@@ -228,22 +228,22 @@ export default function Home() {
       key: taskId,
       completed,
       onPersist: () => {
-        if (session) toggleTask(taskId, true);
+        if (user) toggleTask(taskId, true);
         else persistGuestTask(taskId, true);
       },
     });
   };
 
-  const { indices } = useWardrobeIndices(!!session);
+  const { indices } = useWardrobeIndices(!!user);
 
-  if (sessionLoading || (session && isLoading && tasks.length === 0)) {
+  if (sessionLoading || (user && isLoading && tasks.length === 0)) {
     return <LoadingScreen message="Loading your day..." />;
   }
 
   return (
     <main className="min-h-screen pb-24 md:pb-12 bg-background">
       <div className="px-4 pt-2 pb-6 mx-auto max-w-7xl md:px-8">
-        <Header session={session} router={router} />
+        <Header router={router} />
 
         <div className="relative grid items-start grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-8">
           <div className="z-10 flex flex-col gap-4 lg:col-span-4 lg:sticky lg:top-8 lg:gap-6">
@@ -261,10 +261,10 @@ export default function Home() {
               total={data.length}
               giftsClaimed={dailyGiftCount}
               isCatching={cinematic}
-              hunger={session ? hungerStatus.hunger : 1000}
-              maxHunger={session ? hungerStatus.maxHunger : 10000}
-              animateHunger={!!session}
-              isGuest={!session}
+              hunger={user ? hungerStatus.hunger : 1000}
+              maxHunger={user ? hungerStatus.maxHunger : 10000}
+              animateHunger={!!user}
+              isGuest={!user}
             />
             <div className="w-full">
               <ProgressCard
@@ -273,7 +273,7 @@ export default function Home() {
                 total={data.length}
                 giftsClaimed={dailyGiftCount}
                 onAddRequested={() => {
-                  if (!session) {
+                  if (!user) {
                     router.push('/login');
                     return;
                   }
@@ -281,6 +281,10 @@ export default function Home() {
                   setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
                   setShowQuickAdd(true);
                 }}
+                // ... (omitting chunks for brevity, I will rely on AllowMultiple for simple replacements if possible, but regex based needs precise context)
+                // Actually AllowMultiple with simple string replace 'session' -> 'user' is dangerous because 'session' might be used for other things.
+                // Use precise chunks.
+
                 onGiftClick={() => {
                   // Only show reward popup if user hasn't claimed all 3 gifts yet
                   if (dailyGiftCount < 3) {
@@ -505,7 +509,7 @@ export default function Home() {
                   exit={{ opacity: 0, x: 10 }}
                   transition={{ duration: 0.2 }}
                 >
-                  {!session && (
+                  {!user && (
                     <div className="relative overflow-hidden mb-3 rounded-xl bg-primary/5 border border-primary/10 shadow-sm">
                       <div className="relative flex items-center gap-4 p-4">
                         <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-background text-primary shadow-sm ring-1 ring-primary/20">
@@ -543,7 +547,7 @@ export default function Home() {
                       )
                     }
                     onAddRequested={(prefill) => {
-                      if (!session) {
+                      if (!user) {
                         router.push('/login');
                         return;
                       }
@@ -553,14 +557,14 @@ export default function Home() {
                     }}
                     weeklyIds={weeklyIds}
                     onDeleteToday={(id) => {
-                      if (!session) {
+                      if (!user) {
                         router.push('/login');
                         return;
                       }
                       deleteTask(id);
                     }}
                     onDeleteFromWeek={async (taskId) => {
-                      if (!session) {
+                      if (!user) {
                         router.push('/login');
                         return;
                       }
@@ -573,7 +577,7 @@ export default function Home() {
                       deleteTask(taskId);
                     }}
                     onDoLater={(id) => {
-                      if (!session) {
+                      if (!user) {
                         router.push('/login');
                         return;
                       }
@@ -582,20 +586,20 @@ export default function Home() {
                     onReorder={reorderTasks}
                     pendingToToday={pendingToToday}
                     onToggleRepeat={(id) => {
-                      if (!session) {
+                      if (!user) {
                         router.push('/login');
                         return;
                       }
                       toggleRepeat(id);
                     }}
                     onEditTask={(id, text) => {
-                      if (!session) {
+                      if (!user) {
                         router.push('/login');
                         return;
                       }
                       editTask(id, text, false);
                     }}
-                    isGuest={!session}
+                    isGuest={!user}
                     tags={tags}
                     showCompleted={showCompleted}
                     selectedTags={selectedTags}
@@ -613,13 +617,13 @@ export default function Home() {
                   <BacklogPanel
                     later={laterThisWeek}
                     onRefreshToday={async () => {
-                      if (session) await mutateToday();
+                      if (user) await mutateToday();
                     }}
                     onRefreshBacklog={async () => {
-                      if (session) await mutateBacklog();
+                      if (user) await mutateBacklog();
                     }}
                     onMoveToToday={(item) => {
-                      if (!session) {
+                      if (!user) {
                         router.push('/login');
                         return;
                       }
@@ -627,7 +631,7 @@ export default function Home() {
                     }}
                     pendingToBacklog={pendingToBacklog}
                     onAddRequested={() => {
-                      if (!session) {
+                      if (!user) {
                         router.push('/login');
                         return;
                       }
@@ -636,13 +640,13 @@ export default function Home() {
                       setShowQuickAdd(true);
                     }}
                     onEditTask={(id, text) => {
-                      if (!session) {
+                      if (!user) {
                         router.push('/login');
                         return;
                       }
                       editTask(id, text, true);
                     }}
-                    isGuest={!session}
+                    isGuest={!user}
                     tags={tags}
                   />
                 </motion.div>
@@ -722,7 +726,7 @@ export default function Home() {
             });
             const data = await res.json();
 
-            if (session && data.ok && data.tasks) {
+            if (user && data.ok && data.tasks) {
               const newTasks = data.tasks;
               // Check backlog based on days array or repeat type if casted
               const isBacklog =
@@ -749,7 +753,7 @@ export default function Home() {
                   { revalidate: false },
                 );
               }
-            } else if (session) {
+            } else if (user) {
               // Fallback
               const isBacklog =
                 (repeat as string) === 'backlog' ||
@@ -797,7 +801,7 @@ export default function Home() {
       />
 
       <HungerWarningModal
-        open={!!session && hungerStatus.stolenFlies > 0}
+        open={!!user && hungerStatus.stolenFlies > 0}
         stolenFlies={hungerStatus.stolenFlies}
         indices={indices}
         onAcknowledge={async () => {
@@ -814,7 +818,7 @@ export default function Home() {
         <div className="pointer-events-auto mx-auto w-full max-w-[420px] flex justify-center">
           <AddTaskButton
             onClick={() => {
-              if (!session) {
+              if (!user) {
                 router.push('/login');
                 return;
               }
@@ -833,7 +837,7 @@ export default function Home() {
         onClose={() => setShowGiftInfo(false)}
         slot={selectedGiftSlot}
         onAddTask={() => {
-          if (!session) {
+          if (!user) {
             router.push('/login');
             return;
           }
@@ -847,7 +851,7 @@ export default function Home() {
 }
 
 // Compact Header
-function Header({ session, router }: { session: any; router: any }) {
+function Header({ router }: { router: any }) {
   return (
     <div className="flex flex-col gap-4 mb-2 md:mb-4 md:flex-row md:items-center md:justify-between">
       <div>
