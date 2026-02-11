@@ -2,13 +2,20 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  createUserWithEmailAndPassword,
+  updateProfile,
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   Card,
   CardContent,
@@ -25,8 +32,11 @@ export default function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // We only support Google Sign-In for now in this new Firebase setup
-  // The email/password form is removed in favor of Google Auth
+  // Form State
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
@@ -38,14 +48,62 @@ export default function RegisterPage() {
       document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
 
       // Create/Sync user in MongoDB
-      await fetch('/api/user', {
-        method: 'POST',
-      });
+      await fetch('/api/user', { method: 'POST' });
 
       router.push('/');
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Failed to sign up');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    // Basic validation
+    if (!name.trim()) {
+      setError('Name is required');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      // 1. Create user in Firebase
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
+      const user = userCredential.user;
+
+      // 2. Update Profile with Name
+      await updateProfile(user, {
+        displayName: name,
+      });
+
+      // 3. Set Cookie
+      const token = await user.getIdToken();
+      document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
+
+      // 4. Sync to MongoDB
+      await fetch('/api/user', { method: 'POST' });
+
+      router.push('/');
+    } catch (err: any) {
+      console.error(err);
+      let msg = 'Failed to create account';
+      if (err.code === 'auth/email-already-in-use') {
+        msg = 'Email is already in use';
+      } else if (err.code === 'auth/weak-password') {
+        msg = 'Password should be at least 6 characters';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = 'Invalid email address';
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -94,7 +152,7 @@ export default function RegisterPage() {
               </p>
             </CardHeader>
 
-            <CardContent className="space-y-5">
+            <CardContent className="space-y-4">
               {error && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
@@ -104,6 +162,84 @@ export default function RegisterPage() {
                   {error}
                 </motion.div>
               )}
+
+              <form onSubmit={handleEmailSignUp} className="space-y-3">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="name"
+                    className="text-xs font-bold uppercase text-muted-foreground ml-1"
+                  >
+                    Name
+                  </Label>
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Your Name"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="email"
+                    className="text-xs font-bold uppercase text-muted-foreground ml-1"
+                  >
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="hello@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="password"
+                    className="text-xs font-bold uppercase text-muted-foreground ml-1"
+                  >
+                    Password
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
+                    required
+                    minLength={6}
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-12 mt-2 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25"
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    'Sign Up'
+                  )}
+                </Button>
+              </form>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border/60" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground font-bold tracking-widest">
+                    Or
+                  </span>
+                </div>
+              </div>
 
               <Button
                 variant="outline"

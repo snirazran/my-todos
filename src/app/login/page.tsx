@@ -1,7 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import {
+  signInWithPopup,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+} from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -29,6 +33,10 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // Form State
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
@@ -52,6 +60,51 @@ export default function LoginPage() {
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Failed to sign in');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEmailSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      // 1. Sign in with Firebase
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
+      const user = userCredential.user;
+
+      // 2. Get ID token
+      const token = await user.getIdToken();
+
+      // 3. Set Cookie
+      document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
+
+      // 4. Sync user to MongoDB
+      await fetch('/api/user', {
+        method: 'POST',
+      });
+
+      // 5. Redirect
+      router.push('/');
+    } catch (err: any) {
+      console.error(err);
+      let msg = 'Failed to sign in';
+      if (
+        err.code === 'auth/invalid-credential' ||
+        err.code === 'auth/user-not-found' ||
+        err.code === 'auth/wrong-password'
+      ) {
+        msg = 'Invalid email or password';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = 'Invalid email address';
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -111,6 +164,66 @@ export default function LoginPage() {
                   {error}
                 </motion.div>
               )}
+
+              <form onSubmit={handleEmailSignIn} className="space-y-3">
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="email"
+                    className="text-xs font-bold uppercase text-muted-foreground ml-1"
+                  >
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="hello@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="password"
+                    className="text-xs font-bold uppercase text-muted-foreground ml-1"
+                  >
+                    Password
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
+                    required
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full h-12 mt-2 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25"
+                >
+                  {loading ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    'Sign In'
+                  )}
+                </Button>
+              </form>
+
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t border-border/60" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground font-bold tracking-widest">
+                    Or
+                  </span>
+                </div>
+              </div>
 
               <Button
                 variant="outline"
