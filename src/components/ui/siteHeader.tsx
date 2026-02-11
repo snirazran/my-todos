@@ -462,14 +462,14 @@ function MobileSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm"
+            className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm md:hidden"
           />
           <motion.div
             initial={{ x: '100%' }}
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed z-[101] top-0 right-0 bottom-0 w-[85%] max-w-xs bg-background border-l border-border/50 shadow-2xl p-6 flex flex-col gap-6 h-[100dvh]"
+            className="fixed z-[101] top-0 right-0 bottom-0 w-[85%] max-w-xs bg-background border-l border-border/50 shadow-2xl p-6 flex flex-col gap-6 h-[100dvh] md:hidden"
             style={{ backgroundColor: 'hsl(var(--background))' }} // Force solid background using valid HSL
           >
             <div className="flex items-center justify-between">
