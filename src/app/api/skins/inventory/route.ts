@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/authOptions';
-import { Types } from 'mongoose';
+import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { CATALOG, byId, type WardrobeSlot } from '@/lib/skins/catalog';
@@ -10,12 +8,12 @@ import type { UserWardrobe } from '@/lib/types/UserDoc';
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
 
-type LeanUser = UserDoc & { _id: Types.ObjectId };
+type LeanUser = UserDoc & { _id: string };
 
 /** Ensure user.wardrobe exists; sanitize equipped vs inventory */
-async function ensureWardrobe(email: string) {
+async function ensureWardrobe(uid: string) {
   await connectMongo();
-  const user = (await UserModel.findOne({ email }).lean()) as LeanUser | null;
+  const user = (await UserModel.findById(uid).lean()) as LeanUser | null;
   if (!user) return null;
 
   const current: UserWardrobe = user.wardrobe ?? {
@@ -32,7 +30,11 @@ async function ensureWardrobe(email: string) {
       nextEquipped[slot] = null;
     }
   }
-  const next: UserWardrobe = { ...current, equipped: nextEquipped, unseenItems: current.unseenItems ?? [] };
+  const next: UserWardrobe = {
+    ...current,
+    equipped: nextEquipped,
+    unseenItems: current.unseenItems ?? [],
+  };
 
   if (
     !user.wardrobe ||
@@ -45,10 +47,13 @@ async function ensureWardrobe(email: string) {
 }
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  
-  // Guest Mode
-  if (!session?.user?.email) {
+  try {
+    const userId = await requireUserId();
+    const wardrobe = await ensureWardrobe(userId);
+    if (!wardrobe) return json({ error: 'User not found' }, 404);
+    return json({ wardrobe, catalog: CATALOG });
+  } catch {
+    // Guest Mode or Unauthorized
     return json({
       wardrobe: {
         equipped: {},
@@ -59,133 +64,135 @@ export async function GET() {
       catalog: CATALOG,
     });
   }
-
-  const wardrobe = await ensureWardrobe(session.user.email);
-  if (!wardrobe) return json({ error: 'User not found' }, 404);
-
-  return json({ wardrobe, catalog: CATALOG });
 }
 
 export async function PUT(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
-
-  let body: { slot?: WardrobeSlot; itemId?: string | null };
   try {
-    body = await req.json();
-  } catch {
-    return json({ error: 'Invalid JSON' }, 400);
-  }
+    const userId = await requireUserId();
 
-  const slot = body.slot;
-  const itemId = body.itemId ?? null; // null => unequip
+    let body: { slot?: WardrobeSlot; itemId?: string | null };
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid JSON' }, 400);
+    }
 
-  if (!slot || !['skin', 'hat', 'scarf', 'hand_item'].includes(slot))
-    return json({ error: 'Unknown slot' }, 400);
+    const slot = body.slot;
+    const itemId = body.itemId ?? null; // null => unequip
 
-  await connectMongo();
-  const user = (await UserModel.findOne({
-    email: session.user.email,
-  }).lean()) as LeanUser | null;
-  if (!user) return json({ error: 'User not found' }, 404);
+    if (!slot || !['skin', 'hat', 'scarf', 'hand_item'].includes(slot))
+      return json({ error: 'Unknown slot' }, 400);
 
-  const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
+    await connectMongo();
+    const user = (await UserModel.findById(userId).lean()) as LeanUser | null;
+    if (!user) return json({ error: 'User not found' }, 404);
 
-  // Unequip for this slot
-  if (itemId === null) {
+    const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
+
+    // Unequip for this slot
+    if (itemId === null) {
+      await UserModel.updateOne(
+        { _id: user._id },
+        { $set: { [`wardrobe.equipped.${slot}`]: null } },
+      );
+      return json({ ok: true });
+    }
+
+    // Equip: must exist in catalog, match the slot, and be owned
+    const def = byId[itemId];
+    if (!def) return json({ error: 'Unknown itemId' }, 400);
+    if (def.slot !== slot)
+      return json({ error: 'Item does not match slot' }, 400);
+
+    if ((wardrobe.inventory[itemId] ?? 0) <= 0)
+      return json({ error: 'You do not own this item' }, 403);
+
     await UserModel.updateOne(
       { _id: user._id },
-      { $set: { [`wardrobe.equipped.${slot}`]: null } }
+      { $set: { [`wardrobe.equipped.${slot}`]: itemId } },
     );
     return json({ ok: true });
+  } catch {
+    return json({ error: 'Unauthorized' }, 401);
   }
-
-  // Equip: must exist in catalog, match the slot, and be owned
-  const def = byId[itemId];
-  if (!def) return json({ error: 'Unknown itemId' }, 400);
-  if (def.slot !== slot)
-    return json({ error: 'Item does not match slot' }, 400);
-
-  if ((wardrobe.inventory[itemId] ?? 0) <= 0)
-    return json({ error: 'You do not own this item' }, 403);
-
-  await UserModel.updateOne(
-    { _id: user._id },
-    { $set: { [`wardrobe.equipped.${slot}`]: itemId } }
-  );
-  return json({ ok: true });
 }
 
 export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
-
-  let body: { action?: string; itemId?: string };
   try {
-    body = await req.json();
+    const userId = await requireUserId();
+
+    let body: { action?: string; itemId?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid JSON' }, 400);
+    }
+
+    await connectMongo();
+
+    if (body.action === 'markOneSeen' && body.itemId) {
+      await UserModel.updateOne(
+        { _id: userId },
+        { $pull: { 'wardrobe.unseenItems': body.itemId } },
+      );
+      return json({ ok: true });
+    }
+
+    if (body.action === 'markSeen') {
+      await UserModel.updateOne(
+        { _id: userId },
+        { $set: { 'wardrobe.unseenItems': [] } },
+      );
+      return json({ ok: true });
+    }
+
+    return json({ error: 'Unknown action' }, 400);
   } catch {
-    return json({ error: 'Invalid JSON' }, 400);
+    return json({ error: 'Unauthorized' }, 401);
   }
+}
 
-  await connectMongo();
-
-  if (body.action === 'markOneSeen' && body.itemId) {
-    await UserModel.updateOne(
-      { email: session.user.email },
-      { $pull: { 'wardrobe.unseenItems': body.itemId } }
-    );
-    return json({ ok: true });
-  }
-
-  if (body.action === 'markSeen') {
-    await UserModel.updateOne(
-      { email: session.user.email },
-      { $set: { 'wardrobe.unseenItems': [] } }
-    );
-    return json({ ok: true });
-  }
-
-  return json({ error: 'Unknown action' }, 400);
-}export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
-
-  let body: { itemId?: string };
+export async function POST(req: NextRequest) {
   try {
-    body = await req.json();
+    const userId = await requireUserId();
+
+    let body: { itemId?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid JSON' }, 400);
+    }
+
+    const itemId = body.itemId;
+    if (!itemId || !byId[itemId]) return json({ error: 'Unknown itemId' }, 400);
+
+    await connectMongo();
+    const user = (await UserModel.findById(userId).lean()) as LeanUser | null;
+    if (!user) return json({ error: 'User not found' }, 404);
+
+    // Initialize wardrobe if missing, or update
+    if (!user.wardrobe) {
+      const init: UserWardrobe = {
+        equipped: {},
+        inventory: { [itemId]: 1 },
+        unseenItems: [itemId],
+        flies: 0,
+      };
+      await UserModel.updateOne(
+        { _id: user._id },
+        { $set: { wardrobe: init } },
+      );
+    } else {
+      const update: any = {
+        $inc: { [`wardrobe.inventory.${itemId}`]: 1 },
+        $addToSet: { 'wardrobe.unseenItems': itemId },
+      };
+
+      await UserModel.updateOne({ _id: user._id }, update);
+    }
+
+    return json({ ok: true });
   } catch {
-    return json({ error: 'Invalid JSON' }, 400);
+    return json({ error: 'Unauthorized' }, 401);
   }
-
-  const itemId = body.itemId;
-  if (!itemId || !byId[itemId]) return json({ error: 'Unknown itemId' }, 400);
-
-  await connectMongo();
-  const user = (await UserModel.findOne({
-    email: session.user.email,
-  }).lean()) as LeanUser | null;
-  if (!user) return json({ error: 'User not found' }, 404);
-
-  // Initialize wardrobe if missing, or update
-  if (!user.wardrobe) {
-    const init: UserWardrobe = {
-      equipped: {},
-      inventory: { [itemId]: 1 },
-      unseenItems: [itemId],
-      flies: 0,
-    };
-    await UserModel.updateOne({ _id: user._id }, { $set: { wardrobe: init } });
-  } else {
-    const update: any = {
-      $inc: { [`wardrobe.inventory.${itemId}`]: 1 },
-      $addToSet: { 'wardrobe.unseenItems': itemId }
-    };
-
-    await UserModel.updateOne(
-      { _id: user._id },
-      update
-    );
-  }
-
-  return json({ ok: true });
 }

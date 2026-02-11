@@ -2,14 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { signIn } from 'next-auth/react';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import Link from 'next/link';
-import { Eye, EyeOff, User, Mail, Lock, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Card,
   CardContent,
@@ -17,71 +16,33 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import Frog from '@/components/ui/frog';
+import dynamic from 'next/dynamic';
+
+const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
 export default function RegisterPage() {
   const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  /* ───────── state ───────── */
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [pw, setPw] = useState('');
-  const [pw2, setPw2] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [showPw2, setShowPw2] = useState(false);
-
-  const [submitting, setSubmitting] = useState(false);
-  const [serverErr, setServerErr] = useState<string | null>(null);
-
-  /* ───────── helpers ───────── */
-  const toggle1 = () => setShowPw(!showPw);
-  const toggle2 = () => setShowPw2(!showPw2);
-
-  /* ───────── submit ───────── */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setServerErr(null);
-
-    /* local checks */
-    if (pw !== pw2) {
-      setServerErr('Passwords do not match');
-      return;
-    }
-
-    setSubmitting(true);
-
+  // We only support Google Sign-In for now in this new Firebase setup
+  // The email/password form is removed in favor of Google Auth
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      /* 1️⃣  create the user */
-      const res = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password: pw }),
-      });
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
 
-      if (!res.ok) {
-        const { error, details } = await res.json().catch(() => ({}));
-        setServerErr(
-          error === 'Validation failed'
-            ? Object.values(details ?? {})
-                .flat()
-                .join(' · ')
-            : error || 'An error occurred — please try again'
-        );
-        return;
-      }
+      const token = await result.user.getIdToken();
+      document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
 
-      /* 2️⃣  log-in immediately */
-      await signIn('credentials', {
-        email,
-        password: pw,
-        redirect: true,
-        callbackUrl: '/', // landing page after auto-login
-      });
-      /* signIn handles the redirect – no router.push() needed */
-    } catch {
-      setServerErr('An error occurred — please try again');
+      router.push('/');
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Failed to sign up');
     } finally {
-      setSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -129,132 +90,46 @@ export default function RegisterPage() {
             </CardHeader>
 
             <CardContent className="space-y-5">
-              {serverErr && (
+              {error && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="p-3 text-[11px] font-black uppercase tracking-wider text-center text-destructive border border-destructive/50 rounded-2xl bg-destructive/10"
                 >
-                  {serverErr}
+                  {error}
                 </motion.div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Full Name */}
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="name"
-                    className="text-[10px] uppercase font-black tracking-[0.15em] text-muted-foreground ml-1"
-                  >
-                    Full Name
-                  </Label>
-                  <div className="relative group">
-                    <Input
-                      id="name"
-                      placeholder="John Doe"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="transition-all h-11 pl-11 rounded-2xl bg-muted/50 border-border focus:ring-primary/20 focus:border-primary/50"
-                    />
-                    <User className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors z-10" />
-                  </div>
-                </div>
-
-                {/* Email */}
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="email"
-                    className="text-[10px] uppercase font-black tracking-[0.15em] text-muted-foreground ml-1"
-                  >
-                    Email
-                  </Label>
-                  <div className="relative group">
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="name@example.com"
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="transition-all h-11 pl-11 rounded-2xl bg-muted/50 border-border focus:ring-primary/20 focus:border-primary/50"
-                    />
-                    <Mail className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors z-10" />
-                  </div>
-                </div>
-
-                {/* Password */}
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="password"
-                    className="text-[10px] uppercase font-black tracking-[0.15em] text-muted-foreground ml-1"
-                  >
-                    Password
-                  </Label>
-                  <div className="relative group">
-                    <Input
-                      id="password"
-                      type={showPw ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      required
-                      value={pw}
-                      onChange={(e) => setPw(e.target.value)}
-                      className="transition-all h-11 pl-11 pr-11 rounded-2xl bg-muted/50 border-border focus:ring-primary/20 focus:border-primary/50"
-                    />
-                    <Lock className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors z-10" />
-                    <button
-                      type="button"
-                      onClick={toggle1}
-                      className="absolute inset-y-0 right-0 z-10 flex items-center justify-center w-10 transition-colors text-muted-foreground hover:text-foreground"
-                      tabIndex={-1}
+              <Button
+                variant="outline"
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="w-full h-12 rounded-2xl border-border bg-background hover:bg-muted/50 font-bold tracking-wide transition-all"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <svg
+                      className="mr-2 h-4 w-4"
+                      aria-hidden="true"
+                      focusable="false"
+                      data-prefix="fab"
+                      data-icon="google"
+                      role="img"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 488 512"
                     >
-                      {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Confirm Password */}
-                <div className="space-y-1.5">
-                  <Label
-                    htmlFor="confirm-password"
-                    className="text-[10px] uppercase font-black tracking-[0.15em] text-muted-foreground ml-1"
-                  >
-                    Confirm Password
-                  </Label>
-                  <div className="relative group">
-                    <Input
-                      id="confirm-password"
-                      type={showPw2 ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      required
-                      value={pw2}
-                      onChange={(e) => setPw2(e.target.value)}
-                      className="transition-all h-11 pl-11 pr-11 rounded-2xl bg-muted/50 border-border focus:ring-primary/20 focus:border-primary/50"
-                    />
-                    <Lock className="absolute left-4 top-3.5 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors z-10" />
-                    <button
-                      type="button"
-                      onClick={toggle2}
-                      className="absolute inset-y-0 right-0 z-10 flex items-center justify-center w-10 transition-colors text-muted-foreground hover:text-foreground"
-                      tabIndex={-1}
-                    >
-                      {showPw2 ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full h-12 mt-2 bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase tracking-[0.1em] rounded-2xl shadow-lg shadow-primary/25 transition-all active:scale-[0.98]"
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    'Sign Up'
-                  )}
-                </Button>
-              </form>
+                      <path
+                        fill="currentColor"
+                        d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
+                      ></path>
+                    </svg>
+                    Sign up with Google
+                  </>
+                )}
+              </Button>
             </CardContent>
 
             <CardFooter className="flex flex-col gap-4 py-6 border-t bg-muted/30 border-border">

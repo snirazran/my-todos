@@ -1,47 +1,40 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/authOptions';
+import { requireAuth } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const { uid } = await requireAuth();
 
     const body = await request.json();
     const amount = body.amount || 100000;
 
     await dbConnect();
 
-    // Find user and add flies
-    const user = await UserModel.findOne({ email: session.user.email });
-    
+    // Use findById since _id is now the string UID
+    const user = await UserModel.findById(uid).select('wardrobe.flies');
+
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const currentFlies = user.wardrobe?.flies || 0;
-    const newFlies = currentFlies + amount;
+    const currentAmount = user.wardrobe?.flies || 0;
+    const newFlies = currentAmount + amount;
 
-    await UserModel.findOneAndUpdate(
-      { email: session.user.email },
+    await UserModel.findByIdAndUpdate(
+      uid,
       { $set: { 'wardrobe.flies': newFlies } },
-      { new: true }
+      { new: true },
     );
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: `Added ${amount} flies successfully`,
-      flies: newFlies
+      flies: newFlies,
     });
   } catch (error) {
     console.error('Error adding flies:', error);
-    return NextResponse.json(
-      { error: 'Failed to add flies' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to add flies' }, { status: 500 });
   }
 }

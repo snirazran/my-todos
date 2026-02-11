@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { signIn } from 'next-auth/react';
+import { signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Mail, Lock, Loader2, Sparkles } from 'lucide-react';
@@ -17,57 +18,37 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import Frog from '@/components/ui/frog';
+import dynamic from 'next/dynamic';
+
+const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
 /* tiny helper */
-const mailRx = /^[\w-.]+@([\w-]+\.)+[\w-]{2,}$/;
 
 export default function LoginPage() {
   const router = useRouter();
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  /* form state */
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
+  const handleGoogleSignIn = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const provider = new GoogleAuthProvider();
+      const result = await signInWithPopup(auth, provider);
 
-  /* validation & server errors */
-  const [errs, setErrs] = useState<{
-    email?: string;
-    password?: string;
-    server?: string;
-  }>({});
+      // Get ID token
+      const token = await result.user.getIdToken();
 
-  /* -------------- submit -------------- */
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const nextErrs: typeof errs = {};
+      // Set cookie for middleware
+      document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
 
-    /* 1️⃣ client-side validation (EN) */
-    if (!email.trim()) nextErrs.email = 'Email is required';
-    else if (!mailRx.test(email)) nextErrs.email = 'Invalid email address';
-
-    if (!password) nextErrs.password = 'Password is required';
-    else if (password.length < 8) nextErrs.password = 'At least 8 characters';
-
-    setErrs(nextErrs);
-    if (Object.keys(nextErrs).length) return;
-
-    /* 2️⃣ sign-in */
-    setSubmitting(true);
-    const res = await signIn('credentials', {
-      email,
-      password,
-      redirect: false,
-    });
-    setSubmitting(false);
-
-    if (res?.ok) return router.push('/');
-
-    /* 3️⃣ server-side errors (EN) */
-    if (res?.error === 'CredentialsSignin') {
-      setErrs({ server: 'Incorrect email or password' });
-    } else {
-      setErrs({ server: 'An error occurred — please try again' });
+      // Redirect
+      router.push('/');
+    } catch (err: any) {
+      console.error(err);
+      setError(err.message || 'Failed to sign in');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -116,83 +97,46 @@ export default function LoginPage() {
             </CardHeader>
 
             <CardContent className="space-y-6">
-              {errs.server && (
+              {error && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   className="p-3 text-[11px] font-black uppercase tracking-wider text-center text-destructive border border-destructive/50 rounded-2xl bg-destructive/10"
                 >
-                  {errs.server}
+                  {error}
                 </motion.div>
               )}
 
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* email */}
-                <div className="space-y-2">
-                  <Label
-                    htmlFor="email"
-                    className="text-[10px] uppercase font-black tracking-[0.15em] text-muted-foreground ml-1"
-                  >
-                    Email Address
-                  </Label>
-                  <div className="relative group">
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="name@example.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className={`h-12 pl-11 rounded-2xl bg-muted/50 border-border transition-all focus:ring-primary/20 focus:border-primary/50 ${
-                        errs.email
-                          ? 'border-destructive/50 focus:ring-destructive/10'
-                          : ''
-                      }`}
-                    />
-                    <Mail className="absolute z-10 w-4 h-4 transition-colors left-4 top-4 text-muted-foreground group-focus-within:text-primary" />
-                  </div>
-                  {errs.email && <FieldError msg={errs.email} />}
-                </div>
-
-                {/* password */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between ml-1">
-                    <Label
-                      htmlFor="password"
-                      className="text-[10px] uppercase font-black tracking-[0.15em] text-muted-foreground"
+              <Button
+                variant="outline"
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+                className="w-full h-12 rounded-2xl border-border bg-background hover:bg-muted/50 font-bold tracking-wide transition-all"
+              >
+                {loading ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <>
+                    <svg
+                      className="mr-2 h-4 w-4"
+                      aria-hidden="true"
+                      focusable="false"
+                      data-prefix="fab"
+                      data-icon="google"
+                      role="img"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 488 512"
                     >
-                      Password
-                    </Label>
-                  </div>
-                  <div className="relative group">
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className={`h-12 pl-11 rounded-2xl bg-muted/50 border-border transition-all focus:ring-primary/20 focus:border-primary/50 ${
-                        errs.password
-                          ? 'border-destructive/50 focus:ring-destructive/10'
-                          : ''
-                      }`}
-                    />
-                    <Lock className="absolute z-10 w-4 h-4 transition-colors left-4 top-4 text-muted-foreground group-focus-within:text-primary" />
-                  </div>
-                  {errs.password && <FieldError msg={errs.password} />}
-                </div>
-
-                <Button
-                  type="submit"
-                  className="w-full h-12 mt-2 bg-primary hover:bg-primary/90 text-primary-foreground font-black uppercase tracking-[0.1em] rounded-2xl shadow-lg shadow-primary/25 transition-all active:scale-[0.98]"
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    'Sign In'
-                  )}
-                </Button>
-              </form>
+                      <path
+                        fill="currentColor"
+                        d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
+                      ></path>
+                    </svg>
+                    Continue with Google
+                  </>
+                )}
+              </Button>
             </CardContent>
 
             <CardFooter className="flex flex-col gap-4 py-6 border-t bg-muted/30 border-border">

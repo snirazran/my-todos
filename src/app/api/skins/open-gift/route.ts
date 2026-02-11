@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/authOptions';
-import { Types } from 'mongoose';
+import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { CATALOG, byId, ItemDef, Rarity } from '@/lib/skins/catalog';
@@ -10,7 +8,7 @@ import type { UserWardrobe } from '@/lib/types/UserDoc';
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
 
-type LeanUser = UserDoc & { _id: Types.ObjectId };
+type LeanUser = UserDoc & { _id: string };
 
 const WIN_WEIGHTS: Record<Rarity, number> = {
   common: 0.6,
@@ -38,12 +36,12 @@ const getRandomItem = (): ItemDef => {
     epic: [],
     legendary: [],
   };
-  
+
   CATALOG.forEach((item) => {
     // Don't award containers as prizes for now to prevent loops, or do?
     // Let's exclude containers.
     if (item.slot !== 'container') {
-        if (catalogByRarity[item.rarity]) catalogByRarity[item.rarity].push(item);
+      if (catalogByRarity[item.rarity]) catalogByRarity[item.rarity].push(item);
     }
   });
 
@@ -60,56 +58,55 @@ const getRandomItem = (): ItemDef => {
 };
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) return json({ error: 'Unauthorized' }, 401);
-
-  let body: { giftBoxId?: string };
   try {
-    body = await req.json();
-  } catch {
-    return json({ error: 'Invalid JSON' }, 400);
-  }
+    const userId = await requireUserId();
 
-  const giftBoxId = body.giftBoxId;
-  if (!giftBoxId || !byId[giftBoxId]) return json({ error: 'Unknown giftBoxId' }, 400);
+    let body: { giftBoxId?: string };
+    try {
+      body = await req.json();
+    } catch {
+      return json({ error: 'Invalid JSON' }, 400);
+    }
 
-  // 1. Pick a prize
-  const prize = getRandomItem();
+    const giftBoxId = body.giftBoxId;
+    if (!giftBoxId || !byId[giftBoxId])
+      return json({ error: 'Unknown giftBoxId' }, 400);
 
-  await connectMongo();
-  const user = (await UserModel.findOne({
-    email: session.user.email,
-  }).lean()) as LeanUser | null;
-  if (!user) return json({ error: 'User not found' }, 404);
+    // 1. Pick a prize
+    const prize = getRandomItem();
 
-  const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
-  const owned = wardrobe.inventory[giftBoxId] || 0;
+    await connectMongo();
+    const user = (await UserModel.findById(userId).lean()) as LeanUser | null;
+    if (!user) return json({ error: 'User not found' }, 404);
 
-  if (owned < 1) {
-    return json({ error: 'You do not have any gift boxes to open' }, 403);
-  }
+    const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
+    const owned = wardrobe.inventory[giftBoxId] || 0;
 
-  // 2. Atomic swap: decrement box, increment prize & update unseen items
-  // We calculate the new unseen list to avoid conflicting $pull and $addToSet on the same field
-  const currentUnseen = user.wardrobe?.unseenItems || [];
-  const nextUnseen = currentUnseen.filter((id) => id !== giftBoxId);
-  // Add prize if not already present (though $addToSet logic implies set behavior, we do it manually for $set)
-  if (!nextUnseen.includes(prize.id)) {
-    nextUnseen.push(prize.id);
-  }
+    if (owned < 1) {
+      return json({ error: 'You do not have any gift boxes to open' }, 403);
+    }
 
-  const update: any = {
-    $inc: { 
+    // 2. Atomic swap: decrement box, increment prize & update unseen items
+    // We calculate the new unseen list to avoid conflicting $pull and $addToSet on the same field
+    const currentUnseen = user.wardrobe?.unseenItems || [];
+    const nextUnseen = currentUnseen.filter((id) => id !== giftBoxId);
+    // Add prize if not already present (though $addToSet logic implies set behavior, we do it manually for $set)
+    if (!nextUnseen.includes(prize.id)) {
+      nextUnseen.push(prize.id);
+    }
+
+    const update: any = {
+      $inc: {
         [`wardrobe.inventory.${giftBoxId}`]: -1,
-        [`wardrobe.inventory.${prize.id}`]: 1
-    },
-    $set: { 'wardrobe.unseenItems': nextUnseen }
-  };
+        [`wardrobe.inventory.${prize.id}`]: 1,
+      },
+      $set: { 'wardrobe.unseenItems': nextUnseen },
+    };
 
-  await UserModel.updateOne(
-    { _id: user._id },
-    update
-  );
+    await UserModel.updateOne({ _id: user._id }, update);
 
-  return json({ ok: true, prize });
+    return json({ ok: true, prize });
+  } catch {
+    return json({ error: 'Unauthorized' }, 401);
+  }
 }

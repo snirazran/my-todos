@@ -1,23 +1,17 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/authOptions';
-import { Types } from 'mongoose';
+import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import TaskModel, { type TaskDoc, type Weekday } from '@/lib/models/Task';
-import { format, parseISO, subDays, isBefore, isAfter, parse } from 'date-fns';
+import { format, parseISO, subDays } from 'date-fns';
 
 /* ---------- GET  /api/history ---------- */
 export async function GET(req: NextRequest) {
   /* auth */
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'Unauthenticated' }, { status: 401 });
-  }
-  const userId = new Types.ObjectId(session.user.id);
-
   try {
+    const userId = await requireUserId();
+
     await connectMongo();
 
     // Parse query params or default to 30 days
@@ -44,11 +38,12 @@ export async function GET(req: NextRequest) {
 
     // Helper to get YYYY-MM-DD in user's timezone
     const getZonedYMD = (d: Date) => {
-      return new Intl.DateTimeFormat('en-CA', { // en-CA gives YYYY-MM-DD
+      return new Intl.DateTimeFormat('en-CA', {
+        // en-CA gives YYYY-MM-DD
         timeZone: userTimezone,
         year: 'numeric',
         month: '2-digit',
-        day: '2-digit'
+        day: '2-digit',
       }).format(d);
     };
 
@@ -74,7 +69,7 @@ export async function GET(req: NextRequest) {
         createdAt: 1,
         deletedAt: 1,
         tags: 1,
-      }
+      },
     )
       .lean<TaskDoc[]>()
       .exec();
@@ -103,19 +98,19 @@ export async function GET(req: NextRequest) {
           } else if (t.type === 'weekly') {
             matchesDay = t.dayOfWeek === dow;
           }
-          
+
           if (!matchesDay) return false;
 
           // 2. Check Lifespan (Creation) - in User Timezone
           if (t.createdAt) {
-             const createdYMD = getZonedYMD(t.createdAt);
-             if (createdYMD > dateStr) return false;
+            const createdYMD = getZonedYMD(t.createdAt);
+            if (createdYMD > dateStr) return false;
           }
 
           // 3. Check Lifespan (Deletion) - in User Timezone
           if (t.deletedAt) {
-             const deletedYMD = getZonedYMD(t.deletedAt);
-             if (deletedYMD < dateStr) return false;
+            const deletedYMD = getZonedYMD(t.deletedAt);
+            if (deletedYMD < dateStr) return false;
           }
 
           return true;
@@ -131,7 +126,7 @@ export async function GET(req: NextRequest) {
               (!!t.completed && t.type === 'regular'),
             type: t.type as 'weekly' | 'regular',
             tags: t.tags,
-          })
+          }),
         )
         .sort((a: HistoryTask, b: HistoryTask) => a.order - b.order);
 
@@ -148,8 +143,8 @@ export async function GET(req: NextRequest) {
       .sort(
         (
           a: { date: string; tasks: HistoryTask[] },
-          b: { date: string; tasks: HistoryTask[] }
-        ) => (a.date > b.date ? -1 : 1)
+          b: { date: string; tasks: HistoryTask[] },
+        ) => (a.date > b.date ? -1 : 1),
       );
 
     return NextResponse.json(history);
@@ -157,7 +152,7 @@ export async function GET(req: NextRequest) {
     console.error(err);
     return NextResponse.json(
       { error: 'Failed to fetch history' },
-      { status: 500 }
+      { status: 500 }, // Or 401 if it was auth error, but simplistic handling
     );
   }
 }

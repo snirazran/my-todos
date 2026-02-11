@@ -6,20 +6,21 @@ export type { UserDoc };
 
 const UserSchema = new Schema<UserDoc>(
   {
+    _id: { type: String, required: true },
     name: { type: String, required: true },
     email: { type: String, required: true, lowercase: true, index: true },
-    passwordHash: { type: String, required: true },
+    passwordHash: { type: String, required: false },
     createdAt: { type: Date, default: Date.now },
     wardrobe: {
       type: Schema.Types.Mixed,
-      default: () => ({ 
-        equipped: {}, 
-        inventory: {}, 
-        unseenItems: [], 
+      default: () => ({
+        equipped: {},
+        inventory: {},
+        unseenItems: [],
         flies: 0,
         hunger: 86400000, // Start full (24h)
         lastHungerUpdate: new Date(),
-        stolenFlies: 0
+        stolenFlies: 0,
       }),
     },
     skins: { type: Schema.Types.Mixed },
@@ -46,7 +47,7 @@ const UserSchema = new Schema<UserDoc>(
     },
     premiumUntil: { type: Date },
   },
-  { collection: 'users' }
+  { collection: 'users' },
 );
 
 // FIX: Delete the model if it exists to force a recompile with new fields

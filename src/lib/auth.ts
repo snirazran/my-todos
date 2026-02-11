@@ -1,8 +1,24 @@
-import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/authOptions';
+import { cookies } from 'next/headers';
+import { getAdminAuth } from '@/lib/firebaseAdmin';
+
+export async function requireAuth() {
+  const cookieStore = cookies();
+  const token = cookieStore.get('token')?.value;
+
+  if (!token) {
+    throw new Error('Unauthenticated - No token found');
+  }
+
+  try {
+    const decodedToken = await getAdminAuth().verifyIdToken(token);
+    return decodedToken;
+  } catch (error) {
+    console.error('Error verifying Firebase token:', error);
+    throw new Error('Unauthenticated - Invalid token');
+  }
+}
 
 export async function requireUserId() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) throw new Error('Unauthenticated');
-  return session.user.id;
+  const decoded = await requireAuth();
+  return decoded.uid;
 }
