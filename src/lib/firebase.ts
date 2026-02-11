@@ -22,8 +22,8 @@ try {
       app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
       authInstance = getAuth(app);
     } else {
-      console.warn(
-        'Firebase not initialized: Missing NEXT_PUBLIC_FIREBASE_API_KEY',
+      console.error(
+        'Firebase not initialized: Missing NEXT_PUBLIC_FIREBASE_API_KEY. Check your .env.local or Vercel Environment Variables.',
       );
     }
   }

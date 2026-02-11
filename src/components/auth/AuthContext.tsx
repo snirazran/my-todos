@@ -28,6 +28,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
 
   useEffect(() => {
+    if (!auth) {
+      console.error(
+        'Firebase Auth is not initialized. Check your environment variables (NEXT_PUBLIC_FIREBASE_API_KEY).',
+      );
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       setLoading(false);
