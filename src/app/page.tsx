@@ -601,6 +601,7 @@ export default function Home() {
                     selectedTags={selectedTags}
                     onSetSelectedTags={setSelectedTags}
                     isGlowActive={isTaskGlow}
+                    isFrozen={cinematic}
                   />
                 </motion.div>
               ) : (

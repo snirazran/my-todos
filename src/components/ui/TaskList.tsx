@@ -21,7 +21,7 @@ import {
   animate,
   useAnimation,
 } from 'framer-motion';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import {
@@ -616,6 +616,7 @@ export default function TaskList({
   onSetSelectedTags,
   isGuest,
   isGlowActive,
+  isFrozen = false,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -642,6 +643,8 @@ export default function TaskList({
   onSetSelectedTags: (tags: string[]) => void;
   isGuest?: boolean;
   isGlowActive?: boolean;
+  /** When true the current sort order is frozen (prevents layout shifts during tongue animation) */
+  isFrozen?: boolean;
 }) {
   const router = useRouter(); // Import might be needed if not present
   const userTags = tags || [];
@@ -881,14 +884,7 @@ export default function TaskList({
   // IF the user wants completed at bottom, we might need a secondary sort.
   // User said: "just make the task be added to the bottom of the list".
   // Let's interpret this as: Active tasks sorted by order, THEN Completed tasks sorted by order.
-  const sortedVisibleTasks = [...visibleTasks].sort((a, b) => {
-    // 1. Completion status (Active top, Completed bottom)
-    // We consider "delayedCompleted" as active for this purpose, to keep them in place?
-    // User said "remove reordering" before.
-    // But now says "added to the bottom".
-    // "Added to bottom" wins as latest instruction.
-    // Grace period items (delayedCompleted) should conceptually stay in ACTIVE list until they vanish.
-
+  const freshSortedTasks = [...visibleTasks].sort((a, b) => {
     const aIsCompleted =
       a.completed && !vSet.has(a.id) && !delayedCompleted.has(a.id);
     const bIsCompleted =
@@ -900,6 +896,35 @@ export default function TaskList({
 
     return (a.order ?? 0) - (b.order ?? 0);
   });
+
+  // ---- Freeze sort order during tongue animation to prevent layout shifts ----
+  const frozenOrderRef = useRef<string[]>([]);
+  if (!isFrozen) {
+    // Snapshot the current ID order whenever the list is free to reorder
+    frozenOrderRef.current = freshSortedTasks.map((t) => t.id);
+  }
+
+  const sortedVisibleTasks = isFrozen
+    ? (() => {
+        // Rebuild the list in the frozen order, dropping IDs that no longer
+        // exist in visibleTasks and appending any new ones at the end.
+        const taskMap = new Map(visibleTasks.map((t) => [t.id, t]));
+        const ordered: Task[] = [];
+        const placed = new Set<string>();
+        for (const id of frozenOrderRef.current) {
+          const t = taskMap.get(id);
+          if (t) {
+            ordered.push(t);
+            placed.add(id);
+          }
+        }
+        // Append any tasks that appeared after the freeze (unlikely but safe)
+        for (const t of visibleTasks) {
+          if (!placed.has(t.id)) ordered.push(t);
+        }
+        return ordered;
+      })()
+    : freshSortedTasks;
 
   const activeTaskIds = sortedVisibleTasks.map((t) => t.id);
 
