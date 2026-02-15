@@ -157,6 +157,7 @@ export default function Home() {
     tonguePathEl,
     triggerTongue,
     visuallyDone,
+    speedUpTongue,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
   const { showNotification } = useNotification();
@@ -701,6 +702,11 @@ export default function Home() {
         </svg>
       )}
 
+      {/* Full-screen blocker + skip button during tongue animation */}
+      {cinematic && (
+        <CinematicOverlay onSkip={speedUpTongue} />
+      )}
+
       <QuickAddSheet
         open={showQuickAdd}
         onOpenChange={setShowQuickAdd}
@@ -840,6 +846,61 @@ export default function Home() {
         }}
       />
     </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Cinematic overlay: full-screen tap blocker + skip indicator       */
+/* ------------------------------------------------------------------ */
+function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
+  const [active, setActive] = React.useState(false);
+
+  const handleSkip = React.useCallback(() => {
+    if (active) return;
+    setActive(true);
+    onSkip();
+  }, [active, onSkip]);
+
+  return (
+    <>
+      {/* Invisible full-screen tap target */}
+      <div
+        role="button"
+        tabIndex={0}
+        className="fixed inset-0 z-[55]"
+        onClick={handleSkip}
+        onTouchStart={handleSkip}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSkip(); }}
+      />
+
+      {/* Visual skip indicator (non-interactive, sits above blocker visually) */}
+      <div className="fixed z-[56] bottom-[calc(env(safe-area-inset-bottom)+88px)] left-7 flex flex-col items-center gap-1 pointer-events-none">
+        <div
+          className={`
+            flex items-center justify-center w-11 h-11 rounded-full
+            border shadow-lg backdrop-blur-2xl transition-all duration-200
+            ${active
+              ? 'bg-emerald-500/20 border-emerald-500/40 shadow-emerald-500/10 scale-95'
+              : 'bg-card/80 border-border/80 shadow-black/5 dark:shadow-black/20'
+            }
+          `}
+        >
+          {active ? (
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-emerald-500">
+              <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
+              <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-primary ml-0.5">
+              <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
+            </svg>
+          )}
+        </div>
+        <span className={`text-[10px] font-medium select-none transition-colors duration-200 ${active ? 'text-emerald-500' : 'text-primary'}`}>
+          {active ? '×2' : 'skip'}
+        </span>
+      </div>
+    </>
   );
 }
 

@@ -35,6 +35,9 @@ export function useFrogTongue({
 }: UseFrogTongueOptions) {
   const cooldownUntil = useRef(0);
   const animatingRef = useRef(false);
+  const speedRef = useRef(1);
+  const timeOffsetRef = useRef(0);
+  const lastTickRef = useRef(0);
   const [cinematic, setCinematic] = useState(false);
 
   const [grab, setGrab] = useState<{
@@ -140,11 +143,12 @@ export function useFrogTongue({
         flyR.right > 0;
 
       const needCine = frogRatio < 0.75 || !flyVisible;
+      speedRef.current = 1;
       setCinematic(true);
 
       if (needCine) {
-        await animateScrollTo(frogFocusY, PRE_PAN_MS);
-        await new Promise((r) => setTimeout(r, PRE_LINGER_MS));
+        await animateScrollTo(frogFocusY, PRE_PAN_MS, speedRef);
+        await new Promise((r) => setTimeout(r, PRE_LINGER_MS / speedRef.current));
       }
 
       const originDoc = getMouthDoc();
@@ -236,8 +240,18 @@ export function useFrogTongue({
     seedViewportPath();
 
     let raf = 0;
+    timeOffsetRef.current = 0;
+    lastTickRef.current = 0;
+
     const tick = () => {
-      const now = performance.now();
+      const realNow = performance.now();
+      if (lastTickRef.current > 0 && speedRef.current > 1) {
+        const dt = realNow - lastTickRef.current;
+        timeOffsetRef.current += dt * (speedRef.current - 1);
+      }
+      lastTickRef.current = realNow;
+      const now = realNow + timeOffsetRef.current;
+
       const tRaw = (now - grab.startAt) / TONGUE_MS;
       const t = Math.max(0, Math.min(1, tRaw));
 
@@ -374,6 +388,10 @@ export function useFrogTongue({
     };
   }, [grab, getMouthDoc]);
 
+  const speedUpTongue = useCallback(() => {
+    speedRef.current = 2;
+  }, []);
+
   return {
     vp,
     cinematic,
@@ -383,6 +401,7 @@ export function useFrogTongue({
     tonguePathEl,
     triggerTongue,
     visuallyDone,
+    speedUpTongue,
   };
 }
 
@@ -390,14 +409,23 @@ function easeOutQuad(t: number) {
   return 1 - (1 - t) * (1 - t);
 }
 
-function animateScrollTo(targetY: number, duration: number) {
+function animateScrollTo(
+  targetY: number,
+  duration: number,
+  speedRef?: React.MutableRefObject<number>
+) {
   return new Promise<void>((resolve) => {
     const start = window.scrollY;
     const dy = targetY - start;
-    const t0 = performance.now();
+    let progress = 0;
+    let lastT = 0;
 
     function frame(t: number) {
-      const p = Math.min(1, (t - t0) / duration);
+      if (lastT === 0) lastT = t;
+      const dt = t - lastT;
+      lastT = t;
+      progress += (dt / duration) * (speedRef?.current ?? 1);
+      const p = Math.min(1, progress);
       const y = start + dy * easeOutQuad(p);
       window.scrollTo(0, y);
       if (p < 1) requestAnimationFrame(frame);
