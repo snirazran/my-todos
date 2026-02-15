@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FrogHandle } from '@/components/ui/frog';
 
 export const TONGUE_MS = 1111;
@@ -50,8 +50,12 @@ export function useFrogTongue({
     onPersist: () => Promise<void> | void;
   } | null>(null);
 
-  const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
-  const [tipVisible, setTipVisible] = useState(false);
+  /* ------------------------------------------------------------------ */
+  /*  Direct-DOM refs for the tongue tip group                          */
+  /*  (replaces tip / tipVisible React state → zero re-renders / frame) */
+  /* ------------------------------------------------------------------ */
+  const tipGroupEl = useRef<SVGGElement | null>(null);
+
   const [vp, setVp] = useState({ w: 0, h: 0 });
 
   const tonguePathEl = useRef<SVGPathElement | null>(null);
@@ -165,7 +169,11 @@ export function useFrogTongue({
       const camStartAt = startAt + CAM_START_DELAY;
 
       flyEl.style.visibility = 'visible';
-      setTipVisible(false);
+
+      // Ensure tip is hidden before the new animation starts
+      if (tipGroupEl.current) {
+        tipGroupEl.current.style.visibility = 'hidden';
+      }
 
       setGrab({
         key,
@@ -184,11 +192,13 @@ export function useFrogTongue({
     [cinematic, grab, flyRefs, frogBoxRef, getFlyDoc, getMouthDoc]
   );
 
-  /* Tongue RAF */
+  /* ================================================================= */
+  /*  Tongue RAF – single source of truth for stroke + tip position    */
+  /* ================================================================= */
   useEffect(() => {
     if (!grab) return;
 
-    let p0Doc = getMouthDoc();
+    const p0Doc = getMouthDoc();
     const p2 = grab.targetDoc;
 
     const buildGeom = (p0: { x: number; y: number }) => {
@@ -205,13 +215,20 @@ export function useFrogTongue({
       return { tmp, total, p1 };
     };
 
-    let { tmp, total, p1: p1Doc } = buildGeom(p0Doc);
+    const { tmp, total, p1: p1Doc } = buildGeom(p0Doc);
     geomRef.current = {
       total,
       getPointAtLength: (s: number) => tmp.getPointAtLength(s),
       hidImpact: false,
       raf: 0,
     };
+
+    /* -- initialise the rendered <path> so the tongue is invisible -- */
+    const pathNode = tonguePathEl.current;
+    if (pathNode) {
+      pathNode.style.strokeDasharray = `0 ${total}`;
+      pathNode.style.strokeDashoffset = '0';
+    }
 
     const seedViewportPath = () => {
       const vv = window.visualViewport;
@@ -220,14 +237,13 @@ export function useFrogTongue({
       const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
       const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
       const p2V = { x: p2.x - offX, y: p2.y - offY };
-      tonguePathEl.current?.setAttribute(
+      pathNode?.setAttribute(
         'd',
         `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`
       );
     };
     seedViewportPath();
 
-    const settleUntil = grab.startAt + 140;
     let raf = 0;
     const tick = () => {
       const now = performance.now();
@@ -243,29 +259,48 @@ export function useFrogTongue({
       const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
       const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
       const p2V = { x: p2.x - offX, y: p2.y - offY };
-      tonguePathEl.current?.setAttribute(
-        'd',
-        `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`
-      );
 
-      const sLen = geomRef.current!.total * forward;
+      /* --- update path shape + stroke visibility (replaces framer-motion) --- */
+      if (pathNode) {
+        pathNode.setAttribute(
+          'd',
+          `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`
+        );
+        const visibleLen = total * forward;
+        pathNode.style.strokeDasharray = `${visibleLen} ${total}`;
+      }
+
+      /* --- update tip position directly (replaces setTip React state) --- */
+      const sLen = total * forward;
       const pt = geomRef.current!.getPointAtLength(sLen);
       const ahead = geomRef.current!.getPointAtLength(
-        Math.min(geomRef.current!.total, sLen + 1)
+        Math.min(total, sLen + 1)
       );
       const dx = ahead.x - pt.x,
         dy = ahead.y - pt.y;
       const len = Math.hypot(dx, dy) || 1;
       const ox = (dx / len) * (TONGUE_STROKE / 2);
       const oy = (dy / len) * (TONGUE_STROKE / 2);
-      setTip({ x: pt.x + ox - offX, y: pt.y + oy - offY });
+      const tipX = pt.x + ox - offX;
+      const tipY = pt.y + oy - offY;
 
+      if (tipGroupEl.current) {
+        tipGroupEl.current.setAttribute(
+          'transform',
+          `translate(${tipX}, ${tipY})`
+        );
+      }
+
+      /* --- show the fly-on-tongue at impact --- */
       if (!geomRef.current!.hidImpact && t >= HIT_AT) {
         geomRef.current!.hidImpact = true;
         setVisuallyDone((prev) => new Set(prev).add(grab.key));
-        setTipVisible(true);
+        if (tipGroupEl.current) {
+          tipGroupEl.current.style.visibility = 'visible';
+        }
       }
 
+      /* --- camera follow --- */
       if (grab.follow && now >= grab.camStartAt && t <= HIT_AT) {
         const seg =
           (now - grab.camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
@@ -279,8 +314,14 @@ export function useFrogTongue({
       if (t < 1) {
         raf = requestAnimationFrame(tick);
       } else {
-        setTip(null);
-        setTipVisible(false);
+        /* ---- animation complete: hide everything immediately ---- */
+        if (tipGroupEl.current) {
+          tipGroupEl.current.style.visibility = 'hidden';
+        }
+        if (pathNode) {
+          pathNode.style.strokeDasharray = `0 ${total}`;
+        }
+
         grab.onPersist();
         setVisuallyDone((prev) => {
           const s = new Set(prev);
@@ -299,7 +340,14 @@ export function useFrogTongue({
     raf = requestAnimationFrame(tick);
     if (geomRef.current) geomRef.current.raf = raf;
     return () => {
-      if (geomRef.current?.raf) cancelAnimationFrame(geomRef.current.raf);
+      cancelAnimationFrame(raf);
+      /* Ensure visuals are hidden if effect is torn down early */
+      if (tipGroupEl.current) {
+        tipGroupEl.current.style.visibility = 'hidden';
+      }
+      if (pathNode) {
+        pathNode.style.strokeDasharray = `0 ${total}`;
+      }
     };
   }, [grab, getMouthDoc]);
 
@@ -308,8 +356,7 @@ export function useFrogTongue({
     cinematic,
     setCinematic,
     grab,
-    tip,
-    tipVisible,
+    tipGroupEl,
     tonguePathEl,
     triggerTongue,
     visuallyDone,

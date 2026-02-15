@@ -12,9 +12,6 @@ import useSWR from 'swr';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import {
     useFrogTongue,
-    HIT_AT,
-    OFFSET_MS,
-    TONGUE_MS,
     TONGUE_STROKE,
 } from '@/hooks/useFrogTongue';
 
@@ -46,8 +43,7 @@ export default function DayDetailSheet({
         vp,
         cinematic,
         grab,
-        tip,
-        tipVisible,
+        tipGroupEl,
         tonguePathEl,
         triggerTongue,
         visuallyDone,
@@ -249,8 +245,7 @@ export default function DayDetailSheet({
                                     <stop offset="1" stopColor="#f43f5e" />
                                 </linearGradient>
                             </defs>
-                            <motion.path
-                                key={`tongue-${grab.startAt}`}
+                            <path
                                 ref={tonguePathEl}
                                 d="M0 0 L0 0"
                                 fill="none"
@@ -258,27 +253,20 @@ export default function DayDetailSheet({
                                 strokeWidth={TONGUE_STROKE}
                                 strokeLinecap="round"
                                 vectorEffect="non-scaling-stroke"
-                                initial={{ pathLength: 0 }}
-                                animate={{ pathLength: [0, 1, 0] }}
-                                transition={{
-                                    delay: OFFSET_MS / 1000,
-                                    duration: TONGUE_MS / 1000,
-                                    times: [0, HIT_AT, 1],
-                                    ease: 'linear',
-                                }}
                             />
-                            {tipVisible && tip && (
-                                <g transform={`translate(${tip.x}, ${tip.y})`}>
-                                    <circle r={10} fill="transparent" />
-                                    <image
-                                        href="/fly.svg"
-                                        x={-24 / 2}
-                                        y={-24 / 2}
-                                        width={24}
-                                        height={24}
-                                    />
-                                </g>
-                            )}
+                            <g
+                                ref={tipGroupEl}
+                                style={{ visibility: 'hidden' }}
+                            >
+                                <circle r={10} fill="transparent" />
+                                <image
+                                    href="/fly.svg"
+                                    x={-24 / 2}
+                                    y={-24 / 2}
+                                    width={24}
+                                    height={24}
+                                />
+                            </g>
                         </svg>
                     )}
                 </>

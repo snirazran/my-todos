@@ -35,9 +35,6 @@ import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { mutate } from 'swr';
 import {
   useFrogTongue,
-  HIT_AT,
-  OFFSET_MS,
-  TONGUE_MS,
   TONGUE_STROKE,
 } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
@@ -156,8 +153,7 @@ export default function Home() {
     vp,
     cinematic,
     grab,
-    tip,
-    tipVisible,
+    tipGroupEl,
     tonguePathEl,
     triggerTongue,
     visuallyDone,
@@ -674,8 +670,9 @@ export default function Home() {
             </linearGradient>
           </defs>
 
-          <motion.path
-            key={`tongue-${grab.startAt}`}
+          {/* Plain <path> — stroke visibility driven entirely by the RAF
+              loop via stroke-dasharray (no framer-motion needed). */}
+          <path
             ref={tonguePathEl}
             d="M0 0 L0 0"
             fill="none"
@@ -683,28 +680,23 @@ export default function Home() {
             strokeWidth={TONGUE_STROKE}
             strokeLinecap="round"
             vectorEffect="non-scaling-stroke"
-            initial={{ pathLength: 0 }}
-            animate={{ pathLength: [0, 1, 0] }}
-            transition={{
-              delay: OFFSET_MS / 1000,
-              duration: TONGUE_MS / 1000,
-              times: [0, HIT_AT, 1],
-              ease: 'linear',
-            }}
           />
 
-          {tipVisible && tip && (
-            <g transform={`translate(${tip.x}, ${tip.y})`}>
-              <circle r={10} fill="transparent" />
-              <image
-                href="/fly.svg"
-                x={-FLY_PX / 2}
-                y={-FLY_PX / 2}
-                width={FLY_PX}
-                height={FLY_PX}
-              />
-            </g>
-          )}
+          {/* Tip group is always in the DOM; the RAF loop toggles its
+              visibility and transform directly — no React re-renders. */}
+          <g
+            ref={tipGroupEl}
+            style={{ visibility: 'hidden' }}
+          >
+            <circle r={10} fill="transparent" />
+            <image
+              href="/fly.svg"
+              x={-FLY_PX / 2}
+              y={-FLY_PX / 2}
+              width={FLY_PX}
+              height={FLY_PX}
+            />
+          </g>
         </svg>
       )}
 
