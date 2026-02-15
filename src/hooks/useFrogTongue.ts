@@ -69,10 +69,6 @@ export function useFrogTongue({
 
   useEffect(() => {
     const set = () => {
-      // Freeze viewport dimensions while the tongue animation is running.
-      // On mobile the URL-bar show/hide fires visualViewport resize events
-      // which would change the SVG viewBox mid-animation, causing the
-      // tongue to jump/jitter.
       if (animatingRef.current) return;
       setVp({ w: window.innerWidth, h: window.innerHeight });
     };
@@ -85,7 +81,6 @@ export function useFrogTongue({
 
   const getMouthDoc = useCallback(() => {
     const p = frogRef.current?.getMouthPoint() ?? { x: 0, y: 0 };
-    // Use pageXOffset/pageYOffset for better PWA/mobile support
     const offX = window.pageXOffset || document.documentElement.scrollLeft;
     const offY = window.pageYOffset || document.documentElement.scrollTop;
     return { x: p.x + offX, y: p.y + offY + ORIGIN_Y_ADJ };
@@ -93,7 +88,6 @@ export function useFrogTongue({
 
   const getFlyDoc = useCallback((el: HTMLElement) => {
     const r = el.getBoundingClientRect();
-    // Use pageXOffset/pageYOffset for better PWA/mobile support
     const offX = window.pageXOffset || document.documentElement.scrollLeft;
     const offY = window.pageYOffset || document.documentElement.scrollTop;
     return { x: r.left + r.width / 2 + offX, y: r.top + r.height / 2 + offY };
@@ -163,7 +157,6 @@ export function useFrogTongue({
 
       flyEl.style.visibility = 'visible';
 
-      // Ensure tip is hidden before the new animation starts
       if (tipGroupEl.current) {
         tipGroupEl.current.style.visibility = 'hidden';
       }
@@ -193,29 +186,13 @@ export function useFrogTongue({
 
     animatingRef.current = true;
 
-    /* ------------------------------------------------------------------
-     * Anchor timing to when this effect fires, NOT to when setGrab() was
-     * called in triggerTongue().  On slow mobile devices the React
-     * re-render between setGrab() and this useEffect can take longer than
-     * OFFSET_MS, which would cause the tongue to "jump ahead" on the
-     * first painted frame instead of starting smoothly from t = 0.
-     * ---------------------------------------------------------------- */
-    const startAt = performance.now() + OFFSET_MS;
-    const camStartAt = startAt + CAM_START_DELAY;
-
+    /* Use grab.targetDoc directly – these coordinates were captured in
+       triggerTongue at the correct scroll position and are proven to
+       target the right element. DO NOT re-capture from the live DOM
+       element here; React re-renders between setGrab and this effect
+       can give stale/wrong getBoundingClientRect values. */
     const p0Doc = getMouthDoc();
-
-    /* ------------------------------------------------------------------
-     * Re-capture fly position from the actual DOM element at effect time.
-     * Between setGrab() in triggerTongue and this effect, a React
-     * re-render may have shifted/recreated the fly element.  Using the
-     * live element ensures the tongue targets the correct position.
-     * Also recompute camera focus Y values so everything is consistent.
-     * ---------------------------------------------------------------- */
-    const currentFlyEl = flyRefs.current[grab.key];
-    const p2 = currentFlyEl ? getFlyDoc(currentFlyEl) : grab.targetDoc;
-    const frogFocusY = Math.max(0, p0Doc.y - window.innerHeight * 0.35);
-    const flyFocusY = Math.max(0, p2.y - window.innerHeight * 0.45);
+    const p2 = grab.targetDoc;
 
     const buildGeom = (p0: { x: number; y: number }) => {
       const p1 = { x: (p0.x + p2.x) / 2, y: p0.y - 120 };
@@ -239,21 +216,12 @@ export function useFrogTongue({
       raf: 0,
     };
 
-    /* -- initialise the rendered <path> so the tongue is invisible -- */
     const pathNode = tonguePathEl.current;
     if (pathNode) {
       pathNode.style.strokeDasharray = `0 ${total}`;
       pathNode.style.strokeDashoffset = '0';
     }
 
-    /* ------------------------------------------------------------------
-     * Use plain window.scrollX / scrollY for coordinate conversion
-     * (layout-viewport space).  Do NOT include visualViewport.offsetTop/
-     * offsetLeft – those shift when the mobile URL-bar shows/hides during
-     * the programmatic scroll, causing the tongue to jump.  The fixed SVG
-     * overlay and getBoundingClientRect() both operate in layout-viewport
-     * space, so plain scroll offsets are the correct conversion.
-     * ---------------------------------------------------------------- */
     const seedViewportPath = () => {
       const offX = window.scrollX;
       const offY = window.scrollY;
@@ -270,46 +238,44 @@ export function useFrogTongue({
     let raf = 0;
     const tick = () => {
       const now = performance.now();
-      const tRaw = (now - startAt) / TONGUE_MS;
+      const tRaw = (now - grab.startAt) / TONGUE_MS;
       const t = Math.max(0, Math.min(1, tRaw));
 
       const forward =
         t <= HIT_AT ? t / HIT_AT : 1 - (t - HIT_AT) / (1 - HIT_AT);
 
-      /* --- camera follow ---
-       *  Track the intended scroll position in a local variable rather than
-       *  reading window.scrollY back after scrollTo().  On mobile browsers
-       *  the read-back can be slightly off (sub-pixel rounding, URL-bar
-       *  adjustments, compositing lag) which causes the tongue to jump when
-       *  the camera follow stops.  Using the computed value directly keeps
-       *  the path coordinates perfectly consistent frame-to-frame.
+      /* ---------------------------------------------------------------
+       * Predict the scroll position the browser will PAINT this frame.
        *
-       *  After HIT_AT the camera holds at flyFocusY so the scroll doesn't
-       *  drift while the tongue retracts.
-       * ---------------------------------------------------------------- */
-      let frameScrollY = window.scrollY;
+       * At 24df97c the camera follow ran AFTER path computation, so the
+       * tongue was drawn one frame behind the scroll → visible "slide".
+       *
+       * Moving scrollTo() before the read (c2079064) fixed the slide
+       * but introduced timing/rounding glitches on mobile.
+       *
+       * The fix: pre-compute where the camera WILL be, use that value
+       * for coordinate conversion, then call scrollTo at the END of the
+       * tick (same order as 24df97c).  The tongue is drawn for the
+       * correct position without relying on scrollTo → scrollY round-
+       * tripping being perfectly synchronous.
+       * ------------------------------------------------------------- */
+      let paintScrollY = window.scrollY;
 
-      if (grab.follow) {
-        if (now >= camStartAt && t <= HIT_AT) {
-          const seg =
-            (now - camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
-          const clamped = Math.max(0, Math.min(1, seg));
-          const eased = FOLLOW_EASE(clamped);
-          frameScrollY =
-            frogFocusY + (flyFocusY - frogFocusY) * eased;
-        } else if (t > HIT_AT) {
-          frameScrollY = flyFocusY;
-        }
-        window.scrollTo(0, frameScrollY);
+      if (grab.follow && now >= grab.camStartAt && t <= HIT_AT) {
+        const seg =
+          (now - grab.camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
+        const clamped = Math.max(0, Math.min(1, seg));
+        const eased = FOLLOW_EASE(clamped);
+        paintScrollY =
+          grab.frogFocusY + (grab.flyFocusY - grab.frogFocusY) * eased;
       }
 
       const offX = window.scrollX;
-      const offY = frameScrollY;
+      const offY = paintScrollY;
       const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
       const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
       const p2V = { x: p2.x - offX, y: p2.y - offY };
 
-      /* --- update path shape + stroke visibility (replaces framer-motion) --- */
       if (pathNode) {
         pathNode.setAttribute(
           'd',
@@ -319,7 +285,6 @@ export function useFrogTongue({
         pathNode.style.strokeDasharray = `${visibleLen} ${total}`;
       }
 
-      /* --- update tip position directly (replaces setTip React state) --- */
       const sLen = total * forward;
       const pt = geomRef.current!.getPointAtLength(sLen);
       const ahead = geomRef.current!.getPointAtLength(
@@ -340,7 +305,6 @@ export function useFrogTongue({
         );
       }
 
-      /* --- show the fly-on-tongue at impact --- */
       if (!geomRef.current!.hidImpact && t >= HIT_AT) {
         geomRef.current!.hidImpact = true;
         setVisuallyDone((prev) => new Set(prev).add(grab.key));
@@ -349,10 +313,14 @@ export function useFrogTongue({
         }
       }
 
+      /* --- camera follow at the END of tick (same order as 24df97c) --- */
+      if (grab.follow && now >= grab.camStartAt && t <= HIT_AT) {
+        window.scrollTo(0, paintScrollY);
+      }
+
       if (t < 1) {
         raf = requestAnimationFrame(tick);
       } else {
-        /* ---- animation complete: hide everything immediately ---- */
         if (tipGroupEl.current) {
           tipGroupEl.current.style.visibility = 'hidden';
         }
@@ -380,7 +348,6 @@ export function useFrogTongue({
     return () => {
       cancelAnimationFrame(raf);
       animatingRef.current = false;
-      /* Ensure visuals are hidden if effect is torn down early */
       if (tipGroupEl.current) {
         tipGroupEl.current.style.visibility = 'hidden';
       }
@@ -388,7 +355,7 @@ export function useFrogTongue({
         pathNode.style.strokeDasharray = `0 ${total}`;
       }
     };
-  }, [grab, getMouthDoc, getFlyDoc, flyRefs]);
+  }, [grab, getMouthDoc]);
 
   return {
     vp,
