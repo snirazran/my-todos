@@ -204,7 +204,18 @@ export function useFrogTongue({
     const camStartAt = startAt + CAM_START_DELAY;
 
     const p0Doc = getMouthDoc();
-    const p2 = grab.targetDoc;
+
+    /* ------------------------------------------------------------------
+     * Re-capture fly position from the actual DOM element at effect time.
+     * Between setGrab() in triggerTongue and this effect, a React
+     * re-render may have shifted/recreated the fly element.  Using the
+     * live element ensures the tongue targets the correct position.
+     * Also recompute camera focus Y values so everything is consistent.
+     * ---------------------------------------------------------------- */
+    const currentFlyEl = flyRefs.current[grab.key];
+    const p2 = currentFlyEl ? getFlyDoc(currentFlyEl) : grab.targetDoc;
+    const frogFocusY = Math.max(0, p0Doc.y - window.innerHeight * 0.35);
+    const flyFocusY = Math.max(0, p2.y - window.innerHeight * 0.45);
 
     const buildGeom = (p0: { x: number; y: number }) => {
       const p1 = { x: (p0.x + p2.x) / 2, y: p0.y - 120 };
@@ -285,9 +296,9 @@ export function useFrogTongue({
           const clamped = Math.max(0, Math.min(1, seg));
           const eased = FOLLOW_EASE(clamped);
           frameScrollY =
-            grab.frogFocusY + (grab.flyFocusY - grab.frogFocusY) * eased;
+            frogFocusY + (flyFocusY - frogFocusY) * eased;
         } else if (t > HIT_AT) {
-          frameScrollY = grab.flyFocusY;
+          frameScrollY = flyFocusY;
         }
         window.scrollTo(0, frameScrollY);
       }
@@ -377,7 +388,7 @@ export function useFrogTongue({
         pathNode.style.strokeDasharray = `0 ${total}`;
       }
     };
-  }, [grab, getMouthDoc]);
+  }, [grab, getMouthDoc, getFlyDoc, flyRefs]);
 
   return {
     vp,
