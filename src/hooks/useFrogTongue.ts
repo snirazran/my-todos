@@ -253,6 +253,19 @@ export function useFrogTongue({
       const forward =
         t <= HIT_AT ? t / HIT_AT : 1 - (t - HIT_AT) / (1 - HIT_AT);
 
+      /* --- camera follow (MUST run before reading scroll offsets so the
+             tongue path is computed against the scroll position the browser
+             will actually paint) --- */
+      if (grab.follow && now >= grab.camStartAt && t <= HIT_AT) {
+        const seg =
+          (now - grab.camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
+        const clamped = Math.max(0, Math.min(1, seg));
+        const eased = FOLLOW_EASE(clamped);
+        const camY =
+          grab.frogFocusY + (grab.flyFocusY - grab.frogFocusY) * eased;
+        window.scrollTo(0, camY);
+      }
+
       const vv = window.visualViewport;
       const offX = window.scrollX + (vv?.offsetLeft ?? 0);
       const offY = window.scrollY + (vv?.offsetTop ?? 0);
@@ -298,17 +311,6 @@ export function useFrogTongue({
         if (tipGroupEl.current) {
           tipGroupEl.current.style.visibility = 'visible';
         }
-      }
-
-      /* --- camera follow --- */
-      if (grab.follow && now >= grab.camStartAt && t <= HIT_AT) {
-        const seg =
-          (now - grab.camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
-        const clamped = Math.max(0, Math.min(1, seg));
-        const eased = FOLLOW_EASE(clamped);
-        const camY =
-          grab.frogFocusY + (grab.flyFocusY - grab.frogFocusY) * eased;
-        window.scrollTo(0, camY);
       }
 
       if (t < 1) {
