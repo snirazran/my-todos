@@ -197,11 +197,11 @@ export function FrogDisplay({
 
               <div
                 className={cn(
-                  'absolute bottom-0 left-0 right-0 z-0 opacity-20',
+                  'absolute bottom-0 left-0 right-0 z-0',
                   animateHunger && 'transition-all duration-1000 ease-in-out',
                   hungerColor,
                 )}
-                style={{ height: `${hungerPercent}%` }}
+                style={{ height: `${hungerPercent}%`, opacity: 0.2 }}
               />
 
               {/* Icon Container */}
