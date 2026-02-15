@@ -131,7 +131,7 @@ export default function ProgressCard({
                     className={`${cardBase} bg-muted/30 border-dashed border-2 border-muted-foreground/20 cursor-pointer hover:bg-muted/50 hover:border-muted-foreground/40 group`}
                   >
                     <div className="flex items-center justify-center w-full h-12">
-                      <div className="flex items-center justify-center transition-all border rounded-full h-11 w-11 bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+                      <div className="flex items-center justify-center transition-all border rounded-full h-11 w-11 bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100 translate-y-2">
                         <Fly size={24} y={-3} />
                       </div>
                     </div>
