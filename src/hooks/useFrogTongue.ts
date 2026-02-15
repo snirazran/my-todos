@@ -34,6 +34,7 @@ export function useFrogTongue({
   flyRefs,
 }: UseFrogTongueOptions) {
   const cooldownUntil = useRef(0);
+  const animatingRef = useRef(false);
   const [cinematic, setCinematic] = useState(false);
 
   const [grab, setGrab] = useState<{
@@ -68,25 +69,17 @@ export function useFrogTongue({
 
   useEffect(() => {
     const set = () => {
-      const vv = window.visualViewport;
-      if (vv) {
-        setVp({ w: Math.round(vv.width), h: Math.round(vv.height) });
-      } else {
-        setVp({ w: window.innerWidth, h: window.innerHeight });
-      }
+      // Freeze viewport dimensions while the tongue animation is running.
+      // On mobile the URL-bar show/hide fires visualViewport resize events
+      // which would change the SVG viewBox mid-animation, causing the
+      // tongue to jump/jitter.
+      if (animatingRef.current) return;
+      setVp({ w: window.innerWidth, h: window.innerHeight });
     };
     set();
     window.addEventListener('resize', set);
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', set);
-      window.visualViewport.addEventListener('scroll', set);
-    }
     return () => {
       window.removeEventListener('resize', set);
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', set);
-        window.visualViewport.removeEventListener('scroll', set);
-      }
     };
   }, []);
 
@@ -198,6 +191,18 @@ export function useFrogTongue({
   useEffect(() => {
     if (!grab) return;
 
+    animatingRef.current = true;
+
+    /* ------------------------------------------------------------------
+     * Anchor timing to when this effect fires, NOT to when setGrab() was
+     * called in triggerTongue().  On slow mobile devices the React
+     * re-render between setGrab() and this useEffect can take longer than
+     * OFFSET_MS, which would cause the tongue to "jump ahead" on the
+     * first painted frame instead of starting smoothly from t = 0.
+     * ---------------------------------------------------------------- */
+    const startAt = performance.now() + OFFSET_MS;
+    const camStartAt = startAt + CAM_START_DELAY;
+
     const p0Doc = getMouthDoc();
     const p2 = grab.targetDoc;
 
@@ -230,10 +235,17 @@ export function useFrogTongue({
       pathNode.style.strokeDashoffset = '0';
     }
 
+    /* ------------------------------------------------------------------
+     * Use plain window.scrollX / scrollY for coordinate conversion
+     * (layout-viewport space).  Do NOT include visualViewport.offsetTop/
+     * offsetLeft – those shift when the mobile URL-bar shows/hides during
+     * the programmatic scroll, causing the tongue to jump.  The fixed SVG
+     * overlay and getBoundingClientRect() both operate in layout-viewport
+     * space, so plain scroll offsets are the correct conversion.
+     * ---------------------------------------------------------------- */
     const seedViewportPath = () => {
-      const vv = window.visualViewport;
-      const offX = window.scrollX + (vv?.offsetLeft ?? 0);
-      const offY = window.scrollY + (vv?.offsetTop ?? 0);
+      const offX = window.scrollX;
+      const offY = window.scrollY;
       const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
       const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
       const p2V = { x: p2.x - offX, y: p2.y - offY };
@@ -247,7 +259,7 @@ export function useFrogTongue({
     let raf = 0;
     const tick = () => {
       const now = performance.now();
-      const tRaw = (now - grab.startAt) / TONGUE_MS;
+      const tRaw = (now - startAt) / TONGUE_MS;
       const t = Math.max(0, Math.min(1, tRaw));
 
       const forward =
@@ -256,9 +268,9 @@ export function useFrogTongue({
       /* --- camera follow (MUST run before reading scroll offsets so the
              tongue path is computed against the scroll position the browser
              will actually paint) --- */
-      if (grab.follow && now >= grab.camStartAt && t <= HIT_AT) {
+      if (grab.follow && now >= camStartAt && t <= HIT_AT) {
         const seg =
-          (now - grab.camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
+          (now - camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
         const clamped = Math.max(0, Math.min(1, seg));
         const eased = FOLLOW_EASE(clamped);
         const camY =
@@ -266,9 +278,8 @@ export function useFrogTongue({
         window.scrollTo(0, camY);
       }
 
-      const vv = window.visualViewport;
-      const offX = window.scrollX + (vv?.offsetLeft ?? 0);
-      const offY = window.scrollY + (vv?.offsetTop ?? 0);
+      const offX = window.scrollX;
+      const offY = window.scrollY;
       const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
       const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
       const p2V = { x: p2.x - offX, y: p2.y - offY };
@@ -343,6 +354,7 @@ export function useFrogTongue({
     if (geomRef.current) geomRef.current.raf = raf;
     return () => {
       cancelAnimationFrame(raf);
+      animatingRef.current = false;
       /* Ensure visuals are hidden if effect is torn down early */
       if (tipGroupEl.current) {
         tipGroupEl.current.style.visibility = 'hidden';
