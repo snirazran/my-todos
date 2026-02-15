@@ -84,7 +84,7 @@ export function EditTaskDialog({
                 if (e.key === 'Escape') onClose();
               }}
               maxLength={45}
-              className="w-full h-12 px-4 rounded-[16px] bg-muted/50 text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 text-lg font-medium placeholder:text-muted-foreground/50 transition-all"
+              className="w-full h-12 pl-4 pr-16 rounded-[16px] bg-muted/50 text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 text-lg font-medium placeholder:text-muted-foreground/50 transition-all"
               placeholder="Task description..."
               disabled={busy}
             />
