@@ -265,21 +265,35 @@ export function useFrogTongue({
       const forward =
         t <= HIT_AT ? t / HIT_AT : 1 - (t - HIT_AT) / (1 - HIT_AT);
 
-      /* --- camera follow (MUST run before reading scroll offsets so the
-             tongue path is computed against the scroll position the browser
-             will actually paint) --- */
-      if (grab.follow && now >= camStartAt && t <= HIT_AT) {
-        const seg =
-          (now - camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
-        const clamped = Math.max(0, Math.min(1, seg));
-        const eased = FOLLOW_EASE(clamped);
-        const camY =
-          grab.frogFocusY + (grab.flyFocusY - grab.frogFocusY) * eased;
-        window.scrollTo(0, camY);
+      /* --- camera follow ---
+       *  Track the intended scroll position in a local variable rather than
+       *  reading window.scrollY back after scrollTo().  On mobile browsers
+       *  the read-back can be slightly off (sub-pixel rounding, URL-bar
+       *  adjustments, compositing lag) which causes the tongue to jump when
+       *  the camera follow stops.  Using the computed value directly keeps
+       *  the path coordinates perfectly consistent frame-to-frame.
+       *
+       *  After HIT_AT the camera holds at flyFocusY so the scroll doesn't
+       *  drift while the tongue retracts.
+       * ---------------------------------------------------------------- */
+      let frameScrollY = window.scrollY;
+
+      if (grab.follow) {
+        if (now >= camStartAt && t <= HIT_AT) {
+          const seg =
+            (now - camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
+          const clamped = Math.max(0, Math.min(1, seg));
+          const eased = FOLLOW_EASE(clamped);
+          frameScrollY =
+            grab.frogFocusY + (grab.flyFocusY - grab.frogFocusY) * eased;
+        } else if (t > HIT_AT) {
+          frameScrollY = grab.flyFocusY;
+        }
+        window.scrollTo(0, frameScrollY);
       }
 
       const offX = window.scrollX;
-      const offY = window.scrollY;
+      const offY = frameScrollY;
       const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
       const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
       const p2V = { x: p2.x - offX, y: p2.y - offY };
