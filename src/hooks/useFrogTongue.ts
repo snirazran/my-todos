@@ -261,13 +261,27 @@ export function useFrogTongue({
        * ------------------------------------------------------------- */
       let paintScrollY = window.scrollY;
 
-      if (grab.follow && now >= grab.camStartAt && t <= HIT_AT) {
-        const seg =
-          (now - grab.camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
-        const clamped = Math.max(0, Math.min(1, seg));
-        const eased = FOLLOW_EASE(clamped);
-        paintScrollY =
-          grab.frogFocusY + (grab.flyFocusY - grab.frogFocusY) * eased;
+      if (grab.follow) {
+        if (now >= grab.camStartAt && t <= HIT_AT) {
+          const seg =
+            (now - grab.camStartAt) /
+            (TONGUE_MS * HIT_AT - CAM_START_DELAY);
+          const clamped = Math.max(0, Math.min(1, seg));
+          const eased = FOLLOW_EASE(clamped);
+          paintScrollY =
+            grab.frogFocusY + (grab.flyFocusY - grab.frogFocusY) * eased;
+        } else if (t > HIT_AT) {
+          paintScrollY = grab.flyFocusY;
+        }
+        /* Clamp to the browser's actual scrollable range.  scrollTo()
+           clamps internally, so without this the tongue offset would
+           overshoot the real scroll position when flyFocusY exceeds
+           the document height — making the tongue land above the task. */
+        const maxScroll = Math.max(
+          0,
+          document.documentElement.scrollHeight - window.innerHeight
+        );
+        paintScrollY = Math.max(0, Math.min(paintScrollY, maxScroll));
       }
 
       const offX = window.scrollX;
@@ -313,8 +327,11 @@ export function useFrogTongue({
         }
       }
 
-      /* --- camera follow at the END of tick (same order as 24df97c) --- */
-      if (grab.follow && now >= grab.camStartAt && t <= HIT_AT) {
+      /* --- camera follow at the END of tick (same order as 24df97c).
+       *  After HIT_AT, hold the scroll at flyFocusY to prevent browser
+       *  scroll drift from causing a jump when we stop actively scrolling.
+       * --------------------------------------------------------------- */
+      if (grab.follow && (now >= grab.camStartAt || t > HIT_AT)) {
         window.scrollTo(0, paintScrollY);
       }
 
