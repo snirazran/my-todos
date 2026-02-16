@@ -28,10 +28,7 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
-import {
-  useFrogTongue,
-  TONGUE_STROKE,
-} from '@/hooks/useFrogTongue';
+import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import {
   useTaskData,
@@ -601,10 +598,7 @@ export default function Home() {
 
           {/* Tip group is always in the DOM; the RAF loop toggles its
               visibility and transform directly — no React re-renders. */}
-          <g
-            ref={tipGroupEl}
-            style={{ visibility: 'hidden' }}
-          >
+          <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
             <circle r={10} fill="transparent" />
             <image
               href="/fly.svg"
@@ -618,9 +612,7 @@ export default function Home() {
       )}
 
       {/* Full-screen blocker + skip button during tongue animation */}
-      {cinematic && (
-        <CinematicOverlay onSkip={speedUpTongue} />
-      )}
+      {cinematic && <CinematicOverlay onSkip={speedUpTongue} />}
 
       <QuickAddSheet
         open={showQuickAdd}
@@ -716,7 +708,6 @@ export default function Home() {
           />
         </div>
       </div>
-
     </main>
   );
 }
@@ -745,14 +736,15 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
       />
 
       {/* Visual skip hint (non-interactive): aligned with bottom notification zone */}
-      <div className="fixed bottom-0 left-0 right-0 z-[56] flex justify-center pointer-events-none px-4 pb-40 md:pb-20">
+      <div className="fixed bottom-0 left-0 right-0 z-[56] flex justify-center pointer-events-none px-4 pb-40 md:pb-36">
         <div
           className={`
             flex items-center gap-2 rounded-full border px-3 py-2
             shadow-sm backdrop-blur-2xl transition-all duration-200
-            ${active
-              ? 'bg-card/90 border-primary/40'
-              : 'bg-card/80 border-border/50'
+            ${
+              active
+                ? 'bg-card/90 border-primary/40'
+                : 'bg-card/80 border-border/50'
             }
           `}
         >

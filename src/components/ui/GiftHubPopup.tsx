@@ -7,7 +7,6 @@ import {
   X,
   Gift,
   Check,
-
   Plus,
   Sparkles,
   ShoppingBag,
@@ -203,11 +202,11 @@ export function GiftHubPopup({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={onClose}
-                className="fixed inset-0 z-[998] bg-black/60 backdrop-blur-md"
+                className="fixed inset-0 z-[1050] bg-black/60 backdrop-blur-md"
               />
 
               {/* Container: bottom-aligned mobile, centered desktop */}
-              <div className="fixed inset-0 z-[999] flex items-end sm:items-center justify-center pointer-events-none p-0 sm:p-6">
+              <div className="fixed inset-0 z-[1051] flex items-end sm:items-center justify-center pointer-events-none p-0 sm:p-6">
                 <motion.div
                   variants={isDesktop ? desktopVariants : mobileVariants}
                   initial="initial"
@@ -243,17 +242,13 @@ export function GiftHubPopup({
                     'rounded-t-[32px] sm:rounded-[32px] border-t sm:border border-border/40',
                   )}
                 >
-                  {/* Drag Handle (Mobile Only) */}
+                  {/* ─── HEADER ─── */}
                   {!isDesktop && (
                     <div
                       className="absolute top-0 left-0 right-0 h-8 z-50 touch-none flex justify-center items-center"
                       onPointerDown={(e) => dragControls.start(e)}
-                    >
-                      <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mt-3" />
-                    </div>
+                    />
                   )}
-
-                  {/* ─── HEADER ─── */}
                   <div
                     className={cn(
                       'relative z-20 px-4 py-4 md:px-6 md:py-5 shrink-0 border-b border-border/40',
@@ -404,33 +399,31 @@ export function GiftHubPopup({
                             {/* ── Sub-tab Switcher ── */}
                             <div className="sticky top-0 z-10 pb-3">
                               <div className="flex p-0.5 rounded-xl bg-muted/50 ring-1 ring-border/20">
-                                {(['browse', 'myboxes'] as const).map(
-                                  (sub) => (
-                                    <button
-                                      key={sub}
-                                      onClick={() => setShopSubTab(sub)}
-                                      className={cn(
-                                        'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200',
-                                        shopSubTab === sub
-                                          ? 'bg-background text-foreground shadow-sm'
-                                          : 'text-muted-foreground hover:text-foreground',
-                                      )}
-                                    >
-                                      {sub === 'browse' ? (
-                                        'Browse'
-                                      ) : (
-                                        <>
-                                          My Boxes
-                                          {totalOwnedBoxes > 0 && (
-                                            <span className="flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-primary text-[9px] font-black text-primary-foreground">
-                                              {totalOwnedBoxes}
-                                            </span>
-                                          )}
-                                        </>
-                                      )}
-                                    </button>
-                                  ),
-                                )}
+                                {(['browse', 'myboxes'] as const).map((sub) => (
+                                  <button
+                                    key={sub}
+                                    onClick={() => setShopSubTab(sub)}
+                                    className={cn(
+                                      'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200',
+                                      shopSubTab === sub
+                                        ? 'bg-background text-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground',
+                                    )}
+                                  >
+                                    {sub === 'browse' ? (
+                                      'Browse'
+                                    ) : (
+                                      <>
+                                        My Boxes
+                                        {totalOwnedBoxes > 0 && (
+                                          <span className="flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-primary text-[9px] font-black text-primary-foreground">
+                                            {totalOwnedBoxes}
+                                          </span>
+                                        )}
+                                      </>
+                                    )}
+                                  </button>
+                                ))}
                               </div>
                             </div>
 
@@ -457,16 +450,11 @@ export function GiftHubPopup({
                                           }
                                           isEquipped={false}
                                           canAfford={
-                                            balance >=
-                                              (item.priceFlies ?? 0) &&
+                                            balance >= (item.priceFlies ?? 0) &&
                                             !isGuest
                                           }
-                                          actionLoading={
-                                            buyingId === item.id
-                                          }
-                                          onAction={() =>
-                                            handleBuyItem(item)
-                                          }
+                                          actionLoading={buyingId === item.id}
+                                          onAction={() => handleBuyItem(item)}
                                         />
                                       ))}
                                     </div>
@@ -501,9 +489,7 @@ export function GiftHubPopup({
                                           isEquipped={false}
                                           canAfford={true}
                                           actionLoading={false}
-                                          onAction={() =>
-                                            handleOpenItem(item)
-                                          }
+                                          onAction={() => handleOpenItem(item)}
                                         />
                                       ))}
                                     </div>

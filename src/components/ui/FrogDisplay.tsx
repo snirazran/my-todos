@@ -65,7 +65,11 @@ export function FrogDisplay({
   const [shopOpen, setShopOpen] = React.useState(false);
   const [giftHubOpen, setGiftHubOpen] = React.useState(false);
 
-  const progressSlots = useProgressLogic(done ?? 0, total ?? 0, giftsClaimed ?? 0);
+  const progressSlots = useProgressLogic(
+    done ?? 0,
+    total ?? 0,
+    giftsClaimed ?? 0,
+  );
   const readyGifts = progressSlots.filter((s) => s.status === 'READY').length;
   const totalOwnedBoxes = React.useMemo(() => {
     const inv = inventoryData?.wardrobe?.inventory;
@@ -142,7 +146,7 @@ export function FrogDisplay({
 
       <div
         ref={frogBoxRef}
-        className="relative z-20 transition-transform duration-500 -translate-y-3.5 pointer-events-none "
+        className="relative z-50 transition-transform duration-500 -translate-y-3.5 pointer-events-none "
       >
         <div
           className="pointer-events-auto cursor-pointer"
