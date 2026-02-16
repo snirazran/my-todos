@@ -253,7 +253,7 @@ function BacklogTaskItem({
       animate={{ opacity: 1, x: 0, y: 0 }}
       exit={isExiting ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
       transition={{ delay: index * 0.05 }}
-      className={`group relative mb-3 rounded-xl ${isOpen ? 'z-20' : isMenuOpen ? 'z-50' : isExiting ? 'z-0' : 'z-auto'} ${isExiting ? 'overflow-visible bg-transparent shadow-none' : isOpen || isDragging || !isDesktop ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden bg-transparent shadow-sm shadow-black/5 dark:shadow-black/20'} ${isExiting ? 'will-change-transform' : ''}`}
+      className={`group relative mb-3 rounded-xl ${isOpen ? 'z-20' : isMenuOpen ? 'z-50' : isExiting ? 'z-0' : 'z-auto'} ${isExiting ? 'overflow-visible bg-transparent shadow-none' : isOpen || isDragging || isNudging ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden bg-transparent shadow-sm shadow-black/5 dark:shadow-black/20'} ${isExiting ? 'will-change-transform' : ''}`}
       style={{ zIndex: isMenuOpen ? 50 : isExiting ? 0 : isOpen ? 20 : 1 }}
     >
       {/* Swipe Actions Layer (Left - for Right Swipe - Trash) */}
@@ -345,8 +345,8 @@ function BacklogTaskItem({
                 relative flex items-center gap-1.5 px-2 py-3.5 
                 transition-colors duration-200 rounded-xl 
                 bg-card
-                border border-border/50 shadow-sm shadow-black/5 dark:shadow-black/20
-                ${isDesktop && isHovered ? 'border-border/70 shadow-sm' : ''}
+                border border-border/50 shadow-none
+                ${isDesktop && isHovered ? 'border-border/70' : ''}
                 ${isExiting ? 'pointer-events-none' : ''}
                 cursor-pointer
             `}
