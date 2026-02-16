@@ -4,7 +4,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format } from 'date-fns';
-import { useProgressLogic } from '@/hooks/useProgressLogic';
 import {
   Calendar,
   History,
@@ -22,17 +21,13 @@ import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { useUIStore } from '@/lib/uiStore';
 import { type FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
-import ProgressCard from '@/components/ui/ProgressCard';
 import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
-import { RewardPopup } from '@/components/ui/gift-box/RewardPopup';
-import { GiftInfoPopup } from '@/components/ui/GiftInfoPopup';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
-import { mutate } from 'swr';
 import {
   useFrogTongue,
   TONGUE_STROKE,
@@ -60,16 +55,6 @@ const demoTasks: Task[] = [
   { id: 'g4', text: 'Drink 2 liters of water', completed: true, order: 5 },
   { id: 'g5', text: 'Eat a healthy meal', completed: true, order: 6 },
 ];
-
-function getMilestones(totalTasks: number): number[] {
-  // Fixed milestones at 2, 4, and 6 completed tasks
-  const fixedMilestones = [2, 4, 6];
-
-  // Only return milestones that are achievable with current total tasks
-  // But the milestone is based on COMPLETED tasks, not total tasks
-  // So we return all 3 milestones regardless of total
-  return fixedMilestones;
-}
 
 export default function Home() {
   const { user, loading } = useAuth();
@@ -112,16 +97,8 @@ export default function Home() {
 
   /* State */
   const [activeTab, setActiveTab] = useState<'today' | 'backlog'>('today');
-  const [showReward, setShowReward] = useState(false);
   const [showCompleted, setShowCompleted] = useState(true);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [showGiftInfo, setShowGiftInfo] = useState(false);
-  const [selectedGiftSlot, setSelectedGiftSlot] = useState<{
-    status: string;
-    target: number;
-    tasksLeft: number;
-    neededToUnlock: number;
-  } | null>(null);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const headerMenuBtnRef = useRef<HTMLButtonElement>(null);
   const headerMenuRef = useRef<HTMLDivElement>(null);
@@ -169,22 +146,6 @@ export default function Home() {
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
   const flyBalance = user ? flyStatus.balance : 5;
   const laterThisWeek = user ? backlogTasks : [];
-
-  // Milestone gift trigger removed - users must click the gift in ProgressCard to claim rewards
-  // The RewardPopup will only show when setShowReward(true) is called from the gift click handler
-
-  // -- AUTO-OPEN POPUP LOGIC FOR GUEST --
-  const slots = useProgressLogic(doneCount, data.length, dailyGiftCount);
-  const readyCount = slots.filter((s) => s.status === 'READY').length;
-  const prevReadyCount = useRef(readyCount);
-
-  useEffect(() => {
-    // If not signed in (guest) and we see MORE ready gifts than before, open popup
-    if (!user && readyCount > prevReadyCount.current) {
-      setShowReward(true);
-    }
-    prevReadyCount.current = readyCount;
-  }, [readyCount, user]);
 
   // Block Scrolling during cinematic
   useEffect(() => {
@@ -262,63 +223,17 @@ export default function Home() {
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
               isGuest={!user}
+              onAddTask={() => {
+                if (!user) {
+                  router.push('/login');
+                  return;
+                }
+                setQuickText('');
+                setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
+                setShowQuickAdd(true);
+              }}
+              onMutateToday={() => mutateToday()}
             />
-            <div className="w-full">
-              <ProgressCard
-                rate={rate}
-                done={doneCount}
-                total={data.length}
-                giftsClaimed={dailyGiftCount}
-                onAddRequested={() => {
-                  if (!user) {
-                    router.push('/login');
-                    return;
-                  }
-                  setQuickText('');
-                  setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
-                  setShowQuickAdd(true);
-                }}
-                // ... (omitting chunks for brevity, I will rely on AllowMultiple for simple replacements if possible, but regex based needs precise context)
-                // Actually AllowMultiple with simple string replace 'session' -> 'user' is dangerous because 'session' might be used for other things.
-                // Use precise chunks.
-
-                onGiftClick={() => {
-                  // Only show reward popup if user hasn't claimed all 3 gifts yet
-                  if (dailyGiftCount < 3) {
-                    setShowReward(true);
-                  }
-                }}
-                onGiftInfoClick={(slot) => {
-                  if (slot.status === 'PENDING') {
-                    // Check if there are tasks in 'today' (using 'tasks' from useTaskData or 'data' which handles guest/session)
-                    const hasTasks = data.length > 0;
-
-                    // Switch to Today if needed
-                    if (activeTab !== 'today') {
-                      setActiveTab('today');
-                    }
-
-                    // Scroll to TaskList area
-                    // Timeout allows for state update/render (e.g. tab switch) to complete
-                    setTimeout(() => {
-                      taskListRef.current?.scrollIntoView({
-                        behavior: 'smooth',
-                        block: 'center', // Center it for better visibility
-                      });
-                    }, 50);
-
-                    // Trigger glow if there are tasks
-                    if (hasTasks) {
-                      setIsTaskGlow(true);
-                      setTimeout(() => setIsTaskGlow(false), 2000);
-                    }
-                  } else {
-                    setSelectedGiftSlot(slot);
-                    setShowGiftInfo(true);
-                  }
-                }}
-              />
-            </div>
           </div>
 
           <div
@@ -771,34 +686,6 @@ export default function Home() {
         }}
       />
 
-      <RewardPopup
-        show={showReward}
-        onClose={async (claimed) => {
-          if (claimed) {
-            // Optimistically update gift count to prevent popup from re-triggering
-            // immediately due to stale data race condition
-            await mutateToday(
-              (current) => {
-                if (!current) return current;
-                return {
-                  ...current,
-                  dailyGiftCount: (current.dailyGiftCount || 0) + 1,
-                };
-              },
-              { revalidate: false },
-            );
-          }
-
-          setShowReward(false);
-
-          if (claimed) {
-            mutateToday(); // Should get new dailyGiftCount (CONFIRMATION)
-            mutate('/api/skins/inventory');
-          }
-        }}
-        dailyGiftCount={dailyGiftCount}
-      />
-
       <HungerWarningModal
         open={!!user && hungerStatus.stolenFlies > 0}
         stolenFlies={hungerStatus.stolenFlies}
@@ -830,21 +717,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Gift Info Popup */}
-      <GiftInfoPopup
-        show={showGiftInfo}
-        onClose={() => setShowGiftInfo(false)}
-        slot={selectedGiftSlot}
-        onAddTask={() => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          setQuickText('');
-          setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
-          setShowQuickAdd(true);
-        }}
-      />
     </main>
   );
 }

@@ -18,23 +18,35 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
   ({ onClick, size = 30, className, x = 0, y = 0, paused = false, onLoad }, ref) => {
     const riveUrl = useRiveAsset('/fly_idle.riv');
 
-    // 1) Memoize options so Rive isn't re-created on parent re-renders
     const riveOptions = useMemo(
       () => ({
         src: riveUrl || undefined,
         artboard: 'fly',
-        // If it's a single animation named "Wings and Body", replace the array with that string.
         animations: ['Wings', 'Body'],
         autoplay: true,
         layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
-        onLoad: onLoad,
+        useDevicePixelRatio: true,
+        onLoad: () => {
+          onLoad?.();
+        },
       }),
       [onLoad, riveUrl]
     );
 
     const { RiveComponent, rive } = useRive(riveOptions);
 
-    // 2) Control play/pause based on prop
+    useEffect(() => {
+      if (!rive) return;
+      const resize = () => rive.resizeDrawingSurfaceToCanvas();
+      resize();
+      const raf = requestAnimationFrame(resize);
+      const delays = [100, 300, 600, 1000].map((ms) => setTimeout(resize, ms));
+      return () => {
+        cancelAnimationFrame(raf);
+        delays.forEach(clearTimeout);
+      };
+    }, [rive]);
+
     useEffect(() => {
       if (!rive) return;
       if (paused) {
@@ -44,7 +56,6 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
       }
     }, [rive, paused]);
 
-    // 3) On click, run parent handler and re-assert play (belt & suspenders)
     const handleClick = useCallback(
       (e: React.MouseEvent) => {
         onClick?.(e);
@@ -64,7 +75,7 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
           display: 'inline-block',
           verticalAlign: 'middle',
           marginInlineStart: x,
-          transform: y ? `translateY(${y}px)` : undefined, // <- fine-tune
+          transform: y ? `translateY(${y}px)` : undefined,
           cursor: 'pointer',
           lineHeight: 0,
         }}

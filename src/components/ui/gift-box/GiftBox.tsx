@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { motion, Variants } from 'framer-motion';
+import React, { useEffect } from 'react';
+import { motion } from 'framer-motion';
 import {
   useRive,
   useStateMachineInput,
@@ -7,7 +7,6 @@ import {
   Fit,
   Alignment,
 } from '@rive-app/react-canvas';
-import { cn } from '@/lib/utils';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 
 // Define layout outside component to maintain reference stability
@@ -43,9 +42,22 @@ export const GiftRive = React.memo(
     const { rive, RiveComponent } = useRive({
       src: riveUrl || undefined,
       stateMachines: 'State Machine 1',
-      autoplay: true, // Always autoplay initially to engage State Machine
+      autoplay: true,
+      useDevicePixelRatio: true,
       layout: RIVE_LAYOUT,
     });
+
+    useEffect(() => {
+      if (!rive) return;
+      const resize = () => rive.resizeDrawingSurfaceToCanvas();
+      resize();
+      const raf = requestAnimationFrame(resize);
+      const delays = [100, 300, 600, 1000].map((ms) => setTimeout(resize, ms));
+      return () => {
+        cancelAnimationFrame(raf);
+        delays.forEach(clearTimeout);
+      };
+    }, [rive]);
 
     const startOpenInput = useStateMachineInput(
       rive,

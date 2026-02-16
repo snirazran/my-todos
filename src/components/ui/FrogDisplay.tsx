@@ -3,13 +3,15 @@
 import React from 'react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
-import { Shirt, Sparkles } from 'lucide-react';
+import { Shirt, Gift } from 'lucide-react';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { useInventory } from '@/hooks/useInventory';
 import { cn } from '@/lib/utils';
 import { CurrencyShop } from '@/components/ui/shop/CurrencyShop';
+import { GiftHubPopup } from './GiftHubPopup';
+import { useProgressLogic } from '@/hooks/useProgressLogic';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle>;
@@ -31,6 +33,8 @@ type Props = {
   hunger?: number;
   maxHunger?: number;
   isGuest?: boolean;
+  onAddTask?: () => void;
+  onMutateToday?: () => void;
 };
 
 export function FrogDisplay({
@@ -53,10 +57,25 @@ export function FrogDisplay({
   hunger,
   maxHunger,
   isGuest,
+  onAddTask,
+  onMutateToday,
 }: Props) {
-  const { unseenCount } = useInventory();
+  const { unseenCount, data: inventoryData } = useInventory();
   const [clickedAt, setClickedAt] = React.useState(0);
   const [shopOpen, setShopOpen] = React.useState(false);
+  const [giftHubOpen, setGiftHubOpen] = React.useState(false);
+
+  const progressSlots = useProgressLogic(done ?? 0, total ?? 0, giftsClaimed ?? 0);
+  const readyGifts = progressSlots.filter((s) => s.status === 'READY').length;
+  const totalOwnedBoxes = React.useMemo(() => {
+    const inv = inventoryData?.wardrobe?.inventory;
+    const catalog = inventoryData?.catalog;
+    if (!inv || !catalog) return 0;
+    return catalog
+      .filter((i) => i.slot === 'container')
+      .reduce((sum, item) => sum + (inv[item.id] ?? 0), 0);
+  }, [inventoryData]);
+  const giftBadge = readyGifts + totalOwnedBoxes;
 
   // Local state for smooth hunger updates
   const [displayedHunger, setDisplayedHunger] = React.useState(hunger ?? 0);
@@ -165,7 +184,7 @@ export function FrogDisplay({
       <div
         className="relative z-10 -mt-6 flex items-center justify-between 
 
-              w-[340px] max-w-[92vw] h-[76px] px-3
+              w-[370px] max-w-[95vw] h-[76px] px-3
 
               bg-card/80
 
@@ -248,32 +267,64 @@ export function FrogDisplay({
             <div className="w-24" />
           )}
         </div>
-        {/* Center: Invisible Grip Area for Frog Paws */}
+        {/* Spacer */}
         <div className="flex-1" />
-        {/* Right: Wardrobe Button (Floating Key Look) */}
-        {/* Center: Invisible Grip Area for Frog Paws */}
-        <div className="flex-1" />
-        {/* Right: Wardrobe Button (Floating Key Look) */}
-        <button
-          onClick={() => onOpenChange(true)}
-          className="group relative flex items-center justify-center w-[52px] h-[52px] rounded-[15px]
-                  bg-card/80 backdrop-blur-2xl
-                  text-muted-foreground hover:text-primary
-                  shadow-sm hover:shadow-md
-                  border border-border/50
-                  transition-all duration-300 ease-out
-                  active:scale-95 active:translate-y-0.5"
-          title="Open Wardrobe"
-        >
-          <div className="absolute inset-0 bg-primary/10 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-          <Shirt className="relative w-6 h-6 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
-          {unseenCount > 0 && (
-            <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm z-20">
-              {unseenCount > 9 ? '9+' : unseenCount}
-            </span>
-          )}
-        </button>{' '}
+
+        {/* Right: Gift & Wardrobe Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setGiftHubOpen(true)}
+            className="group relative flex items-center justify-center w-[52px] h-[52px] rounded-[15px]
+                    bg-card/80 backdrop-blur-2xl
+                    text-muted-foreground hover:text-primary
+                    shadow-sm hover:shadow-md
+                    border border-border/50
+                    transition-all duration-300 ease-out
+                    active:scale-95 active:translate-y-0.5"
+            title="Gift Center"
+          >
+            <div className="absolute inset-0 bg-primary/10 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <Gift className="relative w-5 h-5 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
+            {giftBadge > 0 && (
+              <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-primary-foreground bg-primary rounded-full border-2 border-background shadow-sm z-20">
+                {giftBadge > 9 ? '9+' : giftBadge}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => onOpenChange(true)}
+            className="group relative flex items-center justify-center w-[52px] h-[52px] rounded-[15px]
+                    bg-card/80 backdrop-blur-2xl
+                    text-muted-foreground hover:text-primary
+                    shadow-sm hover:shadow-md
+                    border border-border/50
+                    transition-all duration-300 ease-out
+                    active:scale-95 active:translate-y-0.5"
+            title="Open Wardrobe"
+          >
+            <div className="absolute inset-0 bg-primary/10 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <Shirt className="relative w-5 h-5 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
+            {unseenCount > 0 && (
+              <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background shadow-sm z-20">
+                {unseenCount > 9 ? '9+' : unseenCount}
+              </span>
+            )}
+          </button>
+        </div>
       </div>
+
+      <GiftHubPopup
+        show={giftHubOpen}
+        onClose={() => setGiftHubOpen(false)}
+        done={done ?? 0}
+        total={total ?? 0}
+        giftsClaimed={giftsClaimed ?? 0}
+        flyBalance={flyBalance ?? 0}
+        onAddTask={onAddTask ?? (() => {})}
+        onMutateToday={onMutateToday ?? (() => {})}
+        isGuest={isGuest}
+      />
 
       <WardrobePanel open={openWardrobe} onOpenChange={onOpenChange} />
     </div>

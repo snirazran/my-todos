@@ -474,10 +474,10 @@ export function WardrobePanel({
                             : 'bg-secondary border-border dark:bg-slate-800/50 dark:border-slate-700',
                         )}
                       >
-                        <div className="flex items-center justify-center bg-background rounded-full shadow-sm w-7 h-7 md:w-10 md:h-10 dark:bg-slate-900">
+                        <div className="flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0 dark:bg-slate-900">
                           <Fly
                             size={24}
-                            className="text-muted-foreground md:w-8 md:h-8"
+                            className="text-muted-foreground"
                             y={-2}
                           />
                         </div>
