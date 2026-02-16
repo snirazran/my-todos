@@ -56,7 +56,6 @@ export function FilterBar({
 
   const categories: FilterCategory[] = [
     'all',
-    'container',
     'hat',
     'scarf',
     'body',

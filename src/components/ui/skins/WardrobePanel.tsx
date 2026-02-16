@@ -189,7 +189,7 @@ export function WardrobePanel({
       if (!item) return;
 
       let cat: FilterCategory | null = null;
-      if (item.slot === 'container') cat = 'container';
+      if (item.slot === 'container') return;
       else if (item.slot === 'hat') cat = 'hat';
       else if (item.slot === 'scarf') cat = 'scarf';
       else if (item.slot === 'hand_item') cat = 'held';
@@ -355,13 +355,15 @@ export function WardrobePanel({
     const ownedIds = Object.keys(data.wardrobe.inventory).filter(
       (id) => (data.wardrobe.inventory[id] ?? 0) > 0,
     );
-    const owned = (data.catalog || []).filter((i) => ownedIds.includes(i.id));
+    const owned = (data.catalog || []).filter(
+      (i) => ownedIds.includes(i.id) && i.slot !== 'container',
+    );
     return getFilteredItems(owned);
   }, [data, activeFilter, sortBy]);
 
   const shopItems = useMemo(() => {
     if (!data?.catalog) return [];
-    return getFilteredItems(data.catalog);
+    return getFilteredItems(data.catalog.filter((i) => i.slot !== 'container'));
   }, [data, activeFilter, sortBy]);
 
   const balance = data?.wardrobe?.flies ?? 0;

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import useSWR from 'swr';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 
@@ -71,13 +72,23 @@ export function useInventory(active: boolean = true) {
     mutate();
   };
 
+  const containerIds = useMemo(
+    () => new Set((data?.catalog ?? []).filter((i) => i.slot === 'container').map((i) => i.id)),
+    [data?.catalog],
+  );
+
+  const unseenItems = useMemo(
+    () => (data?.wardrobe?.unseenItems ?? []).filter((id) => !containerIds.has(id)),
+    [data?.wardrobe?.unseenItems, containerIds],
+  );
+
   return {
     data,
     mutate,
     isLoading,
     error,
-    unseenItems: data?.wardrobe?.unseenItems ?? [],
-    unseenCount: (data?.wardrobe?.unseenItems ?? []).length,
+    unseenItems,
+    unseenCount: unseenItems.length,
     markAllSeen,
     markItemSeen,
   };

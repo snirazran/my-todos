@@ -43,7 +43,6 @@ export const GiftRive = React.memo(
       src: riveUrl || undefined,
       stateMachines: 'State Machine 1',
       autoplay: true,
-      useDevicePixelRatio: true,
       layout: RIVE_LAYOUT,
     });
 

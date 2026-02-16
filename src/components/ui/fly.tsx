@@ -25,7 +25,6 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
         animations: ['Wings', 'Body'],
         autoplay: true,
         layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
-        useDevicePixelRatio: true,
         onLoad: () => {
           onLoad?.();
         },
