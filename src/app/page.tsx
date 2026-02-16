@@ -28,6 +28,7 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
+import { DailyRewardPopup } from '@/components/ui/daily-reward/DailyRewardPopup';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import {
@@ -135,6 +136,41 @@ export default function Home() {
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
   const { showNotification } = useNotification();
+  const [showDailyReward, setShowDailyReward] = useState(false);
+
+  // Check Daily Reward Status
+  useEffect(() => {
+    if (!user) return;
+
+    const checkReward = async () => {
+      try {
+        const res = await fetch('/api/daily-reward/status');
+        const data = await res.json();
+        if (data.dailyRewards) {
+          const today = new Date().getDate();
+          const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+          // Only show if it's the correct month AND today isn't claimed
+          if (data.dailyRewards.month === currentMonthKey) {
+            const hasClaimedToday =
+              data.dailyRewards.claimedDays.includes(today);
+            if (!hasClaimedToday) {
+              setShowDailyReward(true);
+            }
+          } else {
+            // New month, definitely show
+            setShowDailyReward(true);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to check daily reward', e);
+      }
+    };
+
+    // customizable delay or check
+    const timer = setTimeout(checkReward, 1000); // Small delay to let app load
+    return () => clearTimeout(timer);
+  }, [user]);
 
   // Data Switching
   const data = user ? tasks : guestTasks;
@@ -689,6 +725,11 @@ export default function Home() {
           await fetch('/api/hunger/acknowledge', { method: 'POST' });
           mutateToday();
         }}
+      />
+
+      <DailyRewardPopup
+        show={showDailyReward}
+        onClose={() => setShowDailyReward(false)}
       />
 
       {/* Floating Add Task Button - Home Page Version */}

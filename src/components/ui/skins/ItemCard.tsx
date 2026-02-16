@@ -31,8 +31,7 @@ const RARITY_CONFIG: Record<
     text: 'text-muted-foreground',
     glow: 'shadow-none',
     label: 'Common',
-    gradient:
-      'from-muted/50 to-muted/20',
+    gradient: 'from-muted/50 to-muted/20',
     shadow: 'shadow-sm',
     hoverGlow: 'hover:shadow-[0_0_20px_rgba(148,163,184,0.1)]',
   },
@@ -94,19 +93,27 @@ export function ItemCard({
   mode,
   selectedCount,
   isNew,
-  onSell, // NEW
+  onSell,
+  customAction,
+  customPreview,
+  hidePrice,
+  hideRarity,
 }: {
   item: ItemDef;
   ownedCount: number;
   isEquipped: boolean;
   canAfford: boolean;
   onAction?: (e: React.MouseEvent) => void;
-  onSell?: () => void; // NEW
+  onSell?: () => void;
   actionLabel?: React.ReactNode;
   actionLoading: boolean;
   mode: 'inventory' | 'shop' | 'trade';
   selectedCount?: number;
   isNew?: boolean;
+  customAction?: React.ReactNode;
+  customPreview?: React.ReactNode;
+  hidePrice?: boolean;
+  hideRarity?: boolean;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
@@ -151,14 +158,14 @@ export function ItemCard({
         isEquipped
           ? cn(config.shadow)
           : isSelected
-          ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(34,197,94,0.4)]'
-          : cn(config.shadow, config.hoverGlow),
-        !isOwned && mode === 'shop' && !canAfford && 'opacity-80'
+            ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(34,197,94,0.4)]'
+            : cn(config.shadow, config.hoverGlow),
+        !isOwned && mode === 'shop' && !canAfford && 'opacity-80',
       )}
     >
       {/* Selected Indicator */}
       <AnimatePresence>
-        {isEquipped && (
+        {isEquipped && !customAction && (
           <motion.div
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -182,22 +189,24 @@ export function ItemCard({
       </AnimatePresence>
 
       {/* Rarity Tag */}
-      <div
-        className={cn(
-          'absolute top-0 left-0 px-2 py-1 md:px-2.5 rounded-br-2xl text-[9px] md:text-[10px] font-black uppercase tracking-wider border-b border-r z-20',
-          config.bg,
-          config.text,
-          config.border
-        )}
-      >
-        {config.label}
-      </div>
+      {!hideRarity && (
+        <div
+          className={cn(
+            'absolute top-0 left-0 px-2 py-1 md:px-2.5 rounded-br-2xl text-[9px] md:text-[10px] font-black uppercase tracking-wider border-b border-r z-20',
+            config.bg,
+            config.text,
+            config.border,
+          )}
+        >
+          {config.label}
+        </div>
+      )}
 
       <div
         className={cn(
           'mt-4 mb-2 md:mt-5 md:mb-3 mx-auto w-full aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl flex items-center justify-center relative overflow-hidden',
           'bg-gradient-to-br shadow-inner',
-          config.gradient
+          config.gradient,
         )}
       >
         <div className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine" />
@@ -210,7 +219,9 @@ export function ItemCard({
         )}
 
         <div className="absolute inset-0 z-10 flex items-end justify-center">
-          {item.slot === 'container' ? (
+          {customPreview ? (
+            customPreview
+          ) : item.slot === 'container' ? (
             <div className="w-[110%] h-[110%] -translate-y-1 drop-shadow-xl">
               <GiftRive />
             </div>
@@ -236,39 +247,44 @@ export function ItemCard({
         <h4 className="w-full text-xs font-bold leading-tight text-center truncate md:text-sm text-foreground">
           {item.name}
         </h4>
-
-
       </div>
 
       {/* Actions */}
       <div className="w-full mx-auto mt-1 md:w-3/4">
-        {(mode === 'inventory' || mode === 'trade') && (
+        {(mode === 'inventory' || mode === 'trade') && !customAction && (
           <div
             className={cn(
               'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
               isEquipped
                 ? 'bg-green-600 text-white shadow-md'
                 : isSelected
-                ? 'bg-primary text-primary-foreground shadow-md'
-                : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary'
+                  ? 'bg-primary text-primary-foreground shadow-md'
+                  : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
             )}
           >
             {actionLoading
               ? '...'
               : mode === 'trade'
-              ? isSelected
-                ? 'SELECTED'
-                : 'SELECT'
-              : item.slot === 'container'
-              ? 'OPEN'
-              : isEquipped
-              ? 'EQUIPPED'
-              : 'EQUIP'}
+                ? isSelected
+                  ? 'SELECTED'
+                  : 'SELECT'
+                : item.slot === 'container'
+                  ? 'OPEN'
+                  : isEquipped
+                    ? 'EQUIPPED'
+                    : 'EQUIP'}
+          </div>
+        )}
+
+        {/* Custom Action (e.g. Claim) */}
+        {customAction && (
+          <div className="w-full" onClick={(e) => e.stopPropagation()}>
+            {customAction}
           </div>
         )}
 
         {/* Shop Button */}
-        {mode === 'shop' && (
+        {mode === 'shop' && !customAction && (
           <Button
             key="buy"
             variant="secondary"
@@ -282,7 +298,7 @@ export function ItemCard({
               canAfford
                 ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/25'
                 : 'bg-secondary text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 cursor-not-allowed opacity-100', // High contrast error state
-              actionLoading && 'opacity-80 cursor-wait'
+              actionLoading && 'opacity-80 cursor-wait',
             )}
           >
             {actionLoading ? (
@@ -290,35 +306,55 @@ export function ItemCard({
             ) : (
               <span className="flex items-center gap-1">
                 {ownedCount > 0 ? 'Buy' : 'Buy'}
-                <span className={cn("mx-1", canAfford ? "opacity-40" : "opacity-40 text-red-400")}>|</span>
-                <Fly size={18} className={cn(canAfford ? "opacity-80" : "opacity-100")} y={-2} />
-                <span className={cn(canAfford ? "" : "font-black")}>{item.priceFlies}</span>
+                {!hidePrice && (
+                  <>
+                    <span
+                      className={cn(
+                        'mx-1',
+                        canAfford ? 'opacity-40' : 'opacity-40 text-red-400',
+                      )}
+                    >
+                      |
+                    </span>
+                    <Fly
+                      size={18}
+                      className={cn(canAfford ? 'opacity-80' : 'opacity-100')}
+                      y={-2}
+                    />
+                    <span className={cn(canAfford ? '' : 'font-black')}>
+                      {item.priceFlies}
+                    </span>
+                  </>
+                )}
               </span>
             )}
           </Button>
         )}
 
         {/* Sell Button (Inventory Mode) */}
-        {mode === 'inventory' && onSell && (item.priceFlies ?? 0) > 0 && (
-          <div className="mt-2 text-center w-full">
-            <Button
-              variant="ghost"
-              size="sm"
-               onClick={(e) => {
-                 e.stopPropagation();
-                 onSell();
-               }}
-               className="w-full h-7 rounded-lg text-[10px] font-bold uppercase tracking-wide text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900 transition-all shadow-none hover:shadow-sm active:scale-95 gap-1.5"
-            >
-              <span className="flex items-center gap-1">
-                Sell
-                <span className="mx-1 opacity-40">|</span>
-                <Fly size={18} className="opacity-80" y={-3} />
-                +{Math.floor((item.priceFlies || 0) / 2)}
-              </span>
-            </Button>
-          </div>
-        )}
+        {mode === 'inventory' &&
+          onSell &&
+          (item.priceFlies ?? 0) > 0 &&
+          !customAction && (
+            <div className="mt-2 text-center w-full">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSell();
+                }}
+                className="w-full h-7 rounded-lg text-[10px] font-bold uppercase tracking-wide text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900 transition-all shadow-none hover:shadow-sm active:scale-95 gap-1.5"
+              >
+                <span className="flex items-center gap-1">
+                  Sell
+                  <span className="mx-1 opacity-40">|</span>
+                  <Fly size={18} className="opacity-80" y={-3} />+
+                  {Math.floor((item.priceFlies || 0) / 2)}
+                </span>
+              </Button>
+            </div>
+          )}
       </div>
     </motion.div>
   );

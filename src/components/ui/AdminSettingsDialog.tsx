@@ -2,7 +2,14 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, DollarSign, Sparkles, AlertTriangle } from 'lucide-react';
+import {
+  X,
+  Trash2,
+  DollarSign,
+  Sparkles,
+  AlertTriangle,
+  Gift,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
 
@@ -11,7 +18,10 @@ interface AdminSettingsDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-export function AdminSettingsDialog({ open, onOpenChange }: AdminSettingsDialogProps) {
+export function AdminSettingsDialog({
+  open,
+  onOpenChange,
+}: AdminSettingsDialogProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
 
@@ -59,6 +69,31 @@ export function AdminSettingsDialog({ open, onOpenChange }: AdminSettingsDialogP
       }
     } catch (error) {
       alert('Error resetting cash');
+    } finally {
+      setLoading(null);
+      setConfirmAction(null);
+    }
+  };
+
+  const handleResetDaily = async () => {
+    if (confirmAction !== 'reset-daily') {
+      setConfirmAction('reset-daily');
+      return;
+    }
+
+    setLoading('reset-daily');
+    try {
+      const res = await fetch('/api/admin/reset-daily-reward', {
+        method: 'POST',
+      });
+
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        alert('Failed to reset daily reward');
+      }
+    } catch (error) {
+      alert('Error resetting daily reward');
     } finally {
       setLoading(null);
       setConfirmAction(null);
@@ -138,14 +173,20 @@ export function AdminSettingsDialog({ open, onOpenChange }: AdminSettingsDialogP
                   <Button
                     onClick={handleResetTasks}
                     disabled={loading !== null}
-                    variant={confirmAction === 'reset-tasks' ? 'destructive' : 'outline'}
+                    variant={
+                      confirmAction === 'reset-tasks'
+                        ? 'destructive'
+                        : 'outline'
+                    }
                     className="w-full justify-start gap-3 h-auto py-4 px-4"
                   >
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-red-500/10 text-red-600 dark:text-red-400">
                       <Trash2 className="w-5 h-5" />
                     </div>
                     <div className="flex-1 text-left">
-                      <div className="font-bold text-sm">Reset Tasks & Statistics</div>
+                      <div className="font-bold text-sm">
+                        Reset Tasks & Statistics
+                      </div>
                       <div className="text-xs text-muted-foreground font-normal">
                         Clear all tasks, history, and milestones
                       </div>
@@ -162,7 +203,8 @@ export function AdminSettingsDialog({ open, onOpenChange }: AdminSettingsDialogP
                     >
                       <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
                       <div className="text-xs text-red-600 dark:text-red-400">
-                        <strong>Warning:</strong> This will permanently delete all your tasks and progress. Click again to confirm.
+                        <strong>Warning:</strong> This will permanently delete
+                        all your tasks and progress. Click again to confirm.
                       </div>
                     </motion.div>
                   )}
@@ -173,7 +215,9 @@ export function AdminSettingsDialog({ open, onOpenChange }: AdminSettingsDialogP
                   <Button
                     onClick={handleResetCash}
                     disabled={loading !== null}
-                    variant={confirmAction === 'reset-cash' ? 'destructive' : 'outline'}
+                    variant={
+                      confirmAction === 'reset-cash' ? 'destructive' : 'outline'
+                    }
                     className="w-full justify-start gap-3 h-auto py-4 px-4"
                   >
                     <div className="flex items-center justify-center w-10 h-10 rounded-full bg-orange-500/10 text-orange-600 dark:text-orange-400">
@@ -197,7 +241,50 @@ export function AdminSettingsDialog({ open, onOpenChange }: AdminSettingsDialogP
                     >
                       <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400 mt-0.5 shrink-0" />
                       <div className="text-xs text-orange-600 dark:text-orange-400">
-                        <strong>Warning:</strong> This will reset your flies to 0. Click again to confirm.
+                        <strong>Warning:</strong> This will reset your flies to
+                        0. Click again to confirm.
+                      </div>
+                    </motion.div>
+                  )}
+                </div>
+
+                {/* Reset Daily Reward */}
+                <div className="space-y-2">
+                  <Button
+                    onClick={handleResetDaily}
+                    disabled={loading !== null}
+                    variant={
+                      confirmAction === 'reset-daily'
+                        ? 'destructive'
+                        : 'outline'
+                    }
+                    className="w-full justify-start gap-3 h-auto py-4 px-4"
+                  >
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400">
+                      <Gift className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 text-left">
+                      <div className="font-bold text-sm">
+                        Reset Daily Reward
+                      </div>
+                      <div className="text-xs text-muted-foreground font-normal">
+                        Allow claiming today's reward again
+                      </div>
+                    </div>
+                    {loading === 'reset-daily' && (
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    )}
+                  </Button>
+                  {confirmAction === 'reset-daily' && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="flex items-start gap-2 p-3 bg-teal-50 dark:bg-teal-950/20 border border-teal-200 dark:border-teal-900 rounded-xl"
+                    >
+                      <AlertTriangle className="w-4 h-4 text-teal-600 dark:text-teal-400 mt-0.5 shrink-0" />
+                      <div className="text-xs text-teal-600 dark:text-teal-400">
+                        <strong>Confirm:</strong> This will reset today's reward
+                        claim status. Click again to maximize testing.
                       </div>
                     </motion.div>
                   )}
@@ -236,6 +323,6 @@ export function AdminSettingsDialog({ open, onOpenChange }: AdminSettingsDialogP
         </>
       )}
     </AnimatePresence>,
-    document.body
+    document.body,
   );
 }

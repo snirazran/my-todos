@@ -550,18 +550,20 @@ function MobileSheet({
                   </div>
                 </button>
 
-                <button
-                  onClick={() => {
-                    setAdminDialogOpen(true);
-                    onClose();
-                  }}
-                  className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
-                >
-                  <span className="font-bold text-sm group-hover:text-foreground transition-colors">
-                    Admin Settings
-                  </span>
-                  <Settings className="h-5 w-5 text-amber-500" />
-                </button>
+                {setAdminDialogOpen && (
+                  <button
+                    onClick={() => {
+                      setAdminDialogOpen(true);
+                      onClose();
+                    }}
+                    className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
+                  >
+                    <span className="font-bold text-sm group-hover:text-foreground transition-colors">
+                      Admin Settings
+                    </span>
+                    <Settings className="h-5 w-5 text-amber-500" />
+                  </button>
+                )}
               </div>
             </div>
 

@@ -46,6 +46,12 @@ const UserSchema = new Schema<UserDoc>(
       default: [],
     },
     premiumUntil: { type: Date },
+    dailyRewards: {
+      lastClaimDate: { type: Date },
+      claimedDays: { type: [Number], default: [] },
+      month: { type: String }, // Format YYYY-MM
+      streak: { type: Number, default: 0 },
+    },
   },
   { collection: 'users' },
 );

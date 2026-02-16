@@ -58,4 +58,12 @@ export type UserDoc = {
   statistics?: UserStatistics;
   tags?: UserTag[];
   premiumUntil?: Date;
+  dailyRewards?: DailyRewardProgress;
+};
+
+export type DailyRewardProgress = {
+  lastClaimDate: Date | null; // Date of last claim
+  claimedDays: number[]; // Array of day numbers (1-31) claimed this month
+  month: string; // YYYY-MM to track which month we are tracking
+  streak: number; // Current streak (optional usage for now)
 };
