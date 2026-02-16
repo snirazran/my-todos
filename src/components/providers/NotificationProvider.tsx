@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, CalendarCheck, FolderOpen } from 'lucide-react';
 
 interface NotificationContextType {
     showNotification: (message: string, undoAction?: () => void | Promise<void>) => void;
@@ -76,6 +76,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
     };
 
+    const isSavedTasksToast = notification?.message === 'Moved to Saved Tasks';
+    const isMovedToTodayToast = notification?.message === 'Moved to Today';
+    const isMoveToast = isSavedTasksToast || isMovedToTodayToast;
+
     return (
         <NotificationContext.Provider value={{ showNotification, hideNotification }}>
             {children}
@@ -88,9 +92,23 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 20, scale: 0.95 }}
                             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                            className="pointer-events-auto flex items-center gap-3 px-4 py-3 bg-popover text-popover-foreground rounded-lg shadow-xl max-w-sm w-full border border-border"
+                            className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-[18px] max-w-sm w-full border ${
+                                isMoveToast
+                                    ? 'bg-card/80 text-foreground border-border/50 backdrop-blur-2xl shadow-sm'
+                                    : 'bg-popover text-popover-foreground border-border'
+                            }`}
                         >
-                            <span className="flex-1 text-sm font-medium">{notification.message}</span>
+                            {isMoveToast && (
+                                <span
+                                    aria-hidden
+                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25"
+                                >
+                                    {isSavedTasksToast ? <FolderOpen size={14} /> : <CalendarCheck size={14} />}
+                                </span>
+                            )}
+                            <span className={`flex-1 text-sm ${isMoveToast ? 'font-semibold' : 'font-medium'}`}>
+                                {notification.message}
+                            </span>
                             {notification.undoAction && (
                                 <button
                                     onClick={handleUndo}

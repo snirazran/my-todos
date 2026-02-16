@@ -332,7 +332,7 @@ const SortableTaskItem = React.forwardRef<
           transition={{
             layout: { type: 'spring', stiffness: 250, damping: 25 },
           }}
-          className={`group relative rounded-xl ${isDragging ? 'overflow-visible' : isExitingLater ? 'overflow-visible' : isGlowActive && !isDone ? 'overflow-visible' : 'overflow-hidden bg-muted/50'} ${isExitingLater ? 'will-change-transform' : ''}`}
+          className={`group relative rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden bg-transparent shadow-sm shadow-black/5 dark:shadow-black/20'} ${isExitingLater ? 'will-change-transform' : ''}`}
         >
           {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
           {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
@@ -420,9 +420,9 @@ const SortableTaskItem = React.forwardRef<
               relative flex items-center gap-1.5 px-2 py-3.5 
               transition-colors duration-200 rounded-xl 
               bg-card
-              border border-border/40 shadow-sm
+              border border-border/50 shadow-none
               ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
-              ${isHovered && isDesktop ? 'border-border shadow-md' : ''}
+              ${isHovered && isDesktop ? 'border-border/70' : ''}
               ${
                 isGlowActive && !isDone
                   ? 'ring-2 ring-primary shadow-[0_0_30px_rgba(var(--primary),0.3)]'
@@ -1078,7 +1078,7 @@ export default function TaskList({
         </div>
 
         <div
-          className={`py-1 px-1 -mx-1 pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+          className={`pt-0 px-1 -mx-1 pb-2 space-y-0 overflow-y-auto min-h-[100px] max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && !exitAction ? (

@@ -864,41 +864,47 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
   return (
     <>
       {/* Invisible full-screen tap target */}
-      <div
-        role="button"
-        tabIndex={0}
-        className="fixed inset-0 z-[55]"
+      <button
+        type="button"
+        aria-label="Tap anywhere to fast-forward tongue animation"
+        className="fixed inset-0 z-[55] cursor-default bg-transparent"
         onClick={handleSkip}
         onTouchStart={handleSkip}
-        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSkip(); }}
       />
 
-      {/* Visual skip indicator (non-interactive, sits above blocker visually) */}
-      <div className="fixed z-[56] bottom-[calc(env(safe-area-inset-bottom)+88px)] left-7 flex flex-col items-center gap-1 pointer-events-none">
+      {/* Visual skip hint (non-interactive): aligned with bottom notification zone */}
+      <div className="fixed bottom-0 left-0 right-0 z-[56] flex justify-center pointer-events-none px-4 pb-40 md:pb-20">
         <div
           className={`
-            flex items-center justify-center w-11 h-11 rounded-full
-            border shadow-lg backdrop-blur-2xl transition-all duration-200
+            flex items-center gap-2 rounded-full border px-3 py-2
+            shadow-sm backdrop-blur-2xl transition-all duration-200
             ${active
-              ? 'bg-emerald-500/20 border-emerald-500/40 shadow-emerald-500/10 scale-95'
-              : 'bg-card/80 border-border/80 shadow-black/5 dark:shadow-black/20'
+              ? 'bg-card/90 border-primary/40'
+              : 'bg-card/80 border-border/50'
             }
           `}
         >
-          {active ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-emerald-500">
-              <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
-              <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
-            </svg>
-          ) : (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="text-primary ml-0.5">
-              <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
-            </svg>
-          )}
+          <span
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors duration-200"
+            aria-hidden
+          >
+            {active ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
+                <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
+              </svg>
+            )}
+          </span>
+          <span
+            className={`text-[11px] font-semibold select-none whitespace-nowrap transition-colors duration-200 ${active ? 'text-primary' : 'text-muted-foreground'}`}
+          >
+            {active ? 'x2 speed' : 'Tap to speed'}
+          </span>
         </div>
-        <span className={`text-[10px] font-medium select-none transition-colors duration-200 ${active ? 'text-emerald-500' : 'text-primary'}`}>
-          {active ? '×2' : 'skip'}
-        </span>
       </div>
     </>
   );
