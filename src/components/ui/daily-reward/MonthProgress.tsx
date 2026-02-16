@@ -53,38 +53,40 @@ export function MonthProgress({
   };
 
   // Auto-scroll function
-  const scrollToDay = (containerRef: React.RefObject<HTMLDivElement>) => {
-    if (containerRef.current) {
-      const container = containerRef.current;
-      const scrollContainer = container.firstElementChild as HTMLElement;
-      if (!scrollContainer || !scrollContainer.children.length) return;
+  const scrollToDay = (container: HTMLDivElement) => {
+    const scrollContainer = container.firstElementChild as HTMLElement;
+    if (!scrollContainer || !scrollContainer.children.length) return;
 
-      const targetNode = scrollContainer.children[
-        currentDay - 1
-      ] as HTMLElement;
+    const targetNode = scrollContainer.children[currentDay - 1] as HTMLElement;
 
-      if (targetNode) {
-        const containerWidth = container.clientWidth;
-        const targetLeft = targetNode.offsetLeft;
-        const targetWidth = targetNode.offsetWidth;
+    if (targetNode) {
+      const containerWidth = container.clientWidth;
+      const targetLeft = targetNode.offsetLeft;
+      const targetWidth = targetNode.offsetWidth;
 
-        const scrollPos = targetLeft - containerWidth / 2 + targetWidth / 2;
+      const scrollPos = targetLeft - containerWidth / 2 + targetWidth / 2;
 
-        container.scrollTo({
-          left: Math.max(0, scrollPos),
-          behavior: 'auto', // Instant scroll to avoid conflicts
-        });
-      }
+      container.scrollTo({
+        left: Math.max(0, scrollPos),
+        behavior: 'smooth',
+      });
     }
   };
 
   // Auto-scroll to current day on mount/change
   useEffect(() => {
-    // Wait for modal animation to complete (approx 300-400ms)
     const timer = setTimeout(() => {
-      scrollToDay(premiumRef);
-      // Sync logic will handle scrolling the freeRef
-    }, 400);
+      // Temporarily disable sync to prevent conflicts during smooth scroll
+      isSyncing.current = true;
+
+      if (premiumRef.current) scrollToDay(premiumRef.current);
+      if (freeRef.current) scrollToDay(freeRef.current);
+
+      // Re-enable sync after smooth scroll completes (~500ms)
+      setTimeout(() => {
+        isSyncing.current = false;
+      }, 600);
+    }, 700);
     return () => clearTimeout(timer);
   }, [currentDay]);
 

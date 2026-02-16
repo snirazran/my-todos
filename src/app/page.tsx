@@ -715,7 +715,7 @@ export default function Home() {
       />
 
       <HungerWarningModal
-        open={!!user && hungerStatus.stolenFlies > 0}
+        open={!!user && hungerStatus.stolenFlies > 0 && !showDailyReward}
         stolenFlies={hungerStatus.stolenFlies}
         indices={indices}
         onAcknowledge={async () => {

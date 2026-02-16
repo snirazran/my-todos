@@ -62,12 +62,18 @@ export function DailyRewardPopup({
       if (data.success) {
         await mutateStatus();
         mutate('/api/skins/inventory');
-        if (data.rewards.items.length > 0) {
-          // TODO: Trigger item reveal
-        }
         setJustClaimedReward(data.rewards);
-        // Auto-close after claiming (small delay for visual feedback)
-        setTimeout(() => onClose(), 1200);
+        // Auto-close after claiming, then refresh fly balance
+        setTimeout(() => {
+          onClose();
+          // Refresh fly balance in task data after popup is closed
+          mutate(
+            (key: string) =>
+              typeof key === 'string' && key.startsWith('/api/tasks'),
+            undefined,
+            { revalidate: true },
+          );
+        }, 1200);
       }
     } catch (e) {
       console.error('Claim failed', e);

@@ -191,9 +191,11 @@ function RightActions({
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
 
-  // Close on click outside
+  // Close on click outside (desktop only — mobile has its own close via MobileSheet)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Only apply on desktop
+      if (window.innerWidth < 768) return;
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
