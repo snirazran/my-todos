@@ -50,7 +50,9 @@ export function WardrobePanel({
   const [visitedCategories, setVisitedCategories] = useState<
     Set<FilterCategory>
   >(new Set<FilterCategory>(['all']));
-  const [actionId, setActionId] = useState<string | null>(null);
+  const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [confirmingBuyId, setConfirmingBuyId] = useState<string | null>(null);
+  const [equippingId, setEquippingId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOrder>('rarity_desc');
   const [notif, setNotif] = useState<{
     msg: string;
@@ -112,7 +114,7 @@ export function WardrobePanel({
     };
     mutate(newData, false);
 
-    setActionId(item.id);
+    // setActionId(item.id); // Removed
     try {
       const res = await fetch('/api/skins/sell', {
         method: 'POST',
@@ -130,7 +132,7 @@ export function WardrobePanel({
       setNotif({ msg: 'Sell failed.', type: 'error' });
       mutate();
     } finally {
-      setActionId(null);
+      // setActionId(null); // Removed
     }
   };
 
@@ -256,13 +258,13 @@ export function WardrobePanel({
   const toggleEquip = async (slot: WardrobeSlot, itemId: string) => {
     if (!data?.wardrobe?.equipped) return;
     const isEquipped = data.wardrobe.equipped[slot] === itemId;
-    setActionId(itemId);
+    setEquippingId(itemId);
     await fetch('/api/skins/inventory', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slot, itemId: isEquipped ? null : itemId }),
     });
-    setActionId(null);
+    setEquippingId(null);
     mutate();
   };
 
@@ -283,8 +285,8 @@ export function WardrobePanel({
     }
   };
 
-  const buyItem = async (item: ItemDef, e?: React.MouseEvent) => {
-    if (!user) {
+  const handleBuyItem = async (item: ItemDef, e?: React.MouseEvent) => {
+    if (!user || buyingId) {
       setNotif({ msg: 'Sign in to buy items!', type: 'error' });
       return;
     }
@@ -299,37 +301,44 @@ export function WardrobePanel({
       return;
     }
 
-    const currentCount = data.wardrobe.inventory[item.id] ?? 0;
-    const newData: ApiData = {
-      ...data,
-      wardrobe: {
-        ...data.wardrobe,
-        flies: balance - price,
-        inventory: {
-          ...data.wardrobe.inventory,
-          [item.id]: currentCount + 1,
-        },
-      },
-    };
-    mutate(newData, false);
+    // Confirmation Step
+    if (confirmingBuyId !== item.id) {
+      setConfirmingBuyId(item.id);
+      return;
+    }
 
-    const origin = e
-      ? {
-          x: e.clientX / window.innerWidth,
-          y: e.clientY / window.innerHeight,
-        }
-      : { y: 0.6 };
-
-    confetti({
-      particleCount: 40,
-      spread: 70,
-      origin,
-      zIndex: 9999,
-      colors: ['#a78bfa', '#4ade80', '#facc15'],
-    });
-
-    setActionId(item.id);
+    setBuyingId(item.id);
+    setConfirmingBuyId(null); // Clear confirmation for this item
     try {
+      const currentCount = data.wardrobe.inventory[item.id] ?? 0;
+      const newData: ApiData = {
+        ...data,
+        wardrobe: {
+          ...data.wardrobe,
+          flies: balance - price,
+          inventory: {
+            ...data.wardrobe.inventory,
+            [item.id]: currentCount + 1,
+          },
+        },
+      };
+      mutate(newData, false);
+
+      const origin = e
+        ? {
+            x: e.clientX / window.innerWidth,
+            y: e.clientY / window.innerHeight,
+          }
+        : { y: 0.6 };
+
+      confetti({
+        particleCount: 40,
+        spread: 70,
+        origin,
+        zIndex: 9999,
+        colors: ['#a78bfa', '#4ade80', '#facc15'],
+      });
+
       const res = await fetch('/api/skins/shop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -346,7 +355,7 @@ export function WardrobePanel({
       setNotif({ msg: 'Purchase failed.', type: 'error' });
       mutate();
     } finally {
-      setActionId(null);
+      setBuyingId(null);
     }
   };
 
@@ -367,6 +376,7 @@ export function WardrobePanel({
   }, [data, activeFilter, sortBy]);
 
   const balance = data?.wardrobe?.flies ?? 0;
+  const isGuest = !user;
 
   // Track if touch started from right edge (for drag-to-close gesture)
   // const [isDragEnabled, setIsDragEnabled] = useState(false);
@@ -651,7 +661,7 @@ export function WardrobePanel({
                                   item.id
                                 }
                                 canAfford={true}
-                                actionLoading={actionId === item.id}
+                                actionLoading={equippingId === item.id}
                                 onAction={() => handleItemAction(item)}
                                 onSell={() => {
                                   setItemToSell(item);
@@ -679,10 +689,16 @@ export function WardrobePanel({
                                 mode="shop"
                                 ownedCount={count}
                                 isEquipped={false}
-                                canAfford={balance >= (item.priceFlies ?? 0)}
-                                actionLoading={actionId === item.id}
-                                onAction={(e) => buyItem(item, e)}
-                                actionLabel={null}
+                                canAfford={
+                                  balance >= (item.priceFlies ?? 0) && !isGuest
+                                }
+                                actionLoading={buyingId === item.id}
+                                actionLabel={
+                                  confirmingBuyId === item.id
+                                    ? 'CONFIRM'
+                                    : undefined
+                                }
+                                onAction={(e) => handleBuyItem(item, e)}
                               />
                             );
                           })}

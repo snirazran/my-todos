@@ -19,6 +19,7 @@ import {
   Crown,
   Circle,
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { FilterBar, FilterCategory } from './skins/FilterBar';
 import { cn } from '@/lib/utils';
@@ -81,6 +82,7 @@ export function GiftHubPopup({
 
   const [claiming, setClaiming] = useState(false);
   const [buyingId, setBuyingId] = useState<string | null>(null);
+  const [confirmingBuyId, setConfirmingBuyId] = useState<string | null>(null);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
   const [optimisticExtraClaimed, setOptimisticExtraClaimed] = useState(0);
 
@@ -210,22 +212,35 @@ export function GiftHubPopup({
     setOptimisticExtraClaimed(0);
   }, [giftsClaimed]);
 
+  // ... inside component
+
+  // Track if we've already auto-switched for this session
+  const [hasAutoSwitched, setHasAutoSwitched] = useState(false);
+
+  // Reset auto-switch flag when popup closes or claim status resets
   useEffect(() => {
-    if (show && allClaimed && totalOwnedBoxes > 0) {
-      setActiveTab('inventory');
+    if (!show || !allClaimed) {
+      setHasAutoSwitched(false);
     }
-  }, [show, allClaimed, totalOwnedBoxes]);
+  }, [show, allClaimed]);
 
   useEffect(() => {
-    if (show) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+    // Only auto-switch to inventory if:
+    // 1. All tasks are claimed
+    // 2. We have boxes to show
+    // 3. We haven't already auto-switched this session
+    // 4. Detailed: If the user manually goes back to 'earn', we shouldn't force them away again logic handled by hasAutoSwitched
+    if (
+      show &&
+      allClaimed &&
+      totalOwnedBoxes > 0 &&
+      !hasAutoSwitched &&
+      activeTab === 'earn'
+    ) {
+      setActiveTab('inventory');
+      setHasAutoSwitched(true);
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [show]);
+  }, [show, allClaimed, totalOwnedBoxes, activeTab, hasAutoSwitched]);
 
   /* ─── HANDLERS ─── */
 
@@ -244,6 +259,7 @@ export function GiftHubPopup({
       onMutateToday();
       mutateInventory();
       globalMutate('/api/skins/inventory');
+      setActiveTab('inventory'); // Auto-switch to gifts
     } catch (e) {
       console.error(e);
     } finally {
@@ -251,9 +267,38 @@ export function GiftHubPopup({
     }
   };
 
-  const handleBuyItem = async (item: ItemDef) => {
+  const handleBuyItem = async (item: ItemDef, e?: React.MouseEvent) => {
     if (!user || buyingId) return;
+
+    if ((inventoryData?.wardrobe?.flies ?? 0) < (item.priceFlies ?? 0)) {
+      return;
+    }
+
+    // Confirmation Step
+    if (confirmingBuyId !== item.id) {
+      setConfirmingBuyId(item.id);
+      return;
+    }
+
     setBuyingId(item.id);
+    setConfirmingBuyId(null);
+
+    // Confetti Effect
+    const origin = e
+      ? {
+          x: e.clientX / window.innerWidth,
+          y: e.clientY / window.innerHeight,
+        }
+      : { y: 0.5 };
+
+    confetti({
+      particleCount: 40,
+      spread: 70,
+      origin,
+      zIndex: 1060, // Higher than popup (1051)
+      colors: ['#a78bfa', '#4ade80', '#facc15'],
+    });
+
     try {
       const res = await fetch('/api/skins/shop', {
         method: 'POST',
@@ -585,7 +630,12 @@ export function GiftHubPopup({
                                 balance >= (item.priceFlies ?? 0) && !isGuest
                               }
                               actionLoading={buyingId === item.id}
-                              onAction={() => handleBuyItem(item)}
+                              actionLabel={
+                                confirmingBuyId === item.id
+                                  ? 'CONFIRM'
+                                  : undefined
+                              }
+                              onAction={(e) => handleBuyItem(item, e)}
                             />
                           ))}
                         </div>

@@ -147,7 +147,8 @@ export function ItemCard({
       animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}}
       transition={{ duration: 0.4 }}
       onClick={(e) => {
-        if (mode === 'inventory' || mode === 'trade') handleAction(e);
+        if (mode === 'inventory' || mode === 'trade' || mode === 'shop')
+          handleAction(e);
       }}
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
@@ -303,6 +304,8 @@ export function ItemCard({
           >
             {actionLoading ? (
               <span>...</span>
+            ) : actionLabel ? (
+              <span>{actionLabel}</span>
             ) : (
               <span className="flex items-center gap-1">
                 {ownedCount > 0 ? 'Buy' : 'Buy'}
