@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -10,9 +10,19 @@ import {
   AlertTriangle,
   Gift,
   Wind,
+  Bell,
+  Send,
+  CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
+
+interface Template {
+  id: string;
+  label: string;
+  preview: string;
+}
 
 interface AdminSettingsDialogProps {
   open: boolean;
@@ -25,6 +35,77 @@ export function AdminSettingsDialog({
 }: AdminSettingsDialogProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
+
+  // Notification test state
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [taskCount, setTaskCount] = useState(0);
+  const [hasTokens, setHasTokens] = useState(false);
+  const [tokenCount, setTokenCount] = useState(0);
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [notifResult, setNotifResult] = useState<{
+    type: 'success' | 'error';
+    message: string;
+  } | null>(null);
+
+  // Load notification data when dialog opens
+  useEffect(() => {
+    if (!open) {
+      setNotifResult(null);
+      return;
+    }
+
+    async function loadNotifData() {
+      try {
+        const res = await fetch('/api/admin/test-notification');
+        if (res.ok) {
+          const data = await res.json();
+          setTemplates(data.templates);
+          setTaskCount(data.taskCount);
+          setHasTokens(data.hasTokens);
+          setTokenCount(data.tokenCount);
+          if (data.templates.length > 0 && !selectedTemplate) {
+            setSelectedTemplate(data.templates[0].id);
+          }
+        }
+      } catch {
+        // Silent fail
+      }
+    }
+
+    loadNotifData();
+  }, [open]);
+
+  const handleSendTestNotification = async () => {
+    if (!selectedTemplate) return;
+
+    setLoading('test-notif');
+    setNotifResult(null);
+    try {
+      const res = await fetch('/api/admin/test-notification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateId: selectedTemplate }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        setNotifResult({
+          type: 'success',
+          message: `Sent to ${data.sent}/${data.totalTokens} device${data.totalTokens === 1 ? '' : 's'}`,
+        });
+      } else {
+        setNotifResult({
+          type: 'error',
+          message: data.error || 'Failed to send',
+        });
+      }
+    } catch {
+      setNotifResult({ type: 'error', message: 'Network error' });
+    } finally {
+      setLoading(null);
+    }
+  };
 
   const handleResetTasks = async () => {
     if (confirmAction !== 'reset-tasks') {
@@ -159,7 +240,7 @@ export function AdminSettingsDialog({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="relative w-full max-w-md bg-background border border-border rounded-3xl shadow-2xl overflow-hidden"
+              className="relative w-full max-w-md bg-background border border-border rounded-3xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col"
             >
               {/* Header */}
               <div className="relative px-6 py-5 border-b border-border/40 bg-gradient-to-br from-amber-500/10 to-orange-500/10">
@@ -185,7 +266,7 @@ export function AdminSettingsDialog({
               </div>
 
               {/* Content */}
-              <div className="p-6 space-y-4">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 {/* Reset Tasks & Statistics */}
                 <div className="space-y-2">
                   <Button
@@ -301,8 +382,8 @@ export function AdminSettingsDialog({
                     >
                       <AlertTriangle className="w-4 h-4 text-teal-600 dark:text-teal-400 mt-0.5 shrink-0" />
                       <div className="text-xs text-teal-600 dark:text-teal-400">
-                        <strong>Confirm:</strong> This will reset today's reward
-                        claim status. Click again to maximize testing.
+                        <strong>Confirm:</strong> This will reset today&#39;s
+                        reward claim status. Click again to maximize testing.
                       </div>
                     </motion.div>
                   )}
@@ -349,6 +430,85 @@ export function AdminSettingsDialog({
                     <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   )}
                 </Button>
+
+                {/* ── Notification Test Section ── */}
+                <div className="pt-2">
+                  <div className="border-t border-border/40 pt-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="flex items-center justify-center w-8 h-8 rounded-full bg-violet-500/15 text-violet-600 dark:text-violet-400">
+                        <Bell className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-foreground">
+                          Test Notifications
+                        </h3>
+                        <p className="text-[11px] text-muted-foreground">
+                          {hasTokens
+                            ? `${tokenCount} device${tokenCount === 1 ? '' : 's'} registered · ${taskCount} task${taskCount === 1 ? '' : 's'} left`
+                            : 'No devices registered — open on mobile first'}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Template picker */}
+                    <div className="space-y-1.5 mb-3">
+                      {templates.map((t) => (
+                        <button
+                          key={t.id}
+                          onClick={() => setSelectedTemplate(t.id)}
+                          className={`w-full text-left px-3 py-2.5 rounded-xl border transition-all text-xs ${
+                            selectedTemplate === t.id
+                              ? 'border-violet-500/50 bg-violet-500/10 ring-1 ring-violet-500/20'
+                              : 'border-border/50 bg-muted/30 hover:bg-muted/50'
+                          }`}
+                        >
+                          <div className="font-semibold text-foreground mb-0.5">
+                            {t.label}
+                          </div>
+                          <div className="text-muted-foreground leading-snug">
+                            {t.preview}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Send button */}
+                    <Button
+                      onClick={handleSendTestNotification}
+                      disabled={
+                        loading !== null || !hasTokens || !selectedTemplate
+                      }
+                      className="w-full gap-2 h-11 bg-violet-600 hover:bg-violet-700 text-white font-bold"
+                    >
+                      {loading === 'test-notif' ? (
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      Send Test Notification
+                    </Button>
+
+                    {/* Result feedback */}
+                    {notifResult && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className={`flex items-center gap-2 mt-2 px-3 py-2 rounded-xl text-xs font-medium ${
+                          notifResult.type === 'success'
+                            ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+                            : 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20'
+                        }`}
+                      >
+                        {notifResult.type === 'success' ? (
+                          <CheckCircle className="w-3.5 h-3.5 shrink-0" />
+                        ) : (
+                          <XCircle className="w-3.5 h-3.5 shrink-0" />
+                        )}
+                        {notifResult.message}
+                      </motion.div>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Footer */}
