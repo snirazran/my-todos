@@ -36,16 +36,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = auth.onIdTokenChanged(async (user) => {
       setUser(user);
       setLoading(false);
 
       if (user) {
-        // Refresh token cookie on auth state change (e.g. initial load or token refresh)
         const token = await user.getIdToken();
+        // Set cookie with 1 hour expiration (matches Firebase token lifetime)
+        // But onIdTokenChanged will fire again when token refreshes, updating this.
         document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
       } else {
-        // Clear cookie on logout
         document.cookie = `token=; path=/; max-age=0; SameSite=Strict`;
       }
     });

@@ -20,34 +20,52 @@ const EXTRA = 'Maybe Today';
 
 export default function ManageTasksPage() {
   const [week, setWeek] = useState<Task[][]>(
-    Array.from({ length: DAYS }, () => [])
+    Array.from({ length: DAYS }, () => []),
   );
   const [loading, setLoading] = useState(true);
   // Calculate rolling week order once on mount
   const processingWeekOrder = useMemo(() => getRollingWeekOrder(), []);
-  const todayIdx = useMemo(() => todayDisplayIndex(processingWeekOrder), [processingWeekOrder]);
+  const todayIdx = useMemo(
+    () => todayDisplayIndex(processingWeekOrder),
+    [processingWeekOrder],
+  );
 
   /** Map API order (Sun..Sat, Later at index 7) -> Display order */
-  const mapApiToDisplay = useCallback((apiWeek: Task[][]): Task[][] => {
-    const out: Task[][] = Array.from({ length: DAYS }, () => []);
-    // API days 0..6 (Sun..Sat)
-    for (
-      let apiDay = 0 as ApiDay;
-      apiDay <= 6;
-      apiDay = (apiDay + 1) as ApiDay
-    ) {
-      const displayIdx = displayDayFromApi(apiDay, processingWeekOrder);
-      out[displayIdx] = apiWeek[apiDay] ?? [];
-    }
-    // Later bucket is already at index 7 from the API
-    out[7] = apiWeek[7] ?? [];
-    return out;
-  }, [processingWeekOrder]);
+  const mapApiToDisplay = useCallback(
+    (apiWeek: Task[][]): Task[][] => {
+      const out: Task[][] = Array.from({ length: DAYS }, () => []);
+
+      const sortTasks = (tasks: Task[]) => {
+        // Sort by completed status (false first, true last)
+        // If same status, keep original order (stable sort)
+        return [...tasks].sort((a, b) => {
+          if (a.completed === b.completed) return 0;
+          return a.completed ? 1 : -1;
+        });
+      };
+
+      // API days 0..6 (Sun..Sat)
+      for (
+        let apiDay = 0 as ApiDay;
+        apiDay <= 6;
+        apiDay = (apiDay + 1) as ApiDay
+      ) {
+        const displayIdx = displayDayFromApi(apiDay, processingWeekOrder);
+        out[displayIdx] = sortTasks(apiWeek[apiDay] ?? []);
+      }
+      // Later bucket is already at index 7 from the API
+      out[7] = sortTasks(apiWeek[7] ?? []);
+      return out;
+    },
+    [processingWeekOrder],
+  );
 
   const fetchWeek = useCallback(async () => {
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      const res = await fetch(`/api/tasks?view=board&timezone=${encodeURIComponent(tz)}`);
+      const res = await fetch(
+        `/api/tasks?view=board&timezone=${encodeURIComponent(tz)}`,
+      );
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as Task[][];
       if (Array.isArray(data)) setWeek(mapApiToDisplay(data));
@@ -131,9 +149,9 @@ export default function ManageTasksPage() {
       body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
     });
 
-    const data = (await fetch(`/api/tasks?view=board&timezone=${encodeURIComponent(tz)}`).then((r) =>
-      r.json()
-    )) as Task[][];
+    const data = (await fetch(
+      `/api/tasks?view=board&timezone=${encodeURIComponent(tz)}`,
+    ).then((r) => r.json())) as Task[][];
     setWeek(mapApiToDisplay(data));
   };
 
