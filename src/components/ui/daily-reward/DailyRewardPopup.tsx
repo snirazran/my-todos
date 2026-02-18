@@ -167,7 +167,7 @@ export function DailyRewardPopup({
               <div className="p-4 md:p-8 text-center space-y-1 relative bg-gradient-to-b from-primary/5 to-transparent shrink-0">
                 <button
                   onClick={onClose}
-                  className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors opacity-70 hover:opacity-100"
+                  className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors opacity-70 hover:opacity-100 z-[60]"
                 >
                   <X className="w-5 h-5" />
                 </button>

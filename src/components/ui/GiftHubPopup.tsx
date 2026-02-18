@@ -11,6 +11,8 @@ import {
   Sparkles,
   ShoppingBag,
   Loader2,
+  CalendarCheck,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { GiftRive } from './gift-box/GiftBox';
@@ -19,7 +21,7 @@ import Fly from './fly';
 import { useProgressLogic, type ProgressSlot } from '@/hooks/useProgressLogic';
 import { useInventory } from '@/hooks/useInventory';
 import { useAuth } from '@/components/auth/AuthContext';
-import { mutate as globalMutate } from 'swr';
+import useSWR, { mutate as globalMutate } from 'swr';
 import { ItemCard } from './skins/ItemCard';
 import type { ItemDef } from '@/lib/skins/catalog';
 
@@ -35,6 +37,7 @@ interface GiftHubPopupProps {
   onAddTask: () => void;
   onMutateToday: () => void;
   isGuest?: boolean;
+  onOpenDailyReward?: () => void;
 }
 
 /* ─── MAIN COMPONENT ───────────────────────────────── */
@@ -49,6 +52,7 @@ export function GiftHubPopup({
   onAddTask,
   onMutateToday,
   isGuest,
+  onOpenDailyReward,
 }: GiftHubPopupProps) {
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
@@ -65,6 +69,15 @@ export function GiftHubPopup({
   const effectiveGiftsClaimed = giftsClaimed + optimisticExtraClaimed;
   const slots = useProgressLogic(done, total, effectiveGiftsClaimed);
   const { data: inventoryData, mutate: mutateInventory } = useInventory();
+
+  // Check Daily Reward Status
+  const { data: dailyStatus } = useSWR<any>(
+    user ? '/api/daily-reward/status' : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+  );
+  const today = new Date().getDate();
+  const hasClaimedDaily =
+    dailyStatus?.dailyRewards?.claimedDays?.includes(today);
 
   const giftBoxItems = useMemo(
     () => (inventoryData?.catalog ?? []).filter((i) => i.slot === 'container'),
@@ -363,6 +376,35 @@ export function GiftHubPopup({
                             ) : (
                               <>
                                 <div className="space-y-3 mb-4">
+                                  {/* Daily Login Button - Only show if NOT claimed today */}
+                                  {!hasClaimedDaily && (
+                                    <button
+                                      onClick={() => {
+                                        onClose();
+                                        onOpenDailyReward?.();
+                                      }}
+                                      className="w-full flex items-center gap-4 p-3 rounded-2xl border border-amber-200/50 dark:border-amber-800/30 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 group transition-all hover:brightness-105 active:scale-[0.98]"
+                                    >
+                                      <div className="flex-shrink-0 w-16 h-16 md:w-20 md:h-20 flex items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-500">
+                                        <CalendarCheck className="w-8 h-8 md:w-9 md:h-9" />
+                                      </div>
+                                      <div className="flex-1 text-left">
+                                        <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500">
+                                          Daily Login
+                                        </span>
+                                        <h3 className="text-base font-black text-foreground leading-tight">
+                                          Check Daily Rewards
+                                        </h3>
+                                        <p className="text-xs font-medium text-muted-foreground mt-0.5">
+                                          See what you can claim today!
+                                        </p>
+                                      </div>
+                                      <div className="bg-background/50 p-2 rounded-full text-muted-foreground group-hover:text-foreground transition-colors">
+                                        <ArrowRight className="w-5 h-5" />
+                                      </div>
+                                    </button>
+                                  )}
+
                                   {slots.map((slot, idx) => (
                                     <MilestoneRow
                                       key={idx}

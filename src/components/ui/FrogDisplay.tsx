@@ -35,6 +35,7 @@ type Props = {
   isGuest?: boolean;
   onAddTask?: () => void;
   onMutateToday?: () => void;
+  onOpenDailyReward?: () => void;
 };
 
 export function FrogDisplay({
@@ -59,6 +60,7 @@ export function FrogDisplay({
   isGuest,
   onAddTask,
   onMutateToday,
+  onOpenDailyReward,
 }: Props) {
   const { unseenCount, data: inventoryData } = useInventory();
   const [clickedAt, setClickedAt] = React.useState(0);
@@ -328,6 +330,7 @@ export function FrogDisplay({
         onAddTask={onAddTask ?? (() => {})}
         onMutateToday={onMutateToday ?? (() => {})}
         isGuest={isGuest}
+        onOpenDailyReward={onOpenDailyReward}
       />
 
       <WardrobePanel open={openWardrobe} onOpenChange={onOpenChange} />

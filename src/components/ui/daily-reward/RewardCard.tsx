@@ -155,13 +155,22 @@ export function SingleRewardCard({
       <span
         className={cn(
           'text-xs font-bold uppercase tracking-wider',
-          isReady ? 'text-primary' : 'text-muted-foreground/70',
+          isReady
+            ? 'text-primary'
+            : isLockedPremium && isToday
+              ? 'text-amber-500'
+              : 'text-muted-foreground/70',
         )}
       >
         {isClaimed ? (
-          <span className="flex items-center gap-1 text-green-600">
-            <Check className="w-3 h-3" /> Done
-          </span>
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/30 shadow-sm">
+            <div className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-500 text-white">
+              <Check className="w-2.5 h-2.5 stroke-[4]" />
+            </div>
+            <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+              Claimed
+            </span>
+          </div>
         ) : (
           `Day ${day}`
         )}

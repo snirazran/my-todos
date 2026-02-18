@@ -156,7 +156,7 @@ export function MonthProgress({
         {/* ─── FREE ROW ─── */}
         <div className="relative mt-2">
           {/* Free Track Background */}
-          <div className="absolute top-1/2 left-0 right-0 h-3 -translate-y-1/2 bg-muted/30 border-y border-border/30" />
+          <div className="absolute top-1/2 left-0 right-0 h-3 -translate-y-1/2 bg-gray-100 dark:bg-gray-800/40 border-y border-gray-200 dark:border-gray-700/40" />
 
           {/* Header Badge */}
           <div className="sticky left-4 z-10 mb-3 inline-flex items-center gap-2 px-3 py-1 bg-background/80 backdrop-blur-sm border border-border rounded-full shadow-sm">

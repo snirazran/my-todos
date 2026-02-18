@@ -266,6 +266,7 @@ export default function Home() {
                 setShowQuickAdd(true);
               }}
               onMutateToday={() => mutateToday()}
+              onOpenDailyReward={() => setShowDailyReward(true)}
             />
           </div>
 
