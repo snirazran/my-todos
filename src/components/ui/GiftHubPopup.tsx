@@ -631,13 +631,16 @@ function MilestoneRow({
           >
             <Check className="w-5 h-5 text-primary" strokeWidth={3} />
           </motion.div>
-        ) : isLocked ? (
-          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 grayscale opacity-70">
-            <Fly size={28} y={-2} />
-          </div>
         ) : (
           <div className="-translate-y-1">
-            <GiftRive width={80} height={80} isMilestone={!isReady} />
+            {/* Show Gift for both Locked & Pending */}
+            <GiftRive
+              width={80}
+              height={80}
+              isMilestone={!isReady}
+              // Optional: Add opacity/grayscale if strictly locked?
+              // The user asked to "show the gift as milestone", implying the same look as pending.
+            />
           </div>
         )}
       </div>
@@ -655,14 +658,14 @@ function MilestoneRow({
             {MILESTONE_LABELS[index]}
           </span>
           <span className="text-[10px] font-bold text-muted-foreground/70 tabular-nums">
-            {slot.target} tasks
+            {isClaimed || isReady ? 'Done!' : `${slot.tasksLeft} left`}
           </span>
         </div>
 
         <div className="mb-2">
           <span
             className={cn(
-              'text-sm font-black',
+              'text-lg font-black tracking-tight', // Increased size slightly
               isClaimed && 'text-primary/80',
               isReady && 'text-foreground',
               isLocked && 'text-muted-foreground',
@@ -673,9 +676,7 @@ function MilestoneRow({
               ? 'Collected!'
               : isReady
                 ? 'Ready to claim!'
-                : isLocked
-                  ? `Add ${slot.neededToUnlock} task${slot.neededToUnlock > 1 ? 's' : ''}`
-                  : `${slot.tasksLeft} task${slot.tasksLeft > 1 ? 's' : ''} left`}
+                : `Complete ${slot.target} tasks`}
           </span>
         </div>
 
