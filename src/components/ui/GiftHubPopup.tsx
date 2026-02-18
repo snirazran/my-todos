@@ -460,8 +460,8 @@ export function GiftHubPopup({
                         "
                       >
                         <Gift className="w-4 h-4" />
-                        <span className="hidden xs:inline">Gifts</span>
-                        <span className="xs:hidden">Gifts</span>
+                        <span className="hidden xs:inline">My Gifts</span>
+                        <span className="xs:hidden">My Gifts</span>
                         {totalOwnedBoxes > 0 && (
                           <span className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-primary text-[10px] font-black text-primary-foreground ml-1">
                             {totalOwnedBoxes}
@@ -569,15 +569,6 @@ export function GiftHubPopup({
                       value="shop"
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
                     >
-                      <div className="mb-4 px-1">
-                        <h3 className="text-lg font-bold text-foreground mb-1">
-                          Buy Items
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          Spend your flies on items and mystery boxes.
-                        </p>
-                      </div>
-
                       {shopItemsFiltered.length > 0 ? (
                         <div className="grid grid-cols-2 min-[450px]:grid-cols-3 gap-3 md:gap-4 pb-20 md:pb-4">
                           {shopItemsFiltered.map((item) => (
@@ -613,15 +604,6 @@ export function GiftHubPopup({
                       value="inventory"
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
                     >
-                      <div className="mb-4 px-1">
-                        <h3 className="text-lg font-bold text-foreground mb-1">
-                          My Collection
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          Your owned boxes and items.
-                        </p>
-                      </div>
-
                       {inventoryItemsFiltered.length > 0 ? (
                         <div className="grid grid-cols-2 min-[450px]:grid-cols-3 gap-3 md:gap-4 pb-20 md:pb-4">
                           {inventoryItemsFiltered.map((item) => (
