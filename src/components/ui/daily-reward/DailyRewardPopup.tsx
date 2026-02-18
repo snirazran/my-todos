@@ -205,7 +205,7 @@ export function DailyRewardPopup({
               </div>
 
               {/* Content */}
-              <div className="flex-1 overflow-y-auto min-h-0 py-4 md:py-6">
+              <div className="flex-1 overflow-y-auto min-h-0 pt-1 pb-4 md:py-6">
                 <MonthProgress
                   progress={{
                     ...statusData.dailyRewards,
