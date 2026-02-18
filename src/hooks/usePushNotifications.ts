@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 
 /**
+ * dd
  * Hook that handles push notification setup for native platforms (Android/iOS).
  * - Requests permission
  * - Registers the FCM token with the server
