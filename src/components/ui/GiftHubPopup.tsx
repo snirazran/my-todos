@@ -689,6 +689,17 @@ export function GiftHubPopup({
               </div>
             </motion.div>
           </div>
+          {openingGiftId && (
+            <GiftBoxOpening
+              giftBoxId={openingGiftId}
+              onClose={() => {
+                setOpeningGiftId(null);
+                mutateInventory();
+                globalMutate('/api/skins/inventory');
+                onMutateToday();
+              }}
+            />
+          )}
         </>
       )}
     </AnimatePresence>,

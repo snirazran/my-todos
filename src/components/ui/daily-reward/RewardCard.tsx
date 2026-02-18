@@ -129,8 +129,10 @@ export function SingleRewardCard({
     <div className="flex flex-col items-center gap-2 group">
       {/* Card Wrapper - Increased size to match Shop (approx 176px) */}
       <div
+        onClick={onClick}
         className={cn(
           'relative transition-all duration-300 w-44 sm:w-48 scale-100',
+          onClick && 'cursor-pointer',
           status !== 'READY' &&
             status !== 'CLAIMED' &&
             !(isLockedPremium && isToday) &&
