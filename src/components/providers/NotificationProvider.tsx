@@ -13,7 +13,7 @@ import { X, CalendarCheck, FolderOpen } from 'lucide-react';
 
 interface NotificationContextType {
   showNotification: (
-    message: string,
+    content: React.ReactNode,
     undoAction?: () => void | Promise<void>,
   ) => void;
   hideNotification: () => void;
@@ -39,7 +39,7 @@ export function NotificationProvider({
   children: React.ReactNode;
 }) {
   const [notification, setNotification] = useState<{
-    message: string;
+    content: React.ReactNode;
     undoAction?: () => void | Promise<void>;
     id: number;
   } | null>(null);
@@ -57,14 +57,14 @@ export function NotificationProvider({
   }, []);
 
   const showNotification = useCallback(
-    (message: string, undoAction?: () => void | Promise<void>) => {
+    (content: React.ReactNode, undoAction?: () => void | Promise<void>) => {
       // Clear existing timeout
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
 
       setNotification({
-        message,
+        content,
         undoAction,
         id: Date.now(),
       });
@@ -97,8 +97,8 @@ export function NotificationProvider({
     }
   };
 
-  const isSavedTasksToast = notification?.message === 'Moved to Saved Tasks';
-  const isMovedToTodayToast = notification?.message === 'Moved to Today';
+  const isSavedTasksToast = notification?.content === 'Moved to Saved Tasks';
+  const isMovedToTodayToast = notification?.content === 'Moved to Today';
   const isMoveToast = isSavedTasksToast || isMovedToTodayToast;
 
   return (
@@ -115,16 +115,16 @@ export function NotificationProvider({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 20, scale: 0.95 }}
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-[18px] max-w-sm w-full border ${
+              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-[18px] max-w-sm w-auto border shadow-sm backdrop-blur-2xl ${
                 isMoveToast
-                  ? 'bg-card/80 text-foreground border-border/50 backdrop-blur-2xl shadow-sm'
-                  : 'bg-popover text-popover-foreground border-border'
+                  ? 'bg-card/90 text-foreground border-border/50'
+                  : 'bg-popover/90 text-popover-foreground border-border'
               }`}
             >
               {isMoveToast && (
                 <span
                   aria-hidden
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 bg-background"
                 >
                   {isSavedTasksToast ? (
                     <FolderOpen size={14} />
@@ -133,11 +133,13 @@ export function NotificationProvider({
                   )}
                 </span>
               )}
-              <span
-                className={`flex-1 text-sm ${isMoveToast ? 'font-semibold' : 'font-medium'}`}
+              <div
+                className={`flex-1 text-sm ${
+                  isMoveToast ? 'font-semibold' : 'font-medium'
+                }`}
               >
-                {notification.message}
-              </span>
+                {notification.content}
+              </div>
               {notification.undoAction && (
                 <button
                   onClick={handleUndo}

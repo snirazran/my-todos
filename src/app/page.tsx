@@ -38,6 +38,8 @@ import {
   HungerStatus,
 } from '@/hooks/useTaskData';
 
+// Force re-compilation of this file to pick up useTaskData.tsx change
+
 const FLY_PX = 24;
 
 const demoTasks: Task[] = [

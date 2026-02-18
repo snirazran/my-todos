@@ -3,6 +3,7 @@ import { useCallback, useState, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
+import Fly from '@/components/ui/fly';
 
 // --- Types ---
 export interface Task {
@@ -205,6 +206,39 @@ export function useTaskData() {
           // Update Fly/Hunger status if returned
           // We use a functional update to ensure we're modifying the LATEST state (which might include the optimistic change)
           if (json.flyStatus || json.hungerStatus) {
+            const newFlyStatus = json.flyStatus as FlyStatus | undefined;
+
+            // NOTIFICATIONS
+            if (newFlyStatus) {
+              const prevEarned = flyStatus.earnedToday;
+              const newEarned = newFlyStatus.earnedToday;
+
+              if (newFlyStatus.justHitLimit) {
+                showNotification(
+                  <div className="flex items-center gap-3 pr-1">
+                    <Fly size={28} y={-4} />
+                    <span className="font-bold text-red-500">
+                      Daily Target Reached!
+                    </span>
+                  </div>,
+                );
+              } else if (newEarned > prevEarned) {
+                showNotification(
+                  <div className="flex items-center gap-3 pr-2">
+                    <Fly size={28} y={-4} />
+                    <div className="flex flex-col leading-none">
+                      <span className="font-black text-base">
+                        +1 Fly Collected!
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-bold mt-0.5 uppercase tracking-wider">
+                        Keep it up!
+                      </span>
+                    </div>
+                  </div>,
+                );
+              }
+            }
+
             mutateToday(
               (curr) => {
                 if (!curr) return curr;
