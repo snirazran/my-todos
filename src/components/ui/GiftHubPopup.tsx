@@ -57,14 +57,15 @@ export function GiftHubPopup({
   const { user } = useAuth();
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [activeTab, setActiveTab] = useState<'earn' | 'shop'>('earn');
+  const [activeTab, setActiveTab] = useState<'earn' | 'shop' | 'inventory'>(
+    'earn',
+  );
   const dragControls = useDragControls();
 
   const [claiming, setClaiming] = useState(false);
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
   const [optimisticExtraClaimed, setOptimisticExtraClaimed] = useState(0);
-  const [shopSubTab, setShopSubTab] = useState<'browse' | 'myboxes'>('browse');
 
   const effectiveGiftsClaimed = giftsClaimed + optimisticExtraClaimed;
   const slots = useProgressLogic(done, total, effectiveGiftsClaimed);
@@ -123,8 +124,7 @@ export function GiftHubPopup({
 
   useEffect(() => {
     if (show && allClaimed && totalOwnedBoxes > 0) {
-      setActiveTab('shop');
-      setShopSubTab('myboxes');
+      setActiveTab('inventory');
     }
   }, [show, allClaimed, totalOwnedBoxes]);
 
@@ -308,18 +308,18 @@ export function GiftHubPopup({
                   {/* ─── TAB SWITCHER ─── */}
                   <div className="px-4 pt-4 pb-3 shrink-0 md:px-6">
                     <div className="flex p-1 rounded-2xl bg-muted/40 ring-1 ring-border/30">
-                      {(['earn', 'shop'] as const).map((tab) => (
+                      {(['earn', 'shop', 'inventory'] as const).map((tab) => (
                         <button
                           key={tab}
                           onClick={() => setActiveTab(tab)}
                           className={cn(
-                            'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all duration-200',
+                            'flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 relative',
                             activeTab === tab
                               ? 'bg-background text-foreground shadow-sm'
                               : 'text-muted-foreground hover:text-foreground',
                           )}
                         >
-                          {tab === 'earn' ? (
+                          {tab === 'earn' && (
                             <>
                               <Sparkles
                                 className={cn(
@@ -327,12 +327,14 @@ export function GiftHubPopup({
                                   activeTab === 'earn' && 'text-primary',
                                 )}
                               />
-                              Daily Rewards
+                              <span className="hidden sm:inline">Rewards</span>
+                              <span className="sm:hidden">Earn</span>
                               {hasReadyGift && (
-                                <span className="flex h-2 w-2 rounded-full bg-primary animate-pulse" />
+                                <span className="absolute top-2 right-2 sm:static sm:flex h-2 w-2 rounded-full bg-primary animate-pulse" />
                               )}
                             </>
-                          ) : (
+                          )}
+                          {tab === 'shop' && (
                             <>
                               <ShoppingBag
                                 className={cn(
@@ -340,9 +342,20 @@ export function GiftHubPopup({
                                   activeTab === 'shop' && 'text-primary',
                                 )}
                               />
-                              Gift Shop
+                              Shop
+                            </>
+                          )}
+                          {tab === 'inventory' && (
+                            <>
+                              <Gift
+                                className={cn(
+                                  'w-4 h-4',
+                                  activeTab === 'inventory' && 'text-primary',
+                                )}
+                              />
+                              My Gifts
                               {totalOwnedBoxes > 0 && (
-                                <span className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-primary text-[10px] font-black text-primary-foreground">
+                                <span className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-primary text-[10px] font-black text-primary-foreground ml-1">
                                   {totalOwnedBoxes}
                                 </span>
                               )}
@@ -422,133 +435,109 @@ export function GiftHubPopup({
                                 </div>
                                 <div className="p-3 rounded-2xl bg-muted/30 ring-1 ring-border/30">
                                   <p className="text-xs font-medium text-muted-foreground text-center leading-relaxed">
-                                    Complete daily tasks to earn gift boxes
-                                    containing random skins or flies!
+                                    Complete daily tasks to earn gift boxes!
                                   </p>
                                 </div>
                               </>
                             )}
                           </motion.div>
-                        ) : (
+                        ) : activeTab === 'shop' ? (
                           <motion.div
                             key="shop"
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 20 }}
                             transition={{ duration: 0.15 }}
-                            className="pb-20 md:pb-4"
+                            className="pb-4"
                           >
-                            {/* ── Sub-tab Switcher ── */}
-                            <div className="sticky top-0 z-10 pb-3">
-                              <div className="flex p-0.5 rounded-xl bg-muted/50 ring-1 ring-border/20">
-                                {(['browse', 'myboxes'] as const).map((sub) => (
-                                  <button
-                                    key={sub}
-                                    onClick={() => setShopSubTab(sub)}
-                                    className={cn(
-                                      'flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-[10px] text-xs font-bold transition-all duration-200',
-                                      shopSubTab === sub
-                                        ? 'bg-background text-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground',
-                                    )}
-                                  >
-                                    {sub === 'browse' ? (
-                                      'Browse'
-                                    ) : (
-                                      <>
-                                        My Boxes
-                                        {totalOwnedBoxes > 0 && (
-                                          <span className="flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-primary text-[9px] font-black text-primary-foreground">
-                                            {totalOwnedBoxes}
-                                          </span>
-                                        )}
-                                      </>
-                                    )}
-                                  </button>
-                                ))}
-                              </div>
+                            <div className="mb-4 px-1">
+                              <h3 className="text-lg font-bold text-foreground mb-1">
+                                Buy Gift Boxes
+                              </h3>
+                              <p className="text-xs text-muted-foreground">
+                                Spend your flies on mystery boxes.
+                              </p>
                             </div>
 
-                            {/* ── Browse: Buy gift boxes ── */}
-                            <AnimatePresence mode="wait">
-                              {shopSubTab === 'browse' ? (
-                                <motion.div
-                                  key="browse"
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  transition={{ duration: 0.12 }}
-                                >
-                                  {giftBoxItems.length > 0 ? (
-                                    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 gap-3 md:gap-4">
-                                      {giftBoxItems.map((item) => (
-                                        <ItemCard
-                                          key={item.id}
-                                          item={item}
-                                          mode="shop"
-                                          ownedCount={
-                                            inventoryData?.wardrobe
-                                              ?.inventory?.[item.id] ?? 0
-                                          }
-                                          isEquipped={false}
-                                          canAfford={
-                                            balance >= (item.priceFlies ?? 0) &&
-                                            !isGuest
-                                          }
-                                          actionLoading={buyingId === item.id}
-                                          onAction={() => handleBuyItem(item)}
-                                        />
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col items-center justify-center py-12 opacity-50">
-                                      <Gift className="w-10 h-10 text-muted-foreground mb-3" />
-                                      <p className="text-sm font-bold text-muted-foreground">
-                                        No gift boxes available
-                                      </p>
-                                    </div>
-                                  )}
-                                </motion.div>
-                              ) : (
-                                <motion.div
-                                  key="myboxes"
-                                  initial={{ opacity: 0 }}
-                                  animate={{ opacity: 1 }}
-                                  exit={{ opacity: 0 }}
-                                  transition={{ duration: 0.12 }}
-                                >
-                                  {ownedGiftBoxes.length > 0 ? (
-                                    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 gap-3 md:gap-4">
-                                      {ownedGiftBoxes.map((item) => (
-                                        <ItemCard
-                                          key={`owned-${item.id}`}
-                                          item={item}
-                                          mode="inventory"
-                                          ownedCount={
-                                            inventoryData?.wardrobe
-                                              ?.inventory?.[item.id] ?? 0
-                                          }
-                                          isEquipped={false}
-                                          canAfford={true}
-                                          actionLoading={false}
-                                          onAction={() => handleOpenItem(item)}
-                                        />
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <div className="flex flex-col items-center justify-center py-12 opacity-50">
-                                      <Gift className="w-10 h-10 text-muted-foreground mb-3" />
-                                      <p className="text-sm font-bold text-muted-foreground">
-                                        No gift boxes to open
-                                      </p>
-                                      <p className="text-xs text-muted-foreground/60 mt-1">
-                                        Buy or earn boxes to see them here
-                                      </p>
-                                    </div>
-                                  )}
-                                </motion.div>
-                              )}
-                            </AnimatePresence>
+                            {giftBoxItems.length > 0 ? (
+                              <div className="grid grid-cols-2 min-[450px]:grid-cols-3 gap-3 md:gap-4">
+                                {giftBoxItems.map((item) => (
+                                  <ItemCard
+                                    key={item.id}
+                                    item={item}
+                                    mode="shop"
+                                    ownedCount={
+                                      inventoryData?.wardrobe?.inventory?.[
+                                        item.id
+                                      ] ?? 0
+                                    }
+                                    isEquipped={false}
+                                    canAfford={
+                                      balance >= (item.priceFlies ?? 0) &&
+                                      !isGuest
+                                    }
+                                    actionLoading={buyingId === item.id}
+                                    onAction={() => handleBuyItem(item)}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-12 opacity-50">
+                                <Gift className="w-10 h-10 text-muted-foreground mb-3" />
+                                <p className="text-sm font-bold text-muted-foreground">
+                                  No gift boxes available
+                                </p>
+                              </div>
+                            )}
+                          </motion.div>
+                        ) : (
+                          <motion.div
+                            key="inventory"
+                            initial={{ opacity: 0, x: 20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            transition={{ duration: 0.15 }}
+                            className="pb-4"
+                          >
+                            <div className="mb-4 px-1">
+                              <h3 className="text-lg font-bold text-foreground mb-1">
+                                My Gift Boxes
+                              </h3>
+                              <p className="text-xs text-muted-foreground">
+                                Open boxes to win prizes!
+                              </p>
+                            </div>
+
+                            {ownedGiftBoxes.length > 0 ? (
+                              <div className="grid grid-cols-2 min-[450px]:grid-cols-3 gap-3 md:gap-4">
+                                {ownedGiftBoxes.map((item) => (
+                                  <ItemCard
+                                    key={`owned-${item.id}`}
+                                    item={item}
+                                    mode="inventory"
+                                    ownedCount={
+                                      inventoryData?.wardrobe?.inventory?.[
+                                        item.id
+                                      ] ?? 0
+                                    }
+                                    isEquipped={false}
+                                    canAfford={true}
+                                    actionLoading={false}
+                                    onAction={() => handleOpenItem(item)}
+                                  />
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center py-12 opacity-50">
+                                <Gift className="w-10 h-10 text-muted-foreground mb-3" />
+                                <p className="text-sm font-bold text-muted-foreground">
+                                  No gift boxes to open
+                                </p>
+                                <p className="text-xs text-muted-foreground/60 mt-1">
+                                  Buy or earn boxes to see them here
+                                </p>
+                              </div>
+                            )}
                           </motion.div>
                         )}
                       </AnimatePresence>
