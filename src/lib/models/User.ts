@@ -52,6 +52,10 @@ const UserSchema = new Schema<UserDoc>(
       month: { type: String }, // Format YYYY-MM
       streak: { type: Number, default: 0 },
     },
+    notificationPrefs: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
   },
   { collection: 'users' },
 );

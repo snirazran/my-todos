@@ -59,6 +59,17 @@ export type UserDoc = {
   tags?: UserTag[];
   premiumUntil?: Date;
   dailyRewards?: DailyRewardProgress;
+  notificationPrefs?: NotificationPrefs;
+};
+
+export type NotificationPrefs = {
+  fcmTokens: string[]; // Device FCM tokens (one per device)
+  enabled: boolean; // User opt-in for push notifications
+  activityHours: number[]; // Rolling log of active hours (last 50)
+  lastNotifiedAt?: Date; // Prevent duplicate sends
+  timezone: string; // User's IANA timezone
+  morningSlot: number; // Best morning notification hour (0-23), default 9
+  eveningSlot: number; // Best evening notification hour (0-23), default 18
 };
 
 export type DailyRewardProgress = {

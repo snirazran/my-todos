@@ -38,3 +38,8 @@ export function getAdminAuth() {
   getFirebaseApp();
   return admin.auth();
 }
+
+export function getAdminMessaging() {
+  getFirebaseApp();
+  return admin.messaging();
+}

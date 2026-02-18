@@ -52,7 +52,9 @@ next-env.d.ts
 android/.gradle
 android/app/build
 android/app/src/main/assets/public
+android/app/google-services.json
 
 # iOS
 ios/App/App.xcworkspace/xcuserdata
 ios/App/Pods
+ios/App/App/GoogleService-Info.plist

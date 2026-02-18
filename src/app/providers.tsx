@@ -4,6 +4,7 @@ import { SWRConfig } from 'swr';
 import { ThemeProvider } from 'next-themes';
 import type { ReactNode } from 'react';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
+import { PushNotificationInit } from '@/components/providers/PushNotificationInit';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -14,7 +15,10 @@ export default function Providers({ children }: { children: ReactNode }) {
           revalidateOnReconnect: false,
         }}
       >
-        <NotificationProvider>{children}</NotificationProvider>
+        <NotificationProvider>
+          <PushNotificationInit />
+          {children}
+        </NotificationProvider>
       </SWRConfig>
     </ThemeProvider>
   );
