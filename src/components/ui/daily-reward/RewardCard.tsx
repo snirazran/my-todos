@@ -121,6 +121,12 @@ export function SingleRewardCard({
         Missed
       </Button>
     );
+  } else if (isClaimed && isToday) {
+    customAction = (
+      <div className="w-full h-8 flex items-center justify-center rounded-lg bg-muted/50 border border-border/50 text-muted-foreground text-[10px] font-black uppercase tracking-wide px-1">
+        Next gift tomorrow
+      </div>
+    );
   } else {
     customAction = <div className="h-8 w-full" />; // Reserve space equal to button height
   }
