@@ -2,9 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
-import { getZonedToday } from '@/app/api/tasks/route'; // reuse helper if exported, or just duplicate for simplicity.
-// Actually, `getZonedToday` is not exported from route.ts. I'll just rewrite a simple version or import if I can find it.
-// Checking route.ts again, it's not exported. I'll just use a simple robust format.
+import { getZonedToday } from '@/lib/utils';
 
 export async function GET(req: Request) {
   try {

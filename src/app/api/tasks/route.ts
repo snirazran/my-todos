@@ -18,6 +18,7 @@ import {
   MAX_HUNGER_MS,
   TASK_HUNGER_REWARD_MS,
 } from '@/lib/hungerLogic';
+import { getZonedToday, getZonedYMD } from '@/lib/utils';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
@@ -54,29 +55,6 @@ function unauth() {
 }
 
 // --- Timezone Helpers ---
-
-function getZonedYMD(d: Date, tz: string) {
-  try {
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: tz,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(d);
-  } catch (e) {
-    console.warn('Invalid timezone:', tz);
-    return new Intl.DateTimeFormat('en-CA', {
-      timeZone: 'UTC',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-    }).format(d);
-  }
-}
-
-function getZonedToday(tz: string) {
-  return getZonedYMD(new Date(), tz);
-}
 
 function getRollingWeekDatesZoned(tz: string) {
   const todayYMD = getZonedToday(tz);
