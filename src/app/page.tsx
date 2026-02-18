@@ -687,16 +687,23 @@ export default function Home() {
                   { revalidate: false },
                 );
               } else {
-                mutateToday(
-                  (curr) => {
-                    if (!curr) return undefined;
-                    return {
-                      ...curr,
-                      tasks: [...curr.tasks, ...newTasks],
-                    };
-                  },
-                  { revalidate: false },
+                // Filter to only add tasks that match TODAY's date
+                const relevantTasks = newTasks.filter(
+                  (t: any) => !t.date || t.date === dateStr,
                 );
+
+                if (relevantTasks.length > 0) {
+                  mutateToday(
+                    (curr) => {
+                      if (!curr) return undefined;
+                      return {
+                        ...curr,
+                        tasks: [...curr.tasks, ...relevantTasks],
+                      };
+                    },
+                    { revalidate: false },
+                  );
+                }
               }
             } else if (user) {
               // Fallback

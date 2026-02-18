@@ -15,6 +15,7 @@ export interface Task {
   origin?: 'regular' | 'weekly' | 'backlog';
   kind?: 'regular' | 'weekly' | 'backlog';
   tags?: string[];
+  date?: string;
 }
 
 export type FlyStatus = {

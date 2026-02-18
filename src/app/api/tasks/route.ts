@@ -519,6 +519,7 @@ export async function POST(req: NextRequest) {
         completed: false,
         type: 'regular',
         tags: task.tags || [],
+        date: task.date,
       });
     }
   }
