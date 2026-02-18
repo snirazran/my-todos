@@ -37,14 +37,22 @@ const CATEGORY_CONFIG: Record<
   costume: { label: 'Costumes', icon: <Ghost className="w-5 h-5" /> },
 };
 
+export interface FilterOption {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+}
+
 export function FilterBar({
   active,
   onChange,
   badges,
+  options,
 }: {
-  active: FilterCategory;
-  onChange: (s: FilterCategory) => void;
-  badges?: Partial<Record<FilterCategory, number>>;
+  active: string;
+  onChange: (s: any) => void;
+  badges?: Partial<Record<string, number>>;
+  options?: FilterOption[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -54,14 +62,43 @@ export function FilterBar({
   const scrollLeft = useRef(0);
   const isDragging = useRef(false);
 
-  const categories: FilterCategory[] = [
-    'all',
-    'hat',
-    'scarf',
-    'body',
-    'held',
-    'glasses',
-    'costume',
+  // Use provided options or default categories (mapped to FilterOption format)
+  const displayOptions: FilterOption[] = options ?? [
+    {
+      id: 'all',
+      label: CATEGORY_CONFIG.all.label,
+      icon: CATEGORY_CONFIG.all.icon,
+    },
+    {
+      id: 'hat',
+      label: CATEGORY_CONFIG.hat.label,
+      icon: CATEGORY_CONFIG.hat.icon,
+    },
+    {
+      id: 'scarf',
+      label: CATEGORY_CONFIG.scarf.label,
+      icon: CATEGORY_CONFIG.scarf.icon,
+    },
+    {
+      id: 'body',
+      label: CATEGORY_CONFIG.body.label,
+      icon: CATEGORY_CONFIG.body.icon,
+    },
+    {
+      id: 'held',
+      label: CATEGORY_CONFIG.held.label,
+      icon: CATEGORY_CONFIG.held.icon,
+    },
+    {
+      id: 'glasses',
+      label: CATEGORY_CONFIG.glasses.label,
+      icon: CATEGORY_CONFIG.glasses.icon,
+    },
+    {
+      id: 'costume',
+      label: CATEGORY_CONFIG.costume.label,
+      icon: CATEGORY_CONFIG.costume.icon,
+    },
   ];
 
   /* --- Mouse Event Handlers (Desktop Drag) --- */
@@ -136,7 +173,7 @@ export function FilterBar({
           // Scroll & Interaction
           'pb-2 touch-pan-x cursor-grab active:cursor-grabbing',
           // Hide Scrollbars
-          'no-scrollbar'
+          'no-scrollbar',
         )}
         style={{
           scrollbarWidth: 'none',
@@ -149,14 +186,13 @@ export function FilterBar({
           }
         `}</style>
 
-        {categories.map((cat) => {
-          const conf = CATEGORY_CONFIG[cat];
-          const isActive = active === cat;
-          const badgeCount = badges?.[cat] ?? 0;
-          
+        {displayOptions.map((opt) => {
+          const isActive = active === opt.id;
+          const badgeCount = badges?.[opt.id] ?? 0;
+
           return (
             <button
-              key={cat}
+              key={opt.id}
               data-active={isActive}
               // The Click Guard
               onClick={(e) => {
@@ -165,18 +201,18 @@ export function FilterBar({
                   e.stopPropagation();
                   return;
                 }
-                onChange(cat);
+                onChange(opt.id);
               }}
               className={cn(
                 'relative flex-none flex items-center gap-2 px-5 py-3 rounded-2xl transition-all duration-200 border-[2px] shadow-sm select-none',
                 'text-sm font-bold whitespace-nowrap',
                 isActive
                   ? 'bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/20 shadow-none'
-                  : 'bg-muted/40 text-muted-foreground border-transparent hover:bg-muted/60 hover:text-foreground'
+                  : 'bg-muted/40 text-muted-foreground border-transparent hover:bg-muted/60 hover:text-foreground',
               )}
             >
-              {conf.icon}
-              {conf.label}
+              {opt.icon}
+              {opt.label}
               {badgeCount > 0 && (
                 <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background shadow-sm animate-in zoom-in">
                   {badgeCount}
