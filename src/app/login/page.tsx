@@ -103,6 +103,10 @@ export default function LoginPage() {
         msg = 'Invalid email or password';
       } else if (err.code === 'auth/invalid-email') {
         msg = 'Invalid email address';
+      } else if (err.code === 'auth/network-request-failed') {
+        msg = 'Network error — check your connection';
+      } else if (err.code) {
+        msg = `Error: ${err.code}`;
       }
       setError(msg);
     } finally {
