@@ -665,11 +665,7 @@ export async function PUT(req: NextRequest) {
       : { $pull: { completedDates: date } };
   if (doc.type === 'regular')
     (update as any).$set = { ...(update as any).$set, completed };
-  if (completed === false && alreadyCompletedForDate) {
-    const dow = dowFromYMD(date);
-    const newOrder = await nextOrderForDay(uid, dow, date);
-    (update as any).$set = { ...((update as any).$set || {}), order: newOrder };
-  }
+
   if (typeof order === 'number')
     (update as any).$set = { ...((update as any).$set || {}), order };
   await TaskModel.updateOne({ userId: uid, id: taskId }, update);
