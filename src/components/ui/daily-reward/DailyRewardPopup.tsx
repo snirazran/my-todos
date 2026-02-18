@@ -164,7 +164,7 @@ export function DailyRewardPopup({
               )}
 
               {/* Header */}
-              <div className="p-6 md:p-8 text-center space-y-2 relative bg-gradient-to-b from-primary/5 to-transparent shrink-0">
+              <div className="p-4 md:p-8 text-center space-y-1 relative bg-gradient-to-b from-primary/5 to-transparent shrink-0">
                 <button
                   onClick={onClose}
                   className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors opacity-70 hover:opacity-100"
@@ -177,7 +177,7 @@ export function DailyRewardPopup({
                 </div>
 
                 <h2 className="text-2xl md:text-3xl font-black tracking-tight">
-                  Monthly Rewards
+                  Daily Rewards
                 </h2>
                 <p className="text-muted-foreground font-medium">
                   Claim free gifts every day!
@@ -200,12 +200,7 @@ export function DailyRewardPopup({
                 />
               </div>
 
-              {/* Footer / Status */}
-              <div className="p-4 border-t bg-muted/20 text-center shrink-0 safe-area-bottom">
-                <p className="text-xs text-muted-foreground">
-                  Resets daily at 00:00 local time
-                </p>
-              </div>
+              {/* Footer / Status - Removed */}
 
               {/* Loading Overlay */}
               {claiming && (

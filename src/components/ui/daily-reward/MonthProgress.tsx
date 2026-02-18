@@ -108,79 +108,85 @@ export function MonthProgress({
   };
 
   return (
-    <div className="w-full space-y-8 px-2">
-      <div className="space-y-4">
+    <div className="w-full flex flex-col gap-6 relative">
+      <div>
         {/* ─── PREMIUM ROW ─── */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 px-2">
-            <div className="p-1 rounded-full bg-amber-100 dark:bg-amber-900/30">
-              <Crown
-                className="w-4 h-4 text-amber-600 dark:text-amber-500"
-                fill="currentColor"
-              />
-            </div>
-            <h3 className="text-sm font-bold text-amber-600 dark:text-amber-500 uppercase tracking-wider">
-              Premium Tier
-            </h3>
+        <div className="relative">
+          {/* Premium Track Background */}
+          <div className="absolute top-1/2 left-0 right-0 h-3 -translate-y-1/2 bg-amber-100/50 dark:bg-amber-900/10 border-y border-amber-200/30 dark:border-amber-800/20" />
+
+          {/* Header Badge (Floating) */}
+          <div className="sticky left-4 z-10 mb-3 inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/80 dark:to-orange-900/80 border border-amber-200 dark:border-amber-700/50 rounded-full shadow-sm backdrop-blur-sm">
+            <Crown className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 fill-amber-600 dark:fill-amber-400" />
+            <span className="text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-wider">
+              Premium
+            </span>
           </div>
 
           <div
             ref={premiumRef}
             onScroll={() => handleScroll('premium')}
-            className="w-full overflow-x-auto pb-4 px-2 flex gap-3 snap-none no-scrollbar"
+            className="w-full overflow-x-auto pb-4 pt-1 px-4 flex gap-4 snap-x snap-mandatory no-scrollbar"
           >
-            <div className="flex gap-3 min-w-max relative">
+            <div className="flex gap-4 min-w-max relative py-2">
               {REWARD_SCHEDULE.map((dayDef) => (
-                <SingleRewardCard
-                  key={`prem-${dayDef.day}`}
-                  day={dayDef.day}
-                  rewardType={dayDef.premium.type}
-                  amount={dayDef.premium.amount}
-                  itemId={dayDef.premium.itemId}
-                  status={getStatus(dayDef.day, true)}
-                  isPremiumTier={true}
-                  isToday={dayDef.day === currentDay}
-                  onClick={
-                    !isPremium
-                      ? onGoPremium
-                      : dayDef.day === currentDay
-                        ? () => onClaim(dayDef.day)
-                        : undefined
-                  }
-                />
+                <div key={`prem-${dayDef.day}`} className="snap-center">
+                  <SingleRewardCard
+                    day={dayDef.day}
+                    rewardType={dayDef.premium.type}
+                    amount={dayDef.premium.amount}
+                    itemId={dayDef.premium.itemId}
+                    status={getStatus(dayDef.day, true)}
+                    isPremiumTier={true}
+                    isToday={dayDef.day === currentDay}
+                    onClick={
+                      !isPremium
+                        ? onGoPremium
+                        : dayDef.day === currentDay
+                          ? () => onClaim(dayDef.day)
+                          : undefined
+                    }
+                  />
+                </div>
               ))}
             </div>
           </div>
         </div>
 
         {/* ─── FREE ROW ─── */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 px-2">
-            <span className="text-sm font-bold text-muted-foreground uppercase tracking-wider">
+        <div className="relative mt-2">
+          {/* Free Track Background */}
+          <div className="absolute top-1/2 left-0 right-0 h-3 -translate-y-1/2 bg-muted/30 border-y border-border/30" />
+
+          {/* Header Badge */}
+          <div className="sticky left-4 z-10 mb-3 inline-flex items-center gap-2 px-3 py-1 bg-background/80 backdrop-blur-sm border border-border rounded-full shadow-sm">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
               Free Tier
             </span>
           </div>
+
           <div
             ref={freeRef}
             onScroll={() => handleScroll('free')}
-            className="w-full overflow-x-auto pb-4 px-2 flex gap-3 snap-none no-scrollbar"
+            className="w-full overflow-x-auto pb-4 pt-1 px-4 flex gap-4 snap-x snap-mandatory no-scrollbar"
           >
-            <div className="flex gap-3 min-w-max relative">
+            <div className="flex gap-4 min-w-max relative py-2">
               {REWARD_SCHEDULE.map((dayDef) => (
-                <SingleRewardCard
-                  key={`free-${dayDef.day}`}
-                  day={dayDef.day}
-                  rewardType={dayDef.free.type}
-                  amount={dayDef.free.amount}
-                  itemId={dayDef.free.itemId}
-                  status={getStatus(dayDef.day, false)}
-                  isToday={dayDef.day === currentDay}
-                  onClick={
-                    dayDef.day === currentDay
-                      ? () => onClaim(dayDef.day)
-                      : undefined
-                  }
-                />
+                <div key={`free-${dayDef.day}`} className="snap-center">
+                  <SingleRewardCard
+                    day={dayDef.day}
+                    rewardType={dayDef.free.type}
+                    amount={dayDef.free.amount}
+                    itemId={dayDef.free.itemId}
+                    status={getStatus(dayDef.day, false)}
+                    isToday={dayDef.day === currentDay}
+                    onClick={
+                      dayDef.day === currentDay
+                        ? () => onClaim(dayDef.day)
+                        : undefined
+                    }
+                  />
+                </div>
               ))}
             </div>
           </div>
