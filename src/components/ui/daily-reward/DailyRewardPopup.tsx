@@ -164,28 +164,48 @@ export function DailyRewardPopup({
               )}
 
               {/* Header */}
-              <div className="p-4 md:p-8 text-center space-y-1 relative bg-gradient-to-b from-primary/5 to-transparent shrink-0">
-                <button
-                  onClick={onClose}
-                  className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors opacity-70 hover:opacity-100 z-[60]"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+              <div
+                className={cn(
+                  'relative z-20 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-border/40',
+                  isDesktop
+                    ? 'bg-background/50 backdrop-blur-xl'
+                    : 'bg-transparent',
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <h2 className="text-2xl md:text-5xl font-bold tracking-tight text-foreground">
+                        Daily Rewards
+                      </h2>
+                      <p className="hidden md:block text-base font-medium text-muted-foreground mt-1">
+                        Claim free gifts every day!
+                      </p>
+                    </div>
+                  </div>
 
-                <div className="mx-auto w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
-                  <Gift className="w-6 h-6 text-primary" />
+                  <div className="flex items-center gap-3">
+                    {/* Mobile Close Button (X) */}
+                    <button
+                      onClick={onClose}
+                      className="flex items-center justify-center w-10 h-10 rounded-full md:hidden bg-secondary/80 text-foreground"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+
+                    {/* Desktop Close Button */}
+                    <button
+                      onClick={onClose}
+                      className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-secondary hover:bg-secondary/80 border-border dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                    >
+                      <X className="w-5 h-5 text-muted-foreground" />
+                    </button>
+                  </div>
                 </div>
-
-                <h2 className="text-2xl md:text-3xl font-black tracking-tight">
-                  Daily Rewards
-                </h2>
-                <p className="text-muted-foreground font-medium">
-                  Claim free gifts every day!
-                </p>
               </div>
 
               {/* Content */}
-              <div className="flex-1 overflow-y-auto min-h-0">
+              <div className="flex-1 overflow-y-auto min-h-0 py-4 md:py-6">
                 <MonthProgress
                   progress={{
                     ...statusData.dailyRewards,
