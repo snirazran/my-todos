@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
 import {
   signInWithPopup,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
+  signInWithCredential,
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Mail, Lock, Loader2, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -37,30 +40,58 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  // Initialize Google Auth Plugin for the web (if needed) and ensure it's ready
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      GoogleAuth.initialize({
+        clientId:
+          '324868480648-mcnp29sgs2r9ip4nsbfs82phhiuv4tos.apps.googleusercontent.com',
+        scopes: ['profile', 'email'],
+        grantOfflineAccess: true,
+      });
+    }
+  }, []);
+
   const handleGoogleSignIn = async () => {
     setLoading(true);
     setError(null);
     try {
-      const provider = new GoogleAuthProvider();
-      const result = await signInWithPopup(auth, provider);
+      if (Capacitor.isNativePlatform()) {
+        // Native apps use the Google Auth Plugin
+        const googleUser = await GoogleAuth.signIn();
 
-      // Get ID token
-      const token = await result.user.getIdToken();
+        if (googleUser?.authentication?.idToken) {
+          // Sign in to Firebase using the acquired token
+          const credential = GoogleAuthProvider.credential(
+            googleUser.authentication.idToken,
+          );
+          const result = await signInWithCredential(auth, credential);
 
-      // Set cookie for middleware
-      document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
-
-      // Sync user to MongoDB
-      await fetch('/api/user', {
-        method: 'POST',
-      });
-
-      // Redirect
-      router.push('/');
+          const token = await result.user.getIdToken();
+          document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
+          await fetch('/api/user', { method: 'POST' });
+          router.push('/');
+        } else {
+          throw new Error('Failed to get Google authentication token');
+        }
+      } else {
+        // Web uses standard popup
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        const token = await result.user.getIdToken();
+        document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
+        await fetch('/api/user', { method: 'POST' });
+        router.push('/');
+      }
     } catch (err: any) {
-      console.error(err);
-      setError(err.message || 'Failed to sign in');
-    } finally {
+      console.error(
+        'Google Sign In Error Details:',
+        JSON.stringify(err, null, 2),
+      );
+      console.error('Original Error:', err);
+      setError(
+        `Google Error: ${err.message || JSON.stringify(err) || 'Failed to sign in'}`,
+      );
       setLoading(false);
     }
   };
