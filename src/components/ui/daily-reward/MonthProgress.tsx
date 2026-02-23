@@ -4,7 +4,6 @@ import { REWARD_SCHEDULE } from '@/lib/dailyRewards';
 import { SingleRewardCard } from './RewardCard';
 import type { DailyRewardProgress } from '@/lib/types/UserDoc';
 import { Crown } from 'lucide-react';
-import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 
 interface MonthProgressProps {
   progress: DailyRewardProgress;
@@ -22,7 +21,6 @@ export function MonthProgress({
   onGoPremium,
 }: MonthProgressProps) {
   const containerRef = useRef<HTMLDivElement>(null);
-  useDraggableScroll(containerRef);
 
   // Auto-scroll to current day on mount
   useEffect(() => {
@@ -30,25 +28,19 @@ export function MonthProgress({
       const scrollContainer = containerRef.current;
       if (!scrollContainer) return;
 
-      // Find the today element (in either row, they align)
-      // We can infer position from the index
-      const dayIndex = currentDay - 1;
-      // Assuming cards are consistent width + gap.
-      // But better to find the actual node.
-      // Let's look for a data attribute or class we can target?
-      // Or just querySelector.
       const targetNode = scrollContainer.querySelector(
         `[data-day="${currentDay}"]`,
       ) as HTMLElement;
 
       if (targetNode) {
-        const containerWidth = scrollContainer.clientWidth;
-        const targetLeft = targetNode.offsetLeft;
-        const targetWidth = targetNode.offsetWidth;
-        const scrollPos = targetLeft - containerWidth / 2 + targetWidth / 2;
+        // Calculate offset to center vertically
+        const containerHeight = scrollContainer.clientHeight;
+        const targetTop = targetNode.offsetTop;
+        const targetHeight = targetNode.offsetHeight;
+        const scrollPos = targetTop - containerHeight / 2 + targetHeight / 2;
 
         scrollContainer.scrollTo({
-          left: Math.max(0, scrollPos),
+          top: Math.max(0, scrollPos),
           behavior: 'smooth',
         });
       }
@@ -73,85 +65,137 @@ export function MonthProgress({
   };
 
   return (
-    <div className="w-full relative">
-      {/* Single shared scroll container */}
-      <div
-        ref={containerRef}
-        className="w-full overflow-x-auto pb-4 pt-0 px-4 no-scrollbar"
-      >
-        <div className="flex flex-col gap-8 min-w-max">
-          {/* ─── PREMIUM ROW ─── */}
-          <div className="mt-2">
-            {/* Sticky Header Badge */}
-            <div className="sticky left-0 z-10 mb-6 inline-flex items-center gap-1.5 px-3 py-1 bg-gradient-to-r from-amber-100 to-orange-100 dark:from-amber-900/80 dark:to-orange-900/80 border border-amber-200 dark:border-amber-700/50 rounded-full shadow-sm backdrop-blur-sm">
-              <Crown className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 fill-amber-600 dark:fill-amber-400" />
-              <span className="text-[10px] font-black text-amber-700 dark:text-amber-300 uppercase tracking-wider">
-                Premium
-              </span>
-            </div>
+    <div
+      className="w-full relative h-full overflow-y-auto overflow-x-hidden no-scrollbar"
+      ref={containerRef}
+    >
+      {/* Container without Card Box */}
+      <div className="w-full relative pb-16 min-h-full flex flex-col">
+        {/* Split Background Layers */}
+        <div className="absolute inset-y-0 left-0 w-[50%] bg-[#F8F9F8] dark:bg-muted/30" />
+        <div className="absolute inset-y-0 right-0 w-[50%] bg-[#FFF6E8] dark:bg-amber-900/10" />
 
-            <div className="relative">
-              {/* Track Background - Centered in Items */}
-              <div className="absolute top-1/2 left-0 right-0 h-3 -translate-y-1/2 bg-amber-100/50 dark:bg-amber-900/10 border-y border-amber-200/30 dark:border-amber-800/20 rounded-full" />
-
-              <div className="flex gap-4 relative z-0">
-                {REWARD_SCHEDULE.map((dayDef) => (
-                  <div key={`prem-${dayDef.day}`} data-day={dayDef.day}>
-                    <SingleRewardCard
-                      day={dayDef.day}
-                      rewardType={dayDef.premium.type}
-                      amount={dayDef.premium.amount}
-                      itemId={dayDef.premium.itemId}
-                      status={getStatus(dayDef.day, true)}
-                      isPremiumTier={true}
-                      isToday={dayDef.day === currentDay}
-                      onClick={
-                        !isPremium
-                          ? onGoPremium
-                          : dayDef.day === currentDay
-                            ? () => onClaim(dayDef.day)
-                            : undefined
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
+        {/* Sticky Header Tabs */}
+        <div className="sticky top-0 z-50 flex items-stretch border-t border-b border-border/40 bg-background h-12 shadow-sm">
+          {/* Basic Header */}
+          <div className="w-[50%] bg-[#F4F5F4] dark:bg-muted/80 flex items-center justify-center relative">
+            <span className="text-[11px] sm:text-[12px] font-black text-muted-foreground uppercase tracking-widest pl-2">
+              Basic
+            </span>
           </div>
 
-          {/* ─── FREE ROW ─── */}
-          <div>
-            {/* Sticky Header Badge */}
-            <div className="sticky left-0 z-10 mb-6 inline-flex items-center gap-2 px-3 py-1 bg-background/80 backdrop-blur-sm border border-border rounded-full shadow-sm">
-              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                Free Tier
-              </span>
-            </div>
+          {/* Premium Header */}
+          <div className="w-[50%] bg-amber-400 dark:bg-amber-500 flex items-center justify-center border-l-2 border-background shadow-[-4px_0_12px_-4px_rgba(0,0,0,0.1)] relative">
+            <span className="text-[11px] sm:text-[12px] font-black text-white dark:text-amber-950 uppercase tracking-widest flex items-center justify-center gap-1.5 pr-2">
+              <Crown className="w-3.5 h-3.5 shrink-0" strokeWidth={3} /> Premium
+            </span>
+          </div>
+        </div>
 
-            <div className="relative">
-              {/* Track Background */}
-              <div className="absolute top-1/2 left-0 right-0 h-3 -translate-y-1/2 bg-gray-100 dark:bg-gray-800/40 border-y border-gray-200 dark:border-gray-700/40 rounded-full" />
+        {/* Vertical Timeline Structure */}
+        <div className="relative flex-grow">
+          {/* Central Vertical Line Background */}
+          <div className="absolute top-0 bottom-0 left-1/2 w-[2px] -translate-x-1/2 bg-border/40" />
 
-              <div className="flex gap-4 relative z-0">
-                {REWARD_SCHEDULE.map((dayDef) => (
-                  <div key={`free-${dayDef.day}`} data-day={dayDef.day}>
-                    <SingleRewardCard
-                      day={dayDef.day}
-                      rewardType={dayDef.free.type}
-                      amount={dayDef.free.amount}
-                      itemId={dayDef.free.itemId}
-                      status={getStatus(dayDef.day, false)}
-                      isToday={dayDef.day === currentDay}
-                      onClick={
-                        dayDef.day === currentDay
-                          ? () => onClaim(dayDef.day)
-                          : undefined
-                      }
-                    />
+          {/* Central Vertical Line Glow / Progress effect for past/current days */}
+          <div
+            className="absolute top-0 left-1/2 w-[2px] -translate-x-1/2 bg-[#22a06b] dark:bg-primary"
+            style={{
+              height: `calc(${((currentDay - 0.5) / REWARD_SCHEDULE.length) * 100}%)`,
+            }}
+          />
+
+          <div className="flex flex-col gap-y-6 sm:gap-y-8 relative z-10 w-full px-2 sm:px-3 pt-3 pb-6">
+            {REWARD_SCHEDULE.map((dayDef) => {
+              const freeStatus = getStatus(dayDef.day, false);
+              const premiumStatus = getStatus(dayDef.day, true);
+              const isToday = dayDef.day === currentDay;
+
+              return (
+                <div
+                  key={`day-${dayDef.day}`}
+                  data-day={dayDef.day}
+                  className={cn(
+                    'grid grid-cols-[1fr_auto_1fr] items-center group transition-opacity duration-500',
+                    isToday
+                      ? 'opacity-100 z-20'
+                      : 'opacity-95 hover:opacity-100',
+                  )}
+                >
+                  {/* Left Column (Free) */}
+                  <div className="pr-2 sm:pr-3 flex justify-center w-full">
+                    <div className="w-full max-w-[140px] sm:max-w-[160px]">
+                      <SingleRewardCard
+                        day={dayDef.day}
+                        rewardType={dayDef.free.type}
+                        amount={dayDef.free.amount}
+                        itemId={dayDef.free.itemId}
+                        status={freeStatus}
+                        isToday={isToday}
+                        hideDayLabel={true}
+                        onClick={
+                          isToday && freeStatus === 'READY'
+                            ? () => onClaim(dayDef.day)
+                            : undefined
+                        }
+                      />
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
+
+                  {/* Center Column (Timeline Marker) */}
+                  <div className="w-8 flex justify-center relative my-auto">
+                    <div
+                      className={cn(
+                        'flex items-center justify-center rounded-full border-2 transition-colors duration-300 z-10',
+                        isToday
+                          ? 'w-8 h-8 sm:w-9 sm:h-9 bg-primary border-background text-primary-foreground shadow-lg shadow-primary/30'
+                          : progress.claimedDays.includes(dayDef.day)
+                            ? 'w-6 h-6 sm:w-7 sm:h-7 bg-muted-foreground border-background text-background'
+                            : 'w-6 h-6 sm:w-7 sm:h-7 bg-card border-border text-foreground',
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'font-black tracking-tight',
+                          isToday
+                            ? 'text-[13px] sm:text-sm'
+                            : 'text-[11px] sm:text-[12px]',
+                        )}
+                      >
+                        {dayDef.day}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Right Column (Premium) */}
+                  <div className="pl-2 sm:pl-3 flex justify-center w-full relative">
+                    {/* Soft highlight behind premium item if it's today */}
+                    {isToday && (
+                      <div className="absolute inset-0 bg-amber-500/10 dark:bg-amber-500/15 rounded-2xl -z-10 scale-110 blur-xl" />
+                    )}
+                    <div className="w-full max-w-[140px] sm:max-w-[160px]">
+                      <SingleRewardCard
+                        day={dayDef.day}
+                        rewardType={dayDef.premium.type}
+                        amount={dayDef.premium.amount}
+                        itemId={dayDef.premium.itemId}
+                        status={premiumStatus}
+                        isPremiumTier={true}
+                        isToday={isToday}
+                        hideDayLabel={true}
+                        onClick={
+                          !isPremium
+                            ? onGoPremium
+                            : isToday && premiumStatus === 'READY'
+                              ? () => onClaim(dayDef.day)
+                              : undefined
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>

@@ -54,6 +54,7 @@ export function SingleRewardCard({
   onClick,
   isPremiumTier,
   isToday,
+  hideDayLabel,
 }: {
   day: number;
   rewardType: 'FLIES' | 'ITEM' | 'BOX';
@@ -63,6 +64,7 @@ export function SingleRewardCard({
   onClick?: () => void;
   isPremiumTier?: boolean;
   isToday?: boolean;
+  hideDayLabel?: boolean;
 }) {
   const isReady = status === 'READY';
   const isLockedPremium = status === 'LOCKED_PREMIUM';
@@ -123,8 +125,14 @@ export function SingleRewardCard({
     );
   } else if (isClaimed && isToday) {
     customAction = (
-      <div className="w-full h-8 flex items-center justify-center rounded-lg bg-muted/50 border border-border/50 text-muted-foreground text-[10px] font-black uppercase tracking-wide px-1">
+      <div className="w-full h-8 flex items-center justify-center rounded-lg bg-emerald-500 border border-emerald-600 text-white text-[10px] font-black uppercase tracking-wide px-1 shadow-sm">
         Next gift tomorrow
+      </div>
+    );
+  } else if (isClaimed) {
+    customAction = (
+      <div className="w-full h-8 flex items-center justify-center rounded-lg bg-emerald-100/80 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wide px-1 shadow-sm gap-1">
+        <Check className="w-3.5 h-3.5 stroke-[4]" /> Claimed
       </div>
     );
   } else {
@@ -132,12 +140,12 @@ export function SingleRewardCard({
   }
 
   return (
-    <div className="flex flex-col items-center gap-2 group">
-      {/* Card Wrapper - Increased size to match Shop (approx 176px) */}
+    <div className="flex flex-col items-center gap-2 group w-full">
+      {/* Card Wrapper - Responsive sizing for grid */}
       <div
         onClick={onClick}
         className={cn(
-          'relative transition-all duration-300 w-44 sm:w-48 scale-100',
+          'relative transition-all duration-300 w-full max-w-[192px] mx-auto scale-100',
           onClick && 'cursor-pointer',
           status !== 'READY' &&
             status !== 'CLAIMED' &&
@@ -159,30 +167,32 @@ export function SingleRewardCard({
         />
       </div>
 
-      {/* Day Label - Moved Below */}
-      <span
-        className={cn(
-          'text-xs font-bold uppercase tracking-wider',
-          isReady
-            ? 'text-primary'
-            : isLockedPremium && isToday
-              ? 'text-amber-500'
-              : 'text-muted-foreground/70',
-        )}
-      >
-        {isClaimed ? (
-          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/30 shadow-sm">
-            <div className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-500 text-white">
-              <Check className="w-2.5 h-2.5 stroke-[4]" />
+      {/* Day Label - Hidden when layout handles it */}
+      {!hideDayLabel && (
+        <span
+          className={cn(
+            'text-xs font-bold uppercase tracking-wider',
+            isReady
+              ? 'text-primary'
+              : isLockedPremium && isToday
+                ? 'text-amber-500'
+                : 'text-muted-foreground/70',
+          )}
+        >
+          {isClaimed ? (
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/30 shadow-sm">
+              <div className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-500 text-white">
+                <Check className="w-2.5 h-2.5 stroke-[4]" />
+              </div>
+              <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
+                Claimed
+              </span>
             </div>
-            <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-              Claimed
-            </span>
-          </div>
-        ) : (
-          `Day ${day}`
-        )}
-      </span>
+          ) : (
+            `Day ${day}`
+          )}
+        </span>
+      )}
     </div>
   );
 }
