@@ -56,7 +56,9 @@ export function AdminSettingsDialog({
 
     async function loadNotifData() {
       try {
-        const res = await fetch('/api/admin/test-notification');
+        const res = await fetch('/api/admin/test-notification', {
+          credentials: 'include',
+        });
         if (res.ok) {
           const data = await res.json();
           setTemplates(data.templates);
@@ -84,6 +86,7 @@ export function AdminSettingsDialog({
       const res = await fetch('/api/admin/test-notification', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ templateId: selectedTemplate }),
       });
 
@@ -266,7 +269,7 @@ export function AdminSettingsDialog({
               </div>
 
               {/* Content */}
-              <div className="p-6 space-y-4 overflow-y-auto flex-1">
+              <div className="p-6 space-y-4 overflow-y-auto">
                 {/* Reset Tasks & Statistics */}
                 <div className="space-y-2">
                   <Button

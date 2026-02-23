@@ -51,6 +51,7 @@ export function usePushNotifications(userId: string | null | undefined) {
             await fetch('/api/notifications/register', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
               body: JSON.stringify({
                 fcmToken: token.value,
                 timezone: tz,
@@ -96,6 +97,7 @@ export function usePushNotifications(userId: string | null | undefined) {
         await fetch('/api/notifications/track-activity', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ timezone: tz }),
         });
       } catch {
