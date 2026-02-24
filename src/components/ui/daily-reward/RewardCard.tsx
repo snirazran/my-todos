@@ -37,7 +37,7 @@ const getRewardItemDef = (
   return {
     id: 'flies_reward',
     name: `${amount || 0} Flies`,
-    rarity: 'common',
+    rarity: 'uncommon',
     priceFlies: 0,
     slot: 'hand_item', // Dummy
     riveIndex: 0,
@@ -147,10 +147,6 @@ export function SingleRewardCard({
         className={cn(
           'relative transition-all duration-300 w-full max-w-[192px] mx-auto scale-100',
           onClick && 'cursor-pointer',
-          status !== 'READY' &&
-            status !== 'CLAIMED' &&
-            !(isLockedPremium && isToday) &&
-            'opacity-60 grayscale-[0.5]',
         )}
       >
         <ItemCard
