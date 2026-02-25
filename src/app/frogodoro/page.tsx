@@ -16,9 +16,12 @@ import {
   Settings2,
   ChevronDown,
   CheckCircle2,
-  Save,
   ListTodo,
   X,
+  Plus,
+  Minus,
+  HelpCircle,
+  Save,
 } from 'lucide-react';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -26,10 +29,53 @@ import { useUIStore } from '@/lib/uiStore';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { type FrogHandle } from '@/components/ui/frog';
+import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import Fly from '@/components/ui/fly';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 
 const FLY_PX = 24;
+
+const Stepper = ({
+  value,
+  onChange,
+  min = 1,
+  max = 999,
+  step = 1,
+  suffix = '',
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  suffix?: string;
+}) => (
+  <div className="flex items-center w-full justify-between bg-white dark:bg-card border border-border/60 rounded-[20px] p-[5px] shadow-sm overflow-hidden">
+    <button
+      onClick={() => onChange(Math.max(min, value - step))}
+      className="w-10 h-10 flex flex-shrink-0 items-center justify-center rounded-[16px] bg-muted/60 text-muted-foreground hover:bg-muted transition-all active:scale-95"
+      type="button"
+    >
+      <Minus className="w-4 h-4 stroke-[2.5]" />
+    </button>
+    <div className="flex items-baseline justify-center gap-1 font-black text-xl text-foreground px-1 flex-1 min-w-[3.5rem]">
+      {value}
+      {suffix && (
+        <span className="text-[9px] text-muted-foreground font-extrabold uppercase tracking-widest translate-y-[-1px]">
+          {suffix}
+        </span>
+      )}
+    </div>
+    <button
+      onClick={() => onChange(Math.min(max, value + step))}
+      className="w-10 h-10 flex flex-shrink-0 items-center justify-center rounded-[16px] bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-95"
+      type="button"
+    >
+      <Plus className="w-4 h-4 stroke-[2.5]" />
+    </button>
+  </div>
+);
+
 export default function FrogodoroPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -62,6 +108,7 @@ export default function FrogodoroPage() {
   // Local UI State
   const [showTaskDropdown, setShowTaskDropdown] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [localSettings, setLocalSettings] = useState(settings); // For the modal forms
 
   // Sync local modal form to global settings
@@ -86,6 +133,19 @@ export default function FrogodoroPage() {
     visuallyDone,
     speedUpTongue,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
+
+  // Mobile check for drawer animation
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const checkDesktop = () =>
+      setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
+    checkDesktop();
+    window.addEventListener('resize', checkDesktop);
+    return () => window.removeEventListener('resize', checkDesktop);
+  }, []);
+
+  // Quick Add State
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
 
   // Handle Authentication Tracking
   useEffect(() => {
@@ -262,10 +322,19 @@ export default function FrogodoroPage() {
           <div className="flex flex-col gap-4 lg:col-span-8 lg:gap-6 w-full max-w-2xl mx-auto">
             {/* TIMER CARD */}
             <div
-              className={`px-6 py-6 md:px-10 md:py-8 rounded-[32px] shadow-2xl transition-colors duration-500 ${getPhaseColor()} relative overflow-hidden backdrop-blur-sm`}
+              className={`px-6 py-6 md:px-10 md:py-8 rounded-[32px] shadow-2xl transition-colors duration-500 ${getPhaseColor()} relative overflow-hidden backdrop-blur-sm group`}
             >
+              {/* Help Button */}
+              <button
+                onClick={() => setShowHelpModal(true)}
+                className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors opacity-80 hover:opacity-100 hidden sm:block z-50 cursor-pointer"
+                title="How Frogodoro Works"
+              >
+                <HelpCircle className="w-6 h-6" />
+              </button>
+
               {/* Top Phase Selector */}
-              <div className="flex items-center justify-center gap-2 mb-10 md:mb-12">
+              <div className="flex items-center justify-center gap-2 mb-10 md:mb-12 relative flex-wrap sm:flex-nowrap">
                 {[
                   { id: 'focus', label: 'Frogodoro' },
                   { id: 'shortBreak', label: 'Short Break' },
@@ -337,7 +406,7 @@ export default function FrogodoroPage() {
                 >
                   <div
                     className="flex items-center justify-between p-4 bg-card border shadow-sm rounded-2xl cursor-pointer hover:border-primary transition-colors group"
-                    onClick={() => setShowTaskDropdown(!showTaskDropdown)}
+                    onClick={() => setShowTaskDropdown(true)}
                   >
                     <div className="flex items-center gap-3 w-full pr-4">
                       <div
@@ -383,19 +452,343 @@ export default function FrogodoroPage() {
                       </button>
                     </div>
                   </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowTaskDropdown(true)}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-4 bg-card border shadow-sm rounded-2xl cursor-pointer hover:border-primary transition-colors w-full max-w-sm mx-auto font-bold text-foreground relative z-20"
+                >
+                  <ListTodo className="w-5 h-5 text-primary" />
+                  <span>Select a task to focus on...</span>
+                  <ChevronDown className="w-5 h-5 text-muted-foreground ml-auto" />
+                </button>
+              )}
 
-                  <AnimatePresence>
-                    {showTaskDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute mt-2 w-full bg-popover border shadow-xl rounded-2xl z-30 max-h-[300px] overflow-y-auto"
+              {/* Help Modal */}
+              <AnimatePresence>
+                {showHelpModal && (
+                  <div
+                    className="fixed inset-0 z-[100] flex flex-col justify-end sm:items-center sm:justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+                    onClick={() => setShowHelpModal(false)}
+                  >
+                    <motion.div
+                      onClick={(e) => e.stopPropagation()}
+                      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                      className="w-full sm:max-w-lg bg-card sm:border sm:rounded-[32px] rounded-t-[32px] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-8 shadow-2xl text-left relative"
+                    >
+                      <button
+                        onClick={() => setShowHelpModal(false)}
+                        className="absolute top-6 right-6 p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors"
                       >
+                        <X className="w-5 h-5" />
+                      </button>
+
+                      <h3 className="text-xl font-black mb-6 flex items-center gap-2.5 text-foreground pr-10">
+                        <HelpCircle className="w-6 h-6 text-primary" />
+                        How Frogodoro Works
+                      </h3>
+
+                      <div className="space-y-5 text-sm md:text-[15px] font-medium text-muted-foreground leading-relaxed">
+                        <p>
+                          <strong>Frogodoro</strong> is a variation of the
+                          classic Pomodoro Technique designed to help you power
+                          through tasks by breaking work into intervals,
+                          separated by short breaks. We call these focus
+                          sessions "eating the frog" 🐸.
+                        </p>
+
+                        <div className="bg-muted/30 p-4 rounded-[20px] space-y-4">
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg">⏱️</span>
+                            <div>
+                              <h4 className="font-bold text-foreground mb-0.5">
+                                1. Focus
+                              </h4>
+                              <p>
+                                Pick a task and immerse yourself completely
+                                until the timer rings.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg">☕</span>
+                            <div>
+                              <h4 className="font-bold text-foreground mb-0.5">
+                                2. Short Break
+                              </h4>
+                              <p>
+                                Take a quick breather. Stretch, drink water,
+                                step away from the screen.
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg">🛋️</span>
+                            <div>
+                              <h4 className="font-bold text-foreground mb-0.5">
+                                3. Long Break
+                              </h4>
+                              <p>
+                                After completing several cycles (your interval
+                                setting), take a longer rest to fully recharge
+                                your brain.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <p className="pt-2 text-[13px] text-center opacity-80">
+                          Configure these durations and cycle counts via the ⚙️
+                          settings.
+                        </p>
+                      </div>
+
+                      <button
+                        onClick={() => setShowHelpModal(false)}
+                        className="mt-8 w-full flex items-center justify-center bg-primary hover:bg-primary/90 text-primary-foreground font-black text-lg px-4 py-4 rounded-[20px] transition-all shadow-md active:scale-[0.98]"
+                      >
+                        Got it!
+                      </button>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
+
+              {/* Settings Modal */}
+              <AnimatePresence>
+                {showSettingsModal && (
+                  <div
+                    className="fixed inset-0 z-[100] flex flex-col justify-end sm:items-center sm:justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4"
+                    onClick={() => setShowSettingsModal(false)}
+                  >
+                    <motion.div
+                      onClick={(e) => e.stopPropagation()}
+                      initial={{ opacity: 0, y: '100%' }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: '100%' }}
+                      transition={{
+                        type: 'spring',
+                        damping: 25,
+                        stiffness: 300,
+                      }}
+                      className="w-full sm:max-w-lg bg-card sm:border sm:rounded-[32px] rounded-t-[32px] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 shadow-2xl text-left max-h-[90vh] overflow-y-auto relative"
+                    >
+                      <button
+                        onClick={() => setShowSettingsModal(false)}
+                        className="absolute top-6 right-6 p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                      <h3 className="text-xl font-black mb-8 flex items-center gap-2.5 text-foreground pr-10">
+                        <Settings2 className="w-6 h-6 text-primary" />
+                        Frogodoro Settings
+                      </h3>
+
+                      <div className="space-y-4">
+                        {/* Target Cycles */}
+                        <div className="bg-background border border-border/60 p-4 rounded-[24px]">
+                          <label className="flex flex-col mb-4">
+                            <span className="text-[16px] font-black text-foreground flex items-center gap-2">
+                              🎯 Target Cycles
+                            </span>
+                            <span className="text-[13px] text-muted-foreground mt-1 leading-snug font-medium">
+                              How many focus sessions you plan to complete for
+                              this task.
+                            </span>
+                          </label>
+                          <Stepper
+                            value={localSettings.expectedCycles || 3}
+                            onChange={(v) =>
+                              setLocalSettings({
+                                ...localSettings,
+                                expectedCycles: v,
+                              })
+                            }
+                            suffix="cycles"
+                            min={1}
+                            max={99}
+                          />
+                        </div>
+
+                        {/* Focus & Short Break */}
+                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                          <div className="bg-background border border-border/60 p-3.5 rounded-[24px] flex flex-col justify-between">
+                            <label className="flex flex-col mb-4 items-center">
+                              <span className="text-[14px] sm:text-[15px] font-black text-foreground flex items-center gap-1.5">
+                                ⏱️ Focus
+                              </span>
+                              <span className="text-[11px] text-muted-foreground mt-0.5 font-medium">
+                                Session length
+                              </span>
+                            </label>
+                            <Stepper
+                              value={localSettings.cycleDuration}
+                              onChange={(v) =>
+                                setLocalSettings({
+                                  ...localSettings,
+                                  cycleDuration: v,
+                                })
+                              }
+                              suffix="min"
+                              step={5}
+                              min={5}
+                              max={360}
+                            />
+                          </div>
+
+                          <div className="bg-background border border-border/60 p-3.5 rounded-[24px] flex flex-col justify-between">
+                            <label className="flex flex-col mb-4 items-center">
+                              <span className="text-[14px] sm:text-[15px] font-black text-foreground flex items-center gap-1.5">
+                                ☕ Rest
+                              </span>
+                              <span className="text-[11px] text-muted-foreground mt-0.5 font-medium">
+                                Short break
+                              </span>
+                            </label>
+                            <Stepper
+                              value={localSettings.shortBreakDuration}
+                              onChange={(v) =>
+                                setLocalSettings({
+                                  ...localSettings,
+                                  shortBreakDuration: v,
+                                })
+                              }
+                              suffix="min"
+                              step={5}
+                              min={5}
+                              max={360}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Long Break Settings */}
+                        <div className="bg-background border border-border/60 p-4 rounded-[24px]">
+                          <label className="flex flex-col mb-4">
+                            <span className="text-[15px] sm:text-[16px] font-black text-foreground flex items-center gap-1.5">
+                              🛋️ Long Break & Interval
+                            </span>
+                            <span className="text-[13px] text-muted-foreground mt-1 leading-snug font-medium">
+                              After completing several cycles, take an extended
+                              rest to recharge.
+                            </span>
+                          </label>
+                          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-extrabold text-muted-foreground/80 uppercase tracking-widest mb-2 text-center">
+                                Duration
+                              </span>
+                              <Stepper
+                                value={localSettings.longBreakDuration}
+                                onChange={(v) =>
+                                  setLocalSettings({
+                                    ...localSettings,
+                                    longBreakDuration: v,
+                                  })
+                                }
+                                suffix="min"
+                                step={5}
+                                min={5}
+                                max={360}
+                              />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-extrabold text-muted-foreground/80 uppercase tracking-widest mb-2 text-center">
+                                After
+                              </span>
+                              <Stepper
+                                value={localSettings.longBreakInterval}
+                                onChange={(v) =>
+                                  setLocalSettings({
+                                    ...localSettings,
+                                    longBreakInterval: v,
+                                  })
+                                }
+                                suffix="cycles"
+                                min={1}
+                                max={20}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={saveSettings}
+                        className="mt-8 w-full flex items-center justify-center gap-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-lg px-4 py-4 rounded-[20px] transition-all shadow-md active:scale-[0.98]"
+                      >
+                        <Save className="w-6 h-6" />
+                        Save Configuration
+                      </button>
+                    </motion.div>
+                  </div>
+                )}
+              </AnimatePresence>
+
+              {/* Task Selector Bottom Sheet / Modal */}
+              <AnimatePresence>
+                {showTaskDropdown && (
+                  <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center pointer-events-none sm:p-4">
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      onClick={() => setShowTaskDropdown(false)}
+                      className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto"
+                    />
+                    <motion.div
+                      variants={
+                        isDesktop
+                          ? {
+                              initial: { opacity: 0, scale: 0.95, y: 0 },
+                              animate: { opacity: 1, scale: 1, y: 0 },
+                              exit: { opacity: 0, scale: 0.95, y: 0 },
+                            }
+                          : {
+                              initial: { y: '100%' },
+                              animate: { y: 0 },
+                              exit: { y: '100%' },
+                            }
+                      }
+                      initial="initial"
+                      animate="animate"
+                      exit="exit"
+                      transition={{
+                        type: 'spring',
+                        damping: 28,
+                        stiffness: 300,
+                      }}
+                      drag={!isDesktop ? 'y' : false}
+                      dragConstraints={{ top: 0, bottom: 0 }}
+                      dragElastic={0.2}
+                      onDragEnd={(e, { offset, velocity }) => {
+                        if (offset.y > 100 || velocity.y > 500) {
+                          setShowTaskDropdown(false);
+                        }
+                      }}
+                      className="w-full sm:max-w-md bg-background border border-border/40 rounded-t-[32px] sm:rounded-[24px] shadow-2xl p-4 sm:p-6 pointer-events-auto relative z-10 max-h-[85vh] flex flex-col pt-3"
+                    >
+                      {/* Drag Handle */}
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted rounded-full sm:hidden" />
+
+                      <div className="flex items-center justify-between mb-4 mt-2 sm:mt-0 px-2">
+                        <h3 className="text-xl font-black">Select Task</h3>
+                        <button
+                          onClick={() => setShowTaskDropdown(false)}
+                          className="p-2 bg-muted/50 hover:bg-muted rounded-full transition-colors text-muted-foreground"
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto space-y-2 pb-4 scrollbar-hide px-2">
                         {availableTasks.map((t) => (
                           <div
                             key={t.id}
-                            className={`p-4 hover:bg-accent border-b last:border-0 cursor-pointer flex items-center gap-3 group transition-colors ${t.id === selectedTaskId ? 'bg-primary/5' : ''}`}
+                            className={`p-4 hover:bg-accent border border-transparent cursor-pointer flex items-center gap-3 group rounded-2xl transition-colors ${t.id === selectedTaskId ? 'bg-primary/5 border-primary/20' : 'bg-card'}`}
                             onClick={() => handleTaskSelect(t.id)}
                           >
                             <div className="flex items-center justify-center p-2 -ml-2 flex-shrink-0 z-30 pointer-events-none">
@@ -418,188 +811,24 @@ export default function FrogodoroPage() {
                           </div>
                         ))}
                         {availableTasks.length === 0 && (
-                          <div className="p-4 text-center text-muted-foreground text-sm">
-                            No uncompleted tasks here!
-                          </div>
-                        )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowTaskDropdown(!showTaskDropdown)}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-4 bg-card border shadow-sm rounded-2xl cursor-pointer hover:border-primary transition-colors w-full max-w-sm mx-auto font-bold text-foreground relative z-20"
-                >
-                  <ListTodo className="w-5 h-5 text-primary" />
-                  <span>Select a task to focus on...</span>
-                  <ChevronDown className="w-5 h-5 text-muted-foreground ml-auto" />
-
-                  <AnimatePresence>
-                    {showTaskDropdown && (
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        className="absolute top-full mt-2 left-0 w-full bg-popover border shadow-xl rounded-2xl z-30 max-h-[300px] overflow-y-auto text-left font-normal"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {availableTasks.map((t) => (
-                          <div
-                            key={t.id}
-                            className="p-4 hover:bg-accent border-b last:border-0 cursor-pointer flex items-center gap-3 group"
-                            onClick={() => handleTaskSelect(t.id)}
+                          <button
+                            onClick={() => {
+                              setShowTaskDropdown(false);
+                              setShowQuickAdd(true);
+                            }}
+                            className="w-full flex flex-col items-center justify-center p-6 mt-4 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-2xl transition-all cursor-pointer group"
                           >
-                            <div className="flex items-center justify-center p-2 -ml-2 flex-shrink-0 z-30 pointer-events-none">
-                              {visuallyDone.has(t.id) || t.completed ? (
-                                <CheckCircle2 className="w-6 h-6 text-primary" />
-                              ) : (
-                                <Fly
-                                  ref={(el) => {
-                                    flyRefs.current[t.id] = el;
-                                  }}
-                                  onClick={() => {}}
-                                  size={24}
-                                  y={-2}
-                                />
-                              )}
+                            <div className="flex items-center justify-center w-12 h-12 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+                              <Fly size={24} y={-2} />
                             </div>
-                            <span className="font-medium line-clamp-2 flex-1">
-                              {t.text}
-                            </span>
-                          </div>
-                        ))}
-                        {availableTasks.length === 0 && (
-                          <div className="p-4 text-center text-muted-foreground text-sm">
-                            Great job! All tasks completed.
-                          </div>
+                            <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                              {tasks.length > 0
+                                ? 'All caught up! Add a new task'
+                                : 'No tasks yet! Add a task'}
+                            </p>
+                          </button>
                         )}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </button>
-              )}
-
-              {/* Settings Modal */}
-              <AnimatePresence>
-                {showSettingsModal && (
-                  <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                      className="w-full max-w-sm relative bg-card border p-6 rounded-[24px] shadow-2xl text-left"
-                    >
-                      <button
-                        onClick={() => setShowSettingsModal(false)}
-                        className="absolute top-6 right-6 p-1 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                      <h3 className="text-lg font-black mb-6 flex items-center gap-2 pr-8">
-                        <Settings2 className="w-5 h-5 text-primary" />
-                        Frogodoro Settings
-                      </h3>
-
-                      <div className="space-y-4">
-                        <div>
-                          <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
-                            Target Cycles
-                          </label>
-                          <input
-                            type="number"
-                            value={localSettings.expectedCycles}
-                            onChange={(e) =>
-                              setLocalSettings({
-                                ...localSettings,
-                                expectedCycles: Number(e.target.value),
-                              })
-                            }
-                            className="w-full bg-background border px-3 py-2.5 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-shadow"
-                            min="1"
-                          />
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
-                              Focus (min)
-                            </label>
-                            <input
-                              type="number"
-                              value={localSettings.cycleDuration}
-                              onChange={(e) =>
-                                setLocalSettings({
-                                  ...localSettings,
-                                  cycleDuration: Number(e.target.value),
-                                })
-                              }
-                              className="w-full bg-background border px-3 py-2.5 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-shadow"
-                              min="1"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
-                              Short Bk (min)
-                            </label>
-                            <input
-                              type="number"
-                              value={localSettings.shortBreakDuration}
-                              onChange={(e) =>
-                                setLocalSettings({
-                                  ...localSettings,
-                                  shortBreakDuration: Number(e.target.value),
-                                })
-                              }
-                              className="w-full bg-background border px-3 py-2.5 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-shadow"
-                              min="1"
-                            />
-                          </div>
-                        </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
-                              Long Bk (min)
-                            </label>
-                            <input
-                              type="number"
-                              value={localSettings.longBreakDuration}
-                              onChange={(e) =>
-                                setLocalSettings({
-                                  ...localSettings,
-                                  longBreakDuration: Number(e.target.value),
-                                })
-                              }
-                              className="w-full bg-background border px-3 py-2.5 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-shadow"
-                              min="1"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-1.5 block">
-                              Long Bk Int.
-                            </label>
-                            <input
-                              type="number"
-                              value={localSettings.longBreakInterval}
-                              onChange={(e) =>
-                                setLocalSettings({
-                                  ...localSettings,
-                                  longBreakInterval: Number(e.target.value),
-                                })
-                              }
-                              className="w-full bg-background border px-3 py-2.5 rounded-xl text-sm font-medium focus:ring-2 focus:ring-primary outline-none transition-shadow"
-                              min="1"
-                            />
-                          </div>
-                        </div>
                       </div>
-
-                      <button
-                        onClick={saveSettings}
-                        className="mt-6 w-full flex items-center justify-center gap-2 bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-4 py-3 rounded-xl transition-colors shadow-sm"
-                      >
-                        <Save className="w-5 h-5" />
-                        Save Configuration
-                      </button>
                     </motion.div>
                   </div>
                 )}
@@ -656,6 +885,35 @@ export default function FrogodoroPage() {
 
       {/* Full-screen blocker + skip button during tongue animation */}
       {cinematic && <CinematicOverlay onSkip={speedUpTongue} />}
+
+      <QuickAddSheet
+        open={showQuickAdd}
+        onOpenChange={setShowQuickAdd}
+        initialText=""
+        defaultRepeat="this-week"
+        defaultMode="pick"
+        hideDayPicker={true}
+        hideRepeatPicker={true}
+        onSubmit={async ({ text, days, repeat, tags }) => {
+          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          const res = await fetch('/api/tasks?view=board', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.ok && data.tasks && data.tasks.length > 0) {
+              setTask(data.tasks[0].id, DEFAULT_SETTINGS);
+            }
+          }
+
+          setShowQuickAdd(false);
+          // Refetch tasks using the hook's mutate function
+          mutateToday();
+        }}
+      />
     </main>
   );
 }

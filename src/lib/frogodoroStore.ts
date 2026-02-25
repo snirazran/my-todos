@@ -12,7 +12,7 @@ export interface FrogodoroSettings {
 }
 
 export const DEFAULT_SETTINGS: FrogodoroSettings = {
-  expectedCycles: 4,
+  expectedCycles: 3,
   cycleDuration: 25,
   shortBreakDuration: 5,
   longBreakDuration: 30,
