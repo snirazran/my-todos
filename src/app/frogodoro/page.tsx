@@ -1,10 +1,14 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthContext';
-import { useTaskData, Task } from '@/hooks/useTaskData';
-import { format } from 'date-fns';
+import { useTaskData } from '@/hooks/useTaskData';
+import {
+  useFrogodoroStore,
+  PomodoroPhase,
+  DEFAULT_SETTINGS,
+} from '@/lib/frogodoroStore';
 import {
   Play,
   Pause,
@@ -18,40 +22,49 @@ import {
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type Phase = 'focus' | 'shortBreak' | 'longBreak';
-
-const DEFAULT_SETTINGS = {
-  expectedCycles: 4,
-  cycleDuration: 25,
-  shortBreakDuration: 5,
-  longBreakDuration: 15,
-  longBreakInterval: 4,
-};
-
 export default function FrogodoroPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
-  const { tasks, isLoading, toggleTask } = useTaskData();
+  const {
+    tasks,
+    isLoading: isTasksLoading,
+    toggleTask,
+    mutateToday,
+  } = useTaskData();
 
-  const [selectedTaskId, setSelectedTaskId] = useState<string>('');
+  // Global Store hook
+  const {
+    settings,
+    selectedTaskId,
+    phase,
+    timeLeft,
+    isRunning,
+    completedCycles,
+    setSettings,
+    setTask,
+    startTimer,
+    pauseTimer,
+    switchPhase,
+    completePhase,
+  } = useFrogodoroStore();
+
+  // Local UI State
   const [showTaskDropdown, setShowTaskDropdown] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [localSettings, setLocalSettings] = useState(settings); // For the modal forms
 
-  // Settings
-  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  // Sync local modal form to global settings
+  useEffect(() => {
+    setLocalSettings(settings);
+  }, [settings]);
 
-  // Timer State
-  const [phase, setPhase] = useState<Phase>('focus');
-  const [timeLeft, setTimeLeft] = useState(DEFAULT_SETTINGS.cycleDuration * 60);
-  const [isRunning, setIsRunning] = useState(false);
+  // Handle Authentication Tracking
+  useEffect(() => {
+    if (loading) return;
+    if (!user) router.push('/login');
+  }, [loading, user, router]);
 
-  // Daily Progress
-  const [completedCycles, setCompletedCycles] = useState(0);
-  const [currentSessionSpend, setCurrentSessionSpend] = useState(0); // in seconds
-
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Filter Tasks to only uncompleted tasks
+  // Derived Task info
   const availableTasks = useMemo(() => {
     return tasks.filter((t) => !t.completed);
   }, [tasks]);
@@ -60,161 +73,54 @@ export default function FrogodoroPage() {
     return tasks.find((t) => t.id === selectedTaskId);
   }, [tasks, selectedTaskId]);
 
-  // Handle Authentication Tracking
-  useEffect(() => {
-    if (loading) return;
-    if (!user) router.push('/login');
-  }, [loading, user, router]);
-
-  // 1. Sync Settings when task changes
-  useEffect(() => {
-    if (selectedTask) {
-      const taskSettings = selectedTask.frogodoroSettings || DEFAULT_SETTINGS;
-      setSettings(taskSettings);
-
-      // Only reset timer if NOT running and we switch tasks
-      if (!isRunning) {
-        if (phase === 'focus') setTimeLeft(taskSettings.cycleDuration * 60);
-        else if (phase === 'shortBreak')
-          setTimeLeft(taskSettings.shortBreakDuration * 60);
-        else setTimeLeft(taskSettings.longBreakDuration * 60);
-      }
-    }
-  }, [selectedTaskId, selectedTask]); // omitted phase, isRunning
-
-  // 2. Timer Loop
-  useEffect(() => {
-    if (isRunning) {
-      timerRef.current = setInterval(() => {
-        setTimeLeft((prev) => {
-          if (prev <= 1) {
-            handlePhaseComplete();
-            return 0;
-          }
-          return prev - 1;
-        });
-
-        // Track strictly focus time spent
-        if (phase === 'focus') {
-          setCurrentSessionSpend((prev) => prev + 1);
-        }
-      }, 1000);
-    } else {
-      if (timerRef.current) clearInterval(timerRef.current);
-      // If we paused in focus mode, flush accumulated time to backend!
-      if (phase === 'focus' && currentSessionSpend > 0 && selectedTaskId) {
-        saveProgress(selectedTaskId, 0, currentSessionSpend);
-        setCurrentSessionSpend(0);
-      }
-    }
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, [isRunning, phase, settings, selectedTaskId, currentSessionSpend]); // intentionally comprehensive
-
-  // Handlers
-  const toggleTimer = () => setIsRunning(!isRunning);
-
-  const switchPhase = async (newPhase: Phase) => {
-    // Before switching, dump time
-    if (
-      isRunning &&
-      phase === 'focus' &&
-      currentSessionSpend > 0 &&
-      selectedTaskId
-    ) {
-      await saveProgress(selectedTaskId, 0, currentSessionSpend);
-      setCurrentSessionSpend(0);
-    }
-
-    setIsRunning(false);
-    setPhase(newPhase);
-
-    if (newPhase === 'focus') setTimeLeft(settings.cycleDuration * 60);
-    else if (newPhase === 'shortBreak')
-      setTimeLeft(settings.shortBreakDuration * 60);
-    else setTimeLeft(settings.longBreakDuration * 60);
+  // Actions
+  const toggleTimer = () => {
+    if (isRunning) pauseTimer();
+    else startTimer();
   };
 
-  const handlePhaseComplete = async () => {
-    // Timer reached 0
-    // Try to play sound
-    try {
-      const audio = new Audio('/notification.mp3');
-      audio.play().catch(() => {});
-    } catch (e) {}
-
-    setIsRunning(false);
-
-    if (phase === 'focus') {
-      const newCycles = completedCycles + 1;
-      setCompletedCycles(newCycles);
-
-      // Save full cycle progress & remaining time
-      if (selectedTaskId) {
-        await saveProgress(selectedTaskId, 1, currentSessionSpend + 1); // adding the final second
-        setCurrentSessionSpend(0);
-      }
-
-      if (newCycles % settings.longBreakInterval === 0) {
-        await switchPhase('longBreak');
-      } else {
-        await switchPhase('shortBreak');
-      }
-    } else {
-      // Break over, go back to work
-      await switchPhase('focus');
-    }
+  const handleManualSkip = () => {
+    completePhase();
   };
 
-  const saveProgress = async (
-    taskId: string,
-    cycles: number,
-    spend: number,
-  ) => {
-    const today = format(new Date(), 'yyyy-MM-dd');
-    try {
-      await fetch(`/api/tasks/${taskId}/frogodoro`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session: {
-            date: today,
-            completedCycles: cycles,
-            targetCycles: settings.expectedCycles,
-            timeSpent: spend,
-          },
-        }),
-      });
-    } catch (e) {
-      console.error('Failed saving Frogodoro progress', e);
-    }
+  const handleTaskSelect = (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+    setTask(taskId, task.frogodoroSettings);
+    setShowTaskDropdown(false);
   };
 
   const saveSettings = async () => {
-    if (!selectedTaskId) {
-      setShowSettings(false);
-      return;
-    }
-    try {
-      await fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          settings: settings,
-        }),
-      });
-      setShowSettings(false);
+    setSettings(localSettings);
+    setShowSettingsModal(false);
 
-      // Reset timer config immediately if NOT running
-      if (!isRunning) {
-        if (phase === 'focus') setTimeLeft(settings.cycleDuration * 60);
-        else if (phase === 'shortBreak')
-          setTimeLeft(settings.shortBreakDuration * 60);
-        else setTimeLeft(settings.longBreakDuration * 60);
+    // Attempt persist settings purely to backend if selected
+    if (selectedTaskId && selectedTask) {
+      // Optimistically update the SWR cache so the re-selection shows the new defaults immediately
+      mutateToday(
+        (curr) => {
+          if (!curr) return curr;
+          return {
+            ...curr,
+            tasks: curr.tasks.map((t) =>
+              t.id === selectedTaskId
+                ? { ...t, frogodoroSettings: localSettings }
+                : t,
+            ),
+          };
+        },
+        { revalidate: false },
+      );
+
+      try {
+        await fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ settings: localSettings }),
+        });
+      } catch (e) {
+        console.error('Error saving settings remotely', e);
       }
-    } catch (e) {
-      console.error('Error saving settings', e);
     }
   };
 
@@ -224,7 +130,7 @@ export default function FrogodoroPage() {
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Theming colors for phases
+  // Theming colors
   const getPhaseColor = () => {
     if (phase === 'focus') return 'bg-primary text-primary-foreground';
     if (phase === 'shortBreak') return 'bg-blue-500 text-white';
@@ -237,7 +143,7 @@ export default function FrogodoroPage() {
     return 'bg-purple-600/10';
   };
 
-  if (loading || isLoading) {
+  if (loading || isTasksLoading) {
     return <LoadingScreen message="Loading Frogodoro..." />;
   }
 
@@ -259,7 +165,7 @@ export default function FrogodoroPage() {
             ].map((p) => (
               <button
                 key={p.id}
-                onClick={() => switchPhase(p.id as Phase)}
+                onClick={() => switchPhase(p.id as PomodoroPhase)}
                 className={`px-4 py-2 text-sm font-bold rounded-full transition-all ${
                   phase === p.id
                     ? 'bg-black/25 text-white shadow-inner'
@@ -296,7 +202,7 @@ export default function FrogodoroPage() {
             </button>
 
             <button
-              onClick={() => handlePhaseComplete()}
+              onClick={handleManualSkip}
               className="p-4 bg-white/20 hover:bg-white/30 rounded-2xl transition-colors backdrop-blur active:scale-95 text-white"
             >
               <SkipForward className="w-8 h-8 fill-current opacity-90 relative left-0.5" />
@@ -322,7 +228,7 @@ export default function FrogodoroPage() {
                     onClick={(e) => {
                       e.stopPropagation();
                       toggleTask(selectedTask.id);
-                      setSelectedTaskId(''); // Clear selection when completing
+                      setTask(''); // Clear selection when completing
                     }}
                   />
                   <span className="font-bold text-lg leading-tight truncate">
@@ -333,7 +239,7 @@ export default function FrogodoroPage() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      setShowSettings(!showSettings);
+                      setShowSettingsModal(!showSettingsModal);
                     }}
                     className="p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors"
                   >
@@ -354,11 +260,7 @@ export default function FrogodoroPage() {
                       <div
                         key={t.id}
                         className={`p-4 hover:bg-accent border-b last:border-0 cursor-pointer flex items-center gap-3 transition-colors ${t.id === selectedTaskId ? 'bg-primary/5' : ''}`}
-                        onClick={() => {
-                          setSelectedTaskId(t.id);
-                          setShowTaskDropdown(false);
-                          setIsRunning(false);
-                        }}
+                        onClick={() => handleTaskSelect(t.id)}
                       >
                         <span
                           className={`w-3 h-3 rounded-full ${t.id === selectedTaskId ? 'bg-primary' : 'bg-muted-foreground/30'}`}
@@ -397,10 +299,7 @@ export default function FrogodoroPage() {
                       <div
                         key={t.id}
                         className="p-4 hover:bg-accent border-b last:border-0 cursor-pointer flex items-center gap-3"
-                        onClick={() => {
-                          setSelectedTaskId(t.id);
-                          setShowTaskDropdown(false);
-                        }}
+                        onClick={() => handleTaskSelect(t.id)}
                       >
                         <span className="font-medium line-clamp-2">
                           {t.text}
@@ -418,9 +317,9 @@ export default function FrogodoroPage() {
             </button>
           )}
 
-          {/* Settings Modal relative to task */}
+          {/* Settings Modal */}
           <AnimatePresence>
-            {showSettings && selectedTaskId && (
+            {showSettingsModal && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
@@ -440,10 +339,10 @@ export default function FrogodoroPage() {
                       </label>
                       <input
                         type="number"
-                        value={settings.expectedCycles}
+                        value={localSettings.expectedCycles}
                         onChange={(e) =>
-                          setSettings({
-                            ...settings,
+                          setLocalSettings({
+                            ...localSettings,
                             expectedCycles: Number(e.target.value),
                           })
                         }
@@ -458,10 +357,10 @@ export default function FrogodoroPage() {
                         </label>
                         <input
                           type="number"
-                          value={settings.cycleDuration}
+                          value={localSettings.cycleDuration}
                           onChange={(e) =>
-                            setSettings({
-                              ...settings,
+                            setLocalSettings({
+                              ...localSettings,
                               cycleDuration: Number(e.target.value),
                             })
                           }
@@ -475,10 +374,10 @@ export default function FrogodoroPage() {
                         </label>
                         <input
                           type="number"
-                          value={settings.shortBreakDuration}
+                          value={localSettings.shortBreakDuration}
                           onChange={(e) =>
-                            setSettings({
-                              ...settings,
+                            setLocalSettings({
+                              ...localSettings,
                               shortBreakDuration: Number(e.target.value),
                             })
                           }
@@ -494,10 +393,10 @@ export default function FrogodoroPage() {
                         </label>
                         <input
                           type="number"
-                          value={settings.longBreakDuration}
+                          value={localSettings.longBreakDuration}
                           onChange={(e) =>
-                            setSettings({
-                              ...settings,
+                            setLocalSettings({
+                              ...localSettings,
                               longBreakDuration: Number(e.target.value),
                             })
                           }
@@ -511,10 +410,10 @@ export default function FrogodoroPage() {
                         </label>
                         <input
                           type="number"
-                          value={settings.longBreakInterval}
+                          value={localSettings.longBreakInterval}
                           onChange={(e) =>
-                            setSettings({
-                              ...settings,
+                            setLocalSettings({
+                              ...localSettings,
                               longBreakInterval: Number(e.target.value),
                             })
                           }
