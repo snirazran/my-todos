@@ -744,6 +744,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
         (!!t.completed && t.type === 'regular'),
       origin: t.type as Origin,
       tags: t.tags ?? [],
+      frogodoroSettings: t.frogodoroSettings,
     }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const { flyStatus, hungerStatus } = await currentFlyStatus(userId, tz);
@@ -785,6 +786,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           type: t.type,
           completed: !!t.completed,
           tags: t.tags ?? [],
+          frogodoroSettings: t.frogodoroSettings,
         }))
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       return NextResponse.json(out);

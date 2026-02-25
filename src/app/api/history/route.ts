@@ -69,6 +69,7 @@ export async function GET(req: NextRequest) {
         createdAt: 1,
         deletedAt: 1,
         tags: 1,
+        frogodoroSessions: 1,
       },
     )
       .lean<TaskDoc[]>()
@@ -81,6 +82,11 @@ export async function GET(req: NextRequest) {
       completed: boolean;
       type: 'weekly' | 'regular';
       tags?: string[];
+      frogodoroSession?: {
+        completedCycles: number;
+        targetCycles: number;
+        timeSpent: number;
+      };
     };
 
     const byDate: Record<string, HistoryTask[]> = {};
@@ -126,6 +132,9 @@ export async function GET(req: NextRequest) {
               (!!t.completed && t.type === 'regular'),
             type: t.type as 'weekly' | 'regular',
             tags: t.tags,
+            frogodoroSession: t.frogodoroSessions?.find(
+              (s) => s.date === dateStr,
+            ),
           }),
         )
         .sort((a: HistoryTask, b: HistoryTask) => a.order - b.order);

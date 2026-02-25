@@ -16,6 +16,13 @@ export interface Task {
   kind?: 'regular' | 'weekly' | 'backlog';
   tags?: string[];
   date?: string;
+  frogodoroSettings?: {
+    expectedCycles: number;
+    cycleDuration: number;
+    shortBreakDuration: number;
+    longBreakDuration: number;
+    longBreakInterval: number;
+  };
 }
 
 export type FlyStatus = {

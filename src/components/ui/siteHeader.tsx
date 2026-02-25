@@ -12,6 +12,7 @@ import {
   Sparkles,
   LogIn,
   LogOut,
+  Timer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -41,6 +42,12 @@ export default function SiteHeader() {
       href: '/history',
       label: 'History',
       icon: History,
+      protected: true,
+    },
+    {
+      href: '/frogodoro',
+      label: 'Frogodoro',
+      icon: Timer,
       protected: true,
     },
     {
