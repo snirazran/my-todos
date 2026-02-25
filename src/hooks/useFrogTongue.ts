@@ -115,11 +115,6 @@ export function useFrogTongue({
         return;
       }
 
-      if (!completed) {
-        await onPersist();
-        return;
-      }
-
       const flyEl = flyRefs.current[key];
       if (!flyEl) {
         await onPersist();
@@ -148,7 +143,9 @@ export function useFrogTongue({
 
       if (needCine) {
         await animateScrollTo(frogFocusY, PRE_PAN_MS, speedRef);
-        await new Promise((r) => setTimeout(r, PRE_LINGER_MS / speedRef.current));
+        await new Promise((r) =>
+          setTimeout(r, PRE_LINGER_MS / speedRef.current),
+        );
       }
 
       const originDoc = getMouthDoc();
@@ -179,7 +176,7 @@ export function useFrogTongue({
         onPersist,
       });
     },
-    [cinematic, grab, flyRefs, frogBoxRef, getFlyDoc, getMouthDoc]
+    [cinematic, grab, flyRefs, frogBoxRef, getFlyDoc, getMouthDoc],
   );
 
   /* ================================================================= */
@@ -202,11 +199,11 @@ export function useFrogTongue({
       const p1 = { x: (p0.x + p2.x) / 2, y: p0.y - 120 };
       const tmp = document.createElementNS(
         'http://www.w3.org/2000/svg',
-        'path'
+        'path',
       );
       tmp.setAttribute(
         'd',
-        `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`
+        `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`,
       );
       const total = tmp.getTotalLength();
       return { tmp, total, p1 };
@@ -234,7 +231,7 @@ export function useFrogTongue({
       const p2V = { x: p2.x - offX, y: p2.y - offY };
       pathNode?.setAttribute(
         'd',
-        `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`
+        `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`,
       );
     };
     seedViewportPath();
@@ -278,8 +275,7 @@ export function useFrogTongue({
       if (grab.follow) {
         if (now >= grab.camStartAt && t <= HIT_AT) {
           const seg =
-            (now - grab.camStartAt) /
-            (TONGUE_MS * HIT_AT - CAM_START_DELAY);
+            (now - grab.camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
           const clamped = Math.max(0, Math.min(1, seg));
           const eased = FOLLOW_EASE(clamped);
           paintScrollY =
@@ -293,7 +289,7 @@ export function useFrogTongue({
            the document height — making the tongue land above the task. */
         const maxScroll = Math.max(
           0,
-          document.documentElement.scrollHeight - window.innerHeight
+          document.documentElement.scrollHeight - window.innerHeight,
         );
         paintScrollY = Math.max(0, Math.min(paintScrollY, maxScroll));
       }
@@ -307,7 +303,7 @@ export function useFrogTongue({
       if (pathNode) {
         pathNode.setAttribute(
           'd',
-          `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`
+          `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`,
         );
         const visibleLen = total * forward;
         pathNode.style.strokeDasharray = `${visibleLen} ${total}`;
@@ -316,7 +312,7 @@ export function useFrogTongue({
       const sLen = total * forward;
       const pt = geomRef.current!.getPointAtLength(sLen);
       const ahead = geomRef.current!.getPointAtLength(
-        Math.min(total, sLen + 1)
+        Math.min(total, sLen + 1),
       );
       const dx = ahead.x - pt.x,
         dy = ahead.y - pt.y;
@@ -329,7 +325,7 @@ export function useFrogTongue({
       if (tipGroupEl.current) {
         tipGroupEl.current.setAttribute(
           'transform',
-          `translate(${tipX}, ${tipY})`
+          `translate(${tipX}, ${tipY})`,
         );
       }
 
@@ -412,7 +408,7 @@ function easeOutQuad(t: number) {
 function animateScrollTo(
   targetY: number,
   duration: number,
-  speedRef?: React.MutableRefObject<number>
+  speedRef?: React.MutableRefObject<number>,
 ) {
   return new Promise<void>((resolve) => {
     const start = window.scrollY;

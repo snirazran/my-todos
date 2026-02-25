@@ -417,19 +417,25 @@ export default function FrogodoroPage() {
                             completeTaskWithAnimation(selectedTask.id);
                         }}
                       >
-                        {visuallyDone.has(selectedTask.id) ||
-                        selectedTask.completed ? (
-                          <CheckCircle2 className="w-8 h-8 text-primary" />
-                        ) : (
+                        {/* Always render the fly so the ref exists, but hide it if visually done */}
+                        <div
+                          className={`transition-opacity duration-300 w-8 h-8 flex items-center justify-center ${visuallyDone.has(selectedTask.id) || selectedTask.completed ? 'opacity-0' : 'opacity-100'}`}
+                        >
                           <Fly
                             ref={(el) => {
                               flyRefs.current[selectedTask.id] = el;
                             }}
                             onClick={() => {}}
                             size={32}
-                            y={-4}
-                            x={-2}
+                            y={0}
+                            x={0}
                           />
+                        </div>
+
+                        {/* Show the checkmark when visually done */}
+                        {(visuallyDone.has(selectedTask.id) ||
+                          selectedTask.completed) && (
+                          <CheckCircle2 className="absolute w-8 h-8 text-primary animate-in zoom-in spin-in-12 duration-300" />
                         )}
                       </div>
                       <span
@@ -791,18 +797,22 @@ export default function FrogodoroPage() {
                             className={`p-4 hover:bg-accent border border-transparent cursor-pointer flex items-center gap-3 group rounded-2xl transition-colors ${t.id === selectedTaskId ? 'bg-primary/5 border-primary/20' : 'bg-card'}`}
                             onClick={() => handleTaskSelect(t.id)}
                           >
-                            <div className="flex items-center justify-center p-2 -ml-2 flex-shrink-0 z-30 pointer-events-none">
-                              {visuallyDone.has(t.id) || t.completed ? (
-                                <CheckCircle2 className="w-6 h-6 text-primary" />
-                              ) : (
+                            <div className="relative flex items-center justify-center p-2 -ml-2 flex-shrink-0 z-30 pointer-events-none">
+                              {/* Always render the fly so the ref exists, but hide it if visually done */}
+                              <div
+                                className={`transition-opacity duration-300 ${visuallyDone.has(t.id) || t.completed ? 'opacity-0' : 'opacity-100'}`}
+                              >
                                 <Fly
-                                  ref={(el) => {
-                                    flyRefs.current[t.id] = el;
-                                  }}
+                                  ref={null}
                                   onClick={() => {}}
                                   size={24}
                                   y={-2}
                                 />
+                              </div>
+
+                              {/* Show the checkmark when visually done */}
+                              {(visuallyDone.has(t.id) || t.completed) && (
+                                <CheckCircle2 className="absolute w-6 h-6 text-primary animate-in zoom-in spin-in-12 duration-300" />
                               )}
                             </div>
                             <span className="font-medium flex-1 line-clamp-2">
@@ -932,6 +942,7 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
 
   return (
     <>
+      {/* Invisible full-screen tap target */}
       <button
         type="button"
         aria-label="Tap anywhere to fast-forward tongue animation"
@@ -939,6 +950,42 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
         onClick={handleSkip}
         onTouchStart={handleSkip}
       />
+
+      {/* Visual skip hint (non-interactive): aligned with bottom notification zone */}
+      <div className="fixed bottom-0 left-0 right-0 z-[66] flex justify-center pointer-events-none px-4 pb-[calc(env(safe-area-inset-bottom)+160px)] md:pb-[calc(env(safe-area-inset-bottom)+144px)]">
+        <div
+          className={`
+            flex items-center gap-2 rounded-full border px-3 py-2
+            shadow-sm backdrop-blur-2xl transition-all duration-200
+            ${
+              active
+                ? 'bg-card/90 border-primary/40'
+                : 'bg-card/80 border-border/50'
+            }
+          `}
+        >
+          <span
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors duration-200"
+            aria-hidden
+          >
+            {active ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
+                <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
+              </svg>
+            )}
+          </span>
+          <span
+            className={`text-[11px] font-semibold select-none whitespace-nowrap transition-colors duration-200 ${active ? 'text-primary' : 'text-muted-foreground'}`}
+          >
+            {active ? 'x2 speed' : 'Tap to speed'}
+          </span>
+        </div>
+      </div>
     </>
   );
 }
