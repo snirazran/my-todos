@@ -26,6 +26,10 @@ import { useUIStore } from '@/lib/uiStore';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { type FrogHandle } from '@/components/ui/frog';
+import Fly from '@/components/ui/fly';
+import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
+
+const FLY_PX = 24;
 export default function FrogodoroPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -70,6 +74,18 @@ export default function FrogodoroPage() {
   const { indices } = useWardrobeIndices(!!user);
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
+  const flyRefs = useRef<Record<string, HTMLElement | null>>({});
+
+  const {
+    vp,
+    cinematic,
+    grab,
+    tipGroupEl,
+    tonguePathEl,
+    triggerTongue,
+    visuallyDone,
+    speedUpTongue,
+  } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
   // Handle Authentication Tracking
   useEffect(() => {
@@ -102,6 +118,60 @@ export default function FrogodoroPage() {
     setTask(taskId, task.frogodoroSettings);
     setShowTaskDropdown(false);
   };
+
+  const completeTaskWithAnimation = async (taskId: string) => {
+    if (cinematic || grab) return;
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.completed) return;
+
+    await triggerTongue({
+      key: taskId,
+      completed: true,
+      onPersist: () => {
+        toggleTask(taskId, true);
+        // The 3-second disappearance is handled in the useEffect below
+      },
+    });
+  };
+
+  // Handle 3-second disappearance of completed selected task
+  useEffect(() => {
+    if (!selectedTask || !selectedTaskId) return;
+
+    if (selectedTask.completed) {
+      const timeout = setTimeout(() => {
+        // Clear if it's STILL the selected task after 3 seconds
+        if (useFrogodoroStore.getState().selectedTaskId === selectedTask.id) {
+          setTask('', DEFAULT_SETTINGS);
+        }
+      }, 3000);
+      return () => clearTimeout(timeout);
+    }
+  }, [selectedTask, selectedTaskId, setTask]);
+
+  // Auto-complete task when target cycles are reached
+  useEffect(() => {
+    if (!selectedTask || !selectedTaskId || isRunning) return;
+
+    // Check if we just completed all target cycles
+    if (
+      completedCycles > 0 &&
+      completedCycles >= settings.expectedCycles &&
+      !selectedTask.completed &&
+      !visuallyDone.has(selectedTaskId)
+    ) {
+      completeTaskWithAnimation(selectedTaskId);
+    }
+  }, [
+    completedCycles,
+    settings.expectedCycles,
+    selectedTask,
+    selectedTaskId,
+    isRunning,
+    visuallyDone,
+    cinematic,
+    grab,
+  ]);
 
   const saveSettings = async () => {
     setSettings(localSettings);
@@ -163,6 +233,8 @@ export default function FrogodoroPage() {
             <FrogDisplay
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
+              mouthOpen={!!grab}
+              mouthOffset={{ y: -4 }}
               indices={indices}
               openWardrobe={isWardrobeOpen}
               onOpenChange={setWardrobeOpen}
@@ -219,30 +291,36 @@ export default function FrogodoroPage() {
               </div>
 
               {/* Controls */}
-              <div className="flex items-center justify-center gap-4">
-                <button
-                  onClick={toggleTimer}
-                  className={`
-                relative flex items-center justify-center px-12 py-4 h-20 bg-white text-[24px] md:text-[28px] 
-                font-black uppercase tracking-widest rounded-3xl shadow-[0_8px_0_rgba(0,0,0,0.15)] 
-                active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-2 transition-all group
-                ${phase === 'focus' ? 'text-primary' : phase === 'shortBreak' ? 'text-blue-500' : 'text-purple-600'}
-              `}
-                >
-                  {isRunning ? (
-                    <Pause className="w-8 h-8 mr-2 fill-current" />
-                  ) : (
-                    <Play className="w-8 h-8 mr-2 fill-current" />
-                  )}
-                  {isRunning ? 'PAUSE' : 'START'}
-                </button>
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 w-full max-w-md mx-auto h-20">
+                <div className="col-start-2 flex justify-center">
+                  <button
+                    onClick={toggleTimer}
+                    className={`
+                  relative flex items-center justify-center px-8 md:px-12 py-4 h-20 bg-white text-[24px] md:text-[28px] 
+                  font-black uppercase tracking-widest rounded-3xl shadow-[0_8px_0_rgba(0,0,0,0.15)] 
+                  active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-2 transition-all group z-10
+                  ${phase === 'focus' ? 'text-primary' : phase === 'shortBreak' ? 'text-blue-500' : 'text-purple-600'}
+                `}
+                  >
+                    {isRunning ? (
+                      <Pause className="w-8 h-8 mr-2 fill-current" />
+                    ) : (
+                      <Play className="w-8 h-8 mr-2 fill-current" />
+                    )}
+                    {isRunning ? 'PAUSE' : 'START'}
+                  </button>
+                </div>
 
-                <button
-                  onClick={handleManualSkip}
-                  className="p-4 bg-white/20 hover:bg-white/30 rounded-2xl transition-colors backdrop-blur active:scale-95 text-white"
-                >
-                  <SkipForward className="w-8 h-8 fill-current opacity-90 relative left-0.5" />
-                </button>
+                <div className="col-start-3 flex justify-start">
+                  {isRunning && (
+                    <button
+                      onClick={handleManualSkip}
+                      className="p-4 bg-white/20 hover:bg-white/30 rounded-2xl transition-colors backdrop-blur active:scale-95 text-white z-0"
+                    >
+                      <SkipForward className="w-8 h-8 fill-current opacity-90 relative left-0.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -253,25 +331,47 @@ export default function FrogodoroPage() {
               </p>
 
               {selectedTask ? (
-                <div className="relative inline-block text-left w-full max-w-sm mx-auto z-20">
+                <div
+                  className="relative inline-block text-left w-full max-w-sm mx-auto z-20"
+                  style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
+                >
                   <div
-                    className="flex items-center justify-between p-4 bg-card border shadow-sm rounded-2xl cursor-pointer hover:border-primary transition-colors"
+                    className="flex items-center justify-between p-4 bg-card border shadow-sm rounded-2xl cursor-pointer hover:border-primary transition-colors group"
                     onClick={() => setShowTaskDropdown(!showTaskDropdown)}
                   >
                     <div className="flex items-center gap-3 w-full pr-4">
-                      <CheckCircle2
-                        className="flex-shrink-0 w-6 h-6 text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                      <div
+                        className="flex items-center justify-center p-2 -ml-2 rounded-full flex-shrink-0 cursor-pointer transition-colors hover:bg-primary/10 hover:text-primary z-30 group-hover:border-primary/20"
                         onClick={(e) => {
                           e.stopPropagation();
-                          toggleTask(selectedTask.id);
-                          setTask(''); // Clear selection when completing
+                          if (!visuallyDone.has(selectedTask.id))
+                            completeTaskWithAnimation(selectedTask.id);
                         }}
-                      />
-                      <span className="font-bold text-lg leading-tight truncate">
+                      >
+                        {visuallyDone.has(selectedTask.id) ||
+                        selectedTask.completed ? (
+                          <CheckCircle2 className="w-8 h-8 text-primary" />
+                        ) : (
+                          <Fly
+                            ref={(el) => {
+                              flyRefs.current[selectedTask.id] = el;
+                            }}
+                            onClick={() => {}}
+                            size={32}
+                            y={-4}
+                            x={-2}
+                          />
+                        )}
+                      </div>
+                      <span
+                        className={`font-bold text-lg leading-tight truncate transition-colors duration-500 ${selectedTask.completed ? 'line-through text-muted-foreground' : ''}`}
+                      >
                         {selectedTask.text}
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
+
+                    {/* Right Side Actions */}
+                    <div className="flex items-center gap-2 flex-shrink-0 relative z-30">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -295,13 +395,26 @@ export default function FrogodoroPage() {
                         {availableTasks.map((t) => (
                           <div
                             key={t.id}
-                            className={`p-4 hover:bg-accent border-b last:border-0 cursor-pointer flex items-center gap-3 transition-colors ${t.id === selectedTaskId ? 'bg-primary/5' : ''}`}
+                            className={`p-4 hover:bg-accent border-b last:border-0 cursor-pointer flex items-center gap-3 group transition-colors ${t.id === selectedTaskId ? 'bg-primary/5' : ''}`}
                             onClick={() => handleTaskSelect(t.id)}
                           >
-                            <span
-                              className={`w-3 h-3 rounded-full ${t.id === selectedTaskId ? 'bg-primary' : 'bg-muted-foreground/30'}`}
-                            />
-                            <span className="font-medium">{t.text}</span>
+                            <div className="flex items-center justify-center p-2 -ml-2 flex-shrink-0 z-30 pointer-events-none">
+                              {visuallyDone.has(t.id) || t.completed ? (
+                                <CheckCircle2 className="w-6 h-6 text-primary" />
+                              ) : (
+                                <Fly
+                                  ref={(el) => {
+                                    flyRefs.current[t.id] = el;
+                                  }}
+                                  onClick={() => {}}
+                                  size={24}
+                                  y={-2}
+                                />
+                              )}
+                            </div>
+                            <span className="font-medium flex-1 line-clamp-2">
+                              {t.text}
+                            </span>
                           </div>
                         ))}
                         {availableTasks.length === 0 && (
@@ -334,10 +447,24 @@ export default function FrogodoroPage() {
                         {availableTasks.map((t) => (
                           <div
                             key={t.id}
-                            className="p-4 hover:bg-accent border-b last:border-0 cursor-pointer flex items-center gap-3"
+                            className="p-4 hover:bg-accent border-b last:border-0 cursor-pointer flex items-center gap-3 group"
                             onClick={() => handleTaskSelect(t.id)}
                           >
-                            <span className="font-medium line-clamp-2">
+                            <div className="flex items-center justify-center p-2 -ml-2 flex-shrink-0 z-30 pointer-events-none">
+                              {visuallyDone.has(t.id) || t.completed ? (
+                                <CheckCircle2 className="w-6 h-6 text-primary" />
+                              ) : (
+                                <Fly
+                                  ref={(el) => {
+                                    flyRefs.current[t.id] = el;
+                                  }}
+                                  onClick={() => {}}
+                                  size={24}
+                                  y={-2}
+                                />
+                              )}
+                            </div>
+                            <span className="font-medium line-clamp-2 flex-1">
                               {t.text}
                             </span>
                           </div>
@@ -481,6 +608,79 @@ export default function FrogodoroPage() {
           </div>
         </div>
       </div>
+
+      {/* SVG Tongue Overlay */}
+      {grab && (
+        <svg
+          key={grab.startAt}
+          className="fixed inset-0 z-[60] pointer-events-none"
+          width={vp.w}
+          height={vp.h}
+          viewBox={`0 0 ${vp.w} ${vp.h}`}
+          preserveAspectRatio="none"
+          style={{ width: vp.w, height: vp.h }}
+        >
+          <defs>
+            <linearGradient id="tongue-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop stopColor="#ff6b6b" />
+              <stop offset="1" stopColor="#f43f5e" />
+            </linearGradient>
+          </defs>
+
+          {/* Plain <path> — stroke visibility driven entirely by the RAF
+              loop via stroke-dasharray (no framer-motion needed). */}
+          <path
+            ref={tonguePathEl}
+            d="M0 0 L0 0"
+            fill="none"
+            stroke="url(#tongue-grad)"
+            strokeWidth={TONGUE_STROKE}
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+
+          {/* Tip group is always in the DOM; the RAF loop toggles its
+              visibility and transform directly — no React re-renders. */}
+          <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
+            <circle r={10} fill="transparent" />
+            <image
+              href="/fly.svg"
+              x={-FLY_PX / 2}
+              y={-FLY_PX / 2}
+              width={FLY_PX}
+              height={FLY_PX}
+            />
+          </g>
+        </svg>
+      )}
+
+      {/* Full-screen blocker + skip button during tongue animation */}
+      {cinematic && <CinematicOverlay onSkip={speedUpTongue} />}
     </main>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Cinematic overlay: full-screen tap blocker + skip indicator       */
+/* ------------------------------------------------------------------ */
+function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
+  const [active, setActive] = React.useState(false);
+
+  const handleSkip = React.useCallback(() => {
+    if (active) return;
+    setActive(true);
+    onSkip();
+  }, [active, onSkip]);
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Tap anywhere to fast-forward tongue animation"
+        className="fixed inset-0 z-[65] cursor-default bg-transparent"
+        onClick={handleSkip}
+        onTouchStart={handleSkip}
+      />
+    </>
   );
 }

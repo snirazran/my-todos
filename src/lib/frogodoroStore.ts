@@ -76,7 +76,13 @@ export const useFrogodoroStore = create<FrogodoroState>()(
               initialTime = settings.shortBreakDuration * 60;
             if (state.phase === 'longBreak')
               initialTime = settings.longBreakDuration * 60;
-            return { selectedTaskId: taskId, settings, timeLeft: initialTime };
+            return {
+              selectedTaskId: taskId,
+              settings,
+              timeLeft: initialTime,
+              completedCycles: 0,
+              currentSessionSpend: 0,
+            };
           }
           return { selectedTaskId: taskId, settings };
         });
