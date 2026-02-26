@@ -2,7 +2,8 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
+import { LayoutList, ListTodo, Repeat } from 'lucide-react';
 import useSWR from 'swr';
 import { Task, DAYS, type DisplayDay, type ApiDay } from './helpers';
 import DayColumn from './DayColumn';
@@ -71,6 +72,20 @@ export default function TaskBoard({
     endDrag,
     cancelDrag,
   } = useDragManager();
+
+  // Independent filters for each column (0-7, where 7 is backlog)
+  const [columnFilters, setColumnFilters] = useState<
+    Record<number, 'all' | 'tasks' | 'habits'>
+  >({});
+
+  const getFilter = useCallback(
+    (day: number) => columnFilters[day] || 'all',
+    [columnFilters],
+  );
+
+  const setFilter = useCallback((day: number, f: 'all' | 'tasks' | 'habits') => {
+    setColumnFilters((prev) => ({ ...prev, [day]: f }));
+  }, []);
 
   const { data: tagsData } = useSWR('/api/tags', (url) =>
     fetch(url).then((r) => r.json()),
@@ -450,6 +465,8 @@ export default function TaskBoard({
                 // Aggressive subtraction for both mobile (320px) and desktop (340px) to prevent overlap consistently
                 maxHeightClass="max-h-[calc(100svh-320px-var(--safe-bottom))] md:max-h-[calc(100svh-340px-var(--safe-bottom))]"
                 isToday={day === todayDisplayIndex}
+                filter={getFilter(day)}
+                onFilterChange={(f) => setFilter(day, f)}
               >
                 <TaskList
                   day={day}
@@ -472,6 +489,7 @@ export default function TaskBoard({
                   onEditTask={handleEditTask}
                   onDoLater={handleDoLater}
                   isAnyDragging={!!drag?.active}
+                  filter={getFilter(day)}
                 />
               </DayColumn>
             </div>
@@ -494,35 +512,34 @@ export default function TaskBoard({
       {/* GLOBAL BOTTOM AREA - Floating Toolbar */}
       {/* Increased padding drastically to clear standard mobile app navbars (typically 60-80px) */}
       <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[360px] relative min-h-[56px] flex items-end justify-center">
+        <div className={`pointer-events-auto mx-auto w-full max-w-[420px] relative min-h-[56px] flex items-end justify-center transition-all duration-300 ${drag?.active && drag?.taskType !== 'habit' ? 'gap-0' : 'gap-2'}`}>
           {/* Backlog Trigger */}
           <BacklogBox
             count={week[7]?.length || 0}
             isDragOver={isDragOverBacklog}
-            isDragging={!!drag?.active}
+            isDragging={!!drag?.active && drag?.taskType !== 'habit'}
             proximity={backlogProximity}
             onClick={() => setBacklogOpen(true)}
             forwardRef={backlogBoxRef}
           />
 
           {/* Add Task Button (Hide when dragging) */}
-          {/* Add Task Button (Hide when dragging) */}
           <motion.div
             initial={false}
             animate={{
-              opacity: drag?.active ? 0 : 1,
-              scale: drag?.active ? 0.9 : 1, // subtle scale down
-              width: drag?.active ? 0 : 'auto',
-              marginLeft: drag?.active ? 0 : 12,
+              opacity: drag?.active && drag?.taskType !== 'habit' ? 0 : 1,
+              scale: drag?.active && drag?.taskType !== 'habit' ? 0.9 : 1, // subtle scale down
+              width: drag?.active && drag?.taskType !== 'habit' ? 0 : 'auto',
+              flexGrow: drag?.active && drag?.taskType !== 'habit' ? 0 : 1,
             }}
             transition={{
               type: 'spring',
               stiffness: 300,
               damping: 28,
             }}
-            className={`flex-1 min-w-0 ${drag?.active ? 'overflow-hidden' : 'overflow-visible'}`}
+            className={`min-w-0 ${drag?.active && drag?.taskType !== 'habit' ? 'overflow-hidden' : 'overflow-visible'}`}
             style={{
-              pointerEvents: drag?.active ? 'none' : 'auto',
+              pointerEvents: drag?.active && drag?.taskType !== 'habit' ? 'none' : 'auto',
               whiteSpace: 'nowrap',
             }}
           >
@@ -538,7 +555,7 @@ export default function TaskBoard({
                 setQuickText('');
                 setShowQuickAdd(true);
               }}
-              disabled={!!drag?.active}
+              disabled={!!drag?.active && drag?.taskType !== 'habit'}
             />
           </motion.div>
         </div>
@@ -581,6 +598,8 @@ export default function TaskBoard({
             return next;
           });
         }}
+        filter={getFilter(7)}
+        onFilterChange={(f) => setFilter(7, f)}
       />
 
       <QuickAddSheet

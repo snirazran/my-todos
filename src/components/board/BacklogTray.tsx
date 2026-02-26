@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, FolderOpen, CalendarRange, Trash2 } from 'lucide-react';
+import { X, FolderOpen, CalendarRange, Trash2, LayoutList, ListTodo, Repeat, EllipsisVertical } from 'lucide-react';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
@@ -12,7 +12,18 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   tasks: Task[];
-  onGrab: (params: any) => void;
+  onGrab: (params: {
+    day: number;
+    index: number;
+    taskId: string;
+    taskText: string;
+    taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
+    clientX: number;
+    clientY: number;
+    pointerType: 'mouse' | 'touch';
+    rectGetter: () => DOMRect;
+    tags?: { id: string; name: string; color: string }[];
+  }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
   activeDragId: string | null;
   trayRef?: React.RefObject<HTMLDivElement>;
@@ -224,12 +235,14 @@ export default React.memo(function BacklogTray({
                   <h3 className="text-2xl font-black tracking-tight text-foreground uppercase">
                     Saved Tasks
                   </h3>
-                  <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
-                    <CalendarRange size={12} strokeWidth={3} />
-                    <span>
-                      {tasks.length} {tasks.length === 1 ? 'Task' : 'Tasks'}{' '}
-                      Saved
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
+                      <CalendarRange size={12} strokeWidth={3} />
+                      <span>
+                        {tasks.length}{' '}
+                        {tasks.length === 1 ? 'Task' : 'Tasks'} Saved
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -255,98 +268,101 @@ export default React.memo(function BacklogTray({
                     </p>
                   </div>
                 ) : (
-                  tasks.map((t, i) => (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{
-                        opacity: 0,
-                        scale: 0.9,
-                        transition: { duration: 0.15 },
-                      }}
-                      key={t.id}
-                      layout
-                      className="w-full relative"
-                    >
-                      <div className="group relative">
-                        <TaskCard
-                          innerRef={(el) =>
-                            setCardRef(draggableIdFor(7, t.id), el)
-                          }
-                          dragId={draggableIdFor(7, t.id)}
-                          task={t}
-                          userTags={userTags}
-                          menuOpen={menu?.id === t.id}
-                          onToggleMenu={(rect) => {
-                            setMenu((prev) => {
-                              if (prev?.id === t.id) return null;
-                              const MENU_W = 160;
-                              const MENU_H = 180; // Approximate height with all options
-                              const MARGIN = 10;
-                              const vw = window.innerWidth;
-                              const vh = window.innerHeight;
+                  tasks.map((t) => {
+                    const originalIndex = tasks.findIndex((it) => it.id === t.id);
+                    return (
+                      <motion.div
+                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{
+                          opacity: 0,
+                          scale: 0.9,
+                          transition: { duration: 0.15 },
+                        }}
+                        key={t.id}
+                        layout
+                        className="w-full relative"
+                      >
+                        <div className="group relative">
+                          <TaskCard
+                            innerRef={(el) =>
+                              setCardRef(draggableIdFor(7, t.id), el)
+                            }
+                            dragId={draggableIdFor(7, t.id)}
+                            task={t}
+                            userTags={userTags}
+                            menuOpen={menu?.id === t.id}
+                            onToggleMenu={(rect) => {
+                              setMenu((prev) => {
+                                if (prev?.id === t.id) return null;
+                                const MENU_W = 160;
+                                const MENU_H = 180; // Approximate height with all options
+                                const MARGIN = 10;
+                                const vw = window.innerWidth;
+                                const vh = window.innerHeight;
 
-                              let left =
-                                rect.left + rect.width / 2 - MENU_W / 2;
+                                let left =
+                                  rect.left + rect.width / 2 - MENU_W / 2;
 
-                              // Clamp horizontal position
-                              left = Math.max(
-                                MARGIN,
-                                Math.min(left, vw - MENU_W - MARGIN),
-                              );
+                                // Clamp horizontal position
+                                left = Math.max(
+                                  MARGIN,
+                                  Math.min(left, vw - MENU_W - MARGIN),
+                                );
 
-                              let top = rect.bottom + 8;
-                              // If menu would go off bottom, flip to above
-                              if (top + MENU_H > vh - MARGIN) {
-                                top = rect.top - MENU_H - 8;
-                              }
+                                let top = rect.bottom + 8;
+                                // If menu would go off bottom, flip to above
+                                if (top + MENU_H > vh - MARGIN) {
+                                  top = rect.top - MENU_H - 8;
+                                }
 
-                              return { id: t.id, top, left };
-                            });
-                          }}
-                          hiddenWhileDragging={activeDragId === t.id}
-                          isRepeating={t.type === 'weekly'}
-                          touchAction="auto" // Vertical scroll, so auto is fine? Or none? TaskCard usually handles handle
-                          isAnyDragging={!!activeDragId}
-                          onGrab={(payload) => {
-                            // Same grab logic
-                            const resolvedTags = t.tags?.map((tagId) => {
-                              const found = userTags?.find(
-                                (ut) => ut.id === tagId || ut.name === tagId,
-                              );
-                              return (
-                                found || { id: tagId, name: tagId, color: '' }
-                              );
-                            });
-                            onGrab({
-                              day: 7,
-                              index: i,
-                              taskId: t.id,
-                              taskText: t.text,
-                              clientX: payload.clientX,
-                              clientY: payload.clientY,
-                              pointerType: payload.pointerType,
-                              rectGetter: () => {
-                                // ... },
-                                const id = draggableIdFor(7, t.id);
-                                const el = document.querySelector(
-                                  `[data-card-id="${id}"]`,
+                                return { id: t.id, top, left };
+                              });
+                            }}
+                            hiddenWhileDragging={activeDragId === t.id}
+                            isRepeating={t.type === 'weekly'}
+                            touchAction="auto" // Vertical scroll, so auto is fine? Or none? TaskCard usually handles handle
+                            isAnyDragging={!!activeDragId}
+                            onGrab={(payload) => {
+                              // Same grab logic
+                              const resolvedTags = t.tags?.map((tagId) => {
+                                const found = userTags?.find(
+                                  (ut) => ut.id === tagId || ut.name === tagId,
                                 );
                                 return (
-                                  el?.getBoundingClientRect() ??
-                                  new DOMRect(0, 0, 0, 0)
+                                  found || { id: tagId, name: tagId, color: '' }
                                 );
-                              },
-                              tags: resolvedTags,
-                            });
-                          }}
-                          onDoToday={
-                            onDoToday ? () => onDoToday(t.id) : undefined
-                          }
-                        />
-                      </div>
-                    </motion.div>
-                  ))
+                              });
+                              onGrab({
+                                day: 7,
+                                index: originalIndex,
+                                taskId: t.id,
+                                taskText: t.text,
+                                taskType: t.type,
+                                clientX: payload.clientX,
+                                clientY: payload.clientY,
+                                pointerType: payload.pointerType,
+                                rectGetter: () => {
+                                  const id = draggableIdFor(7, t.id);
+                                  const el = document.querySelector(
+                                    `[data-card-id="${id}"]`,
+                                  );
+                                  return (
+                                    el?.getBoundingClientRect() ??
+                                    new DOMRect(0, 0, 0, 0)
+                                  );
+                                },
+                                tags: resolvedTags,
+                              });
+                            }}
+                            onDoToday={
+                              onDoToday ? () => onDoToday(t.id) : undefined
+                            }
+                          />
+                        </div>
+                      </motion.div>
+                    );
+                  })
                 )}
               </AnimatePresence>
             </div>

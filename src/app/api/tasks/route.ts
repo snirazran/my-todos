@@ -1007,12 +1007,26 @@ async function handleBoardPut(
   const weekday: Weekday = day as Weekday;
   const batch = tasks as Array<{ id: string; text?: string; tags?: string[] }>;
   const ids = batch.map((t) => t.id);
+
+  // 1. Remove regular tasks that are no longer in this day's list
   await TaskModel.deleteMany({
     userId: uid,
     type: 'regular',
     date: weekDates[weekday],
     id: { $nin: ids },
   });
+
+  // 2. For habits that were on this day but are now missing, remove this day from their daysOfWeek
+  await TaskModel.updateMany(
+    {
+      userId: uid,
+      type: 'habit',
+      daysOfWeek: weekday,
+      id: { $nin: ids },
+    },
+    { $pull: { daysOfWeek: weekday } },
+  );
+
   const docs: TaskDoc[] = await TaskModel.find(
     { userId: uid, id: { $in: ids } },
     { id: 1, type: 1, text: 1, tags: 1 },
@@ -1031,6 +1045,14 @@ async function handleBoardPut(
         return TaskModel.updateOne(
           { userId: uid, type: 'weekly', id: t.id },
           { $set: { dayOfWeek: weekday, order: i + 1, updatedAt: now, tags } },
+        );
+      if (ttype === 'habit')
+        return TaskModel.updateOne(
+          { userId: uid, type: 'habit', id: t.id },
+          {
+            $set: { order: i + 1, updatedAt: now, tags },
+            $addToSet: { daysOfWeek: weekday },
+          },
         );
       if (ttype === 'regular')
         return TaskModel.updateOne(

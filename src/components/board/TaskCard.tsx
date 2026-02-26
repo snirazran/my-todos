@@ -1,7 +1,13 @@
 ﻿'use client';
 
 import React, { useRef, useCallback, useEffect } from 'react';
-import { RotateCcw, EllipsisVertical, CheckCircle2, Plus } from 'lucide-react';
+import {
+  RotateCcw,
+  EllipsisVertical,
+  CheckCircle2,
+  Plus,
+  Repeat,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
@@ -226,7 +232,9 @@ export default function TaskCard({
         <div
           className={`flex-1 min-w-0 flex flex-col justify-center ${task.completed ? 'opacity-60' : ''}`}
         >
-          {(isRepeating || (task.tags && task.tags.length > 0)) && (
+          {(isRepeating ||
+            task.type === 'habit' ||
+            (task.tags && task.tags.length > 0)) && (
             <div className="mb-1 flex flex-wrap items-center gap-1.5">
               {isRepeating && (
                 <span
@@ -235,6 +243,15 @@ export default function TaskCard({
                 >
                   <RotateCcw className="h-3 w-3" aria-hidden="true" />
                   <span className="tracking-wider uppercase">Weekly</span>
+                </span>
+              )}
+              {task.type === 'habit' && (
+                <span
+                  title="Daily Habit"
+                  className="inline-flex items-center gap-1 rounded-md bg-emerald-50/80 px-2 py-0.5 text-[9px] font-bold text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-200 transition-colors"
+                >
+                  <Repeat className="h-3 w-3" aria-hidden="true" />
+                  <span className="tracking-wider uppercase">Habit</span>
                 </span>
               )}
               <AnimatePresence mode="popLayout">

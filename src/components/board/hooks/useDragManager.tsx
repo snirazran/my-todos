@@ -9,6 +9,7 @@ export type DragState = {
   fromIndex: number;
   taskId: string;
   taskText: string;
+  taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
   x: number;
   y: number;
   dx: number;
@@ -121,6 +122,7 @@ export function useDragManager() {
       index: number,
       taskId: string,
       taskText: string,
+      taskType: 'weekly' | 'regular' | 'backlog' | 'habit' | undefined,
       clientX: number,
       clientY: number,
       rect: DOMRect,
@@ -149,6 +151,7 @@ export function useDragManager() {
         fromIndex: index,
         taskId,
         taskText,
+        taskType,
         x: clientX,
         y: clientY,
         dx: clientX - rect.left,
@@ -169,16 +172,17 @@ export function useDragManager() {
       index: number;
       taskId: string;
       taskText: string;
+      taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
       clientX: number;
       clientY: number;
       rectGetter: () => DOMRect;
       tags?: { id: string; name: string; color: string }[];
     }) => {
-      const { day, index, taskId, taskText, clientX, clientY, rectGetter, tags } =
+      const { day, index, taskId, taskText, taskType, clientX, clientY, rectGetter, tags } =
         params;
 
       const rect = rectGetter();
-      beginDragFromCard(day, index, taskId, taskText, clientX, clientY, rect, tags);
+      beginDragFromCard(day, index, taskId, taskText, taskType, clientX, clientY, rect, tags);
     },
     [beginDragFromCard]
   );

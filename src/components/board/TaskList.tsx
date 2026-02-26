@@ -9,7 +9,7 @@ import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import Fly from '@/components/ui/fly';
-import { Plus } from 'lucide-react';
+import { Plus, LayoutList, ListTodo, Repeat } from 'lucide-react';
 
 export default React.memo(function TaskList({
   day,
@@ -28,6 +28,7 @@ export default React.memo(function TaskList({
   onAddRequested,
   onEditTask,
   onDoLater,
+  filter = 'all',
 }: {
   day: DisplayDay;
   items: Task[];
@@ -42,6 +43,7 @@ export default React.memo(function TaskList({
     index: number;
     taskId: string;
     taskText: string;
+    taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
     clientX: number;
     clientY: number;
     pointerType: 'mouse' | 'touch';
@@ -55,6 +57,7 @@ export default React.memo(function TaskList({
   isAnyDragging?: boolean;
   onEditTask?: (day: DisplayDay, taskId: string, newText: string) => Promise<void>;
   onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
+  filter?: 'all' | 'tasks' | 'habits';
 }) {
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay; kind?: 'edit' } | null>(null);
@@ -158,8 +161,14 @@ export default React.memo(function TaskList({
     />
   );
 
+  const filteredItems = items.filter(t => {
+    if (filter === 'tasks') return t.type !== 'habit';
+    if (filter === 'habits') return t.type === 'habit';
+    return true;
+  });
+
   // ---- Empty list: render a single placeholder (if targeting index 0) OR themed empty state
-  if (items.length === 0) {
+  if (filteredItems.length === 0) {
     if (placeholderAt === 0) {
       rows.push(renderPlaceholder(`ph-empty-${day}`));
     } else {
@@ -174,7 +183,7 @@ export default React.memo(function TaskList({
             <Fly size={20} y={-2} />
           </div>
           <p className="text-xs font-bold text-muted-foreground group-hover:text-primary transition-colors">
-            Add Task
+            {filter === 'habits' ? 'Add a Habit' : filter === 'tasks' ? 'Add a Task' : 'Add a task or habit'}
           </p>
         </button>
       );
@@ -192,6 +201,11 @@ export default React.memo(function TaskList({
 
   for (let i = 0; i < items.length; i++) {
     const t = items[i];
+
+    // Filter Logic
+    if (filter === 'tasks' && t.type === 'habit') continue;
+    if (filter === 'habits' && t.type !== 'habit') continue;
+
     const isDraggedHere = isSelfDrag && sourceIndex === i;
 
     if (!isDraggedHere) {
@@ -239,6 +253,7 @@ export default React.memo(function TaskList({
                 index: i, // original array index
                 taskId: t.id,
                 taskText: t.text,
+                taskType: t.type,
                 clientX: payload.clientX,
                 clientY: payload.clientY,
                 pointerType: payload.pointerType,

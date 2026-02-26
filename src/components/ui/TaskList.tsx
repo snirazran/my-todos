@@ -5,6 +5,7 @@ import {
   CalendarCheck,
   CalendarClock,
   RotateCcw,
+  Repeat,
   Trash2,
   Pencil,
   Filter,
@@ -564,6 +565,9 @@ const SortableTaskItem = React.forwardRef<
                   </motion.span>
                   {isWeekly && (
                     <RotateCcw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
+                  )}
+                  {task.type === 'habit' && (
+                    <Repeat className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
                   )}
                 </span>
               </div>
