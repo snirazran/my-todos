@@ -239,8 +239,8 @@ export default function HistoryPage() {
       <div className="w-full max-w-7xl px-4 py-8 md:px-8">
         {/* Main Content - Grid Layout on Desktop */}
         <div className="lg:grid lg:grid-cols-12 lg:gap-8 lg:items-start w-full mx-auto">
-          {/* Left Column: Calendar (Span 8) */}
-          <div className="lg:col-span-8 w-full relative mb-8 lg:mb-0">
+          {/* Left Column: Calendar (Span 5) */}
+          <div className="lg:col-span-5 w-full relative mb-8 lg:mb-0">
             {loadingCalendar && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/50 backdrop-blur-sm rounded-3xl">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -258,8 +258,8 @@ export default function HistoryPage() {
             />
           </div>
 
-          {/* Right Column: Insights (Span 4) */}
-          <div className="lg:col-span-4 w-full">
+          {/* Right Column: Insights (Span 7) */}
+          <div className="lg:col-span-7 w-full">
             <div className="lg:sticky lg:top-8">
               <HistoryInsights
                 historyData={filteredStatsData}
