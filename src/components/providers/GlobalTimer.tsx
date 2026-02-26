@@ -43,7 +43,6 @@ export function GlobalTimer() {
           session: {
             date: today,
             completedCycles: cycles,
-            targetCycles: settings.expectedCycles,
             timeSpent: spend,
           },
         }),

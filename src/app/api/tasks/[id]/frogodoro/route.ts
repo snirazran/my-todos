@@ -45,9 +45,6 @@ export async function PUT(
         task.frogodoroSessions[idx].completedCycles +=
           session.completedCycles || 0;
         task.frogodoroSessions[idx].timeSpent += session.timeSpent || 0;
-        if (session.targetCycles) {
-          task.frogodoroSessions[idx].targetCycles = session.targetCycles;
-        }
       } else {
         task.frogodoroSessions.push(session);
       }

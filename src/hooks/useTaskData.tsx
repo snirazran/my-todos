@@ -19,7 +19,6 @@ export interface Task {
   daysOfWeek?: number[]; // For Habits
   completedDates?: string[];
   frogodoroSettings?: {
-    expectedCycles: number;
     cycleDuration: number;
     shortBreakDuration: number;
     longBreakDuration: number;

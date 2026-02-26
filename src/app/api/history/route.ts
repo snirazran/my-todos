@@ -84,7 +84,6 @@ export async function GET(req: NextRequest) {
       tags?: string[];
       frogodoroSession?: {
         completedCycles: number;
-        targetCycles: number;
         timeSpent: number;
       };
     };

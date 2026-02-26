@@ -17,7 +17,6 @@ export type HistoryTaskCardProps = {
   frogodoroSession?: {
     date: string;
     completedCycles: number;
-    targetCycles: number;
     timeSpent: number;
   };
   onToggle?: (id: string, date: string, currentStatus: boolean) => void;
@@ -170,8 +169,7 @@ export default function HistoryTaskCard({
               })}
               {frogodoroSession && frogodoroSession.timeSpent > 0 && (
                 <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold text-green-700 bg-green-50 dark:bg-green-900/40 dark:text-green-200 border border-green-200 dark:border-green-800/50 uppercase tracking-wider">
-                  🐸 {frogodoroSession.completedCycles}/
-                  {frogodoroSession.targetCycles} •{' '}
+                  🐸 {frogodoroSession.completedCycles} •{' '}
                   {Math.round(frogodoroSession.timeSpent / 60)}m
                 </span>
               )}

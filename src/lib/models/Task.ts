@@ -22,7 +22,6 @@ export interface TaskDoc {
   deletedAt?: Date;
   tags?: string[];
   frogodoroSettings?: {
-    expectedCycles: number;
     cycleDuration: number;
     shortBreakDuration: number;
     longBreakDuration: number;
@@ -31,7 +30,6 @@ export interface TaskDoc {
   frogodoroSessions?: {
     date: string;
     completedCycles: number;
-    targetCycles: number;
     timeSpent: number;
   }[];
 }
@@ -60,7 +58,6 @@ const TaskSchema = new Schema<TaskDoc>(
     tags: { type: [String], default: [] },
     frogodoroSettings: {
       type: {
-        expectedCycles: { type: Number, default: 4 },
         cycleDuration: { type: Number, default: 25 },
         shortBreakDuration: { type: Number, default: 5 },
         longBreakDuration: { type: Number, default: 30 },
@@ -73,7 +70,6 @@ const TaskSchema = new Schema<TaskDoc>(
         {
           date: { type: String, required: true },
           completedCycles: { type: Number, default: 0 },
-          targetCycles: { type: Number, default: 4 },
           timeSpent: { type: Number, default: 0 },
         },
       ],
