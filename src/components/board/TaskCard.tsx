@@ -6,7 +6,7 @@ import {
   EllipsisVertical,
   CheckCircle2,
   Plus,
-  Repeat,
+  CalendarClock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
@@ -210,14 +210,14 @@ export default function TaskCard({
     >
       <motion.div className="flex items-stretch gap-3 w-full">
         <div
-          className={`grid self-center shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-6 w-6 ${task.completed ? 'opacity-60' : ''}`}
+          className={`grid self-center shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-7 w-7 ${task.completed ? 'opacity-60' : ''}`}
         >
           <div
-            className={`absolute inset-0 transition-opacity duration-200 ${
+            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
               task.completed ? 'opacity-0 pointer-events-none' : 'opacity-100'
             }`}
           >
-            <Fly size={24} paused={task.completed} />
+            <Fly size={28} paused={task.completed} y={-4} />
           </div>
 
           <div
@@ -225,7 +225,7 @@ export default function TaskCard({
               task.completed ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
           >
-            <CheckCircle2 className="w-6 h-6 text-green-500" />
+            <CheckCircle2 className="w-7 h-7 text-green-500" />
           </div>
         </div>
 
@@ -293,7 +293,7 @@ export default function TaskCard({
               />
             )}
             {task.type === 'habit' && (
-              <Repeat
+              <CalendarClock
                 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0"
               />
             )}

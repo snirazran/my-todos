@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutList, ListTodo, Repeat, Check } from 'lucide-react';
+import { LayoutList, CalendarCheck, CalendarClock, Check } from 'lucide-react';
 
 export type FilterType = 'all' | 'tasks' | 'habits';
 
@@ -146,7 +146,7 @@ export function FilterDropdown({
                           : 'hover:bg-accent text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      <ListTodo size={18} />
+                      <CalendarCheck size={18} />
                       Tasks Only
                     </button>
                     <button
@@ -160,7 +160,7 @@ export function FilterDropdown({
                           : 'hover:bg-accent text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      <Repeat size={18} />
+                      <CalendarClock size={18} />
                       Habits Only
                     </button>
                   </>
