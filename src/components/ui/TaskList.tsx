@@ -509,14 +509,8 @@ const SortableTaskItem = React.forwardRef<
               </div>
 
               <div className="flex-1 min-w-0">
-                {(isWeekly || (task.tags && task.tags.length > 0)) && (
+                {task.tags && task.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 mb-1">
-                    {isWeekly && (
-                      <span className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-900/40 dark:text-purple-200 border border-purple-100 dark:border-purple-800/50 uppercase tracking-wider">
-                        <RotateCcw className="w-3 h-3" />
-                        Weekly
-                      </span>
-                    )}
                     <AnimatePresence mode="popLayout">
                       {task.tags?.map((tagId) => {
                         const tagDetails = getTagDetails(tagId);
@@ -554,19 +548,24 @@ const SortableTaskItem = React.forwardRef<
                     </AnimatePresence>
                   </div>
                 )}
-                <motion.span
-                  className={`block text-base font-medium md:text-lg transition-colors duration-200 ${
-                    isDone
-                      ? 'text-muted-foreground line-through'
-                      : 'text-foreground'
-                  }`}
-                  animate={{
-                    opacity: isDone ? 0.8 : 1, // Double ensure text is dimmed
-                  }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {task.text}
-                </motion.span>
+                <span className="flex items-center gap-1.5">
+                  <motion.span
+                    className={`text-base font-medium md:text-lg transition-colors duration-200 ${
+                      isDone
+                        ? 'text-muted-foreground line-through'
+                        : 'text-foreground'
+                    }`}
+                    animate={{
+                      opacity: isDone ? 0.8 : 1,
+                    }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {task.text}
+                  </motion.span>
+                  {isWeekly && (
+                    <RotateCcw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
+                  )}
+                </span>
               </div>
             </div>
             {/* Grab handle area for mobile if needed, or just edge drag */}
