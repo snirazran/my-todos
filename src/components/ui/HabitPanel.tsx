@@ -220,7 +220,7 @@ function HabitItem({
         transition: { type: 'spring', stiffness: 400, damping: 30 },
       }}
       exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-      className={`relative group ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl' : 'overflow-hidden bg-transparent rounded-xl'}`}
+      className={`relative group ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'}`}
     >
       {/* Swipe Actions Layer (behind the card) */}
       <div
@@ -268,9 +268,9 @@ function HabitItem({
         transition={{ type: 'spring', stiffness: 600, damping: 28, mass: 1 }}
         onClick={handleCardClick}
         className={`
-          relative flex flex-col gap-2 px-2 py-3.5 rounded-xl border border-border/50 shadow-none transition-colors duration-200 cursor-pointer select-none
+          relative flex flex-col gap-2 px-2 py-3.5 rounded-xl border border-border/50 transition-colors duration-200 cursor-pointer select-none
           ${isDone ? 'bg-card opacity-60' : 'bg-card hover:border-border/70'}
-          ${isOpen || isSwiping ? 'bg-card' : ''}
+          ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
         `}
       >
         <div className="flex items-center justify-between gap-3 pl-2">
