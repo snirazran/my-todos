@@ -10,6 +10,8 @@ interface Props {
   busy?: boolean;
   onClose: () => void;
   onSave: (newText: string) => void;
+  title?: string;
+  subtitle?: string;
 }
 
 export function EditTaskDialog({
@@ -18,6 +20,8 @@ export function EditTaskDialog({
   busy,
   onClose,
   onSave,
+  title = 'Edit Task',
+  subtitle = 'Make changes to your task below.',
 }: Props) {
   const [text, setText] = useState(initialText);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -57,9 +61,9 @@ export function EditTaskDialog({
             <Pencil className="w-4 h-4" />
           </div>
           <div className="flex-1 space-y-0.5">
-            <h4 className="text-lg font-bold text-foreground">Edit Task</h4>
+            <h4 className="text-lg font-bold text-foreground">{title}</h4>
             <p className="text-sm font-medium text-muted-foreground">
-              Make changes to your task below.
+              {subtitle}
             </p>
           </div>
           <button

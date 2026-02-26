@@ -4,12 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import useSWR from 'swr';
-import {
-  Task,
-  DAYS,
-  type DisplayDay,
-  type ApiDay,
-} from './helpers';
+import { Task, DAYS, type DisplayDay, type ApiDay } from './helpers';
 import DayColumn from './DayColumn';
 import TaskList from './TaskList';
 import PaginationDots from './PaginationDots';
@@ -45,7 +40,7 @@ export default function TaskBoard({
     day: DisplayDay | null,
     text?: string,
     afterIndex?: number | null,
-    repeat?: RepeatChoice
+    repeat?: RepeatChoice,
   ) => void;
   onQuickAdd?: (data: {
     text: string;
@@ -56,7 +51,11 @@ export default function TaskBoard({
   todayDisplayIndex: Exclude<DisplayDay, 7>;
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>; // New Prop
   onToggleRepeat?: (taskId: string, day: DisplayDay) => Promise<void> | void;
-  onEditTask?: (day: DisplayDay, taskId: string, newText: string) => Promise<void>;
+  onEditTask?: (
+    day: DisplayDay,
+    taskId: string,
+    newText: string,
+  ) => Promise<void>;
   onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
 }) {
   const pathname = usePathname();
@@ -74,7 +73,7 @@ export default function TaskBoard({
   } = useDragManager();
 
   const { data: tagsData } = useSWR('/api/tags', (url) =>
-    fetch(url).then((r) => r.json())
+    fetch(url).then((r) => r.json()),
   );
   const userTags = tagsData?.tags || [];
 
@@ -83,7 +82,7 @@ export default function TaskBoard({
   }, [pathname, cancelDrag]);
 
   const [pageIndex, setPageIndex] = useState<DisplayDay>(
-    todayDisplayIndex as DisplayDay
+    todayDisplayIndex as DisplayDay,
   );
   const recomputeCanPanRef = useRef<() => void>();
 
@@ -130,7 +129,7 @@ export default function TaskBoard({
     if (!s) return;
     const handler = () => {
       const cols = Array.from(
-        document.querySelectorAll<HTMLElement>('[data-col="true"]')
+        document.querySelectorAll<HTMLElement>('[data-col="true"]'),
       );
       const idx = cols.findIndex((col) => {
         const colCenter = col.offsetLeft + col.clientWidth / 2;
@@ -176,7 +175,9 @@ export default function TaskBoard({
       // So the limit should be (firstCompleted - 1).
       // If dragging from another column, the limit is firstCompleted (insert before it).
       const isSelfDrag = drag?.fromDay === effectiveTargetDay;
-      const limit = isSelfDrag ? Math.max(0, firstCompleted - 1) : firstCompleted;
+      const limit = isSelfDrag
+        ? Math.max(0, firstCompleted - 1)
+        : firstCompleted;
       clampedTargetIndex = Math.min(targetIndex, limit);
     }
   }
@@ -278,48 +279,54 @@ export default function TaskBoard({
           drag.fromDay === toDay
             ? [saveDay(toDay, next[toDay])]
             : [
-              saveDay(drag.fromDay as DisplayDay, next[drag.fromDay]),
-              saveDay(toDay, next[toDay]),
-            ]
-        ).catch(() => { });
+                saveDay(drag.fromDay as DisplayDay, next[drag.fromDay]),
+                saveDay(toDay, next[toDay]),
+              ],
+        ).catch(() => {});
         return next;
       });
     },
-    [drag, saveDay, setWeek]
+    [drag, saveDay, setWeek],
   );
 
-  const handleEditTask = useCallback(async (day: DisplayDay, taskId: string, newText: string) => {
-    setWeek(prev => {
-      const next = prev.map(d => d.slice());
-      const taskIndex = next[day].findIndex(t => t.id === taskId);
-      if (taskIndex !== -1) {
-        next[day][taskIndex] = { ...next[day][taskIndex], text: newText };
-        saveDay(day, next[day]).catch(console.error);
-      }
-      return next;
-    });
-  }, [setWeek, saveDay]);
+  const handleEditTask = useCallback(
+    async (day: DisplayDay, taskId: string, newText: string) => {
+      setWeek((prev) => {
+        const next = prev.map((d) => d.slice());
+        const taskIndex = next[day].findIndex((t) => t.id === taskId);
+        if (taskIndex !== -1) {
+          next[day][taskIndex] = { ...next[day][taskIndex], text: newText };
+          saveDay(day, next[day]).catch(console.error);
+        }
+        return next;
+      });
+    },
+    [setWeek, saveDay],
+  );
 
-  const handleDoLater = useCallback(async (day: DisplayDay, taskId: string) => {
-    // Move to Backlog (Index 7)
-    setWeek(prev => {
-      const next = prev.map(d => d.slice());
-      const taskIndex = next[day].findIndex(t => t.id === taskId);
-      if (taskIndex !== -1) {
-        const [task] = next[day].splice(taskIndex, 1);
-        task.type = 'backlog'; // Ensure it's marked as backlog
+  const handleDoLater = useCallback(
+    async (day: DisplayDay, taskId: string) => {
+      // Move to Backlog (Index 7)
+      setWeek((prev) => {
+        const next = prev.map((d) => d.slice());
+        const taskIndex = next[day].findIndex((t) => t.id === taskId);
+        if (taskIndex !== -1) {
+          const [task] = next[day].splice(taskIndex, 1);
+          task.type = 'backlog'; // Ensure it's marked as backlog
 
-        if (!next[7]) next[7] = [];
-        next[7].push(task); // Add to end of backlog
+          if (!next[7]) next[7] = [];
+          next[7].push(task); // Add to end of backlog
 
-        Promise.all([
-          saveDay(day, next[day]),
-          saveDay(7 as DisplayDay, next[7])
-        ]).catch(console.error);
-      }
-      return next;
-    });
-  }, [setWeek, saveDay]);
+          Promise.all([
+            saveDay(day, next[day]),
+            saveDay(7 as DisplayDay, next[7]),
+          ]).catch(console.error);
+        }
+        return next;
+      });
+    },
+    [setWeek, saveDay],
+  );
 
   const onDrop = useCallback(() => {
     if (!drag) return;
@@ -415,7 +422,9 @@ export default function TaskBoard({
         className={[
           'no-scrollbar absolute inset-0 w-full h-full',
           'flex flex-col items-start overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x',
-          snapSuppressed ? 'snap-none' : 'snap-x snap-mandatory scroll-smooth md:snap-none',
+          snapSuppressed
+            ? 'snap-none'
+            : 'snap-x snap-mandatory scroll-smooth md:snap-none',
         ].join(' ')}
         style={{
           WebkitOverflowScrolling: 'touch',
@@ -486,7 +495,6 @@ export default function TaskBoard({
       {/* Increased padding drastically to clear standard mobile app navbars (typically 60-80px) */}
       <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
         <div className="pointer-events-auto mx-auto w-full max-w-[360px] relative min-h-[56px] flex items-end justify-center">
-
           {/* Backlog Trigger */}
           <BacklogBox
             count={week[7]?.length || 0}
@@ -512,14 +520,20 @@ export default function TaskBoard({
               stiffness: 300,
               damping: 28,
             }}
-            className={`flex-1 min-w-0 ${drag?.active ? 'overflow-hidden' : 'overflow-visible'}`} style={{
+            className={`flex-1 min-w-0 ${drag?.active ? 'overflow-hidden' : 'overflow-visible'}`}
+            style={{
               pointerEvents: drag?.active ? 'none' : 'auto',
-              whiteSpace: 'nowrap'
+              whiteSpace: 'nowrap',
             }}
           >
             <AddTaskButton
               className="w-full h-[56px]"
-              label="Add a task"
+              label={
+                <span className="flex items-center">
+                  Add a <Fly size={24} y={-3} x={4} />
+                </span>
+              }
+              showFly={false}
               onClick={() => {
                 setQuickText('');
                 setShowQuickAdd(true);
@@ -543,13 +557,15 @@ export default function TaskBoard({
         onRemove={(id) => removeTask(7 as DisplayDay, id)}
         userTags={userTags}
         onEdit={(id, newText) => handleEditTask(7 as DisplayDay, id, newText)}
-        onToggleRepeat={(id) => onToggleRepeat && onToggleRepeat(id, 7 as DisplayDay)}
+        onToggleRepeat={(id) =>
+          onToggleRepeat && onToggleRepeat(id, 7 as DisplayDay)
+        }
         onDoToday={async (id) => {
           // Move to today (DisplayIndex)
           const tDay = todayDisplayIndex;
-          setWeek(prev => {
-            const next = prev.map(d => d.slice());
-            const taskIndex = next[7].findIndex(t => t.id === id);
+          setWeek((prev) => {
+            const next = prev.map((d) => d.slice());
+            const taskIndex = next[7].findIndex((t) => t.id === id);
             if (taskIndex !== -1) {
               const [task] = next[7].splice(taskIndex, 1);
               if (task.type === 'backlog') task.type = 'regular';
@@ -559,7 +575,7 @@ export default function TaskBoard({
 
               Promise.all([
                 saveDay(7 as DisplayDay, next[7]),
-                saveDay(tDay, next[tDay])
+                saveDay(tDay, next[tDay]),
               ]).catch(console.error);
             }
             return next;

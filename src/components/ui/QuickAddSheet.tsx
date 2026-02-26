@@ -13,8 +13,10 @@ import {
 import {
   CalendarDays,
   CalendarCheck,
+  CalendarClock,
   RotateCcw,
   Info,
+  HelpCircle,
   Plus,
   X,
   Tag,
@@ -29,8 +31,8 @@ import Fly from '@/components/ui/fly';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PremiumLimitDialog } from './PremiumLimitDialog';
 
-type RepeatChoice = 'this-week' | 'weekly';
-type WhenChoice = 'pick' | 'later';
+type RepeatChoice = 'this-week' | 'weekly' | 'habit';
+type WhenChoice = 'pick' | 'habit';
 
 type Props = Readonly<{
   open: boolean;
@@ -180,6 +182,7 @@ export default function QuickAddSheet({
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showTypeInfo, setShowTypeInfo] = useState(false);
   const [mounted, setMounted] = useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -371,19 +374,16 @@ export default function QuickAddSheet({
     const trimmed = text.trim();
     if (!trimmed) return;
 
-    const apiDays: ApiDay[] =
-      when === 'later'
-        ? [-1]
-        : pickedDays
-            .slice()
-            .sort()
-            .map((d) => apiDayFromDisplay(d, daysOrder));
+    const apiDays: ApiDay[] = pickedDays
+      .slice()
+      .sort()
+      .map((d) => apiDayFromDisplay(d, daysOrder));
 
     if (apiDays.length === 0) return;
 
     setIsSubmitting(true);
     try {
-      const finalRepeat: RepeatChoice = when === 'later' ? 'this-week' : repeat;
+      const finalRepeat: RepeatChoice = when === 'habit' ? 'habit' : repeat;
       await onSubmit({
         text: trimmed,
         days: apiDays,
@@ -399,7 +399,7 @@ export default function QuickAddSheet({
   if (!mounted) return null;
 
   const repeatsOn = repeat === 'weekly';
-  const isLater = when === 'later';
+  const isHabit = when === 'habit';
 
   return (
     <>
@@ -434,7 +434,9 @@ export default function QuickAddSheet({
                         ref={inputRef}
                         value={text}
                         onChange={(e) => setText(e.target.value)}
-                        placeholder="New task?"
+                        placeholder={
+                          when === 'habit' ? 'New habit...' : 'New task?'
+                        }
                         disabled={isSubmitting}
                         spellCheck={false}
                         autoComplete="off"
@@ -877,18 +879,21 @@ export default function QuickAddSheet({
                               'data-[active=false]:text-muted-foreground',
                             ].join(' ')}
                           >
-                            <CalendarDays className="w-4 h-4" />
-                            Pick day
+                            <CalendarCheck className="w-4 h-4" />
+                            Task
                           </button>
 
                           <button
                             type="button"
-                            aria-pressed={when === 'later'}
-                            data-active={when === 'later'}
+                            aria-pressed={when === 'habit'}
+                            data-active={when === 'habit'}
                             onClick={() => {
-                              setWhen('later');
-                              setPickedDays([]);
-                              setRepeat('this-week');
+                              setWhen('habit');
+                              if (pickedDays.length === 0)
+                                setPickedDays([
+                                  todayDisplayIndex() as Exclude<DisplayDay, 7>,
+                                ]);
+                              setRepeat('habit');
                             }}
                             className={[
                               'h-10 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-2 transition',
@@ -897,15 +902,59 @@ export default function QuickAddSheet({
                               'data-[active=false]:text-muted-foreground',
                             ].join(' ')}
                           >
-                            <CalendarCheck className="w-4 h-4" />
-                            I'll decide later
+                            <CalendarClock className="w-4 h-4" />
+                            Habit
                           </button>
                         </div>
+
+                        {/* Question mark toggle */}
+                        <div className="flex justify-end mt-1.5 px-1">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              setShowTypeInfo(!showTypeInfo);
+                            }}
+                            className="p-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                            aria-label="What's the difference?"
+                          >
+                            <HelpCircle className="w-4 h-4" />
+                          </button>
+                        </div>
+
+                        <AnimatePresence>
+                          {showTypeInfo && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="overflow-hidden"
+                            >
+                              <div className="rounded-xl bg-muted/40 ring-1 ring-border/30 p-3 text-[12px] text-muted-foreground leading-relaxed space-y-1.5">
+                                <p>
+                                  <span className="font-bold text-foreground">
+                                    Task
+                                  </span>{' '}
+                                  — For things on your to-do list. Can be
+                                  one-time or repeat weekly.
+                                </p>
+                                <p>
+                                  <span className="font-bold text-foreground">
+                                    Habit
+                                  </span>{' '}
+                                  — Auto-repeats on chosen days and tracks your
+                                  progress over time.
+                                </p>
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     )}
 
-                    {/* PICK MODE */}
-                    {when === 'pick' && (
+                    {/* DAY PICKER */}
+                    {(when === 'pick' || when === 'habit') && (
                       <div
                         className="flex flex-col gap-4 mt-1 sm:flex-row sm:items-center"
                         style={{ transform: 'translateZ(0)' }}
@@ -941,7 +990,7 @@ export default function QuickAddSheet({
                           </div>
                         )}
 
-                        {!hideRepeatPicker && (
+                        {!hideRepeatPicker && when !== 'habit' && (
                           <div className="sm:shrink-0 sm:pl-1">
                             <button
                               type="button"
@@ -950,7 +999,6 @@ export default function QuickAddSheet({
                                   r === 'weekly' ? 'this-week' : 'weekly',
                                 )
                               }
-                              disabled={isLater}
                               className={`
                                 inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-bold transition-all
                                 border shadow-sm
@@ -959,14 +1007,9 @@ export default function QuickAddSheet({
                                     ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15'
                                     : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted/80 hover:text-foreground'
                                 }
-                                ${isLater ? 'opacity-50 cursor-not-allowed' : ''}
                             `}
                               title={
-                                isLater
-                                  ? 'Repeat is not available for Later'
-                                  : repeatsOn
-                                    ? 'Repeats Weekly'
-                                    : 'One-time task'
+                                repeatsOn ? 'Repeats Weekly' : 'One-time task'
                               }
                             >
                               <RotateCcw
@@ -976,18 +1019,6 @@ export default function QuickAddSheet({
                             </button>
                           </div>
                         )}
-                      </div>
-                    )}
-
-                    {!hideDayPicker && when === 'later' && (
-                      <div className="mt-2 flex items-start gap-2 rounded-xl bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30 ring-1 ring-green-200 dark:ring-green-800/50 p-3 text-[13px]">
-                        <Info className="w-4 h-4 mt-0.5 shrink-0 text-green-600 dark:text-green-500" />
-                        <span className="text-foreground">
-                          <span className="font-bold text-green-700 dark:text-green-400">
-                            Not sure when?
-                          </span>{' '}
-                          Your task will be saved for later.
-                        </span>
                       </div>
                     )}
 

@@ -14,7 +14,9 @@ import {
   Check,
   FolderOpen,
 } from 'lucide-react';
-import BacklogPanel from '@/components/ui/BacklogPanel';
+import { HabitPanel } from '@/components/ui/HabitPanel';
+import BacklogTray from '@/components/board/BacklogTray';
+import BacklogBox from '@/components/board/BacklogBox';
 //fix
 import { useAuth } from '@/components/auth/AuthContext';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
@@ -65,6 +67,7 @@ export default function Home() {
   const {
     tasks,
     backlogTasks,
+    habits,
     isLoading,
     flyStatus,
     hungerStatus,
@@ -85,7 +88,7 @@ export default function Home() {
   } = useTaskData();
 
   const frogRef = useRef<FrogHandle>(null);
-  const flyRefs = useRef<Record<string, HTMLElement | null>>({});
+  const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const isInitialLoad = useRef(true);
 
   const { isWardrobeOpen, setWardrobeOpen } = useUIStore();
@@ -93,10 +96,11 @@ export default function Home() {
 
   const [quickText, setQuickText] = useState('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [quickAddMode, setQuickAddMode] = useState<'pick' | 'later'>('pick');
+  const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>('pick');
 
   /* State */
-  const [activeTab, setActiveTab] = useState<'today' | 'backlog'>('today');
+  const [activeTab, setActiveTab] = useState<'today' | 'habits'>('today');
+  const [isBacklogOpen, setIsBacklogOpen] = useState(false);
   const [showCompleted, setShowCompleted] = useState(true);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
@@ -206,7 +210,8 @@ export default function Home() {
 
   const handleToggle = async (taskId: string, explicitCompleted?: boolean) => {
     if (cinematic || grab) return;
-    const task = data.find((t) => t.id === taskId);
+    const task =
+      data.find((t) => t.id === taskId) || habits.find((h) => h.id === taskId);
     if (!task) return;
     const completed =
       explicitCompleted !== undefined ? explicitCompleted : !task.completed;
@@ -264,7 +269,7 @@ export default function Home() {
                   return;
                 }
                 setQuickText('');
-                setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
+                setQuickAddMode(activeTab === 'habits' ? 'habit' : 'pick');
                 setShowQuickAdd(true);
               }}
               onMutateToday={() => mutateToday()}
@@ -292,7 +297,7 @@ export default function Home() {
                   <CalendarCheck
                     className={`w-4 h-4 ${activeTab === 'today' ? 'text-primary' : 'text-muted-foreground'}`}
                   />
-                  Today
+                  Tasks
                   <TaskCounter
                     count={
                       showCompleted
@@ -303,24 +308,21 @@ export default function Home() {
                   />
                 </button>
                 <button
-                  onClick={() => setActiveTab('backlog')}
+                  onClick={() => setActiveTab('habits')}
                   className={`
         flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap
         ${
-          activeTab === 'backlog'
+          activeTab === 'habits'
             ? 'bg-background text-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground'
         }
       `}
                 >
-                  <FolderOpen
-                    className={`w-4 h-4 ${activeTab === 'backlog' ? 'text-primary' : 'text-muted-foreground'}`}
+                  <CalendarClock
+                    className={`w-4 h-4 ${activeTab === 'habits' ? 'text-primary' : 'text-muted-foreground'}`}
                   />
-                  Saved Tasks
-                  <TaskCounter
-                    count={laterThisWeek.length}
-                    pendingCount={pendingToBacklog}
-                  />
+                  Habits
+                  <TaskCounter count={habits.length} />
                 </button>
 
                 {/* 3-DOTS MENU ADDED HERE */}
@@ -450,156 +452,159 @@ export default function Home() {
             </div>
 
             <div className="min-h-[400px] pb-20" ref={taskListRef}>
-              {activeTab === 'today' ? (
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: 10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  {!user && (
-                    <div className="relative overflow-hidden mb-3 rounded-xl bg-primary/5 border border-primary/10 shadow-sm">
-                      <div className="relative flex items-center gap-4 p-4">
-                        <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-background text-primary shadow-sm ring-1 ring-primary/20">
-                          <span className="text-xl animate-bounce">🍽️</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-black text-foreground tracking-tight mb-0.5">
-                            The Frog is Hungry!
-                          </h3>
-                          <p className="text-xs font-medium text-muted-foreground leading-relaxed">
-                            Catch a fly to make her happy and unlock a special{' '}
-                            <span className="text-primary font-bold">Gift</span>
-                            !
-                          </p>
+              <AnimatePresence mode="wait">
+                {activeTab === 'today' ? (
+                  <motion.div
+                    key="today"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {!user && (
+                      <div className="relative overflow-hidden mb-3 rounded-xl bg-primary/5 border border-primary/10 shadow-sm">
+                        <div className="relative flex items-center gap-4 p-4">
+                          <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-background text-primary shadow-sm ring-1 ring-primary/20">
+                            <span className="text-xl animate-bounce">🍽️</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm font-black text-foreground tracking-tight mb-0.5">
+                              The Frog is Hungry!
+                            </h3>
+                            <p className="text-xs font-medium text-muted-foreground leading-relaxed">
+                              Catch a fly to make her happy and unlock a special{' '}
+                              <span className="text-primary font-bold">
+                                Gift
+                              </span>
+                              !
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                  <TaskList
-                    tasks={data}
-                    toggle={handleToggle}
-                    showConfetti={rate === 100}
-                    visuallyCompleted={visuallyDone}
-                    renderBullet={(task, isVisuallyDone) =>
-                      task.completed || isVisuallyDone ? null : (
-                        <Fly
-                          ref={(el) => {
-                            flyRefs.current[task.id] = el;
-                          }}
-                          onClick={() => null}
-                          size={28}
-                          y={-4}
-                          x={-2}
-                        />
-                      )
-                    }
-                    onAddRequested={(prefill) => {
-                      if (!user) {
-                        router.push('/login');
-                        return;
+                    )}
+                    <TaskList
+                      tasks={data}
+                      toggle={handleToggle}
+                      showConfetti={rate === 100}
+                      visuallyCompleted={visuallyDone}
+                      renderBullet={(task, isVisuallyDone) =>
+                        task.completed || isVisuallyDone ? null : (
+                          <Fly
+                            ref={(el) => {
+                              flyRefs.current[task.id] = el;
+                            }}
+                            onClick={() => null}
+                            size={28}
+                            y={-4}
+                            x={-2}
+                          />
+                        )
                       }
-                      setQuickText(prefill || '');
-                      setQuickAddMode('pick');
-                      setShowQuickAdd(true);
-                    }}
-                    weeklyIds={weeklyIds}
-                    onDeleteToday={(id) => {
-                      if (!user) {
-                        router.push('/login');
-                        return;
-                      }
-                      deleteTask(id);
-                    }}
-                    onDeleteFromWeek={async (taskId) => {
-                      if (!user) {
-                        router.push('/login');
-                        return;
-                      }
-                      const dow = new Date().getDay();
-                      await fetch('/api/tasks?view=board', {
-                        method: 'DELETE',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ day: dow, taskId }),
-                      });
-                      deleteTask(taskId);
-                    }}
-                    onDoLater={(id) => {
-                      if (!user) {
-                        router.push('/login');
-                        return;
-                      }
-                      moveTaskToBacklog(id);
-                    }}
-                    onReorder={reorderTasks}
-                    pendingToToday={pendingToToday}
-                    onToggleRepeat={(id) => {
-                      if (!user) {
-                        router.push('/login');
-                        return;
-                      }
-                      toggleRepeat(id);
-                    }}
-                    onEditTask={(id, text) => {
-                      if (!user) {
-                        router.push('/login');
-                        return;
-                      }
-                      editTask(id, text, false);
-                    }}
-                    isGuest={!user}
-                    tags={tags}
-                    showCompleted={showCompleted}
-                    selectedTags={selectedTags}
-                    onSetSelectedTags={setSelectedTags}
-                    isGlowActive={isTaskGlow}
-                    isFrozen={cinematic}
-                  />
-                </motion.div>
-              ) : (
-                <motion.div
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <BacklogPanel
-                    later={laterThisWeek}
-                    onRefreshToday={async () => {
-                      if (user) await mutateToday();
-                    }}
-                    onRefreshBacklog={async () => {
-                      if (user) await mutateBacklog();
-                    }}
-                    onMoveToToday={(item) => {
-                      if (!user) {
-                        router.push('/login');
-                        return;
-                      }
-                      moveTaskToToday(item);
-                    }}
-                    pendingToBacklog={pendingToBacklog}
-                    onAddRequested={() => {
-                      if (!user) {
-                        router.push('/login');
-                        return;
-                      }
-                      setQuickText('');
-                      setQuickAddMode('later');
-                      setShowQuickAdd(true);
-                    }}
-                    onEditTask={(id, text) => {
-                      if (!user) {
-                        router.push('/login');
-                        return;
-                      }
-                      editTask(id, text, true);
-                    }}
-                    isGuest={!user}
-                    tags={tags}
-                  />
-                </motion.div>
-              )}
+                      onAddRequested={(prefill) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        setQuickText(prefill || '');
+                        setQuickAddMode('pick');
+                        setShowQuickAdd(true);
+                      }}
+                      weeklyIds={weeklyIds}
+                      onDeleteToday={(id) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        deleteTask(id);
+                      }}
+                      onDeleteFromWeek={async (taskId) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        const dow = new Date().getDay();
+                        await fetch('/api/tasks?view=board', {
+                          method: 'DELETE',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ day: dow, taskId }),
+                        });
+                        deleteTask(taskId);
+                      }}
+                      onDoLater={(id) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        moveTaskToBacklog(id);
+                      }}
+                      onReorder={reorderTasks}
+                      pendingToToday={pendingToToday}
+                      onToggleRepeat={(id) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        toggleRepeat(id);
+                      }}
+                      onEditTask={(id, text) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        editTask(id, text, false);
+                      }}
+                      isGuest={!user}
+                      tags={tags}
+                      showCompleted={showCompleted}
+                      selectedTags={selectedTags}
+                      onSetSelectedTags={setSelectedTags}
+                      isGlowActive={isTaskGlow}
+                      isFrozen={cinematic}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="habits"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <HabitPanel
+                      habits={habits}
+                      onToggle={handleToggle}
+                      onEdit={(id, text) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        editTask(id, text, false);
+                      }}
+                      onDelete={(id) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        deleteTask(id, true);
+                      }}
+                      onAddRequested={(prefill, isHabit) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        setQuickText(prefill || '');
+                        setQuickAddMode(isHabit ? 'habit' : 'pick');
+                        setShowQuickAdd(true);
+                      }}
+                      tags={tags}
+                      flyRefs={flyRefs}
+                      showCompleted={showCompleted}
+                      visuallyCompleted={visuallyDone}
+                      date={new Date().toISOString().slice(0, 10)}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>
@@ -679,30 +684,31 @@ export default function Home() {
                 (Array.isArray(days) && days.includes(-1));
 
               if (isBacklog) {
-                mutateBacklog(
-                  (curr) => {
-                    if (!curr) return newTasks;
-                    return [...curr, ...newTasks];
-                  },
-                  { revalidate: false },
-                );
+                mutateBacklog((curr) => {
+                  if (!curr) return newTasks;
+                  return [...curr, ...newTasks];
+                });
               } else {
-                // Filter to only add tasks that match TODAY's date
-                const relevantTasks = newTasks.filter(
-                  (t: any) => !t.date || t.date === dateStr,
-                );
+                const currentDayOfWeek = new Date().getDay();
+                // Filter to only add tasks that match TODAY's date, or if it's a habit meant for today
+                const relevantTasks = newTasks.filter((t: any) => {
+                  if (t.type === 'habit') {
+                    return (
+                      Array.isArray(t.daysOfWeek) &&
+                      t.daysOfWeek.includes(currentDayOfWeek)
+                    );
+                  }
+                  return !t.date || t.date === dateStr;
+                });
 
                 if (relevantTasks.length > 0) {
-                  mutateToday(
-                    (curr) => {
-                      if (!curr) return undefined;
-                      return {
-                        ...curr,
-                        tasks: [...curr.tasks, ...relevantTasks],
-                      };
-                    },
-                    { revalidate: false },
-                  );
+                  mutateToday((curr) => {
+                    if (!curr) return undefined;
+                    return {
+                      ...curr,
+                      tasks: [...curr.tasks, ...relevantTasks],
+                    };
+                  });
                 }
               }
             } else if (user) {
@@ -743,22 +749,75 @@ export default function Home() {
       />
 
       {/* Floating Add Task Button - Home Page Version */}
-      <div className="fixed bottom-0 left-0 right-0 z-[40] px-6 pb-[calc(env(safe-area-inset-bottom)+88px)] md:pb-[calc(env(safe-area-inset-bottom)+24px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[420px] flex justify-center">
-          <AddTaskButton
-            onClick={() => {
-              if (!user) {
-                router.push('/login');
-                return;
+      <div className="fixed bottom-0 left-0 right-0 z-[40] px-4 pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
+        <div className="pointer-events-auto mx-auto w-full max-w-[360px] relative min-h-[56px] flex items-end justify-center gap-3">
+          {(activeTab === 'today' || activeTab === 'habits') && (
+            <BacklogBox
+              count={laterThisWeek.length}
+              isDragOver={false}
+              isDragging={false}
+              proximity={0}
+              onClick={() => setIsBacklogOpen(true)}
+              forwardRef={null}
+            />
+          )}
+          <div
+            className="flex-1 min-w-0 pointer-events-auto"
+            style={{ whiteSpace: 'nowrap' }}
+          >
+            <AddTaskButton
+              className="w-full"
+              onClick={() => {
+                if (!user) {
+                  router.push('/login');
+                  return;
+                }
+                setQuickText('');
+                setQuickAddMode(activeTab === 'habits' ? 'habit' : 'pick');
+                setShowQuickAdd(true);
+              }}
+              label={
+                <span className="flex items-center">
+                  Add a <Fly size={24} y={-3} x={4} />
+                </span>
               }
-              setQuickText('');
-              setQuickAddMode(activeTab === 'backlog' ? 'later' : 'pick');
-              setShowQuickAdd(true);
-            }}
-            label="Add a task"
-          />
+              showFly={false}
+            />
+          </div>
         </div>
       </div>
+
+      <BacklogTray
+        isOpen={isBacklogOpen}
+        onClose={() => setIsBacklogOpen(false)}
+        tasks={laterThisWeek.map((t) => ({ ...t, order: t.order || 0 }))}
+        onGrab={() => {}}
+        setCardRef={() => {}}
+        activeDragId={null}
+        onDoToday={(id) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          const item = laterThisWeek.find((t) => t.id === id);
+          if (item) moveTaskToToday(item);
+        }}
+        onEdit={(id, text) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          editTask(id, text, true);
+        }}
+        onRemove={(id) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          deleteTask(id);
+        }}
+        userTags={tags}
+      />
     </main>
   );
 }
@@ -787,7 +846,7 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
       />
 
       {/* Visual skip hint (non-interactive): aligned with bottom notification zone */}
-      <div className="fixed bottom-0 left-0 right-0 z-[56] flex justify-center pointer-events-none px-4 pb-[calc(env(safe-area-inset-bottom)+160px)] md:pb-[calc(env(safe-area-inset-bottom)+144px)]">
+      <div className="fixed bottom-0 left-0 right-0 z-[56] flex justify-center pointer-events-none px-4 pb-[calc(env(safe-area-inset-bottom)+176px)]">
         <div
           className={`
             flex items-center gap-2 rounded-full border px-3 py-2

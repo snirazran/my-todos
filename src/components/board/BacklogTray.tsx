@@ -46,19 +46,27 @@ export default React.memo(function BacklogTray({
 
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
-    const checkDesktop = () => setIsDesktop(window.matchMedia("(min-width: 768px)").matches);
+    const checkDesktop = () =>
+      setIsDesktop(window.matchMedia('(min-width: 768px)').matches);
     checkDesktop();
     window.addEventListener('resize', checkDesktop);
     return () => window.removeEventListener('resize', checkDesktop);
   }, []);
 
   // Menu & Dialog State
-  const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+  const [menu, setMenu] = useState<{
+    id: string;
+    top: number;
+    left: number;
+  } | null>(null);
   const [confirmItem, setConfirmItem] = useState<Task | null>(null);
   const [editItem, setEditItem] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
-  
-  const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
+
+  const [tagPopup, setTagPopup] = useState<{
+    open: boolean;
+    taskId: string | null;
+  }>({ open: false, taskId: null });
 
   // Close on Escape
   useEffect(() => {
@@ -110,21 +118,21 @@ export default React.memo(function BacklogTray({
       setConfirmItem(null);
     }
   };
-  
+
   const handleTagSave = async (taskId: string, newTags: string[]) => {
-      try {
-          await fetch('/api/tasks', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              taskId: taskId,
-              tags: newTags
-            }),
-          });
-          window.dispatchEvent(new Event('tags-updated'));
-      } catch (e) {
-          console.error("Failed to update tags", e);
-      }
+    try {
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: taskId,
+          tags: newTags,
+        }),
+      });
+      window.dispatchEvent(new Event('tags-updated'));
+    } catch (e) {
+      console.error('Failed to update tags', e);
+    }
   };
 
   // Auto-hide when dragging FROM the tray
@@ -132,24 +140,24 @@ export default React.memo(function BacklogTray({
 
   const mobileVariants = {
     initial: { y: '100%', opacity: 0 },
-    animate: { 
-        y: `${closeProgress * 100}%`, 
-        opacity: isDraggingAny ? 0 : 1,
-        scale: isDraggingAny ? 0.95 : 1
+    animate: {
+      y: `${closeProgress * 100}%`,
+      opacity: isDraggingAny ? 0 : 1,
+      scale: isDraggingAny ? 0.95 : 1,
     },
-    exit: { y: '100%', opacity: 0 }
+    exit: { y: '100%', opacity: 0 },
   };
 
   const desktopVariants = {
     initial: { x: '-100%', opacity: 0 },
-    animate: { 
-        x: '0%', 
-        opacity: isDraggingAny ? 0 : 1,
-        scale: isDraggingAny ? 0.95 : 1
+    animate: {
+      x: '0%',
+      opacity: isDraggingAny ? 0 : 1,
+      scale: isDraggingAny ? 0.95 : 1,
     },
-    exit: { x: '-100%', opacity: 0 }
+    exit: { x: '-100%', opacity: 0 },
   };
-  
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -157,12 +165,15 @@ export default React.memo(function BacklogTray({
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: isDraggingAny ? 0 : (1 - closeProgress) }}
+            animate={{ opacity: isDraggingAny ? 0 : 1 - closeProgress }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             className="fixed inset-0 z-[80] bg-background/60 backdrop-blur-sm"
             onClick={onClose}
-            style={{ pointerEvents: (closeProgress > 0.5 || isDraggingAny) ? 'none' : 'auto' }}
+            style={{
+              pointerEvents:
+                closeProgress > 0.5 || isDraggingAny ? 'none' : 'auto',
+            }}
           />
 
           {/* The Vertical Tray/Drawer */}
@@ -172,15 +183,20 @@ export default React.memo(function BacklogTray({
             initial="initial"
             animate="animate"
             exit="exit"
-            drag={!isDesktop && !isDraggingAny ? "y" : false}
+            drag={!isDesktop && !isDraggingAny ? 'y' : false}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.5 }}
             onDragEnd={(e, { offset, velocity }) => {
-                if (offset.y > 100 || velocity.y > 500) {
-                    onClose();
-                }
+              if (offset.y > 100 || velocity.y > 500) {
+                onClose();
+              }
             }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300, mass: 0.8 }}
+            transition={{
+              type: 'spring',
+              damping: 30,
+              stiffness: 300,
+              mass: 0.8,
+            }}
             className={`
                 fixed z-[90] flex flex-col bg-card/95 border-r border-border/50 shadow-2xl backdrop-blur-3xl overflow-hidden
                 
@@ -195,7 +211,7 @@ export default React.memo(function BacklogTray({
           >
             {/* Drag Handle (Mobile Only) */}
             {!isDesktop && (
-                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full z-50 pointer-events-none" />
+              <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full z-50 pointer-events-none" />
             )}
 
             {/* Header */}
@@ -210,7 +226,10 @@ export default React.memo(function BacklogTray({
                   </h3>
                   <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
                     <CalendarRange size={12} strokeWidth={3} />
-                    <span>{tasks.length} {tasks.length === 1 ? 'Task' : 'Tasks'} Saved</span>
+                    <span>
+                      {tasks.length} {tasks.length === 1 ? 'Task' : 'Tasks'}{' '}
+                      Saved
+                    </span>
                   </div>
                 </div>
               </div>
@@ -225,91 +244,115 @@ export default React.memo(function BacklogTray({
             {/* Vertical Scroll Content */}
             <div
               ref={scrollRef}
-              className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4 md:px-6 pb-8 space-y-3"
+              className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4 md:px-6 pb-8 flex flex-col gap-3"
             >
               <AnimatePresence mode="popLayout">
                 {tasks.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
+                  <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
                     <FolderOpen size={64} strokeWidth={1} />
-                    <p className="text-sm font-bold uppercase tracking-widest">No saved tasks</p>
-                    </div>
+                    <p className="text-sm font-bold uppercase tracking-widest">
+                      No saved tasks
+                    </p>
+                  </div>
                 ) : (
-                    tasks.map((t, i) => (
+                  tasks.map((t, i) => (
                     <motion.div
-                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-                        key={t.id}
-                        layout
-                        className="w-full relative"
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{
+                        opacity: 0,
+                        scale: 0.9,
+                        transition: { duration: 0.15 },
+                      }}
+                      key={t.id}
+                      layout
+                      className="w-full relative"
                     >
-                        <div className="group relative">
+                      <div className="group relative">
                         <TaskCard
-                            innerRef={(el) => setCardRef(draggableIdFor(7, t.id), el)}
-                            dragId={draggableIdFor(7, t.id)}
-                            task={t}
-                            userTags={userTags}
-                            menuOpen={menu?.id === t.id}
-                            onToggleMenu={(rect) => {
-                                setMenu((prev) => {
-                                    if (prev?.id === t.id) return null;
-                                    const MENU_W = 160;
-                                    const MENU_H = 180; // Approximate height with all options
-                                    const MARGIN = 10;
-                                    const vw = window.innerWidth;
-                                    const vh = window.innerHeight;
-                                    
-                                    let left = rect.left + rect.width / 2 - MENU_W / 2;
-                                    
-                                    // Clamp horizontal position
-                                    left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
-                                    
-                                    let top = rect.bottom + 8;
-                                    // If menu would go off bottom, flip to above
-                                    if (top + MENU_H > vh - MARGIN) {
-                                        top = rect.top - MENU_H - 8;
-                                    }
-                                    
-                                    return { id: t.id, top, left };
-                                });
-                            }}
-                            hiddenWhileDragging={activeDragId === t.id}
-                            isRepeating={t.type === 'weekly'}
-                            touchAction="auto" // Vertical scroll, so auto is fine? Or none? TaskCard usually handles handle
-                            isAnyDragging={!!activeDragId}
-                            onGrab={(payload) => {
-                                // Same grab logic
-                                const resolvedTags = t.tags?.map(tagId => {
-                                    const found = userTags?.find(ut => ut.id === tagId || ut.name === tagId);
-                                    return found || { id: tagId, name: tagId, color: '' };
-                                });
-                                onGrab({
-                                    day: 7,
-                                    index: i,
-                                    taskId: t.id,
-                                    taskText: t.text,
-                                    clientX: payload.clientX,
-                                    clientY: payload.clientY,
-                                    pointerType: payload.pointerType,
-                                    rectGetter: () => { // ... },
-                                        const id = draggableIdFor(7, t.id);
-                                        const el = document.querySelector(`[data-card-id="${id}"]`);
-                                        return el?.getBoundingClientRect() ?? new DOMRect(0,0,0,0);
-                                    },
-                                    tags: resolvedTags
-                                })
-                            }}
+                          innerRef={(el) =>
+                            setCardRef(draggableIdFor(7, t.id), el)
+                          }
+                          dragId={draggableIdFor(7, t.id)}
+                          task={t}
+                          userTags={userTags}
+                          menuOpen={menu?.id === t.id}
+                          onToggleMenu={(rect) => {
+                            setMenu((prev) => {
+                              if (prev?.id === t.id) return null;
+                              const MENU_W = 160;
+                              const MENU_H = 180; // Approximate height with all options
+                              const MARGIN = 10;
+                              const vw = window.innerWidth;
+                              const vh = window.innerHeight;
+
+                              let left =
+                                rect.left + rect.width / 2 - MENU_W / 2;
+
+                              // Clamp horizontal position
+                              left = Math.max(
+                                MARGIN,
+                                Math.min(left, vw - MENU_W - MARGIN),
+                              );
+
+                              let top = rect.bottom + 8;
+                              // If menu would go off bottom, flip to above
+                              if (top + MENU_H > vh - MARGIN) {
+                                top = rect.top - MENU_H - 8;
+                              }
+
+                              return { id: t.id, top, left };
+                            });
+                          }}
+                          hiddenWhileDragging={activeDragId === t.id}
+                          isRepeating={t.type === 'weekly'}
+                          touchAction="auto" // Vertical scroll, so auto is fine? Or none? TaskCard usually handles handle
+                          isAnyDragging={!!activeDragId}
+                          onGrab={(payload) => {
+                            // Same grab logic
+                            const resolvedTags = t.tags?.map((tagId) => {
+                              const found = userTags?.find(
+                                (ut) => ut.id === tagId || ut.name === tagId,
+                              );
+                              return (
+                                found || { id: tagId, name: tagId, color: '' }
+                              );
+                            });
+                            onGrab({
+                              day: 7,
+                              index: i,
+                              taskId: t.id,
+                              taskText: t.text,
+                              clientX: payload.clientX,
+                              clientY: payload.clientY,
+                              pointerType: payload.pointerType,
+                              rectGetter: () => {
+                                // ... },
+                                const id = draggableIdFor(7, t.id);
+                                const el = document.querySelector(
+                                  `[data-card-id="${id}"]`,
+                                );
+                                return (
+                                  el?.getBoundingClientRect() ??
+                                  new DOMRect(0, 0, 0, 0)
+                                );
+                              },
+                              tags: resolvedTags,
+                            });
+                          }}
+                          onDoToday={
+                            onDoToday ? () => onDoToday(t.id) : undefined
+                          }
                         />
-                        </div>
+                      </div>
                     </motion.div>
-                    ))
+                  ))
                 )}
               </AnimatePresence>
             </div>
-            
+
             {/* Footer / Gradient Cover at bottom? */}
             <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
-
           </motion.div>
 
           <TaskMenu
@@ -318,20 +361,24 @@ export default React.memo(function BacklogTray({
             onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
             addTagsPosition="first"
             onToggleRepeat={() => {
-                if (menu && onToggleRepeat) onToggleRepeat(menu.id);
-                setMenu(null);
+              if (menu && onToggleRepeat) onToggleRepeat(menu.id);
+              setMenu(null);
             }}
-            isWeekly={menu ? tasks.find(t => t.id === menu.id)?.type === 'weekly' : false}
+            isWeekly={
+              menu
+                ? tasks.find((t) => t.id === menu.id)?.type === 'weekly'
+                : false
+            }
             onEdit={(id) => {
-                const t = tasks.find(it => it.id === id);
-                if (t && onEdit) {
-                    setEditItem(t);
-                }
-                setMenu(null);
+              const t = tasks.find((it) => it.id === id);
+              if (t && onEdit) {
+                setEditItem(t);
+              }
+              setMenu(null);
             }}
             onDoToday={() => {
-                if (menu && onDoToday) onDoToday(menu.id);
-                setMenu(null);
+              if (menu && onDoToday) onDoToday(menu.id);
+              setMenu(null);
             }}
             onDelete={() => {
               if (menu) {
@@ -345,27 +392,27 @@ export default React.memo(function BacklogTray({
           <TagPopup
             open={tagPopup.open}
             taskId={tagPopup.taskId}
-            initialTags={tasks.find(t => t.id === tagPopup.taskId)?.tags}
+            initialTags={tasks.find((t) => t.id === tagPopup.taskId)?.tags}
             onClose={() => setTagPopup({ open: false, taskId: null })}
             onSave={handleTagSave}
           />
 
-         {editItem && (
+          {editItem && (
             <EditTaskDialog
-                open={!!editItem}
-                initialText={editItem.text}
-                busy={busy}
-                onClose={() => setEditItem(null)}
-                onSave={async (newText) => {
-                    if (onEdit) {
-                        setBusy(true);
-                        await onEdit(editItem.id, newText);
-                        setBusy(false);
-                        setEditItem(null);
-                    }
-                }}
+              open={!!editItem}
+              initialText={editItem.text}
+              busy={busy}
+              onClose={() => setEditItem(null)}
+              onSave={async (newText) => {
+                if (onEdit) {
+                  setBusy(true);
+                  await onEdit(editItem.id, newText);
+                  setBusy(false);
+                  setEditItem(null);
+                }
+              }}
             />
-         )}
+          )}
 
           <DeleteDialog
             open={!!confirmItem}

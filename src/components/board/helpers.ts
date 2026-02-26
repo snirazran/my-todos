@@ -5,7 +5,7 @@ export type Task = {
   text: string;
   order: number;
   /** provided by /api/tasks?view=board */
-  type?: 'weekly' | 'regular' | 'backlog';
+  type?: 'weekly' | 'regular' | 'backlog' | 'habit';
   completed?: boolean;
   tags?: string[];
 };
@@ -52,25 +52,24 @@ export const getRollingWeekOrder = (): ReadonlyArray<Exclude<ApiDay, -1>> => {
 /** UI/display day index (0..6, 7=Later) -> API day (-1 for Later, else 0..6) */
 export const apiDayFromDisplay = (
   displayDay: DisplayDay,
-  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER
+  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER,
 ): ApiDay => (displayDay === 7 ? -1 : order[displayDay]);
 
 /** API day (0..6, -1=Later) -> UI/display index (0..6, 7=Later) */
 export const displayDayFromApi = (
   apiDay: ApiDay,
-  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER
-): DisplayDay =>
-  apiDay === -1 ? 7 : (order.indexOf(apiDay) as DisplayDay);
+  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER,
+): DisplayDay => (apiDay === -1 ? 7 : (order.indexOf(apiDay) as DisplayDay));
 
 /** Label for a weekday display index (0..6). For index 7, use your own EXTRA label. */
 export const labelForDisplayDay = (
   displayDay: Exclude<DisplayDay, 7>,
-  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER
+  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER,
 ): string => englishDays[order[displayDay]];
 
 /** Today as UI/display index (0..6) using provided order */
 export const todayDisplayIndex = (
-  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER
+  order: ReadonlyArray<Exclude<ApiDay, -1>> = WEEK_ORDER,
 ): Exclude<DisplayDay, 7> => {
   const apiToday = new Date().getDay() as Exclude<ApiDay, -1>; // 0..6 Sun..Sat
   return order.indexOf(apiToday) as Exclude<DisplayDay, 7>;

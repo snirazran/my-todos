@@ -11,11 +11,13 @@ export interface Task {
   text: string;
   completed: boolean;
   order?: number;
-  type?: 'regular' | 'weekly' | 'backlog';
-  origin?: 'regular' | 'weekly' | 'backlog';
-  kind?: 'regular' | 'weekly' | 'backlog';
+  type?: 'regular' | 'weekly' | 'backlog' | 'habit';
+  origin?: 'regular' | 'weekly' | 'backlog' | 'habit';
+  kind?: 'regular' | 'weekly' | 'backlog' | 'habit';
   tags?: string[];
   date?: string;
+  daysOfWeek?: number[]; // For Habits
+  completedDates?: string[];
   frogodoroSettings?: {
     expectedCycles: number;
     cycleDuration: number;
@@ -142,10 +144,12 @@ export function useTaskData() {
   }, [todayData, backlogData]);
 
   // --- Derived State ---
-  // Filter Today: Hide if excluded from 'today'
+  // Filter Today: Hide if excluded from 'today' and separate habits
   const tasks = (todayData?.tasks || []).filter(
-    (t) => pendingExclusions.get(t.id) !== 'today',
+    (t) => pendingExclusions.get(t.id) !== 'today' && t.type !== 'habit',
   );
+
+  const habits = (todayData?.tasks || []).filter((t) => t.type === 'habit');
 
   const weeklyIds = new Set(todayData?.weeklyIds || []);
   const flyStatus = todayData?.flyStatus || {
@@ -174,7 +178,7 @@ export function useTaskData() {
   const toggleTask = useCallback(
     async (taskId: string, forceState?: boolean) => {
       if (!todayData || !backlogData) return;
-      const task = tasks.find((t) => t.id === taskId);
+      const task = (todayData.tasks || []).find((t) => t.id === taskId);
       if (!task) return;
 
       const nextCompleted = forceState ?? !task.completed;
@@ -186,8 +190,22 @@ export function useTaskData() {
       const prevBacklog = backlogData;
 
       // Optimistic Update
-      const updatedTasks = tasks.map((t) => {
+      const updatedTasks = todayData.tasks.map((t) => {
         if (t.id !== taskId) return t;
+        // For habits, also update completedDates so HabitPanel sees the change immediately
+        if (t.type === 'habit') {
+          const currentDates = t.completedDates ?? [];
+          const updatedDates = nextCompleted
+            ? currentDates.includes(dateStr)
+              ? currentDates
+              : [...currentDates, dateStr]
+            : currentDates.filter((d) => d !== dateStr);
+          return {
+            ...t,
+            completed: nextCompleted,
+            completedDates: updatedDates,
+          };
+        }
         return { ...t, completed: nextCompleted };
       });
 
@@ -278,7 +296,7 @@ export function useTaskData() {
         mutateToday(prevToday, { revalidate: false });
       }
     },
-    [dateStr, tasks, todayData, backlogData, mutateToday, tz, sortTasks],
+    [dateStr, todayData, backlogData, mutateToday, tz, sortTasks],
   );
 
   /**
@@ -489,7 +507,7 @@ export function useTaskData() {
    * Delete Task (Today)
    */
   const deleteTask = useCallback(
-    async (taskId: string) => {
+    async (taskId: string, forcePermanent?: boolean) => {
       setPendingExclusions((prev) => new Map(prev).set(taskId, 'today'));
       const prevToday = todayData;
 
@@ -498,7 +516,7 @@ export function useTaskData() {
         mutateToday(
           {
             ...todayData,
-            tasks: tasks.filter((t) => t.id !== taskId),
+            tasks: todayData.tasks.filter((t) => t.id !== taskId),
           },
           { revalidate: false },
         );
@@ -508,7 +526,11 @@ export function useTaskData() {
         await fetch('/api/tasks', {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr, taskId }),
+          body: JSON.stringify({
+            date: dateStr,
+            taskId,
+            permanent: forcePermanent,
+          }),
         });
       } catch (e) {
         console.error('Delete failed', e);
@@ -538,10 +560,15 @@ export function useTaskData() {
           order: i,
         }));
 
+        const reorderedIds = new Set(newTasks.map((t) => t.id));
+        const otherTasks = todayData.tasks.filter(
+          (t) => !reorderedIds.has(t.id),
+        );
+
         await mutateToday(
           {
             ...todayData,
-            tasks: reorderedOptimistic,
+            tasks: [...reorderedOptimistic, ...otherTasks],
           },
           { revalidate: false },
         );
@@ -579,7 +606,7 @@ export function useTaskData() {
         task.type === 'weekly' || (todayData.weeklyIds || []).includes(taskId);
       const newType: 'regular' | 'weekly' = isWeekly ? 'regular' : 'weekly';
 
-      const updatedTasks = tasks.map((t) =>
+      const updatedTasks = todayData.tasks.map((t) =>
         t.id === taskId ? ({ ...t, type: newType } as Task) : t,
       );
 
@@ -634,7 +661,7 @@ export function useTaskData() {
         );
         mutateBacklog(updated, { revalidate: false });
       } else if (!isBacklog && todayData) {
-        const updated = tasks.map((t) =>
+        const updated = todayData.tasks.map((t) =>
           t.id === taskId ? { ...t, text: newText } : t,
         );
         mutateToday({ ...todayData, tasks: updated }, { revalidate: false });
@@ -668,6 +695,7 @@ export function useTaskData() {
 
   return {
     tasks,
+    habits,
     backlogTasks,
     pendingToBacklog,
     pendingToToday,

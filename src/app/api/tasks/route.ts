@@ -391,9 +391,11 @@ export async function POST(req: NextRequest) {
   const repeat =
     body?.repeat === 'backlog'
       ? 'backlog'
-      : body?.repeat === 'this-week'
-        ? 'this-week'
-        : 'weekly';
+      : body?.repeat === 'habit'
+        ? 'habit'
+        : body?.repeat === 'this-week'
+          ? 'this-week'
+          : 'weekly';
   if (!text)
     return NextResponse.json({ error: 'text is required' }, { status: 400 });
   const days =
@@ -443,6 +445,43 @@ export async function POST(req: NextRequest) {
         tags: task.tags || [],
       });
     }
+    return NextResponse.json({
+      ok: true,
+      ids: createdIds,
+      tasks: createdTasks,
+    });
+  }
+  if (repeat === 'habit') {
+    if (days.some((d) => d === -1))
+      return NextResponse.json(
+        { error: 'Habits target weekdays 0..6' },
+        { status: 400 },
+      );
+    const id = uuid();
+    // Use the earliest day in the array for initial order placement
+    const firstDay = Math.min(...days) as Weekday;
+    const order = await nextOrderForDay(uid, firstDay, weekDates[firstDay]);
+    const task = await TaskModel.create({
+      userId: uid,
+      type: 'habit',
+      id,
+      text,
+      order,
+      daysOfWeek: days,
+      createdAt: now,
+      updatedAt: now,
+      tags,
+    });
+    createdIds.push(id);
+    createdTasks.push({
+      id: task.id,
+      text: task.text,
+      order: task.order,
+      completed: false,
+      type: 'habit',
+      tags: task.tags || [],
+      daysOfWeek: task.daysOfWeek || [],
+    });
     return NextResponse.json({
       ok: true,
       ids: createdIds,
@@ -697,11 +736,18 @@ export async function DELETE(req: NextRequest) {
   }).lean<TaskDoc>();
   if (!doc)
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-  if (doc.type === 'weekly') {
-    await TaskModel.updateOne(
-      { userId: uid, id: taskId },
-      { $addToSet: { suppressedDates: date } },
-    );
+  if (doc.type === 'weekly' || doc.type === 'habit') {
+    if (body.permanent) {
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        { $set: { deletedAt: new Date() } },
+      );
+    } else {
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        { $addToSet: { suppressedDates: date } },
+      );
+    }
     return NextResponse.json({ ok: true });
   }
   if (doc.type === 'regular') {
@@ -723,6 +769,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
     $or: [
       { type: 'weekly', dayOfWeek: dow },
       { type: 'regular', date },
+      { type: 'habit', daysOfWeek: dow }, // Match habit if today is one of its active days
     ],
   })
     .sort({ order: 1 })
@@ -742,8 +789,11 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       completed:
         (t.completedDates ?? []).includes(date) ||
         (!!t.completed && t.type === 'regular'),
+      type: t.type,
       origin: t.type as Origin,
       tags: t.tags ?? [],
+      completedDates: t.completedDates ?? [],
+      daysOfWeek: t.daysOfWeek ?? [],
       frogodoroSettings: t.frogodoroSettings,
     }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -802,6 +852,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       $or: [
         { type: 'weekly', dayOfWeek: dayNum },
         { type: 'regular', date: weekDates[dayNum] },
+        { type: 'habit', daysOfWeek: dayNum },
       ],
     })
       .sort({ order: 1 })
@@ -829,6 +880,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       $or: [
         { type: 'weekly', dayOfWeek: d },
         { type: 'regular', date: weekDates[d] },
+        { type: 'habit', daysOfWeek: d },
       ],
     })
       .sort({ order: 1 })
@@ -1073,10 +1125,12 @@ async function handleBoardDelete(
     await TaskModel.deleteOne({ userId: uid, type: 'regular', id: taskId });
     return NextResponse.json({ ok: true });
   }
-  await TaskModel.updateOne(
-    { userId: uid, type: 'weekly', id: taskId },
-    { $set: { deletedAt: new Date() } },
-  );
+  if (doc?.type === 'weekly' || doc?.type === 'habit') {
+    await TaskModel.updateOne(
+      { userId: uid, type: doc.type, id: taskId },
+      { $set: { deletedAt: new Date() } },
+    );
+  }
   const today = getZonedToday(tz);
   await TaskModel.deleteMany({
     userId: uid,

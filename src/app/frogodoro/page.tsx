@@ -952,7 +952,7 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
       />
 
       {/* Visual skip hint (non-interactive): aligned with bottom notification zone */}
-      <div className="fixed bottom-0 left-0 right-0 z-[66] flex justify-center pointer-events-none px-4 pb-[calc(env(safe-area-inset-bottom)+160px)] md:pb-[calc(env(safe-area-inset-bottom)+144px)]">
+      <div className="fixed bottom-0 left-0 right-0 z-[66] flex justify-center pointer-events-none px-4 pb-[calc(env(safe-area-inset-bottom)+176px)]">
         <div
           className={`
             flex items-center gap-2 rounded-full border px-3 py-2

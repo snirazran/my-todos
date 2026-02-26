@@ -58,9 +58,9 @@ interface Task {
   text: string;
   completed: boolean;
   order?: number;
-  type?: 'regular' | 'weekly' | 'backlog';
-  origin?: 'regular' | 'weekly' | 'backlog';
-  kind?: 'regular' | 'weekly' | 'backlog';
+  type?: 'regular' | 'weekly' | 'backlog' | 'habit';
+  origin?: 'regular' | 'weekly' | 'backlog' | 'habit';
+  kind?: 'regular' | 'weekly' | 'backlog' | 'habit';
   tags?: string[];
 }
 
@@ -404,7 +404,7 @@ const SortableTaskItem = React.forwardRef<
             }}
             style={{
               x: x,
-              cursor: 'grab',
+              cursor: 'pointer',
               willChange: isExitingLater ? 'transform' : 'auto',
             }}
             transition={
@@ -1094,13 +1094,13 @@ export default function TaskList({
                 }
                 className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
               >
-                <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+                <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 md:grayscale md:opacity-70 opacity-100 grayscale-0 group-hover:grayscale-0 group-hover:opacity-100">
                   <Fly size={32} y={-4} />
                 </div>
-                <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                <p className="text-sm font-bold md:text-muted-foreground text-primary group-hover:text-primary transition-colors">
                   Start your day
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+                <p className="mt-1 text-xs md:text-muted-foreground/60 text-muted-foreground group-hover:text-muted-foreground transition-colors">
                   Tap to add your first task
                 </p>
               </button>

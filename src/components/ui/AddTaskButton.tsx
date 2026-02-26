@@ -7,7 +7,7 @@ import { Plus } from 'lucide-react';
 interface Props {
   onClick: () => void;
   disabled?: boolean;
-  label?: string;
+  label?: React.ReactNode;
   className?: string;
   showFly?: boolean;
 }
@@ -39,16 +39,16 @@ export function AddTaskButton({
     >
       {/* Subtle Gradient Hover Effect */}
       <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-emerald-400/5 opacity-0 md:group-hover:opacity-100 transition-opacity duration-500" />
-      
+
       <span className="relative z-10 flex items-center justify-center h-full gap-3">
         <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary md:group-hover:scale-110 transition-transform duration-300">
           <Plus size={18} strokeWidth={3} />
         </div>
-        
+
         <span className="text-[15px] text-foreground transition-colors duration-300 whitespace-nowrap">
           {label}
         </span>
-        
+
         {showFly && (
           <span className="opacity-100 transition-all duration-300">
             <Fly size={24} y={-3} x={-5} />
