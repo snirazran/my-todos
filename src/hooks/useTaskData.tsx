@@ -166,7 +166,7 @@ export function useTaskData() {
   const dailyGiftCount = todayData?.dailyGiftCount ?? (user ? 0 : 2);
 
   // Filter Backlog: Hide if excluded from 'backlog'
-  const backlogTasks = (backlogData || []).filter(
+  const backlogTasks = (Array.isArray(backlogData) ? backlogData : []).filter(
     (t) => pendingExclusions.get(t.id) !== 'backlog',
   );
 

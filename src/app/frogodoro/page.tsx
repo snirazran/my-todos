@@ -22,6 +22,9 @@ import {
   Minus,
   HelpCircle,
   Save,
+  Target,
+  Clock,
+  Zap,
 } from 'lucide-react';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -50,10 +53,10 @@ const Stepper = ({
   step?: number;
   suffix?: string;
 }) => (
-  <div className="flex items-center w-full justify-between bg-white dark:bg-card border border-border/60 rounded-[20px] p-[5px] shadow-sm overflow-hidden">
+  <div className="flex items-center w-full justify-between bg-muted/30 dark:bg-background/50 border border-border/60 rounded-[20px] p-[5px] shadow-sm overflow-hidden">
     <button
       onClick={() => onChange(Math.max(min, value - step))}
-      className="w-10 h-10 flex flex-shrink-0 items-center justify-center rounded-[16px] bg-muted/60 text-muted-foreground hover:bg-muted transition-all active:scale-95"
+      className="w-10 h-10 flex flex-shrink-0 items-center justify-center rounded-[16px] bg-background dark:bg-muted/50 text-muted-foreground hover:bg-muted transition-all active:scale-95 shadow-sm"
       type="button"
     >
       <Minus className="w-4 h-4 stroke-[2.5]" />
@@ -68,7 +71,7 @@ const Stepper = ({
     </div>
     <button
       onClick={() => onChange(Math.min(max, value + step))}
-      className="w-10 h-10 flex flex-shrink-0 items-center justify-center rounded-[16px] bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-95"
+      className="w-10 h-10 flex flex-shrink-0 items-center justify-center rounded-[16px] bg-primary/10 text-primary hover:bg-primary/20 transition-all active:scale-95 shadow-sm"
       type="button"
     >
       <Plus className="w-4 h-4 stroke-[2.5]" />
@@ -209,30 +212,6 @@ export default function FrogodoroPage() {
     }
   }, [selectedTask, selectedTaskId, setTask]);
 
-  // Auto-complete task when target cycles are reached
-  useEffect(() => {
-    if (!selectedTask || !selectedTaskId || isRunning) return;
-
-    // Check if we just completed all target cycles
-    if (
-      completedCycles > 0 &&
-      completedCycles >= settings.expectedCycles &&
-      !selectedTask.completed &&
-      !visuallyDone.has(selectedTaskId)
-    ) {
-      completeTaskWithAnimation(selectedTaskId);
-    }
-  }, [
-    completedCycles,
-    settings.expectedCycles,
-    selectedTask,
-    selectedTaskId,
-    isRunning,
-    visuallyDone,
-    cinematic,
-    grab,
-  ]);
-
   const saveSettings = async () => {
     setSettings(localSettings);
     setShowSettingsModal(false);
@@ -276,8 +255,8 @@ export default function FrogodoroPage() {
   // Theming colors
   const getPhaseColor = () => {
     if (phase === 'focus') return 'bg-primary text-primary-foreground';
-    if (phase === 'shortBreak') return 'bg-blue-500 text-white';
-    return 'bg-purple-600 text-white';
+    if (phase === 'shortBreak') return 'bg-sky-500 dark:bg-sky-600 text-white';
+    return 'bg-indigo-500 dark:bg-indigo-600 text-white';
   };
 
   if (loading || isTasksLoading) {
@@ -324,15 +303,6 @@ export default function FrogodoroPage() {
             <div
               className={`px-6 py-6 md:px-10 md:py-8 rounded-[32px] shadow-2xl transition-colors duration-500 ${getPhaseColor()} relative overflow-hidden backdrop-blur-sm group`}
             >
-              {/* Help Button */}
-              <button
-                onClick={() => setShowHelpModal(true)}
-                className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 text-white rounded-full transition-colors opacity-80 hover:opacity-100 hidden sm:block z-50 cursor-pointer"
-                title="How Frogodoro Works"
-              >
-                <HelpCircle className="w-6 h-6" />
-              </button>
-
               {/* Top Phase Selector */}
               <div className="flex items-center justify-center gap-2 mb-10 md:mb-12 relative flex-wrap sm:flex-nowrap">
                 {[
@@ -355,20 +325,30 @@ export default function FrogodoroPage() {
               </div>
 
               {/* Time Display */}
-              <div className="text-[120px] md:text-[160px] font-black tabular-nums tracking-tighter text-center leading-none mb-10 drop-shadow-lg">
+              <div className="text-[120px] md:text-[160px] font-black tabular-nums tracking-tighter text-center leading-none mb-10 drop-shadow-lg text-white">
                 {formatTime(timeLeft)}
               </div>
 
               {/* Controls */}
               <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 w-full max-w-md mx-auto h-20">
+                <div className="col-start-1 flex justify-end">
+                  <button
+                    onClick={() => setShowHelpModal(true)}
+                    className="p-4 bg-white/20 hover:bg-white/30 rounded-2xl transition-colors backdrop-blur active:scale-95 text-white z-10"
+                    title="How Frogodoro Works"
+                  >
+                    <HelpCircle className="w-8 h-8 text-white opacity-90" />
+                  </button>
+                </div>
+
                 <div className="col-start-2 flex justify-center">
                   <button
                     onClick={toggleTimer}
                     className={`
-                  relative flex items-center justify-center px-8 md:px-12 py-4 h-20 bg-white text-[24px] md:text-[28px] 
+                  relative flex items-center justify-center px-8 md:px-12 py-4 h-20 bg-white dark:bg-slate-50 text-[24px] md:text-[28px] 
                   font-black uppercase tracking-widest rounded-3xl shadow-[0_8px_0_rgba(0,0,0,0.15)] 
                   active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-2 transition-all group z-10
-                  ${phase === 'focus' ? 'text-primary' : phase === 'shortBreak' ? 'text-blue-500' : 'text-purple-600'}
+                  ${phase === 'focus' ? 'text-primary' : phase === 'shortBreak' ? 'text-sky-500' : 'text-indigo-500'}
                 `}
                   >
                     {isRunning ? (
@@ -395,10 +375,6 @@ export default function FrogodoroPage() {
 
             {/* TASK SELECTOR */}
             <div className="mt-4 text-center animate-fadeInUp">
-              <p className="text-sm font-bold tracking-widest text-muted-foreground uppercase mb-4">
-                #{completedCycles}
-              </p>
-
               {selectedTask ? (
                 <div
                   className="relative inline-block text-left w-full max-w-sm mx-auto z-20"
@@ -491,71 +467,62 @@ export default function FrogodoroPage() {
                         <X className="w-5 h-5" />
                       </button>
 
-                      <h3 className="text-xl font-black mb-6 flex items-center gap-2.5 text-foreground pr-10">
-                        <HelpCircle className="w-6 h-6 text-primary" />
-                        How Frogodoro Works
+                      <h3 className="text-2xl font-black mb-2 flex items-center gap-3 text-foreground pr-10">
+                        How it works
                       </h3>
+                      <p className="text-muted-foreground text-sm font-medium mb-8">Master your tasks in 4 simple steps.</p>
 
-                      <div className="space-y-5 text-sm md:text-[15px] font-medium text-muted-foreground leading-relaxed">
-                        <p>
-                          <strong>Frogodoro</strong> is a variation of the
-                          classic Pomodoro Technique designed to help you power
-                          through tasks by breaking work into intervals,
-                          separated by short breaks. We call these focus
-                          sessions "eating the frog" 🐸.
-                        </p>
-
-                        <div className="bg-muted/30 p-4 rounded-[20px] space-y-4">
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg">⏱️</span>
-                            <div>
-                              <h4 className="font-bold text-foreground mb-0.5">
-                                1. Focus
-                              </h4>
-                              <p>
-                                Pick a task and immerse yourself completely
-                                until the timer rings.
-                              </p>
-                            </div>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-4 p-4 rounded-2xl bg-primary/5 border border-primary/10">
+                          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                            <Target className="w-6 h-6" />
                           </div>
-
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg">☕</span>
-                            <div>
-                              <h4 className="font-bold text-foreground mb-0.5">
-                                2. Short Break
-                              </h4>
-                              <p>
-                                Take a quick breather. Stretch, drink water,
-                                step away from the screen.
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg">🛋️</span>
-                            <div>
-                              <h4 className="font-bold text-foreground mb-0.5">
-                                3. Long Break
-                              </h4>
-                              <p>
-                                After completing several cycles (your interval
-                                setting), take a longer rest to fully recharge
-                                your brain.
-                              </p>
-                            </div>
+                          <div>
+                            <h4 className="font-black text-sm text-foreground uppercase tracking-tight">1. Pick a Fly</h4>
+                            <p className="text-xs font-medium text-muted-foreground leading-tight">Select a task to focus on.</p>
                           </div>
                         </div>
 
-                        <p className="pt-2 text-[13px] text-center opacity-80">
-                          Configure these durations and cycle counts via the ⚙️
-                          settings.
+                        <div className="flex items-center gap-4 p-4 rounded-2xl bg-sky-500/5 border border-sky-500/10">
+                          <div className="w-12 h-12 rounded-xl bg-sky-500/10 flex items-center justify-center text-sky-500 shrink-0">
+                            <Clock className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-sm text-foreground uppercase tracking-tight">2. Focus</h4>
+                            <p className="text-xs font-medium text-muted-foreground leading-tight">Work without distraction until the timer rings.</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10">
+                          <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500 shrink-0">
+                            <Zap className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-sm text-foreground uppercase tracking-tight">3. Rest & Recharge</h4>
+                            <p className="text-xs font-medium text-muted-foreground leading-tight">Short rest after each session. Long rest after a few.</p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
+                          <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500 shrink-0">
+                            <CheckCircle2 className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-sm text-foreground uppercase tracking-tight">4. Finish & Earn</h4>
+                            <p className="text-xs font-medium text-muted-foreground leading-tight">Tap the fly to complete and get rewards!</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-8 p-4 rounded-2xl bg-muted/30 text-center">
+                        <p className="text-[11px] font-bold text-muted-foreground leading-relaxed flex items-center justify-center gap-1.5">
+                          Adjust session & break lengths in <b>Settings</b> <Settings2 className="w-3 h-3 inline" />
                         </p>
                       </div>
 
                       <button
                         onClick={() => setShowHelpModal(false)}
-                        className="mt-8 w-full flex items-center justify-center bg-primary hover:bg-primary/90 text-primary-foreground font-black text-lg px-4 py-4 rounded-[20px] transition-all shadow-md active:scale-[0.98]"
+                        className="mt-6 w-full py-4 rounded-2xl font-black bg-primary text-primary-foreground shadow-lg shadow-primary/20 active:scale-[0.98] transition-all"
                       >
                         Got it!
                       </button>
@@ -590,70 +557,35 @@ export default function FrogodoroPage() {
                         <X className="w-5 h-5" />
                       </button>
                       <h3 className="text-xl font-black mb-8 flex items-center gap-2.5 text-foreground pr-10">
-                        <Settings2 className="w-6 h-6 text-primary" />
-                        Frogodoro Settings
+                        Session Profile
                       </h3>
 
-                      <div className="space-y-4">
-                        {/* Target Cycles */}
-                        <div className="bg-background border border-border/60 p-4 rounded-[24px]">
-                          <label className="flex flex-col mb-4">
-                            <span className="text-[16px] font-black text-foreground flex items-center gap-2">
-                              🎯 Target Cycles
-                            </span>
-                            <span className="text-[13px] text-muted-foreground mt-1 leading-snug font-medium">
-                              How many focus sessions you plan to complete for
-                              this task.
-                            </span>
+                      <div className="space-y-6">
+                        {/* Session Length */}
+                        <div className="space-y-3">
+                          <label className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 px-1">
+                            Focus session period
                           </label>
                           <Stepper
-                            value={localSettings.expectedCycles || 3}
+                            value={localSettings.cycleDuration}
                             onChange={(v) =>
                               setLocalSettings({
                                 ...localSettings,
-                                expectedCycles: v,
+                                cycleDuration: v,
                               })
                             }
-                            suffix="cycles"
-                            min={1}
-                            max={99}
+                            suffix="minutes"
+                            step={5}
+                            min={5}
+                            max={120}
                           />
                         </div>
 
-                        {/* Focus & Short Break */}
-                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                          <div className="bg-background border border-border/60 p-3.5 rounded-[24px] flex flex-col justify-between">
-                            <label className="flex flex-col mb-4 items-center">
-                              <span className="text-[14px] sm:text-[15px] font-black text-foreground flex items-center gap-1.5">
-                                ⏱️ Focus
-                              </span>
-                              <span className="text-[11px] text-muted-foreground mt-0.5 font-medium">
-                                Session length
-                              </span>
-                            </label>
-                            <Stepper
-                              value={localSettings.cycleDuration}
-                              onChange={(v) =>
-                                setLocalSettings({
-                                  ...localSettings,
-                                  cycleDuration: v,
-                                })
-                              }
-                              suffix="min"
-                              step={5}
-                              min={5}
-                              max={360}
-                            />
-                          </div>
-
-                          <div className="bg-background border border-border/60 p-3.5 rounded-[24px] flex flex-col justify-between">
-                            <label className="flex flex-col mb-4 items-center">
-                              <span className="text-[14px] sm:text-[15px] font-black text-foreground flex items-center gap-1.5">
-                                ☕ Rest
-                              </span>
-                              <span className="text-[11px] text-muted-foreground mt-0.5 font-medium">
-                                Short break
-                              </span>
+                        {/* Breaks */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 px-1">
+                              Short Rest
                             </label>
                             <Stepper
                               value={localSettings.shortBreakDuration}
@@ -664,70 +596,56 @@ export default function FrogodoroPage() {
                                 })
                               }
                               suffix="min"
+                              step={1}
+                              min={1}
+                              max={30}
+                            />
+                          </div>
+                          <div className="space-y-3">
+                            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 px-1">
+                              Long Rest
+                            </label>
+                            <Stepper
+                              value={localSettings.longBreakDuration}
+                              onChange={(v) =>
+                                setLocalSettings({
+                                  ...localSettings,
+                                  longBreakDuration: v,
+                                })
+                              }
+                              suffix="min"
                               step={5}
                               min={5}
-                              max={360}
+                              max={60}
                             />
                           </div>
                         </div>
 
-                        {/* Long Break Settings */}
-                        <div className="bg-background border border-border/60 p-4 rounded-[24px]">
-                          <label className="flex flex-col mb-4">
-                            <span className="text-[15px] sm:text-[16px] font-black text-foreground flex items-center gap-1.5">
-                              🛋️ Long Break & Interval
-                            </span>
-                            <span className="text-[13px] text-muted-foreground mt-1 leading-snug font-medium">
-                              After completing several cycles, take an extended
-                              rest to recharge.
-                            </span>
+                        {/* Cycles */}
+                        <div className="space-y-3">
+                          <label className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 px-1">
+                            Long rest after
                           </label>
-                          <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                            <div className="flex flex-col">
-                              <span className="text-[10px] font-extrabold text-muted-foreground/80 uppercase tracking-widest mb-2 text-center">
-                                Duration
-                              </span>
-                              <Stepper
-                                value={localSettings.longBreakDuration}
-                                onChange={(v) =>
-                                  setLocalSettings({
-                                    ...localSettings,
-                                    longBreakDuration: v,
-                                  })
-                                }
-                                suffix="min"
-                                step={5}
-                                min={5}
-                                max={360}
-                              />
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-[10px] font-extrabold text-muted-foreground/80 uppercase tracking-widest mb-2 text-center">
-                                After
-                              </span>
-                              <Stepper
-                                value={localSettings.longBreakInterval}
-                                onChange={(v) =>
-                                  setLocalSettings({
-                                    ...localSettings,
-                                    longBreakInterval: v,
-                                  })
-                                }
-                                suffix="cycles"
-                                min={1}
-                                max={20}
-                              />
-                            </div>
-                          </div>
+                          <Stepper
+                            value={localSettings.longBreakInterval}
+                            onChange={(v) =>
+                              setLocalSettings({
+                                ...localSettings,
+                                longBreakInterval: v,
+                              })
+                            }
+                            suffix="sessions"
+                            min={1}
+                            max={10}
+                          />
                         </div>
                       </div>
 
                       <button
                         onClick={saveSettings}
-                        className="mt-8 w-full flex items-center justify-center gap-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-lg px-4 py-4 rounded-[20px] transition-all shadow-md active:scale-[0.98]"
+                        className="mt-10 w-full flex items-center justify-center gap-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-lg px-4 py-4 rounded-[20px] transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
                       >
-                        <Save className="w-6 h-6" />
-                        Save Configuration
+                        Update Session
                       </button>
                     </motion.div>
                   </div>

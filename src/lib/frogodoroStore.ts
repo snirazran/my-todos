@@ -4,7 +4,6 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 export type PomodoroPhase = 'focus' | 'shortBreak' | 'longBreak';
 
 export interface FrogodoroSettings {
-  expectedCycles: number;
   cycleDuration: number;
   shortBreakDuration: number;
   longBreakDuration: number;
@@ -12,7 +11,6 @@ export interface FrogodoroSettings {
 }
 
 export const DEFAULT_SETTINGS: FrogodoroSettings = {
-  expectedCycles: 3,
   cycleDuration: 25,
   shortBreakDuration: 5,
   longBreakDuration: 30,

@@ -48,12 +48,10 @@ export default function RootLayout({
     <html lang="en" dir="ltr" className={`h-full ${poppins.variable}`}>
       <body
         className={[
-          // use Poppins globally (directly + via Tailwind var)
           poppins.className,
-          'antialiased h-full min-h-[100svh]',
-          // respect device notches / home indicators
+          'antialiased min-h-screen bg-background',
           '[padding-top:env(safe-area-inset-top)]',
-          '[padding-bottom:env(safe-area-inset-bottom)]',
+          'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}
       >
         {/* Global, fixed background that paints under mobile URL/search bars */}
@@ -62,7 +60,9 @@ export default function RootLayout({
         <AuthContext>
           <Providers>
             <SiteHeader />
-            {children}
+            <main className="w-full h-full min-h-[calc(100vh-3.5rem)] md:min-h-[calc(100vh-4rem)]">
+              {children}
+            </main>
             <MobileNav />
           </Providers>
         </AuthContext>
