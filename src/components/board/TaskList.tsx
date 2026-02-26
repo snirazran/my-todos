@@ -29,6 +29,8 @@ export default React.memo(function TaskList({
   onEditTask,
   onDoLater,
   filter = 'all',
+  selectedTags = [],
+  showCompleted = true,
 }: {
   day: DisplayDay;
   items: Task[];
@@ -58,6 +60,8 @@ export default React.memo(function TaskList({
   onEditTask?: (day: DisplayDay, taskId: string, newText: string) => Promise<void>;
   onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
   filter?: 'all' | 'tasks' | 'habits';
+  selectedTags?: string[];
+  showCompleted?: boolean;
 }) {
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay; kind?: 'edit' } | null>(null);
@@ -162,8 +166,13 @@ export default React.memo(function TaskList({
   );
 
   const filteredItems = items.filter(t => {
-    if (filter === 'tasks') return t.type !== 'habit';
-    if (filter === 'habits') return t.type === 'habit';
+    if (filter === 'tasks' && t.type === 'habit') return false;
+    if (filter === 'habits' && t.type !== 'habit') return false;
+    if (!showCompleted && t.completed) return false;
+    if (selectedTags && selectedTags.length > 0) {
+      const hasTag = t.tags?.some(tagId => selectedTags.includes(tagId));
+      if (!hasTag) return false;
+    }
     return true;
   });
 
@@ -205,6 +214,11 @@ export default React.memo(function TaskList({
     // Filter Logic
     if (filter === 'tasks' && t.type === 'habit') continue;
     if (filter === 'habits' && t.type !== 'habit') continue;
+    if (!showCompleted && t.completed) continue;
+    if (selectedTags && selectedTags.length > 0) {
+      const hasTag = t.tags?.some(tagId => selectedTags.includes(tagId));
+      if (!hasTag) continue;
+    }
 
     const isDraggedHere = isSelfDrag && sourceIndex === i;
 

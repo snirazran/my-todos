@@ -7,6 +7,7 @@ import TaskMenu from './TaskMenu';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TagPopup from '@/components/ui/TagPopup';
+import { FilterDropdown, FilterType } from '@/components/ui/FilterDropdown';
 
 interface Props {
   isOpen: boolean;
@@ -33,6 +34,12 @@ interface Props {
   onToggleRepeat?: (id: string) => void;
   onDoToday?: (id: string) => void;
   userTags?: { id: string; name: string; color: string }[];
+  filter?: FilterType;
+  onFilterChange?: (filter: FilterType) => void;
+  selectedTags?: string[];
+  onTagsChange?: (tags: string[]) => void;
+  showCompleted?: boolean;
+  onShowCompletedChange?: (show: boolean) => void;
 }
 
 export default React.memo(function BacklogTray({
@@ -49,6 +56,12 @@ export default React.memo(function BacklogTray({
   onToggleRepeat,
   onDoToday,
   userTags = [],
+  filter = 'all',
+  onFilterChange,
+  selectedTags = [],
+  onTagsChange,
+  showCompleted = true,
+  onShowCompletedChange,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
@@ -78,6 +91,9 @@ export default React.memo(function BacklogTray({
     open: boolean;
     taskId: string | null;
   }>({ open: false, taskId: null });
+
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
 
   // Close on Escape
   useEffect(() => {
@@ -169,6 +185,19 @@ export default React.memo(function BacklogTray({
     exit: { x: '-100%', opacity: 0 },
   };
 
+  const isFiltered = filter !== 'all' || selectedTags.length > 0 || !showCompleted;
+
+  const filteredTasks = tasks.filter((t) => {
+    if (filter === 'tasks' && t.type === 'habit') return false;
+    if (filter === 'habits' && t.type !== 'habit') return false;
+    if (!showCompleted && t.completed) return false;
+    if (selectedTags && selectedTags.length > 0) {
+      const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));
+      if (!hasTag) return false;
+    }
+    return true;
+  });
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -236,12 +265,47 @@ export default React.memo(function BacklogTray({
                     Saved Tasks
                   </h3>
                   <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
-                      <CalendarRange size={12} strokeWidth={3} />
-                      <span>
-                        {tasks.length}{' '}
-                        {tasks.length === 1 ? 'Task' : 'Tasks'} Saved
-                      </span>
+                    <div className="flex items-center gap-2 relative">
+                      <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
+                        <CalendarRange size={12} strokeWidth={3} />
+                        <span>
+                          {filteredTasks.length}{' '}
+                          {filteredTasks.length === 1 ? 'Task' : 'Tasks'} Saved
+                        </span>
+                      </div>
+
+                      <div className="relative" ref={filterMenuRef}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowFilterMenu(!showFilterMenu);
+                          }}
+                          className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-90 ${
+                            showFilterMenu || isFiltered
+                              ? 'bg-primary/10 text-primary'
+                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                          }`}
+                        >
+                          <EllipsisVertical size={16} />
+                          {isFiltered && (
+                            <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
+                          )}
+                        </button>
+
+                        <FilterDropdown
+                          isOpen={showFilterMenu}
+                          onClose={() => setShowFilterMenu(false)}
+                          triggerRef={filterMenuRef}
+                          align="left"
+                          filter={filter}
+                          onFilterChange={onFilterChange}
+                          availableTags={userTags}
+                          selectedTags={selectedTags}
+                          onTagsChange={(tags) => onTagsChange?.(tags)}
+                          showCompleted={showCompleted}
+                          onShowCompletedChange={(show) => onShowCompletedChange?.(show)}
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -260,7 +324,7 @@ export default React.memo(function BacklogTray({
               className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4 md:px-6 pb-8 flex flex-col gap-3"
             >
               <AnimatePresence mode="popLayout">
-                {tasks.length === 0 ? (
+                {filteredTasks.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
                     <FolderOpen size={64} strokeWidth={1} />
                     <p className="text-sm font-bold uppercase tracking-widest">
@@ -268,7 +332,7 @@ export default React.memo(function BacklogTray({
                     </p>
                   </div>
                 ) : (
-                  tasks.map((t) => {
+                  filteredTasks.map((t) => {
                     const originalIndex = tasks.findIndex((it) => it.id === t.id);
                     return (
                       <motion.div

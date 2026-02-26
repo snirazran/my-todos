@@ -26,6 +26,7 @@ import Fly from '@/components/ui/fly';
 import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
+import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -111,23 +112,6 @@ export default function Home() {
   const taskListRef = useRef<HTMLDivElement>(null);
   // State for task glow effect
   const [isTaskGlow, setIsTaskGlow] = useState(false);
-
-  // Close menu on click outside
-  useEffect(() => {
-    if (!isHeaderMenuOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        headerMenuRef.current &&
-        !headerMenuRef.current.contains(e.target as Node) &&
-        headerMenuBtnRef.current &&
-        !headerMenuBtnRef.current.contains(e.target as Node)
-      ) {
-        setIsHeaderMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isHeaderMenuOpen]);
 
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
   const {
@@ -329,125 +313,26 @@ export default function Home() {
                 <div className="w-[1px] h-6 bg-border/50 mx-1" />
                 <button
                   ref={headerMenuBtnRef}
-                  onClick={() => setIsHeaderMenuOpen(!isHeaderMenuOpen)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsHeaderMenuOpen(!isHeaderMenuOpen);
+                  }}
                   className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
                 >
                   <EllipsisVertical className="w-5 h-5" />
                 </button>
 
-                <AnimatePresence>
-                  {isHeaderMenuOpen && (
-                    <motion.div
-                      ref={headerMenuRef}
-                      initial={{ opacity: 0, scale: 0.95, y: -4, x: 0 }}
-                      animate={{ opacity: 1, scale: 1, y: 0, x: 0 }}
-                      exit={{ opacity: 0, scale: 0.95, y: -4, x: 0 }}
-                      transition={{ duration: 0.15, ease: 'easeOut' }}
-                      className="absolute right-0 top-full mt-2 z-50 w-64 bg-popover rounded-xl border border-border shadow-lg shadow-black/5 ring-1 ring-black/5 p-1 flex flex-col gap-1 overflow-hidden"
-                      style={{ transformOrigin: 'top right' }}
-                    >
-                      {/* Show Finished Toggle */}
-                      <div className="flex items-center justify-between p-2 rounded-lg hover:bg-accent/50 transition-colors">
-                        <span className="text-sm font-medium text-foreground">
-                          Show Completed
-                        </span>
-                        <button
-                          onClick={() => setShowCompleted(!showCompleted)}
-                          className={`w-9 h-5 rounded-full relative transition-all duration-300 ease-in-out ${showCompleted ? 'bg-primary' : 'bg-muted-foreground/30'}`}
-                        >
-                          <span
-                            className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-background shadow-sm transition-transform duration-300 ${showCompleted ? 'translate-x-4' : 'translate-x-0'}`}
-                          />
-                        </button>
-                      </div>
-
-                      {/* Tag Filter Section */}
-                      {(() => {
-                        // Filter logic: Only show tags used in TODAY's tasks (or all tags? Let's use all user tags for broader filtering capability, OR just relevant ones. TaskList used relevant ones. Let's start with ALL user tags for simplicity, or we can filter like TaskList did)
-                        // TaskList did: const usedTagIds = new Set(tasks.flatMap(t => t.tags || []));
-                        // Let's replicate that if we want strictly relevant tags.
-                        const currentList =
-                          activeTab === 'today' ? data : backlogTasks;
-                        const usedTagIds = new Set(
-                          currentList.flatMap((t) => t.tags || []),
-                        );
-                        const visibleFilterTags = (tags || []).filter((tag) =>
-                          usedTagIds.has(tag.id),
-                        );
-
-                        if (visibleFilterTags.length === 0) return null;
-
-                        return (
-                          <div className="flex flex-col gap-2 pt-2 border-t border-border/50 px-1">
-                            <div className="flex items-center justify-between px-2">
-                              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-                                Filter by Tags
-                              </span>
-                              {selectedTags.length > 0 && (
-                                <button
-                                  onClick={() => setSelectedTags([])}
-                                  className="text-[10px] font-bold text-primary hover:text-primary/80 transition-colors"
-                                >
-                                  Clear
-                                </button>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap gap-1.5 px-1 pb-1">
-                              {visibleFilterTags.map((tag) => {
-                                const isSelected = selectedTags.includes(
-                                  tag.id,
-                                );
-                                return (
-                                  <button
-                                    key={tag.id}
-                                    onClick={() => {
-                                      setSelectedTags((prev) =>
-                                        prev.includes(tag.id)
-                                          ? prev.filter((id) => id !== tag.id)
-                                          : [...prev, tag.id],
-                                      );
-                                    }}
-                                    className={`
-                                                  relative inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all duration-200 border
-                                                  ${
-                                                    isSelected
-                                                      ? 'ring-1 ring-offset-0 ring-primary border-transparent'
-                                                      : 'bg-muted/40 border-transparent hover:bg-muted/70 text-muted-foreground'
-                                                  }
-                                               `}
-                                    style={
-                                      isSelected && tag.color
-                                        ? {
-                                            backgroundColor: `${tag.color}15`,
-                                            color: tag.color,
-                                            borderColor: tag.color, // Use border for selected state color
-                                            boxShadow: 'none',
-                                          }
-                                        : isSelected
-                                          ? {
-                                              backgroundColor:
-                                                'rgba(var(--primary), 0.1)',
-                                              color: 'hsl(var(--primary))',
-                                              borderColor:
-                                                'hsl(var(--primary))',
-                                            }
-                                          : {}
-                                    }
-                                  >
-                                    {isSelected && (
-                                      <Check className="w-3 h-3" />
-                                    )}
-                                    {tag.name}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })()}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <FilterDropdown
+                  isOpen={isHeaderMenuOpen}
+                  onClose={() => setIsHeaderMenuOpen(false)}
+                  triggerRef={headerMenuBtnRef}
+                  showTypeFilters={false}
+                  showCompleted={showCompleted}
+                  onShowCompletedChange={setShowCompleted}
+                  availableTags={tags || []}
+                  selectedTags={selectedTags}
+                  onTagsChange={setSelectedTags}
+                />
               </div>
             </div>
 

@@ -77,6 +77,10 @@ export default function TaskBoard({
   const [columnFilters, setColumnFilters] = useState<
     Record<number, 'all' | 'tasks' | 'habits'>
   >({});
+  const [columnTags, setColumnTags] = useState<Record<number, string[]>>({});
+  const [columnShowCompleted, setColumnShowCompleted] = useState<
+    Record<number, boolean>
+  >({});
 
   const getFilter = useCallback(
     (day: number) => columnFilters[day] || 'all',
@@ -85,6 +89,25 @@ export default function TaskBoard({
 
   const setFilter = useCallback((day: number, f: 'all' | 'tasks' | 'habits') => {
     setColumnFilters((prev) => ({ ...prev, [day]: f }));
+  }, []);
+
+  const getSelectedTags = useCallback(
+    (day: number) => columnTags[day] || [],
+    [columnTags],
+  );
+
+  const setSelectedTags = useCallback((day: number, tags: string[]) => {
+    setColumnTags((prev) => ({ ...prev, [day]: tags }));
+  }, []);
+
+  const getShowCompleted = useCallback(
+    (day: number) =>
+      columnShowCompleted[day] === undefined ? true : columnShowCompleted[day],
+    [columnShowCompleted],
+  );
+
+  const setShowCompleted = useCallback((day: number, show: boolean) => {
+    setColumnShowCompleted((prev) => ({ ...prev, [day]: show }));
   }, []);
 
   const { data: tagsData } = useSWR('/api/tags', (url) =>
@@ -467,6 +490,11 @@ export default function TaskBoard({
                 isToday={day === todayDisplayIndex}
                 filter={getFilter(day)}
                 onFilterChange={(f) => setFilter(day, f)}
+                availableTags={tagsData?.tags || []}
+                selectedTags={getSelectedTags(day)}
+                onTagsChange={(tags) => setSelectedTags(day, tags)}
+                showCompleted={getShowCompleted(day)}
+                onShowCompletedChange={(show) => setShowCompleted(day, show)}
               >
                 <TaskList
                   day={day}
@@ -490,6 +518,8 @@ export default function TaskBoard({
                   onDoLater={handleDoLater}
                   isAnyDragging={!!drag?.active}
                   filter={getFilter(day)}
+                  selectedTags={getSelectedTags(day)}
+                  showCompleted={getShowCompleted(day)}
                 />
               </DayColumn>
             </div>
@@ -600,6 +630,10 @@ export default function TaskBoard({
         }}
         filter={getFilter(7)}
         onFilterChange={(f) => setFilter(7, f)}
+        selectedTags={getSelectedTags(7)}
+        onTagsChange={(tags) => setSelectedTags(7, tags)}
+        showCompleted={getShowCompleted(7)}
+        onShowCompletedChange={(show) => setShowCompleted(7, show)}
       />
 
       <QuickAddSheet

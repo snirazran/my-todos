@@ -1,10 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { LayoutList, ListTodo, Repeat, EllipsisVertical } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-
-export type FilterType = 'all' | 'tasks' | 'habits';
+import { EllipsisVertical } from 'lucide-react';
+import { FilterDropdown, FilterType } from '../ui/FilterDropdown';
 
 export default function DayColumn({
   title,
@@ -18,6 +16,11 @@ export default function DayColumn({
   isToday = false,
   filter = 'all',
   onFilterChange,
+  availableTags = [],
+  selectedTags = [],
+  onTagsChange,
+  showCompleted = true,
+  onShowCompletedChange,
 }: {
   title: string;
   count?: number;
@@ -29,25 +32,20 @@ export default function DayColumn({
   isToday?: boolean;
   filter?: FilterType;
   onFilterChange?: (filter: FilterType) => void;
+  availableTags?: { id: string; name: string; color: string }[];
+  selectedTags?: string[];
+  onTagsChange?: (tags: string[]) => void;
+  showCompleted?: boolean;
+  onShowCompletedChange?: (show: boolean) => void;
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close menu on click outside
-  useEffect(() => {
-    if (!showMenu) return;
-    const handleClick = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setShowMenu(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [showMenu]);
-
   const appliedMax = compact
     ? 'max-h-[60svh] md:max-h-[70svh]'
     : maxHeightClass;
+
+  const isFiltered = filter !== 'all' || selectedTags.length > 0 || !showCompleted;
 
   // Split "Sunday 7/12" into name and date
   const match = title.match(/^(.*) (\d+\/\d+)$/);
@@ -92,72 +90,34 @@ export default function DayColumn({
 
             <div className="relative" ref={menuRef}>
               <button
-                onClick={() => setShowMenu(!showMenu)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMenu(!showMenu);
+                }}
                 className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-90 ${
-                  showMenu || filter !== 'all'
+                  showMenu || isFiltered
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
                 <EllipsisVertical size={18} />
-                {filter !== 'all' && (
+                {isFiltered && (
                   <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
                 )}
               </button>
 
-              <AnimatePresence>
-                {showMenu && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: -10 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                    className="absolute right-0 top-full mt-2 z-50 min-w-[140px] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-xl ring-1 ring-black/5 backdrop-blur-xl"
-                  >
-                    <button
-                      onClick={() => {
-                        onFilterChange?.('all');
-                        setShowMenu(false);
-                      }}
-                      className={`group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-all ${
-                        filter === 'all'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'hover:bg-accent text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <LayoutList size={16} />
-                      All Items
-                    </button>
-                    <button
-                      onClick={() => {
-                        onFilterChange?.('tasks');
-                        setShowMenu(false);
-                      }}
-                      className={`group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-all ${
-                        filter === 'tasks'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'hover:bg-accent text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <ListTodo size={16} />
-                      Tasks Only
-                    </button>
-                    <button
-                      onClick={() => {
-                        onFilterChange?.('habits');
-                        setShowMenu(false);
-                      }}
-                      className={`group flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-bold transition-all ${
-                        filter === 'habits'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'hover:bg-accent text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <Repeat size={16} />
-                      Habits Only
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <FilterDropdown
+                isOpen={showMenu}
+                onClose={() => setShowMenu(false)}
+                triggerRef={menuRef}
+                filter={filter}
+                onFilterChange={onFilterChange}
+                availableTags={availableTags}
+                selectedTags={selectedTags}
+                onTagsChange={(tags) => onTagsChange?.(tags)}
+                showCompleted={showCompleted}
+                onShowCompletedChange={(show) => onShowCompletedChange?.(show)}
+              />
             </div>
           </div>
         </div>
