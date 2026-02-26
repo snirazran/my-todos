@@ -232,28 +232,8 @@ export default function TaskCard({
         <div
           className={`flex-1 min-w-0 flex flex-col justify-center ${task.completed ? 'opacity-60' : ''}`}
         >
-          {(isRepeating ||
-            task.type === 'habit' ||
-            (task.tags && task.tags.length > 0)) && (
+          {task.tags && task.tags.length > 0 && (
             <div className="mb-1 flex flex-wrap items-center gap-1.5">
-              {isRepeating && (
-                <span
-                  title="Repeats weekly"
-                  className="inline-flex items-center gap-1 rounded-md bg-purple-50/80 px-2 py-0.5 text-[9px] font-bold text-purple-600 dark:bg-purple-900/40 dark:text-purple-200 transition-colors"
-                >
-                  <RotateCcw className="h-3 w-3" aria-hidden="true" />
-                  <span className="tracking-wider uppercase">Weekly</span>
-                </span>
-              )}
-              {task.type === 'habit' && (
-                <span
-                  title="Daily Habit"
-                  className="inline-flex items-center gap-1 rounded-md bg-emerald-50/80 px-2 py-0.5 text-[9px] font-bold text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-200 transition-colors"
-                >
-                  <Repeat className="h-3 w-3" aria-hidden="true" />
-                  <span className="tracking-wider uppercase">Habit</span>
-                </span>
-              )}
               <AnimatePresence mode="popLayout">
                 {task.tags?.map((tagId) => {
                   const tagDetails = getTagDetails(tagId);
@@ -300,13 +280,25 @@ export default function TaskCard({
             </div>
           )}
           <div
-            className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-snug transition-colors ${
+            className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-snug transition-colors flex items-center gap-1.5 ${
               task.completed
                 ? 'text-muted-foreground line-through'
                 : 'text-foreground'
             }`}
           >
-            {task.text}
+            <span>{task.text}</span>
+            {isRepeating && (
+              <RotateCcw
+                className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0"
+                title="Weekly"
+              />
+            )}
+            {task.type === 'habit' && (
+              <Repeat
+                className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0"
+                title="Habit"
+              />
+            )}
           </div>
         </div>
 

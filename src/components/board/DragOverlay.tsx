@@ -1,5 +1,6 @@
 'use client';
 import Fly from '@/components/ui/fly';
+import { Repeat, RotateCcw } from 'lucide-react';
 
 export default function DragOverlay({
   x,
@@ -10,6 +11,7 @@ export default function DragOverlay({
   height,
   text,
   tags,
+  taskType,
 }: {
   x: number;
   y: number;
@@ -19,6 +21,7 @@ export default function DragOverlay({
   height: number;
   text: string;
   tags?: { id: string; name: string; color: string }[];
+  taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
 }) {
   return (
     <div
@@ -43,7 +46,7 @@ export default function DragOverlay({
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           {tags && tags.length > 0 && (
             <div className="mb-1 flex flex-wrap items-center gap-1.5">
-              {tags.map((tag) => (
+              {tags?.map((tag) => (
                 <span
                   key={tag.id}
                   className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors border shadow-sm"
@@ -65,9 +68,15 @@ export default function DragOverlay({
               ))}
             </div>
           )}
-          <span className="text-[15px] font-medium leading-snug text-foreground whitespace-pre-wrap break-words">
-            {text}
-          </span>
+          <div className="text-[15px] font-medium leading-snug text-foreground whitespace-pre-wrap break-words flex items-center gap-1.5">
+            <span>{text}</span>
+            {taskType === 'weekly' && (
+              <RotateCcw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
+            )}
+            {taskType === 'habit' && (
+              <Repeat className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
+            )}
+          </div>
         </div>
       </div>
     </div>

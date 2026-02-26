@@ -635,6 +635,7 @@ export default function TaskBoard({
           height={drag.height}
           text={drag.taskText}
           tags={drag.tags}
+          taskType={drag.taskType}
         />
       )}
 
