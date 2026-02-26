@@ -123,9 +123,9 @@ export default function HistoryCalendar({
                 dragElastic={0.1} // Feel of resistance
                 onDragEnd={(e, { offset, velocity }) => {
                     const swipeThreshold = 50;
-                    if (offset.x > swipeThreshold) {
+                    if (offset.x > swipeThreshold && !isPrevDisabled) {
                         handlePrevMonth();
-                    } else if (offset.x < -swipeThreshold) {
+                    } else if (offset.x < -swipeThreshold && !isNextDisabled) {
                         handleNextMonth();
                     }
                 }}
