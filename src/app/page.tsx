@@ -273,8 +273,8 @@ export default function Home() {
         flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap
         ${
           activeTab === 'today'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground'
+            ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
         }
       `}
                 >
@@ -294,11 +294,11 @@ export default function Home() {
                 <button
                   onClick={() => setActiveTab('habits')}
                   className={`
-        flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-lg transition-all flex items-center gap-2 whitespace-nowrap
+        flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap
         ${
           activeTab === 'habits'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground'
+            ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
         }
       `}
                 >
@@ -635,7 +635,7 @@ export default function Home() {
 
       {/* Floating Add Task Button - Home Page Version */}
       <div className="fixed bottom-0 left-0 right-0 z-[40] px-4 pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[360px] relative min-h-[56px] flex items-end justify-center gap-3">
+        <div className="pointer-events-auto mx-auto w-full max-w-[400px] relative min-h-[56px] flex items-center justify-center gap-2">
           {(activeTab === 'today' || activeTab === 'habits') && (
             <BacklogBox
               count={laterThisWeek.length}
