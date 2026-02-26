@@ -3,12 +3,15 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar as CalendarIcon, CheckCircle2 } from 'lucide-react';
+import { X, Calendar as CalendarIcon, CheckCircle2, EllipsisVertical } from 'lucide-react';
 import { format } from 'date-fns';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { type FrogHandle } from '@/components/ui/frog';
 import HistoryTaskCard from './HistoryTaskCard';
+import TaskMenu from '../board/TaskMenu';
+import { FilterDropdown, FilterType } from '../ui/FilterDropdown';
 import useSWR from 'swr';
+import { cn } from '@/lib/utils';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 
@@ -18,7 +21,16 @@ type DayDetailSheetProps = {
   date: string;
   tasks: any[];
   onToggleTask: (id: string, date: string, currentStatus: boolean) => void;
+  onDeleteTask?: (id: string, date: string) => void;
+  onEditTask?: (id: string, text: string) => void;
   frogProps: any; // Props for FrogDisplay
+  // Filter Props
+  filter: FilterType;
+  onFilterChange: (filter: FilterType) => void;
+  selectedTags: string[];
+  onTagsChange: (tags: string[]) => void;
+  showCompleted: boolean;
+  onShowCompletedChange: (show: boolean) => void;
 };
 
 export default function DayDetailSheet({
@@ -27,12 +39,54 @@ export default function DayDetailSheet({
   date,
   tasks,
   onToggleTask,
+  onDeleteTask,
+  onEditTask,
   frogProps,
+  filter,
+  onFilterChange,
+  selectedTags,
+  onTagsChange,
+  showCompleted,
+  onShowCompletedChange,
 }: DayDetailSheetProps) {
   const [mounted, setMounted] = useState(false);
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
+  const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const filterMenuRef = useRef<HTMLDivElement>(null);
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
+
+  const handleToggleMenu = (taskId: string, anchor: DOMRect) => {
+    if (menu?.id === taskId) {
+      setMenu(null);
+    } else {
+      setMenu({ id: taskId, top: anchor.bottom + window.scrollY, left: anchor.left + window.scrollX });
+    }
+  };
+
+  // Close menu when sheet scrolls
+  const handleScroll = () => {
+    if (menu) setMenu(null);
+    if (showFilterMenu) setShowFilterMenu(false);
+  };
+
+  // Filtering Logic
+  const filteredTasks = React.useMemo(() => {
+    return tasks.filter((t) => {
+      if (!showCompleted && t.completed) return false;
+      if (filter === 'tasks' && t.type === 'habit') return false;
+      if (filter === 'habits' && t.type !== 'habit') return false;
+      if (selectedTags.length > 0) {
+        if (!t.tags || !t.tags.some((tagId: string) => selectedTags.includes(tagId))) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [tasks, filter, selectedTags, showCompleted]);
+
+  const isFiltered = filter !== 'all' || selectedTags.length > 0 || !showCompleted;
 
   // Animation State
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -156,16 +210,14 @@ export default function DayDetailSheet({
               )}
 
               {/* Header (Compact) */}
-              <div className="flex-shrink-0 px-4 py-3 flex items-center justify-between border-b border-border/40 bg-background/20">
+              <div className="flex-shrink-0 px-5 py-3.5 flex items-center justify-between border-b border-border/40 bg-background/20">
                 <div>
                   <h2 className="text-xl font-black tracking-tighter flex items-center gap-2 text-foreground">
                     <CalendarIcon className="w-5 h-5 text-primary" />
                     {format(new Date(date), 'MMMM do')}
                   </h2>
-                  <p className="text-muted-foreground font-bold text-[10px] uppercase tracking-wider mt-0.5 opacity-80">
-                    {completedCount} / {totalCount} Tasks Completed
-                  </p>
                 </div>
+
                 <button
                   onClick={onClose}
                   className="p-1.5 bg-muted/50 hover:bg-red-500/10 hover:text-red-500 rounded-full transition-all text-muted-foreground"
@@ -175,10 +227,13 @@ export default function DayDetailSheet({
               </div>
 
               {/* Content Scrollable */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-2 scrollbar-hide">
+              <div 
+                className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-hide"
+                onScroll={handleScroll}
+              >
                 {/* 1. Frog Display Section */}
                 <div className="flex justify-center pb-0 border-b border-border/40 border-dashed">
-                  <div className="scale-100 transform-origin-center -my-1">
+                  <div className="scale-100 transform-origin-center">
                     <FrogDisplay
                       {...frogProps}
                       frogRef={frogRef}
@@ -195,43 +250,95 @@ export default function DayDetailSheet({
                   </div>
                 </div>
 
-                {/* 2. Tasks List */}
-                <div className="space-y-1 pb-8">
-                  <h3 className="font-black text-muted-foreground/40 uppercase tracking-widest text-[9px] text-center mb-0">
-                    Activity Log
-                  </h3>
-
-                  {tasks.length === 0 ? (
-                    <div className="text-center py-10 px-4 text-muted-foreground bg-muted/20 rounded-2xl border border-dashed border-border/50">
-                      <p className="font-bold text-sm">
-                        No tasks recorded details for this day.
-                      </p>
+                {/* 2. Tasks Section (Wrapped like a DayColumn) */}
+                <div className="flex flex-col rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
+                  {/* Column Header */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-muted/20">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-500">
+                        <CheckCircle2 size={16} />
+                      </div>
+                      <span className="text-sm font-black tracking-tight text-foreground uppercase">
+                        {completedCount} / {totalCount}
+                      </span>
                     </div>
-                  ) : (
-                    tasks.map((task) => {
-                      const uniqueKey = `${date}::${task.id}`;
-                      return (
-                        <HistoryTaskCard
-                          key={uniqueKey}
-                          id={task.id}
-                          text={task.text}
-                          completed={task.completed}
-                          type={task.type}
-                          tags={task.tags}
-                          date={date}
-                          frogodoroSession={task.frogodoroSession}
-                          onToggle={handleToggleProxy}
-                          setFlyRef={(el) => {
-                            if (el) flyRefs.current[uniqueKey] = el;
-                            else delete flyRefs.current[uniqueKey];
-                          }}
-                          isEaten={visuallyDone?.has(uniqueKey)}
-                          userTags={userTags}
-                        />
-                      );
-                    })
-                  )}
+
+                    <div className="relative" ref={filterMenuRef}>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setShowFilterMenu(!showFilterMenu);
+                        }}
+                        className={cn(
+                          'flex items-center justify-center w-7 h-7 rounded-xl transition-all active:scale-90',
+                          showFilterMenu || isFiltered
+                            ? 'bg-primary/10 text-primary'
+                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                        )}
+                      >
+                        <EllipsisVertical size={16} />
+                        {isFiltered && (
+                          <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-background shadow-sm" />
+                        )}
+                      </button>
+
+                      <FilterDropdown
+                        isOpen={showFilterMenu}
+                        onClose={() => setShowFilterMenu(false)}
+                        triggerRef={filterMenuRef}
+                        filter={filter}
+                        onFilterChange={onFilterChange}
+                        availableTags={userTags}
+                        selectedTags={selectedTags}
+                        onTagsChange={onTagsChange}
+                        showCompleted={showCompleted}
+                        onShowCompletedChange={onShowCompletedChange}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Tasks List Area */}
+                  <div className="p-2 space-y-1 pb-4 min-h-[120px]">
+                    {filteredTasks.length === 0 ? (
+                      <div className="text-center py-8 px-4 text-muted-foreground bg-muted/5 rounded-2xl border border-dashed border-border/40">
+                        <p className="font-bold text-sm">
+                          {isFiltered ? 'No matches found.' : 'No tasks for this day.'}
+                        </p>
+                      </div>
+                    ) : (
+                      filteredTasks.map((task) => {
+                        const uniqueKey = `${date}::${task.id}`;
+                        return (
+                          <HistoryTaskCard
+                            key={uniqueKey}
+                            id={task.id}
+                            text={task.text}
+                            completed={task.completed}
+                            type={task.type}
+                            tags={task.tags}
+                            date={date}
+                            completedDates={task.completedDates}
+                            daysOfWeek={task.daysOfWeek}
+                            frogodoroSession={task.frogodoroSession}
+                            onToggle={handleToggleProxy}
+                            setFlyRef={(el) => {
+                              if (el) flyRefs.current[uniqueKey] = el;
+                              else delete flyRefs.current[uniqueKey];
+                            }}
+                            isEaten={visuallyDone?.has(uniqueKey)}
+                            userTags={userTags}
+                          />
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
+
+                {/* Legacy TaskMenu cleanup - we'll handle actions via Swipe if possible, 
+                    or we keep this for desktop. But user said "remove 3 dots from tasks". 
+                    If they want to edit, they need another way. 
+                    I'll keep the TaskMenu hidden for now or only for long-press if I added it.
+                */}
               </div>
             </motion.div>
           </div>

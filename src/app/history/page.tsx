@@ -20,19 +20,27 @@ import DayDetailSheet from '@/components/history/DayDetailSheet';
 import HistoryInsights from '@/components/history/HistoryInsights';
 import { DateRangeOption } from '@/components/history/HistoryTimeSelector';
 import { useTaskData } from '@/hooks/useTaskData';
+import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
+import { FilterType } from '@/components/ui/FilterDropdown';
 
 export default function HistoryPage() {
   const { user, loading } = useAuth();
-  const { hungerStatus, flyStatus } = useTaskData();
+  const { hungerStatus, flyStatus, mutateToday, mutateBacklog } = useTaskData();
   const router = useRouter();
 
   // --- State: Calendar View ---
-  const [viewDate, setViewDate] = useState(subDays(new Date(), 1));
+  const [viewDate, setViewDate] = useState(new Date());
   const [calendarData, setCalendarData] = useState<any[]>([]);
   const [loadingCalendar, setLoadingCalendar] = useState(false);
 
   // --- State: Selection (Day Popup) ---
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [editingTask, setEditingTask] = useState<{ id: string; text: string } | null>(null);
+
+  // Filters for Popup
+  const [popupFilter, setPopupFilter] = useState<FilterType>('all');
+  const [popupSelectedTags, setPopupSelectedTags] = useState<string[]>([]);
+  const [popupShowCompleted, setPopupShowCompleted] = useState(true);
 
   // Filters for Stats
   const [statsFilter, setStatsFilter] = useState<DateRangeOption>('7d');
@@ -40,7 +48,7 @@ export default function HistoryPage() {
     format(subDays(new Date(), 7), 'yyyy-MM-dd'),
   );
   const [customTo, setCustomTo] = useState<string>(
-    format(subDays(new Date(), 1), 'yyyy-MM-dd'),
+    format(new Date(), 'yyyy-MM-dd'),
   );
   const [statsData, setStatsData] = useState<any[]>([]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -59,7 +67,7 @@ export default function HistoryPage() {
   const minDate = userData?.createdAt
     ? startOfDay(new Date(userData.createdAt))
     : undefined;
-  const maxDate = startOfDay(subDays(new Date(), 1)); // Yesterday
+  const maxDate = startOfDay(new Date()); // Today
 
   // --- Auth Check ---
   useEffect(() => {
@@ -106,14 +114,14 @@ export default function HistoryPage() {
         // Logic similar to old page
         const today = startOfToday();
         let fromDate = new Date();
-        let toDate = subDays(today, 1);
+        let toDate = today;
 
         switch (statsFilter) {
           case '7d':
-            fromDate = subDays(today, 7);
+            fromDate = subDays(today, 6);
             break;
           case '30d':
-            fromDate = subDays(today, 30);
+            fromDate = subDays(today, 29);
             break;
           case 'custom':
             if (customFrom) fromDate = new Date(customFrom);
@@ -222,6 +230,69 @@ export default function HistoryPage() {
     }
   };
 
+  const handleDeleteTask = async (taskId: string, date: string) => {
+    // Optimistic
+    const updateData = (prev: any[]) =>
+      prev.map((day) => {
+        if (day.date !== date) return day;
+        return {
+          ...day,
+          tasks: day.tasks.filter((t: any) => t.id !== taskId),
+        };
+      });
+    setCalendarData(updateData);
+    setStatsData(updateData);
+
+    try {
+      await fetch('/api/tasks', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, date }),
+      });
+      // Also mutate today/backlog just in case
+      mutateToday();
+      mutateBacklog();
+    } catch (error) {
+      console.error('Delete failed', error);
+      // Re-fetch calendar to be safe
+      // fetchMonth() is triggered by viewDate, but we can just wait for revalidation or re-fetch manually.
+    }
+  };
+
+  const handleSaveEdit = async (newText: string) => {
+    if (!editingTask || !selectedDate) return;
+    const taskId = editingTask.id;
+    const date = selectedDate;
+
+    // Optimistic
+    const updateData = (prev: any[]) =>
+      prev.map((day) => {
+        if (day.date !== date) return day;
+        return {
+          ...day,
+          tasks: day.tasks.map((t: any) => {
+            if (t.id === taskId) return { ...t, text: newText };
+            return t;
+          }),
+        };
+      });
+    setCalendarData(updateData);
+    setStatsData(updateData);
+
+    try {
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, text: newText }),
+      });
+      mutateToday();
+      mutateBacklog();
+    } catch (error) {
+      console.error('Edit failed', error);
+    }
+    setEditingTask(null);
+  };
+
   // Frog Props for Day Detail
   const frogProps = {
     flyBalance: flyStatus.balance,
@@ -287,9 +358,24 @@ export default function HistoryPage() {
           date={selectedDate || format(new Date(), 'yyyy-MM-dd')}
           tasks={selectedDayTasks}
           onToggleTask={handleToggleTask}
+          onDeleteTask={handleDeleteTask}
+          onEditTask={(id, text) => setEditingTask({ id, text })}
           frogProps={{
             ...frogProps,
           }}
+          filter={popupFilter}
+          onFilterChange={setPopupFilter}
+          selectedTags={popupSelectedTags}
+          onTagsChange={setPopupSelectedTags}
+          showCompleted={popupShowCompleted}
+          onShowCompletedChange={setPopupShowCompleted}
+        />
+
+        <EditTaskDialog
+          open={!!editingTask}
+          onClose={() => setEditingTask(null)}
+          initialText={editingTask?.text || ''}
+          onSave={handleSaveEdit}
         />
       </div>
     </main>
