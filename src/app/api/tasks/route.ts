@@ -443,6 +443,7 @@ export async function POST(req: NextRequest) {
         completed: false,
         type: 'weekly',
         tags: task.tags || [],
+        dayOfWeek: dayOfWeek,
       });
     }
     return NextResponse.json({
@@ -630,7 +631,14 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  const { date, taskId, completed, tags, toggleType, order, text } = body ?? {};
+  const { date, taskId, completed, tags, toggleType, order, text, daysOfWeek } = body ?? {};
+  if (daysOfWeek !== undefined && taskId) {
+    await TaskModel.updateOne(
+      { userId: uid, id: taskId, type: 'habit' },
+      { $set: { daysOfWeek, updatedAt: new Date() } },
+    );
+    return NextResponse.json({ ok: true });
+  }
   // Relaxed validation to allow text updates
   if (
     (!date &&
@@ -877,6 +885,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       .lean<TaskDoc[]>()
       .exec();
     const out = docs
+      .filter((t: TaskDoc) => !(t.suppressedDates ?? []).includes(weekDates[dayNum]))
       .map((t: TaskDoc) => ({
         id: t.id,
         text: t.text,
@@ -886,6 +895,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[dayNum]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
+        ...(t.type === 'habit' && { daysOfWeek: t.daysOfWeek ?? [] }),
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return NextResponse.json(out);
@@ -905,6 +915,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       .lean<TaskDoc[]>()
       .exec();
     week[d] = docs
+      .filter((t: TaskDoc) => !(t.suppressedDates ?? []).includes(weekDates[d]))
       .map((t: TaskDoc) => ({
         id: t.id,
         text: t.text,
@@ -914,6 +925,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[d]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
+        ...(t.type === 'habit' && { daysOfWeek: t.daysOfWeek ?? [] }),
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }

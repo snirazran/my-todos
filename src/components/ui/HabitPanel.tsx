@@ -13,6 +13,7 @@ import Fly from '@/components/ui/fly';
 import { Task } from '@/hooks/useTaskData';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
+import { EditHabitDaysDialog } from '@/components/ui/EditHabitDaysDialog';
 
 type SavedTag = {
   id: string;
@@ -49,6 +50,8 @@ export function HabitPanel({
 }: HabitPanelProps) {
   const [editingHabit, setEditingHabit] = React.useState<Task | null>(null);
   const [deletingHabit, setDeletingHabit] = React.useState<Task | null>(null);
+  const [editingDaysHabit, setEditingDaysHabit] = React.useState<Task | null>(null);
+  const [busy, setBusy] = React.useState(false);
 
   const visibleHabits = React.useMemo(() => {
     if (showCompleted) return habits;
@@ -112,17 +115,59 @@ export function HabitPanel({
       <DeleteDialog
         open={!!deletingHabit}
         onClose={() => setDeletingHabit(null)}
-        variant="regular"
+        variant="habit"
         itemLabel={deletingHabit?.text}
-        onDeleteToday={() => {
-          if (deletingHabit) onDelete(deletingHabit.id);
-          setDeletingHabit(null);
+        dayLabel="today"
+        busy={busy}
+        onDeleteToday={async () => {
+          if (!deletingHabit) return;
+          setBusy(true);
+          try {
+            await fetch('/api/tasks', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ date, taskId: deletingHabit.id }),
+            });
+          } finally {
+            setBusy(false);
+            setDeletingHabit(null);
+          }
         }}
         onDeleteAll={() => {
           if (deletingHabit) onDelete(deletingHabit.id);
           setDeletingHabit(null);
         }}
+        onEditDays={() => {
+          setEditingDaysHabit(deletingHabit);
+          setDeletingHabit(null);
+        }}
       />
+
+      {editingDaysHabit && (
+        <EditHabitDaysDialog
+          open
+          key={editingDaysHabit.id}
+          taskId={editingDaysHabit.id}
+          taskLabel={editingDaysHabit.text}
+          initialDays={editingDaysHabit.daysOfWeek ?? []}
+          busy={busy}
+          onClose={() => setEditingDaysHabit(null)}
+          onSave={async (newDays) => {
+            setBusy(true);
+            try {
+              await fetch('/api/tasks', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskId: editingDaysHabit.id, daysOfWeek: newDays }),
+              });
+              window.dispatchEvent(new Event('habits-updated'));
+            } finally {
+              setBusy(false);
+              setEditingDaysHabit(null);
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

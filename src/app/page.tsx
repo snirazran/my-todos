@@ -593,6 +593,9 @@ export default function Home() {
                       t.daysOfWeek.includes(currentDayOfWeek)
                     );
                   }
+                  if (t.type === 'weekly') {
+                    return t.dayOfWeek === currentDayOfWeek;
+                  }
                   return !t.date || t.date === dateStr;
                 });
 

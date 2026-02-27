@@ -82,10 +82,14 @@ export default function ManageTasksPage() {
     })();
   }, [fetchWeek]);
 
-  // Listen for global tag updates
+  // Listen for global tag updates and board refresh requests
   useEffect(() => {
     window.addEventListener('tags-updated', fetchWeek);
-    return () => window.removeEventListener('tags-updated', fetchWeek);
+    window.addEventListener('board-refresh', fetchWeek);
+    return () => {
+      window.removeEventListener('tags-updated', fetchWeek);
+      window.removeEventListener('board-refresh', fetchWeek);
+    };
   }, [fetchWeek]);
 
   /** Save order for one display column (maps -> API day) */

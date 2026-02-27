@@ -4,9 +4,10 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
-import { Task, draggableIdFor, type DisplayDay, apiDayFromDisplay } from './helpers';
+import { Task, draggableIdFor, type DisplayDay, type ApiDay, apiDayFromDisplay, labelForDisplayDay } from './helpers';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
+import { EditHabitDaysDialog } from '@/components/ui/EditHabitDaysDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import Fly from '@/components/ui/fly';
 import { Plus, LayoutList, ListTodo, Repeat } from 'lucide-react';
@@ -31,6 +32,7 @@ export default React.memo(function TaskList({
   filter = 'all',
   selectedTags = [],
   showCompleted = true,
+  daysOrder,
 }: {
   day: DisplayDay;
   items: Task[];
@@ -62,9 +64,10 @@ export default React.memo(function TaskList({
   filter?: 'all' | 'tasks' | 'habits';
   selectedTags?: string[];
   showCompleted?: boolean;
+  daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
 }) {
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
-  const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay; kind?: 'edit' } | null>(null);
+  const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay; kind?: 'edit' | 'editDays' } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
@@ -75,7 +78,8 @@ export default React.memo(function TaskList({
   const isSelfDrag = isDragging && dragFromDay === day;
   const sourceIndex = isSelfDrag && dragFromIndex != null ? dragFromIndex : null;
 
-  const variantFor = (t: Task): 'regular' | 'weekly' | 'backlog' => {
+  const variantFor = (t: Task): 'regular' | 'weekly' | 'backlog' | 'habit' => {
+    if (t.type === 'habit') return 'habit';
     if (t.type === 'weekly') return 'weekly';
     if (t.type === 'backlog') return 'backlog';
     return 'regular';
@@ -85,7 +89,7 @@ export default React.memo(function TaskList({
   const ymdLocal = (d: Date) =>
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
   const dateForDisplayDay = (displayDay: DisplayDay) => {
-    const apiDay = apiDayFromDisplay(displayDay);
+    const apiDay = apiDayFromDisplay(displayDay, daysOrder);
     if (apiDay === -1) return null;
     const base = new Date();
     const sunday = new Date(base.getFullYear(), base.getMonth(), base.getDate());
@@ -95,7 +99,7 @@ export default React.memo(function TaskList({
     return ymdLocal(target);
   };
 
-  const dialogVariant: 'regular' | 'weekly' | 'backlog' = dialog
+  const dialogVariant: 'regular' | 'weekly' | 'backlog' | 'habit' = dialog
     ? variantFor(dialog.task)
     : 'regular';
 
@@ -103,7 +107,7 @@ export default React.memo(function TaskList({
     if (!dialog || busy) return;
     setBusy(true);
     try {
-      if (dialogVariant === 'weekly') {
+      if (dialogVariant === 'weekly' || dialogVariant === 'habit') {
         const date = dateForDisplayDay(dialog.day);
         if (date) {
           await fetch('/api/tasks', {
@@ -111,6 +115,7 @@ export default React.memo(function TaskList({
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ date, taskId: dialog.task.id }),
           });
+          window.dispatchEvent(new Event('board-refresh'));
         }
       } else {
         await removeTask(dialog.day, dialog.task.id);
@@ -308,6 +313,7 @@ export default React.memo(function TaskList({
         onClose={() => setMenu(null)}
         onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
         addTagsPosition="second"
+        isHabit={menu ? items.find((t) => t.id === menu.id)?.type === 'habit' : false}
         onToggleRepeat={onToggleRepeat ? () => { if (menu) { onToggleRepeat(menu.id, day); setMenu(null); } } : undefined}
         isWeekly={menu ? items.find((t) => t.id === menu.id)?.type === 'weekly' : false}
         onDelete={() => {
@@ -332,6 +338,13 @@ export default React.memo(function TaskList({
             setMenu(null);
           }
         } : undefined}
+        onChangeDays={() => {
+          if (menu) {
+            const t = items.find((it) => it.id === menu.id);
+            if (t) setDialog({ task: t, day, kind: 'editDays' });
+          }
+          setMenu(null);
+        }}
       />
       <TagPopup
         open={tagPopup.open}
@@ -357,22 +370,54 @@ export default React.memo(function TaskList({
       )}
 
       <DeleteDialog
-        open={!!dialog && dialog.kind !== 'edit'}
+        open={!!dialog && dialog.kind !== 'edit' && dialog.kind !== 'editDays'}
         variant={dialogVariant}
         itemLabel={dialog?.task.text}
+        dayLabel={dialog && dialog.day < 7 ? labelForDisplayDay(dialog.day as Exclude<DisplayDay, 7>, daysOrder) : undefined}
         busy={busy}
         onClose={() => setDialog(null)}
         onDeleteToday={
           dialogVariant !== 'backlog' ? handleDeleteToday : handleDeleteAll
         }
         onDeleteAll={
-          dialogVariant === 'weekly'
+          dialogVariant === 'weekly' || dialogVariant === 'habit'
             ? handleDeleteAll
             : dialogVariant === 'backlog'
               ? handleDeleteToday
               : undefined
         }
+        onEditDays={
+          dialogVariant === 'habit'
+            ? () => setDialog((prev) => prev ? { ...prev, kind: 'editDays' } : prev)
+            : undefined
+        }
       />
+
+      {dialog && dialog.kind === 'editDays' && (
+        <EditHabitDaysDialog
+          open
+          taskId={dialog.task.id}
+          taskLabel={dialog.task.text}
+          initialDays={dialog.task.daysOfWeek ?? []}
+          busy={busy}
+          onClose={() => setDialog(null)}
+          onSave={async (newDays) => {
+            setBusy(true);
+            try {
+              await fetch('/api/tasks', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ taskId: dialog.task.id, daysOfWeek: newDays }),
+              });
+              window.dispatchEvent(new Event('board-refresh'));
+            } finally {
+              setBusy(false);
+              setDialog(null);
+              setMenu(null);
+            }
+          }}
+        />
+      )}
     </>
   );
 });

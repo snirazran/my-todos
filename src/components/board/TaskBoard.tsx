@@ -520,6 +520,7 @@ export default function TaskBoard({
                   filter={getFilter(day)}
                   selectedTags={getSelectedTags(day)}
                   showCompleted={getShowCompleted(day)}
+                  daysOrder={daysOrder}
                 />
               </DayColumn>
             </div>
