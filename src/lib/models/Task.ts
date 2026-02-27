@@ -14,7 +14,7 @@ export interface TaskDoc {
   completedDates?: string[]; // YYYY-MM-DD entries where the task was completed
   suppressedDates?: string[]; // YYYY-MM-DD entries hidden for that date
   dayOfWeek?: Weekday;
-  daysOfWeek?: number[]; // Array of weekday numbers (0-6)
+  timesPerWeek?: number; // Target number of completions per week for habits
   date?: string;
   weekStart?: string;
   createdAt: Date;
@@ -49,7 +49,7 @@ const TaskSchema = new Schema<TaskDoc>(
     completedDates: { type: [String], default: [] },
     suppressedDates: { type: [String], default: [] },
     dayOfWeek: { type: Number, min: 0, max: 6 },
-    daysOfWeek: { type: [Number], default: [] },
+    timesPerWeek: { type: Number, min: 1, max: 7 },
     date: { type: String },
     weekStart: { type: String },
     createdAt: { type: Date, default: Date.now },

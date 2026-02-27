@@ -318,7 +318,7 @@ export default function DayDetailSheet({
                             tags={task.tags}
                             date={date}
                             completedDates={task.completedDates}
-                            daysOfWeek={task.daysOfWeek}
+                            timesPerWeek={task.timesPerWeek}
                             frogodoroSession={task.frogodoroSession}
                             onToggle={handleToggleProxy}
                             setFlyRef={(el) => {

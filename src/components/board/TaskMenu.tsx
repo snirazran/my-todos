@@ -140,7 +140,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
               <CalendarDays className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              Change Days
+              Change Goal
             </button>
           )}
 

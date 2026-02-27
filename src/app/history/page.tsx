@@ -196,7 +196,24 @@ export default function HistoryPage() {
         return {
           ...day,
           tasks: day.tasks.map((t: any) => {
-            if (t.id === taskId) return { ...t, completed: !currentStatus };
+            if (t.id === taskId) {
+              const nextCompleted = !currentStatus;
+              let updatedCompletedDates = t.completedDates || [];
+              if (t.type === 'habit') {
+                if (nextCompleted) {
+                  if (!updatedCompletedDates.includes(date)) {
+                    updatedCompletedDates = [...updatedCompletedDates, date];
+                  }
+                } else {
+                  updatedCompletedDates = updatedCompletedDates.filter((d: string) => d !== date);
+                }
+              }
+              return { 
+                ...t, 
+                completed: nextCompleted,
+                completedDates: updatedCompletedDates
+              };
+            }
             return t;
           }),
         };

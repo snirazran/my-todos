@@ -4,39 +4,29 @@ import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Check } from 'lucide-react';
 
-// API days: 0=Sun, 1=Mon, 2=Tue, 3=Wed, 4=Thu, 5=Fri, 6=Sat
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon first display order
-
 interface Props {
   open: boolean;
   taskId: string;
   taskLabel?: string;
-  initialDays: number[];
+  initialGoal: number;
   busy?: boolean;
   onClose: () => void;
-  onSave: (newDays: number[]) => void;
+  onSave: (newGoal: number) => void;
 }
 
 export function EditHabitDaysDialog({
   open,
   taskId,
   taskLabel,
-  initialDays,
+  initialGoal,
   busy,
   onClose,
   onSave,
 }: Props) {
-  const [selected, setSelected] = useState<number[]>(initialDays);
+  const [goal, setGoal] = useState<number>(initialGoal);
 
   if (!open) return null;
   if (typeof document === 'undefined') return null;
-
-  const toggle = (day: number) => {
-    setSelected((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day],
-    );
-  };
 
   const content = (
     <div
@@ -57,10 +47,10 @@ export function EditHabitDaysDialog({
         <div className="flex items-start justify-between px-5 pt-5 pb-3">
           <div className="flex-1 min-w-0 pr-3">
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-              Habit
+              Habit Goal
             </p>
             <h4 className="text-base font-bold text-slate-900 dark:text-white leading-snug truncate">
-              {taskLabel ? `"${taskLabel}"` : 'Edit repeat days'}
+              {taskLabel ? `"${taskLabel}"` : 'Edit habit goal'}
             </h4>
           </div>
           <button
@@ -72,27 +62,29 @@ export function EditHabitDaysDialog({
           </button>
         </div>
 
-        {/* Day picker */}
+        {/* Goal picker */}
         <div className="px-5 pb-2">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            Choose which days this habit appears
+          <p className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider mb-3 px-1">
+            Goal: {goal} {goal === 1 ? 'time' : 'times'} per week
           </p>
-          <div className="grid grid-cols-7 gap-1.5">
-            {DAY_ORDER.map((apiDay) => {
-              const isOn = selected.includes(apiDay);
+          <div className="flex justify-start gap-2 py-2 px-1 overflow-x-auto no-scrollbar">
+            {[1, 2, 3, 4, 5, 6, 7].map((num) => {
+              const isOn = goal >= num;
               return (
                 <button
-                  key={apiDay}
-                  onClick={() => toggle(apiDay)}
-                  className={`flex flex-col items-center gap-1 py-2.5 rounded-xl text-xs font-bold transition-all active:scale-95 ${
-                    isOn
-                      ? 'bg-primary text-primary-foreground shadow-sm'
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
+                  key={num}
+                  type="button"
+                  onClick={() => setGoal(num)}
+                  className={`
+                    w-10 h-10 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-black transition-all border shadow-sm
+                    ${
+                      isOn
+                        ? 'bg-primary/20 border-primary text-primary scale-110 shadow-md shadow-primary/10'
+                        : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 text-slate-400 dark:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    }
+                  `}
                 >
-                  {DAY_LABELS[apiDay]}
-                  {isOn && <Check className="w-3 h-3" strokeWidth={3} />}
-                  {!isOn && <span className="w-3 h-3" />}
+                  {num}
                 </button>
               );
             })}
@@ -100,13 +92,13 @@ export function EditHabitDaysDialog({
         </div>
 
         {/* Actions */}
-        <div className="px-4 pb-4 pt-3 flex flex-col gap-2">
+        <div className="px-4 pb-4 pt-4 flex flex-col gap-2">
           <button
             className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-50 shadow-sm"
-            onClick={() => onSave(selected)}
-            disabled={busy || selected.length === 0}
+            onClick={() => onSave(goal)}
+            disabled={busy}
           >
-            {selected.length === 0 ? 'Pick at least one day' : 'Save changes'}
+            Save changes
           </button>
           <button
             className="w-full py-2.5 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"

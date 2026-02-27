@@ -18,7 +18,7 @@ export interface Task {
   kind?: 'regular' | 'weekly' | 'backlog' | 'habit';
   tags?: string[];
   date?: string;
-  daysOfWeek?: number[]; // For Habits
+  timesPerWeek?: number; // Target number of completions per week for habits
   completedDates?: string[];
   frogodoroSettings?: {
     cycleDuration: number;
@@ -117,10 +117,12 @@ export function useTaskData() {
 
     window.addEventListener('habits-updated', handleUpdate);
     window.addEventListener('tags-updated', handleUpdate);
+    window.addEventListener('board-refresh', handleUpdate);
 
     return () => {
       window.removeEventListener('habits-updated', handleUpdate);
       window.removeEventListener('tags-updated', handleUpdate);
+      window.removeEventListener('board-refresh', handleUpdate);
     };
   }, [mutateToday, mutateBacklog]);
 

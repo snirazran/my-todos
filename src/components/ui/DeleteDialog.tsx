@@ -78,24 +78,7 @@ export function DeleteDialog({
           {/* ── HABIT ── */}
           {variant === 'habit' && (
             <>
-              {/* Skip today */}
-              <button
-                className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left disabled:opacity-50 border border-slate-200/60 dark:border-slate-700/50 active:scale-[0.98]"
-                onClick={onDeleteToday}
-                disabled={busy}
-              >
-                <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                  <EyeOff className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Skip {dayLabel}</p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Won&apos;t show {dayLabel} — still repeats as usual
-                  </p>
-                </div>
-              </button>
-
-              {/* Edit days */}
+              {/* Edit Goal */}
               {onEditDays && (
                 <button
                   className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left disabled:opacity-50 border border-slate-200/60 dark:border-slate-700/50 active:scale-[0.98]"
@@ -106,9 +89,9 @@ export function DeleteDialog({
                     <CalendarDays className="w-4 h-4" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Edit days</p>
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">Edit goal</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                      Change which days this habit repeats
+                      Change how many times a week you want to do this
                     </p>
                   </div>
                 </button>

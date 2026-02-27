@@ -18,7 +18,7 @@ import { AddTaskButton } from '../ui/AddTaskButton';
 import BacklogBox from './BacklogBox';
 import BacklogTray from './BacklogTray';
 
-type RepeatChoice = 'this-week' | 'weekly';
+type RepeatChoice = 'this-week' | 'weekly' | 'habit';
 
 export default function TaskBoard({
   titles,
@@ -48,6 +48,7 @@ export default function TaskBoard({
     days: ApiDay[];
     repeat: RepeatChoice;
     tags: string[];
+    timesPerWeek?: number;
   }) => Promise<void> | void;
   todayDisplayIndex: Exclude<DisplayDay, 7>;
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>; // New Prop
@@ -644,13 +645,14 @@ export default function TaskBoard({
         defaultRepeat="this-week"
         defaultPickedDay={isMobile ? pageIndex : todayDisplayIndex}
         daysOrder={daysOrder}
-        onSubmit={async ({ text, days, repeat, tags }) => {
+        onSubmit={async ({ text, days, repeat, tags, timesPerWeek }) => {
           if (onQuickAdd) {
             await onQuickAdd({
               text,
               days,
               repeat: repeat as RepeatChoice,
               tags,
+              timesPerWeek,
             });
           } else {
             onRequestAdd(null, text, null, repeat as RepeatChoice);

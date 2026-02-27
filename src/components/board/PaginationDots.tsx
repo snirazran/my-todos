@@ -63,7 +63,7 @@ export default function PaginationDots({
 
     <LayoutGroup id="pagination-dots">
 
-      <div className="flex items-center gap-0.5">
+      <div className="flex items-center gap-0.5 pb-1">
 
         {Array.from({ length: count }).map((_, i) => {
 

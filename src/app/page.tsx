@@ -559,7 +559,7 @@ export default function Home() {
         initialText={quickText}
         defaultRepeat="this-week"
         defaultMode={quickAddMode}
-        onSubmit={async ({ text, days, repeat, tags }) => {
+        onSubmit={async ({ text, days, repeat, tags, timesPerWeek }) => {
           try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const dateStr = format(new Date(), 'yyyy-MM-dd');
@@ -567,7 +567,7 @@ export default function Home() {
             const res = await fetch('/api/tasks?view=board', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
+              body: JSON.stringify({ text, days, repeat, tags, timesPerWeek, timezone: tz }),
             });
             const data = await res.json();
 
@@ -588,10 +588,8 @@ export default function Home() {
                 // Filter to only add tasks that match TODAY's date, or if it's a habit meant for today
                 const relevantTasks = newTasks.filter((t: any) => {
                   if (t.type === 'habit') {
-                    return (
-                      Array.isArray(t.daysOfWeek) &&
-                      t.daysOfWeek.includes(currentDayOfWeek)
-                    );
+                    // Habits show on ALL days now, so it's always relevant
+                    return true;
                   }
                   if (t.type === 'weekly') {
                     return t.dayOfWeek === currentDayOfWeek;

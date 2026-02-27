@@ -398,16 +398,16 @@ export default React.memo(function TaskList({
           open
           taskId={dialog.task.id}
           taskLabel={dialog.task.text}
-          initialDays={dialog.task.daysOfWeek ?? []}
+          initialGoal={dialog.task.timesPerWeek ?? 7}
           busy={busy}
           onClose={() => setDialog(null)}
-          onSave={async (newDays) => {
+          onSave={async (newGoal) => {
             setBusy(true);
             try {
               await fetch('/api/tasks', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ taskId: dialog.task.id, daysOfWeek: newDays }),
+                body: JSON.stringify({ taskId: dialog.task.id, timesPerWeek: newGoal }),
               });
               window.dispatchEvent(new Event('board-refresh'));
             } finally {

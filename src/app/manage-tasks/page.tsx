@@ -139,18 +139,20 @@ export default function ManageTasksPage() {
     days,
     repeat,
     tags,
+    timesPerWeek,
   }: {
     text: string;
     // -1 = Later, 0..6 = Sun..Sat (API days)
     days: (-1 | 0 | 1 | 2 | 3 | 4 | 5 | 6)[];
-    repeat: 'this-week' | 'weekly';
+    repeat: 'this-week' | 'weekly' | 'habit';
     tags: string[];
+    timesPerWeek?: number;
   }) => {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     await fetch('/api/tasks?view=board', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
+      body: JSON.stringify({ text, days, repeat, tags, timesPerWeek, timezone: tz }),
     });
 
     const data = (await fetch(

@@ -43,6 +43,7 @@ type Props = Readonly<{
     days: ApiDay[];
     repeat: RepeatChoice;
     tags: string[];
+    timesPerWeek?: number;
   }) => Promise<void> | void;
   initialText?: string;
   defaultRepeat?: RepeatChoice;
@@ -179,6 +180,7 @@ export default function QuickAddSheet({
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
   const [when, setWhen] = useState<WhenChoice>(defaultMode);
+  const [timesPerWeek, setTimesPerWeek] = useState(7);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -220,6 +222,7 @@ export default function QuickAddSheet({
           : todayDisplayIndex(daysOrder);
       setPickedDays([initialDay as Exclude<DisplayDay, 7>]);
       setRepeat(defaultRepeat);
+      setTimesPerWeek(7);
       setTags([]);
       setTagInput('');
       setIsSubmitting(false);
@@ -379,16 +382,17 @@ export default function QuickAddSheet({
       .sort()
       .map((d) => apiDayFromDisplay(d, daysOrder));
 
-    if (apiDays.length === 0) return;
+    if (apiDays.length === 0 && when !== 'habit') return;
 
     setIsSubmitting(true);
     try {
       const finalRepeat: RepeatChoice = when === 'habit' ? 'habit' : repeat;
       await onSubmit({
         text: trimmed,
-        days: apiDays,
+        days: when === 'habit' ? [0, 1, 2, 3, 4, 5, 6] : apiDays,
         repeat: finalRepeat,
         tags,
+        timesPerWeek: when === 'habit' ? timesPerWeek : undefined,
       });
       onOpenChange(false);
     } finally {
@@ -943,8 +947,8 @@ export default function QuickAddSheet({
                                   <span className="font-bold text-foreground">
                                     Habit
                                   </span>{' '}
-                                  — Auto-repeats on chosen days and tracks your
-                                  progress over time.
+                                  — Appears every day and tracks your weekly
+                                  frequency goal.
                                 </p>
                               </div>
                             </motion.div>
@@ -953,13 +957,13 @@ export default function QuickAddSheet({
                       </div>
                     )}
 
-                    {/* DAY PICKER */}
+                    {/* DAY PICKER or TIMES PER WEEK */}
                     {(when === 'pick' || when === 'habit') && (
                       <div
                         className="flex flex-col gap-4 mt-1 sm:flex-row sm:items-center"
                         style={{ transform: 'translateZ(0)' }}
                       >
-                        {!hideDayPicker && (
+                        {!hideDayPicker && when !== 'habit' && (
                           <div className="flex-1 min-w-0 -mx-2 px-2">
                             <div className="flex justify-start gap-2 sm:gap-2 py-2 px-1 overflow-x-auto no-scrollbar mask-fade-right">
                               {dayLabels.map(({ short, title }, idx) => {
@@ -986,6 +990,33 @@ export default function QuickAddSheet({
                                   </button>
                                 );
                               })}
+                            </div>
+                          </div>
+                        )}
+
+                        {when === 'habit' && (
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">
+                              Goal: {timesPerWeek} {timesPerWeek === 1 ? 'time' : 'times'} per week
+                            </p>
+                            <div className="flex justify-start gap-2 py-2 px-1">
+                              {[1, 2, 3, 4, 5, 6, 7].map((num) => (
+                                <button
+                                  key={num}
+                                  type="button"
+                                  onClick={() => setTimesPerWeek(num)}
+                                  className={`
+                                    w-10 h-10 rounded-full flex items-center justify-center text-sm font-black transition-all border shadow-sm
+                                    ${
+                                      timesPerWeek >= num
+                                        ? 'bg-primary/20 border-primary text-primary scale-110'
+                                        : 'bg-card border-border text-muted-foreground hover:bg-accent/50'
+                                    }
+                                  `}
+                                >
+                                  {num}
+                                </button>
+                              ))}
                             </div>
                           </div>
                         )}

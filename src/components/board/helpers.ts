@@ -9,7 +9,7 @@ export type Task = {
   completed?: boolean;
   tags?: string[];
   /** only present for habit tasks */
-  daysOfWeek?: number[];
+  timesPerWeek?: number;
 };
 
 // Display has 7 weekday columns + 1 “Later” column at index 7

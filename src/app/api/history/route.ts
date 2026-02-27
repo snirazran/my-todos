@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
         type: 1,
         dayOfWeek: 1,
         daysOfWeek: 1,
+        timesPerWeek: 1,
         date: 1,
         completed: 1,
         completedDates: 1,
@@ -86,6 +87,7 @@ export async function GET(req: NextRequest) {
       tags?: string[];
       completedDates?: string[];
       daysOfWeek?: number[];
+      timesPerWeek?: number;
       frogodoroSession?: {
         completedCycles: number;
         timeSpent: number;
@@ -107,7 +109,7 @@ export async function GET(req: NextRequest) {
           } else if (t.type === 'weekly') {
             matchesDay = t.dayOfWeek === dow;
           } else if (t.type === 'habit') {
-            matchesDay = (t.daysOfWeek ?? []).includes(dow);
+            matchesDay = true; // Habits show on ALL days now
           }
 
           if (!matchesDay) return false;
@@ -138,7 +140,7 @@ export async function GET(req: NextRequest) {
             type: t.type as 'weekly' | 'regular' | 'habit',
             tags: t.tags,
             completedDates: t.completedDates,
-            daysOfWeek: t.daysOfWeek,
+            timesPerWeek: t.timesPerWeek,
             frogodoroSession: t.frogodoroSessions?.find(
               (s) => s.date === dateStr,
             ),

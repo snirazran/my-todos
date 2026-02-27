@@ -453,14 +453,10 @@ export async function POST(req: NextRequest) {
     });
   }
   if (repeat === 'habit') {
-    if (days.some((d) => d === -1))
-      return NextResponse.json(
-        { error: 'Habits target weekdays 0..6' },
-        { status: 400 },
-      );
+    const timesPerWeek = Number(body?.timesPerWeek) || 7;
     const id = uuid();
-    // Use the earliest day in the array for initial order placement
-    const firstDay = Math.min(...days) as Weekday;
+    // Use Sunday (0) for initial order placement if no days provided, or just default to 0
+    const firstDay = 0;
     const order = await nextOrderForDay(uid, firstDay, weekDates[firstDay]);
     const task = await TaskModel.create({
       userId: uid,
@@ -468,7 +464,7 @@ export async function POST(req: NextRequest) {
       id,
       text,
       order,
-      daysOfWeek: days,
+      timesPerWeek,
       createdAt: now,
       updatedAt: now,
       tags,
@@ -481,7 +477,7 @@ export async function POST(req: NextRequest) {
       completed: false,
       type: 'habit',
       tags: task.tags || [],
-      daysOfWeek: task.daysOfWeek || [],
+      timesPerWeek: task.timesPerWeek,
     });
     return NextResponse.json({
       ok: true,
@@ -631,7 +627,14 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  const { date, taskId, completed, tags, toggleType, order, text, daysOfWeek } = body ?? {};
+  const { date, taskId, completed, tags, toggleType, order, text, daysOfWeek, timesPerWeek } = body ?? {};
+  if (timesPerWeek !== undefined && taskId) {
+    await TaskModel.updateOne(
+      { userId: uid, id: taskId, type: 'habit' },
+      { $set: { timesPerWeek, updatedAt: new Date() } },
+    );
+    return NextResponse.json({ ok: true });
+  }
   if (daysOfWeek !== undefined && taskId) {
     await TaskModel.updateOne(
       { userId: uid, id: taskId, type: 'habit' },
@@ -791,7 +794,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
     $or: [
       { type: 'weekly', dayOfWeek: dow },
       { type: 'regular', date },
-      { type: 'habit', daysOfWeek: dow }, // Match habit if today is one of its active days
+      { type: 'habit' }, // Include ALL habits
     ],
   })
     .sort({ order: 1 })
@@ -815,7 +818,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       origin: t.type as Origin,
       tags: t.tags ?? [],
       completedDates: t.completedDates ?? [],
-      daysOfWeek: t.daysOfWeek ?? [],
+      timesPerWeek: t.timesPerWeek,
       frogodoroSettings: t.frogodoroSettings,
     }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -878,7 +881,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       $or: [
         { type: 'weekly', dayOfWeek: dayNum },
         { type: 'regular', date: weekDates[dayNum] },
-        { type: 'habit', daysOfWeek: dayNum },
+        { type: 'habit' },
       ],
     })
       .sort({ order: 1 })
@@ -895,7 +898,9 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[dayNum]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
-        ...(t.type === 'habit' && { daysOfWeek: t.daysOfWeek ?? [] }),
+        ...(t.type === 'habit' && { 
+          timesPerWeek: t.timesPerWeek 
+        }),
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return NextResponse.json(out);
@@ -908,7 +913,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       $or: [
         { type: 'weekly', dayOfWeek: d },
         { type: 'regular', date: weekDates[d] },
-        { type: 'habit', daysOfWeek: d },
+        { type: 'habit' },
       ],
     })
       .sort({ order: 1 })
@@ -925,7 +930,9 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[d]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
-        ...(t.type === 'habit' && { daysOfWeek: t.daysOfWeek ?? [] }),
+        ...(t.type === 'habit' && { 
+          timesPerWeek: t.timesPerWeek 
+        }),
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }
@@ -1046,17 +1053,6 @@ async function handleBoardPut(
     id: { $nin: ids },
   });
 
-  // 2. For habits that were on this day but are now missing, remove this day from their daysOfWeek
-  await TaskModel.updateMany(
-    {
-      userId: uid,
-      type: 'habit',
-      daysOfWeek: weekday,
-      id: { $nin: ids },
-    },
-    { $pull: { daysOfWeek: weekday } },
-  );
-
   const docs: TaskDoc[] = await TaskModel.find(
     { userId: uid, id: { $in: ids } },
     { id: 1, type: 1, text: 1, tags: 1 },
@@ -1081,7 +1077,6 @@ async function handleBoardPut(
           { userId: uid, type: 'habit', id: t.id },
           {
             $set: { order: i + 1, updatedAt: now, tags },
-            $addToSet: { daysOfWeek: weekday },
           },
         );
       if (ttype === 'regular')

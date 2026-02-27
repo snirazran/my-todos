@@ -14,7 +14,7 @@ export type HistoryTaskCardProps = {
   tags?: string[];
   date: string;
   completedDates?: string[];
-  daysOfWeek?: number[];
+  timesPerWeek?: number;
   userTags?: { id: string; name: string; color: string }[];
   frogodoroSession?: {
     date: string;
@@ -34,7 +34,7 @@ export default function HistoryTaskCard({
   tags,
   date,
   completedDates,
-  daysOfWeek,
+  timesPerWeek,
   userTags,
   frogodoroSession,
   onToggle,
@@ -172,63 +172,84 @@ export default function HistoryTaskCard({
             </div>
           )}
 
-          {/* Habit History Tracker (Mirroring HabitItem) */}
+          {/* Weekly Goal Progress Dots */}
           {type === 'habit' && (
             <div className="flex items-center gap-1.5 mt-2">
               {(() => {
-                const weekDays = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-                // Use 'date' (historical date) as the reference for 'today' in the 7-day view
-                const baseDate = new Date(`${date}T12:00:00Z`);
-                const pastWeekDates = Array.from({ length: 7 }, (_, i) => {
-                  const d = new Date(baseDate);
-                  d.setUTCDate(d.getUTCDate() - (6 - i));
-                  const dStr = [
-                    d.getUTCFullYear(),
-                    String(d.getUTCMonth() + 1).padStart(2, '0'),
-                    String(d.getUTCDate()).padStart(2, '0'),
-                  ].join('-');
-                  return {
-                    dateStr: dStr,
-                    dayIdx: d.getUTCDay(),
-                    isTargetDate: i === 6,
-                  };
-                });
+                const goal = timesPerWeek || 7;
+                
+                // Effective completed dates for this view
+                let allCompleted = [...(completedDates || [])];
+                if (completed) {
+                  if (!allCompleted.includes(date)) allCompleted.push(date);
+                } else {
+                  allCompleted = allCompleted.filter(d => d !== date);
+                }
 
-                return pastWeekDates.map((info, i) => {
-                  const isScheduled = (daysOfWeek || []).includes(info.dayIdx);
-                  if (!isScheduled) return null;
+                // Calculate completions in the week containing 'date' (Sun-Sat)
+                const dDate = new Date(date);
+                const dayOfWeek = dDate.getDay();
+                const sun = new Date(dDate);
+                sun.setDate(dDate.getDate() - dayOfWeek);
+                sun.setHours(0,0,0,0);
+                
+                const weekDates: string[] = [];
+                for (let i = 0; i < 7; i++) {
+                  const d = new Date(sun);
+                  d.setDate(sun.getDate() + i);
+                  weekDates.push(d.toISOString().split('T')[0]);
+                }
+                
+                const completedThisWeek = weekDates.filter(d => allCompleted.includes(d)).length;
 
-                  const allCompleted = completedDates || [];
-                  const isDayCompleted =
-                    allCompleted.includes(info.dateStr) ||
-                    (info.isTargetDate && completed);
-
-                  let dotColor = 'bg-muted text-muted-foreground/30';
-                  if (isDayCompleted) {
-                    dotColor =
-                      'bg-green-500 text-white shadow-sm shadow-green-500/25';
-                  } else if (!info.isTargetDate) {
-                    // Check if it should be red (missed) for PAST days only
-                    const wasTracked = allCompleted.some(
-                      (d) => d <= info.dateStr,
-                    );
-                    if (wasTracked)
-                      dotColor =
-                        'bg-red-500 text-white shadow-sm shadow-red-500/25';
-                  }
-
+                return Array.from({ length: 7 }).map((_, i) => {
+                  if (i >= goal) return null;
+                  const isFilled = i < completedThisWeek;
                   return (
                     <div
                       key={i}
                       className={cn(
-                        'w-6 h-6 flex items-center justify-center rounded-full text-[9px] font-bold tracking-tighter',
-                        dotColor,
+                        'w-3 h-3 rounded-full border transition-all duration-300 flex-shrink-0',
+                        isFilled 
+                          ? 'bg-green-500 border-green-600 shadow-sm shadow-green-500/20 scale-105' 
+                          : 'bg-muted border-border/50'
                       )}
-                    >
-                      {weekDays[info.dayIdx]}
-                    </div>
+                    />
                   );
                 });
+              })()}
+              {(() => {
+                // Effective completed dates for streak calculation
+                let allCompleted = [...(completedDates || [])];
+                if (completed) {
+                  if (!allCompleted.includes(date)) allCompleted.push(date);
+                } else {
+                  allCompleted = allCompleted.filter(d => d !== date);
+                }
+
+                if (allCompleted.length === 0) return null;
+                
+                let streak = 0;
+                let curr = new Date(date);
+                const checkDate = (d: Date) => d.toISOString().split('T')[0];
+                
+                while (true) {
+                  const s = checkDate(curr);
+                  if (allCompleted.includes(s)) {
+                    streak++;
+                    curr.setDate(curr.getDate() - 1);
+                  } else {
+                    break;
+                  }
+                }
+
+                if (streak === 0) return null;
+
+                return (
+                  <span className="text-[10px] font-black text-orange-500 ml-1 uppercase tracking-tight flex items-center gap-0.5">
+                    <span className="text-[12px]">🔥</span> {streak} Day Streak
+                  </span>
+                );
               })()}
             </div>
           )}

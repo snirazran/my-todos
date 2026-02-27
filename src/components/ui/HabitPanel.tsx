@@ -114,6 +114,7 @@ export function HabitPanel({
             menuOpen={menu?.id === habit.id}
             flyRefs={flyRefs}
             tags={tags}
+            date={date}
           />
         ))}
       </AnimatePresence>
@@ -201,16 +202,16 @@ export function HabitPanel({
           key={editingDaysHabit.id}
           taskId={editingDaysHabit.id}
           taskLabel={editingDaysHabit.text}
-          initialDays={editingDaysHabit.daysOfWeek ?? []}
+          initialGoal={editingDaysHabit.timesPerWeek ?? 7}
           busy={busy}
           onClose={() => setEditingDaysHabit(null)}
-          onSave={async (newDays) => {
+          onSave={async (newGoal) => {
             setBusy(true);
             try {
               await fetch('/api/tasks', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ taskId: editingDaysHabit.id, daysOfWeek: newDays }),
+                body: JSON.stringify({ taskId: editingDaysHabit.id, timesPerWeek: newGoal }),
               });
               window.dispatchEvent(new Event('habits-updated'));
             } finally {
@@ -233,6 +234,7 @@ function HabitItem({
   menuOpen,
   flyRefs,
   tags,
+  date,
 }: {
   habit: Task;
   isDone: boolean;
@@ -242,6 +244,7 @@ function HabitItem({
   menuOpen: boolean;
   flyRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
   tags: SavedTag[];
+  date: string;
 }) {
   const menuBtnRef = React.useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -445,7 +448,7 @@ function HabitItem({
             </AnimatePresence>
           </div>
 
-          {/* Text & Tags & History Tracker */}
+          {/* Text & Tags & Goal Tracker */}
           <div className="flex-1 min-w-0 overflow-hidden">
             {/* Tags */}
             {habit.tags && habit.tags.length > 0 && (
@@ -479,70 +482,83 @@ function HabitItem({
               {habit.text}
             </span>
 
-            {/* 7-Day Progress Indicator */}
+            {/* Weekly Goal Progress Dots */}
             <div className="flex items-center gap-1.5 mt-2">
               {(() => {
-                const weekDays = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
-                const pastWeekDates = Array.from({ length: 7 }, (_, i) => {
-                  const d = new Date();
-                  d.setDate(d.getDate() - (6 - i));
-                  return {
-                    dateStr: [
-                      d.getFullYear(),
-                      String(d.getMonth() + 1).padStart(2, '0'),
-                      String(d.getDate()).padStart(2, '0'),
-                    ].join('-'),
-                    dayIdx: d.getDay(),
-                    isToday: i === 6,
-                  };
-                });
+                const goal = habit.timesPerWeek || 7;
+                
+                // Effective completed dates for this view
+                let allCompleted = [...(habit.completedDates || [])];
+                if (isDone) {
+                  if (!allCompleted.includes(date)) allCompleted.push(date);
+                } else {
+                  allCompleted = allCompleted.filter(d => d !== date);
+                }
 
-                return pastWeekDates.map((info, i) => {
-                  const isScheduled = (habit.daysOfWeek || []).includes(
-                    info.dayIdx,
-                  );
-                  if (!isScheduled) return null;
+                // Calculate completions in the week containing 'date' (Sun-Sat)
+                const dDate = new Date(date);
+                const dayOfWeek = dDate.getDay();
+                const sun = new Date(dDate);
+                sun.setDate(dDate.getDate() - dayOfWeek);
+                sun.setHours(0,0,0,0);
+                
+                const weekDates: string[] = [];
+                for (let i = 0; i < 7; i++) {
+                  const d = new Date(sun);
+                  d.setDate(sun.getDate() + i);
+                  weekDates.push(d.toISOString().split('T')[0]);
+                }
+                
+                const completedThisWeek = weekDates.filter(d => allCompleted.includes(d)).length;
 
-                  const completedDates = habit.completedDates || [];
-                  const isDayCompleted =
-                    completedDates.includes(info.dateStr) ||
-                    (info.isToday && isDone);
-
-                  let dotColor = 'bg-muted text-muted-foreground/30'; // default: gray/untracked
-                  if (info.isToday) {
-                    if (isDone)
-                      dotColor =
-                        'bg-green-500 text-white shadow-sm shadow-green-500/25';
-                  } else {
-                    // Past day
-                    if (isDayCompleted) {
-                      dotColor =
-                        'bg-green-500 text-white shadow-sm shadow-green-500/25';
-                    } else {
-                      // Only mark red if the habit was already active on that day
-                      // (has any completedDate on or before this date)
-                      const wasTracked = completedDates.some(
-                        (d) => d <= info.dateStr,
-                      );
-                      if (wasTracked)
-                        dotColor =
-                          'bg-red-500 text-white shadow-sm shadow-red-500/25';
-                      // else stays gray — habit is new, not tracked yet
-                    }
-                  }
-
+                return Array.from({ length: 7 }).map((_, i) => {
+                  if (i >= goal) return null;
+                  const isFilled = i < completedThisWeek;
                   return (
                     <div
                       key={i}
                       className={`
-                        w-6 h-6 flex items-center justify-center rounded-full text-[9px] font-bold tracking-tighter
-                        ${dotColor}
+                        w-3 h-3 rounded-full border transition-all duration-300 flex-shrink-0
+                        ${isFilled 
+                          ? 'bg-green-500 border-green-600 shadow-sm shadow-green-500/20 scale-105' 
+                          : 'bg-muted border-border/50'}
                       `}
-                    >
-                      {weekDays[info.dayIdx]}
-                    </div>
+                    />
                   );
                 });
+              })()}
+              {(() => {
+                // Effective completed dates for streak calculation
+                let allCompleted = [...(habit.completedDates || [])];
+                if (isDone) {
+                  if (!allCompleted.includes(date)) allCompleted.push(date);
+                } else {
+                  allCompleted = allCompleted.filter(d => d !== date);
+                }
+
+                if (allCompleted.length === 0) return null;
+                
+                let streak = 0;
+                let curr = new Date(date);
+                const checkDate = (d: Date) => d.toISOString().split('T')[0];
+                
+                while (true) {
+                  const s = checkDate(curr);
+                  if (allCompleted.includes(s)) {
+                    streak++;
+                    curr.setDate(curr.getDate() - 1);
+                  } else {
+                    break;
+                  }
+                }
+
+                if (streak === 0) return null;
+
+                return (
+                  <span className="text-[10px] font-black text-orange-500 ml-1 uppercase tracking-tight flex items-center gap-0.5">
+                    <span className="text-[12px]">🔥</span> {streak} Day Streak
+                  </span>
+                );
               })()}
             </div>
           </div>
