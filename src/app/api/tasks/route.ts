@@ -881,7 +881,6 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       $or: [
         { type: 'weekly', dayOfWeek: dayNum },
         { type: 'regular', date: weekDates[dayNum] },
-        { type: 'habit' },
       ],
     })
       .sort({ order: 1 })
@@ -898,9 +897,6 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[dayNum]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
-        ...(t.type === 'habit' && { 
-          timesPerWeek: t.timesPerWeek 
-        }),
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return NextResponse.json(out);
@@ -913,7 +909,6 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       $or: [
         { type: 'weekly', dayOfWeek: d },
         { type: 'regular', date: weekDates[d] },
-        { type: 'habit' },
       ],
     })
       .sort({ order: 1 })
@@ -930,9 +925,6 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[d]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
-        ...(t.type === 'habit' && { 
-          timesPerWeek: t.timesPerWeek 
-        }),
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }

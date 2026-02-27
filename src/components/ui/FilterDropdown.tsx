@@ -17,6 +17,7 @@ interface Props {
   filter?: FilterType;
   onFilterChange?: (filter: FilterType) => void;
   showTypeFilters?: boolean;
+  hideHabitFilter?: boolean;
   // Completed Filter
   showCompleted: boolean;
   onShowCompletedChange: (show: boolean) => void;
@@ -34,6 +35,7 @@ export function FilterDropdown({
   filter = 'all',
   onFilterChange,
   showTypeFilters = true,
+  hideHabitFilter = false,
   showCompleted,
   onShowCompletedChange,
   availableTags = [],
@@ -149,20 +151,22 @@ export function FilterDropdown({
                       <CalendarCheck size={18} />
                       Tasks Only
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onFilterChange?.('habits');
-                      }}
-                      className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-bold transition-all ${
-                        filter === 'habits'
-                          ? 'bg-primary text-primary-foreground'
-                          : 'hover:bg-accent text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      <CalendarClock size={18} />
-                      Habits Only
-                    </button>
+                    {!hideHabitFilter && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onFilterChange?.('habits');
+                        }}
+                        className={`group flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-sm font-bold transition-all ${
+                          filter === 'habits'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'hover:bg-accent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <CalendarClock size={18} />
+                        Habits Only
+                      </button>
+                    )}
                   </>
                 )}
 

@@ -197,7 +197,7 @@ export default React.memo(function TaskList({
             <Fly size={20} y={-2} />
           </div>
           <p className="text-xs font-bold text-muted-foreground group-hover:text-primary transition-colors">
-            {filter === 'habits' ? 'Add a Habit' : filter === 'tasks' ? 'Add a Task' : 'Add a task or habit'}
+            Add a task
           </p>
         </button>
       );
