@@ -36,21 +36,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    const syncToken = async (user: User | null) => {
+      if (user) {
+        try {
+          // getIdToken(false) returns cached token if not expired, 
+          // but we want to ensure it's not JUST about to expire.
+          // getIdToken(true) forces a refresh, but it's expensive.
+          // Standard getIdToken() is fine as it refreshes if needed.
+          const token = await user.getIdToken();
+          // We use a 7-day max-age for the cookie itself so it doesn't disappear 
+          // between sessions, but the server will still reject the token if it's expired.
+          // The proactive refresh in the client will keep the token fresh.
+          document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+        } catch (e) {
+          console.error('Error syncing token to cookie:', e);
+        }
+      } else {
+        document.cookie = `token=; path=/; max-age=0; SameSite=Lax; Secure`;
+      }
+    };
+
     const unsubscribe = auth.onIdTokenChanged(async (user) => {
       setUser(user);
       setLoading(false);
-
-      if (user) {
-        const token = await user.getIdToken();
-        // Set cookie with 1 hour expiration (matches Firebase token lifetime)
-        // But onIdTokenChanged will fire again when token refreshes, updating this.
-        document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
-      } else {
-        document.cookie = `token=; path=/; max-age=0; SameSite=Strict`;
-      }
+      await syncToken(user);
     });
 
-    return () => unsubscribe();
+    // Proactive refresh: check token every 10 minutes and on visibility change
+    const intervalId = setInterval(async () => {
+      if (auth.currentUser) {
+        await syncToken(auth.currentUser);
+      }
+    }, 10 * 60 * 1000);
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible' && auth.currentUser) {
+        // Force a refresh check when the user returns to the tab
+        await syncToken(auth.currentUser);
+      }
+    };
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      unsubscribe();
+      clearInterval(intervalId);
+      window.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   return (

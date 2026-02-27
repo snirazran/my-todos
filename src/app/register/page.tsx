@@ -45,7 +45,7 @@ export default function RegisterPage() {
       const result = await signInWithPopup(auth, provider);
 
       const token = await result.user.getIdToken();
-      document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
+      document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
 
       // Create/Sync user in MongoDB
       await fetch('/api/user', { method: 'POST' });
@@ -87,7 +87,7 @@ export default function RegisterPage() {
 
       // 3. Set Cookie
       const token = await user.getIdToken();
-      document.cookie = `token=${token}; path=/; max-age=3600; SameSite=Strict`;
+      document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
 
       // 4. Sync to MongoDB
       await fetch('/api/user', { method: 'POST' });
