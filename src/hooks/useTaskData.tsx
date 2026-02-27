@@ -108,6 +108,22 @@ export function useTaskData() {
     revalidateOnFocus: false,
   });
 
+  // --- External Event Listeners ---
+  useEffect(() => {
+    const handleUpdate = () => {
+      mutateToday();
+      mutateBacklog();
+    };
+
+    window.addEventListener('habits-updated', handleUpdate);
+    window.addEventListener('tags-updated', handleUpdate);
+
+    return () => {
+      window.removeEventListener('habits-updated', handleUpdate);
+      window.removeEventListener('tags-updated', handleUpdate);
+    };
+  }, [mutateToday, mutateBacklog]);
+
   // --- Cleanup Effect ---
   // Remove exclusions when task is confirmed gone from source list
   useEffect(() => {

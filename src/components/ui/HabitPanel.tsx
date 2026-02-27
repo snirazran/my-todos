@@ -179,6 +179,7 @@ export function HabitPanel({
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ date, taskId: deletingHabit.id }),
             });
+            window.dispatchEvent(new Event('habits-updated'));
           } finally {
             setBusy(false);
             setDeletingHabit(null);
@@ -229,6 +230,7 @@ function HabitItem({
   onToggle,
   onDelete,
   onMenuOpen,
+  menuOpen,
   flyRefs,
   tags,
 }: {
@@ -237,6 +239,7 @@ function HabitItem({
   onToggle: (id: string) => void;
   onDelete: () => void;
   onMenuOpen: (id: string, top: number, left: number) => void;
+  menuOpen: boolean;
   flyRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
   tags: SavedTag[];
 }) {
@@ -325,7 +328,7 @@ function HabitItem({
         transition: { type: 'spring', stiffness: 400, damping: 30 },
       }}
       exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-      className={`relative group ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'}`}
+      className={`relative group ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'} ${menuOpen ? 'z-50 shadow-xl ring-2 ring-primary/20' : ''}`}
     >
       {/* Swipe Actions Layer (behind the card) */}
       <div
