@@ -29,7 +29,12 @@ import TagPopup from '@/components/ui/TagPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TaskType } from '@/lib/models/Task';
 
-type BacklogItem = { id: string; text: string; type: TaskType; tags?: string[] };
+type BacklogItem = {
+  id: string;
+  text: string;
+  type?: TaskType;
+  tags?: string[];
+};
 
 function BacklogTaskItem({
   item,

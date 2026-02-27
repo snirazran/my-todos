@@ -458,7 +458,12 @@ export function useTaskData() {
    * Move Task: Backlog -> Today
    */
   const moveTaskToToday = useCallback(
-    async (item: { id: string; text: string; type: TaskType; tags?: string[] }) => {
+    async (item: {
+      id: string;
+      text: string;
+      type?: TaskType;
+      tags?: string[];
+    }) => {
       if (!todayData || !backlogData) return;
 
       // Snapshot
