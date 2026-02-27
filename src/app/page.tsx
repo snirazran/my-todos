@@ -167,6 +167,16 @@ export default function Home() {
   const doneCount = data.filter((t) => t.completed).length;
   // Note: We don't rely purely on 'rate' anymore for triggering, but we keep it for the progress bar
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
+
+  // Include completed habits in gift milestone progress
+  const todayDateStr = format(new Date(), 'yyyy-MM-dd');
+  const habitsDone = user
+    ? habits.filter(
+        (h) => h.completedDates?.includes(todayDateStr) || h.completed,
+      ).length
+    : 0;
+  const giftDone = doneCount + habitsDone;
+  const giftTotal = data.length + (user ? habits.length : 0);
   const flyBalance = user ? flyStatus.balance : 5;
   const laterThisWeek = user ? backlogTasks : [];
 
@@ -239,8 +249,8 @@ export default function Home() {
               onOpenChange={setWardrobeOpen}
               flyBalance={flyBalance}
               rate={rate}
-              done={doneCount}
-              total={data.length}
+              done={giftDone}
+              total={giftTotal}
               giftsClaimed={dailyGiftCount}
               isCatching={cinematic}
               hunger={user ? hungerStatus.hunger : 1000}

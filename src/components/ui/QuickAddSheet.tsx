@@ -1046,7 +1046,7 @@ export default function QuickAddSheet({
                           ) : (
                             <>
                               <Plus className="w-4 h-4 stroke-[3]" />
-                              <span>Add Task</span>
+                              <span>{when === 'habit' ? 'Add Habit' : 'Add Task'}</span>
                               <Fly size={24} x={-1} y={-3} />
                             </>
                           )}

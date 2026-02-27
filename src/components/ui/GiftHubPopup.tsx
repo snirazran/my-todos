@@ -7,7 +7,6 @@ import {
   X,
   Gift,
   Check,
-  Plus,
   Sparkles,
   ShoppingBag,
   Loader2,
@@ -566,35 +565,41 @@ export function GiftHubPopup({
                             <AllCollectedState />
                           ) : (
                             <>
-                              <div className="space-y-3 mb-4">
-                                {!hasClaimedDaily && (
-                                  <button
-                                    onClick={() => {
-                                      onClose();
-                                      onOpenDailyReward?.();
-                                    }}
-                                    className="w-full flex items-center gap-4 p-3 rounded-2xl border border-amber-200/50 dark:border-amber-800/30 bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 group transition-all hover:brightness-105 active:scale-[0.98]"
-                                  >
-                                    <div className="flex-shrink-0 w-16 h-16 md:w-20 md:h-20 flex items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-500">
-                                      <CalendarCheck className="w-8 h-8 md:w-9 md:h-9" />
+                              {/* Today's Bonus — top, compact, pulsing */}
+                              {!hasClaimedDaily && (
+                                <button
+                                  onClick={() => {
+                                    onClose();
+                                    onOpenDailyReward?.();
+                                  }}
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 mb-4 rounded-2xl border-l-4 border border-amber-400/60 dark:border-amber-600/40 border-l-amber-400 dark:border-l-amber-500 bg-amber-50/60 dark:bg-amber-950/20 transition-all active:scale-[0.99]"
+                                >
+                                  {/* Icon with pulsing ring */}
+                                  <div className="relative flex-shrink-0">
+                                    <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                                    </span>
+                                    <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400">
+                                      <CalendarCheck className="w-4.5 h-4.5" />
                                     </div>
-                                    <div className="flex-1 text-left">
-                                      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500">
-                                        Daily Login
-                                      </span>
-                                      <h3 className="text-base font-black text-foreground leading-tight">
-                                        Check Daily Rewards
-                                      </h3>
-                                      <p className="text-xs font-medium text-muted-foreground mt-0.5">
-                                        See what you can claim today!
-                                      </p>
-                                    </div>
-                                    <div className="bg-background/50 p-2 rounded-full text-muted-foreground group-hover:text-foreground transition-colors">
-                                      <ArrowRight className="w-5 h-5" />
-                                    </div>
-                                  </button>
-                                )}
+                                  </div>
+                                  <div className="flex-1 text-left min-w-0">
+                                    <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-500">
+                                      Today's Bonus
+                                    </p>
+                                    <p className="text-sm font-bold text-foreground leading-tight truncate">
+                                      Daily reward available
+                                    </p>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-xs font-bold text-amber-600 dark:text-amber-500 flex-shrink-0">
+                                    Collect
+                                    <ArrowRight className="w-3.5 h-3.5" />
+                                  </div>
+                                </button>
+                              )}
 
+                              <div className="space-y-3 mb-4">
                                 {slots.map((slot, idx) => (
                                   <MilestoneRow
                                     key={idx}
@@ -612,7 +617,7 @@ export function GiftHubPopup({
                               </div>
                               <div className="p-3 rounded-2xl bg-muted/30 ring-1 ring-border/30">
                                 <p className="text-xs font-medium text-muted-foreground text-center leading-relaxed">
-                                  Complete daily tasks to earn gift boxes!
+                                  Eat flies to earn gift boxes!
                                 </p>
                               </div>
                             </>
@@ -721,7 +726,7 @@ export function GiftHubPopup({
 
 /* ─── MILESTONE ROW ─────────────────────────────────── */
 
-const MILESTONE_LABELS = ['First Reward', 'Second Reward', 'Third Reward'];
+const MILESTONE_LABELS = ['Gift  I', 'Gift  II', 'Gift  III'];
 
 function MilestoneRow({
   slot,
@@ -747,10 +752,10 @@ function MilestoneRow({
     <motion.div
       layout
       className={cn(
-        'relative flex items-center gap-4 p-3 rounded-2xl border transition-all duration-300',
+        'relative flex items-center gap-3.5 p-3.5 rounded-2xl border transition-all duration-300',
         isClaimed && 'bg-primary/5 border-primary/20',
         isReady &&
-          'bg-gradient-to-r from-primary/10 to-primary/5 border-primary shadow-[0_0_20px_rgba(34,197,94,0.12)]',
+          'bg-gradient-to-br from-primary/10 to-primary/5 border-primary/60 shadow-[0_0_24px_rgba(34,197,94,0.10)]',
         isLocked && 'bg-muted/20 border-dashed border-muted-foreground/20',
         isPending && 'bg-card border-border/50',
       )}
@@ -758,9 +763,9 @@ function MilestoneRow({
       {/* Left: Visual */}
       <div
         className={cn(
-          'relative flex-shrink-0 w-16 h-16 md:w-20 md:h-20 flex items-center justify-center rounded-2xl overflow-hidden',
+          'relative flex-shrink-0 w-[68px] h-[68px] flex items-center justify-center rounded-2xl overflow-hidden',
           isClaimed && 'bg-primary/10',
-          isReady && 'bg-primary/10',
+          isReady && 'bg-primary/10 ring-1 ring-primary/25',
           isLocked && 'bg-muted/50',
           isPending && 'bg-muted/30',
         )}
@@ -775,56 +780,65 @@ function MilestoneRow({
             <Check className="w-5 h-5 text-primary" strokeWidth={3} />
           </motion.div>
         ) : (
-          <div className="-translate-y-1">
-            {/* Show Gift for both Locked & Pending */}
-            <GiftRive
-              width={80}
-              height={80}
-              isMilestone={!isReady}
-              // Optional: Add opacity/grayscale if strictly locked?
-              // The user asked to "show the gift as milestone", implying the same look as pending.
-            />
+          <div className={cn('-translate-y-1', isLocked && 'opacity-35 grayscale')}>
+            <GiftRive width={80} height={80} isMilestone={!isReady} />
           </div>
         )}
       </div>
 
       {/* Right: Content */}
       <div className="flex-1 min-w-0">
-        <div className="flex items-center justify-between mb-0.5">
+        {/* Label + counter */}
+        <div className="flex items-center justify-between mb-1">
           <span
             className={cn(
-              'text-[11px] font-bold uppercase tracking-wider',
-              (isClaimed || isReady) && 'text-primary',
-              (isLocked || isPending) && 'text-muted-foreground',
+              'text-[10px] font-bold uppercase tracking-widest',
+              (isClaimed || isReady) ? 'text-primary' : 'text-muted-foreground/60',
             )}
           >
             {MILESTONE_LABELS[index]}
           </span>
-          <span className="text-[10px] font-bold text-muted-foreground/70 tabular-nums">
-            {isClaimed || isReady ? 'Done!' : `${slot.tasksLeft} left`}
-          </span>
+          {!isClaimed && !isReady && (
+            <span
+              className={cn(
+                'text-[10px] font-bold tabular-nums px-1.5 py-0.5 rounded-full',
+                isPending
+                  ? 'bg-primary/10 text-primary'
+                  : 'bg-muted text-muted-foreground/50',
+              )}
+            >
+              {slot.target - slot.tasksLeft}/{slot.target}
+            </span>
+          )}
         </div>
 
-        <div className="mb-2">
-          <span
-            className={cn(
-              'text-lg font-black tracking-tight', // Increased size slightly
-              isClaimed && 'text-primary/80',
-              isReady && 'text-foreground',
-              isLocked && 'text-muted-foreground',
-              isPending && 'text-foreground',
-            )}
-          >
-            {isClaimed
-              ? 'Collected!'
-              : isReady
-                ? 'Ready to claim!'
-                : `Complete ${slot.target} tasks`}
-          </span>
-        </div>
+        {/* Main label */}
+        <p
+          className={cn(
+            'text-base font-black tracking-tight mb-2',
+            isClaimed && 'text-primary/70',
+            isReady && 'text-foreground',
+            isLocked && 'text-muted-foreground/50',
+            isPending && 'text-foreground',
+          )}
+        >
+          {isClaimed ? (
+            'Collected!'
+          ) : isReady ? (
+            'Ready to claim!'
+          ) : (
+            <>
+              Eat{' '}
+              <span className={cn(isPending ? 'text-primary' : 'text-muted-foreground/60')}>
+                {slot.target}
+              </span>{' '}
+              flies
+            </>
+          )}
+        </p>
 
         {/* Progress Bar */}
-        <div className="relative w-full h-1.5 bg-muted/60 rounded-full overflow-hidden mb-2">
+        <div className="relative w-full h-2 bg-muted/60 rounded-full overflow-hidden mb-2.5">
           <motion.div
             initial={{ width: 0 }}
             animate={{
@@ -835,7 +849,7 @@ function MilestoneRow({
               'h-full rounded-full relative',
               isClaimed && 'bg-primary/40',
               isReady && 'bg-primary',
-              isLocked && 'bg-muted-foreground/30',
+              isLocked && 'bg-muted-foreground/20',
               isPending &&
                 (slot.percent > 50
                   ? 'bg-gradient-to-r from-amber-400 to-yellow-400'
@@ -859,7 +873,7 @@ function MilestoneRow({
           <button
             onClick={onClaim}
             disabled={claiming || isGuest}
-            className="w-full py-2 rounded-xl bg-primary text-primary-foreground text-xs font-black uppercase tracking-wider hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 ring-1 ring-white/20 relative overflow-hidden"
+            className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-black uppercase tracking-wider hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2 ring-1 ring-white/20 relative overflow-hidden"
           >
             <span className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/20 to-transparent" />
             {claiming ? (
@@ -879,10 +893,9 @@ function MilestoneRow({
         {isLocked && (
           <button
             onClick={onAddTask}
-            className="flex items-center gap-1.5 text-xs font-bold text-primary hover:text-primary/80 transition-colors"
+            className="flex items-center gap-1.5 text-xs font-bold text-primary/70 hover:text-primary transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" strokeWidth={3} />
-            Add tasks to unlock
+            + Add <Fly size={20} y={-2} /> to unlock
           </button>
         )}
       </div>

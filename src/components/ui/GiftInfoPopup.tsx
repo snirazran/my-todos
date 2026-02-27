@@ -99,8 +99,8 @@ export function GiftInfoPopup({
                       </h2>
                       <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
                         {isLocked
-                          ? 'Add more tasks'
-                          : `${slot.tasksLeft} task${slot.tasksLeft > 1 ? 's' : ''} to go`}
+                          ? 'Eat more flies'
+                          : `${slot.tasksLeft} fl${slot.tasksLeft > 1 ? 'ies' : 'y'} to go`}
                       </p>
                     </div>
                   </div>
@@ -123,7 +123,7 @@ export function GiftInfoPopup({
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                          Tasks Needed
+                          Flies Needed
                         </span>
                         <div className="flex items-center gap-2">
                           <Plus
@@ -136,12 +136,12 @@ export function GiftInfoPopup({
                         </div>
                       </div>
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        Add{' '}
+                        Eat{' '}
                         <span className="font-bold text-foreground">
                           {slot.neededToUnlock}
                         </span>{' '}
-                        more task{slot.neededToUnlock > 1 ? 's' : ''} to your
-                        list to unlock this gift slot.
+                        more fl{slot.neededToUnlock > 1 ? 'ies' : 'y'} to
+                        unlock this gift slot.
                       </p>
                     </div>
                   )}
@@ -172,12 +172,12 @@ export function GiftInfoPopup({
                         </motion.div>
                       </div>
                       <p className="text-sm text-muted-foreground leading-relaxed">
-                        Complete{' '}
+                        Eat{' '}
                         <span className="font-bold text-foreground">
                           {slot.tasksLeft}
                         </span>{' '}
-                        more task{slot.tasksLeft > 1 ? 's' : ''} to unlock this
-                        gift!
+                        more fl{slot.tasksLeft > 1 ? 'ies' : 'y'} to unlock
+                        this gift!
                       </p>
                     </div>
                   )}
