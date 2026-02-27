@@ -635,7 +635,7 @@ export default function Home() {
 
       {/* Floating Add Task Button - Home Page Version */}
       <div className="fixed bottom-0 left-0 right-0 z-[40] px-4 pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[400px] relative min-h-[56px] flex items-center justify-center gap-2">
+        <div className="pointer-events-auto mx-auto w-full max-w-[320px] md:max-w-[400px] relative min-h-[56px] flex items-center justify-center gap-2">
           {(activeTab === 'today' || activeTab === 'habits') && (
             <BacklogBox
               count={laterThisWeek.length}

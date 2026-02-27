@@ -542,7 +542,7 @@ export default function TaskBoard({
       {/* GLOBAL BOTTOM AREA - Floating Toolbar */}
       {/* Increased padding drastically to clear standard mobile app navbars (typically 60-80px) */}
       <div className="absolute bottom-0 left-0 right-0 z-[40] px-4 pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
-        <div className={`pointer-events-auto mx-auto w-full max-w-[400px] relative min-h-[56px] flex items-center justify-center transition-all duration-300 ${drag?.active && drag?.taskType !== 'habit' ? 'gap-0' : 'gap-2'}`}>
+        <div className={`pointer-events-auto mx-auto w-full max-w-[320px] md:max-w-[400px] relative min-h-[56px] flex items-center justify-center transition-all duration-300 ${drag?.active && drag?.taskType !== 'habit' ? 'gap-0' : 'gap-2'}`}>
           {/* Backlog Trigger */}
           <BacklogBox
             count={week[7]?.length || 0}
