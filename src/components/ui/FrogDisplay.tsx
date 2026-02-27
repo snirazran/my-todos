@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { CurrencyShop } from '@/components/ui/shop/CurrencyShop';
 import { GiftHubPopup } from './GiftHubPopup';
 import { useProgressLogic } from '@/hooks/useProgressLogic';
+import { useUIStore } from '@/lib/uiStore';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle>;
@@ -65,7 +66,8 @@ export function FrogDisplay({
   const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory();
   const [clickedAt, setClickedAt] = React.useState(0);
   const [shopOpen, setShopOpen] = React.useState(false);
-  const [giftHubOpen, setGiftHubOpen] = React.useState(false);
+  
+  const { isGiftHubOpen, setGiftHubOpen } = useUIStore();
 
   const progressSlots = useProgressLogic(
     done ?? 0,
@@ -313,7 +315,7 @@ export function FrogDisplay({
       </div>
 
       <GiftHubPopup
-        show={giftHubOpen}
+        show={isGiftHubOpen}
         onClose={() => setGiftHubOpen(false)}
         done={done ?? 0}
         total={total ?? 0}

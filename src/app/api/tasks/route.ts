@@ -117,10 +117,15 @@ function normalizeDailyFly(
 async function currentFlyStatus(
   userId: string,
   tz: string,
-): Promise<{ flyStatus: FlyStatus; hungerStatus: HungerStatus }> {
+): Promise<{
+  flyStatus: FlyStatus;
+  hungerStatus: HungerStatus;
+  dailyTasksCount: number;
+}> {
   const today = getZonedToday(tz);
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
+    statistics: 1,
   }).lean()) as LeanUser;
 
   if (!user) {
@@ -136,6 +141,7 @@ async function currentFlyStatus(
         stolenFlies: 0,
         maxHunger: MAX_HUNGER_MS,
       },
+      dailyTasksCount: 0,
     };
   }
 
@@ -171,14 +177,20 @@ async function currentFlyStatus(
   const currentBalance =
     pendingUpdates['wardrobe.flies'] ?? wardrobe.flies ?? 0;
 
+  const dailyTasksCount =
+    user.statistics?.daily?.date === today
+      ? user.statistics.daily.dailyTasksCount ?? 0
+      : 0;
+
   return {
     flyStatus: {
       balance: currentBalance,
       earnedToday: daily.earned,
       limit: DAILY_FLY_LIMIT,
-      limitHit: daily.earned >= DAILY_FLY_LIMIT,
+      limitHit: false,
     },
     hungerStatus,
+    dailyTasksCount,
   };
 }
 
@@ -190,6 +202,7 @@ async function awardFlyForTask(
   awarded: boolean;
   flyStatus: FlyStatus;
   hungerStatus: HungerStatus;
+  dailyTasksCount: number;
 }> {
   const today = getZonedToday(tz);
   const user = (await UserModel.findById(userId, {
@@ -211,6 +224,7 @@ async function awardFlyForTask(
         stolenFlies: 0,
         maxHunger: MAX_HUNGER_MS,
       },
+      dailyTasksCount: 0,
     };
   }
 
@@ -240,6 +254,9 @@ async function awardFlyForTask(
 
   const statsUpdates: Record<string, any> = {};
 
+  let nextDailyTasksCount = isNewDay ? 1 : currentStats.dailyTasksCount;
+  if (!alreadyCountedInStats && !isNewDay) nextDailyTasksCount += 1;
+
   if (!alreadyCountedInStats) {
     if (isNewDay) {
       statsUpdates['statistics.daily'] = {
@@ -252,38 +269,21 @@ async function awardFlyForTask(
     } else {
       statsUpdates['statistics.daily.dailyTasksCount'] =
         currentStats.dailyTasksCount + 1;
-      // We use $push in the actual query construction if possible, or just set the new array/count?
-      // Since we are building a big $set object usually, let's try to use specific operators if we can,
-      // or just compute the new values.
-      // `awardFlyForTask` implementation below primarily builds a `setFields` object for `$set`.
-      // Mixing $set and $push in the same update is fine.
     }
   }
-  // -----------------------------------------------------
 
   if (alreadyRewarded) {
-    // Even if already rewarded (fly-wise), we might still need to update stats (if they drifted?).
-    // But usually if already rewarded, it implies we processed it.
-    // However, the user might be toggling completion.
-    // If 'alreadyCountedInStats' is false (e.g. maybe different logic), we should still update stats.
-
+    // Merge stat updates
     const finalUpdates = { ...hungerUpdates };
 
-    // Merge stat updates
     if (Object.keys(statsUpdates).length > 0) {
-      // We have strict sets for isNewDay
       Object.assign(finalUpdates, statsUpdates);
     }
 
     const ops: any = { $set: finalUpdates };
     if (!isNewDay && !alreadyCountedInStats) {
-      // If not new day, we need $inc and $push which are safer for concurrency
-      // But here we are operating inside a specific logic block.
-      // Let's just use $push for completedTaskIds if we aren't resetting the whole object.
       ops.$inc = { ...(ops.$inc || {}), 'statistics.daily.dailyTasksCount': 1 };
       ops.$push = { 'statistics.daily.completedTaskIds': taskId };
-
-      // Remove $set collisions if any
       delete finalUpdates['statistics.daily.dailyTasksCount'];
     }
 
@@ -300,6 +300,7 @@ async function awardFlyForTask(
         limitHit: atLimit,
       },
       hungerStatus: currentHungerState,
+      dailyTasksCount: nextDailyTasksCount,
     };
   }
 
@@ -316,7 +317,6 @@ async function awardFlyForTask(
     'wardrobe.lastHungerUpdate': new Date(),
   };
 
-  // Merge simple stat sets (like new day reset)
   if (statsUpdates['statistics.daily']) {
     setFields['statistics.daily'] = statsUpdates['statistics.daily'];
   }
@@ -346,7 +346,6 @@ async function awardFlyForTask(
 
   const ops: any = { $set: setFields };
 
-  // Handle incremental stats update
   if (!isNewDay && !alreadyCountedInStats) {
     ops.$inc = { ...(ops.$inc || {}), 'statistics.daily.dailyTasksCount': 1 };
     ops.$push = {
@@ -367,6 +366,7 @@ async function awardFlyForTask(
       justHitLimit: hitLimit && !limitNotified ? true : undefined,
     },
     hungerStatus: finalHungerStatus,
+    dailyTasksCount: nextDailyTasksCount,
   };
 }
 
@@ -710,10 +710,24 @@ export async function PUT(req: NextRequest) {
   await TaskModel.updateOne({ userId: uid, id: taskId }, update);
   let flyStatus: FlyStatus | undefined;
   let hungerStatus: HungerStatus | undefined;
+  let dailyTasksCount: number | undefined;
   if (completed && !alreadyCompletedForDate)
-    ({ flyStatus, hungerStatus } = await awardFlyForTask(uid, taskId, tz));
-  else ({ flyStatus, hungerStatus } = await currentFlyStatus(uid, tz));
-  return NextResponse.json({ ok: true, flyStatus, hungerStatus });
+    ({ flyStatus, hungerStatus, dailyTasksCount } = await awardFlyForTask(
+      uid,
+      taskId,
+      tz,
+    ));
+  else
+    ({ flyStatus, hungerStatus, dailyTasksCount } = await currentFlyStatus(
+      uid,
+      tz,
+    ));
+  return NextResponse.json({
+    ok: true,
+    flyStatus,
+    hungerStatus,
+    dailyTasksCount,
+  });
 }
 
 export async function DELETE(req: NextRequest) {
@@ -802,8 +816,11 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
     statistics: 1,
   }).lean()) as LeanUser;
   let dailyGiftCount = 0;
-  if (userForStats?.statistics?.daily?.date === todayLocal)
+  let dailyTasksCount = 0;
+  if (userForStats?.statistics?.daily?.date === todayLocal) {
     dailyGiftCount = userForStats.statistics.daily.dailyMilestoneGifts ?? 0;
+    dailyTasksCount = userForStats.statistics.daily.dailyTasksCount ?? 0;
+  }
   return NextResponse.json({
     date,
     tasks: output,
@@ -811,6 +828,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
     flyStatus,
     hungerStatus,
     dailyGiftCount,
+    dailyTasksCount,
   });
 }
 

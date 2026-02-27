@@ -38,6 +38,14 @@ export function NotificationProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const [queue, setQueue] = useState<
+    {
+      content: React.ReactNode;
+      undoAction?: () => void | Promise<void>;
+      id: number;
+    }[]
+  >([]);
+
   const [notification, setNotification] = useState<{
     content: React.ReactNode;
     undoAction?: () => void | Promise<void>;
@@ -45,8 +53,8 @@ export function NotificationProvider({
   } | null>(null);
 
   const [isUndoing, setIsUndoing] = useState(false);
-
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const processedIds = useRef<Set<number>>(new Set());
 
   const hideNotification = useCallback(() => {
     setNotification(null);
@@ -54,28 +62,49 @@ export function NotificationProvider({
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+    // Small delay before showing next in queue for smooth transition
+    setTimeout(() => {
+      setQueue((prev) => {
+        const nextQueue = prev.slice(1);
+        if (nextQueue.length === 0) {
+          processedIds.current.clear();
+        }
+        return nextQueue;
+      });
+    }, 150);
   }, []);
 
   const showNotification = useCallback(
     (content: React.ReactNode, undoAction?: () => void | Promise<void>) => {
-      // Clear existing timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
-      setNotification({
-        content,
-        undoAction,
-        id: Date.now(),
-      });
-
-      // Auto dismiss after 4 seconds
-      timeoutRef.current = setTimeout(() => {
-        setNotification(null);
-      }, 4000);
+      setQueue((prev) => [
+        ...prev,
+        {
+          content,
+          undoAction,
+          id: Date.now() + Math.random(),
+        },
+      ]);
     },
     [],
   );
+
+  // Effect to process the queue
+  useEffect(() => {
+    if (queue.length > 0 && !notification) {
+      const next = queue[0];
+
+      // Prevent re-processing the same notification ID
+      if (processedIds.current.has(next.id)) return;
+
+      processedIds.current.add(next.id);
+      setNotification(next);
+
+      // Auto dismiss after 3 seconds
+      timeoutRef.current = setTimeout(() => {
+        hideNotification();
+      }, 3000);
+    }
+  }, [queue, notification, hideNotification]);
 
   const handleUndo = async () => {
     if (!notification?.undoAction) return;
