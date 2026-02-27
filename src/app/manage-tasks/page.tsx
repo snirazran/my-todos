@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { format } from 'date-fns';
 import TaskBoard from '@/components/board/TaskBoard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
@@ -22,6 +23,7 @@ export default function ManageTasksPage() {
   const [week, setWeek] = useState<Task[][]>(
     Array.from({ length: DAYS }, () => []),
   );
+  const [habits, setHabits] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   // Calculate rolling week order once on mount
   const processingWeekOrder = useMemo(() => getRollingWeekOrder(), []);
@@ -69,6 +71,13 @@ export default function ManageTasksPage() {
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as Task[][];
       if (Array.isArray(data)) setWeek(mapApiToDisplay(data));
+
+      // Fetch habits too
+      const habitsRes = await fetch(`/api/tasks?timezone=${encodeURIComponent(tz)}`);
+      const habitsData = await habitsRes.json();
+      if (habitsData && habitsData.tasks) {
+        setHabits(habitsData.tasks.filter((t: any) => t.type === 'habit'));
+      }
     } catch (err) {
       console.error('Failed to fetch weekly tasks:', err);
     }
@@ -155,10 +164,65 @@ export default function ManageTasksPage() {
       body: JSON.stringify({ text, days, repeat, tags, timesPerWeek, timezone: tz }),
     });
 
-    const data = (await fetch(
-      `/api/tasks?view=board&timezone=${encodeURIComponent(tz)}`,
-    ).then((r) => r.json())) as Task[][];
-    setWeek(mapApiToDisplay(data));
+    fetchWeek();
+  };
+
+  const onToggleHabit = async (id: string) => {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const dateStr = format(new Date(), 'yyyy-MM-dd');
+    
+    // Optimistic Update
+    setHabits(prev => prev.map(h => {
+      if (h.id === id) {
+        const isCurrentlyDone = (h.completedDates ?? []).includes(dateStr);
+        let nextDates = h.completedDates || [];
+        if (isCurrentlyDone) {
+          nextDates = nextDates.filter(d => d !== dateStr);
+        } else {
+          nextDates = [...nextDates, dateStr];
+        }
+        return { ...h, completedDates: nextDates };
+      }
+      return h;
+    }));
+
+    await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: dateStr,
+        taskId: id,
+        timezone: tz,
+      }),
+    });
+    fetchWeek();
+  };
+
+  const onEditHabit = async (id: string, text: string) => {
+    await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: id, text }),
+    });
+    fetchWeek();
+  };
+
+  const onDeleteHabit = async (id: string) => {
+    await fetch(`/api/tasks`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: id }),
+    });
+    fetchWeek();
+  };
+
+  const onEditHabitGoal = async (id: string, timesPerWeek: number) => {
+    await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId: id, timesPerWeek }),
+    });
+    fetchWeek();
   };
 
   const onToggleRepeat = async (taskId: string, day: DisplayDay) => {
@@ -251,6 +315,11 @@ export default function ManageTasksPage() {
           titles={titles}
           week={week}
           setWeek={setWeek}
+          habits={habits}
+          onToggleHabit={onToggleHabit}
+          onEditHabit={onEditHabit}
+          onDeleteHabit={onDeleteHabit}
+          onEditHabitGoal={onEditHabitGoal}
           saveDay={saveDay}
           removeTask={removeTask}
           onRequestAdd={() => {

@@ -1303,6 +1303,12 @@ export default function TaskList({
           <EditTaskDialog
             open={!!dialog && dialog.kind === 'edit'}
             initialText={dialog.task.text}
+            title={dialog.task.type === 'habit' ? 'Edit Habit' : 'Edit Task'}
+            subtitle={
+              dialog.task.type === 'habit'
+                ? 'Make changes to your habit below.'
+                : 'Make changes to your task below.'
+            }
             busy={busy}
             onClose={() => setDialog(null)}
             onSave={async (newText) => {

@@ -27,8 +27,9 @@ import TaskMenu from '../board/TaskMenu';
 import useSWR from 'swr';
 import TagPopup from '@/components/ui/TagPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
+import { TaskType } from '@/lib/models/Task';
 
-type BacklogItem = { id: string; text: string; tags?: string[] };
+type BacklogItem = { id: string; text: string; type: TaskType; tags?: string[] };
 
 function BacklogTaskItem({
   item,

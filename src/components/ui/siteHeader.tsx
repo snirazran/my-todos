@@ -34,7 +34,7 @@ export default function SiteHeader() {
     },
     {
       href: '/manage-tasks',
-      label: 'Weekly',
+      label: 'Upcoming',
       icon: LayoutDashboard,
       protected: true,
     },

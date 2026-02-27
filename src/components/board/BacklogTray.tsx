@@ -323,7 +323,7 @@ export default React.memo(function BacklogTray({
               ref={scrollRef}
               className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4 md:px-6 pb-8 flex flex-col gap-3"
             >
-              <AnimatePresence mode="popLayout">
+              <AnimatePresence mode="popLayout" initial={false}>
                 {filteredTasks.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
                     <FolderOpen size={64} strokeWidth={1} />

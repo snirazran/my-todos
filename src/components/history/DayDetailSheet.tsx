@@ -22,7 +22,7 @@ type DayDetailSheetProps = {
   tasks: any[];
   onToggleTask: (id: string, date: string, currentStatus: boolean) => void;
   onDeleteTask?: (id: string, date: string) => void;
-  onEditTask?: (id: string, text: string) => void;
+  onEditTask?: (id: string, text: string, type?: string) => void;
   frogProps: any; // Props for FrogDisplay
   // Filter Props
   filter: FilterType;
@@ -321,6 +321,10 @@ export default function DayDetailSheet({
                             timesPerWeek={task.timesPerWeek}
                             frogodoroSession={task.frogodoroSession}
                             onToggle={handleToggleProxy}
+                            onMenuOpen={(e, id) => {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setMenu({ id, top: rect.bottom + 6, left: rect.left - 120 });
+                            }}
                             setFlyRef={(el) => {
                               if (el) flyRefs.current[uniqueKey] = el;
                               else delete flyRefs.current[uniqueKey];
@@ -334,11 +338,19 @@ export default function DayDetailSheet({
                   </div>
                 </div>
 
-                {/* Legacy TaskMenu cleanup - we'll handle actions via Swipe if possible, 
-                    or we keep this for desktop. But user said "remove 3 dots from tasks". 
-                    If they want to edit, they need another way. 
-                    I'll keep the TaskMenu hidden for now or only for long-press if I added it.
-                */}
+                <TaskMenu
+                  menu={menu}
+                  onClose={() => setMenu(null)}
+                  isHabit={tasks.find((t) => t.id === menu?.id)?.type === 'habit'}
+                  onEdit={(id) => {
+                    const t = tasks.find((it) => it.id === id);
+                    if (t && onEditTask) onEditTask(id, t.text, t.type);
+                  }}
+                  onDelete={() => {
+                    if (menu && onDeleteTask) onDeleteTask(menu.id, date);
+                    setMenu(null);
+                  }}
+                />
               </div>
             </motion.div>
           </div>

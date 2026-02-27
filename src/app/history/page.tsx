@@ -35,7 +35,11 @@ export default function HistoryPage() {
 
   // --- State: Selection (Day Popup) ---
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [editingTask, setEditingTask] = useState<{ id: string; text: string } | null>(null);
+  const [editingTask, setEditingTask] = useState<{
+    id: string;
+    text: string;
+    type?: string;
+  } | null>(null);
 
   // Filters for Popup
   const [popupFilter, setPopupFilter] = useState<FilterType>('all');
@@ -376,7 +380,7 @@ export default function HistoryPage() {
           tasks={selectedDayTasks}
           onToggleTask={handleToggleTask}
           onDeleteTask={handleDeleteTask}
-          onEditTask={(id, text) => setEditingTask({ id, text })}
+          onEditTask={(id, text, type) => setEditingTask({ id, text, type })}
           frogProps={{
             ...frogProps,
           }}
@@ -392,6 +396,12 @@ export default function HistoryPage() {
           open={!!editingTask}
           onClose={() => setEditingTask(null)}
           initialText={editingTask?.text || ''}
+          title={editingTask?.type === 'habit' ? 'Edit Habit' : 'Edit Task'}
+          subtitle={
+            editingTask?.type === 'habit'
+              ? 'Make changes to your habit below.'
+              : 'Make changes to your task below.'
+          }
           onSave={handleSaveEdit}
         />
       </div>

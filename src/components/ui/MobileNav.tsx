@@ -33,7 +33,7 @@ export default function MobileNav() {
     },
     {
       href: '/manage-tasks',
-      label: 'Weekly',
+      label: 'Upcoming',
       icon: LayoutDashboard,
       protected: true,
     },

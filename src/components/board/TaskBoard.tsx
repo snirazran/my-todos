@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LayoutList, ListTodo, Repeat } from 'lucide-react';
+import { LayoutList, ListTodo, Repeat, CalendarClock } from 'lucide-react';
 import useSWR from 'swr';
 import { Task, DAYS, type DisplayDay, type ApiDay } from './helpers';
 import DayColumn from './DayColumn';
@@ -16,7 +16,10 @@ import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import Fly from '../ui/fly';
 import { AddTaskButton } from '../ui/AddTaskButton';
 import BacklogBox from './BacklogBox';
+import HabitBox from './HabitBox';
 import BacklogTray from './BacklogTray';
+import HabitTray from './HabitTray';
+import { format } from 'date-fns';
 
 type RepeatChoice = 'this-week' | 'weekly' | 'habit';
 
@@ -24,6 +27,11 @@ export default function TaskBoard({
   titles,
   week,
   setWeek,
+  habits = [],
+  onToggleHabit,
+  onEditHabit,
+  onDeleteHabit,
+  onEditHabitGoal,
   saveDay,
   removeTask,
   onRequestAdd,
@@ -31,10 +39,17 @@ export default function TaskBoard({
   todayDisplayIndex,
   daysOrder,
   onToggleRepeat,
+  onEditTask,
+  onDoLater,
 }: {
   titles: string[];
   week: Task[][];
   setWeek: React.Dispatch<React.SetStateAction<Task[][]>>;
+  habits?: Task[];
+  onToggleHabit?: (id: string) => void;
+  onEditHabit?: (id: string, text: string) => void;
+  onDeleteHabit?: (id: string) => void;
+  onEditHabitGoal?: (id: string, newGoal: number) => void;
   saveDay: (day: DisplayDay, tasks: Task[]) => Promise<void>;
   removeTask: (day: DisplayDay, id: string) => Promise<void>;
   onRequestAdd: (
@@ -61,6 +76,7 @@ export default function TaskBoard({
   onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
 }) {
   const pathname = usePathname();
+  const [habitTrayOpen, setHabitTrayOpen] = useState(false);
   const {
     scrollerRef,
     setSlideRef,
@@ -190,6 +206,9 @@ export default function TaskBoard({
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickText, setQuickText] = useState('');
+  const [quickAddMode, setQuickAddMode] = useState<'pick' | 'later' | 'habit'>(
+    'pick',
+  );
 
   // Derived state for masking targetDay (Placeholder Suppression)
   // Derived state for masking targetDay (Placeholder Suppression)
@@ -555,6 +574,13 @@ export default function TaskBoard({
             forwardRef={backlogBoxRef}
           />
 
+          {/* Habits Trigger */}
+          <HabitBox
+            count={habits.length}
+            onClick={() => setHabitTrayOpen(true)}
+            isDragging={!!drag?.active && drag?.taskType !== 'habit'}
+          />
+
           {/* Add Task Button (Hide when dragging) */}
           <motion.div
             initial={false}
@@ -585,6 +611,7 @@ export default function TaskBoard({
               showFly={false}
               onClick={() => {
                 setQuickText('');
+                setQuickAddMode('pick');
                 setShowQuickAdd(true);
               }}
               disabled={!!drag?.active && drag?.taskType !== 'habit'}
@@ -638,11 +665,30 @@ export default function TaskBoard({
         onShowCompletedChange={(show) => setShowCompleted(7, show)}
       />
 
+      <HabitTray
+        isOpen={habitTrayOpen}
+        onClose={() => setHabitTrayOpen(false)}
+        habits={habits}
+        onToggle={(id) => onToggleHabit?.(id)}
+        onEdit={(id, text) => onEditHabit?.(id, text)}
+        onDelete={(id) => onDeleteHabit?.(id)}
+        onEditGoal={(id, goal) => onEditHabitGoal?.(id, goal)}
+        onAddRequested={() => {
+          setHabitTrayOpen(false);
+          setPageIndex(todayDisplayIndex);
+          setQuickAddMode('habit');
+          setShowQuickAdd(true);
+        }}
+        userTags={userTags}
+        date={format(new Date(), 'yyyy-MM-dd')}
+      />
+
       <QuickAddSheet
         open={showQuickAdd}
         onOpenChange={setShowQuickAdd}
         initialText={quickText}
         defaultRepeat="this-week"
+        defaultMode={quickAddMode}
         defaultPickedDay={isMobile ? pageIndex : todayDisplayIndex}
         daysOrder={daysOrder}
         onSubmit={async ({ text, days, repeat, tags, timesPerWeek }) => {

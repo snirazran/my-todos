@@ -22,6 +22,7 @@ export type HistoryTaskCardProps = {
     timeSpent: number;
   };
   onToggle?: (id: string, date: string, currentStatus: boolean) => void;
+  onMenuOpen?: (e: React.MouseEvent, id: string) => void;
   setFlyRef?: (el: HTMLDivElement | null) => void;
   isEaten?: boolean;
 };
@@ -38,6 +39,7 @@ export default function HistoryTaskCard({
   userTags,
   frogodoroSession,
   onToggle,
+  onMenuOpen,
   setFlyRef,
   isEaten = false,
 }: HistoryTaskCardProps) {
