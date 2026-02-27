@@ -321,10 +321,6 @@ export default function DayDetailSheet({
                             timesPerWeek={task.timesPerWeek}
                             frogodoroSession={task.frogodoroSession}
                             onToggle={handleToggleProxy}
-                            onMenuOpen={(e, id) => {
-                              const rect = e.currentTarget.getBoundingClientRect();
-                              setMenu({ id, top: rect.bottom + 6, left: rect.left - 120 });
-                            }}
                             setFlyRef={(el) => {
                               if (el) flyRefs.current[uniqueKey] = el;
                               else delete flyRefs.current[uniqueKey];
@@ -337,20 +333,6 @@ export default function DayDetailSheet({
                     )}
                   </div>
                 </div>
-
-                <TaskMenu
-                  menu={menu}
-                  onClose={() => setMenu(null)}
-                  isHabit={tasks.find((t) => t.id === menu?.id)?.type === 'habit'}
-                  onEdit={(id) => {
-                    const t = tasks.find((it) => it.id === id);
-                    if (t && onEditTask) onEditTask(id, t.text, t.type);
-                  }}
-                  onDelete={() => {
-                    if (menu && onDeleteTask) onDeleteTask(menu.id, date);
-                    setMenu(null);
-                  }}
-                />
               </div>
             </motion.div>
           </div>
