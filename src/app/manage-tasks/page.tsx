@@ -303,13 +303,7 @@ export default function ManageTasksPage() {
   }
 
   return (
-    <main
-      className="relative overflow-hidden min-h-100svh pb-safe bg-background"
-      style={{
-        height: 'calc(100dvh - var(--header-h))',
-        minHeight: 'calc(-webkit-fill-available - var(--header-h))',
-      }}
-    >
+    <div className="relative w-full h-full overflow-hidden bg-background">
       <div className="absolute inset-0">
         <TaskBoard
           titles={titles}
@@ -406,6 +400,6 @@ export default function ManageTasksPage() {
           animation: cardShine 1200ms ease;
         }
       `}</style>
-    </main>
+    </div>
   );
 }

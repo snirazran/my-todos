@@ -49,7 +49,7 @@ export default function RootLayout({
       <body
         className={[
           poppins.className,
-          'antialiased min-h-screen bg-background',
+          'antialiased h-full bg-background flex flex-col',
           '[padding-top:env(safe-area-inset-top)]',
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}
@@ -59,11 +59,13 @@ export default function RootLayout({
 
         <AuthContext>
           <Providers>
-            <SiteHeader />
-            <main className="w-full h-full min-h-[calc(100vh-3.5rem)] md:min-h-[calc(100vh-4rem)]">
-              {children}
-            </main>
-            <MobileNav />
+            <div className="flex flex-col h-full overflow-hidden">
+              <SiteHeader />
+              <main className="flex-1 min-h-0 relative">
+                {children}
+              </main>
+              <MobileNav />
+            </div>
           </Providers>
         </AuthContext>
       </body>
