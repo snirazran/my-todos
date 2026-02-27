@@ -1,8 +1,16 @@
 'use client';
 
-import React, { forwardRef, useMemo, useCallback, useEffect } from 'react';
+import React, {
+  forwardRef,
+  useMemo,
+  useCallback,
+  useEffect,
+  useRef,
+  useImperativeHandle,
+} from 'react';
 import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
+import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 
 type FlyProps = {
   onClick?: (e: React.MouseEvent) => void;
@@ -16,6 +24,9 @@ type FlyProps = {
 
 const Fly = forwardRef<HTMLDivElement, FlyProps>(
   ({ onClick, size = 30, className, x = 0, y = 0, paused = false, onLoad }, ref) => {
+    const innerRef = useRef<HTMLDivElement>(null);
+    useImperativeHandle(ref, () => innerRef.current!);
+
     const riveUrl = useRiveAsset('/fly_idle.riv');
 
     const riveOptions = useMemo(
@@ -33,6 +44,8 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
     );
 
     const { RiveComponent, rive } = useRive(riveOptions);
+
+    useRiveVisibility(rive, innerRef);
 
     useEffect(() => {
       if (!rive) return;
@@ -65,7 +78,7 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
 
     return (
       <div
-        ref={ref}
+        ref={innerRef}
         onClick={handleClick}
         className={className}
         style={{

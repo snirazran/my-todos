@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   useRive,
@@ -8,6 +8,7 @@ import {
   Alignment,
 } from '@rive-app/react-canvas';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
+import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 
 // Define layout outside component to maintain reference stability
 const RIVE_LAYOUT = new Layout({
@@ -38,6 +39,7 @@ export const GiftRive = React.memo(
     isMilestone?: boolean;
     paused?: boolean;
   }) => {
+    const containerRef = useRef<HTMLDivElement>(null);
     const riveUrl = useRiveAsset('/idle_gift.riv');
     const { rive, RiveComponent } = useRive({
       src: riveUrl || undefined,
@@ -45,6 +47,8 @@ export const GiftRive = React.memo(
       autoplay: true,
       layout: RIVE_LAYOUT,
     });
+
+    useRiveVisibility(rive, containerRef);
 
     useEffect(() => {
       if (!rive) return;
@@ -104,6 +108,7 @@ export const GiftRive = React.memo(
 
     return (
       <div
+        ref={containerRef}
         className={className}
         style={{
           width: width ?? '100%',

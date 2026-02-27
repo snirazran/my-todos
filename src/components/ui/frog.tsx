@@ -15,6 +15,7 @@ import {
   useStateMachineInput,
 } from '@rive-app/react-canvas';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
+import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 
 /* === Artboard & geometry (adjust to your .riv) =========================== */
 const ARTBOARD_NAME = 'main';
@@ -80,6 +81,8 @@ const Frog = memo(
       autoplay: true,
       layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
     });
+
+    useRiveVisibility(rive, wrapperRef);
 
     // inputs
     const mouthTrigger = useStateMachineInput(
