@@ -10,6 +10,7 @@ export type Task = {
   tags?: string[];
   /** only present for habit tasks */
   timesPerWeek?: number;
+  completedDates?: string[];
 };
 
 // Display has 7 weekday columns + 1 “Later” column at index 7
