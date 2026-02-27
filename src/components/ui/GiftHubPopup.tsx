@@ -86,7 +86,12 @@ export function GiftHubPopup({
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
   const [optimisticExtraClaimed, setOptimisticExtraClaimed] = useState(0);
 
-  const { data: inventoryData, mutate: mutateInventory } = useInventory();
+  const {
+    data: inventoryData,
+    mutate: mutateInventory,
+    unseenContainerCount,
+    markContainersSeen,
+  } = useInventory();
 
   // Calculate slots
   const slots = useProgressLogic(
@@ -94,6 +99,13 @@ export function GiftHubPopup({
     total,
     giftsClaimed + optimisticExtraClaimed,
   );
+
+  // Clear unseen indicator for containers when tab is visited
+  useEffect(() => {
+    if (show && activeTab === 'inventory' && unseenContainerCount > 0) {
+      markContainersSeen();
+    }
+  }, [show, activeTab, unseenContainerCount, markContainersSeen]);
 
   const hasClaimedDaily = slots[0]?.status !== 'CLAIMED' && giftsClaimed > 0; // Rough check, refined later if needed
   // Actually, hasClaimedDaily logic needs to check if TODAY's reward is done?
@@ -507,9 +519,9 @@ export function GiftHubPopup({
                         <Gift className="w-4 h-4" />
                         <span className="hidden xs:inline">My Gifts</span>
                         <span className="xs:hidden">My Gifts</span>
-                        {totalOwnedBoxes > 0 && (
+                        {unseenContainerCount > 0 && (
                           <span className="flex items-center justify-center h-5 min-w-[20px] px-1.5 rounded-full bg-primary text-[10px] font-black text-primary-foreground ml-1">
-                            {totalOwnedBoxes}
+                            {unseenContainerCount}
                           </span>
                         )}
                       </TabsTrigger>

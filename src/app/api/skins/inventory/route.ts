@@ -181,6 +181,18 @@ export async function PATCH(req: NextRequest) {
       return json({ ok: true });
     }
 
+    if (body.action === 'markContainersSeen') {
+      // Get all container IDs from CATALOG
+      const containerIds = CATALOG.filter((i) => i.slot === 'container').map(
+        (i) => i.id,
+      );
+      await UserModel.updateOne(
+        { _id: userId },
+        { $pull: { 'wardrobe.unseenItems': { $in: containerIds } } },
+      );
+      return json({ ok: true });
+    }
+
     return json({ error: 'Unknown action' }, 400);
   } catch {
     return json({ error: 'Unauthorized' }, 401);

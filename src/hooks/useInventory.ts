@@ -48,6 +48,37 @@ export function useInventory(active: boolean = true) {
     mutate(); // Re-validate to be sure
   };
 
+  const markContainersSeen = async () => {
+    if (!data?.wardrobe?.unseenItems?.length) return;
+
+    // Optimistic: filter out all containers
+    const containerIdsArr = (data?.catalog ?? [])
+      .filter((i) => i.slot === 'container')
+      .map((i) => i.id);
+    const containerSet = new Set(containerIdsArr);
+
+    mutate(
+      {
+        ...data,
+        wardrobe: {
+          ...data.wardrobe!,
+          unseenItems: data.wardrobe!.unseenItems!.filter(
+            (id) => !containerSet.has(id),
+          ),
+        },
+      },
+      false,
+    );
+
+    await fetch('/api/skins/inventory', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'markContainersSeen' }),
+    });
+
+    mutate();
+  };
+
   const markItemSeen = async (itemId: string) => {
     if (!data?.wardrobe?.unseenItems?.includes(itemId)) return;
 
@@ -82,6 +113,11 @@ export function useInventory(active: boolean = true) {
     [data?.wardrobe?.unseenItems, containerIds],
   );
 
+  const unseenContainers = useMemo(
+    () => (data?.wardrobe?.unseenItems ?? []).filter((id) => containerIds.has(id)),
+    [data?.wardrobe?.unseenItems, containerIds],
+  );
+
   return {
     data,
     mutate,
@@ -89,7 +125,10 @@ export function useInventory(active: boolean = true) {
     error,
     unseenItems,
     unseenCount: unseenItems.length,
+    unseenContainers,
+    unseenContainerCount: unseenContainers.length,
     markAllSeen,
+    markContainersSeen,
     markItemSeen,
   };
 }

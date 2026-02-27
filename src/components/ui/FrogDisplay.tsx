@@ -62,7 +62,7 @@ export function FrogDisplay({
   onMutateToday,
   onOpenDailyReward,
 }: Props) {
-  const { unseenCount, data: inventoryData } = useInventory();
+  const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory();
   const [clickedAt, setClickedAt] = React.useState(0);
   const [shopOpen, setShopOpen] = React.useState(false);
   const [giftHubOpen, setGiftHubOpen] = React.useState(false);
@@ -73,15 +73,7 @@ export function FrogDisplay({
     giftsClaimed ?? 0,
   );
   const readyGifts = progressSlots.filter((s) => s.status === 'READY').length;
-  const totalOwnedBoxes = React.useMemo(() => {
-    const inv = inventoryData?.wardrobe?.inventory;
-    const catalog = inventoryData?.catalog;
-    if (!inv || !catalog) return 0;
-    return catalog
-      .filter((i) => i.slot === 'container')
-      .reduce((sum, item) => sum + (inv[item.id] ?? 0), 0);
-  }, [inventoryData]);
-  const giftBadge = readyGifts + totalOwnedBoxes;
+  const giftBadge = readyGifts + unseenContainerCount;
 
   // Local state for smooth hunger updates
   const [displayedHunger, setDisplayedHunger] = React.useState(hunger ?? 0);
