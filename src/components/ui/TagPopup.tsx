@@ -37,67 +37,87 @@ export default function TagPopup({ open, onClose, taskId, initialTags = [], onSa
 
   if (!open) return null;
 
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                onClick={onClose}
-                className="fixed inset-0 z-[1000] bg-black/20 backdrop-blur-[2px]"
-            />
-            <motion.div
-                 initial={{ opacity: 0, scale: 0.95, x: '-50%', y: '-50%' }}
-                 animate={{ opacity: 1, scale: 1, x: '-50%', y: '-50%' }}
-                 exit={{ opacity: 0, scale: 0.95, x: '-50%', y: '-50%' }}
-                 className="fixed z-[1001] w-[90%] max-w-[400px] bg-popover rounded-2xl shadow-xl border border-border p-4"
-                 style={{
-                     left: '50%',
-                     top: '50%',
-                 }}
-            >
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-foreground">Add Tags</h3>
-                    <button onClick={onClose} className="p-1 rounded-full hover:bg-accent text-muted-foreground">
-                        <X className="w-5 h-5" />
-                    </button>
-                </div>
-                
-                <div className="max-h-[60vh] overflow-y-auto">
-                    <TagManager
-                        open={true}
-                        onOpenChange={() => {}}
-                        selectedTags={tags}
-                        onTagsChange={setTags}
-                    />
-                </div>
+  const dialogContent = (
+    <div
+      className="fixed inset-0 z-[10001] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-4 pb-6 sm:pb-0"
+      role="dialog"
+      aria-modal="true"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden"
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between px-5 pt-5 pb-3">
+          <div className="flex-1 min-w-0 pr-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+              Organization
+            </p>
+            <h4 className="text-base font-bold text-slate-900 dark:text-white leading-snug truncate">
+              Manage Tags
+            </h4>
+          </div>
+          <button
+            className="flex-shrink-0 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
 
-                <div className="flex gap-3 mt-4 pt-4 border-t border-border">
-                    <button
-                        onClick={onClose}
-                         className="flex-1 py-2.5 text-sm font-bold text-secondary-foreground bg-secondary hover:bg-secondary/80 rounded-xl transition-colors"
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        onClick={handleSave}
-                        disabled={isSaving}
-                        className="flex-1 py-2.5 text-sm font-bold text-primary-foreground bg-primary hover:bg-primary/90 rounded-xl shadow-sm transition-colors flex items-center justify-center gap-2"
-                    >
-                        {isSaving ? 'Saving...' : (
-                            <>
-                                <Check className="w-4 h-4" />
-                                Done
-                            </>
-                        )}
-                    </button>
-                </div>
-            </motion.div>
-        </>
-      )}
-    </AnimatePresence>,
-    document.body
+        <div className="px-5 pb-2">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            Select or create tags to organize your items
+          </p>
+          <div className="max-h-[60vh] overflow-y-auto no-scrollbar">
+            <TagManager
+              open={true}
+              onOpenChange={() => {}}
+              selectedTags={tags}
+              onTagsChange={setTags}
+            />
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="px-4 pb-4 pt-3 flex flex-col gap-2">
+          <button
+            className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-50 shadow-sm flex items-center justify-center gap-2"
+            onClick={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              'Saving...'
+            ) : (
+              <>
+                <Check className="w-4 h-4" />
+                Save tags
+              </>
+            )}
+          </button>
+          <button
+            className="w-full py-2.5 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+            onClick={onClose}
+            disabled={isSaving}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
   );
+
+  return createPortal(dialogContent, document.body);
 }

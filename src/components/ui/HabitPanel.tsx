@@ -384,7 +384,7 @@ function HabitItem({
           ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
         `}
       >
-        <div className="flex items-center justify-between gap-3 pl-2 pr-1">
+        <div className="relative z-10 flex items-center justify-between gap-3 pl-2 pr-1">
           {/* Bullet — exact match to TaskList */}
           <div className="relative flex-shrink-0 w-7 h-7">
             <AnimatePresence initial={false}>
@@ -543,29 +543,31 @@ function HabitItem({
               })()}
             </div>
           </div>
-          {/* 3-dots menu button — desktop only, shows on hover */}
-          <div className="relative self-center shrink-0 hidden md:flex items-center md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100">
-            <button
-              ref={menuBtnRef}
-              onClick={(e) => {
-                e.stopPropagation();
-                if (isDraggingRef.current) return;
-                const rect = menuBtnRef.current?.getBoundingClientRect();
-                if (!rect) return;
-                const MENU_W = 160;
-                const MARGIN = 10;
-                const vw = window.innerWidth;
-                let left = rect.left + rect.width / 2 - MENU_W / 2;
-                left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
-                onMenuOpen(habit.id, rect.bottom + 6, left);
-              }}
-              className="rounded-full p-1.5 hover:bg-accent transition-colors"
-              title="More options"
-              aria-label="More options"
-            >
-              <EllipsisVertical className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
+        </div>
+
+        {/* 3-dots menu button — desktop only, shows on hover */}
+        <div className="hidden md:group-hover:block absolute right-2 top-1/2 -translate-y-1/2 z-20 transition-opacity">
+          <button
+            ref={menuBtnRef}
+            onClick={(e) => {
+              e.stopPropagation();
+              e.nativeEvent.stopImmediatePropagation();
+              if (isDraggingRef.current) return;
+              const rect = e.currentTarget.getBoundingClientRect();
+              const MENU_W = 160;
+              const MARGIN = 10;
+              const vw = window.innerWidth;
+              let left = rect.left + rect.width / 2 - MENU_W / 2;
+              left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
+              onMenuOpen(habit.id, rect.bottom + 6, left);
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
+            title="Options"
+            aria-label="Options"
+          >
+            <EllipsisVertical className="w-5 h-5" />
+          </button>
         </div>
       </motion.div>
     </motion.div>

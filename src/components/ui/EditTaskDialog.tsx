@@ -45,38 +45,48 @@ export function EditTaskDialog({
 
   const dialogContent = (
     <div
-      className="fixed inset-0 z-[10001] flex items-center justify-center bg-slate-950/70 backdrop-blur-[2px] px-4"
+      className="fixed inset-0 z-[10001] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-4 pb-6 sm:pb-0"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onPointerDown={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
     >
       <div
-        className="w-[440px] max-w-[calc(100vw-2rem)] rounded-[28px] bg-popover/95 backdrop-blur-2xl p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)] ring-1 ring-border/80"
+        className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden"
         onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start gap-3 mb-4">
-          <div className="mt-1 h-8 w-8 flex items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
-            <Pencil className="w-4 h-4" />
-          </div>
-          <div className="flex-1 space-y-0.5">
-            <h4 className="text-lg font-bold text-foreground">{title}</h4>
-            <p className="text-sm font-medium text-muted-foreground">
-              {subtitle}
+        {/* Header */}
+        <div className="flex items-start justify-between px-5 pt-5 pb-3">
+          <div className="flex-1 min-w-0 pr-3">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
+              {title.includes('Habit') ? 'Habit' : 'Task'}
             </p>
+            <h4 className="text-base font-bold text-slate-900 dark:text-white leading-snug truncate">
+              {title}
+            </h4>
           </div>
           <button
-            className="p-2 rounded-full hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring transition-colors"
+            className="flex-shrink-0 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
             onClick={onClose}
             aria-label="Close"
-            title="Close"
           >
-            <X className="w-5 h-5 text-muted-foreground" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="space-y-4">
+        <div className="px-5 pb-2">
+          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
+            {subtitle}
+          </p>
           <div className="relative">
             <input
               ref={inputRef}
@@ -88,42 +98,40 @@ export function EditTaskDialog({
                 if (e.key === 'Escape') onClose();
               }}
               maxLength={45}
-              className="w-full h-12 pl-4 pr-16 rounded-[16px] bg-muted/50 text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 text-lg font-medium placeholder:text-muted-foreground/50 transition-all"
-              placeholder="Task description..."
+              className="w-full h-11 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-none ring-0 focus:ring-2 focus:ring-primary/50 text-sm font-medium placeholder:text-slate-400 transition-all"
+              placeholder="Description..."
               disabled={busy}
             />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold pointer-events-none">
+            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold pointer-events-none">
               <span
                 className={
                   text.length >= 40
                     ? 'text-rose-500'
-                    : 'text-muted-foreground/40'
+                    : 'text-slate-400 dark:text-slate-500'
                 }
               >
                 {text.length}/45
               </span>
             </div>
           </div>
+        </div>
 
-          <div className="grid grid-cols-2 gap-3 pt-2">
-            <button
-              onClick={handleSave}
-              disabled={busy || !text.trim()}
-              className="relative h-11 w-full rounded-full text-[14px] font-bold text-primary-foreground bg-primary shadow-sm ring-1 ring-white/20 hover:brightness-105 active:scale-[0.98] disabled:opacity-50 disabled:grayscale transition-all overflow-hidden"
-            >
-              <span className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent pointer-events-none" />
-              <span className="relative z-10">
-                {busy ? 'Saving...' : 'Save Changes'}
-              </span>
-            </button>
-            <button
-              onClick={onClose}
-              className="h-11 w-full rounded-full text-[14px] font-semibold text-secondary-foreground bg-secondary ring-1 ring-border hover:bg-secondary/80 active:scale-[0.98] transition-all"
-              disabled={busy}
-            >
-              Cancel
-            </button>
-          </div>
+        {/* Actions */}
+        <div className="px-4 pb-4 pt-3 flex flex-col gap-2">
+          <button
+            className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-50 shadow-sm"
+            onClick={handleSave}
+            disabled={busy || !text.trim()}
+          >
+            {busy ? 'Saving...' : 'Save changes'}
+          </button>
+          <button
+            className="w-full py-2.5 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+            onClick={onClose}
+            disabled={busy}
+          >
+            Cancel
+          </button>
         </div>
       </div>
     </div>
