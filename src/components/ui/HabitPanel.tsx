@@ -8,12 +8,14 @@ import {
   useMotionValue,
   animate,
 } from 'framer-motion';
-import { Pencil, Trash2, CheckCircle2 } from 'lucide-react';
+import { Trash2, CheckCircle2, EllipsisVertical } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { Task } from '@/hooks/useTaskData';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { EditHabitDaysDialog } from '@/components/ui/EditHabitDaysDialog';
+import TaskMenu from '@/components/board/TaskMenu';
+import TagPopup from '@/components/ui/TagPopup';
 
 type SavedTag = {
   id: string;
@@ -52,6 +54,21 @@ export function HabitPanel({
   const [deletingHabit, setDeletingHabit] = React.useState<Task | null>(null);
   const [editingDaysHabit, setEditingDaysHabit] = React.useState<Task | null>(null);
   const [busy, setBusy] = React.useState(false);
+  const [menu, setMenu] = React.useState<{ id: string; top: number; left: number } | null>(null);
+  const [tagPopupId, setTagPopupId] = React.useState<string | null>(null);
+
+  const handleTagSave = async (taskId: string, newTags: string[]) => {
+    try {
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, tags: newTags }),
+      });
+      window.dispatchEvent(new Event('tags-updated'));
+    } catch (e) {
+      console.error('Failed to update tags', e);
+    }
+  };
 
   const visibleHabits = React.useMemo(() => {
     if (showCompleted) return habits;
@@ -92,13 +109,47 @@ export function HabitPanel({
               (visuallyCompleted ? visuallyCompleted.has(habit.id) : false)
             }
             onToggle={onToggle}
-            onEdit={() => setEditingHabit(habit)}
             onDelete={() => setDeletingHabit(habit)}
+            onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
+            menuOpen={menu?.id === habit.id}
             flyRefs={flyRefs}
             tags={tags}
           />
         ))}
       </AnimatePresence>
+
+      <TaskMenu
+        menu={menu}
+        onClose={() => setMenu(null)}
+        isHabit
+        onEdit={() => {
+          const h = habits.find((h) => h.id === menu?.id) ?? null;
+          if (h) setEditingHabit(h);
+          setMenu(null);
+        }}
+        onAddTags={(id) => {
+          setTagPopupId(id);
+          setMenu(null);
+        }}
+        onChangeDays={() => {
+          const h = habits.find((h) => h.id === menu?.id) ?? null;
+          if (h) setEditingDaysHabit(h);
+          setMenu(null);
+        }}
+        onDelete={() => {
+          const h = habits.find((h) => h.id === menu?.id) ?? null;
+          if (h) setDeletingHabit(h);
+          setMenu(null);
+        }}
+      />
+
+      <TagPopup
+        open={!!tagPopupId}
+        taskId={tagPopupId}
+        initialTags={habits.find((h) => h.id === tagPopupId)?.tags}
+        onClose={() => setTagPopupId(null)}
+        onSave={handleTagSave}
+      />
 
       <EditTaskDialog
         open={!!editingHabit}
@@ -176,23 +227,32 @@ function HabitItem({
   habit,
   isDone,
   onToggle,
-  onEdit,
   onDelete,
+  onMenuOpen,
   flyRefs,
   tags,
 }: {
   habit: Task;
   isDone: boolean;
   onToggle: (id: string) => void;
-  onEdit: () => void;
   onDelete: () => void;
+  onMenuOpen: (id: string, top: number, left: number) => void;
   flyRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
   tags: SavedTag[];
 }) {
+  const menuBtnRef = React.useRef<HTMLButtonElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
   const isDraggingRef = React.useRef(false);
   const x = useMotionValue(0);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   const handleDragStart = () => {
     isDraggingRef.current = true;
@@ -275,14 +335,20 @@ function HabitItem({
           onClick={(e) => {
             e.stopPropagation();
             e.nativeEvent.stopImmediatePropagation();
-            onEdit();
+            const rect = e.currentTarget.getBoundingClientRect();
+            const MENU_W = 160;
+            const MARGIN = 10;
+            const vw = window.innerWidth;
+            let left = rect.left + rect.width / 2 - MENU_W / 2;
+            left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
+            onMenuOpen(habit.id, rect.bottom + 6, left);
             setIsOpen(false);
           }}
-          className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors cursor-pointer"
-          title="Edit habit"
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
+          title="More options"
           tabIndex={isOpen ? 0 : -1}
         >
-          <Pencil className="w-4 h-4" />
+          <EllipsisVertical className="w-5 h-5" />
         </button>
         <button
           onClick={(e) => {
@@ -291,7 +357,7 @@ function HabitItem({
             onDelete();
             setIsOpen(false);
           }}
-          className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors cursor-pointer"
+          className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors"
           title="Delete habit"
           tabIndex={isOpen ? 0 : -1}
         >
@@ -299,9 +365,9 @@ function HabitItem({
         </button>
       </div>
 
-      {/* Foreground Card (Swipeable) */}
+      {/* Foreground Card (Swipeable on touch only) */}
       <motion.div
-        drag="x"
+        drag={isDesktop ? false : 'x'}
         dragDirectionLock
         dragConstraints={{ left: -100, right: 0 }}
         dragElastic={0}
@@ -313,12 +379,12 @@ function HabitItem({
         transition={{ type: 'spring', stiffness: 600, damping: 28, mass: 1 }}
         onClick={handleCardClick}
         className={`
-          relative flex flex-col gap-2 px-2 py-3.5 rounded-xl border border-border/50 transition-colors duration-200 cursor-pointer select-none
+          group relative flex flex-col gap-2 px-2 py-3.5 rounded-xl border border-border/50 transition-colors duration-200 cursor-pointer select-none
           ${isDone ? 'bg-card opacity-60' : 'bg-card hover:border-border/70'}
           ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
         `}
       >
-        <div className="flex items-center justify-between gap-3 pl-2">
+        <div className="flex items-center justify-between gap-3 pl-2 pr-1">
           {/* Bullet — exact match to TaskList */}
           <div className="relative flex-shrink-0 w-7 h-7">
             <AnimatePresence initial={false}>
@@ -377,7 +443,7 @@ function HabitItem({
           </div>
 
           {/* Text & Tags & History Tracker */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 overflow-hidden">
             {/* Tags */}
             {habit.tags && habit.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 mb-1">
@@ -476,6 +542,29 @@ function HabitItem({
                 });
               })()}
             </div>
+          </div>
+          {/* 3-dots menu button — desktop only, shows on hover */}
+          <div className="relative self-center shrink-0 hidden md:flex items-center md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+            <button
+              ref={menuBtnRef}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isDraggingRef.current) return;
+                const rect = menuBtnRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                const MENU_W = 160;
+                const MARGIN = 10;
+                const vw = window.innerWidth;
+                let left = rect.left + rect.width / 2 - MENU_W / 2;
+                left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
+                onMenuOpen(habit.id, rect.bottom + 6, left);
+              }}
+              className="rounded-full p-1.5 hover:bg-accent transition-colors"
+              title="More options"
+              aria-label="More options"
+            >
+              <EllipsisVertical className="w-4 h-4 text-muted-foreground" />
+            </button>
           </div>
         </div>
       </motion.div>
