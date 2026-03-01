@@ -327,9 +327,16 @@ export default function Home() {
                     e.stopPropagation();
                     setIsHeaderMenuOpen(!isHeaderMenuOpen);
                   }}
-                  className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/50 transition-colors"
+                  className={`relative p-2 rounded-full transition-colors ${
+                    isHeaderMenuOpen || selectedTags.length > 0 || !showCompleted
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                  }`}
                 >
                   <EllipsisVertical className="w-5 h-5" />
+                  {(selectedTags.length > 0 || !showCompleted) && (
+                    <div className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
+                  )}
                 </button>
 
                 <FilterDropdown
@@ -495,7 +502,7 @@ export default function Home() {
                       flyRefs={flyRefs}
                       showCompleted={showCompleted}
                       visuallyCompleted={visuallyDone}
-                      date={new Date().toISOString().slice(0, 10)}
+                      date={format(new Date(), 'yyyy-MM-dd')}
                     />
                   </motion.div>
                 )}
