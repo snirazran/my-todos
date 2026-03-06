@@ -147,12 +147,15 @@ export default function FrogodoroPage() {
     longBreakTime: 0,
   });
 
-  // Track actual seconds per phase while running
+  // Live elapsed time for the current running phase (triggers re-renders)
+  const [liveElapsed, setLiveElapsed] = useState(0);
   const phaseTimeRef = useRef(0);
+
   useEffect(() => {
     if (!isRunning) return;
     const interval = setInterval(() => {
       phaseTimeRef.current += 1;
+      setLiveElapsed(phaseTimeRef.current);
     }, 1000);
     return () => clearInterval(interval);
   }, [isRunning]);
@@ -165,45 +168,47 @@ export default function FrogodoroPage() {
     const prevCycles = prevCyclesRef.current;
     const elapsed = phaseTimeRef.current;
 
-    // Focus session completed (cycles incremented)
-    if (completedCycles > prevCycles) {
-      setSessionStats((s) => ({
-        ...s,
-        focusSessions: s.focusSessions + (completedCycles - prevCycles),
-        focusTime: s.focusTime + elapsed,
-      }));
-      phaseTimeRef.current = 0;
-    }
-    // Short break completed (phase changed from shortBreak to focus)
-    else if (prevPhase === 'shortBreak' && phase === 'focus') {
-      setSessionStats((s) => ({
-        ...s,
-        shortBreaks: s.shortBreaks + 1,
-        shortBreakTime: s.shortBreakTime + elapsed,
-      }));
-      phaseTimeRef.current = 0;
-    }
-    // Long break completed (phase changed from longBreak to focus)
-    else if (prevPhase === 'longBreak' && phase === 'focus') {
-      setSessionStats((s) => ({
-        ...s,
-        longBreaks: s.longBreaks + 1,
-        longBreakTime: s.longBreakTime + elapsed,
-      }));
-      phaseTimeRef.current = 0;
-    }
-    // Manual phase switch (user clicked a different phase tab)
-    else if (prevPhase !== phase) {
-      // Flush time for the old phase
-      if (elapsed > 0) {
+    if (elapsed > 0) {
+      // Focus session completed (cycles incremented by timer)
+      if (completedCycles > prevCycles) {
         setSessionStats((s) => ({
           ...s,
-          ...(prevPhase === 'focus' ? { focusTime: s.focusTime + elapsed } : {}),
-          ...(prevPhase === 'shortBreak' ? { shortBreakTime: s.shortBreakTime + elapsed } : {}),
-          ...(prevPhase === 'longBreak' ? { longBreakTime: s.longBreakTime + elapsed } : {}),
+          focusSessions: s.focusSessions + (completedCycles - prevCycles),
+          focusTime: s.focusTime + elapsed,
         }));
+        phaseTimeRef.current = 0;
+        setLiveElapsed(0);
       }
-      phaseTimeRef.current = 0;
+      // Break completed naturally (phase auto-changed to focus)
+      else if (prevPhase === 'shortBreak' && phase === 'focus') {
+        setSessionStats((s) => ({
+          ...s,
+          shortBreaks: s.shortBreaks + 1,
+          shortBreakTime: s.shortBreakTime + elapsed,
+        }));
+        phaseTimeRef.current = 0;
+        setLiveElapsed(0);
+      }
+      else if (prevPhase === 'longBreak' && phase === 'focus') {
+        setSessionStats((s) => ({
+          ...s,
+          longBreaks: s.longBreaks + 1,
+          longBreakTime: s.longBreakTime + elapsed,
+        }));
+        phaseTimeRef.current = 0;
+        setLiveElapsed(0);
+      }
+      // Manual skip while time was spent — count the partial phase
+      else if (prevPhase !== phase) {
+        setSessionStats((s) => ({
+          ...s,
+          ...(prevPhase === 'focus' ? { focusSessions: s.focusSessions + 1, focusTime: s.focusTime + elapsed } : {}),
+          ...(prevPhase === 'shortBreak' ? { shortBreaks: s.shortBreaks + 1, shortBreakTime: s.shortBreakTime + elapsed } : {}),
+          ...(prevPhase === 'longBreak' ? { longBreaks: s.longBreaks + 1, longBreakTime: s.longBreakTime + elapsed } : {}),
+        }));
+        phaseTimeRef.current = 0;
+        setLiveElapsed(0);
+      }
     }
 
     prevPhaseRef.current = phase;
@@ -223,6 +228,7 @@ export default function FrogodoroPage() {
         longBreakTime: 0,
       });
       phaseTimeRef.current = 0;
+      setLiveElapsed(0);
       prevTaskRef.current = selectedTaskId;
     }
   }, [selectedTaskId]);
@@ -234,7 +240,8 @@ export default function FrogodoroPage() {
     return s > 0 ? `${m}m ${s}s` : `${m}m`;
   };
 
-  const hasStats = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0;
+  // Show stats when there are completed phases OR when timer is currently running
+  const hasStats = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || isRunning;
 
   // Mobile check for drawer animation
   const [isDesktop, setIsDesktop] = useState(false);
@@ -363,7 +370,7 @@ export default function FrogodoroPage() {
   }
 
   return (
-    <main className="min-h-[100dvh] flex flex-col pb-24 pt-6 md:pt-10 transition-colors duration-500">
+    <main className="flex flex-col pt-6 md:pt-10 transition-colors duration-500">
       <div className="w-full max-w-7xl px-4 pb-8 mx-auto md:px-8">
         <div className="relative grid items-start grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-8">
           {/* LEFT: FROG DISPLAY */}
@@ -400,10 +407,10 @@ export default function FrogodoroPage() {
           <div className="flex flex-col gap-4 lg:col-span-8 lg:gap-6 w-full max-w-2xl mx-auto">
             {/* TIMER CARD */}
             <div
-              className={`px-6 py-6 md:px-10 md:py-8 rounded-[32px] shadow-2xl transition-colors duration-500 ${getPhaseColor()} relative overflow-hidden backdrop-blur-sm group`}
+              className={`px-4 py-4 md:px-6 md:py-5 lg:px-10 lg:py-8 rounded-[28px] md:rounded-[32px] shadow-2xl transition-colors duration-500 ${getPhaseColor()} relative overflow-hidden backdrop-blur-sm group`}
             >
               {/* Top Phase Selector */}
-              <div className="flex items-center justify-center gap-2 mb-10 md:mb-12 relative flex-wrap sm:flex-nowrap">
+              <div className="flex items-center justify-center gap-1 md:gap-2 mb-5 md:mb-6 lg:mb-12 relative flex-wrap sm:flex-nowrap">
                 {[
                   { id: 'focus', label: 'Frogodoro' },
                   { id: 'shortBreak', label: 'Short Break' },
@@ -411,11 +418,13 @@ export default function FrogodoroPage() {
                 ].map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => switchPhase(p.id as PomodoroPhase)}
-                    className={`px-4 py-2 text-sm font-bold rounded-full transition-all ${
+                    onClick={() => { if (!isRunning) switchPhase(p.id as PomodoroPhase); }}
+                    className={`px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
                       phase === p.id
                         ? 'bg-black/25 text-white shadow-inner'
-                        : 'bg-transparent text-white/70 hover:bg-black/10'
+                        : isRunning
+                          ? 'bg-transparent text-white/30 cursor-not-allowed'
+                          : 'bg-transparent text-white/70 hover:bg-black/10'
                     }`}
                   >
                     {p.label}
@@ -424,19 +433,19 @@ export default function FrogodoroPage() {
               </div>
 
               {/* Time Display */}
-              <div className="text-[120px] md:text-[160px] font-black tabular-nums tracking-tighter text-center leading-none mb-10 drop-shadow-lg text-white">
+              <div className="text-[80px] md:text-[100px] lg:text-[160px] font-black tabular-nums tracking-tighter text-center leading-none mb-5 md:mb-6 lg:mb-10 drop-shadow-lg text-white">
                 {formatTime(timeLeft)}
               </div>
 
               {/* Controls */}
-              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4 w-full max-w-md mx-auto h-20">
+              <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 md:gap-4 w-full max-w-md mx-auto h-14 md:h-16 lg:h-20">
                 <div className="col-start-1 flex justify-end">
                   <button
                     onClick={() => setShowHelpModal(true)}
-                    className="p-4 bg-white/20 hover:bg-white/30 rounded-2xl transition-colors backdrop-blur active:scale-95 text-white z-10"
+                    className="p-3 md:p-3.5 lg:p-4 bg-white/20 hover:bg-white/30 rounded-xl md:rounded-2xl transition-colors backdrop-blur active:scale-95 text-white z-10"
                     title="How Frogodoro Works"
                   >
-                    <HelpCircle className="w-8 h-8 text-white opacity-90" />
+                    <HelpCircle className="w-6 h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 text-white opacity-90" />
                   </button>
                 </div>
 
@@ -444,16 +453,16 @@ export default function FrogodoroPage() {
                   <button
                     onClick={toggleTimer}
                     className={`
-                  relative flex items-center justify-center px-8 md:px-12 py-4 h-20 bg-white dark:bg-slate-50 text-[24px] md:text-[28px] 
-                  font-black uppercase tracking-widest rounded-3xl shadow-[0_8px_0_rgba(0,0,0,0.15)] 
-                  active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-2 transition-all group z-10
+                  relative flex items-center justify-center px-6 md:px-8 lg:px-12 py-3 md:py-3.5 lg:py-4 h-14 md:h-16 lg:h-20 bg-white dark:bg-slate-50 text-[18px] md:text-[22px] lg:text-[28px]
+                  font-black uppercase tracking-widest rounded-2xl md:rounded-3xl shadow-[0_6px_0_rgba(0,0,0,0.15)] md:shadow-[0_8px_0_rgba(0,0,0,0.15)]
+                  active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 md:active:translate-y-2 transition-all group z-10
                   ${phase === 'focus' ? 'text-primary' : phase === 'shortBreak' ? 'text-sky-500' : 'text-indigo-500'}
                 `}
                   >
                     {isRunning ? (
-                      <Pause className="w-8 h-8 mr-2 fill-current" />
+                      <Pause className="w-5 h-5 md:w-6 md:h-6 lg:w-8 lg:h-8 mr-1.5 md:mr-2 fill-current" />
                     ) : (
-                      <Play className="w-8 h-8 mr-2 fill-current" />
+                      <Play className="w-5 h-5 md:w-6 md:h-6 lg:w-8 lg:h-8 mr-1.5 md:mr-2 fill-current" />
                     )}
                     {isRunning ? 'PAUSE' : 'START'}
                   </button>
@@ -463,9 +472,9 @@ export default function FrogodoroPage() {
                   {isRunning && (
                     <button
                       onClick={handleManualSkip}
-                      className="p-4 bg-white/20 hover:bg-white/30 rounded-2xl transition-colors backdrop-blur active:scale-95 text-white z-0"
+                      className="p-3 md:p-3.5 lg:p-4 bg-white/20 hover:bg-white/30 rounded-xl md:rounded-2xl transition-colors backdrop-blur active:scale-95 text-white z-0"
                     >
-                      <SkipForward className="w-8 h-8 fill-current opacity-90 relative left-0.5" />
+                      <SkipForward className="w-6 h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 fill-current opacity-90 relative left-0.5" />
                     </button>
                   )}
                 </div>
@@ -485,30 +494,22 @@ export default function FrogodoroPage() {
                       className="flex items-center gap-3 p-4 pb-3 cursor-pointer group"
                       onClick={() => setShowTaskDropdown(true)}
                     >
-                      <div
-                        className="relative flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 cursor-pointer transition-colors hover:bg-primary/10 z-30"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (!visuallyDone.has(selectedTask.id))
-                            completeTaskWithAnimation(selectedTask.id);
-                        }}
-                      >
+                      <div className="relative flex items-center justify-center w-7 h-7 flex-shrink-0 pointer-events-none">
                         <div
-                          className={`transition-opacity duration-300 w-8 h-8 flex items-center justify-center ${visuallyDone.has(selectedTask.id) || selectedTask.completed ? 'opacity-0' : 'opacity-100'}`}
+                          className={`transition-opacity duration-300 flex items-center justify-center ${visuallyDone.has(selectedTask.id) || selectedTask.completed ? 'opacity-0' : 'opacity-100'}`}
                         >
                           <Fly
                             ref={(el) => {
                               flyRefs.current[selectedTask.id] = el;
                             }}
                             onClick={() => {}}
-                            size={32}
-                            y={0}
-                            x={0}
+                            size={30}
+                            y={-4}
                           />
                         </div>
                         {(visuallyDone.has(selectedTask.id) ||
                           selectedTask.completed) && (
-                          <CheckCircle2 className="absolute w-8 h-8 text-primary animate-in zoom-in spin-in-12 duration-300" />
+                          <CheckCircle2 className="absolute w-7 h-7 text-primary animate-in zoom-in spin-in-12 duration-300" />
                         )}
                       </div>
                       <span
@@ -536,37 +537,40 @@ export default function FrogodoroPage() {
                           exit={{ opacity: 0, height: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className="flex items-center gap-2 px-4 pb-3 flex-wrap">
-                            {sessionStats.focusSessions > 0 && (
-                              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/8 dark:bg-primary/15">
-                                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-                                <span className="text-[10px] font-black text-primary tabular-nums">
-                                  {sessionStats.focusSessions}
+                          <div className="flex items-center gap-2.5 px-4 pb-3 flex-wrap">
+                            {/* Focus — show if completed sessions exist OR currently in focus */}
+                            {(sessionStats.focusSessions > 0 || (isRunning && phase === 'focus')) && (
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/8 dark:bg-primary/15">
+                                <div className={`w-2 h-2 rounded-full bg-primary ${isRunning && phase === 'focus' ? 'animate-pulse' : ''}`} />
+                                <span className="text-xs font-black text-primary tabular-nums">
+                                  {sessionStats.focusSessions + (isRunning && phase === 'focus' ? 1 : 0)}
                                 </span>
-                                <span className="text-[9px] font-bold text-primary/50">
-                                  {formatDuration(sessionStats.focusTime)}
-                                </span>
-                              </div>
-                            )}
-                            {sessionStats.shortBreaks > 0 && (
-                              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
-                                <div className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-                                <span className="text-[10px] font-black text-sky-500 tabular-nums">
-                                  {sessionStats.shortBreaks}
-                                </span>
-                                <span className="text-[9px] font-bold text-sky-500/50">
-                                  {formatDuration(sessionStats.shortBreakTime)}
+                                <span className="text-[11px] font-bold text-primary/60 tabular-nums">
+                                  {formatDuration(sessionStats.focusTime + (isRunning && phase === 'focus' ? liveElapsed : 0))}
                                 </span>
                               </div>
                             )}
-                            {sessionStats.longBreaks > 0 && (
-                              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/8 dark:bg-indigo-500/15">
-                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
-                                <span className="text-[10px] font-black text-indigo-500 tabular-nums">
-                                  {sessionStats.longBreaks}
+                            {/* Short break */}
+                            {(sessionStats.shortBreaks > 0 || (isRunning && phase === 'shortBreak')) && (
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/8 dark:bg-sky-500/15">
+                                <div className={`w-2 h-2 rounded-full bg-sky-500 ${isRunning && phase === 'shortBreak' ? 'animate-pulse' : ''}`} />
+                                <span className="text-xs font-black text-sky-500 tabular-nums">
+                                  {sessionStats.shortBreaks + (isRunning && phase === 'shortBreak' ? 1 : 0)}
                                 </span>
-                                <span className="text-[9px] font-bold text-indigo-500/50">
-                                  {formatDuration(sessionStats.longBreakTime)}
+                                <span className="text-[11px] font-bold text-sky-500/60 tabular-nums">
+                                  {formatDuration(sessionStats.shortBreakTime + (isRunning && phase === 'shortBreak' ? liveElapsed : 0))}
+                                </span>
+                              </div>
+                            )}
+                            {/* Long break */}
+                            {(sessionStats.longBreaks > 0 || (isRunning && phase === 'longBreak')) && (
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/8 dark:bg-indigo-500/15">
+                                <div className={`w-2 h-2 rounded-full bg-indigo-500 ${isRunning && phase === 'longBreak' ? 'animate-pulse' : ''}`} />
+                                <span className="text-xs font-black text-indigo-500 tabular-nums">
+                                  {sessionStats.longBreaks + (isRunning && phase === 'longBreak' ? 1 : 0)}
+                                </span>
+                                <span className="text-[11px] font-bold text-indigo-500/60 tabular-nums">
+                                  {formatDuration(sessionStats.longBreakTime + (isRunning && phase === 'longBreak' ? liveElapsed : 0))}
                                 </span>
                               </div>
                             )}
@@ -883,10 +887,10 @@ export default function FrogodoroPage() {
                           {availableTasks.map((t) => (
                             <button
                               key={t.id}
-                              className={`w-full text-left p-3.5 flex items-center gap-3 rounded-2xl transition-all active:scale-[0.98] ${
+                              className={`w-full text-left p-3.5 flex items-center gap-3 rounded-2xl transition-all active:scale-[0.98] border ${
                                 t.id === selectedTaskId
-                                  ? 'bg-primary/8 dark:bg-primary/15 ring-1 ring-primary/20'
-                                  : 'hover:bg-muted/50'
+                                  ? 'bg-primary/8 dark:bg-primary/15 border-primary/30'
+                                  : 'border-transparent hover:bg-muted/50'
                               }`}
                               onClick={() => handleTaskSelect(t.id)}
                             >
