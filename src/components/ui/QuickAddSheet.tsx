@@ -865,7 +865,7 @@ export default function QuickAddSheet({
                         className="mb-3"
                         style={{ transform: 'translateZ(0)' }}
                       >
-                        <div className="grid grid-cols-2 gap-1.5 p-1.5 rounded-2xl bg-muted/50 ring-1 ring-border/50">
+                        <div className="flex gap-1.5 p-1.5 rounded-2xl bg-muted/50 ring-1 ring-border/50">
                           <button
                             type="button"
                             aria-pressed={when === 'pick'}
@@ -877,7 +877,7 @@ export default function QuickAddSheet({
                               );
                             }}
                             className={[
-                              'h-10 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-2 transition',
+                              'flex-1 h-10 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-2 transition',
                               'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                               'data-[active=true]:bg-card data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-border',
                               'data-[active=false]:text-muted-foreground',
@@ -900,7 +900,7 @@ export default function QuickAddSheet({
                               setRepeat('habit');
                             }}
                             className={[
-                              'h-10 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-2 transition',
+                              'flex-1 h-10 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-2 transition',
                               'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                               'data-[active=true]:bg-card data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-border',
                               'data-[active=false]:text-muted-foreground',
@@ -909,17 +909,21 @@ export default function QuickAddSheet({
                             <CalendarClock className="w-4 h-4" />
                             Habit
                           </button>
-                        </div>
 
-                        {/* Question mark toggle */}
-                        <div className="flex justify-end mt-1.5 px-1">
+                          {/* Question mark toggle */}
                           <button
                             type="button"
                             onClick={(e) => {
                               e.preventDefault();
                               setShowTypeInfo(!showTypeInfo);
                             }}
-                            className="p-0.5 text-muted-foreground/40 hover:text-muted-foreground transition-colors"
+                            className={[
+                              'w-10 h-10 rounded-xl flex items-center justify-center transition',
+                              'focus:outline-none',
+                              showTypeInfo
+                                ? 'bg-card shadow-sm ring-1 ring-border text-muted-foreground'
+                                : 'text-muted-foreground/40 hover:text-muted-foreground',
+                            ].join(' ')}
                             aria-label="What's the difference?"
                           >
                             <HelpCircle className="w-4 h-4" />
@@ -937,18 +941,10 @@ export default function QuickAddSheet({
                             >
                               <div className="rounded-xl bg-muted/40 ring-1 ring-border/30 p-3 text-[12px] text-muted-foreground leading-relaxed space-y-1.5">
                                 <p>
-                                  <span className="font-bold text-foreground">
-                                    Task
-                                  </span>{' '}
-                                  — For things on your to-do list. Can be
-                                  one-time or repeat weekly.
+                                  <span className="font-bold text-foreground">Task</span> — Something you need to get done. Pick which days it shows up, and optionally repeat it every week.
                                 </p>
                                 <p>
-                                  <span className="font-bold text-foreground">
-                                    Habit
-                                  </span>{' '}
-                                  — Appears every day and tracks your weekly
-                                  frequency goal.
+                                  <span className="font-bold text-foreground">Habit</span> — Something you want to do regularly. Choose how many times per week, and track your progress. Resets every Sunday — build your streak!
                                 </p>
                               </div>
                             </motion.div>
@@ -997,7 +993,7 @@ export default function QuickAddSheet({
                         {when === 'habit' && (
                           <div className="flex-1 min-w-0">
                             <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">
-                              Goal: {timesPerWeek} {timesPerWeek === 1 ? 'time' : 'times'} per week
+                              Goal: {timesPerWeek}x per week
                             </p>
                             <div className="flex justify-start gap-2 py-2 px-1">
                               {[1, 2, 3, 4, 5, 6, 7].map((num) => (

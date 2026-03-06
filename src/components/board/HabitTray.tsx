@@ -430,68 +430,67 @@ function HabitTrayItem({
 
           {/* Dots & Streak */}
           <div className="flex items-center gap-2 mt-2">
-            <div className="flex gap-1">
-              {(() => {
-                const goal = habit.timesPerWeek || 7;
-                let allCompleted = [...(habit.completedDates || [])];
-                if (isDone && !allCompleted.includes(date)) allCompleted.push(date);
-                else if (!isDone) allCompleted = allCompleted.filter(d => d !== date);
-
-                const dDate = new Date(date);
-                const sun = new Date(dDate);
-                sun.setDate(dDate.getDate() - dDate.getDay());
-                sun.setHours(0,0,0,0);
-                
-                const weekDates: string[] = [];
-                for (let i = 0; i < 7; i++) {
-                  const d = new Date(sun);
-                  d.setDate(sun.getDate() + i);
-                  weekDates.push(d.toISOString().split('T')[0]);
-                }
-                
-                const completedThisWeek = weekDates.filter(d => allCompleted.includes(d)).length;
-
-                return Array.from({ length: goal }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={cn(
-                      "w-2.5 h-2.5 rounded-full border transition-all",
-                      i < completedThisWeek 
-                        ? "bg-green-500 border-green-600 scale-110 shadow-sm" 
-                        : "bg-muted border-border/50"
-                    )}
-                  />
-                ));
-              })()}
-            </div>
-            
             {(() => {
+              const goal = habit.timesPerWeek || 7;
               let allCompleted = [...(habit.completedDates || [])];
               if (isDone && !allCompleted.includes(date)) allCompleted.push(date);
               else if (!isDone) allCompleted = allCompleted.filter(d => d !== date);
 
-              if (allCompleted.length === 0) return null;
-              
-              let streak = 0;
-              let curr = new Date(date);
-              const checkDate = (d: Date) => d.toISOString().split('T')[0];
-              
+              const getWeekDates = (refDate: string) => {
+                const d = new Date(refDate);
+                const dow = d.getDay();
+                const sun = new Date(d);
+                sun.setDate(d.getDate() - dow);
+                sun.setHours(0,0,0,0);
+                const dates: string[] = [];
+                for (let i = 0; i < 7; i++) {
+                  const wd = new Date(sun);
+                  wd.setDate(sun.getDate() + i);
+                  dates.push(wd.toISOString().split('T')[0]);
+                }
+                return dates;
+              };
+
+              const weekDates = getWeekDates(date);
+              const completedThisWeek = weekDates.filter(d => allCompleted.includes(d)).length;
+
+              // Weekly streak
+              let weekStreak = 0;
+              let checkDate = date;
               while (true) {
-                const s = checkDate(curr);
-                if (allCompleted.includes(s)) {
-                  streak++;
-                  curr.setDate(curr.getDate() - 1);
+                const wk = getWeekDates(checkDate);
+                const count = wk.filter(d => allCompleted.includes(d)).length;
+                if (count >= goal) {
+                  weekStreak++;
+                  const prev = new Date(wk[0]);
+                  prev.setDate(prev.getDate() - 1);
+                  checkDate = prev.toISOString().split('T')[0];
                 } else {
                   break;
                 }
               }
 
-              if (streak === 0) return null;
-
               return (
-                <span className="text-[10px] font-black text-orange-500 uppercase tracking-tighter flex items-center gap-0.5">
-                  🔥 {streak}
-                </span>
+                <>
+                  <div className="flex gap-1">
+                    {Array.from({ length: goal }).map((_, i) => (
+                      <div
+                        key={i}
+                        className={cn(
+                          "w-2.5 h-2.5 rounded-full border transition-all",
+                          i < completedThisWeek
+                            ? "bg-green-500 border-green-600 shadow-sm"
+                            : "bg-muted border-border/50"
+                        )}
+                      />
+                    ))}
+                  </div>
+                  {weekStreak > 0 && (
+                    <span className="text-[10px] font-black text-orange-500 uppercase tracking-tighter flex items-center gap-0.5">
+                      🔥 {weekStreak}w
+                    </span>
+                  )}
+                </>
               );
             })()}
           </div>
