@@ -137,6 +137,105 @@ export default function FrogodoroPage() {
     speedUpTongue,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
+  // Session stats tracking (resets when task changes)
+  const [sessionStats, setSessionStats] = useState({
+    focusSessions: 0,
+    shortBreaks: 0,
+    longBreaks: 0,
+    focusTime: 0,
+    shortBreakTime: 0,
+    longBreakTime: 0,
+  });
+
+  // Track actual seconds per phase while running
+  const phaseTimeRef = useRef(0);
+  useEffect(() => {
+    if (!isRunning) return;
+    const interval = setInterval(() => {
+      phaseTimeRef.current += 1;
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isRunning]);
+
+  // Detect phase transitions to update stats
+  const prevPhaseRef = useRef(phase);
+  const prevCyclesRef = useRef(completedCycles);
+  useEffect(() => {
+    const prevPhase = prevPhaseRef.current;
+    const prevCycles = prevCyclesRef.current;
+    const elapsed = phaseTimeRef.current;
+
+    // Focus session completed (cycles incremented)
+    if (completedCycles > prevCycles) {
+      setSessionStats((s) => ({
+        ...s,
+        focusSessions: s.focusSessions + (completedCycles - prevCycles),
+        focusTime: s.focusTime + elapsed,
+      }));
+      phaseTimeRef.current = 0;
+    }
+    // Short break completed (phase changed from shortBreak to focus)
+    else if (prevPhase === 'shortBreak' && phase === 'focus') {
+      setSessionStats((s) => ({
+        ...s,
+        shortBreaks: s.shortBreaks + 1,
+        shortBreakTime: s.shortBreakTime + elapsed,
+      }));
+      phaseTimeRef.current = 0;
+    }
+    // Long break completed (phase changed from longBreak to focus)
+    else if (prevPhase === 'longBreak' && phase === 'focus') {
+      setSessionStats((s) => ({
+        ...s,
+        longBreaks: s.longBreaks + 1,
+        longBreakTime: s.longBreakTime + elapsed,
+      }));
+      phaseTimeRef.current = 0;
+    }
+    // Manual phase switch (user clicked a different phase tab)
+    else if (prevPhase !== phase) {
+      // Flush time for the old phase
+      if (elapsed > 0) {
+        setSessionStats((s) => ({
+          ...s,
+          ...(prevPhase === 'focus' ? { focusTime: s.focusTime + elapsed } : {}),
+          ...(prevPhase === 'shortBreak' ? { shortBreakTime: s.shortBreakTime + elapsed } : {}),
+          ...(prevPhase === 'longBreak' ? { longBreakTime: s.longBreakTime + elapsed } : {}),
+        }));
+      }
+      phaseTimeRef.current = 0;
+    }
+
+    prevPhaseRef.current = phase;
+    prevCyclesRef.current = completedCycles;
+  }, [phase, completedCycles]);
+
+  // Reset stats when task changes
+  const prevTaskRef = useRef(selectedTaskId);
+  useEffect(() => {
+    if (selectedTaskId !== prevTaskRef.current) {
+      setSessionStats({
+        focusSessions: 0,
+        shortBreaks: 0,
+        longBreaks: 0,
+        focusTime: 0,
+        shortBreakTime: 0,
+        longBreakTime: 0,
+      });
+      phaseTimeRef.current = 0;
+      prevTaskRef.current = selectedTaskId;
+    }
+  }, [selectedTaskId]);
+
+  const formatDuration = (seconds: number) => {
+    if (seconds < 60) return `${seconds}s`;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return s > 0 ? `${m}m ${s}s` : `${m}m`;
+  };
+
+  const hasStats = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0;
+
   // Mobile check for drawer animation
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
@@ -377,23 +476,23 @@ export default function FrogodoroPage() {
             <div className="mt-4 text-center animate-fadeInUp">
               {selectedTask ? (
                 <div
-                  className="relative inline-block text-left w-full max-w-sm mx-auto z-20"
+                  className="relative w-full max-w-sm mx-auto z-20"
                   style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
                 >
-                  <div
-                    className="flex items-center justify-between p-4 bg-card border shadow-sm rounded-2xl cursor-pointer hover:border-primary transition-colors group"
-                    onClick={() => setShowTaskDropdown(true)}
-                  >
-                    <div className="flex items-center gap-3 w-full pr-4">
+                  <div className="bg-card border border-border/60 shadow-lg rounded-[28px] overflow-hidden">
+                    {/* Task Header */}
+                    <div
+                      className="flex items-center gap-3 p-4 pb-3 cursor-pointer group"
+                      onClick={() => setShowTaskDropdown(true)}
+                    >
                       <div
-                        className="flex items-center justify-center p-2 -ml-2 rounded-full flex-shrink-0 cursor-pointer transition-colors hover:bg-primary/10 hover:text-primary z-30 group-hover:border-primary/20"
+                        className="relative flex items-center justify-center w-10 h-10 rounded-full flex-shrink-0 cursor-pointer transition-colors hover:bg-primary/10 z-30"
                         onClick={(e) => {
                           e.stopPropagation();
                           if (!visuallyDone.has(selectedTask.id))
                             completeTaskWithAnimation(selectedTask.id);
                         }}
                       >
-                        {/* Always render the fly so the ref exists, but hide it if visually done */}
                         <div
                           className={`transition-opacity duration-300 w-8 h-8 flex items-center justify-center ${visuallyDone.has(selectedTask.id) || selectedTask.completed ? 'opacity-0' : 'opacity-100'}`}
                         >
@@ -407,43 +506,106 @@ export default function FrogodoroPage() {
                             x={0}
                           />
                         </div>
-
-                        {/* Show the checkmark when visually done */}
                         {(visuallyDone.has(selectedTask.id) ||
                           selectedTask.completed) && (
                           <CheckCircle2 className="absolute w-8 h-8 text-primary animate-in zoom-in spin-in-12 duration-300" />
                         )}
                       </div>
                       <span
-                        className={`font-bold text-lg leading-tight truncate transition-colors duration-500 ${selectedTask.completed ? 'line-through text-muted-foreground' : ''}`}
+                        className={`flex-1 font-bold text-base leading-tight truncate text-left transition-colors duration-500 ${selectedTask.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
                       >
                         {selectedTask.text}
                       </span>
-                    </div>
-
-                    {/* Right Side Actions */}
-                    <div className="flex items-center gap-2 flex-shrink-0 relative z-30">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setShowSettingsModal(!showSettingsModal);
                         }}
-                        className="p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground rounded-lg transition-colors"
+                        className="p-2 text-muted-foreground/50 hover:bg-accent hover:text-foreground rounded-xl transition-colors relative z-30 flex-shrink-0"
                       >
-                        <Settings2 className="w-5 h-5" />
+                        <Settings2 className="w-4 h-4" />
                       </button>
                     </div>
+
+                    {/* Stats Row — inside the card */}
+                    <AnimatePresence>
+                      {hasStats && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div className="flex items-center gap-2 px-4 pb-3 flex-wrap">
+                            {sessionStats.focusSessions > 0 && (
+                              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary/8 dark:bg-primary/15">
+                                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                <span className="text-[10px] font-black text-primary tabular-nums">
+                                  {sessionStats.focusSessions}
+                                </span>
+                                <span className="text-[9px] font-bold text-primary/50">
+                                  {formatDuration(sessionStats.focusTime)}
+                                </span>
+                              </div>
+                            )}
+                            {sessionStats.shortBreaks > 0 && (
+                              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
+                                <div className="w-1.5 h-1.5 rounded-full bg-sky-500" />
+                                <span className="text-[10px] font-black text-sky-500 tabular-nums">
+                                  {sessionStats.shortBreaks}
+                                </span>
+                                <span className="text-[9px] font-bold text-sky-500/50">
+                                  {formatDuration(sessionStats.shortBreakTime)}
+                                </span>
+                              </div>
+                            )}
+                            {sessionStats.longBreaks > 0 && (
+                              <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/8 dark:bg-indigo-500/15">
+                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                                <span className="text-[10px] font-black text-indigo-500 tabular-nums">
+                                  {sessionStats.longBreaks}
+                                </span>
+                                <span className="text-[9px] font-bold text-indigo-500/50">
+                                  {formatDuration(sessionStats.longBreakTime)}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Finish Task — integrated footer */}
+                    {!selectedTask.completed && !visuallyDone.has(selectedTask.id) && (
+                      <div className="px-3 pb-3">
+                        <button
+                          onClick={() => completeTaskWithAnimation(selectedTask.id)}
+                          className="w-full py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider bg-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 transition-all active:scale-[0.97]"
+                        >
+                          <span className="flex items-center justify-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Finish Task
+                          </span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
-                <button
-                  onClick={() => setShowTaskDropdown(true)}
-                  className="inline-flex items-center justify-center gap-2 px-6 py-4 bg-card border shadow-sm rounded-2xl cursor-pointer hover:border-primary transition-colors w-full max-w-sm mx-auto font-bold text-foreground relative z-20"
-                >
-                  <ListTodo className="w-5 h-5 text-primary" />
-                  <span>Select a task to focus on...</span>
-                  <ChevronDown className="w-5 h-5 text-muted-foreground ml-auto" />
-                </button>
+                <div className="w-full max-w-sm mx-auto relative z-20">
+                  <button
+                    onClick={() => setShowTaskDropdown(true)}
+                    className="w-full bg-card border border-border/60 shadow-lg rounded-[28px] p-4 flex items-center gap-3 cursor-pointer hover:border-primary/40 transition-all active:scale-[0.98] group"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 group-hover:bg-primary/15 transition-colors">
+                      <Fly size={24} y={-2} />
+                    </div>
+                    <span className="flex-1 text-left font-bold text-muted-foreground/60 text-sm">
+                      Pick a fly to focus on...
+                    </span>
+                    <ChevronDown className="w-4 h-4 text-muted-foreground/40 flex-shrink-0" />
+                  </button>
+                </div>
               )}
 
               {/* Help Modal */}
@@ -655,7 +817,7 @@ export default function FrogodoroPage() {
               {/* Task Selector Bottom Sheet / Modal */}
               <AnimatePresence>
                 {showTaskDropdown && (
-                  <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center pointer-events-none sm:p-4">
+                  <div className="fixed inset-0 z-[100] flex items-end sm:items-center sm:justify-center pointer-events-none sm:p-4">
                     <motion.div
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -686,73 +848,90 @@ export default function FrogodoroPage() {
                         stiffness: 300,
                       }}
                       drag={!isDesktop ? 'y' : false}
-                      dragConstraints={{ top: 0, bottom: 0 }}
-                      dragElastic={0.2}
+                      dragConstraints={{ top: 0, bottom: 300 }}
+                      dragElastic={0}
+                      dragMomentum={false}
                       onDragEnd={(e, { offset, velocity }) => {
                         if (offset.y > 100 || velocity.y > 500) {
                           setShowTaskDropdown(false);
                         }
                       }}
-                      className="w-full sm:max-w-md bg-background border border-border/40 rounded-t-[32px] sm:rounded-[24px] shadow-2xl p-4 sm:p-6 pointer-events-auto relative z-10 max-h-[85vh] flex flex-col pt-3"
+                      className="w-full sm:max-w-md bg-card border border-border/60 rounded-t-[32px] sm:rounded-[28px] shadow-2xl pointer-events-auto relative z-10 max-h-[85vh] flex flex-col overflow-hidden"
                     >
                       {/* Drag Handle */}
-                      <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted rounded-full sm:hidden" />
+                      <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full sm:hidden z-10" />
 
-                      <div className="flex items-center justify-between mb-4 mt-2 sm:mt-0 px-2">
-                        <h3 className="text-xl font-black">Select Task</h3>
+                      {/* Header */}
+                      <div className="flex items-center justify-between px-6 pt-8 pb-4 sm:pt-6">
+                        <div className="text-left">
+                          <h3 className="text-lg font-black text-foreground">Pick a Fly</h3>
+                          <p className="text-[11px] font-bold text-muted-foreground/50 uppercase tracking-widest mt-0.5">
+                            {availableTasks.length} {availableTasks.length === 1 ? 'task' : 'tasks'} available
+                          </p>
+                        </div>
                         <button
                           onClick={() => setShowTaskDropdown(false)}
-                          className="p-2 bg-muted/50 hover:bg-muted rounded-full transition-colors text-muted-foreground"
+                          className="w-9 h-9 flex items-center justify-center rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground transition-colors"
                         >
-                          <X className="w-5 h-5" />
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
 
-                      <div className="flex-1 overflow-y-auto space-y-2 pb-4 scrollbar-hide px-2">
-                        {availableTasks.map((t) => (
-                          <div
-                            key={t.id}
-                            className={`p-4 hover:bg-accent border border-transparent cursor-pointer flex items-center gap-3 group rounded-2xl transition-colors ${t.id === selectedTaskId ? 'bg-primary/5 border-primary/20' : 'bg-card'}`}
-                            onClick={() => handleTaskSelect(t.id)}
-                          >
-                            <div className="relative flex items-center justify-center p-2 -ml-2 flex-shrink-0 z-30 pointer-events-none">
-                              {/* Always render the fly so the ref exists, but hide it if visually done */}
-                              <div
-                                className={`transition-opacity duration-300 ${visuallyDone.has(t.id) || t.completed ? 'opacity-0' : 'opacity-100'}`}
-                              >
-                                <Fly
-                                  ref={null}
-                                  onClick={() => {}}
-                                  size={24}
-                                  y={-2}
-                                />
+                      {/* Task List */}
+                      <div className="flex-1 overflow-y-auto px-3 pb-6 scrollbar-hide">
+                        <div className="space-y-1.5">
+                          {availableTasks.map((t) => (
+                            <button
+                              key={t.id}
+                              className={`w-full text-left p-3.5 flex items-center gap-3 rounded-2xl transition-all active:scale-[0.98] ${
+                                t.id === selectedTaskId
+                                  ? 'bg-primary/8 dark:bg-primary/15 ring-1 ring-primary/20'
+                                  : 'hover:bg-muted/50'
+                              }`}
+                              onClick={() => handleTaskSelect(t.id)}
+                            >
+                              <div className="relative w-9 h-9 rounded-full bg-muted/50 flex items-center justify-center flex-shrink-0">
+                                <div
+                                  className={`transition-opacity duration-300 ${visuallyDone.has(t.id) || t.completed ? 'opacity-0' : 'opacity-100'}`}
+                                >
+                                  <Fly
+                                    ref={null}
+                                    onClick={() => {}}
+                                    size={22}
+                                    y={-2}
+                                  />
+                                </div>
+                                {(visuallyDone.has(t.id) || t.completed) && (
+                                  <CheckCircle2 className="absolute w-5 h-5 text-primary animate-in zoom-in spin-in-12 duration-300" />
+                                )}
                               </div>
-
-                              {/* Show the checkmark when visually done */}
-                              {(visuallyDone.has(t.id) || t.completed) && (
-                                <CheckCircle2 className="absolute w-6 h-6 text-primary animate-in zoom-in spin-in-12 duration-300" />
+                              <span className="font-bold text-sm flex-1 line-clamp-2 text-foreground">
+                                {t.text}
+                              </span>
+                              {t.id === selectedTaskId && (
+                                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
                               )}
-                            </div>
-                            <span className="font-medium flex-1 line-clamp-2">
-                              {t.text}
-                            </span>
-                          </div>
-                        ))}
+                            </button>
+                          ))}
+                        </div>
                         {availableTasks.length === 0 && (
                           <button
                             onClick={() => {
                               setShowTaskDropdown(false);
                               setShowQuickAdd(true);
                             }}
-                            className="w-full flex flex-col items-center justify-center p-6 mt-4 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-2xl transition-all cursor-pointer group"
+                            className="w-full flex flex-col items-center justify-center p-8 mt-2 text-center border-2 border-dashed border-muted-foreground/15 bg-muted/20 hover:bg-muted/40 rounded-2xl transition-all cursor-pointer group"
                           >
-                            <div className="flex items-center justify-center w-12 h-12 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
-                              <Fly size={24} y={-2} />
+                            <div className="flex items-center justify-center w-14 h-14 mb-3 rounded-full bg-muted/50 border border-muted-foreground/10 md:grayscale md:opacity-70 opacity-100 grayscale-0 group-hover:grayscale-0 group-hover:opacity-100 transition-all">
+                              <Fly size={28} y={-2} />
                             </div>
-                            <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                            <p className="text-sm font-black text-muted-foreground group-hover:text-primary transition-colors">
                               {tasks.length > 0
-                                ? 'All caught up! Add a new task'
-                                : 'No tasks yet! Add a task'}
+                                ? 'All caught up!'
+                                : 'No tasks yet'}
+                            </p>
+                            <p className="text-[11px] font-bold text-muted-foreground/50 mt-1">
+                              Tap to add a new task
                             </p>
                           </button>
                         )}
@@ -812,7 +991,16 @@ export default function FrogodoroPage() {
       )}
 
       {/* Full-screen blocker + skip button during tongue animation */}
-      {cinematic && <CinematicOverlay onSkip={speedUpTongue} />}
+      {/* Block interactions during tongue animation (no speed-up UI on this page) */}
+      {cinematic && (
+        <button
+          type="button"
+          aria-label="Animation in progress"
+          className="fixed inset-0 z-[65] cursor-default bg-transparent"
+          onClick={speedUpTongue}
+          onTouchStart={speedUpTongue}
+        />
+      )}
 
       <QuickAddSheet
         open={showQuickAdd}

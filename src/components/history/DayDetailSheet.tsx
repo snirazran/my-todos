@@ -194,8 +194,9 @@ export default function DayDetailSheet({
               exit="exit"
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
               drag={!isDesktop ? 'y' : false}
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.5 }}
+              dragConstraints={{ top: 0, bottom: 300 }}
+              dragElastic={0}
+              dragMomentum={false}
               onDragEnd={(e, { offset, velocity }) => {
                 if (offset.y > 100 || velocity.y > 500) {
                   onClose();
