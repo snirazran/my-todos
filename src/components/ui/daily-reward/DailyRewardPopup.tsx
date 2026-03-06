@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { X, Loader2, Sparkles } from 'lucide-react';
 import useSWR, { mutate } from 'swr';
+import { useTheme } from 'next-themes';
 import { MonthProgress } from './MonthProgress';
 import { useAuth } from '@/components/auth/AuthContext';
 import { cn } from '@/lib/utils';
@@ -39,6 +40,8 @@ export function DailyRewardPopup({
   onClose: () => void;
 }) {
   const { user } = useAuth();
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const { data: statusData, mutate: mutateStatus } =
     useSWR<DailyStatusResponse>(
       user ? '/api/daily-reward/status' : null,
@@ -147,16 +150,19 @@ export function DailyRewardPopup({
                 if (offset.y > 100 || velocity.y > 500) onClose();
               }}
               className={cn(
-                'dark relative w-full overflow-hidden flex flex-col pointer-events-auto',
+                'relative w-full overflow-hidden flex flex-col pointer-events-auto',
+                isDark && 'dark',
                 isDesktop
                   ? 'max-w-3xl rounded-[32px] max-h-[88vh]'
                   : 'h-[92vh] rounded-t-[28px]',
               )}
               style={{
-                background:
-                  'linear-gradient(165deg, #0b2015 0%, #081610 50%, #060e0a 100%)',
-                boxShadow:
-                  '0 0 0 1px rgba(34,197,94,0.12), 0 48px 120px -20px rgba(0,0,0,0.9), 0 0 60px -10px rgba(34,197,94,0.08)',
+                background: isDark
+                  ? 'linear-gradient(165deg, #0b2015 0%, #081610 50%, #060e0a 100%)'
+                  : 'linear-gradient(165deg, #f0fdf4 0%, #e8f5ec 50%, #dcfce7 100%)',
+                boxShadow: isDark
+                  ? '0 0 0 1px rgba(34,197,94,0.12), 0 48px 120px -20px rgba(0,0,0,0.9), 0 0 60px -10px rgba(34,197,94,0.08)'
+                  : '0 0 0 1px rgba(34,197,94,0.15), 0 48px 120px -20px rgba(0,0,0,0.25), 0 0 60px -10px rgba(34,197,94,0.06)',
               }}
             >
               {/* Mobile drag handle — invisible hit area over banner top */}
@@ -172,17 +178,18 @@ export function DailyRewardPopup({
                 className="relative shrink-0 overflow-hidden"
                 style={{ height: `${BANNER_H}px` }}
               >
-                {/* Night-to-dawn sky */}
+                {/* Sky */}
                 <div
                   className="absolute inset-0"
                   style={{
-                    background:
-                      'linear-gradient(180deg, #010a04 0%, #031408 18%, #052912 42%, #083e1a 60%, #0a5421 80%, #0e6e2c 100%)',
+                    background: isDark
+                      ? 'linear-gradient(180deg, #010a04 0%, #031408 18%, #052912 42%, #083e1a 60%, #0a5421 80%, #0e6e2c 100%)'
+                      : 'linear-gradient(180deg, #7dd3fc 0%, #93e4b5 40%, #4ade80 70%, #22c55e 100%)',
                   }}
                 />
 
-                {/* Stars */}
-                {STARS.map((s, i) => (
+                {/* Stars (dark mode only) */}
+                {isDark && STARS.map((s, i) => (
                   <div
                     key={i}
                     className="absolute rounded-full bg-white animate-pulse"
@@ -198,32 +205,36 @@ export function DailyRewardPopup({
                   />
                 ))}
 
-                {/* Moon */}
+                {/* Moon (dark) / Sun (light) */}
                 <div
                   className="absolute"
                   style={{
                     top: '10%',
                     right: '14%',
-                    width: '26px',
-                    height: '26px',
+                    width: isDark ? '26px' : '32px',
+                    height: isDark ? '26px' : '32px',
                     borderRadius: '50%',
-                    background:
-                      'radial-gradient(circle at 35% 35%, #fef3c7 0%, #fde68a 50%, #fcd34d 100%)',
-                    boxShadow:
-                      '0 0 16px 4px rgba(253,230,138,0.35), 0 0 40px 8px rgba(253,230,138,0.1)',
+                    background: isDark
+                      ? 'radial-gradient(circle at 35% 35%, #fef3c7 0%, #fde68a 50%, #fcd34d 100%)'
+                      : 'radial-gradient(circle at 40% 40%, #fef9c3 0%, #fde047 40%, #facc15 100%)',
+                    boxShadow: isDark
+                      ? '0 0 16px 4px rgba(253,230,138,0.35), 0 0 40px 8px rgba(253,230,138,0.1)'
+                      : '0 0 20px 6px rgba(250,204,21,0.4), 0 0 50px 12px rgba(250,204,21,0.15)',
                   }}
                 />
-                {/* Moon crater shadows */}
-                <div
-                  className="absolute rounded-full"
-                  style={{
-                    top: 'calc(10% + 6px)',
-                    right: 'calc(14% + 6px)',
-                    width: '7px',
-                    height: '7px',
-                    background: 'rgba(0,0,0,0.15)',
-                  }}
-                />
+                {/* Moon crater shadows (dark only) */}
+                {isDark && (
+                  <div
+                    className="absolute rounded-full"
+                    style={{
+                      top: 'calc(10% + 6px)',
+                      right: 'calc(14% + 6px)',
+                      width: '7px',
+                      height: '7px',
+                      background: 'rgba(0,0,0,0.15)',
+                    }}
+                  />
+                )}
 
                 {/* Rolling hills SVG */}
                 <div
@@ -237,18 +248,18 @@ export function DailyRewardPopup({
                   >
                     <path
                       d="M0,42 Q60,14 130,36 Q210,58 290,22 Q340,6 400,30 L400,80 L0,80 Z"
-                      fill="#1a6b33"
+                      fill={isDark ? '#1a6b33' : '#22c55e'}
                     />
                     <path
                       d="M0,54 Q70,34 140,50 Q210,66 285,38 Q340,22 400,46 L400,80 L0,80 Z"
-                      fill="#145d29"
+                      fill={isDark ? '#145d29' : '#16a34a'}
                     />
                     <path
                       d="M0,63 Q90,48 170,60 Q250,72 330,54 Q368,46 400,60 L400,80 L0,80 Z"
-                      fill="#0e4120"
+                      fill={isDark ? '#0e4120' : '#15803d'}
                     />
                     {/* Ground */}
-                    <rect x="0" y="68" width="400" height="12" fill="#0a2f17" />
+                    <rect x="0" y="68" width="400" height="12" fill={isDark ? '#0a2f17' : '#166534'} />
                   </svg>
                 </div>
 
@@ -291,8 +302,9 @@ export function DailyRewardPopup({
                     width: '260px',
                     height: '130px',
                     filter: 'blur(40px)',
-                    background:
-                      'radial-gradient(ellipse, rgba(34,197,94,0.22) 0%, rgba(74,222,128,0.06) 60%, transparent 80%)',
+                    background: isDark
+                      ? 'radial-gradient(ellipse, rgba(34,197,94,0.22) 0%, rgba(74,222,128,0.06) 60%, transparent 80%)'
+                      : 'radial-gradient(ellipse, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 60%, transparent 80%)',
                   }}
                 />
 
@@ -396,8 +408,8 @@ export function DailyRewardPopup({
                   🌱
                 </div>
 
-                {/* Fireflies */}
-                {[
+                {/* Fireflies (dark mode only) */}
+                {isDark && [
                   { x: '20%', y: '55%', d: '0s' },
                   { x: '75%', y: '48%', d: '1s' },
                   { x: '35%', y: '40%', d: '0.5s' },
@@ -422,15 +434,16 @@ export function DailyRewardPopup({
                 <div
                   className="absolute bottom-0 left-0 right-0 h-10 pointer-events-none"
                   style={{
-                    background:
-                      'linear-gradient(180deg, transparent 0%, #081610 100%)',
+                    background: isDark
+                      ? 'linear-gradient(180deg, transparent 0%, #081610 100%)'
+                      : 'linear-gradient(180deg, transparent 0%, #dcfce7 100%)',
                   }}
                 />
               </div>
               {/* ═══════════════════ END SCENE BANNER ═══════════════════ */}
 
-              {/* Content */}
-              <div className="flex-1 w-full flex flex-col min-h-0">
+              {/* Content — pulled up to overlap banner bottom */}
+              <div className="flex-1 w-full flex flex-col min-h-0 -mt-3 relative z-[10]">
                 <MonthProgress
                   progress={{
                     ...statusData.dailyRewards,
@@ -450,11 +463,11 @@ export function DailyRewardPopup({
                 onClick={onClose}
                 className="absolute top-3 right-3 z-50 flex items-center justify-center w-9 h-9 rounded-full transition-all hover:scale-110 active:scale-95"
                 style={{
-                  background: 'rgba(0,0,0,0.55)',
-                  border: '1px solid rgba(255,255,255,0.2)',
+                  background: isDark ? 'rgba(0,0,0,0.55)' : 'rgba(255,255,255,0.8)',
+                  border: isDark ? '1px solid rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.1)',
                   backdropFilter: 'blur(8px)',
-                  color: 'rgba(255,255,255,0.9)',
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
+                  color: isDark ? 'rgba(255,255,255,0.9)' : 'rgba(0,0,0,0.7)',
+                  boxShadow: isDark ? '0 2px 12px rgba(0,0,0,0.4)' : '0 2px 12px rgba(0,0,0,0.1)',
                 }}
               >
                 <X size={16} />

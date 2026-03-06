@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { REWARD_SCHEDULE } from '@/lib/dailyRewards';
 import { SingleRewardCard } from './RewardCard';
@@ -20,6 +21,8 @@ export function MonthProgress({
   isPremium,
   onGoPremium,
 }: MonthProgressProps) {
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -64,14 +67,18 @@ export function MonthProgress({
         <div
           className="sticky top-0 z-50 flex items-stretch h-12 overflow-hidden"
           style={{
-            borderBottom: '1px solid rgba(255,255,255,0.07)',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            borderBottom: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(0,0,0,0.08)',
+            boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.08)',
           }}
         >
           {/* Basic */}
           <div
             className="w-[50%] flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg, #145d29 0%, #0e4120 50%, #145d29 100%)' }}
+            style={{
+              background: isDark
+                ? 'linear-gradient(135deg, #145d29 0%, #0e4120 50%, #145d29 100%)'
+                : 'linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #22c55e 100%)',
+            }}
           >
             <span
               style={{
@@ -79,7 +86,7 @@ export function MonthProgress({
                 fontWeight: 900,
                 textTransform: 'uppercase',
                 letterSpacing: '0.12em',
-                color: 'rgba(255,255,255,0.45)',
+                color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.9)',
               }}
             >
               Basic
@@ -126,7 +133,7 @@ export function MonthProgress({
           {/* Track */}
           <div
             className="absolute top-0 bottom-0 left-1/2 w-[2px] -translate-x-1/2 z-[1]"
-            style={{ background: 'rgba(255,255,255,0.08)' }}
+            style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}
           />
 
           {/* Progress fill — glowing green */}
@@ -164,9 +171,12 @@ export function MonthProgress({
                       style={{
                         top: '-6px',
                         bottom: '-6px',
-                        background:
-                          'linear-gradient(90deg, rgba(34,197,94,0.07) 0%, rgba(34,197,94,0.12) 50%, rgba(251,191,36,0.07) 100%)',
-                        border: '1px solid rgba(34,197,94,0.15)',
+                        background: isDark
+                          ? 'linear-gradient(90deg, rgba(34,197,94,0.07) 0%, rgba(34,197,94,0.12) 50%, rgba(251,191,36,0.07) 100%)'
+                          : 'linear-gradient(90deg, rgba(34,197,94,0.08) 0%, rgba(34,197,94,0.15) 50%, rgba(251,191,36,0.08) 100%)',
+                        border: isDark
+                          ? '1px solid rgba(34,197,94,0.15)'
+                          : '1px solid rgba(34,197,94,0.25)',
                       }}
                     />
                   )}
@@ -200,7 +210,7 @@ export function MonthProgress({
                         style={{
                           width: '2.4rem',
                           height: '2.4rem',
-                          background: 'rgba(34,197,94,0.22)',
+                          background: isDark ? 'rgba(34,197,94,0.22)' : 'rgba(34,197,94,0.3)',
                           top: '50%',
                           left: '50%',
                           transform: 'translate(-50%, -50%)',
@@ -218,15 +228,15 @@ export function MonthProgress({
                         background: isToday
                           ? '#19a34a'
                           : progress.claimedDays.includes(dayDef.day)
-                            ? '#1a3a28'
-                            : '#0f1f17',
+                            ? (isDark ? '#1a3a28' : '#d1fae5')
+                            : (isDark ? '#0f1f17' : '#f0fdf4'),
                         borderColor: isToday
                           ? undefined
                           : progress.claimedDays.includes(dayDef.day)
-                            ? '#2a5a3a'
-                            : 'rgba(255,255,255,0.15)',
+                            ? (isDark ? '#2a5a3a' : '#86efac')
+                            : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'),
                         boxShadow: isToday
-                          ? '0 4px 18px rgba(34,197,94,0.65), 0 0 0 2.5px #0a2f17'
+                          ? `0 4px 18px rgba(34,197,94,0.65), 0 0 0 2.5px ${isDark ? '#0a2f17' : '#dcfce7'}`
                           : undefined,
                       }}
                     >
@@ -241,8 +251,8 @@ export function MonthProgress({
                           color: isToday
                             ? 'white'
                             : progress.claimedDays.includes(dayDef.day)
-                              ? 'rgba(255,255,255,0.75)'
-                              : 'rgba(255,255,255,0.4)',
+                              ? (isDark ? 'rgba(255,255,255,0.75)' : '#166534')
+                              : (isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)'),
                         }}
                       >
                         {dayDef.day}
