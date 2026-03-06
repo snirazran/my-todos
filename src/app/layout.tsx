@@ -59,9 +59,9 @@ export default function RootLayout({
 
         <AuthContext>
           <Providers>
-            <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex flex-col h-full">
               <SiteHeader />
-              <main className="flex-1 min-h-0 relative">
+              <main className="flex-1 overflow-y-auto relative">
                 {children}
               </main>
               <MobileNav />
