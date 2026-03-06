@@ -312,6 +312,7 @@ export default React.memo(function HabitTray({
 function HabitTrayItem({
   habit,
   isDone,
+  onToggle,
   onMenuOpen,
   menuOpen,
   tags,
@@ -319,6 +320,7 @@ function HabitTrayItem({
 }: {
   habit: Task;
   isDone: boolean;
+  onToggle: (id: string) => void;
   onMenuOpen: (id: string, top: number, left: number) => void;
   menuOpen: boolean;
   tags: { id: string; name: string; color: string }[];

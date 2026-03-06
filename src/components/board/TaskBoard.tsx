@@ -206,7 +206,7 @@ export default function TaskBoard({
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickText, setQuickText] = useState('');
-  const [quickAddMode, setQuickAddMode] = useState<'pick' | 'later' | 'habit'>(
+  const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>(
     'pick',
   );
 

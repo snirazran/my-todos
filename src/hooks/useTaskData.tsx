@@ -461,7 +461,7 @@ export function useTaskData() {
     async (item: {
       id: string;
       text: string;
-      type?: TaskType;
+      type?: 'regular' | 'weekly' | 'backlog' | 'habit';
       tags?: string[];
     }) => {
       if (!todayData || !backlogData) return;
