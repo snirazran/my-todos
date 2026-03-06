@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import { format } from 'date-fns';
 import TaskBoard from '@/components/board/TaskBoard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -25,6 +25,15 @@ export default function ManageTasksPage() {
   );
   const [habits, setHabits] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Prevent parent <main> from scrolling on this page (it uses overflow-y-auto for home page)
+  useEffect(() => {
+    const main = document.querySelector('main');
+    if (main) {
+      main.style.overflow = 'hidden';
+      return () => { main.style.overflow = ''; };
+    }
+  }, []);
   // Calculate rolling week order once on mount
   const processingWeekOrder = useMemo(() => getRollingWeekOrder(), []);
   const todayIdx = useMemo(
