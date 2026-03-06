@@ -442,10 +442,10 @@ export default function FrogodoroPage() {
                 <div className="col-start-1 flex justify-end">
                   <button
                     onClick={() => setShowHelpModal(true)}
-                    className="p-3 md:p-3.5 lg:p-4 bg-white/20 hover:bg-white/30 rounded-xl md:rounded-2xl transition-colors backdrop-blur active:scale-95 text-white z-10"
+                    className="p-3 md:p-3.5 lg:p-4 bg-white/20 md:hover:bg-white/30 rounded-xl md:rounded-2xl active:scale-95 text-white z-10 will-change-transform"
                     title="How Frogodoro Works"
                   >
-                    <HelpCircle className="w-6 h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 text-white opacity-90" />
+                    <HelpCircle className="w-6 h-6 md:w-7 md:h-7 lg:w-8 lg:h-8 text-white/90" />
                   </button>
                 </div>
 
@@ -890,7 +890,7 @@ export default function FrogodoroPage() {
                               className={`w-full text-left p-3.5 flex items-center gap-3 rounded-2xl transition-all active:scale-[0.98] border ${
                                 t.id === selectedTaskId
                                   ? 'bg-primary/8 dark:bg-primary/15 border-primary/30'
-                                  : 'border-transparent hover:bg-muted/50'
+                                  : 'border-transparent md:hover:bg-muted/50'
                               }`}
                               onClick={() => handleTaskSelect(t.id)}
                             >
