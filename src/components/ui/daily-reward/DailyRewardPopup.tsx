@@ -225,43 +225,9 @@ export function DailyRewardPopup({
                   }}
                 />
 
-                {/* Distant trees (left) */}
-                {[8, 16, 4].map((h, i) => (
-                  <div
-                    key={i}
-                    className="absolute bottom-[62px]"
-                    style={{
-                      left: `${4 + i * 7}%`,
-                      width: `${14 + i * 4}px`,
-                      height: `${40 + h}px`,
-                      background:
-                        'linear-gradient(180deg, #063d15 0%, #052e10 100%)',
-                      borderRadius: `${7 + i * 2}px ${7 + i * 2}px 3px 3px`,
-                      opacity: 0.7 + i * 0.1,
-                    }}
-                  />
-                ))}
-
-                {/* Distant trees (right) */}
-                {[12, 6, 10].map((h, i) => (
-                  <div
-                    key={i}
-                    className="absolute bottom-[62px]"
-                    style={{
-                      right: `${4 + i * 7}%`,
-                      width: `${12 + i * 4}px`,
-                      height: `${38 + h}px`,
-                      background:
-                        'linear-gradient(180deg, #063d15 0%, #052e10 100%)',
-                      borderRadius: `${6 + i * 2}px ${6 + i * 2}px 3px 3px`,
-                      opacity: 0.65 + i * 0.1,
-                    }}
-                  />
-                ))}
-
                 {/* Rolling hills SVG */}
                 <div
-                  className="absolute bottom-0 left-0 right-0"
+                  className="absolute bottom-0 left-0 right-0 z-[1]"
                   style={{ height: '80px' }}
                 >
                   <svg
@@ -286,28 +252,28 @@ export function DailyRewardPopup({
                   </svg>
                 </div>
 
-                {/* Stone path leading up */}
+                {/* Stone path leading up — sits on the ground */}
                 <div
-                  className="absolute bottom-0 left-1/2 -translate-x-1/2"
+                  className="absolute bottom-[8px] left-1/2 -translate-x-1/2 z-[3]"
                   style={{
-                    width: '76px',
-                    height: '72px',
+                    width: '50px',
+                    height: '28px',
                     background:
                       'linear-gradient(180deg, #c8a85a 0%, #a07c30 60%, #7a5c1a 100%)',
-                    clipPath: 'polygon(20% 0%, 80% 0%, 102% 100%, -2% 100%)',
+                    clipPath: 'polygon(28% 0%, 72% 0%, 102% 100%, -2% 100%)',
                   }}
                 >
                   {/* Path stones */}
-                  {[0, 1, 2, 3].map((j) => (
+                  {[0, 1].map((j) => (
                     <div
                       key={j}
                       style={{
                         position: 'absolute',
                         left: '50%',
                         transform: 'translateX(-50%)',
-                        top: `${12 + j * 16}px`,
-                        width: `${28 - j * 4}px`,
-                        height: '6px',
+                        top: `${5 + j * 11}px`,
+                        width: `${20 - j * 4}px`,
+                        height: '4px',
                         background: 'rgba(255,255,255,0.12)',
                         borderRadius: '3px',
                       }}
@@ -317,9 +283,9 @@ export function DailyRewardPopup({
 
                 {/* Ambient glow behind sign */}
                 <div
-                  className="absolute pointer-events-none"
+                  className="absolute pointer-events-none z-[4]"
                   style={{
-                    top: '-10px',
+                    top: '10px',
                     left: '50%',
                     transform: 'translateX(-50%)',
                     width: '260px',
@@ -330,30 +296,18 @@ export function DailyRewardPopup({
                   }}
                 />
 
-                {/* Sign post + board */}
+                {/* Sign post + board — anchored so post meets the road */}
                 <div
-                  className="absolute flex flex-col items-center"
+                  className="absolute flex flex-col items-center z-[5]"
                   style={{
-                    top: '14px',
+                    bottom: '30px',
                     left: '50%',
                     transform: 'translateX(-50%)',
                   }}
                 >
-                  {/* Post */}
-                  <div
-                    style={{
-                      width: '13px',
-                      height: '34px',
-                      background:
-                        'linear-gradient(90deg, #6b3a0a 0%, #92520e 40%, #6b3a0a 100%)',
-                      borderRadius: '3px 3px 2px 2px',
-                      boxShadow: '2px 0 6px rgba(0,0,0,0.5)',
-                    }}
-                  />
                   {/* Sign board */}
                   <div
                     style={{
-                      marginTop: '-3px',
                       padding: isDesktop ? '10px 24px' : '8px 18px',
                       background:
                         'linear-gradient(150deg, #b45309 0%, #92400e 55%, #7c3409 100%)',
@@ -379,13 +333,25 @@ export function DailyRewardPopup({
                       🎁 Daily Rewards
                     </span>
                   </div>
+                  {/* Post (below the sign, reaching into the ground) */}
+                  <div
+                    style={{
+                      width: '13px',
+                      height: '28px',
+                      marginTop: '-3px',
+                      background:
+                        'linear-gradient(90deg, #6b3a0a 0%, #92520e 40%, #6b3a0a 100%)',
+                      borderRadius: '2px 2px 3px 3px',
+                      boxShadow: '2px 0 6px rgba(0,0,0,0.5)',
+                    }}
+                  />
                 </div>
 
-                {/* Frog character */}
+                {/* Frog character — above hills */}
                 <div
-                  className="absolute select-none"
+                  className="absolute select-none z-[4]"
                   style={{
-                    bottom: '18px',
+                    bottom: '36px',
                     right: isDesktop ? '11%' : '8%',
                     fontSize: isDesktop ? '38px' : '30px',
                     filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.55))',
@@ -395,11 +361,11 @@ export function DailyRewardPopup({
                   🐸
                 </div>
 
-                {/* Decorative foliage */}
+                {/* Decorative foliage — above hills */}
                 <div
-                  className="absolute select-none"
+                  className="absolute select-none z-[4]"
                   style={{
-                    bottom: '18px',
+                    bottom: '36px',
                     left: isDesktop ? '10%' : '6%',
                     fontSize: '26px',
                     filter: 'drop-shadow(0 2px 6px rgba(0,0,0,0.4))',
@@ -408,9 +374,9 @@ export function DailyRewardPopup({
                   🌿
                 </div>
                 <div
-                  className="absolute select-none"
+                  className="absolute select-none z-[4]"
                   style={{
-                    bottom: '26px',
+                    bottom: '44px',
                     left: isDesktop ? '17%' : '14%',
                     fontSize: '18px',
                     opacity: 0.75,
@@ -419,9 +385,9 @@ export function DailyRewardPopup({
                   🌿
                 </div>
                 <div
-                  className="absolute select-none"
+                  className="absolute select-none z-[4]"
                   style={{
-                    bottom: '20px',
+                    bottom: '38px',
                     right: isDesktop ? '21%' : '18%',
                     fontSize: '16px',
                     opacity: 0.6,

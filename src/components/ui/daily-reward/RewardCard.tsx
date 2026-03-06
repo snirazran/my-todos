@@ -125,7 +125,7 @@ export function SingleRewardCard({
     );
   } else if (isClaimed && isToday) {
     customAction = (
-      <div className="w-full h-8 flex items-center justify-center rounded-lg bg-emerald-500 border border-emerald-600 text-white text-[10px] font-black uppercase tracking-wide px-1 shadow-sm">
+      <div className="w-full h-8 flex items-center justify-center rounded-lg bg-emerald-500 border border-emerald-600 text-white text-[10px] font-black uppercase tracking-wide px-1 shadow-sm text-center leading-tight">
         Next gift tomorrow
       </div>
     );
