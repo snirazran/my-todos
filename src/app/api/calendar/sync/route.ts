@@ -128,8 +128,9 @@ async function handleSync(req: NextRequest) {
   );
 
   if (tasksToDelete.length > 0) {
+    const idsToDelete = tasksToDelete.map(t => t._id).filter(Boolean);
     await TaskModel.deleteMany({
-      _id: { $in: tasksToDelete.map(t => t._id) }
+      _id: { $in: idsToDelete }
     });
   }
 

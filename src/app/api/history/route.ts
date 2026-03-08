@@ -123,7 +123,7 @@ export async function GET(req: NextRequest) {
           // 3. Check Lifespan (Deletion) - in User Timezone
           if (t.deletedAt) {
             const deletedYMD = getZonedYMD(t.deletedAt);
-            if (deletedYMD < dateStr) return false;
+            if (deletedYMD <= dateStr) return false;
           }
 
           return true;
