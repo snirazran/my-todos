@@ -1,13 +1,13 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUserId } from '@/lib/auth';
+import { requireUserId, requireAuth } from '@/lib/auth';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 
 export async function GET(req: NextRequest) {
   try {
-    const { uid } = await requireUserId();
+    const uid = await requireUserId();
     await connectMongo();
     
     const user = await UserModel.findById(uid)
@@ -38,7 +38,8 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const { uid, email, name } = await requireUserId();
+    const decoded = await requireAuth();
+    const { uid, email, name } = decoded;
     await connectMongo();
 
     const existingUser = await UserModel.findById(uid).lean();
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const { uid } = await requireUserId();
+    const uid = await requireUserId();
     await connectMongo();
 
     const body = await req.json();
