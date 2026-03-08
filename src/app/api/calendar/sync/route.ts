@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import { v4 as uuid } from 'uuid';
 import connectMongo from '@/lib/mongoose';
+import { Types } from 'mongoose';
 import TaskModel, { type TaskDoc, type Weekday } from '@/lib/models/Task';
 import UserModel from '@/lib/models/User';
 import { getZonedToday } from '@/lib/utils';
@@ -128,7 +129,10 @@ async function handleSync(req: NextRequest) {
   );
 
   if (tasksToDelete.length > 0) {
-    const idsToDelete = tasksToDelete.map(t => t._id).filter(Boolean);
+    const idsToDelete = tasksToDelete
+      .map(t => t._id)
+      .filter((id): id is Types.ObjectId => id instanceof Types.ObjectId || !!id);
+    
     await TaskModel.deleteMany({
       _id: { $in: idsToDelete }
     });
