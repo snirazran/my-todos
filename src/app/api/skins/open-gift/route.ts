@@ -3,6 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { CATALOG, byId, ItemDef, Rarity } from '@/lib/skins/catalog';
+import { DROP_RATES } from '@/lib/skins/dropRates';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 
 const json = (body: unknown, init = 200) =>
@@ -10,25 +11,18 @@ const json = (body: unknown, init = 200) =>
 
 type LeanUser = UserDoc & { _id: string };
 
-const WIN_WEIGHTS: Record<Rarity, number> = {
-  common: 0.6,
-  uncommon: 0.25,
-  rare: 0.1,
-  epic: 0.04,
-  legendary: 0.01,
-};
-
-const rollRarity = (): Rarity => {
+const rollRarity = (containerRarity: Rarity = 'common'): Rarity => {
+  const weights = DROP_RATES[containerRarity] ?? DROP_RATES.common;
   const rand = Math.random();
   let cumulative = 0;
-  for (const [rarity, weight] of Object.entries(WIN_WEIGHTS)) {
+  for (const [rarity, weight] of Object.entries(weights)) {
     cumulative += weight;
     if (rand < cumulative) return rarity as Rarity;
   }
   return 'common';
 };
 
-const getRandomItem = (): ItemDef => {
+const getRandomItem = (containerRarity: Rarity = 'common'): ItemDef => {
   const catalogByRarity: Record<Rarity, ItemDef[]> = {
     common: [],
     uncommon: [],
@@ -45,7 +39,7 @@ const getRandomItem = (): ItemDef => {
     }
   });
 
-  let rarity = rollRarity();
+  let rarity = rollRarity(containerRarity);
   while (catalogByRarity[rarity].length === 0) {
     if (rarity === 'legendary') rarity = 'epic';
     else if (rarity === 'epic') rarity = 'rare';
@@ -72,8 +66,9 @@ export async function POST(req: NextRequest) {
     if (!giftBoxId || !byId[giftBoxId])
       return json({ error: 'Unknown giftBoxId' }, 400);
 
-    // 1. Pick a prize
-    const prize = getRandomItem();
+    // 1. Pick a prize (use container rarity for better odds)
+    const containerDef = byId[giftBoxId];
+    const prize = getRandomItem(containerDef?.rarity ?? 'common');
 
     await connectMongo();
     const user = (await UserModel.findById(userId).lean()) as LeanUser | null;

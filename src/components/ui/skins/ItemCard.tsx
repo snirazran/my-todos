@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Check, Lock, Loader2, CircleDollarSign } from 'lucide-react';
+import { Check, Lock, Loader2, CircleDollarSign, X, Info } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
-import type { ItemDef } from '@/lib/skins/catalog';
+import type { ItemDef, Rarity } from '@/lib/skins/catalog';
+import { DROP_RATES } from '@/lib/skins/dropRates';
 import Frog from '@/components/ui/frog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
@@ -224,7 +226,7 @@ export function ItemCard({
             customPreview
           ) : item.slot === 'container' ? (
             <div className="w-[110%] h-[110%] -translate-y-1 drop-shadow-xl">
-              <GiftRive />
+              <GiftRive color={item.riveIndex} />
             </div>
           ) : (
             <Frog
@@ -358,7 +360,146 @@ export function ItemCard({
               </Button>
             </div>
           )}
+
+        {/* Drop Rates Button (Containers only) */}
+        {item.slot === 'container' && (
+          <DropRatesButton rarity={item.rarity} name={item.name} />
+        )}
       </div>
     </motion.div>
+  );
+}
+
+/* ─── DROP RATES BUTTON + POPUP ─────────────────────── */
+
+const RARITY_COLORS: Record<Rarity, string> = {
+  common: 'bg-slate-400',
+  uncommon: 'bg-emerald-500',
+  rare: 'bg-sky-500',
+  epic: 'bg-violet-500',
+  legendary: 'bg-amber-500',
+};
+
+const RARITY_TEXT: Record<Rarity, string> = {
+  common: 'text-slate-500 dark:text-slate-400',
+  uncommon: 'text-emerald-600 dark:text-emerald-400',
+  rare: 'text-sky-600 dark:text-sky-400',
+  epic: 'text-violet-600 dark:text-violet-400',
+  legendary: 'text-amber-600 dark:text-amber-400',
+};
+
+function DropRatesButton({ rarity, name }: { rarity: Rarity; name: string }) {
+  const [open, setOpen] = useState(false);
+  const closingRef = React.useRef(false);
+  const rates = DROP_RATES[rarity] ?? DROP_RATES.common;
+
+  const handleClose = () => {
+    setOpen(false);
+    // Block card click for a tick after popup closes
+    closingRef.current = true;
+    setTimeout(() => { closingRef.current = false; }, 100);
+  };
+
+  return (
+    <>
+      <button
+        onClick={(e) => {
+          e.stopPropagation();
+          if (closingRef.current) return;
+          setOpen(true);
+        }}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="mt-1.5 w-full flex items-center justify-center gap-1 text-[10px] font-bold text-muted-foreground hover:text-foreground transition-colors py-1 rounded-lg hover:bg-muted/50"
+      >
+        <Info className="w-3 h-3" />
+        Drop Rates
+      </button>
+
+      <AnimatePresence>
+        {open && <DropRatesPopup rates={rates} name={name} onClose={handleClose} />}
+      </AnimatePresence>
+    </>
+  );
+}
+
+function DropRatesPopup({
+  rates,
+  name,
+  onClose,
+}: {
+  rates: Record<Rarity, number>;
+  name: string;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  React.useEffect(() => setMounted(true), []);
+
+  if (!mounted) return null;
+
+  const entries = Object.entries(rates) as [Rarity, number][];
+
+  return createPortal(
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      onClick={(e) => { e.stopPropagation(); onClose(); }}
+      onMouseDown={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        className="relative w-full max-w-xs bg-card border border-border/60 rounded-3xl shadow-2xl overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+          <h3 className="text-sm font-black text-foreground tracking-tight">{name}</h3>
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Rates */}
+        <div className="px-5 pb-5 space-y-2.5">
+          {entries.map(([tier, weight]) => {
+            const raw = weight * 100;
+            const label = raw >= 1 ? `${Math.round(raw)}%` : raw >= 0.01 ? `${raw.toFixed(2)}%` : raw > 0 ? `${raw.toFixed(4)}%` : '0%';
+            const barWidth = raw > 0 ? Math.max(raw, 2) : 0;
+            return (
+              <div key={tier} className="flex items-center gap-3">
+                <div className="flex items-center gap-2 w-24">
+                  <div className={cn('w-2 h-2 rounded-full shrink-0', RARITY_COLORS[tier])} />
+                  <span className={cn('text-xs font-bold capitalize', RARITY_TEXT[tier])}>
+                    {tier}
+                  </span>
+                </div>
+                <div className="flex-1 h-2.5 bg-muted/60 rounded-full overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${barWidth}%` }}
+                    transition={{ duration: 0.5, ease: 'easeOut' }}
+                    className={cn('h-full rounded-full', RARITY_COLORS[tier])}
+                  />
+                </div>
+                <span className="text-xs font-black text-muted-foreground tabular-nums w-14 text-right">
+                  {label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </motion.div>
+    </motion.div>,
+    document.body,
   );
 }

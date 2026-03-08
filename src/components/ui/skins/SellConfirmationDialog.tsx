@@ -147,7 +147,7 @@ export function SellConfirmationDialog({
              <div className="absolute inset-0 z-10 flex items-end justify-center">
               {item.slot === 'container' ? (
                 <div className="w-[80%] h-[80%] mb-4 drop-shadow-xl">
-                   <GiftRive />
+                   <GiftRive color={item.riveIndex} />
                 </div>
               ) : (
                 <Frog

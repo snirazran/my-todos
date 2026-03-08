@@ -359,19 +359,7 @@ export function DailyRewardPopup({
                   />
                 </div>
 
-                {/* Frog character — above hills */}
-                <div
-                  className="absolute select-none z-[4]"
-                  style={{
-                    bottom: '36px',
-                    right: isDesktop ? '11%' : '8%',
-                    fontSize: isDesktop ? '38px' : '30px',
-                    filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.55))',
-                    animation: 'float-blob 4s ease-in-out infinite',
-                  }}
-                >
-                  🐸
-                </div>
+                {/* Frog character removed */}
 
                 {/* Decorative foliage — above hills */}
                 <div

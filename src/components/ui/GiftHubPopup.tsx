@@ -391,6 +391,7 @@ export function GiftHubPopup({
                 touchAction: 'none',
                 transform: 'translate3d(0,0,0)',
               }}
+              onClick={() => confirmingBuyId && setConfirmingBuyId(null)}
               className={cn(
                 'pointer-events-auto w-full sm:max-w-[720px] h-[85vh] sm:h-[80vh] flex flex-col bg-background overflow-hidden relative select-none',
                 isDesktop && 'shadow-2xl',

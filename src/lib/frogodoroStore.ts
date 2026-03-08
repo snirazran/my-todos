@@ -17,6 +17,24 @@ export const DEFAULT_SETTINGS: FrogodoroSettings = {
   longBreakInterval: 3,
 };
 
+export interface SessionStats {
+  focusSessions: number;
+  shortBreaks: number;
+  longBreaks: number;
+  focusTime: number;
+  shortBreakTime: number;
+  longBreakTime: number;
+}
+
+export const DEFAULT_SESSION_STATS: SessionStats = {
+  focusSessions: 0,
+  shortBreaks: 0,
+  longBreaks: 0,
+  focusTime: 0,
+  shortBreakTime: 0,
+  longBreakTime: 0,
+};
+
 interface FrogodoroState {
   settings: FrogodoroSettings;
   selectedTaskId: string;
@@ -26,6 +44,8 @@ interface FrogodoroState {
   endTime: number | null; // unix timestamp for background calc
   completedCycles: number;
   currentSessionSpend: number; // accumulated focus time to sync
+  sessionStats: SessionStats;
+  phaseElapsed: number; // seconds spent in the current phase
 
   // Actions
   setSettings: (settings: FrogodoroSettings) => void;
@@ -37,6 +57,9 @@ interface FrogodoroState {
   completePhase: () => void;
   addSessionSpend: (time: number) => void;
   clearSessionSpend: () => void;
+  updateSessionStats: (stats: SessionStats) => void;
+  setPhaseElapsed: (elapsed: number) => void;
+  resetSessionStats: () => void;
 }
 
 export const useFrogodoroStore = create<FrogodoroState>()(
@@ -50,6 +73,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       endTime: null,
       completedCycles: 0,
       currentSessionSpend: 0,
+      sessionStats: DEFAULT_SESSION_STATS,
+      phaseElapsed: 0,
 
       setSettings: (settings) =>
         set((state) => {
@@ -80,6 +105,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
               timeLeft: initialTime,
               completedCycles: 0,
               currentSessionSpend: 0,
+              sessionStats: DEFAULT_SESSION_STATS,
+              phaseElapsed: 0,
             };
           }
           return { selectedTaskId: taskId, settings };
@@ -149,6 +176,9 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           currentSessionSpend: state.currentSessionSpend + time,
         })),
       clearSessionSpend: () => set({ currentSessionSpend: 0 }),
+      updateSessionStats: (stats) => set({ sessionStats: stats }),
+      setPhaseElapsed: (elapsed) => set({ phaseElapsed: elapsed }),
+      resetSessionStats: () => set({ sessionStats: DEFAULT_SESSION_STATS, phaseElapsed: 0 }),
     }),
     {
       name: 'frogodoro-storage',

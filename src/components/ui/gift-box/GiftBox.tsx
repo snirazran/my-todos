@@ -31,6 +31,7 @@ export const GiftRive = React.memo(
     triggerOpen,
     isMilestone = false,
     paused = false,
+    color = 0,
   }: {
     width?: number;
     height?: number;
@@ -38,6 +39,7 @@ export const GiftRive = React.memo(
     triggerOpen?: boolean;
     isMilestone?: boolean;
     paused?: boolean;
+    color?: number;
   }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const riveUrl = useRiveAsset('/idle_gift.riv');
@@ -62,6 +64,14 @@ export const GiftRive = React.memo(
       };
     }, [rive]);
 
+    // Set color as soon as rive is ready via the stateMachineInputs API
+    useEffect(() => {
+      if (!rive) return;
+      const inputs = rive.stateMachineInputs('State Machine 1');
+      const ci = inputs?.find((i) => i.name === 'color');
+      if (ci) ci.value = color;
+    }, [rive, color]);
+
     const startOpenInput = useStateMachineInput(
       rive,
       'State Machine 1',
@@ -74,13 +84,31 @@ export const GiftRive = React.memo(
       'is_mile_stone'
     );
 
+    const colorInput = useStateMachineInput(
+      rive,
+      'State Machine 1',
+      'color'
+    );
+
+    // Apply color whenever the input becomes available or color changes
+    const applyColor = React.useCallback(() => {
+      if (colorInput && typeof color === 'number') {
+        colorInput.value = color;
+      }
+    }, [color, colorInput]);
+
+    useEffect(() => {
+      applyColor();
+    }, [applyColor]);
+
     useEffect(() => {
       if (rive) {
         if (paused) {
-          // Reset to initial state, play briefly to engage SM, then pause
           rive.reset();
           rive.play();
+          // Re-apply color after reset since reset clears inputs
           const timer = setTimeout(() => {
+            applyColor();
             rive.pause();
           }, 50);
           return () => clearTimeout(timer);
@@ -88,17 +116,17 @@ export const GiftRive = React.memo(
           rive.play();
         }
       }
-    }, [rive, paused]);
+    }, [rive, paused, applyColor]);
 
     useEffect(() => {
       if (isMilestone && isMileStoneInput) {
-        // Delay to allow state machine to enter idle before firing trigger
         const timer = setTimeout(() => {
           isMileStoneInput.fire();
+          applyColor();
         }, 100);
         return () => clearTimeout(timer);
       }
-    }, [isMilestone, isMileStoneInput]);
+    }, [isMilestone, isMileStoneInput, applyColor]);
 
     useEffect(() => {
       if (triggerOpen && startOpenInput) {
@@ -134,6 +162,7 @@ type GiftBoxProps = {
   onOpen: () => void;
   loadingText?: string;
   isMilestone?: boolean;
+  color?: number;
 };
 
 export const GiftBox = ({
@@ -141,6 +170,7 @@ export const GiftBox = ({
   onOpen,
   loadingText,
   isMilestone,
+  color = 1,
 }: GiftBoxProps) => {
   return (
     <motion.div
@@ -161,7 +191,7 @@ export const GiftBox = ({
         variants={shakeVariants}
         className="relative w-[450px] h-[450px] md:w-[500px] md:h-[500px]"
       >
-        <GiftRive triggerOpen={phase === 'shaking'} isMilestone={isMilestone} />
+        <GiftRive triggerOpen={phase === 'shaking'} isMilestone={isMilestone} color={color} />
       </motion.div>
 
       <motion.div

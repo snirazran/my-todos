@@ -441,6 +441,7 @@ export function WardrobePanel({
                   transform: 'translate3d(0,0,0)', // Fixes border-radius clipping on mobile
                 }}
                 // Added rounded-t-[32px] for sheet look on mobile
+                onClick={() => confirmingBuyId && setConfirmingBuyId(null)}
                 className={cn(
                   'pointer-events-auto w-full sm:max-w-[95vw] lg:max-w-[1200px] h-[90vh] sm:h-[90vh] flex flex-col bg-background overflow-hidden relative select-none',
                   isDesktop && 'shadow-2xl', // Only show shadow on desktop to reduce lag on mobile

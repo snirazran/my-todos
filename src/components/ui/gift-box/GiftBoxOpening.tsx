@@ -105,6 +105,8 @@ export default function GiftBoxOpening({
     onClose();
   };
 
+  const giftDef = byId[giftBoxId];
+  const giftColor = giftDef?.riveIndex ?? 0;
   const config = prize ? RARITY_CONFIG[prize.rarity] : RARITY_CONFIG.common;
 
   if (!mounted) return null;
@@ -163,6 +165,7 @@ export default function GiftBoxOpening({
               phase={phase}
               onOpen={handleOpen}
               loadingText={loadingText}
+              color={giftColor}
             />
           )}
 

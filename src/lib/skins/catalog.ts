@@ -140,12 +140,30 @@ export const CATALOG: Readonly<ItemDef[]> = [
   // --- CONTAINERS ---
   {
     id: 'gift_box_1',
-    name: 'Mystery Gift Box',
+    name: 'Common Gift',
     slot: 'container',
     rarity: 'common',
     riveIndex: 0,
     icon: '/skins/container/gift.png',
     priceFlies: 100,
+  },
+  {
+    id: 'gift_box_rare',
+    name: 'Rare Gift',
+    slot: 'container',
+    rarity: 'rare',
+    riveIndex: 1,
+    icon: '/skins/container/gift.png',
+    priceFlies: 500,
+  },
+  {
+    id: 'gift_box_legendary',
+    name: 'Legendary Gift',
+    slot: 'container',
+    rarity: 'legendary',
+    riveIndex: 2,
+    icon: '/skins/container/gift.png',
+    priceFlies: 2500,
   },
 ];
 

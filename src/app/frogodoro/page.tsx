@@ -8,6 +8,7 @@ import {
   useFrogodoroStore,
   PomodoroPhase,
   DEFAULT_SETTINGS,
+  DEFAULT_SESSION_STATS,
 } from '@/lib/frogodoroStore';
 import {
   Play,
@@ -100,12 +101,17 @@ export default function FrogodoroPage() {
     timeLeft,
     isRunning,
     completedCycles,
+    sessionStats,
+    phaseElapsed: liveElapsed,
     setSettings,
     setTask,
     startTimer,
     pauseTimer,
     switchPhase,
     completePhase,
+    updateSessionStats,
+    setPhaseElapsed,
+    resetSessionStats,
   } = useFrogodoroStore();
 
   // Local UI State
@@ -137,28 +143,22 @@ export default function FrogodoroPage() {
     speedUpTongue,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
-  // Session stats tracking (resets when task changes)
-  const [sessionStats, setSessionStats] = useState({
-    focusSessions: 0,
-    shortBreaks: 0,
-    longBreaks: 0,
-    focusTime: 0,
-    shortBreakTime: 0,
-    longBreakTime: 0,
-  });
+  // Live elapsed time — sync phaseTimeRef with persisted store value
+  const phaseTimeRef = useRef(liveElapsed);
 
-  // Live elapsed time for the current running phase (triggers re-renders)
-  const [liveElapsed, setLiveElapsed] = useState(0);
-  const phaseTimeRef = useRef(0);
+  // Keep ref in sync with store on mount / navigation
+  useEffect(() => {
+    phaseTimeRef.current = liveElapsed;
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!isRunning) return;
     const interval = setInterval(() => {
       phaseTimeRef.current += 1;
-      setLiveElapsed(phaseTimeRef.current);
+      setPhaseElapsed(phaseTimeRef.current);
     }, 1000);
     return () => clearInterval(interval);
-  }, [isRunning]);
+  }, [isRunning, setPhaseElapsed]);
 
   // Detect phase transitions to update stats
   const prevPhaseRef = useRef(phase);
@@ -171,67 +171,49 @@ export default function FrogodoroPage() {
     if (elapsed > 0) {
       // Focus session completed (cycles incremented by timer)
       if (completedCycles > prevCycles) {
-        setSessionStats((s) => ({
-          ...s,
-          focusSessions: s.focusSessions + (completedCycles - prevCycles),
-          focusTime: s.focusTime + elapsed,
-        }));
+        updateSessionStats({
+          ...sessionStats,
+          focusSessions: sessionStats.focusSessions + (completedCycles - prevCycles),
+          focusTime: sessionStats.focusTime + elapsed,
+        });
         phaseTimeRef.current = 0;
-        setLiveElapsed(0);
+        setPhaseElapsed(0);
       }
       // Break completed naturally (phase auto-changed to focus)
       else if (prevPhase === 'shortBreak' && phase === 'focus') {
-        setSessionStats((s) => ({
-          ...s,
-          shortBreaks: s.shortBreaks + 1,
-          shortBreakTime: s.shortBreakTime + elapsed,
-        }));
+        updateSessionStats({
+          ...sessionStats,
+          shortBreaks: sessionStats.shortBreaks + 1,
+          shortBreakTime: sessionStats.shortBreakTime + elapsed,
+        });
         phaseTimeRef.current = 0;
-        setLiveElapsed(0);
+        setPhaseElapsed(0);
       }
       else if (prevPhase === 'longBreak' && phase === 'focus') {
-        setSessionStats((s) => ({
-          ...s,
-          longBreaks: s.longBreaks + 1,
-          longBreakTime: s.longBreakTime + elapsed,
-        }));
+        updateSessionStats({
+          ...sessionStats,
+          longBreaks: sessionStats.longBreaks + 1,
+          longBreakTime: sessionStats.longBreakTime + elapsed,
+        });
         phaseTimeRef.current = 0;
-        setLiveElapsed(0);
+        setPhaseElapsed(0);
       }
       // Manual skip while time was spent — count the partial phase
       else if (prevPhase !== phase) {
-        setSessionStats((s) => ({
-          ...s,
-          ...(prevPhase === 'focus' ? { focusSessions: s.focusSessions + 1, focusTime: s.focusTime + elapsed } : {}),
-          ...(prevPhase === 'shortBreak' ? { shortBreaks: s.shortBreaks + 1, shortBreakTime: s.shortBreakTime + elapsed } : {}),
-          ...(prevPhase === 'longBreak' ? { longBreaks: s.longBreaks + 1, longBreakTime: s.longBreakTime + elapsed } : {}),
-        }));
+        updateSessionStats({
+          ...sessionStats,
+          ...(prevPhase === 'focus' ? { focusSessions: sessionStats.focusSessions + 1, focusTime: sessionStats.focusTime + elapsed } : {}),
+          ...(prevPhase === 'shortBreak' ? { shortBreaks: sessionStats.shortBreaks + 1, shortBreakTime: sessionStats.shortBreakTime + elapsed } : {}),
+          ...(prevPhase === 'longBreak' ? { longBreaks: sessionStats.longBreaks + 1, longBreakTime: sessionStats.longBreakTime + elapsed } : {}),
+        });
         phaseTimeRef.current = 0;
-        setLiveElapsed(0);
+        setPhaseElapsed(0);
       }
     }
 
     prevPhaseRef.current = phase;
     prevCyclesRef.current = completedCycles;
   }, [phase, completedCycles]);
-
-  // Reset stats when task changes
-  const prevTaskRef = useRef(selectedTaskId);
-  useEffect(() => {
-    if (selectedTaskId !== prevTaskRef.current) {
-      setSessionStats({
-        focusSessions: 0,
-        shortBreaks: 0,
-        longBreaks: 0,
-        focusTime: 0,
-        shortBreakTime: 0,
-        longBreakTime: 0,
-      });
-      phaseTimeRef.current = 0;
-      setLiveElapsed(0);
-      prevTaskRef.current = selectedTaskId;
-    }
-  }, [selectedTaskId]);
 
   const formatDuration = (seconds: number) => {
     if (seconds < 60) return `${seconds}s`;
@@ -240,8 +222,8 @@ export default function FrogodoroPage() {
     return s > 0 ? `${m}m ${s}s` : `${m}m`;
   };
 
-  // Show stats when there are completed phases OR when timer is currently running
-  const hasStats = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || isRunning;
+  // Show stats when there are completed phases OR when the timer has been used at all
+  const hasStats = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || isRunning || liveElapsed > 0;
 
   // Mobile check for drawer animation
   const [isDesktop, setIsDesktop] = useState(false);
@@ -374,7 +356,7 @@ export default function FrogodoroPage() {
       <div className="w-full max-w-7xl px-4 pb-8 mx-auto md:px-8">
         <div className="relative grid items-start grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-8">
           {/* LEFT: FROG DISPLAY */}
-          <div className="z-10 flex flex-col lg:items-start items-center gap-4 lg:col-span-4 lg:sticky lg:top-8 lg:gap-6">
+          <div className="z-10 flex flex-col gap-4 lg:col-span-4 lg:sticky lg:top-8 lg:gap-6">
             <FrogDisplay
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
@@ -495,22 +477,36 @@ export default function FrogodoroPage() {
                       onClick={() => setShowTaskDropdown(true)}
                     >
                       <div className="relative flex items-center justify-center w-7 h-7 flex-shrink-0 pointer-events-none">
-                        <div
-                          className={`transition-opacity duration-300 flex items-center justify-center ${visuallyDone.has(selectedTask.id) || selectedTask.completed ? 'opacity-0' : 'opacity-100'}`}
-                        >
-                          <Fly
-                            ref={(el) => {
-                              flyRefs.current[selectedTask.id] = el;
-                            }}
-                            onClick={() => {}}
-                            size={30}
-                            y={-4}
-                          />
-                        </div>
-                        {(visuallyDone.has(selectedTask.id) ||
-                          selectedTask.completed) && (
-                          <CheckCircle2 className="absolute w-7 h-7 text-primary animate-in zoom-in spin-in-12 duration-300" />
-                        )}
+                        <AnimatePresence initial={false}>
+                          {!(visuallyDone.has(selectedTask.id) || selectedTask.completed) ? (
+                            <motion.div
+                              key="fly"
+                              initial={{ opacity: 1, scale: 1 }}
+                              exit={{ opacity: 0, scale: 0.6 }}
+                              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                              className="absolute inset-0 flex items-center justify-center"
+                            >
+                              <Fly
+                                ref={(el) => {
+                                  flyRefs.current[selectedTask.id] = el;
+                                }}
+                                onClick={() => {}}
+                                size={30}
+                                y={-4}
+                              />
+                            </motion.div>
+                          ) : (
+                            <motion.div
+                              key="check"
+                              initial={{ opacity: 0, scale: 0.6 }}
+                              animate={{ opacity: 1, scale: 1 }}
+                              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                              className="absolute inset-0 flex items-center justify-center"
+                            >
+                              <CheckCircle2 className="w-7 h-7 text-primary" />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                       <span
                         className={`flex-1 font-bold text-base leading-tight truncate text-left transition-colors duration-500 ${selectedTask.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
@@ -538,39 +534,39 @@ export default function FrogodoroPage() {
                           className="overflow-hidden"
                         >
                           <div className="flex items-center gap-2.5 px-4 pb-3 flex-wrap">
-                            {/* Focus — show if completed sessions exist OR currently in focus */}
-                            {(sessionStats.focusSessions > 0 || (isRunning && phase === 'focus')) && (
+                            {/* Focus — show if completed sessions exist OR currently in focus phase */}
+                            {(sessionStats.focusSessions > 0 || phase === 'focus') && (
                               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/8 dark:bg-primary/15">
                                 <div className={`w-2 h-2 rounded-full bg-primary ${isRunning && phase === 'focus' ? 'animate-pulse' : ''}`} />
                                 <span className="text-xs font-black text-primary tabular-nums">
-                                  {sessionStats.focusSessions + (isRunning && phase === 'focus' ? 1 : 0)}
+                                  {sessionStats.focusSessions + (phase === 'focus' && liveElapsed > 0 ? 1 : 0)}
                                 </span>
                                 <span className="text-[11px] font-bold text-primary/60 tabular-nums">
-                                  {formatDuration(sessionStats.focusTime + (isRunning && phase === 'focus' ? liveElapsed : 0))}
+                                  {formatDuration(sessionStats.focusTime + (phase === 'focus' ? liveElapsed : 0))}
                                 </span>
                               </div>
                             )}
                             {/* Short break */}
-                            {(sessionStats.shortBreaks > 0 || (isRunning && phase === 'shortBreak')) && (
+                            {(sessionStats.shortBreaks > 0 || phase === 'shortBreak') && (
                               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/8 dark:bg-sky-500/15">
                                 <div className={`w-2 h-2 rounded-full bg-sky-500 ${isRunning && phase === 'shortBreak' ? 'animate-pulse' : ''}`} />
                                 <span className="text-xs font-black text-sky-500 tabular-nums">
-                                  {sessionStats.shortBreaks + (isRunning && phase === 'shortBreak' ? 1 : 0)}
+                                  {sessionStats.shortBreaks + (phase === 'shortBreak' && liveElapsed > 0 ? 1 : 0)}
                                 </span>
                                 <span className="text-[11px] font-bold text-sky-500/60 tabular-nums">
-                                  {formatDuration(sessionStats.shortBreakTime + (isRunning && phase === 'shortBreak' ? liveElapsed : 0))}
+                                  {formatDuration(sessionStats.shortBreakTime + (phase === 'shortBreak' ? liveElapsed : 0))}
                                 </span>
                               </div>
                             )}
                             {/* Long break */}
-                            {(sessionStats.longBreaks > 0 || (isRunning && phase === 'longBreak')) && (
+                            {(sessionStats.longBreaks > 0 || phase === 'longBreak') && (
                               <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/8 dark:bg-indigo-500/15">
                                 <div className={`w-2 h-2 rounded-full bg-indigo-500 ${isRunning && phase === 'longBreak' ? 'animate-pulse' : ''}`} />
                                 <span className="text-xs font-black text-indigo-500 tabular-nums">
-                                  {sessionStats.longBreaks + (isRunning && phase === 'longBreak' ? 1 : 0)}
+                                  {sessionStats.longBreaks + (phase === 'longBreak' && liveElapsed > 0 ? 1 : 0)}
                                 </span>
                                 <span className="text-[11px] font-bold text-indigo-500/60 tabular-nums">
-                                  {formatDuration(sessionStats.longBreakTime + (isRunning && phase === 'longBreak' ? liveElapsed : 0))}
+                                  {formatDuration(sessionStats.longBreakTime + (phase === 'longBreak' ? liveElapsed : 0))}
                                 </span>
                               </div>
                             )}

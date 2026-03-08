@@ -184,7 +184,7 @@ export function FrogDisplay({
       <div
         className="relative z-10 -mt-6 flex items-center justify-between 
 
-              w-[370px] max-w-[95vw] h-[76px] px-3
+              w-[370px] max-w-[min(95vw,100%)] h-[76px] px-3
 
               bg-card/80
 
