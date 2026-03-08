@@ -24,7 +24,7 @@ async function ensureWardrobe(uid: string) {
 
   // If equipped item is not owned anymore, null it
   const nextEquipped: UserWardrobe['equipped'] = { ...current.equipped };
-  for (const slot of ['skin', 'hat', 'scarf', 'hand_item'] as WardrobeSlot[]) {
+  for (const slot of ['skin', 'hat', 'scarf', 'hand_item', 'glasses'] as WardrobeSlot[]) {
     const id = nextEquipped[slot];
     if (id && (!current.inventory[id] || current.inventory[id] <= 0)) {
       nextEquipped[slot] = null;
@@ -115,7 +115,7 @@ export async function PUT(req: NextRequest) {
     const slot = body.slot;
     const itemId = body.itemId ?? null; // null => unequip
 
-    if (!slot || !['skin', 'hat', 'scarf', 'hand_item'].includes(slot))
+    if (!slot || !['skin', 'hat', 'scarf', 'hand_item', 'glasses'].includes(slot))
       return json({ error: 'Unknown slot' }, 400);
 
     await connectMongo();
