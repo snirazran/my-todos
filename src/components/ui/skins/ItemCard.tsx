@@ -163,7 +163,6 @@ export function ItemCard({
           : isSelected
             ? 'bg-primary/10 border-primary shadow-[0_0_15px_rgba(34,197,94,0.4)]'
             : cn(config.shadow, config.hoverGlow),
-        !isOwned && mode === 'shop' && !canAfford && 'opacity-80',
       )}
     >
       {/* Selected Indicator */}
@@ -443,12 +442,19 @@ function DropRatesPopup({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
+      transition={{ duration: 0.12 }}
       className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
       onClick={(e) => { e.stopPropagation(); onClose(); }}
       onMouseDown={(e) => e.stopPropagation()}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.12 }}
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+      />
       <motion.div
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
