@@ -11,6 +11,8 @@ import {
   Filter,
   ChevronDown,
   Check,
+  CalendarDays,
+  Clock,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import {
@@ -63,6 +65,9 @@ interface Task {
   origin?: 'regular' | 'weekly' | 'backlog' | 'habit';
   kind?: 'regular' | 'weekly' | 'backlog' | 'habit';
   tags?: string[];
+  calendarEventId?: string;
+  startTime?: string;
+  endTime?: string;
 }
 
 interface SortableTaskItemProps {
@@ -510,9 +515,24 @@ const SortableTaskItem = React.forwardRef<
               </div>
 
               <div className="flex-1 min-w-0">
-                {task.tags && task.tags.length > 0 && (
+                {( (task.tags && task.tags.length > 0) || task.startTime ) && (
                   <div className="flex flex-wrap gap-1 mb-1">
                     <AnimatePresence mode="popLayout">
+                      {task.startTime && (
+                        <motion.span
+                          initial={{ opacity: 0, scale: 0.8 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0 }}
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-500/20 shadow-sm"
+                          key="task-time-tag"
+                        >
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>
+                            {task.startTime}
+                            {task.endTime && task.endTime !== task.startTime ? ` - ${task.endTime}` : ''}
+                          </span>
+                        </motion.span>
+                      )}
                       {task.tags?.map((tagId) => {
                         const tagDetails = getTagDetails(tagId);
                         if (!tagDetails) return null;
@@ -568,6 +588,9 @@ const SortableTaskItem = React.forwardRef<
                   )}
                   {task.type === 'habit' && (
                     <Repeat className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
+                  )}
+                  {task.calendarEventId && (
+                    <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                   )}
                 </span>
               </div>

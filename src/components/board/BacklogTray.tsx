@@ -40,6 +40,7 @@ interface Props {
   onTagsChange?: (tags: string[]) => void;
   showCompleted?: boolean;
   onShowCompletedChange?: (show: boolean) => void;
+  hideDoTodayButton?: boolean;
 }
 
 export default React.memo(function BacklogTray({
@@ -62,6 +63,7 @@ export default React.memo(function BacklogTray({
   onTagsChange,
   showCompleted = true,
   onShowCompletedChange,
+  hideDoTodayButton = false,
 }: Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const startX = useRef(0);
@@ -423,6 +425,7 @@ export default React.memo(function BacklogTray({
                             onDoToday={
                               onDoToday ? () => onDoToday(t.id) : undefined
                             }
+                            hideDoTodayButton={hideDoTodayButton}
                           />
                         </div>
                       </motion.div>
@@ -441,10 +444,6 @@ export default React.memo(function BacklogTray({
             onClose={() => setMenu(null)}
             onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
             addTagsPosition="first"
-            onToggleRepeat={() => {
-              if (menu && onToggleRepeat) onToggleRepeat(menu.id);
-              setMenu(null);
-            }}
             isWeekly={
               menu
                 ? tasks.find((t) => t.id === menu.id)?.type === 'weekly'

@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, CalendarClock, Tag, RotateCcw, Pencil, CalendarCheck, CalendarDays } from 'lucide-react';
+import { Trash2, CalendarClock, Tag, RotateCcw, Pencil, CalendarCheck, CalendarDays, Check } from 'lucide-react';
 import TagManager from '@/components/ui/TagManager';
 
 interface TaskMenuProps {
@@ -124,10 +124,19 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                   onToggleRepeat();
                   onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className={`group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
+                isWeekly 
+                  ? 'bg-primary/10 text-primary hover:bg-primary/20' 
+                  : 'text-foreground hover:bg-accent'
+              }`}
             >
-              <RotateCcw className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              {isWeekly ? 'Make Regular' : 'Make Weekly'}
+              <div className="flex items-center gap-2">
+                <RotateCcw className={`h-4 w-4 transition-colors ${
+                  isWeekly ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'
+                }`} />
+                <span>Repeat Weekly</span>
+              </div>
+              {isWeekly && <Check className="h-3.5 w-3.5 text-primary" />}
             </button>
           )}
 

@@ -869,6 +869,9 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           completed: !!t.completed,
           tags: t.tags ?? [],
           frogodoroSettings: t.frogodoroSettings,
+          calendarEventId: t.calendarEventId,
+          startTime: t.startTime,
+          endTime: t.endTime,
         }))
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       return NextResponse.json(out);
@@ -991,7 +994,7 @@ async function handleBoardPut(
     });
     const docs: TaskDoc[] = await TaskModel.find(
       { userId: uid, id: { $in: ids } },
-      { id: 1, text: 1, type: 1, tags: 1 },
+      { id: 1, text: 1, type: 1, tags: 1, calendarEventId: 1, startTime: 1, endTime: 1 },
     )
       .lean<TaskDoc[]>()
       .exec();
@@ -1009,13 +1012,21 @@ async function handleBoardPut(
     );
     const textById = new Map<string, string>();
     const tagsById = new Map<string, string[]>();
+    const calIdById = new Map<string, string | undefined>();
+    const startById = new Map<string, string | undefined>();
+    const endById = new Map<string, string | undefined>();
+
     for (const d of docs) {
       textById.set(d.id, d.text ?? '');
       tagsById.set(d.id, d.tags ?? []);
+      calIdById.set(d.id, d.calendarEventId);
+      startById.set(d.id, d.startTime);
+      endById.set(d.id, d.endTime);
     }
     await Promise.all(
-      ids.map((id, i) =>
-        TaskModel.updateOne(
+      ids.map((id, i) => {
+        const t = (tasks as any[]).find(item => item.id === id);
+        return TaskModel.updateOne(
           { userId: uid, type: 'backlog', weekStart, id },
           {
             $set: {
@@ -1024,6 +1035,9 @@ async function handleBoardPut(
               tags: tagsFromReq.get(id) ?? tagsById.get(id) ?? [],
               weekStart,
               updatedAt: now,
+              calendarEventId: t?.calendarEventId ?? calIdById.get(id),
+              startTime: t?.startTime ?? startById.get(id),
+              endTime: t?.endTime ?? endById.get(id),
             },
             $setOnInsert: {
               userId: uid,
@@ -1035,8 +1049,8 @@ async function handleBoardPut(
             },
           },
           { upsert: true },
-        ),
-      ),
+        );
+      }),
     );
     await TaskModel.deleteMany({
       userId: uid,
@@ -1059,18 +1073,28 @@ async function handleBoardPut(
 
   const docs: TaskDoc[] = await TaskModel.find(
     { userId: uid, id: { $in: ids } },
-    { id: 1, type: 1, text: 1, tags: 1 },
+    { id: 1, type: 1, text: 1, tags: 1, calendarEventId: 1, startTime: 1, endTime: 1 },
   )
     .lean<TaskDoc[]>()
     .exec();
   const typeById = new Map(docs.map((d) => [d.id, d.type]));
   const textById = new Map(docs.map((d) => [d.id, d.text]));
   const tagsById = new Map(docs.map((d) => [d.id, d.tags ?? []]));
+  const calIdById = new Map(docs.map((d) => [d.id, d.calendarEventId]));
+  const startById = new Map(docs.map((d) => [d.id, d.startTime]));
+  const endById = new Map(docs.map((d) => [d.id, d.endTime]));
+
   await Promise.all(
-    batch.map((t, i) => {
+    batch.map((t: any, i) => {
       const ttype = typeById.get(t.id);
       const textFromReq = t.text ?? textById.get(t.id) ?? '';
       const tags = t.tags ?? tagsById.get(t.id) ?? [];
+      
+      // Use request values if they exist, otherwise fallback to DB values
+      const calendarEventId = t.calendarEventId ?? calIdById.get(t.id);
+      const startTime = t.startTime ?? startById.get(t.id);
+      const endTime = t.endTime ?? endById.get(t.id);
+
       if (ttype === 'weekly')
         return TaskModel.updateOne(
           { userId: uid, type: 'weekly', id: t.id },
@@ -1092,10 +1116,9 @@ async function handleBoardPut(
               order: i + 1,
               updatedAt: now,
               tags,
-              // Preserve these
-              calendarEventId: docs.find(d => d.id === t.id)?.calendarEventId,
-              startTime: docs.find(d => d.id === t.id)?.startTime,
-              endTime: docs.find(d => d.id === t.id)?.endTime,
+              calendarEventId,
+              startTime,
+              endTime,
             },
           },
         );
@@ -1117,10 +1140,9 @@ async function handleBoardPut(
                 order: i + 1,
                 completed: false,
                 updatedAt: now,
-                // Preserve these if they exist on the doc
-                calendarEventId: docs.find(d => d.id === t.id)?.calendarEventId,
-                startTime: docs.find(d => d.id === t.id)?.startTime,
-                endTime: docs.find(d => d.id === t.id)?.endTime,
+                calendarEventId,
+                startTime,
+                endTime,
               },
               $setOnInsert: { userId: uid, type: 'regular', createdAt: now },
             },
@@ -1137,6 +1159,9 @@ async function handleBoardPut(
             order: i + 1,
             completed: false,
             updatedAt: now,
+            calendarEventId,
+            startTime,
+            endTime,
           },
           $setOnInsert: { userId: uid, type: 'regular', createdAt: now },
         },

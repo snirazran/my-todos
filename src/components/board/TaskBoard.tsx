@@ -639,7 +639,7 @@ export default function TaskBoard({
         onToggleRepeat={(id) =>
           onToggleRepeat && onToggleRepeat(id, 7 as DisplayDay)
         }
-        onDoToday={pathname === '/planner' ? undefined : async (id) => {
+        onDoToday={async (id) => {
           // Move to today (DisplayIndex)
           const tDay = todayDisplayIndex;
           setWeek((prev) => {
@@ -660,6 +660,7 @@ export default function TaskBoard({
             return next;
           });
         }}
+        hideDoTodayButton={true}
         filter={getFilter(7)}
         onFilterChange={(f) => setFilter(7, f)}
         selectedTags={getSelectedTags(7)}

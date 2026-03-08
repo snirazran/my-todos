@@ -34,6 +34,7 @@ export default function TaskCard({
   userTags,
   isAnyDragging,
   onDoToday,
+  hideDoTodayButton,
 }: {
   dragId: string;
   task: Task;
@@ -48,6 +49,7 @@ export default function TaskCard({
   userTags?: { id: string; name: string; color: string }[];
   isAnyDragging?: boolean;
   onDoToday?: () => void;
+  hideDoTodayButton?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -324,7 +326,7 @@ export default function TaskCard({
         </div>
 
         <div className="shrink-0 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 pt-0.5">
-          {onDoToday && (
+          {onDoToday && !hideDoTodayButton && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
