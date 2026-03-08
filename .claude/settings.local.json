@@ -5,7 +5,9 @@
       "Bash(npm run:*)",
       "Bash(npx tsc:*)",
       "Bash(xargs grep:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(node:*)",
+      "Bash(npx next:*)"
     ]
   }
 }

@@ -60,6 +60,8 @@ export type UserDoc = {
   premiumUntil?: Date;
   dailyRewards?: DailyRewardProgress;
   notificationPrefs?: NotificationPrefs;
+  calendarSyncEnabled?: boolean;
+  calendarAccessToken?: string;
 };
 
 export type NotificationPrefs = {

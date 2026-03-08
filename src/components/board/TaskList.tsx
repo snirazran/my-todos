@@ -287,6 +287,9 @@ export default React.memo(function TaskList({
                   );
                 },
                 tags: resolvedTags,
+                calendarEventId: t.calendarEventId,
+                startTime: t.startTime,
+                endTime: t.endTime,
               });
             }}
             hiddenWhileDragging={false}

@@ -1,15 +1,17 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireUserId } from '@/lib/auth';
+import UserModel, { type UserDoc } from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
-import UserModel from '@/lib/models/User';
 
 export async function GET(req: NextRequest) {
   try {
-    const { uid } = await requireAuth();
+    const { uid } = await requireUserId();
     await connectMongo();
-    // findById with string ID works fine with _id:String schema
+    
     const user = await UserModel.findById(uid)
-      .select('createdAt premiumUntil')
+      .select('createdAt premiumUntil calendarSyncEnabled calendarAccessToken')
       .lean();
 
     if (!user) {
@@ -25,33 +27,28 @@ export async function GET(req: NextRequest) {
       createdAt: user.createdAt.toISOString(),
       premiumUntil: user.premiumUntil,
       isPremium,
+      calendarSyncEnabled: user.calendarSyncEnabled || false,
+      hasCalendarToken: !!user.calendarAccessToken,
     });
   } catch (error) {
     console.error('Error fetching user data:', error);
-    // If auth fails, requireAuth throws. We catch it here.
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const { uid, email, name } = await requireAuth();
+    const { uid, email, name } = await requireUserId();
     await connectMongo();
 
-    // Check if user exists
     const existingUser = await UserModel.findById(uid).lean();
-
     if (existingUser) {
-      // User exists, maybe update email/name?
       return NextResponse.json({ ok: true, user: existingUser });
     }
 
-    // Create new user
-    console.log(`Creating new user for ${email} (${uid})`);
     const now = new Date();
-
     const newUser = await UserModel.create({
-      _id: uid, // Use Firebase UID as _id
+      _id: uid,
       email: email || '',
       name: name || 'Anonymous Frog',
       createdAt: now,
@@ -81,5 +78,38 @@ export async function POST(req: NextRequest) {
       { error: 'Unauthorized or Internal Error' },
       { status: 401 },
     );
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const { uid } = await requireUserId();
+    await connectMongo();
+
+    const body = await req.json();
+    const { calendarSyncEnabled, calendarAccessToken } = body;
+
+    const updates: any = {};
+    if (typeof calendarSyncEnabled === 'boolean') {
+      updates.calendarSyncEnabled = calendarSyncEnabled;
+    }
+    if (calendarAccessToken !== undefined) {
+      updates.calendarAccessToken = calendarAccessToken;
+    }
+
+    const updatedUser = await UserModel.findByIdAndUpdate(
+      uid,
+      { $set: updates },
+      { new: true },
+    ).lean();
+
+    if (!updatedUser) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ ok: true, user: updatedUser });
+  } catch (error) {
+    console.error('Error updating user settings:', error);
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 }

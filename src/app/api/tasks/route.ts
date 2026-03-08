@@ -820,6 +820,9 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       completedDates: t.completedDates ?? [],
       timesPerWeek: t.timesPerWeek,
       frogodoroSettings: t.frogodoroSettings,
+      calendarEventId: t.calendarEventId,
+      startTime: t.startTime,
+      endTime: t.endTime,
     }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const { flyStatus, hungerStatus } = await currentFlyStatus(userId, tz);
@@ -897,6 +900,9 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[dayNum]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
+        calendarEventId: t.calendarEventId,
+        startTime: t.startTime,
+        endTime: t.endTime,
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return NextResponse.json(out);
@@ -925,6 +931,9 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[d]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
+        calendarEventId: t.calendarEventId,
+        startTime: t.startTime,
+        endTime: t.endTime,
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }
@@ -944,6 +953,9 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       type: t.type,
       completed: !!t.completed,
       tags: t.tags ?? [],
+      calendarEventId: t.calendarEventId,
+      startTime: t.startTime,
+      endTime: t.endTime,
     }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   return NextResponse.json(week);
@@ -1080,6 +1092,10 @@ async function handleBoardPut(
               order: i + 1,
               updatedAt: now,
               tags,
+              // Preserve these
+              calendarEventId: docs.find(d => d.id === t.id)?.calendarEventId,
+              startTime: docs.find(d => d.id === t.id)?.startTime,
+              endTime: docs.find(d => d.id === t.id)?.endTime,
             },
           },
         );
@@ -1101,6 +1117,10 @@ async function handleBoardPut(
                 order: i + 1,
                 completed: false,
                 updatedAt: now,
+                // Preserve these if they exist on the doc
+                calendarEventId: docs.find(d => d.id === t.id)?.calendarEventId,
+                startTime: docs.find(d => d.id === t.id)?.startTime,
+                endTime: docs.find(d => d.id === t.id)?.endTime,
               },
               $setOnInsert: { userId: uid, type: 'regular', createdAt: now },
             },

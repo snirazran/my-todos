@@ -7,6 +7,8 @@ import {
   CheckCircle2,
   Plus,
   CalendarClock,
+  CalendarDays,
+  Clock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
@@ -193,24 +195,22 @@ export default function TaskCard({
         WebkitTapHighlightColor: 'transparent',
       }}
       className={[
-        'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
-        'group relative overflow-visible flex items-stretch gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
+        'group relative overflow-visible flex items-start gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
         task.completed ? 'cursor-default' : 'cursor-grab',
-        // Increased presence: Solid background, stronger border, more defined shadow
         'bg-card border border-border/80',
         task.completed
           ? 'shadow-sm'
           : 'shadow-sm hover:shadow-md hover:border-primary/40',
-        'mb-2.5', // slightly more breathing room
+        'mb-2.5',
         menuOpen ? 'z-50 shadow-xl ring-2 ring-primary/20' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
       role="listitem"
       aria-grabbed={false}
     >
-      <motion.div className="flex items-stretch gap-3 w-full">
+      <motion.div className="flex items-start gap-3 w-full">
         <div
-          className={`grid self-center shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-7 w-7 ${task.completed ? 'opacity-60' : ''}`}
+          className={`shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-7 w-7 mt-0.5 ${task.completed ? 'opacity-60' : ''}`}
         >
           <div
             className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
@@ -230,11 +230,26 @@ export default function TaskCard({
         </div>
 
         <div
-          className={`flex-1 min-w-0 flex flex-col justify-center ${task.completed ? 'opacity-60' : ''}`}
+          className={`flex-1 min-w-0 flex flex-col ${task.completed ? 'opacity-60' : ''}`}
         >
-          {task.tags && task.tags.length > 0 && (
-            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+          {( (task.tags && task.tags.length > 0) || task.startTime ) && (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
               <AnimatePresence mode="popLayout">
+                {task.startTime && (
+                  <motion.span
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0 }}
+                    className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-500/20 shadow-sm"
+                    key="task-time-tag"
+                  >
+                    <Clock className="w-2.5 h-2.5" />
+                    <span>
+                      {task.startTime}
+                      {task.endTime && task.endTime !== task.startTime ? ` - ${task.endTime}` : ''}
+                    </span>
+                  </motion.span>
+                )}
                 {task.tags?.map((tagId) => {
                   const tagDetails = getTagDetails(tagId);
                   if (!tagDetails) return null;
@@ -260,7 +275,6 @@ export default function TaskCard({
                           : undefined
                       }
                     >
-                      {/* Fallback styling if no color found */}
                       {!color && (
                         <span className="absolute inset-0 w-full h-full border rounded-md opacity-10 bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50 pointer-events-none" />
                       )}
@@ -280,27 +294,36 @@ export default function TaskCard({
             </div>
           )}
           <div
-            className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-snug transition-colors flex items-center gap-1.5 ${
+            className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-[1.4] transition-colors ${
               task.completed
                 ? 'text-muted-foreground line-through'
                 : 'text-foreground'
             }`}
           >
-            <span>{task.text}</span>
-            {isRepeating && (
-              <RotateCcw
-                className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0"
-              />
-            )}
-            {task.type === 'habit' && (
-              <CalendarClock
-                className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0"
-              />
-            )}
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+              <span>{task.text}</span>
+              <div className="inline-flex items-center gap-1.5 shrink-0">
+                {isRepeating && (
+                  <RotateCcw
+                    className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0"
+                  />
+                )}
+                {task.type === 'habit' && (
+                  <CalendarClock
+                    className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0"
+                  />
+                )}
+                {task.calendarEventId && (
+                  <CalendarDays
+                    className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0"
+                  />
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="relative self-center shrink-0 flex items-center opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100">
+        <div className="shrink-0 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 pt-0.5">
           {onDoToday && (
             <button
               onClick={(e) => {
@@ -308,7 +331,7 @@ export default function TaskCard({
                 onDoToday();
               }}
               title="Add to Today"
-              className="flex items-center justify-center w-8 h-8 mr-1 bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400 rounded-full hover:bg-green-100 dark:hover:bg-green-500/20 transition-colors"
+              className="flex items-center justify-center w-8 h-8 bg-green-50 text-green-600 dark:bg-green-500/10 dark:text-green-400 rounded-full hover:bg-green-100 dark:hover:bg-green-500/20 transition-colors"
               type="button"
             >
               <Plus className="w-4 h-4" />

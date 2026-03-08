@@ -17,6 +17,9 @@ export type DragState = {
   width: number;
   height: number;
   tags?: { id: string; name: string; color: string }[];
+  calendarEventId?: string;
+  startTime?: string;
+  endTime?: string;
 };
 
 export function useDragManager() {
@@ -126,7 +129,10 @@ export function useDragManager() {
       clientX: number,
       clientY: number,
       rect: DOMRect,
-      tags?: { id: string; name: string; color: string }[]
+      tags?: { id: string; name: string; color: string }[],
+      calendarEventId?: string,
+      startTime?: string,
+      endTime?: string
     ) => {
       document.body.style.userSelect = 'none';
       document.body.style.touchAction = 'none'; // block body scroll
@@ -159,6 +165,9 @@ export function useDragManager() {
         width: rect.width,
         height: rect.height,
         tags,
+        calendarEventId,
+        startTime,
+        endTime,
       });
       setTargetDay(day);
       setTargetIndex(index);
@@ -177,12 +186,22 @@ export function useDragManager() {
       clientY: number;
       rectGetter: () => DOMRect;
       tags?: { id: string; name: string; color: string }[];
+      calendarEventId?: string;
+      startTime?: string;
+      endTime?: string;
     }) => {
-      const { day, index, taskId, taskText, taskType, clientX, clientY, rectGetter, tags } =
-        params;
+      const { 
+        day, index, taskId, taskText, taskType, 
+        clientX, clientY, rectGetter, tags,
+        calendarEventId, startTime, endTime
+      } = params;
 
       const rect = rectGetter();
-      beginDragFromCard(day, index, taskId, taskText, taskType, clientX, clientY, rect, tags);
+      beginDragFromCard(
+        day, index, taskId, taskText, taskType, 
+        clientX, clientY, rect, tags,
+        calendarEventId, startTime, endTime
+      );
     },
     [beginDragFromCard]
   );

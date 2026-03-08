@@ -1,6 +1,6 @@
 'use client';
 import Fly from '@/components/ui/fly';
-import { Repeat, RotateCcw } from 'lucide-react';
+import { Repeat, RotateCcw, CalendarDays, Clock } from 'lucide-react';
 
 export default function DragOverlay({
   x,
@@ -12,6 +12,9 @@ export default function DragOverlay({
   text,
   tags,
   taskType,
+  calendarEventId,
+  startTime,
+  endTime,
 }: {
   x: number;
   y: number;
@@ -22,6 +25,9 @@ export default function DragOverlay({
   text: string;
   tags?: { id: string; name: string; color: string }[];
   taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
+  calendarEventId?: string;
+  startTime?: string;
+  endTime?: string;
 }) {
   return (
     <div
@@ -30,22 +36,30 @@ export default function DragOverlay({
     >
       <div
         className={[
-          'flex items-center gap-3 p-3 select-none rounded-2xl',
-          'bg-card border border-border/80 shadow-2xl', 
+          'flex items-start gap-3 p-3 select-none rounded-2xl',
+          'bg-card border-2 border-primary/20 shadow-2xl backdrop-blur-sm', 
         ].join(' ')}
         style={{
           minHeight: height,
-          transform: 'rotate(-4deg) scale(1.02)',
-          opacity: 1,
-          transition: 'transform 80ms ease-out, opacity 120ms ease-out',
+          transform: 'rotate(-2deg) scale(1.05)',
+          opacity: 0.95,
         }}
       >
-        <span className="relative grid shrink-0 h-7 w-7 place-items-center">
-          <Fly size={22} x={-2} y={-2} />
+        <span className="shrink-0 h-7 w-7 mt-0.5 relative">
+          <Fly size={28} x={-2} y={-2} />
         </span>
-        <div className="flex-1 min-w-0 flex flex-col justify-center">
-          {tags && tags.length > 0 && (
-            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+        <div className="flex-1 min-w-0 flex flex-col">
+          {(tags && tags.length > 0 || startTime) && (
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              {startTime && (
+                <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase bg-amber-500 text-white shadow-sm border border-amber-400">
+                  <Clock className="w-2.5 h-2.5" />
+                  <span>
+                    {startTime}
+                    {endTime && endTime !== startTime ? ` - ${endTime}` : ''}
+                  </span>
+                </span>
+              )}
               {tags?.map((tag) => (
                 <span
                   key={tag.id}
@@ -53,29 +67,33 @@ export default function DragOverlay({
                   style={
                     tag.color
                       ? {
-                          backgroundColor: `${tag.color}20`,
-                          color: tag.color,
-                          borderColor: `${tag.color}40`,
+                          backgroundColor: tag.color,
+                          color: 'white',
+                          borderColor: 'rgba(255,255,255,0.2)',
                         }
                       : undefined
                   }
                 >
-                  {!tag.color && (
-                    <span className="absolute inset-0 w-full h-full border rounded-md opacity-10 bg-indigo-50 text-indigo-700 border-indigo-100 pointer-events-none" />
-                  )}
-                  <span className={!tag.color ? "text-indigo-600 relative z-10" : ""}>{tag.name}</span>
+                  <span className="relative z-10">{tag.name}</span>
                 </span>
               ))}
             </div>
           )}
-          <div className="text-[15px] font-medium leading-snug text-foreground whitespace-pre-wrap break-words flex items-center gap-1.5">
-            <span>{text}</span>
-            {taskType === 'weekly' && (
-              <RotateCcw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
-            )}
-            {taskType === 'habit' && (
-              <Repeat className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
-            )}
+          <div className="text-[15px] font-medium leading-[1.4] text-foreground whitespace-pre-wrap break-words">
+            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+              <span>{text}</span>
+              <div className="inline-flex items-center gap-1.5 shrink-0">
+                {taskType === 'weekly' && (
+                  <RotateCcw className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                )}
+                {taskType === 'habit' && (
+                  <Repeat className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                )}
+                {calendarEventId && (
+                  <CalendarDays className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>

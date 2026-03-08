@@ -11,6 +11,9 @@ export type Task = {
   /** only present for habit tasks */
   timesPerWeek?: number;
   completedDates?: string[];
+  calendarEventId?: string;
+  startTime?: string;
+  endTime?: string;
 };
 
 // Display has 7 weekday columns + 1 “Later” column at index 7

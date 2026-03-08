@@ -32,6 +32,9 @@ export interface TaskDoc {
     completedCycles: number;
     timeSpent: number;
   }[];
+  calendarEventId?: string; // Google Calendar event ID for dedup
+  startTime?: string; // e.g. "10:30"
+  endTime?: string; // e.g. "11:30"
 }
 
 const TaskSchema = new Schema<TaskDoc>(
@@ -75,6 +78,9 @@ const TaskSchema = new Schema<TaskDoc>(
       ],
       default: [],
     },
+    calendarEventId: { type: String },
+    startTime: { type: String },
+    endTime: { type: String },
   },
   {
     collection: 'tasks',

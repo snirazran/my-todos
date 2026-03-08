@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useUIStore } from '@/lib/uiStore';
 import { useInventory } from '@/hooks/useInventory';
+import GoogleCalendarSync from '@/components/ui/GoogleCalendarSync';
 
 export default function SiteHeader() {
   const { user, loading } = useAuth();
@@ -393,6 +394,12 @@ function RightActions({
                   <Settings className="h-[1.2rem] w-[1.2rem] text-amber-500" />
                 </button>
 
+                {pathname === '/planner' && (
+                  <div className="w-full">
+                    <GoogleCalendarSync />
+                  </div>
+                )}
+
                 <button
                   onClick={() => {
                     handleSignOut();
@@ -421,6 +428,7 @@ function RightActions({
         onSignIn={onSignIn}
         adminDialogOpen={adminDialogOpen}
         setAdminDialogOpen={setAdminDialogOpen}
+        pathname={pathname}
       />
 
       {/* Admin Settings Dialog - Rendered at component level */}
@@ -460,6 +468,7 @@ function MobileSheet({
   setTheme,
   adminDialogOpen,
   setAdminDialogOpen,
+  pathname,
 }: any) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -572,6 +581,10 @@ function MobileSheet({
                     </span>
                     <Settings className="h-5 w-5 text-amber-500" />
                   </button>
+                )}
+
+                {pathname === '/planner' && showAuth && (
+                  <GoogleCalendarSync variant="mobile" />
                 )}
               </div>
             </div>

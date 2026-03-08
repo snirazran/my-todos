@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { format } from 'date-fns';
 import TaskBoard from '@/components/board/TaskBoard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
-
 import {
   Task,
   DAYS,

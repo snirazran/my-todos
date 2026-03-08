@@ -209,6 +209,7 @@ export default function TaskBoard({
   const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>(
     'pick',
   );
+  const [initialDay, setInitialDay] = useState<DisplayDay | undefined>(undefined);
 
   // Derived state for masking targetDay (Placeholder Suppression)
   // Derived state for masking targetDay (Placeholder Suppression)
@@ -529,6 +530,7 @@ export default function TaskBoard({
                   setCardRef={setCardRef}
                   onAddRequested={(text) => {
                     setQuickText(text);
+                    setInitialDay(day);
                     setPageIndex(day); // Ensure sheet defaults to this day, even if not fully centered
                     setShowQuickAdd(true);
                   }}
@@ -611,6 +613,7 @@ export default function TaskBoard({
               showFly={false}
               onClick={() => {
                 setQuickText('');
+                setInitialDay(undefined);
                 setQuickAddMode('pick');
                 setShowQuickAdd(true);
               }}
@@ -689,7 +692,7 @@ export default function TaskBoard({
         initialText={quickText}
         defaultRepeat="this-week"
         defaultMode={quickAddMode}
-        defaultPickedDay={isMobile ? pageIndex : todayDisplayIndex}
+        defaultPickedDay={initialDay !== undefined ? initialDay : (isMobile ? pageIndex : todayDisplayIndex)}
         daysOrder={daysOrder}
         onSubmit={async ({ text, days, repeat, tags, timesPerWeek }) => {
           if (onQuickAdd) {
@@ -719,8 +722,10 @@ export default function TaskBoard({
           text={drag.taskText}
           tags={drag.tags}
           taskType={drag.taskType}
-        />
-      )}
+          calendarEventId={drag.calendarEventId}
+          startTime={drag.startTime}
+          endTime={drag.endTime}
+        />      )}
 
       <style jsx global>{`
         @media (prefers-reduced-motion: reduce) {
