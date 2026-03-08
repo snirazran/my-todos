@@ -32,20 +32,20 @@ export default function MobileNav() {
       // Home is safe for everyone
     },
     {
-      href: '/manage-tasks',
-      label: 'Upcoming',
+      href: '/planner',
+      label: 'Planner',
       icon: LayoutDashboard,
       protected: true,
     },
     {
-      href: '/history',
-      label: 'History',
+      href: '/analytics',
+      label: 'Analytics',
       icon: History,
       protected: true,
     },
     {
-      href: '/frogodoro',
-      label: 'Frogodoro',
+      href: '/timer',
+      label: 'Timer',
       icon: Timer,
       protected: true,
     },

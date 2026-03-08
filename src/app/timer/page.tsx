@@ -394,7 +394,7 @@ export default function FrogodoroPage() {
               {/* Top Phase Selector */}
               <div className="flex items-center justify-center gap-1 md:gap-2 mb-5 md:mb-6 lg:mb-12 relative flex-wrap sm:flex-nowrap">
                 {[
-                  { id: 'focus', label: 'Frogodoro' },
+                  { id: 'focus', label: 'Session' },
                   { id: 'shortBreak', label: 'Short Break' },
                   { id: 'longBreak', label: 'Long Break' },
                 ].map((p) => (

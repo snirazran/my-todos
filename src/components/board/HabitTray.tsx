@@ -208,7 +208,7 @@ export default React.memo(function HabitTray({
                 className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 transition-all group mt-2"
               >
                 <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center transition-transform group-hover:scale-110">
-                  <Repeat size={16} strokeWidth={3} />
+                  <CalendarClock size={16} strokeWidth={3} />
                 </div>
                 <span className="text-sm font-bold text-muted-foreground group-hover:text-foreground transition-colors">
                   Add New Habit

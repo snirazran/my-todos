@@ -636,7 +636,7 @@ export default function TaskBoard({
         onToggleRepeat={(id) =>
           onToggleRepeat && onToggleRepeat(id, 7 as DisplayDay)
         }
-        onDoToday={pathname === '/manage-tasks' ? undefined : async (id) => {
+        onDoToday={pathname === '/planner' ? undefined : async (id) => {
           // Move to today (DisplayIndex)
           const tDay = todayDisplayIndex;
           setWeek((prev) => {

@@ -939,13 +939,29 @@ export default function QuickAddSheet({
                               transition={{ duration: 0.2 }}
                               className="overflow-hidden"
                             >
-                              <div className="rounded-xl bg-muted/40 ring-1 ring-border/30 p-3 text-[12px] text-muted-foreground leading-relaxed space-y-1.5">
-                                <p>
-                                  <span className="font-bold text-foreground">Task</span> — Something you need to get done. Pick which days it shows up, and optionally repeat it every week.
-                                </p>
-                                <p>
-                                  <span className="font-bold text-foreground">Habit</span> — Something you want to do regularly. Choose how many times per week, and track your progress. Resets every Sunday — build your streak!
-                                </p>
+                              <div className="rounded-2xl bg-card border border-border/50 shadow-sm overflow-hidden">
+                                <div className="flex items-start gap-3 p-3.5 border-b border-border/30">
+                                  <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary/10 shrink-0 mt-0.5">
+                                    <CalendarCheck className="w-4 h-4 text-primary" />
+                                  </div>
+                                  <div>
+                                    <p className="text-[13px] font-black text-foreground mb-0.5">Task</p>
+                                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                      Something you need to get done. Pick which days it shows up, and optionally repeat it every week.
+                                    </p>
+                                  </div>
+                                </div>
+                                <div className="flex items-start gap-3 p-3.5">
+                                  <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-violet-500/10 shrink-0 mt-0.5">
+                                    <CalendarClock className="w-4 h-4 text-violet-500" />
+                                  </div>
+                                  <div>
+                                    <p className="text-[13px] font-black text-foreground mb-0.5">Habit</p>
+                                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                      Something you want to do regularly. Choose how many times per week and track your progress. Resets every Sunday!
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
                             </motion.div>
                           )}
