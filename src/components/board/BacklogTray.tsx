@@ -24,6 +24,9 @@ interface Props {
     pointerType: 'mouse' | 'touch';
     rectGetter: () => DOMRect;
     tags?: { id: string; name: string; color: string }[];
+    calendarEventId?: string;
+    startTime?: string;
+    endTime?: string;
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
   activeDragId: string | null;
@@ -420,6 +423,9 @@ export default React.memo(function BacklogTray({
                                   );
                                 },
                                 tags: resolvedTags,
+                                calendarEventId: t.calendarEventId,
+                                startTime: t.startTime,
+                                endTime: t.endTime,
                               });
                             }}
                             onDoToday={

@@ -53,6 +53,9 @@ export default React.memo(function TaskList({
     pointerType: 'mouse' | 'touch';
     rectGetter: () => DOMRect;
     tags?: { id: string; name: string; color: string }[];
+    calendarEventId?: string;
+    startTime?: string;
+    endTime?: string;
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
   onAddRequested: (text: string) => void;
