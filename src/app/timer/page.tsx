@@ -10,6 +10,7 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_SESSION_STATS,
 } from '@/lib/frogodoroStore';
+import { playTimerSound, type TimerSound } from '@/lib/timerSounds';
 import {
   Play,
   Pause,
@@ -120,6 +121,13 @@ export default function FrogodoroPage() {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [localSettings, setLocalSettings] = useState(settings); // For the modal forms
 
+  // Lock body scroll when any modal is open
+  useEffect(() => {
+    const anyOpen = showSettingsModal || showHelpModal || showTaskDropdown;
+    document.body.style.overflow = anyOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [showSettingsModal, showHelpModal, showTaskDropdown]);
+
   // Sync local modal form to global settings
   useEffect(() => {
     setLocalSettings(settings);
@@ -145,19 +153,34 @@ export default function FrogodoroPage() {
 
   // Live elapsed time — sync phaseTimeRef with persisted store value
   const phaseTimeRef = useRef(liveElapsed);
+  const runStartTimeRef = useRef<number | null>(null);
+  const runStartElapsedRef = useRef(0);
 
-  // Keep ref in sync with store on mount / navigation
+  // Keep ref in sync when store resets (task change, phase complete, etc.)
   useEffect(() => {
-    phaseTimeRef.current = liveElapsed;
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (!isRunning) {
+      phaseTimeRef.current = liveElapsed;
+    }
+  }, [liveElapsed, isRunning]);
 
   useEffect(() => {
     if (!isRunning) return;
+    // Snapshot wall-clock time and accumulated elapsed at the start of this run segment
+    runStartTimeRef.current = Date.now();
+    runStartElapsedRef.current = phaseTimeRef.current;
+
     const interval = setInterval(() => {
-      phaseTimeRef.current += 1;
-      setPhaseElapsed(phaseTimeRef.current);
+      if (runStartTimeRef.current === null) return;
+      // Use wall-clock diff so background tab throttling can't cause drift
+      const segmentElapsed = Math.floor((Date.now() - runStartTimeRef.current) / 1000);
+      const totalElapsed = runStartElapsedRef.current + segmentElapsed;
+      phaseTimeRef.current = totalElapsed;
+      setPhaseElapsed(totalElapsed);
     }, 1000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      runStartTimeRef.current = null;
+    };
   }, [isRunning, setPhaseElapsed]);
 
   // Detect phase transitions to update stats
@@ -169,31 +192,34 @@ export default function FrogodoroPage() {
     const elapsed = phaseTimeRef.current;
 
     if (elapsed > 0) {
-      // Focus session completed (cycles incremented by timer)
+      // Focus session completed (cycles incremented by timer) — use full duration, not tick count
       if (completedCycles > prevCycles) {
+        const focusDuration = settings.cycleDuration * 60;
         updateSessionStats({
           ...sessionStats,
           focusSessions: sessionStats.focusSessions + (completedCycles - prevCycles),
-          focusTime: sessionStats.focusTime + elapsed,
+          focusTime: sessionStats.focusTime + focusDuration,
         });
         phaseTimeRef.current = 0;
         setPhaseElapsed(0);
       }
-      // Break completed naturally (phase auto-changed to focus)
+      // Break completed naturally (phase auto-changed to focus) — use full break duration
       else if (prevPhase === 'shortBreak' && phase === 'focus') {
+        const breakDuration = settings.shortBreakDuration * 60;
         updateSessionStats({
           ...sessionStats,
           shortBreaks: sessionStats.shortBreaks + 1,
-          shortBreakTime: sessionStats.shortBreakTime + elapsed,
+          shortBreakTime: sessionStats.shortBreakTime + breakDuration,
         });
         phaseTimeRef.current = 0;
         setPhaseElapsed(0);
       }
       else if (prevPhase === 'longBreak' && phase === 'focus') {
+        const breakDuration = settings.longBreakDuration * 60;
         updateSessionStats({
           ...sessionStats,
           longBreaks: sessionStats.longBreaks + 1,
-          longBreakTime: sessionStats.longBreakTime + elapsed,
+          longBreakTime: sessionStats.longBreakTime + breakDuration,
         });
         phaseTimeRef.current = 0;
         setPhaseElapsed(0);
@@ -323,10 +349,12 @@ export default function FrogodoroPage() {
       );
 
       try {
+        // Only persist timer durations to backend — sound/autoStart are local prefs
+        const { cycleDuration, shortBreakDuration, longBreakDuration, longBreakInterval } = localSettings;
         await fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ settings: localSettings }),
+          body: JSON.stringify({ settings: { cycleDuration, shortBreakDuration, longBreakDuration, longBreakInterval } }),
         });
       } catch (e) {
         console.error('Error saving settings remotely', e);
@@ -710,104 +738,176 @@ export default function FrogodoroPage() {
                         damping: 25,
                         stiffness: 300,
                       }}
-                      className="w-full sm:max-w-lg bg-card sm:border sm:rounded-[32px] rounded-t-[32px] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 shadow-2xl text-left max-h-[90vh] overflow-y-auto relative"
+                      className="w-full sm:max-w-lg bg-card sm:border sm:rounded-[32px] rounded-t-[32px] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 shadow-2xl text-left max-h-[90vh] overflow-y-auto relative scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                     >
-                      <button
-                        onClick={() => setShowSettingsModal(false)}
-                        className="absolute top-6 right-6 p-2 text-muted-foreground hover:bg-muted hover:text-foreground rounded-full transition-colors"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                      <h3 className="text-xl font-black mb-8 flex items-center gap-2.5 text-foreground pr-10">
-                        Session Profile
-                      </h3>
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-7">
+                        <h3 className="text-xl font-black text-foreground">Timer Settings</h3>
+                        <button
+                          onClick={() => setShowSettingsModal(false)}
+                          className="w-8 h-8 flex items-center justify-center rounded-full bg-muted/60 text-muted-foreground hover:bg-muted transition-colors"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
 
                       <div className="space-y-6">
-                        {/* Session Length */}
-                        <div className="space-y-3">
-                          <label className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 px-1">
-                            Focus session period
-                          </label>
-                          <Stepper
-                            value={localSettings.cycleDuration}
-                            onChange={(v) =>
-                              setLocalSettings({
-                                ...localSettings,
-                                cycleDuration: v,
-                              })
-                            }
-                            suffix="minutes"
-                            step={5}
-                            min={5}
-                            max={120}
-                          />
+
+                        {/* ── Work Cycle Builder ── */}
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/50 px-1">Work Cycle</p>
+
+                          <div className="rounded-2xl border border-border/50 bg-muted/10 overflow-hidden">
+
+                            {/* Step 1: Focus */}
+                            <div className="flex items-center gap-3 px-4 py-3.5 bg-primary/5 border-b border-border/40">
+                              <div className="w-8 h-8 rounded-full bg-primary/15 flex items-center justify-center flex-shrink-0">
+                                <div className="w-3 h-3 rounded-full bg-primary" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-foreground">Focus</p>
+                                <p className="text-xs text-muted-foreground/60">Deep work, no distractions</p>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, cycleDuration: Math.max(5, localSettings.cycleDuration - 5) })} className="w-6 h-6 rounded-full bg-background border border-border/70 flex items-center justify-center text-muted-foreground hover:border-border active:scale-90 transition-all select-none text-sm">−</button>
+                                <span className="text-sm font-black text-primary tabular-nums w-12 text-center">{localSettings.cycleDuration}m</span>
+                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, cycleDuration: Math.min(120, localSettings.cycleDuration + 5) })} className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary/20 active:scale-90 transition-all select-none text-sm">+</button>
+                              </div>
+                            </div>
+
+                            {/* Connector + "then short break" */}
+                            <div className="flex items-center gap-3 px-4 py-2 border-b border-border/40">
+                              <div className="w-8 flex justify-center flex-shrink-0">
+                                <div className="w-px h-4 bg-border/60" />
+                              </div>
+                              <p className="text-xs text-muted-foreground/50 italic">then</p>
+                            </div>
+
+                            {/* Step 2: Short Break */}
+                            <div className="flex items-center gap-3 px-4 py-3.5 bg-sky-500/5 border-b border-border/40">
+                              <div className="w-8 h-8 rounded-full bg-sky-500/10 flex items-center justify-center flex-shrink-0">
+                                <div className="w-3 h-3 rounded-full bg-sky-400" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-foreground">Short Break</p>
+                                <p className="text-xs text-muted-foreground/60">Step away, breathe</p>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, shortBreakDuration: Math.max(1, localSettings.shortBreakDuration - 1) })} className="w-6 h-6 rounded-full bg-background border border-border/70 flex items-center justify-center text-muted-foreground hover:border-border active:scale-90 transition-all select-none text-sm">−</button>
+                                <span className="text-sm font-black text-sky-500 tabular-nums w-12 text-center">{localSettings.shortBreakDuration}m</span>
+                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, shortBreakDuration: Math.min(30, localSettings.shortBreakDuration + 1) })} className="w-6 h-6 rounded-full bg-sky-500/10 flex items-center justify-center text-sky-500 hover:bg-sky-500/20 active:scale-90 transition-all select-none text-sm">+</button>
+                              </div>
+                            </div>
+
+                            {/* Repeat control */}
+                            <div className="flex items-center gap-3 px-4 py-3 bg-muted/20 border-b border-border/40">
+                              <div className="w-8 flex justify-center flex-shrink-0">
+                                <svg className="w-4 h-4 text-muted-foreground/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                </svg>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-xs font-medium text-muted-foreground/70">Rounds before long break</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setLocalSettings({ ...localSettings, longBreakInterval: Math.max(1, localSettings.longBreakInterval - 1) })}
+                                  className="w-6 h-6 rounded-full bg-background border border-border/70 flex items-center justify-center text-muted-foreground hover:border-border active:scale-90 transition-all select-none text-sm"
+                                >−</button>
+                                <span className="text-sm font-black tabular-nums text-foreground w-5 text-center">{localSettings.longBreakInterval}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setLocalSettings({ ...localSettings, longBreakInterval: Math.min(10, localSettings.longBreakInterval + 1) })}
+                                  className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary/20 active:scale-90 transition-all select-none text-sm"
+                                >+</button>
+                                <span className="text-xs text-muted-foreground/50 ml-0.5">{localSettings.longBreakInterval === 1 ? 'time' : 'times'}</span>
+                              </div>
+                            </div>
+
+                            {/* Connector */}
+                            <div className="flex items-center gap-3 px-4 py-2 border-b border-border/40">
+                              <div className="w-8 flex justify-center flex-shrink-0">
+                                <div className="w-px h-4 bg-border/60" />
+                              </div>
+                              <p className="text-xs text-muted-foreground/50 italic">then</p>
+                            </div>
+
+                            {/* Step 3: Long Break */}
+                            <div className="flex items-center gap-3 px-4 py-3.5 bg-indigo-500/5">
+                              <div className="w-8 h-8 rounded-full bg-indigo-500/10 flex items-center justify-center flex-shrink-0">
+                                <div className="w-3 h-3 rounded-full bg-indigo-500" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-foreground">Long Break</p>
+                                <p className="text-xs text-muted-foreground/60">After {localSettings.longBreakInterval} focus {localSettings.longBreakInterval === 1 ? 'session' : 'sessions'}</p>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, longBreakDuration: Math.max(5, localSettings.longBreakDuration - 5) })} className="w-6 h-6 rounded-full bg-background border border-border/70 flex items-center justify-center text-muted-foreground hover:border-border active:scale-90 transition-all select-none text-sm">−</button>
+                                <span className="text-sm font-black text-indigo-500 tabular-nums w-12 text-center">{localSettings.longBreakDuration}m</span>
+                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, longBreakDuration: Math.min(60, localSettings.longBreakDuration + 5) })} className="w-6 h-6 rounded-full bg-indigo-500/10 flex items-center justify-center text-indigo-500 hover:bg-indigo-500/20 active:scale-90 transition-all select-none text-sm">+</button>
+                              </div>
+                            </div>
+
+                          </div>
                         </div>
 
-                        {/* Breaks */}
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-3">
-                            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 px-1">
-                              Short Rest
-                            </label>
-                            <Stepper
-                              value={localSettings.shortBreakDuration}
-                              onChange={(v) =>
-                                setLocalSettings({
-                                  ...localSettings,
-                                  shortBreakDuration: v,
-                                })
-                              }
-                              suffix="min"
-                              step={1}
-                              min={1}
-                              max={30}
-                            />
+                        {/* ── Auto-start breaks ── */}
+                        <button
+                          type="button"
+                          onClick={() => setLocalSettings({ ...localSettings, autoStartBreaks: !localSettings.autoStartBreaks })}
+                          className={`w-full flex items-center justify-between px-4 py-3.5 rounded-2xl border transition-all active:scale-[0.98] ${
+                            localSettings.autoStartBreaks
+                              ? 'bg-primary/8 border-primary/25 text-primary'
+                              : 'bg-muted/20 border-border/50 text-muted-foreground'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            <div className="text-left">
+                              <p className="text-sm font-semibold">Auto-start breaks</p>
+                              <p className={`text-[11px] font-medium ${localSettings.autoStartBreaks ? 'text-primary/60' : 'text-muted-foreground/50'}`}>Breaks begin automatically when focus ends</p>
+                            </div>
                           </div>
-                          <div className="space-y-3">
-                            <label className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 px-1">
-                              Long Rest
-                            </label>
-                            <Stepper
-                              value={localSettings.longBreakDuration}
-                              onChange={(v) =>
-                                setLocalSettings({
-                                  ...localSettings,
-                                  longBreakDuration: v,
-                                })
-                              }
-                              suffix="min"
-                              step={5}
-                              min={5}
-                              max={60}
-                            />
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${localSettings.autoStartBreaks ? 'bg-primary/15' : 'bg-muted-foreground/10'}`}>
+                            {localSettings.autoStartBreaks ? 'On' : 'Off'}
+                          </span>
+                        </button>
+
+                        {/* ── Finish Sound ── */}
+                        <div className="space-y-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/50 px-1">Finish Sound</p>
+                          <div className="flex gap-2">
+                            {([
+                              { id: 'bell',    label: 'Bell'    },
+                              { id: 'chime',   label: 'Chime'   },
+                              { id: 'digital', label: 'Digital' },
+                              { id: 'none',    label: 'Silent'  },
+                            ] as { id: TimerSound; label: string }[]).map(({ id, label }) => (
+                              <button
+                                key={id}
+                                type="button"
+                                onClick={() => { setLocalSettings({ ...localSettings, timerSound: id }); playTimerSound(id); }}
+                                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 ${
+                                  localSettings.timerSound === id
+                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    : 'bg-muted/40 text-muted-foreground hover:bg-muted/70 border border-border/50'
+                                }`}
+                              >{label}</button>
+                            ))}
                           </div>
+                          <p className="text-[11px] text-muted-foreground/40 px-1">Tap to preview</p>
                         </div>
 
-                        {/* Cycles */}
-                        <div className="space-y-3">
-                          <label className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground/70 px-1">
-                            Long rest after
-                          </label>
-                          <Stepper
-                            value={localSettings.longBreakInterval}
-                            onChange={(v) =>
-                              setLocalSettings({
-                                ...localSettings,
-                                longBreakInterval: v,
-                              })
-                            }
-                            suffix="sessions"
-                            min={1}
-                            max={10}
-                          />
-                        </div>
                       </div>
 
                       <button
                         onClick={saveSettings}
-                        className="mt-10 w-full flex items-center justify-center gap-2.5 bg-primary hover:bg-primary/90 text-primary-foreground font-black text-lg px-4 py-4 rounded-[20px] transition-all shadow-xl shadow-primary/20 active:scale-[0.98]"
+                        className="mt-8 w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base py-3.5 rounded-2xl transition-all active:scale-[0.98]"
                       >
-                        Update Session
+                        Save
                       </button>
                     </motion.div>
                   </div>
