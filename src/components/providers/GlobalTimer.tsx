@@ -80,7 +80,7 @@ export function GlobalTimer() {
       const now = Date.now();
       const remaining = Math.max(0, Math.round((endTime - now) / 1000));
 
-      // Update tab title directly — no React render cycle lag
+      // Set title synchronously before tickTimer so it lands before React renders
       const m = Math.floor(remaining / 60).toString().padStart(2, '0');
       const s = (remaining % 60).toString().padStart(2, '0');
       const icon = phaseRef.current === 'focus' ? '🐸' : phaseRef.current === 'shortBreak' ? '☕' : '💤';

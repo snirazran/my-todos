@@ -103,7 +103,7 @@ export default function FrogodoroPage() {
     isRunning,
     completedCycles,
     sessionStats,
-    phaseElapsed: liveElapsed,
+    phaseElapsed: storeElapsed,
     setSettings,
     setTask,
     startTimer,
@@ -114,6 +114,13 @@ export default function FrogodoroPage() {
     setPhaseElapsed,
     resetSessionStats,
   } = useFrogodoroStore();
+
+  // Derive elapsed from timeLeft so both timers update on the same render
+  const phaseDuration =
+    phase === 'focus' ? settings.cycleDuration * 60
+    : phase === 'shortBreak' ? settings.shortBreakDuration * 60
+    : settings.longBreakDuration * 60;
+  const liveElapsed = phaseDuration - timeLeft;
 
   // Local UI State
   const [showTaskDropdown, setShowTaskDropdown] = useState(false);
@@ -151,37 +158,34 @@ export default function FrogodoroPage() {
     speedUpTongue,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
 
-  // Live elapsed time — sync phaseTimeRef with persisted store value
-  const phaseTimeRef = useRef(liveElapsed);
+  // phaseTimeRef tracks elapsed for stats purposes (used on phase transitions)
+  const phaseTimeRef = useRef(storeElapsed);
   const runStartTimeRef = useRef<number | null>(null);
   const runStartElapsedRef = useRef(0);
 
   // Keep ref in sync when store resets (task change, phase complete, etc.)
   useEffect(() => {
     if (!isRunning) {
-      phaseTimeRef.current = liveElapsed;
+      phaseTimeRef.current = storeElapsed;
     }
-  }, [liveElapsed, isRunning]);
+  }, [storeElapsed, isRunning]);
 
   useEffect(() => {
     if (!isRunning) return;
-    // Snapshot wall-clock time and accumulated elapsed at the start of this run segment
     runStartTimeRef.current = Date.now();
     runStartElapsedRef.current = phaseTimeRef.current;
 
     const interval = setInterval(() => {
       if (runStartTimeRef.current === null) return;
-      // Use wall-clock diff so background tab throttling can't cause drift
       const segmentElapsed = Math.floor((Date.now() - runStartTimeRef.current) / 1000);
-      const totalElapsed = runStartElapsedRef.current + segmentElapsed;
-      phaseTimeRef.current = totalElapsed;
-      setPhaseElapsed(totalElapsed);
+      phaseTimeRef.current = runStartElapsedRef.current + segmentElapsed;
+      // No setPhaseElapsed here — display is derived from timeLeft instead
     }, 1000);
     return () => {
       clearInterval(interval);
       runStartTimeRef.current = null;
     };
-  }, [isRunning, setPhaseElapsed]);
+  }, [isRunning]);
 
   // Detect phase transitions to update stats
   const prevPhaseRef = useRef(phase);

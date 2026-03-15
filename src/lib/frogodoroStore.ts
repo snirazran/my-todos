@@ -164,11 +164,12 @@ export const useFrogodoroStore = create<FrogodoroState>()(
               timeLeft: time,
             };
           } else {
+            // Break finished → return to focus, never auto-start
             const time = state.settings.cycleDuration * 60;
             return {
               phase: 'focus',
-              isRunning: autoStart,
-              endTime: autoStart ? Date.now() + time * 1000 : null,
+              isRunning: false,
+              endTime: null,
               timeLeft: time,
             };
           }
