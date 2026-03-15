@@ -89,6 +89,7 @@ export default function FrogodoroPage() {
     flyStatus,
     hungerStatus,
     dailyGiftCount,
+    tags: userTags,
   } = useTaskData();
 
   // Global Store hook
@@ -206,13 +207,25 @@ export default function FrogodoroPage() {
     return s > 0 ? `${m}m ${s}s` : `${m}m`;
   };
 
-  // Show stats when there are completed phases OR when the timer has been used at all
+  // Derived Task info (must be before hasStats)
+  const availableTasks = useMemo(() => {
+    return tasks.filter((t) => !t.completed);
+  }, [tasks]);
+
+  const selectedTask = useMemo(() => {
+    return tasks.find((t) => t.id === selectedTaskId);
+  }, [tasks, selectedTaskId]);
+
+  // Show stats when there are completed phases, live activity, or saved DB session data
   const hasStats =
     sessionStats.focusSessions > 0 ||
     sessionStats.shortBreaks > 0 ||
     sessionStats.longBreaks > 0 ||
     isRunning ||
-    liveElapsed > 0;
+    liveElapsed > 0 ||
+    (selectedTask?.frogodoroSession?.timeSpent ?? 0) > 0 ||
+    (selectedTask?.frogodoroSession?.shortBreaks ?? 0) > 0 ||
+    (selectedTask?.frogodoroSession?.longBreaks ?? 0) > 0;
 
   // Mobile check for drawer animation
   const [isDesktop, setIsDesktop] = useState(false);
@@ -233,15 +246,6 @@ export default function FrogodoroPage() {
     if (!user) router.push('/login');
   }, [loading, user, router]);
 
-  // Derived Task info
-  const availableTasks = useMemo(() => {
-    return tasks.filter((t) => !t.completed);
-  }, [tasks]);
-
-  const selectedTask = useMemo(() => {
-    return tasks.find((t) => t.id === selectedTaskId);
-  }, [tasks, selectedTaskId]);
-
   // Actions
   const toggleTimer = () => {
     if (isRunning) pauseTimer();
@@ -249,6 +253,24 @@ export default function FrogodoroPage() {
   };
 
   const handleManualSkip = () => {
+    // Save break data to DB when manually skipping a break phase
+    if ((phase === 'shortBreak' || phase === 'longBreak') && selectedTaskId && liveElapsed > 0) {
+      const today = new Date().toISOString().split('T')[0];
+      fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session: {
+            date: today,
+            completedCycles: 0,
+            timeSpent: 0,
+            ...(phase === 'shortBreak'
+              ? { shortBreaks: 1, shortBreakTime: liveElapsed }
+              : { longBreaks: 1, longBreakTime: liveElapsed }),
+          },
+        }),
+      }).catch(() => {});
+    }
     completePhase(false, liveElapsed);
   };
 
@@ -529,11 +551,30 @@ export default function FrogodoroPage() {
                           )}
                         </AnimatePresence>
                       </div>
-                      <span
-                        className={`flex-1 font-bold text-base leading-tight truncate text-left transition-colors duration-500 ${selectedTask.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
-                      >
-                        {selectedTask.text}
-                      </span>
+                      <div className="flex-1 min-w-0 text-left">
+                        {selectedTask.tags && selectedTask.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-1">
+                            {selectedTask.tags.map((tagId) => {
+                              const tag = userTags.find((ut) => ut.id === tagId || ut.name === tagId);
+                              if (!tag) return null;
+                              return (
+                                <span
+                                  key={tagId}
+                                  className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border"
+                                  style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
+                                >
+                                  {tag.name}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                        <span
+                          className={`font-bold text-base leading-tight truncate block transition-colors duration-500 ${selectedTask.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}
+                        >
+                          {selectedTask.text}
+                        </span>
+                      </div>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -554,73 +595,41 @@ export default function FrogodoroPage() {
                           exit={{ opacity: 0, height: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className="flex items-center gap-2.5 px-4 pb-3 flex-wrap">
-                            {/* Focus — show if completed sessions exist OR currently in focus phase */}
-                            {(sessionStats.focusSessions > 0 ||
-                              phase === 'focus') && (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/8 dark:bg-primary/15">
-                                <div
-                                  className={`w-2 h-2 rounded-full bg-primary ${isRunning && phase === 'focus' ? 'animate-pulse' : ''}`}
-                                />
-                                <span className="text-xs font-black text-primary tabular-nums">
-                                  {sessionStats.focusSessions +
-                                    (phase === 'focus' && liveElapsed > 0
-                                      ? 1
-                                      : 0)}
-                                </span>
-                                <span className="text-[11px] font-bold text-primary/60 tabular-nums">
-                                  {formatDuration(
-                                    sessionStats.focusTime +
-                                      (phase === 'focus' ? liveElapsed : 0),
-                                  )}
-                                </span>
+                          {(() => {
+                            const storeHasData = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || isRunning || liveElapsed > 0;
+                            const db = selectedTask.frogodoroSession;
+                            const focusCycles = storeHasData ? sessionStats.focusSessions + (phase === 'focus' && liveElapsed > 0 ? 1 : 0) : (db?.completedCycles ?? 0);
+                            const focusTime = storeHasData ? sessionStats.focusTime + (phase === 'focus' ? liveElapsed : 0) : (db?.timeSpent ?? 0);
+                            const shortBreaks = storeHasData ? sessionStats.shortBreaks + (phase === 'shortBreak' && liveElapsed > 0 ? 1 : 0) : (db?.shortBreaks ?? 0);
+                            const shortBreakTime = storeHasData ? sessionStats.shortBreakTime + (phase === 'shortBreak' ? liveElapsed : 0) : (db?.shortBreakTime ?? 0);
+                            const longBreaks = storeHasData ? sessionStats.longBreaks + (phase === 'longBreak' && liveElapsed > 0 ? 1 : 0) : (db?.longBreaks ?? 0);
+                            const longBreakTime = storeHasData ? sessionStats.longBreakTime + (phase === 'longBreak' ? liveElapsed : 0) : (db?.longBreakTime ?? 0);
+                            return (
+                              <div className="flex items-center gap-2.5 px-4 pb-3 flex-wrap">
+                                {(focusTime > 0 || (storeHasData && phase === 'focus')) && (
+                                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/8 dark:bg-primary/15">
+                                    <div className={`w-2 h-2 rounded-full bg-primary ${isRunning && phase === 'focus' ? 'animate-pulse' : ''}`} />
+                                    <span className="text-xs font-black text-primary tabular-nums">{focusCycles}</span>
+                                    <span className="text-[11px] font-bold text-primary/60 tabular-nums">{formatDuration(focusTime)}</span>
+                                  </div>
+                                )}
+                                {(shortBreaks > 0 || (storeHasData && phase === 'shortBreak')) && (
+                                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/8 dark:bg-sky-500/15">
+                                    <div className={`w-2 h-2 rounded-full bg-sky-500 ${isRunning && phase === 'shortBreak' ? 'animate-pulse' : ''}`} />
+                                    <span className="text-xs font-black text-sky-500 tabular-nums">{shortBreaks}</span>
+                                    <span className="text-[11px] font-bold text-sky-500/60 tabular-nums">{formatDuration(shortBreakTime)}</span>
+                                  </div>
+                                )}
+                                {(longBreaks > 0 || (storeHasData && phase === 'longBreak')) && (
+                                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/8 dark:bg-indigo-500/15">
+                                    <div className={`w-2 h-2 rounded-full bg-indigo-500 ${isRunning && phase === 'longBreak' ? 'animate-pulse' : ''}`} />
+                                    <span className="text-xs font-black text-indigo-500 tabular-nums">{longBreaks}</span>
+                                    <span className="text-[11px] font-bold text-indigo-500/60 tabular-nums">{formatDuration(longBreakTime)}</span>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                            {/* Short break */}
-                            {(sessionStats.shortBreaks > 0 ||
-                              phase === 'shortBreak') && (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/8 dark:bg-sky-500/15">
-                                <div
-                                  className={`w-2 h-2 rounded-full bg-sky-500 ${isRunning && phase === 'shortBreak' ? 'animate-pulse' : ''}`}
-                                />
-                                <span className="text-xs font-black text-sky-500 tabular-nums">
-                                  {sessionStats.shortBreaks +
-                                    (phase === 'shortBreak' && liveElapsed > 0
-                                      ? 1
-                                      : 0)}
-                                </span>
-                                <span className="text-[11px] font-bold text-sky-500/60 tabular-nums">
-                                  {formatDuration(
-                                    sessionStats.shortBreakTime +
-                                      (phase === 'shortBreak'
-                                        ? liveElapsed
-                                        : 0),
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                            {/* Long break */}
-                            {(sessionStats.longBreaks > 0 ||
-                              phase === 'longBreak') && (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/8 dark:bg-indigo-500/15">
-                                <div
-                                  className={`w-2 h-2 rounded-full bg-indigo-500 ${isRunning && phase === 'longBreak' ? 'animate-pulse' : ''}`}
-                                />
-                                <span className="text-xs font-black text-indigo-500 tabular-nums">
-                                  {sessionStats.longBreaks +
-                                    (phase === 'longBreak' && liveElapsed > 0
-                                      ? 1
-                                      : 0)}
-                                </span>
-                                <span className="text-[11px] font-bold text-indigo-500/60 tabular-nums">
-                                  {formatDuration(
-                                    sessionStats.longBreakTime +
-                                      (phase === 'longBreak' ? liveElapsed : 0),
-                                  )}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                            );
+                          })()}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -1300,9 +1309,70 @@ export default function FrogodoroPage() {
                                   <CheckCircle2 className="absolute w-5 h-5 duration-300 text-primary animate-in zoom-in spin-in-12" />
                                 )}
                               </div>
-                              <span className="flex-1 text-sm font-bold line-clamp-2 text-foreground">
-                                {t.text}
-                              </span>
+                              <div className="flex-1 min-w-0">
+                                {t.tags && t.tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mb-1">
+                                    {t.tags.map((tagId) => {
+                                      const tag = userTags.find((ut) => ut.id === tagId || ut.name === tagId);
+                                      if (!tag) return null;
+                                      return (
+                                        <span
+                                          key={tagId}
+                                          className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border"
+                                          style={{ backgroundColor: `${tag.color}20`, color: tag.color, borderColor: `${tag.color}40` }}
+                                        >
+                                          {tag.name}
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                <span className="text-sm font-bold line-clamp-2 text-foreground">
+                                  {t.text}
+                                </span>
+                                {(() => {
+                                  const storeActive = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || isRunning || liveElapsed > 0;
+                                  const session = t.id === selectedTaskId && storeActive
+                                    ? {
+                                        completedCycles: sessionStats.focusSessions + (phase === 'focus' && liveElapsed > 0 ? 1 : 0),
+                                        timeSpent: sessionStats.focusTime + (phase === 'focus' ? liveElapsed : 0),
+                                        shortBreaks: sessionStats.shortBreaks + (phase === 'shortBreak' && liveElapsed > 0 ? 1 : 0),
+                                        shortBreakTime: sessionStats.shortBreakTime + (phase === 'shortBreak' ? liveElapsed : 0),
+                                        longBreaks: sessionStats.longBreaks + (phase === 'longBreak' && liveElapsed > 0 ? 1 : 0),
+                                        longBreakTime: sessionStats.longBreakTime + (phase === 'longBreak' ? liveElapsed : 0),
+                                      }
+                                    : t.frogodoroSession;
+                                  if (!session) return null;
+                                  const hasData = (session.timeSpent ?? 0) > 0 || (session.shortBreaks ?? 0) > 0 || (session.longBreaks ?? 0) > 0;
+                                  if (!hasData) return null;
+                                  const fmt = (s: number) => { const m = Math.floor(s / 60); const sec = s % 60; return s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; };
+                                  return (
+                                    <div className="flex flex-wrap items-center gap-1 mt-1">
+                                      {(session.timeSpent ?? 0) > 0 && (
+                                        <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                                          <span className="text-[11px] font-black text-primary tabular-nums">{session.completedCycles}</span>
+                                          <span className="text-[10px] font-bold text-primary/60 tabular-nums">{fmt(session.timeSpent ?? 0)}</span>
+                                        </div>
+                                      )}
+                                      {(session.shortBreaks ?? 0) > 0 && (
+                                        <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
+                                          <span className="text-[11px] font-black text-sky-500 tabular-nums">{session.shortBreaks}</span>
+                                          <span className="text-[10px] font-bold text-sky-500/60 tabular-nums">{fmt(session.shortBreakTime ?? 0)}</span>
+                                        </div>
+                                      )}
+                                      {(session.longBreaks ?? 0) > 0 && (
+                                        <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-indigo-500/8 dark:bg-indigo-500/15">
+                                          <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
+                                          <span className="text-[11px] font-black text-indigo-500 tabular-nums">{session.longBreaks}</span>
+                                          <span className="text-[10px] font-bold text-indigo-500/60 tabular-nums">{fmt(session.longBreakTime ?? 0)}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
+                              </div>
                               {t.id === selectedTaskId && (
                                 <div className="flex-shrink-0 w-2 h-2 rounded-full bg-primary" />
                               )}

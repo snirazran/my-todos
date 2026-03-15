@@ -97,6 +97,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       setTask: (taskId, taskSettings) => {
         const settings = taskSettings || DEFAULT_SETTINGS;
         set((state) => {
+          const isSameTask = state.selectedTaskId === taskId;
           let initialTime = settings.cycleDuration * 60;
           if (state.phase === 'shortBreak')
             initialTime = settings.shortBreakDuration * 60;
@@ -108,10 +109,10 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             timeLeft: initialTime,
             isRunning: false,
             endTime: null,
-            completedCycles: 0,
-            currentSessionSpend: 0,
-            sessionStats: DEFAULT_SESSION_STATS,
-            phaseElapsed: 0,
+            completedCycles: isSameTask ? state.completedCycles : 0,
+            currentSessionSpend: isSameTask ? state.currentSessionSpend : 0,
+            sessionStats: isSameTask ? state.sessionStats : DEFAULT_SESSION_STATS,
+            phaseElapsed: isSameTask ? state.phaseElapsed : 0,
           };
         });
       },

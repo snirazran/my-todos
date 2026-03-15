@@ -73,7 +73,7 @@ export function GlobalTimer() {
   useEffect(() => { selectedTaskIdRef.current = selectedTaskId; }, [selectedTaskId]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
-  // Detect pause/stop to flush time
+  // Detect pause/stop to flush focus time
   useEffect(() => {
     if (prevIsRunning.current && !isRunning) {
       if (phase === 'focus' && selectedTaskId) {
