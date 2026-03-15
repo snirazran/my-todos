@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 
@@ -14,6 +15,7 @@ import { PushNotifications } from '@capacitor/push-notifications';
  * On web, this hook is a no-op (push notifications use a different mechanism).
  */
 export function usePushNotifications(userId: string | null | undefined) {
+  const router = useRouter();
   const registeredRef = useRef(false);
 
   useEffect(() => {
@@ -80,8 +82,10 @@ export function usePushNotifications(userId: string | null | undefined) {
         PushNotifications.addListener(
           'pushNotificationActionPerformed',
           (action) => {
-            console.log('Push notification action:', action);
-            // Could navigate to task list here
+            const path = action.notification.data?.path;
+            if (path) {
+              router.push(path);
+            }
           },
         );
       } catch (err) {
@@ -111,5 +115,5 @@ export function usePushNotifications(userId: string | null | undefined) {
     return () => {
       PushNotifications.removeAllListeners();
     };
-  }, [userId]);
+  }, [userId, router]);
 }

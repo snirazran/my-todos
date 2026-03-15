@@ -5,6 +5,19 @@ import { useFrogodoroStore, PomodoroPhase, FrogodoroSettings } from '@/lib/frogo
 import { playTimerSound } from '@/lib/timerSounds';
 import { format } from 'date-fns';
 
+async function sendTimerNotification(phase: PomodoroPhase, autoStartBreak: boolean) {
+  try {
+    await fetch('/api/notifications/timer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ phase, autoStartBreak }),
+    });
+  } catch {
+    // Silent fail — notification is non-critical
+  }
+}
+
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings): number {
   if (phase === 'shortBreak') return settings.shortBreakDuration * 60;
   if (phase === 'longBreak') return settings.longBreakDuration * 60;
@@ -99,6 +112,12 @@ export function GlobalTimer() {
           const phaseDuration = getPhaseDuration(phaseRef.current, settingsRef.current);
           saveProgress(selectedTaskIdRef.current, 1, phaseDuration);
         }
+
+        // Push notification
+        sendTimerNotification(
+          phaseRef.current,
+          phaseRef.current === 'focus' && settingsRef.current.autoStartBreaks,
+        );
 
         completePhase(settingsRef.current.autoStartBreaks);
       }
