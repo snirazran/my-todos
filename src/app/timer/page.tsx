@@ -627,13 +627,14 @@ export default function FrogodoroPage() {
 
                     {/* Finish Task — integrated footer */}
                     {!selectedTask.completed &&
-                      !visuallyDone.has(selectedTask.id) && (
+                      (!visuallyDone.has(selectedTask.id) || cinematic) && (
                         <div className="px-3 pb-3">
                           <button
                             onClick={() =>
                               completeTaskWithAnimation(selectedTask.id)
                             }
-                            className="w-full py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider bg-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 transition-all active:scale-[0.97]"
+                            disabled={cinematic}
+                            className="w-full py-2.5 rounded-2xl font-black text-xs uppercase tracking-wider bg-emerald-500 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-600 transition-all active:scale-[0.97] disabled:opacity-60 disabled:pointer-events-none"
                           >
                             <span className="flex items-center justify-center gap-1.5">
                               <CheckCircle2 className="w-3.5 h-3.5" />
