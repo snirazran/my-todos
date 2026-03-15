@@ -43,6 +43,7 @@ export function GlobalTimer() {
     taskId: string,
     cycles: number,
     spend: number,
+    breaks?: { shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number },
   ) => {
     const today = format(new Date(), 'yyyy-MM-dd');
     try {
@@ -54,6 +55,7 @@ export function GlobalTimer() {
             date: today,
             completedCycles: cycles,
             timeSpent: spend,
+            ...breaks,
           },
         }),
       });
@@ -108,9 +110,15 @@ export function GlobalTimer() {
         playTimerSound(settingsRef.current.timerSound);
 
         // Auto Save on Complete — save the full phase duration
-        if (phaseRef.current === 'focus' && selectedTaskIdRef.current) {
+        if (selectedTaskIdRef.current) {
           const phaseDuration = getPhaseDuration(phaseRef.current, settingsRef.current);
-          saveProgress(selectedTaskIdRef.current, 1, phaseDuration);
+          if (phaseRef.current === 'focus') {
+            saveProgress(selectedTaskIdRef.current, 1, phaseDuration);
+          } else if (phaseRef.current === 'shortBreak') {
+            saveProgress(selectedTaskIdRef.current, 0, 0, { shortBreaks: 1, shortBreakTime: phaseDuration });
+          } else if (phaseRef.current === 'longBreak') {
+            saveProgress(selectedTaskIdRef.current, 0, 0, { longBreaks: 1, longBreakTime: phaseDuration });
+          }
         }
 
         // Push notification

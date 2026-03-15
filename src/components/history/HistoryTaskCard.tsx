@@ -17,9 +17,13 @@ export type HistoryTaskCardProps = {
   timesPerWeek?: number;
   userTags?: { id: string; name: string; color: string }[];
   frogodoroSession?: {
-    date: string;
+    date?: string;
     completedCycles: number;
     timeSpent: number;
+    shortBreaks?: number;
+    shortBreakTime?: number;
+    longBreaks?: number;
+    longBreakTime?: number;
   };
   onToggle?: (id: string, date: string, currentStatus: boolean) => void;
   onMenuOpen?: (e: React.MouseEvent, id: string) => void;
@@ -165,23 +169,47 @@ export default function HistoryTaskCard({
             )}
           </div>
 
-          {frogodoroSession && frogodoroSession.timeSpent > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/8 dark:bg-primary/15">
-                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
-                <span className="text-xs font-black text-primary tabular-nums">
-                  {frogodoroSession.completedCycles}
-                </span>
-                <span className="text-[11px] font-bold text-primary/60 tabular-nums">
-                  {(() => {
-                    const s = frogodoroSession.timeSpent;
-                    const m = Math.floor(s / 60);
-                    const sec = s % 60;
-                    if (s < 60) return `${s}s`;
-                    return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
-                  })()}
-                </span>
-              </div>
+          {frogodoroSession && (frogodoroSession.timeSpent > 0 || (frogodoroSession.shortBreaks ?? 0) > 0 || (frogodoroSession.longBreaks ?? 0) > 0) && (
+            <div className="flex flex-wrap items-center gap-1 mt-0.5">
+              {frogodoroSession.timeSpent > 0 && (() => {
+                const s = frogodoroSession.timeSpent;
+                const m = Math.floor(s / 60);
+                const sec = s % 60;
+                const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`;
+                return (
+                  <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
+                    <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                    <span className="text-[11px] font-black text-primary tabular-nums">{frogodoroSession.completedCycles}</span>
+                    <span className="text-[10px] font-bold text-primary/60 tabular-nums">{t}</span>
+                  </div>
+                );
+              })()}
+              {(frogodoroSession.shortBreaks ?? 0) > 0 && (() => {
+                const s = frogodoroSession.shortBreakTime ?? 0;
+                const m = Math.floor(s / 60);
+                const sec = s % 60;
+                const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`;
+                return (
+                  <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
+                    <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
+                    <span className="text-[11px] font-black text-sky-500 tabular-nums">{frogodoroSession.shortBreaks}</span>
+                    <span className="text-[10px] font-bold text-sky-500/60 tabular-nums">{t}</span>
+                  </div>
+                );
+              })()}
+              {(frogodoroSession.longBreaks ?? 0) > 0 && (() => {
+                const s = frogodoroSession.longBreakTime ?? 0;
+                const m = Math.floor(s / 60);
+                const sec = s % 60;
+                const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`;
+                return (
+                  <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-indigo-500/8 dark:bg-indigo-500/15">
+                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
+                    <span className="text-[11px] font-black text-indigo-500 tabular-nums">{frogodoroSession.longBreaks}</span>
+                    <span className="text-[10px] font-bold text-indigo-500/60 tabular-nums">{t}</span>
+                  </div>
+                );
+              })()}
             </div>
           )}
 

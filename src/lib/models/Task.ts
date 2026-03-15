@@ -31,6 +31,10 @@ export interface TaskDoc {
     date: string;
     completedCycles: number;
     timeSpent: number;
+    shortBreaks?: number;
+    shortBreakTime?: number;
+    longBreaks?: number;
+    longBreakTime?: number;
   }[];
   calendarEventId?: string; // Google Calendar event ID for dedup
   startTime?: string; // e.g. "10:30"
@@ -74,6 +78,10 @@ const TaskSchema = new Schema<TaskDoc>(
           date: { type: String, required: true },
           completedCycles: { type: Number, default: 0 },
           timeSpent: { type: Number, default: 0 },
+          shortBreaks: { type: Number, default: 0 },
+          shortBreakTime: { type: Number, default: 0 },
+          longBreaks: { type: Number, default: 0 },
+          longBreakTime: { type: Number, default: 0 },
         },
       ],
       default: [],

@@ -42,9 +42,12 @@ export async function PUT(
       );
 
       if (idx !== -1) {
-        task.frogodoroSessions[idx].completedCycles +=
-          session.completedCycles || 0;
+        task.frogodoroSessions[idx].completedCycles += session.completedCycles || 0;
         task.frogodoroSessions[idx].timeSpent += session.timeSpent || 0;
+        if (session.shortBreaks) task.frogodoroSessions[idx].shortBreaks = (task.frogodoroSessions[idx].shortBreaks ?? 0) + session.shortBreaks;
+        if (session.shortBreakTime) task.frogodoroSessions[idx].shortBreakTime = (task.frogodoroSessions[idx].shortBreakTime ?? 0) + session.shortBreakTime;
+        if (session.longBreaks) task.frogodoroSessions[idx].longBreaks = (task.frogodoroSessions[idx].longBreaks ?? 0) + session.longBreaks;
+        if (session.longBreakTime) task.frogodoroSessions[idx].longBreakTime = (task.frogodoroSessions[idx].longBreakTime ?? 0) + session.longBreakTime;
       } else {
         task.frogodoroSessions.push(session);
       }

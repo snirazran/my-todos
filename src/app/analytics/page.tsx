@@ -22,6 +22,7 @@ import { DateRangeOption } from '@/components/history/HistoryTimeSelector';
 import { useTaskData } from '@/hooks/useTaskData';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { FilterType } from '@/components/ui/FilterDropdown';
+import { useFrogodoroStore } from '@/lib/frogodoroStore';
 
 export default function HistoryPage() {
   const { user, loading } = useAuth();
@@ -152,12 +153,36 @@ export default function HistoryPage() {
     fetchStats();
   }, [statsFilter, customFrom, customTo, user]);
 
+  // Live frogodoro overlay for today
+  const { selectedTaskId: frogTaskId, sessionStats, settings: frogSettings, phase: frogPhase, timeLeft: frogTimeLeft, isRunning: frogRunning } = useFrogodoroStore();
+  const frogPhaseDuration = frogPhase === 'focus' ? frogSettings.cycleDuration * 60 : frogPhase === 'shortBreak' ? frogSettings.shortBreakDuration * 60 : frogSettings.longBreakDuration * 60;
+  const frogLiveElapsed = frogPhaseDuration - frogTimeLeft;
+  const frogHasActivity = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || frogRunning || frogLiveElapsed > 0;
+
   // --- Helpers ---
   const selectedDayTasks = useMemo(() => {
     if (!selectedDate) return [];
     const day = calendarData.find((d) => d.date === selectedDate);
-    return day ? day.tasks : [];
-  }, [calendarData, selectedDate]);
+    const tasks = day ? day.tasks : [];
+    const todayStr = format(new Date(), 'yyyy-MM-dd');
+    if (selectedDate !== todayStr || !frogTaskId || !frogHasActivity) return tasks;
+    return tasks.map((t: any) =>
+      t.id === frogTaskId
+        ? {
+            ...t,
+            frogodoroSession: {
+              date: todayStr,
+              completedCycles: sessionStats.focusSessions + (frogPhase === 'focus' && frogLiveElapsed > 0 ? 1 : 0),
+              timeSpent: sessionStats.focusTime + (frogPhase === 'focus' ? frogLiveElapsed : 0),
+              shortBreaks: sessionStats.shortBreaks + (frogPhase === 'shortBreak' && frogLiveElapsed > 0 ? 1 : 0),
+              shortBreakTime: sessionStats.shortBreakTime + (frogPhase === 'shortBreak' ? frogLiveElapsed : 0),
+              longBreaks: sessionStats.longBreaks + (frogPhase === 'longBreak' && frogLiveElapsed > 0 ? 1 : 0),
+              longBreakTime: sessionStats.longBreakTime + (frogPhase === 'longBreak' ? frogLiveElapsed : 0),
+            },
+          }
+        : t,
+    );
+  }, [calendarData, selectedDate, frogTaskId, frogHasActivity, sessionStats, frogPhase, frogLiveElapsed]);
 
   const filteredStatsData = useMemo(() => {
     if (selectedTagIds.length === 0) return statsData;
