@@ -296,7 +296,7 @@ export default function FrogodoroPage() {
   const handleTaskSelect = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
-    setTask(taskId, task.frogodoroSettings);
+    setTask(taskId, task.frogodoroSettings ? { ...DEFAULT_SETTINGS, ...task.frogodoroSettings } : undefined);
     setShowTaskDropdown(false);
   };
 
