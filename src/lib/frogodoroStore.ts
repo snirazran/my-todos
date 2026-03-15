@@ -59,7 +59,7 @@ interface FrogodoroState {
   pauseTimer: () => void;
   tickTimer: (newTimeLeft: number) => void;
   switchPhase: (phase: PomodoroPhase) => void;
-  completePhase: (autoStart?: boolean) => void;
+  completePhase: (autoStart?: boolean, elapsedOverride?: number) => void;
   addSessionSpend: (time: number) => void;
   clearSessionSpend: () => void;
   updateSessionStats: (stats: SessionStats) => void;
@@ -145,7 +145,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
         });
       },
 
-      completePhase: (autoStart = false) => {
+      completePhase: (autoStart = false, elapsedOverride?: number) => {
         set((state) => {
           if (state.phase === 'focus') {
             const newCycles = state.completedCycles + 1;
@@ -156,21 +156,42 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             let time = state.settings.shortBreakDuration * 60;
             if (nextPhase === 'longBreak')
               time = state.settings.longBreakDuration * 60;
+            const focusTime =
+              elapsedOverride !== undefined
+                ? elapsedOverride
+                : state.settings.cycleDuration * 60;
             return {
               completedCycles: newCycles,
               phase: nextPhase,
               isRunning: autoStart,
               endTime: autoStart ? Date.now() + time * 1000 : null,
               timeLeft: time,
+              sessionStats: {
+                ...state.sessionStats,
+                focusSessions: state.sessionStats.focusSessions + 1,
+                focusTime: state.sessionStats.focusTime + focusTime,
+              },
             };
           } else {
             // Break finished → return to focus, never auto-start
             const time = state.settings.cycleDuration * 60;
+            const fullBreakDuration =
+              state.phase === 'shortBreak'
+                ? state.settings.shortBreakDuration * 60
+                : state.settings.longBreakDuration * 60;
+            const breakTime =
+              elapsedOverride !== undefined ? elapsedOverride : fullBreakDuration;
             return {
               phase: 'focus',
               isRunning: false,
               endTime: null,
               timeLeft: time,
+              sessionStats: {
+                ...state.sessionStats,
+                ...(state.phase === 'shortBreak'
+                  ? { shortBreaks: state.sessionStats.shortBreaks + 1, shortBreakTime: state.sessionStats.shortBreakTime + breakTime }
+                  : { longBreaks: state.sessionStats.longBreaks + 1, longBreakTime: state.sessionStats.longBreakTime + breakTime }),
+              },
             };
           }
         });

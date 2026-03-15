@@ -11,6 +11,15 @@ export type Task = {
   /** only present for habit tasks */
   timesPerWeek?: number;
   completedDates?: string[];
+  frogodoroSession?: {
+    date: string;
+    completedCycles: number;
+    timeSpent: number;
+    shortBreaks?: number;
+    shortBreakTime?: number;
+    longBreaks?: number;
+    longBreakTime?: number;
+  } | null;
   calendarEventId?: string;
   startTime?: string;
   endTime?: string;

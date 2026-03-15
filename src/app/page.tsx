@@ -40,6 +40,7 @@ import {
   FlyStatus,
   HungerStatus,
 } from '@/hooks/useTaskData';
+import { useFrogodoroStore } from '@/lib/frogodoroStore';
 
 // Force re-compilation of this file to pick up useTaskData.tsx change
 
@@ -162,8 +163,36 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [user]);
 
+  // Live frogodoro session stats for the active task
+  const { selectedTaskId: frogTaskId, sessionStats, settings: frogSettings, phase: frogPhase, timeLeft: frogTimeLeft, isRunning: frogRunning } = useFrogodoroStore();
+  const frogPhaseDuration = frogPhase === 'focus'
+    ? frogSettings.cycleDuration * 60
+    : frogPhase === 'shortBreak'
+      ? frogSettings.shortBreakDuration * 60
+      : frogSettings.longBreakDuration * 60;
+  const frogLiveElapsed = frogPhaseDuration - frogTimeLeft;
+  const frogHasActivity = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || frogRunning || frogLiveElapsed > 0;
+
   // Data Switching
-  const data = user ? tasks : guestTasks;
+  const rawData = user ? tasks : guestTasks;
+  const data = frogTaskId && frogHasActivity
+    ? rawData.map((t) =>
+        t.id === frogTaskId
+          ? {
+              ...t,
+              frogodoroSession: {
+                date: format(new Date(), 'yyyy-MM-dd'),
+                completedCycles: sessionStats.focusSessions + (frogPhase === 'focus' && frogLiveElapsed > 0 ? 1 : 0),
+                timeSpent: sessionStats.focusTime + (frogPhase === 'focus' ? frogLiveElapsed : 0),
+                shortBreaks: sessionStats.shortBreaks + (frogPhase === 'shortBreak' && frogLiveElapsed > 0 ? 1 : 0),
+                shortBreakTime: sessionStats.shortBreakTime + (frogPhase === 'shortBreak' ? frogLiveElapsed : 0),
+                longBreaks: sessionStats.longBreaks + (frogPhase === 'longBreak' && frogLiveElapsed > 0 ? 1 : 0),
+                longBreakTime: sessionStats.longBreakTime + (frogPhase === 'longBreak' ? frogLiveElapsed : 0),
+              },
+            }
+          : t,
+      )
+    : rawData;
   const doneCount = data.filter((t) => t.completed).length;
   // Note: We don't rely purely on 'rate' anymore for triggering, but we keep it for the progress bar
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;

@@ -107,7 +107,6 @@ export default function FrogodoroPage() {
     pauseTimer,
     switchPhase,
     completePhase,
-    updateSessionStats,
     setPhaseElapsed,
     resetSessionStats,
   } = useFrogodoroStore();
@@ -190,77 +189,14 @@ export default function FrogodoroPage() {
     };
   }, [isRunning]);
 
-  // Detect phase transitions to update stats
+  // Reset phaseTimeRef on phase transitions (stats are now updated atomically in the store)
   const prevPhaseRef = useRef(phase);
   const prevCyclesRef = useRef(completedCycles);
   useEffect(() => {
-    const prevPhase = prevPhaseRef.current;
-    const prevCycles = prevCyclesRef.current;
-    const elapsed = phaseTimeRef.current;
-
-    if (elapsed > 0) {
-      // Focus session completed (cycles incremented by timer) — use full duration, not tick count
-      if (completedCycles > prevCycles) {
-        const focusDuration = settings.cycleDuration * 60;
-        updateSessionStats({
-          ...sessionStats,
-          focusSessions:
-            sessionStats.focusSessions + (completedCycles - prevCycles),
-          focusTime: sessionStats.focusTime + focusDuration,
-        });
-        phaseTimeRef.current = 0;
-        setPhaseElapsed(0);
-      }
-      // Break completed naturally (phase auto-changed to focus) — use full break duration
-      else if (prevPhase === 'shortBreak' && phase === 'focus') {
-        const breakDuration = settings.shortBreakDuration * 60;
-        updateSessionStats({
-          ...sessionStats,
-          shortBreaks: sessionStats.shortBreaks + 1,
-          shortBreakTime: sessionStats.shortBreakTime + breakDuration,
-        });
-        phaseTimeRef.current = 0;
-        setPhaseElapsed(0);
-      } else if (prevPhase === 'longBreak' && phase === 'focus') {
-        const breakDuration = settings.longBreakDuration * 60;
-        updateSessionStats({
-          ...sessionStats,
-          longBreaks: sessionStats.longBreaks + 1,
-          longBreakTime: sessionStats.longBreakTime + breakDuration,
-        });
-        phaseTimeRef.current = 0;
-        setPhaseElapsed(0);
-      }
-      // Manual skip while time was spent — count the partial phase
-      else if (prevPhase !== phase) {
-        updateSessionStats({
-          ...sessionStats,
-          ...(prevPhase === 'focus'
-            ? {
-                focusSessions: sessionStats.focusSessions + 1,
-                focusTime: sessionStats.focusTime + elapsed,
-              }
-            : {}),
-          ...(prevPhase === 'shortBreak'
-            ? {
-                shortBreaks: sessionStats.shortBreaks + 1,
-                shortBreakTime: sessionStats.shortBreakTime + elapsed,
-              }
-            : {}),
-          ...(prevPhase === 'longBreak'
-            ? {
-                longBreaks: sessionStats.longBreaks + 1,
-                longBreakTime: sessionStats.longBreakTime + elapsed,
-              }
-            : {}),
-        });
-        phaseTimeRef.current = 0;
-        setPhaseElapsed(0);
-      }
-    }
-
     prevPhaseRef.current = phase;
     prevCyclesRef.current = completedCycles;
+    phaseTimeRef.current = 0;
+    setPhaseElapsed(0);
   }, [phase, completedCycles]);
 
   const formatDuration = (seconds: number) => {
@@ -313,7 +249,7 @@ export default function FrogodoroPage() {
   };
 
   const handleManualSkip = () => {
-    completePhase();
+    completePhase(false, liveElapsed);
   };
 
   const handleTaskSelect = (taskId: string) => {

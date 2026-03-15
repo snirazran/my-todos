@@ -167,10 +167,21 @@ export default function HistoryTaskCard({
 
           {frogodoroSession && frogodoroSession.timeSpent > 0 && (
             <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-              <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-bold text-green-700 bg-green-50 dark:bg-green-900/40 dark:text-green-200 border border-green-200 dark:border-green-800/50 uppercase tracking-wider">
-                🐸 {frogodoroSession.completedCycles} •{' '}
-                {Math.round(frogodoroSession.timeSpent / 60)}m
-              </span>
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary/8 dark:bg-primary/15">
+                <div className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+                <span className="text-xs font-black text-primary tabular-nums">
+                  {frogodoroSession.completedCycles}
+                </span>
+                <span className="text-[11px] font-bold text-primary/60 tabular-nums">
+                  {(() => {
+                    const s = frogodoroSession.timeSpent;
+                    const m = Math.floor(s / 60);
+                    const sec = s % 60;
+                    if (s < 60) return `${s}s`;
+                    return sec > 0 ? `${m}m ${sec}s` : `${m}m`;
+                  })()}
+                </span>
+              </div>
             </div>
           )}
 
