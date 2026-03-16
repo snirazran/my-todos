@@ -662,11 +662,11 @@ export default function FrogodoroPage() {
                           {(() => {
                             const storeHasData = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || isRunning || liveElapsed > 0;
                             const db = selectedTask.frogodoroSession;
-                            const focusCycles = storeHasData ? sessionStats.focusSessions + (phase === 'focus' && liveElapsed > 0 ? 1 : 0) : (db?.completedCycles ?? 0);
+                            const focusCycles = storeHasData ? sessionStats.focusSessions : (db?.completedCycles ?? 0);
                             const focusTime = storeHasData ? sessionStats.focusTime + (phase === 'focus' ? liveElapsed : 0) : (db?.timeSpent ?? 0);
-                            const shortBreaks = storeHasData ? sessionStats.shortBreaks + (phase === 'shortBreak' && liveElapsed > 0 ? 1 : 0) : (db?.shortBreaks ?? 0);
+                            const shortBreaks = storeHasData ? sessionStats.shortBreaks : (db?.shortBreaks ?? 0);
                             const shortBreakTime = storeHasData ? sessionStats.shortBreakTime + (phase === 'shortBreak' ? liveElapsed : 0) : (db?.shortBreakTime ?? 0);
-                            const longBreaks = storeHasData ? sessionStats.longBreaks + (phase === 'longBreak' && liveElapsed > 0 ? 1 : 0) : (db?.longBreaks ?? 0);
+                            const longBreaks = storeHasData ? sessionStats.longBreaks : (db?.longBreaks ?? 0);
                             const longBreakTime = storeHasData ? sessionStats.longBreakTime + (phase === 'longBreak' ? liveElapsed : 0) : (db?.longBreakTime ?? 0);
                             return (
                               <div className="flex items-center gap-2.5 px-4 pb-3 flex-wrap">
@@ -1398,11 +1398,11 @@ export default function FrogodoroPage() {
                                   const storeActive = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || isRunning || liveElapsed > 0;
                                   const session = t.id === selectedTaskId && storeActive
                                     ? {
-                                        completedCycles: sessionStats.focusSessions + (phase === 'focus' && liveElapsed > 0 ? 1 : 0),
+                                        completedCycles: sessionStats.focusSessions,
                                         timeSpent: sessionStats.focusTime + (phase === 'focus' ? liveElapsed : 0),
-                                        shortBreaks: sessionStats.shortBreaks + (phase === 'shortBreak' && liveElapsed > 0 ? 1 : 0),
+                                        shortBreaks: sessionStats.shortBreaks,
                                         shortBreakTime: sessionStats.shortBreakTime + (phase === 'shortBreak' ? liveElapsed : 0),
-                                        longBreaks: sessionStats.longBreaks + (phase === 'longBreak' && liveElapsed > 0 ? 1 : 0),
+                                        longBreaks: sessionStats.longBreaks,
                                         longBreakTime: sessionStats.longBreakTime + (phase === 'longBreak' ? liveElapsed : 0),
                                       }
                                     : t.frogodoroSession;

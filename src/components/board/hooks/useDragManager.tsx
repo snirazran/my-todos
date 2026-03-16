@@ -20,6 +20,15 @@ export type DragState = {
   calendarEventId?: string;
   startTime?: string;
   endTime?: string;
+  frogodoroSession?: {
+    date: string;
+    completedCycles: number;
+    timeSpent: number;
+    shortBreaks?: number;
+    shortBreakTime?: number;
+    longBreaks?: number;
+    longBreakTime?: number;
+  } | null;
 };
 
 export function useDragManager() {
@@ -132,7 +141,8 @@ export function useDragManager() {
       tags?: { id: string; name: string; color: string }[],
       calendarEventId?: string,
       startTime?: string,
-      endTime?: string
+      endTime?: string,
+      frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null
     ) => {
       document.body.style.userSelect = 'none';
       document.body.style.touchAction = 'none'; // block body scroll
@@ -168,6 +178,7 @@ export function useDragManager() {
         calendarEventId,
         startTime,
         endTime,
+        frogodoroSession,
       });
       setTargetDay(day);
       setTargetIndex(index);
@@ -189,18 +200,19 @@ export function useDragManager() {
       calendarEventId?: string;
       startTime?: string;
       endTime?: string;
+      frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null;
     }) => {
-      const { 
-        day, index, taskId, taskText, taskType, 
+      const {
+        day, index, taskId, taskText, taskType,
         clientX, clientY, rectGetter, tags,
-        calendarEventId, startTime, endTime
+        calendarEventId, startTime, endTime, frogodoroSession
       } = params;
 
       const rect = rectGetter();
       beginDragFromCard(
-        day, index, taskId, taskText, taskType, 
+        day, index, taskId, taskText, taskType,
         clientX, clientY, rect, tags,
-        calendarEventId, startTime, endTime
+        calendarEventId, startTime, endTime, frogodoroSession
       );
     },
     [beginDragFromCard]
