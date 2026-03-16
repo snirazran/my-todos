@@ -111,6 +111,7 @@ export default function FrogodoroPage() {
     completePhase,
     setPhaseElapsed,
     resetSessionStats,
+    updateSessionStats,
   } = useFrogodoroStore();
 
   // Derive elapsed from timeLeft so both timers update on the same render
@@ -305,9 +306,50 @@ export default function FrogodoroPage() {
         ? { ...DEFAULT_SETTINGS, ...task.frogodoroSettings }
         : undefined,
     );
+    // Re-seed sessionStats from today's DB data so the timer card shows accumulated totals
+    if (task.frogodoroSession) {
+      const db = task.frogodoroSession;
+      updateSessionStats({
+        focusSessions: db.completedCycles ?? 0,
+        focusTime: db.timeSpent ?? 0,
+        shortBreaks: db.shortBreaks ?? 0,
+        shortBreakTime: db.shortBreakTime ?? 0,
+        longBreaks: db.longBreaks ?? 0,
+        longBreakTime: db.longBreakTime ?? 0,
+      });
+    }
     setShowTaskDropdown(false);
     // Refresh task list after DB is updated so frogodoroSession reflects latest data
     mutateToday();
+  };
+
+  const handleTabSwitch = (newPhase: PomodoroPhase) => {
+    if (newPhase === phase || isRunning) return;
+    // If paused with in-progress time, commit it to sessionStats before resetting.
+    // GlobalTimer already saved to DB on pause; we sync the store to match.
+    if (selectedTaskId && liveElapsed > 0) {
+      const updated = { ...sessionStats };
+      if (phase === 'focus') {
+        // Count as a completed cycle — DB only got time (not the cycle) on pause, so save it now
+        updated.focusSessions = sessionStats.focusSessions + 1;
+        updated.focusTime = sessionStats.focusTime + liveElapsed;
+        const today = format(new Date(), 'yyyy-MM-dd');
+        fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session: { date: today, completedCycles: 1, timeSpent: 0 } }),
+        }).then(() => mutateToday()).catch(() => {});
+      } else if (phase === 'shortBreak') {
+        // DB already got shortBreaks+1 on pause; just sync sessionStats
+        updated.shortBreaks = sessionStats.shortBreaks + 1;
+        updated.shortBreakTime = sessionStats.shortBreakTime + liveElapsed;
+      } else if (phase === 'longBreak') {
+        updated.longBreaks = sessionStats.longBreaks + 1;
+        updated.longBreakTime = sessionStats.longBreakTime + liveElapsed;
+      }
+      updateSessionStats(updated);
+    }
+    switchPhase(newPhase);
   };
 
   const completeTaskWithAnimation = async (taskId: string) => {
@@ -454,9 +496,7 @@ export default function FrogodoroPage() {
                 ].map((p) => (
                   <button
                     key={p.id}
-                    onClick={() => {
-                      if (!isRunning) switchPhase(p.id as PomodoroPhase);
-                    }}
+                    onClick={() => handleTabSwitch(p.id as PomodoroPhase)}
                     className={`px-3 py-1.5 md:px-4 md:py-2 text-xs md:text-sm font-bold rounded-full transition-all ${
                       phase === p.id
                         ? 'bg-black/25 text-white shadow-inner'
