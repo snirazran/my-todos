@@ -169,7 +169,7 @@ export default function HistoryTaskCard({
             )}
           </div>
 
-          {frogodoroSession && (frogodoroSession.timeSpent > 0 || (frogodoroSession.shortBreaks ?? 0) > 0 || (frogodoroSession.longBreaks ?? 0) > 0) && (
+          {frogodoroSession && (frogodoroSession.timeSpent > 0 || (frogodoroSession.shortBreaks ?? 0) > 0 || (frogodoroSession.shortBreakTime ?? 0) > 0 || (frogodoroSession.longBreaks ?? 0) > 0 || (frogodoroSession.longBreakTime ?? 0) > 0) && (
             <div className="flex flex-wrap items-center gap-1 mt-0.5">
               {frogodoroSession.timeSpent > 0 && (() => {
                 const s = frogodoroSession.timeSpent;
@@ -184,7 +184,7 @@ export default function HistoryTaskCard({
                   </div>
                 );
               })()}
-              {(frogodoroSession.shortBreaks ?? 0) > 0 && (() => {
+              {((frogodoroSession.shortBreaks ?? 0) > 0 || (frogodoroSession.shortBreakTime ?? 0) > 0) && (() => {
                 const s = frogodoroSession.shortBreakTime ?? 0;
                 const m = Math.floor(s / 60);
                 const sec = s % 60;
@@ -197,7 +197,7 @@ export default function HistoryTaskCard({
                   </div>
                 );
               })()}
-              {(frogodoroSession.longBreaks ?? 0) > 0 && (() => {
+              {((frogodoroSession.longBreaks ?? 0) > 0 || (frogodoroSession.longBreakTime ?? 0) > 0) && (() => {
                 const s = frogodoroSession.longBreakTime ?? 0;
                 const m = Math.floor(s / 60);
                 const sec = s % 60;

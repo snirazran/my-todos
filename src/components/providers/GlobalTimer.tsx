@@ -73,14 +73,20 @@ export function GlobalTimer() {
   useEffect(() => { selectedTaskIdRef.current = selectedTaskId; }, [selectedTaskId]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
 
-  // Detect pause/stop to flush focus time
+  // Detect pause/stop to flush partial time for any phase
   useEffect(() => {
     if (prevIsRunning.current && !isRunning) {
-      if (phase === 'focus' && selectedTaskId) {
+      if (selectedTaskId) {
         const phaseDuration = getPhaseDuration(phase, settings);
         const elapsed = phaseDuration - timeLeft;
         if (elapsed > 0) {
-          saveProgress(selectedTaskId, 0, elapsed);
+          if (phase === 'focus') {
+            saveProgress(selectedTaskId, 0, elapsed);
+          } else if (phase === 'shortBreak') {
+            saveProgress(selectedTaskId, 0, 0, { shortBreaks: 1, shortBreakTime: elapsed });
+          } else if (phase === 'longBreak') {
+            saveProgress(selectedTaskId, 0, 0, { longBreaks: 1, longBreakTime: elapsed });
+          }
         }
       }
     }

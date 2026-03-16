@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useTaskData } from '@/hooks/useTaskData';
@@ -225,7 +226,9 @@ export default function FrogodoroPage() {
     liveElapsed > 0 ||
     (selectedTask?.frogodoroSession?.timeSpent ?? 0) > 0 ||
     (selectedTask?.frogodoroSession?.shortBreaks ?? 0) > 0 ||
-    (selectedTask?.frogodoroSession?.longBreaks ?? 0) > 0;
+    (selectedTask?.frogodoroSession?.shortBreakTime ?? 0) > 0 ||
+    (selectedTask?.frogodoroSession?.longBreaks ?? 0) > 0 ||
+    (selectedTask?.frogodoroSession?.longBreakTime ?? 0) > 0;
 
   // Mobile check for drawer animation
   const [isDesktop, setIsDesktop] = useState(false);
@@ -252,31 +255,50 @@ export default function FrogodoroPage() {
     else startTimer();
   };
 
-  const handleManualSkip = () => {
-    // Save break data to DB when manually skipping a break phase
-    if ((phase === 'shortBreak' || phase === 'longBreak') && selectedTaskId && liveElapsed > 0) {
-      const today = new Date().toISOString().split('T')[0];
-      fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
+  const saveSessionToDb = async (taskId: string, currentPhase: typeof phase, elapsed: number) => {
+    if (elapsed <= 0) return;
+    const today = format(new Date(), 'yyyy-MM-dd');
+    let session: Record<string, unknown> = { date: today, completedCycles: 0, timeSpent: 0 };
+    if (currentPhase === 'focus') {
+      session = { date: today, completedCycles: 1, timeSpent: elapsed };
+    } else if (currentPhase === 'shortBreak') {
+      session = { date: today, completedCycles: 0, timeSpent: 0, shortBreaks: 1, shortBreakTime: elapsed };
+    } else if (currentPhase === 'longBreak') {
+      session = { date: today, completedCycles: 0, timeSpent: 0, longBreaks: 1, longBreakTime: elapsed };
+    } else {
+      return;
+    }
+    try {
+      await fetch(`/api/tasks/${taskId}/frogodoro`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session: {
-            date: today,
-            completedCycles: 0,
-            timeSpent: 0,
-            ...(phase === 'shortBreak'
-              ? { shortBreaks: 1, shortBreakTime: liveElapsed }
-              : { longBreaks: 1, longBreakTime: liveElapsed }),
-          },
-        }),
-      }).catch(() => {});
+        body: JSON.stringify({ session }),
+      });
+    } catch {
+      // silent fail
+    }
+  };
+
+  const handleManualSkip = async () => {
+    if (selectedTaskId && liveElapsed > 0) {
+      await saveSessionToDb(selectedTaskId, phase, liveElapsed);
+      mutateToday();
     }
     completePhase(false, liveElapsed);
   };
 
-  const handleTaskSelect = (taskId: string) => {
+  const handleTaskSelect = async (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return;
+    // Same task — just close the dropdown, preserve all store state
+    if (taskId === selectedTaskId) {
+      setShowTaskDropdown(false);
+      return;
+    }
+    // Different task — only flush if timer is actively running (paused state is already saved by pause handler)
+    if (selectedTaskId && isRunning && liveElapsed > 0) {
+      await saveSessionToDb(selectedTaskId, phase, liveElapsed);
+    }
     setTask(
       taskId,
       task.frogodoroSettings
@@ -284,6 +306,8 @@ export default function FrogodoroPage() {
         : undefined,
     );
     setShowTaskDropdown(false);
+    // Refresh task list after DB is updated so frogodoroSession reflects latest data
+    mutateToday();
   };
 
   const completeTaskWithAnimation = async (taskId: string) => {
@@ -613,14 +637,14 @@ export default function FrogodoroPage() {
                                     <span className="text-[11px] font-bold text-primary/60 tabular-nums">{formatDuration(focusTime)}</span>
                                   </div>
                                 )}
-                                {(shortBreaks > 0 || (storeHasData && phase === 'shortBreak')) && (
+                                {(shortBreaks > 0 || shortBreakTime > 0 || (storeHasData && phase === 'shortBreak')) && (
                                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-sky-500/8 dark:bg-sky-500/15">
                                     <div className={`w-2 h-2 rounded-full bg-sky-500 ${isRunning && phase === 'shortBreak' ? 'animate-pulse' : ''}`} />
                                     <span className="text-xs font-black text-sky-500 tabular-nums">{shortBreaks}</span>
                                     <span className="text-[11px] font-bold text-sky-500/60 tabular-nums">{formatDuration(shortBreakTime)}</span>
                                   </div>
                                 )}
-                                {(longBreaks > 0 || (storeHasData && phase === 'longBreak')) && (
+                                {(longBreaks > 0 || longBreakTime > 0 || (storeHasData && phase === 'longBreak')) && (
                                   <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/8 dark:bg-indigo-500/15">
                                     <div className={`w-2 h-2 rounded-full bg-indigo-500 ${isRunning && phase === 'longBreak' ? 'animate-pulse' : ''}`} />
                                     <span className="text-xs font-black text-indigo-500 tabular-nums">{longBreaks}</span>
@@ -1343,7 +1367,7 @@ export default function FrogodoroPage() {
                                       }
                                     : t.frogodoroSession;
                                   if (!session) return null;
-                                  const hasData = (session.timeSpent ?? 0) > 0 || (session.shortBreaks ?? 0) > 0 || (session.longBreaks ?? 0) > 0;
+                                  const hasData = (session.timeSpent ?? 0) > 0 || (session.shortBreaks ?? 0) > 0 || (session.shortBreakTime ?? 0) > 0 || (session.longBreaks ?? 0) > 0 || (session.longBreakTime ?? 0) > 0;
                                   if (!hasData) return null;
                                   const fmt = (s: number) => { const m = Math.floor(s / 60); const sec = s % 60; return s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; };
                                   return (
@@ -1355,17 +1379,17 @@ export default function FrogodoroPage() {
                                           <span className="text-[10px] font-bold text-primary/60 tabular-nums">{fmt(session.timeSpent ?? 0)}</span>
                                         </div>
                                       )}
-                                      {(session.shortBreaks ?? 0) > 0 && (
+                                      {((session.shortBreaks ?? 0) > 0 || (session.shortBreakTime ?? 0) > 0) && (
                                         <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
                                           <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
-                                          <span className="text-[11px] font-black text-sky-500 tabular-nums">{session.shortBreaks}</span>
+                                          <span className="text-[11px] font-black text-sky-500 tabular-nums">{session.shortBreaks ?? 0}</span>
                                           <span className="text-[10px] font-bold text-sky-500/60 tabular-nums">{fmt(session.shortBreakTime ?? 0)}</span>
                                         </div>
                                       )}
-                                      {(session.longBreaks ?? 0) > 0 && (
+                                      {((session.longBreaks ?? 0) > 0 || (session.longBreakTime ?? 0) > 0) && (
                                         <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-indigo-500/8 dark:bg-indigo-500/15">
                                           <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
-                                          <span className="text-[11px] font-black text-indigo-500 tabular-nums">{session.longBreaks}</span>
+                                          <span className="text-[11px] font-black text-indigo-500 tabular-nums">{session.longBreaks ?? 0}</span>
                                           <span className="text-[10px] font-bold text-indigo-500/60 tabular-nums">{fmt(session.longBreakTime ?? 0)}</span>
                                         </div>
                                       )}
