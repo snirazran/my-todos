@@ -388,7 +388,7 @@ function HabitItem({
         onClick={handleCardClick}
         className={`
           group relative flex flex-col gap-2 px-2 py-3.5 rounded-xl border border-border/50 transition-colors duration-200 cursor-pointer select-none
-          ${isDone ? 'bg-card opacity-60' : 'bg-card hover:border-border/70'}
+          ${isDone ? 'bg-card opacity-60' : 'bg-card md:hover:border-primary/40 active:border-primary/40'}
           ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
         `}
       >

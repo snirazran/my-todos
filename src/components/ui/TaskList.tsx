@@ -437,16 +437,16 @@ const SortableTaskItem = React.forwardRef<
               bg-card
               border border-border/50 shadow-none
               ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
-              ${isHovered && isDesktop ? 'border-border/70' : ''}
+              ${isHovered && isDesktop && !isDone ? 'border-primary/40' : ''}
               ${
                 isGlowActive && !isDone
                   ? 'ring-2 ring-primary shadow-[0_0_30px_rgba(var(--primary),0.3)]'
                   : ''
               }
 
-              select-none
+              select-none active:border-primary/40
               ${isDragging ? 'z-[100] opacity-100' : ''}
-              ${isDone && !isDragging && isHovered && isDesktop ? 'bg-accent/50' : ''} 
+              ${isDone && !isDragging && isHovered && isDesktop ? 'bg-accent/50' : ''}
               cursor-pointer
             `}
             // Note: We are using 'style' prop for x motion value to avoid re-renders
@@ -771,13 +771,13 @@ export default function TaskList({
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        delay: 250,
+        delay: 150,
         tolerance: 5,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 250,
+        delay: 150,
         tolerance: 5,
       },
     }),
