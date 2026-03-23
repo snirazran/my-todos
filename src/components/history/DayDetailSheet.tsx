@@ -3,13 +3,13 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
-import { X, Calendar as CalendarIcon, CheckCircle2, EllipsisVertical } from 'lucide-react';
+import { X, Calendar as CalendarIcon, CalendarCheck, CalendarClock, EllipsisVertical } from 'lucide-react';
 import { format } from 'date-fns';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { type FrogHandle } from '@/components/ui/frog';
 import HistoryTaskCard from './HistoryTaskCard';
 import TaskMenu from '../board/TaskMenu';
-import { FilterDropdown, FilterType } from '../ui/FilterDropdown';
+import { FilterDropdown } from '../ui/FilterDropdown';
 import useSWR from 'swr';
 import { cn } from '@/lib/utils';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -36,10 +36,7 @@ type DayDetailSheetProps = {
   onToggleTask: (id: string, date: string, currentStatus: boolean) => void;
   onDeleteTask?: (id: string, date: string) => void;
   onEditTask?: (id: string, text: string, type?: string) => void;
-  frogProps: any; // Props for FrogDisplay
-  // Filter Props
-  filter: FilterType;
-  onFilterChange: (filter: FilterType) => void;
+  frogProps: any;
   selectedTags: string[];
   onTagsChange: (tags: string[]) => void;
   showCompleted: boolean;
@@ -55,8 +52,6 @@ export default function DayDetailSheet({
   onDeleteTask,
   onEditTask,
   frogProps,
-  filter,
-  onFilterChange,
   selectedTags,
   onTagsChange,
   showCompleted,
@@ -66,6 +61,7 @@ export default function DayDetailSheet({
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [activeTab, setActiveTab] = useState<'tasks' | 'habits'>('tasks');
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
@@ -86,22 +82,32 @@ export default function DayDetailSheet({
     if (showFilterMenu) setShowFilterMenu(false);
   };
 
-  // Filtering Logic
-  const filteredTasks = React.useMemo(() => {
-    return tasks.filter((t) => {
+  // Split tasks by type
+  const regularTasks = React.useMemo(() => tasks.filter((t) => t.type !== 'habit'), [tasks]);
+  const habitTasks = React.useMemo(() => tasks.filter((t) => t.type === 'habit'), [tasks]);
+
+  // Filtering Logic (both lists always computed, shown/hidden via CSS)
+  const filteredRegular = React.useMemo(() => {
+    return regularTasks.filter((t) => {
       if (!showCompleted && t.completed) return false;
-      if (filter === 'tasks' && t.type === 'habit') return false;
-      if (filter === 'habits' && t.type !== 'habit') return false;
       if (selectedTags.length > 0) {
-        if (!t.tags || !t.tags.some((tagId: string) => selectedTags.includes(tagId))) {
-          return false;
-        }
+        if (!t.tags || !t.tags.some((tagId: string) => selectedTags.includes(tagId))) return false;
       }
       return true;
     });
-  }, [tasks, filter, selectedTags, showCompleted]);
+  }, [regularTasks, selectedTags, showCompleted]);
 
-  const isFiltered = filter !== 'all' || selectedTags.length > 0 || !showCompleted;
+  const filteredHabits = React.useMemo(() => {
+    return habitTasks.filter((t) => {
+      if (!showCompleted && t.completed) return false;
+      if (selectedTags.length > 0) {
+        if (!t.tags || !t.tags.some((tagId: string) => selectedTags.includes(tagId))) return false;
+      }
+      return true;
+    });
+  }, [habitTasks, selectedTags, showCompleted]);
+
+  const isFiltered = selectedTags.length > 0 || !showCompleted;
 
   // Animation State
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -142,6 +148,7 @@ export default function DayDetailSheet({
   useEffect(() => {
     if (open) {
       document.body.style.overflow = 'hidden';
+      setActiveTab('tasks');
     } else {
       document.body.style.overflow = '';
     }
@@ -279,89 +286,157 @@ export default function DayDetailSheet({
                   </div>
                 </div>
 
-                {/* 2. Tasks Section (Wrapped like a DayColumn) */}
-                <div className="flex flex-col rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
-                  {/* Column Header */}
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-muted/20">
-                    <div className="flex items-center gap-2">
-                      <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-emerald-500/10 text-emerald-500">
-                        <CheckCircle2 size={16} />
-                      </div>
-                      <span className="text-sm font-black tracking-tight text-foreground uppercase">
-                        {completedCount} / {totalCount}
-                      </span>
-                    </div>
-
-                    <div className="relative" ref={filterMenuRef}>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setShowFilterMenu(!showFilterMenu);
-                        }}
-                        className={cn(
-                          'flex items-center justify-center w-7 h-7 rounded-xl transition-all active:scale-90',
-                          showFilterMenu || isFiltered
-                            ? 'bg-primary/10 text-primary'
-                            : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                        )}
-                      >
-                        <EllipsisVertical size={16} />
-                        {isFiltered && (
-                          <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-background shadow-sm" />
-                        )}
-                      </button>
-
-                      <FilterDropdown
-                        isOpen={showFilterMenu}
-                        onClose={() => setShowFilterMenu(false)}
-                        triggerRef={filterMenuRef}
-                        filter={filter}
-                        onFilterChange={onFilterChange}
-                        availableTags={userTags}
-                        selectedTags={selectedTags}
-                        onTagsChange={onTagsChange}
-                        showCompleted={showCompleted}
-                        onShowCompletedChange={onShowCompletedChange}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Tasks List Area */}
-                  <div className="p-2 space-y-1 pb-4 min-h-[120px]">
-                    {filteredTasks.length === 0 ? (
-                      <div className="text-center py-8 px-4 text-muted-foreground bg-muted/5 rounded-2xl border border-dashed border-border/40">
-                        <p className="font-bold text-sm">
-                          {isFiltered ? 'No matches found.' : 'No tasks for this day.'}
-                        </p>
-                      </div>
-                    ) : (
-                      filteredTasks.map((task) => {
-                        const uniqueKey = `${date}::${task.id}`;
-                        return (
-                          <HistoryTaskCard
-                            key={uniqueKey}
-                            id={task.id}
-                            text={task.text}
-                            completed={task.completed}
-                            type={task.type}
-                            tags={task.tags}
-                            date={date}
-                            completedDates={task.completedDates}
-                            timesPerWeek={task.timesPerWeek}
-                            frogodoroSession={task.frogodoroSession}
-                            onToggle={handleToggleProxy}
-                            setFlyRef={(el) => {
-                              if (el) flyRefs.current[uniqueKey] = el;
-                              else delete flyRefs.current[uniqueKey];
-                            }}
-                            isEaten={visuallyDone?.has(uniqueKey)}
-                            userTags={userTags}
-                          />
-                        );
-                      })
+                {/* 2. Tab Bar (matches home page design) */}
+                <div className="flex items-center w-full p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative">
+                  <button
+                    onClick={() => setActiveTab('tasks')}
+                    className={cn(
+                      'flex-1 justify-center relative px-4 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap',
+                      activeTab === 'tasks'
+                        ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
                     )}
+                  >
+                    <CalendarCheck className={cn('w-4 h-4', activeTab === 'tasks' ? 'text-primary' : 'text-muted-foreground')} />
+                    Tasks
+                    {regularTasks.length > 0 && (
+                      <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm">
+                        {showCompleted ? regularTasks.length : regularTasks.filter((t) => !t.completed).length}
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('habits')}
+                    className={cn(
+                      'flex-1 justify-center relative px-4 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap',
+                      activeTab === 'habits'
+                        ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
+                    )}
+                  >
+                    <CalendarClock className={cn('w-4 h-4', activeTab === 'habits' ? 'text-primary' : 'text-muted-foreground')} />
+                    Habits
+                    {habitTasks.length > 0 && (
+                      <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm">
+                        {habitTasks.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <div className="w-[1px] h-6 bg-border/50 mx-1" />
+
+                  <div className="relative" ref={filterMenuRef}>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowFilterMenu(!showFilterMenu);
+                      }}
+                      className={cn(
+                        'relative p-2 rounded-full transition-colors',
+                        showFilterMenu || isFiltered
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                      )}
+                    >
+                      <EllipsisVertical className="w-5 h-5" />
+                      {isFiltered && (
+                        <div className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
+                      )}
+                    </button>
+
+                    <FilterDropdown
+                      isOpen={showFilterMenu}
+                      onClose={() => setShowFilterMenu(false)}
+                      triggerRef={filterMenuRef}
+                      showTypeFilters={false}
+                      availableTags={userTags}
+                      selectedTags={selectedTags}
+                      onTagsChange={onTagsChange}
+                      showCompleted={showCompleted}
+                      onShowCompletedChange={onShowCompletedChange}
+                    />
                   </div>
                 </div>
+
+                {/* 3. Tasks List */}
+                <div className={activeTab === 'tasks' ? '' : 'hidden'}>
+                      <div className="flex flex-col rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
+                        <div className="p-2 space-y-1 pb-4 min-h-[120px]">
+                          {filteredRegular.length === 0 ? (
+                            <div className="text-center py-8 px-4 text-muted-foreground bg-muted/5 rounded-2xl border border-dashed border-border/40">
+                              <p className="font-bold text-sm">
+                                {isFiltered ? 'No matches found.' : 'No tasks for this day.'}
+                              </p>
+                            </div>
+                          ) : (
+                            filteredRegular.map((task) => {
+                              const uniqueKey = `${date}::${task.id}`;
+                              return (
+                                <HistoryTaskCard
+                                  key={uniqueKey}
+                                  id={task.id}
+                                  text={task.text}
+                                  completed={task.completed}
+                                  type={task.type}
+                                  tags={task.tags}
+                                  date={date}
+                                  completedDates={task.completedDates}
+                                  timesPerWeek={task.timesPerWeek}
+                                  frogodoroSession={task.frogodoroSession}
+                                  onToggle={handleToggleProxy}
+                                  setFlyRef={(el) => {
+                                    if (el) flyRefs.current[uniqueKey] = el;
+                                    else delete flyRefs.current[uniqueKey];
+                                  }}
+                                  isEaten={visuallyDone?.has(uniqueKey)}
+                                  userTags={userTags}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 4. Habits List */}
+                    <div className={activeTab === 'habits' ? '' : 'hidden'}>
+                      <div className="flex flex-col rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
+                        <div className="p-2 space-y-1 pb-4 min-h-[120px]">
+                          {filteredHabits.length === 0 ? (
+                            <div className="text-center py-8 px-4 text-muted-foreground bg-muted/5 rounded-2xl border border-dashed border-border/40">
+                              <p className="font-bold text-sm">
+                                {isFiltered ? 'No matches found.' : 'No habits for this day.'}
+                              </p>
+                            </div>
+                          ) : (
+                            filteredHabits.map((task) => {
+                              const uniqueKey = `${date}::${task.id}`;
+                              return (
+                                <HistoryTaskCard
+                                  key={uniqueKey}
+                                  id={task.id}
+                                  text={task.text}
+                                  completed={task.completed}
+                                  type={task.type}
+                                  tags={task.tags}
+                                  date={date}
+                                  completedDates={task.completedDates}
+                                  timesPerWeek={task.timesPerWeek}
+                                  frogodoroSession={task.frogodoroSession}
+                                  onToggle={handleToggleProxy}
+                                  setFlyRef={(el) => {
+                                    if (el) flyRefs.current[uniqueKey] = el;
+                                    else delete flyRefs.current[uniqueKey];
+                                  }}
+                                  isEaten={visuallyDone?.has(uniqueKey)}
+                                  userTags={userTags}
+                                />
+                              );
+                            })
+                          )}
+                        </div>
+                      </div>
+                    </div>
               </div>
             </motion.div>
           </div>

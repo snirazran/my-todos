@@ -21,7 +21,7 @@ import HistoryInsights from '@/components/history/HistoryInsights';
 import { DateRangeOption } from '@/components/history/HistoryTimeSelector';
 import { useTaskData } from '@/hooks/useTaskData';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
-import { FilterType } from '@/components/ui/FilterDropdown';
+
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 
 export default function HistoryPage() {
@@ -43,7 +43,6 @@ export default function HistoryPage() {
   } | null>(null);
 
   // Filters for Popup
-  const [popupFilter, setPopupFilter] = useState<FilterType>('all');
   const [popupSelectedTags, setPopupSelectedTags] = useState<string[]>([]);
   const [popupShowCompleted, setPopupShowCompleted] = useState(true);
 
@@ -409,8 +408,6 @@ export default function HistoryPage() {
           frogProps={{
             ...frogProps,
           }}
-          filter={popupFilter}
-          onFilterChange={setPopupFilter}
           selectedTags={popupSelectedTags}
           onTagsChange={setPopupSelectedTags}
           showCompleted={popupShowCompleted}

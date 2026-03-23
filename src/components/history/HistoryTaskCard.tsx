@@ -63,11 +63,7 @@ export default function HistoryTaskCard({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.2 }}
+    <div
       className={cn(
         'group relative flex items-stretch gap-3 p-3.5 transition-all duration-200 rounded-xl border select-none cursor-pointer',
         'bg-card border-border/80 shadow-sm hover:border-primary/50 hover:bg-primary/[0.03]',
@@ -285,6 +281,6 @@ export default function HistoryTaskCard({
           )}
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 }
