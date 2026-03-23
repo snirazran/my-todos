@@ -1132,13 +1132,14 @@ export default function TaskList({
 
   return (
     <>
-      <div dir="ltr" className="px-6 pt-0 pb-4 overflow-visible rounded-[20px]">
+      <div dir="ltr" className="px-4 pt-0 pb-4 overflow-visible">
         <div className="flex flex-row items-center justify-end mb-2 gap-3 relative">
           {/* Header Menu Removed - Moved to Page */}
         </div>
 
+        <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
         <div
-          className={`pt-0 px-1 -mx-1 pb-2 space-y-0 md:overflow-y-auto overflow-y-visible min-h-[100px] md:max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+          className={`p-2 space-y-0 md:overflow-y-auto overflow-y-visible min-h-[100px] md:max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && !exitAction ? (
@@ -1260,6 +1261,7 @@ export default function TaskList({
           )}
 
           {/* Show Finished Toggle (Removed from bottom) */}
+        </div>
         </div>
       </div>
 

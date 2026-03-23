@@ -97,7 +97,8 @@ export function HabitPanel({
   }
 
   return (
-    <div className="flex flex-col gap-3 pt-2 px-6 pb-24">
+    <div className="pt-2 px-4 pb-24">
+      <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-2 flex flex-col gap-3">
       <AnimatePresence mode="popLayout">
         {visibleHabits.map((habit) => (
           <HabitItem
@@ -118,6 +119,7 @@ export function HabitPanel({
           />
         ))}
       </AnimatePresence>
+      </div>
 
       <TaskMenu
         menu={menu}
