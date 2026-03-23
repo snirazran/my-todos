@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import dns from 'node:dns/promises';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -25,6 +26,7 @@ globalWithMongoose.mongooseConn = cached;
 export default async function connectMongo() {
   if (cached.conn) return cached.conn;
   if (!cached.promise) {
+    dns.setServers(['1.1.1.1']);
     cached.promise = mongoose.connect(MONGO_URI_STR, {
       bufferCommands: false,
       dbName: 'todoTracker',
