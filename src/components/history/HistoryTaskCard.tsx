@@ -66,7 +66,7 @@ export default function HistoryTaskCard({
     <div
       className={cn(
         'group relative flex items-stretch gap-3 p-3.5 transition-all duration-200 rounded-xl border select-none cursor-pointer',
-        'bg-card border-border/80 shadow-sm hover:border-primary/50 hover:bg-primary/[0.03]',
+        'bg-card border-border/80 shadow-sm md:hover:border-primary/40 active:border-primary/40',
       )}
       onClick={handleToggle}
     >

@@ -202,7 +202,7 @@ export default function TaskCard({
         'bg-card border border-border/80',
         task.completed
           ? 'shadow-sm'
-          : 'shadow-sm hover:shadow-md hover:border-primary/40',
+          : 'shadow-sm md:hover:border-primary/40 active:border-primary/40',
         'mb-2.5',
         menuOpen ? 'z-50 shadow-xl ring-2 ring-primary/20' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
