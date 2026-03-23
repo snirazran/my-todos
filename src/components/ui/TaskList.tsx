@@ -65,6 +65,15 @@ interface Task {
   origin?: 'regular' | 'weekly' | 'backlog' | 'habit';
   kind?: 'regular' | 'weekly' | 'backlog' | 'habit';
   tags?: string[];
+  frogodoroSession?: {
+    date: string;
+    completedCycles: number;
+    timeSpent: number;
+    shortBreaks?: number;
+    shortBreakTime?: number;
+    longBreaks?: number;
+    longBreakTime?: number;
+  } | null;
   calendarEventId?: string;
   startTime?: string;
   endTime?: string;
@@ -593,6 +602,31 @@ const SortableTaskItem = React.forwardRef<
                     <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                   )}
                 </span>
+                {task.frogodoroSession && (task.frogodoroSession.timeSpent > 0 || (task.frogodoroSession.shortBreaks ?? 0) > 0 || (task.frogodoroSession.longBreaks ?? 0) > 0) && (
+                  <div className="flex flex-wrap items-center gap-1 mt-0.5">
+                    {task.frogodoroSession.timeSpent > 0 && (() => { const s = task.frogodoroSession!.timeSpent; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
+                      <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
+                        <span className="text-[11px] font-black text-primary tabular-nums">{task.frogodoroSession!.completedCycles}</span>
+                        <span className="text-[10px] font-bold text-primary/60 tabular-nums">{t}</span>
+                      </div>
+                    ); })()}
+                    {(task.frogodoroSession.shortBreaks ?? 0) > 0 && (() => { const s = task.frogodoroSession!.shortBreakTime ?? 0; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
+                      <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
+                        <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
+                        <span className="text-[11px] font-black text-sky-500 tabular-nums">{task.frogodoroSession!.shortBreaks}</span>
+                        <span className="text-[10px] font-bold text-sky-500/60 tabular-nums">{t}</span>
+                      </div>
+                    ); })()}
+                    {(task.frogodoroSession.longBreaks ?? 0) > 0 && (() => { const s = task.frogodoroSession!.longBreakTime ?? 0; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
+                      <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-indigo-500/8 dark:bg-indigo-500/15">
+                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
+                        <span className="text-[11px] font-black text-indigo-500 tabular-nums">{task.frogodoroSession!.longBreaks}</span>
+                        <span className="text-[10px] font-bold text-indigo-500/60 tabular-nums">{t}</span>
+                      </div>
+                    ); })()}
+                  </div>
+                )}
               </div>
             </div>
             {/* Grab handle area for mobile if needed, or just edge drag */}

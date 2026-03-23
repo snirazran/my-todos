@@ -56,6 +56,7 @@ export default React.memo(function TaskList({
     calendarEventId?: string;
     startTime?: string;
     endTime?: string;
+    frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null;
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
   onAddRequested: (text: string) => void;
@@ -293,6 +294,7 @@ export default React.memo(function TaskList({
                 calendarEventId: t.calendarEventId,
                 startTime: t.startTime,
                 endTime: t.endTime,
+                frogodoroSession: t.frogodoroSession,
               });
             }}
             hiddenWhileDragging={false}

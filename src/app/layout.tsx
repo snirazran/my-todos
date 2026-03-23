@@ -61,7 +61,7 @@ export default function RootLayout({
           <Providers>
             <div className="flex flex-col h-full">
               <SiteHeader />
-              <main className="flex-1 overflow-y-auto relative">
+              <main className="flex-1 overflow-y-auto relative pb-16 md:pb-0">
                 {children}
               </main>
               <MobileNav />

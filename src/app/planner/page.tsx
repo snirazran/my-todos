@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react'
 import { format } from 'date-fns';
 import TaskBoard from '@/components/board/TaskBoard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
+import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import {
   Task,
   DAYS,
@@ -306,16 +307,44 @@ export default function ManageTasksPage() {
     });
   }, [processingWeekOrder]);
 
+  // Live frogodoro overlay for today's column (must be before any early return)
+  const { selectedTaskId: frogTaskId, sessionStats, settings: frogSettings, phase: frogPhase, timeLeft: frogTimeLeft, isRunning: frogRunning } = useFrogodoroStore();
+
   if (loading) {
     return <LoadingScreen message="Loading weekly tasks..." fullscreen />;
   }
+  const frogPhaseDuration = frogPhase === 'focus' ? frogSettings.cycleDuration * 60 : frogPhase === 'shortBreak' ? frogSettings.shortBreakDuration * 60 : frogSettings.longBreakDuration * 60;
+  const frogLiveElapsed = frogPhaseDuration - frogTimeLeft;
+  const frogHasActivity = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || frogRunning || frogLiveElapsed > 0;
+  const liveWeek = frogTaskId && frogHasActivity
+    ? week.map((col, colIdx) =>
+        colIdx === todayIdx
+          ? col.map((t) =>
+              t.id === frogTaskId
+                ? {
+                    ...t,
+                    frogodoroSession: {
+                      date: format(new Date(), 'yyyy-MM-dd'),
+                      completedCycles: sessionStats.focusSessions + (frogPhase === 'focus' && frogLiveElapsed > 0 ? 1 : 0),
+                      timeSpent: sessionStats.focusTime + (frogPhase === 'focus' ? frogLiveElapsed : 0),
+                      shortBreaks: sessionStats.shortBreaks + (frogPhase === 'shortBreak' && frogLiveElapsed > 0 ? 1 : 0),
+                      shortBreakTime: sessionStats.shortBreakTime + (frogPhase === 'shortBreak' ? frogLiveElapsed : 0),
+                      longBreaks: sessionStats.longBreaks + (frogPhase === 'longBreak' && frogLiveElapsed > 0 ? 1 : 0),
+                      longBreakTime: sessionStats.longBreakTime + (frogPhase === 'longBreak' ? frogLiveElapsed : 0),
+                    },
+                  }
+                : t,
+            )
+          : col,
+      )
+    : week;
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-background">
       <div className="absolute inset-0">
         <TaskBoard
           titles={titles}
-          week={week}
+          week={liveWeek}
           setWeek={setWeek}
           habits={habits}
           onToggleHabit={onToggleHabit}

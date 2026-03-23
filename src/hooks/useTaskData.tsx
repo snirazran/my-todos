@@ -26,6 +26,15 @@ export interface Task {
     longBreakDuration: number;
     longBreakInterval: number;
   };
+  frogodoroSession?: {
+    date: string;
+    completedCycles: number;
+    timeSpent: number;
+    shortBreaks?: number;
+    shortBreakTime?: number;
+    longBreaks?: number;
+    longBreakTime?: number;
+  } | null;
 }
 
 export type FlyStatus = {

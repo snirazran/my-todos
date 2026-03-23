@@ -820,6 +820,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       completedDates: t.completedDates ?? [],
       timesPerWeek: t.timesPerWeek,
       frogodoroSettings: t.frogodoroSettings,
+      frogodoroSession: t.frogodoroSessions?.find((s) => s.date === date) ?? null,
       calendarEventId: t.calendarEventId,
       startTime: t.startTime,
       endTime: t.endTime,
@@ -903,6 +904,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[dayNum]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
+        frogodoroSession: t.frogodoroSessions?.find((s) => s.date === weekDates[dayNum]) ?? null,
         calendarEventId: t.calendarEventId,
         startTime: t.startTime,
         endTime: t.endTime,
@@ -934,6 +936,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           (t.completedDates ?? []).includes(weekDates[d]) ||
           (!!t.completed && t.type === 'regular'),
         tags: t.tags ?? [],
+        frogodoroSession: t.frogodoroSessions?.find((s) => s.date === weekDates[d]) ?? null,
         calendarEventId: t.calendarEventId,
         startTime: t.startTime,
         endTime: t.endTime,

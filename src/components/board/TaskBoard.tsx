@@ -726,6 +726,7 @@ export default function TaskBoard({
           calendarEventId={drag.calendarEventId}
           startTime={drag.startTime}
           endTime={drag.endTime}
+          frogodoroSession={drag.frogodoroSession}
         />      )}
 
       <style jsx global>{`

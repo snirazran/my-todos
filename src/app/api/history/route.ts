@@ -89,8 +89,13 @@ export async function GET(req: NextRequest) {
       daysOfWeek?: number[];
       timesPerWeek?: number;
       frogodoroSession?: {
+        date: string;
         completedCycles: number;
         timeSpent: number;
+        shortBreaks?: number;
+        shortBreakTime?: number;
+        longBreaks?: number;
+        longBreakTime?: number;
       };
     };
 
@@ -143,7 +148,7 @@ export async function GET(req: NextRequest) {
             timesPerWeek: t.timesPerWeek,
             frogodoroSession: t.frogodoroSessions?.find(
               (s) => s.date === dateStr,
-            ),
+            ) ?? undefined,
           }),
         )
         .sort((a: HistoryTask, b: HistoryTask) => a.order - b.order);
