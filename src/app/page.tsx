@@ -115,6 +115,10 @@ export default function Home() {
   const [isTaskGlow, setIsTaskGlow] = useState(false);
 
   const frogBoxRef = useRef<HTMLDivElement | null>(null);
+  const mainScrollRef = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    mainScrollRef.current = document.getElementById('main-scroll');
+  }, []);
   const {
     vp,
     cinematic,
@@ -124,7 +128,7 @@ export default function Home() {
     triggerTongue,
     visuallyDone,
     speedUpTongue,
-  } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
+  } = useFrogTongue({ frogRef, frogBoxRef, flyRefs, scrollContainerRef: mainScrollRef });
 
   const { showNotification } = useNotification();
   const [showDailyReward, setShowDailyReward] = useState(false);
@@ -212,12 +216,13 @@ export default function Home() {
   // Block Scrolling during cinematic
   useEffect(() => {
     if (!cinematic) return;
+    const el = mainScrollRef.current ?? window;
     const stop = (e: Event) => e.preventDefault();
-    window.addEventListener('wheel', stop, { passive: false });
-    window.addEventListener('touchmove', stop, { passive: false });
+    el.addEventListener('wheel', stop, { passive: false });
+    el.addEventListener('touchmove', stop, { passive: false });
     return () => {
-      window.removeEventListener('wheel', stop as any);
-      window.removeEventListener('touchmove', stop as any);
+      el.removeEventListener('wheel', stop as any);
+      el.removeEventListener('touchmove', stop as any);
     };
   }, [cinematic]);
 

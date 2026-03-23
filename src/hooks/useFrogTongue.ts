@@ -26,12 +26,14 @@ export interface UseFrogTongueOptions {
   frogRef: React.RefObject<FrogHandle>;
   frogBoxRef?: React.RefObject<HTMLDivElement | null>;
   flyRefs: React.MutableRefObject<Record<string, HTMLElement | null>>;
+  scrollContainerRef?: React.RefObject<HTMLElement | null>;
 }
 
 export function useFrogTongue({
   frogRef,
   frogBoxRef,
   flyRefs,
+  scrollContainerRef,
 }: UseFrogTongueOptions) {
   const cooldownUntil = useRef(0);
   const animatingRef = useRef(false);
@@ -82,8 +84,28 @@ export function useFrogTongue({
     };
   }, []);
 
+  /* ── Scroll-container helpers ──
+   * "Doc" coords = position within the scrollable content.
+   *   docY = viewportY - containerTop + scrollTop
+   * To convert back:
+   *   viewportY = docY - scrollTop + containerTop
+   * So the offset to subtract is: scrollTop - containerTop
+   *
+   * When no container is provided (fallback), these reduce to the
+   * original window-based behaviour.
+   */
+
+  const getSC = () => scrollContainerRef?.current ?? null;
+
   const getMouthDoc = useCallback(() => {
     const p = frogRef.current?.getMouthPoint() ?? { x: 0, y: 0 };
+    const sc = getSC();
+    if (sc) {
+      return {
+        x: p.x,
+        y: p.y - sc.getBoundingClientRect().top + sc.scrollTop + ORIGIN_Y_ADJ,
+      };
+    }
     const offX = window.pageXOffset || document.documentElement.scrollLeft;
     const offY = window.pageYOffset || document.documentElement.scrollTop;
     return { x: p.x + offX, y: p.y + offY + ORIGIN_Y_ADJ };
@@ -91,16 +113,29 @@ export function useFrogTongue({
 
   const getFlyDoc = useCallback((el: HTMLElement) => {
     const r = el.getBoundingClientRect();
+    const sc = getSC();
+    if (sc) {
+      return {
+        x: r.left + r.width / 2,
+        y: r.top + r.height / 2 - sc.getBoundingClientRect().top + sc.scrollTop,
+      };
+    }
     const offX = window.pageXOffset || document.documentElement.scrollLeft;
     const offY = window.pageYOffset || document.documentElement.scrollTop;
     return { x: r.left + r.width / 2 + offX, y: r.top + r.height / 2 + offY };
   }, []);
 
   const visibleRatio = (r: DOMRect) => {
-    const vw = window.innerWidth,
-      vh = window.innerHeight;
-    const xOverlap = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0));
-    const yOverlap = Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+    const sc = getSC();
+    let vL: number, vT: number, vR: number, vB: number;
+    if (sc) {
+      const cr = sc.getBoundingClientRect();
+      vL = cr.left; vT = cr.top; vR = cr.right; vB = cr.bottom;
+    } else {
+      vL = 0; vT = 0; vR = window.innerWidth; vB = window.innerHeight;
+    }
+    const xOverlap = Math.max(0, Math.min(r.right, vR) - Math.max(r.left, vL));
+    const yOverlap = Math.max(0, Math.min(r.bottom, vB) - Math.max(r.top, vT));
     const visArea = xOverlap * yOverlap;
     const totalArea = Math.max(1, r.width * r.height);
     return visArea / totalArea;
@@ -121,28 +156,38 @@ export function useFrogTongue({
         return;
       }
 
-      const startY = window.scrollY;
+      const sc = getSC();
+      const startY = sc ? sc.scrollTop : window.scrollY;
+      const vh = sc ? sc.clientHeight : window.innerHeight;
+
       const originDoc0 = getMouthDoc();
       const targetDoc0 = getFlyDoc(flyEl);
 
-      let frogFocusY = Math.max(0, originDoc0.y - window.innerHeight * 0.35);
-      let flyFocusY = Math.max(0, targetDoc0.y - window.innerHeight * 0.45);
+      let frogFocusY = Math.max(0, originDoc0.y - vh * 0.35);
+      let flyFocusY = Math.max(0, targetDoc0.y - vh * 0.45);
 
       const flyR = flyEl.getBoundingClientRect();
       const frogR = frogBoxRef?.current?.getBoundingClientRect();
       const frogRatio = frogR ? visibleRatio(frogR) : 0;
-      const flyVisible =
-        flyR.top < window.innerHeight &&
-        flyR.bottom > 0 &&
-        flyR.left < window.innerWidth &&
-        flyR.right > 0;
+
+      let flyVisible: boolean;
+      if (sc) {
+        const cr = sc.getBoundingClientRect();
+        flyVisible =
+          flyR.top < cr.bottom && flyR.bottom > cr.top &&
+          flyR.left < cr.right && flyR.right > cr.left;
+      } else {
+        flyVisible =
+          flyR.top < window.innerHeight && flyR.bottom > 0 &&
+          flyR.left < window.innerWidth && flyR.right > 0;
+      }
 
       const needCine = frogRatio < 0.75 || !flyVisible;
       speedRef.current = 1;
       setCinematic(true);
 
       if (needCine) {
-        await animateScrollTo(frogFocusY, PRE_PAN_MS, speedRef);
+        await animateScrollTo(frogFocusY, PRE_PAN_MS, speedRef, sc);
         await new Promise((r) =>
           setTimeout(r, PRE_LINGER_MS / speedRef.current),
         );
@@ -150,8 +195,8 @@ export function useFrogTongue({
 
       const originDoc = getMouthDoc();
       const targetDoc = getFlyDoc(flyEl);
-      frogFocusY = Math.max(0, originDoc.y - window.innerHeight * 0.35);
-      flyFocusY = Math.max(0, targetDoc.y - window.innerHeight * 0.45);
+      frogFocusY = Math.max(0, originDoc.y - vh * 0.35);
+      flyFocusY = Math.max(0, targetDoc.y - vh * 0.45);
 
       const startAt = performance.now() + OFFSET_MS;
       const camStartAt = startAt + CAM_START_DELAY;
@@ -186,6 +231,9 @@ export function useFrogTongue({
     if (!grab) return;
 
     animatingRef.current = true;
+
+    const sc = getSC();
+    const scTop = sc ? sc.getBoundingClientRect().top : 0;
 
     /* Use grab.targetDoc directly – these coordinates were captured in
        triggerTongue at the correct scroll position and are proven to
@@ -224,8 +272,8 @@ export function useFrogTongue({
     }
 
     const seedViewportPath = () => {
-      const offX = window.scrollX;
-      const offY = window.scrollY;
+      const offX = sc ? 0 : window.scrollX;
+      const offY = (sc ? sc.scrollTop : window.scrollY) - scTop;
       const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
       const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
       const p2V = { x: p2.x - offX, y: p2.y - offY };
@@ -257,20 +305,8 @@ export function useFrogTongue({
 
       /* ---------------------------------------------------------------
        * Predict the scroll position the browser will PAINT this frame.
-       *
-       * At 24df97c the camera follow ran AFTER path computation, so the
-       * tongue was drawn one frame behind the scroll → visible "slide".
-       *
-       * Moving scrollTo() before the read (c2079064) fixed the slide
-       * but introduced timing/rounding glitches on mobile.
-       *
-       * The fix: pre-compute where the camera WILL be, use that value
-       * for coordinate conversion, then call scrollTo at the END of the
-       * tick (same order as 24df97c).  The tongue is drawn for the
-       * correct position without relying on scrollTo → scrollY round-
-       * tripping being perfectly synchronous.
        * ------------------------------------------------------------- */
-      let paintScrollY = window.scrollY;
+      let paintScrollY = sc ? sc.scrollTop : window.scrollY;
 
       if (grab.follow) {
         if (now >= grab.camStartAt && t <= HIT_AT) {
@@ -283,19 +319,14 @@ export function useFrogTongue({
         } else if (t > HIT_AT) {
           paintScrollY = grab.flyFocusY;
         }
-        /* Clamp to the browser's actual scrollable range.  scrollTo()
-           clamps internally, so without this the tongue offset would
-           overshoot the real scroll position when flyFocusY exceeds
-           the document height — making the tongue land above the task. */
-        const maxScroll = Math.max(
-          0,
-          document.documentElement.scrollHeight - window.innerHeight,
-        );
+        const maxScroll = sc
+          ? Math.max(0, sc.scrollHeight - sc.clientHeight)
+          : Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
         paintScrollY = Math.max(0, Math.min(paintScrollY, maxScroll));
       }
 
-      const offX = window.scrollX;
-      const offY = paintScrollY;
+      const offX = sc ? 0 : window.scrollX;
+      const offY = paintScrollY - scTop;
       const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
       const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
       const p2V = { x: p2.x - offX, y: p2.y - offY };
@@ -337,12 +368,10 @@ export function useFrogTongue({
         }
       }
 
-      /* --- camera follow at the END of tick (same order as 24df97c).
-       *  After HIT_AT, hold the scroll at flyFocusY to prevent browser
-       *  scroll drift from causing a jump when we stop actively scrolling.
-       * --------------------------------------------------------------- */
+      /* --- camera follow at the END of tick --- */
       if (grab.follow && (now >= grab.camStartAt || t > HIT_AT)) {
-        window.scrollTo(0, paintScrollY);
+        if (sc) sc.scrollTop = paintScrollY;
+        else window.scrollTo(0, paintScrollY);
       }
 
       if (t < 1) {
@@ -409,9 +438,10 @@ function animateScrollTo(
   targetY: number,
   duration: number,
   speedRef?: React.MutableRefObject<number>,
+  container?: HTMLElement | null,
 ) {
   return new Promise<void>((resolve) => {
-    const start = window.scrollY;
+    const start = container ? container.scrollTop : window.scrollY;
     const dy = targetY - start;
     let progress = 0;
     let lastT = 0;
@@ -423,7 +453,8 @@ function animateScrollTo(
       progress += (dt / duration) * (speedRef?.current ?? 1);
       const p = Math.min(1, progress);
       const y = start + dy * easeOutQuad(p);
-      window.scrollTo(0, y);
+      if (container) container.scrollTop = y;
+      else window.scrollTo(0, y);
       if (p < 1) requestAnimationFrame(frame);
       else resolve();
     }

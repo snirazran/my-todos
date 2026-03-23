@@ -18,7 +18,8 @@
       "Bash(cmd.exe /c \"set NODE_OPTIONS=--tls-min-v1.0 && node -e \\\\\"const tls = require\\('tls'\\); const sock = tls.connect\\(27017, 'ac-qzr5qjf-shard-00-00.sd1klbx.mongodb.net', \\(\\) => { console.log\\('TLS connected!', sock.authorized\\); sock.end\\(\\); }\\); sock.on\\('error', e => console.error\\('TLS error:', e.message\\)\\); setTimeout\\(\\(\\) => { console.log\\('Timeout'\\); process.exit\\(1\\); }, 10000\\);\\\\\"\" 2>&1)",
       "Bash(nslookup _mongodb._tcp.snircluster.sd1klbx.mongodb.net)",
       "Bash(nslookup -type=SRV _mongodb._tcp.snircluster.sd1klbx.mongodb.net 8.8.8.8)",
-      "Bash(nslookup -type=TXT snircluster.sd1klbx.mongodb.net 8.8.8.8)"
+      "Bash(nslookup -type=TXT snircluster.sd1klbx.mongodb.net 8.8.8.8)",
+      "Bash(git checkout:*)"
     ]
   }
 }

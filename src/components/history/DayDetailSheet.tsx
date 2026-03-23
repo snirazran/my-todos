@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import { X, Calendar as CalendarIcon, CheckCircle2, EllipsisVertical } from 'lucide-react';
 import { format } from 'date-fns';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
@@ -56,6 +56,7 @@ export default function DayDetailSheet({
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const handleToggleMenu = (taskId: string, anchor: DOMRect) => {
     if (menu?.id === taskId) {
@@ -98,7 +99,7 @@ export default function DayDetailSheet({
     tonguePathEl,
     triggerTongue,
     visuallyDone,
-  } = useFrogTongue({ frogRef, frogBoxRef, flyRefs });
+  } = useFrogTongue({ frogRef, frogBoxRef, flyRefs, scrollContainerRef });
 
   // Need to get tag data for tasks
   const { data: tagsData } = useSWR('/api/tags', (url) =>
@@ -110,6 +111,7 @@ export default function DayDetailSheet({
   const { indices } = useWardrobeIndices(true);
 
   // Responsive Check
+  const dragControls = useDragControls();
   const [isDesktop, setIsDesktop] = useState(false);
   useEffect(() => {
     const checkDesktop = () =>
@@ -133,6 +135,20 @@ export default function DayDetailSheet({
       document.body.style.overflow = '';
     };
   }, [open]);
+
+  // Block scrolling inside the popup during cinematic tongue animation
+  useEffect(() => {
+    if (!cinematic) return;
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const stop = (e: Event) => e.preventDefault();
+    el.addEventListener('wheel', stop, { passive: false });
+    el.addEventListener('touchmove', stop, { passive: false });
+    return () => {
+      el.removeEventListener('wheel', stop as any);
+      el.removeEventListener('touchmove', stop as any);
+    };
+  }, [cinematic]);
 
   const completedCount = tasks.filter((t) => t.completed).length;
   const totalCount = tasks.length;
@@ -194,10 +210,14 @@ export default function DayDetailSheet({
               exit="exit"
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
               drag={!isDesktop ? 'y' : false}
-              dragConstraints={{ top: 0, bottom: 300 }}
-              dragElastic={0}
+              dragControls={dragControls}
+              dragListener={false}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.5 }}
               dragMomentum={false}
-              onDragEnd={(e, { offset, velocity }) => {
+              dragSnapToOrigin
+              dragDirectionLock
+              onDragEnd={(_e, { offset, velocity }) => {
                 if (offset.y > 100 || velocity.y > 500) {
                   onClose();
                 }
@@ -207,7 +227,12 @@ export default function DayDetailSheet({
             >
               {/* Drag Handle (Mobile Only) */}
               {!isDesktop && (
-                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full z-50" />
+                <div
+                  className="absolute top-0 left-0 right-0 h-8 z-50 touch-none flex justify-center items-center"
+                  onPointerDown={(e) => dragControls.start(e)}
+                >
+                  <div className="w-12 h-1.5 bg-muted-foreground/20 rounded-full mt-3" />
+                </div>
               )}
 
               {/* Header (Compact) */}
@@ -228,9 +253,11 @@ export default function DayDetailSheet({
               </div>
 
               {/* Content Scrollable */}
-              <div 
+              <div
+                ref={scrollContainerRef}
                 className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-hide"
                 onScroll={handleScroll}
+                style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
               >
                 {/* 1. Frog Display Section */}
                 <div className="flex justify-center pb-0 border-b border-border/40 border-dashed">
