@@ -15,6 +15,19 @@ import { cn } from '@/lib/utils';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 
+// Stable variant objects (avoid re-triggering springs on re-render)
+const mobileVariants = {
+  initial: { y: '100%', opacity: 0, scale: 0.96 },
+  animate: { y: 0, opacity: 1, scale: 1 },
+  exit: { y: '100%', opacity: 0, scale: 0.96 },
+};
+
+const desktopVariants = {
+  initial: { opacity: 0, scale: 0.95, y: 0 },
+  animate: { opacity: 1, scale: 1, y: 0 },
+  exit: { opacity: 0, scale: 0.95, y: 0 },
+};
+
 type DayDetailSheetProps = {
   open: boolean;
   onClose: () => void;
@@ -57,6 +70,7 @@ export default function DayDetailSheet({
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const sheetRef = useRef<HTMLDivElement>(null);
 
   const handleToggleMenu = (taskId: string, anchor: DOMRect) => {
     if (menu?.id === taskId) {
@@ -175,19 +189,6 @@ export default function DayDetailSheet({
 
   if (!mounted) return null;
 
-  // Animation Variants
-  const mobileVariants = {
-    initial: { y: '100%', opacity: 0, scale: 0.96 },
-    animate: { y: 0, opacity: 1, scale: 1 },
-    exit: { y: '100%', opacity: 0, scale: 0.96 },
-  };
-
-  const desktopVariants = {
-    initial: { opacity: 0, scale: 0.95, y: 0 },
-    animate: { opacity: 1, scale: 1, y: 0 },
-    exit: { opacity: 0, scale: 0.95, y: 0 },
-  };
-
   return createPortal(
     <AnimatePresence>
       {open && (
@@ -204,12 +205,13 @@ export default function DayDetailSheet({
           {/* Sheet Container */}
           <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center pointer-events-none p-0 sm:p-6">
             <motion.div
+              ref={sheetRef}
               variants={isDesktop ? desktopVariants : mobileVariants}
               initial="initial"
               animate="animate"
               exit="exit"
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              drag={!isDesktop ? 'y' : false}
+              drag={!isDesktop && !cinematic ? 'y' : false}
               dragControls={dragControls}
               dragListener={false}
               dragConstraints={{ top: 0, bottom: 0 }}
@@ -222,7 +224,6 @@ export default function DayDetailSheet({
                   onClose();
                 }
               }}
-              // Updated background to match requested "white like"
               className="pointer-events-auto w-full sm:max-w-lg h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col bg-background/95 backdrop-blur-2xl rounded-t-[32px] sm:rounded-[40px] shadow-2xl border-t sm:border border-border/40 overflow-hidden relative"
             >
               {/* Drag Handle (Mobile Only) */}
@@ -366,7 +367,14 @@ export default function DayDetailSheet({
           </div>
 
           {/* SVG Tongue Overlay (Z-index high to overlap sheet) */}
-          {grab && (
+          {grab && (() => {
+            const sr = sheetRef.current?.getBoundingClientRect();
+            const cr = scrollContainerRef.current?.getBoundingClientRect();
+            const clipTop = cr ? cr.top : (sr?.top ?? 0);
+            const clip = sr
+              ? `inset(${clipTop}px ${window.innerWidth - sr.right}px ${window.innerHeight - sr.bottom}px ${sr.left}px round 0 0 32px 32px)`
+              : undefined;
+            return (
             <svg
               key={grab.startAt}
               className="fixed inset-0 z-[1100] pointer-events-none"
@@ -374,7 +382,7 @@ export default function DayDetailSheet({
               height={vp.h}
               viewBox={`0 0 ${vp.w} ${vp.h}`}
               preserveAspectRatio="none"
-              style={{ width: vp.w, height: vp.h }}
+              style={{ width: vp.w, height: vp.h, clipPath: clip }}
             >
               <defs>
                 <linearGradient
@@ -408,7 +416,8 @@ export default function DayDetailSheet({
                 />
               </g>
             </svg>
-          )}
+            );
+          })()}
         </>
       )}
     </AnimatePresence>,
