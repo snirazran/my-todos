@@ -662,11 +662,14 @@ export default function FrogodoroPage() {
                           {(() => {
                             const storeHasData = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || isRunning || liveElapsed > 0;
                             const db = selectedTask.frogodoroSession;
-                            const focusCycles = storeHasData ? sessionStats.focusSessions : (db?.completedCycles ?? 0);
+                            const inProgressFocus = storeHasData && phase === 'focus' && (isRunning || liveElapsed > 0) ? 1 : 0;
+                            const focusCycles = storeHasData ? sessionStats.focusSessions + inProgressFocus : (db?.completedCycles ?? 0);
                             const focusTime = storeHasData ? sessionStats.focusTime + (phase === 'focus' ? liveElapsed : 0) : (db?.timeSpent ?? 0);
-                            const shortBreaks = storeHasData ? sessionStats.shortBreaks : (db?.shortBreaks ?? 0);
+                            const inProgressShort = storeHasData && phase === 'shortBreak' && (isRunning || liveElapsed > 0) ? 1 : 0;
+                            const shortBreaks = storeHasData ? sessionStats.shortBreaks + inProgressShort : (db?.shortBreaks ?? 0);
                             const shortBreakTime = storeHasData ? sessionStats.shortBreakTime + (phase === 'shortBreak' ? liveElapsed : 0) : (db?.shortBreakTime ?? 0);
-                            const longBreaks = storeHasData ? sessionStats.longBreaks : (db?.longBreaks ?? 0);
+                            const inProgressLong = storeHasData && phase === 'longBreak' && (isRunning || liveElapsed > 0) ? 1 : 0;
+                            const longBreaks = storeHasData ? sessionStats.longBreaks + inProgressLong : (db?.longBreaks ?? 0);
                             const longBreakTime = storeHasData ? sessionStats.longBreakTime + (phase === 'longBreak' ? liveElapsed : 0) : (db?.longBreakTime ?? 0);
                             return (
                               <div className="flex items-center gap-2.5 px-4 pb-3 flex-wrap">
@@ -1396,13 +1399,16 @@ export default function FrogodoroPage() {
                                 </span>
                                 {(() => {
                                   const storeActive = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || isRunning || liveElapsed > 0;
+                                  const inProgressFocus = phase === 'focus' && (isRunning || liveElapsed > 0) ? 1 : 0;
+                                  const inProgressShort = phase === 'shortBreak' && (isRunning || liveElapsed > 0) ? 1 : 0;
+                                  const inProgressLong = phase === 'longBreak' && (isRunning || liveElapsed > 0) ? 1 : 0;
                                   const session = t.id === selectedTaskId && storeActive
                                     ? {
-                                        completedCycles: sessionStats.focusSessions,
+                                        completedCycles: sessionStats.focusSessions + inProgressFocus,
                                         timeSpent: sessionStats.focusTime + (phase === 'focus' ? liveElapsed : 0),
-                                        shortBreaks: sessionStats.shortBreaks,
+                                        shortBreaks: sessionStats.shortBreaks + inProgressShort,
                                         shortBreakTime: sessionStats.shortBreakTime + (phase === 'shortBreak' ? liveElapsed : 0),
-                                        longBreaks: sessionStats.longBreaks,
+                                        longBreaks: sessionStats.longBreaks + inProgressLong,
                                         longBreakTime: sessionStats.longBreakTime + (phase === 'longBreak' ? liveElapsed : 0),
                                       }
                                     : t.frogodoroSession;
