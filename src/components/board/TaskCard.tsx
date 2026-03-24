@@ -204,7 +204,7 @@ export default function TaskCard({
           ? 'shadow-sm'
           : 'shadow-sm md:hover:border-primary/40 active:border-primary/40',
         'mb-2.5',
-        menuOpen ? 'z-50 shadow-xl ring-2 ring-primary/20' : '',
+        menuOpen ? 'z-50 shadow-sm ring-1 ring-primary/20' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
       role="listitem"

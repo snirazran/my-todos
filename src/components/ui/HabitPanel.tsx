@@ -249,6 +249,7 @@ function HabitItem({
   date: string;
 }) {
   const menuBtnRef = React.useRef<HTMLButtonElement>(null);
+  const containerRef = React.useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
   const isDraggingRef = React.useRef(false);
@@ -261,6 +262,14 @@ function HabitItem({
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // Close swipe when menu closes
+  useEffect(() => {
+    if (!menuOpen && isOpen) {
+      setIsOpen(false);
+      animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
+    }
+  }, [menuOpen]);
 
   const handleDragStart = () => {
     isDraggingRef.current = true;
@@ -296,6 +305,10 @@ function HabitItem({
   useEffect(() => {
     if (!isOpen) return;
     const handleGlobalClick = (e: MouseEvent) => {
+      // Don't close if clicking inside this habit's container (e.g. 3-dots button)
+      if (containerRef.current && containerRef.current.contains(e.target as Node)) {
+        return;
+      }
       setIsOpen(false);
       animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
     };
@@ -325,6 +338,7 @@ function HabitItem({
 
   return (
     <motion.div
+      ref={containerRef}
       layout
       initial={false}
       animate={{
@@ -333,7 +347,7 @@ function HabitItem({
         transition: { type: 'spring', stiffness: 400, damping: 30 },
       }}
       exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-      className={`relative group ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'} ${menuOpen ? 'z-50 shadow-xl ring-2 ring-primary/20' : ''}`}
+      className={`relative group ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'} ${menuOpen ? 'z-50 shadow-sm ring-1 ring-primary/20' : ''}`}
     >
       {/* Swipe Actions Layer (behind the card) */}
       <div
@@ -350,7 +364,6 @@ function HabitItem({
             let left = rect.left + rect.width / 2 - MENU_W / 2;
             left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
             onMenuOpen(habit.id, rect.bottom + 6, left);
-            setIsOpen(false);
           }}
           className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
           title="More options"
