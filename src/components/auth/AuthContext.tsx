@@ -71,8 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && auth.currentUser) {
-        // Force a refresh check when the user returns to the tab
-        await syncToken(auth.currentUser);
+        // Force a fresh token when the user returns to the tab
+        // This avoids expired token errors after idle periods
+        const token = await auth.currentUser.getIdToken(true);
+        document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
       }
     };
     window.addEventListener('visibilitychange', handleVisibilityChange);
