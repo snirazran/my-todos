@@ -100,6 +100,7 @@ interface SortableTaskItemProps {
   onDoLater?: (task: Task) => void;
   isGuest?: boolean;
   isGlowActive?: boolean;
+  isSortDragging?: boolean;
 }
 
 const SortableTaskItem = React.forwardRef<
@@ -121,6 +122,7 @@ const SortableTaskItem = React.forwardRef<
       disableLayout,
       onDoLater,
       isGlowActive,
+      isSortDragging,
     },
     ref,
   ) => {
@@ -133,6 +135,7 @@ const SortableTaskItem = React.forwardRef<
     const containerRef = React.useRef<HTMLDivElement>(null);
     const [isDesktop, setIsDesktop] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
+    const [swipeBlocked, setSwipeBlocked] = useState(false);
 
     // Motion Values for Swipe
     const x = useMotionValue(0);
@@ -154,13 +157,18 @@ const SortableTaskItem = React.forwardRef<
       isDragging,
     } = useSortable({ id: task.id, disabled: isDragDisabled || isOpen });
 
-    // Clear hover state and reset swipe position when dragging starts
+    // Clear hover state and reset swipe position when any sort drag starts
     useEffect(() => {
-      if (isDragging) {
+      if (isDragging || isSortDragging) {
+        setSwipeBlocked(true);
         setIsHovered(false);
-        x.set(0); // Force reset horizontal position
+        setIsOpen(false);
+        x.set(0);
+      } else if (swipeBlocked) {
+        const timer = setTimeout(() => setSwipeBlocked(false), 200);
+        return () => clearTimeout(timer);
       }
-    }, [isDragging, x]);
+    }, [isDragging, isSortDragging]);
 
     // Transform values based on drag position x
     // Right Swipe (Positive X) -> Do Later (Indigo) - SWAPPED
@@ -248,6 +256,12 @@ const SortableTaskItem = React.forwardRef<
         isDraggingRef.current = false;
         setIsSwiping(false);
       }, 100);
+
+      // If a sort (vertical) drag was active, ignore horizontal swipe result
+      if (swipeBlocked) {
+        animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
+        return;
+      }
 
       const offset = info.offset.x;
       const velocity = info.velocity.x;
@@ -402,7 +416,7 @@ const SortableTaskItem = React.forwardRef<
 
           {/* Foreground Card (Swipeable) */}
           <motion.div
-            drag={isDesktop || isDragging ? false : 'x'} // Disable swipe if sorting/dragging
+            drag={isDesktop || isDragging || swipeBlocked ? false : 'x'} // Disable swipe if sorting/dragging
             dragListener={!isDragging && !isDragDisabled} // Also ensure disabled listener logic matches
             dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
             dragConstraints={{ left: -100, right: 70 }}
@@ -1241,6 +1255,7 @@ export default function TaskList({
                             isWeekly={taskKind(task) === 'weekly'}
                             isGlowActive={isGlowActive}
                             disableLayout={isAnyDragging}
+                            isSortDragging={isAnyDragging}
                             onDoLater={
                               onDoLater
                                 ? (t) => {
