@@ -334,20 +334,6 @@ const SortableTaskItem = React.forwardRef<
               : 1,
     };
 
-    // Measure height for collapse animation
-    const innerRef = React.useRef<HTMLDivElement>(null);
-    const [measuredHeight, setMeasuredHeight] = React.useState<number | 'auto'>('auto');
-
-    React.useEffect(() => {
-      if (innerRef.current) {
-        const ro = new ResizeObserver(([entry]) => {
-          setMeasuredHeight(entry.contentRect.height);
-        });
-        ro.observe(innerRef.current);
-        return () => ro.disconnect();
-      }
-    }, []);
-
     return (
       <motion.div
         ref={(node: HTMLDivElement | null) => {
@@ -355,22 +341,21 @@ const SortableTaskItem = React.forwardRef<
           (
             containerRef as React.MutableRefObject<HTMLDivElement | null>
           ).current = node;
-          // Handle forwarded ref
           if (typeof ref === 'function') ref(node);
           else if (ref)
             (ref as React.MutableRefObject<HTMLDivElement | null>).current =
               node;
         }}
-        style={style}
+        style={{ ...style, overflow: 'hidden' }}
         {...attributes}
         {...listeners}
-        className={`relative rounded-xl overflow-hidden ${isDragging ? 'z-[100]' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
+        className={`relative rounded-xl ${isDragging ? 'z-[100]' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
-        initial={false}
-        animate={{ height: measuredHeight, marginBottom: 12, opacity: 1 }}
+        initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+        animate={{ height: 'auto', opacity: 1, marginBottom: 12 }}
         exit={isExitingLater
           ? { opacity: 1 }
-          : { height: 0, marginBottom: 0, opacity: 0, transition: { height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1], delay: 0.05 }, marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1], delay: 0.05 }, opacity: { duration: 0.15, ease: 'easeOut' } } }
+          : { height: 0, marginBottom: 0, opacity: 0, transition: { height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }, marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }, opacity: { duration: 0.2, ease: 'easeOut' } } }
         }
         transition={{
           height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
@@ -378,14 +363,13 @@ const SortableTaskItem = React.forwardRef<
           opacity: { duration: 0.2, ease: 'easeOut' },
         }}
       >
-        <div ref={innerRef} className="overflow-hidden">
         <motion.div
           layout={!disableLayout && !isDragging && !isExitingLater}
-          initial={{ opacity: 0, y: 10 }}
+          initial={{ opacity: 0 }}
           animate={{ opacity: 1, x: 0, y: 0 }}
           transition={{
             layout: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
-            opacity: { duration: 0.2, ease: 'easeOut' },
+            opacity: { duration: 0.2, ease: 'easeOut', delay: 0.15 },
           }}
           className={`group relative rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden bg-transparent shadow-sm shadow-black/5 dark:shadow-black/20'} ${isExitingLater ? 'will-change-transform' : ''}`}
         >
@@ -690,7 +674,6 @@ const SortableTaskItem = React.forwardRef<
             </div>
           </motion.div>
         </motion.div>
-        </div>
       </motion.div>
     );
   },
