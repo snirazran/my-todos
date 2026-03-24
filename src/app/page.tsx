@@ -351,7 +351,11 @@ export default function Home() {
                     className={`w-4 h-4 ${activeTab === 'habits' ? 'text-primary' : 'text-muted-foreground'}`}
                   />
                   Habits
-                  <TaskCounter count={habits.length} />
+                  <TaskCounter count={
+                      showCompleted
+                        ? habits.length
+                        : habits.filter((h) => !h.completedDates?.includes(todayDateStr) && !h.completed).length
+                    } />
                 </button>
 
                 {/* 3-DOTS MENU ADDED HERE */}

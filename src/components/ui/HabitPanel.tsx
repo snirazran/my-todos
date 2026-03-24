@@ -8,7 +8,7 @@ import {
   useMotionValue,
   animate,
 } from 'framer-motion';
-import { Trash2, CheckCircle2, EllipsisVertical, CalendarCheck } from 'lucide-react';
+import { Trash2, CheckCircle2, EllipsisVertical, CalendarCheck, Flame } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { Task } from '@/hooks/useTaskData';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
@@ -607,59 +607,12 @@ function HabitItem({
               {habit.text}
             </span>
 
-            {/* Weekly Goal Progress Dots */}
+            {/* Weekly Goal Progress Dots — TESTING with random values */}
             <div className="flex items-center gap-1.5 mt-2 pl-px">
               {(() => {
-                const goal = habit.timesPerWeek || 7;
-
-                // Effective completed dates for this view
-                let allCompleted = [...(habit.completedDates || [])];
-                if (isDone) {
-                  if (!allCompleted.includes(date)) allCompleted.push(date);
-                } else {
-                  allCompleted = allCompleted.filter(d => d !== date);
-                }
-
-                // Helper: get Sun-Sat week dates for a given date
-                const getWeekDates = (refDate: string) => {
-                  const d = new Date(refDate);
-                  const dow = d.getDay();
-                  const sun = new Date(d);
-                  sun.setDate(d.getDate() - dow);
-                  sun.setHours(0,0,0,0);
-                  const dates: string[] = [];
-                  for (let i = 0; i < 7; i++) {
-                    const wd = new Date(sun);
-                    wd.setDate(sun.getDate() + i);
-                    dates.push(wd.toISOString().split('T')[0]);
-                  }
-                  return dates;
-                };
-
-                // Completions this week
-                const weekDates = getWeekDates(date);
-                const completedThisWeek = weekDates.filter(d => allCompleted.includes(d)).length;
-
-                // Weekly streak: consecutive weeks (backwards from current) where goal was met
-                let weekStreak = 0;
-                let checkDate = date;
-                while (true) {
-                  const wk = getWeekDates(checkDate);
-                  const count = wk.filter(d => allCompleted.includes(d)).length;
-                  if (count >= goal) {
-                    weekStreak++;
-                    // Move to previous week
-                    const prev = new Date(wk[0]);
-                    prev.setDate(prev.getDate() - 1);
-                    checkDate = prev.toISOString().split('T')[0];
-                  } else {
-                    // If we're in the current week, it might not be over yet — don't break the streak
-                    if (wk[0] === weekDates[0]) {
-                      break;
-                    }
-                    break;
-                  }
-                }
+                const goal = ((habit.id.charCodeAt(0) % 5) + 3);
+                const completedThisWeek = (habit.id.charCodeAt(1) || 0) % (goal + 1);
+                const weekStreak = (habit.id.charCodeAt(2) || 0) % 5;
 
                 return (
                   <>
@@ -677,8 +630,9 @@ function HabitItem({
                       );
                     })}
                     {weekStreak > 0 && (
-                      <span className="text-[10px] font-black text-orange-500 ml-1 uppercase tracking-tight flex items-center gap-0.5">
-                        <span className="text-[12px]">🔥</span> {weekStreak} Week Streak
+                      <span className="inline-flex items-center gap-0.5 ml-1 text-muted-foreground/50">
+                        <Flame className="w-3.5 h-3.5 text-orange-400" />
+                        <span className="text-[11px] font-semibold text-muted-foreground/60">{weekStreak} {weekStreak === 1 ? 'week' : 'weeks'}</span>
                       </span>
                     )}
                   </>
