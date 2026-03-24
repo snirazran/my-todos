@@ -8,7 +8,7 @@ import {
   useMotionValue,
   animate,
 } from 'framer-motion';
-import { Trash2, CheckCircle2, EllipsisVertical } from 'lucide-react';
+import { Trash2, CheckCircle2, EllipsisVertical, CalendarCheck } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { Task } from '@/hooks/useTaskData';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
@@ -70,10 +70,22 @@ export function HabitPanel({
     }
   };
 
+  const isHabitDone = React.useCallback((h: Task) => {
+    return h.completed || (h.completedDates ?? []).includes(date) || (visuallyCompleted ? visuallyCompleted.has(h.id) : false);
+  }, [date, visuallyCompleted]);
+
+  const activeHabits = React.useMemo(() => {
+    return habits.filter((h) => !isHabitDone(h));
+  }, [habits, isHabitDone]);
+
+  const completedHabits = React.useMemo(() => {
+    return habits.filter((h) => isHabitDone(h));
+  }, [habits, isHabitDone]);
+
   const visibleHabits = React.useMemo(() => {
     if (showCompleted) return habits;
-    return habits.filter((h) => !h.completedDates?.includes(date));
-  }, [habits, showCompleted, date]);
+    return activeHabits;
+  }, [habits, showCompleted, activeHabits]);
 
   if (habits.length === 0) {
     return (
@@ -98,27 +110,84 @@ export function HabitPanel({
 
   return (
     <div className="pt-2 px-4 pb-24">
-      <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-2 flex flex-col gap-3">
-      <AnimatePresence mode="popLayout">
-        {visibleHabits.map((habit) => (
-          <HabitItem
-            key={habit.id}
-            habit={habit}
-            isDone={
-              habit.completed ||
-              (habit.completedDates ?? []).includes(date) ||
-              (visuallyCompleted ? visuallyCompleted.has(habit.id) : false)
-            }
-            onToggle={onToggle}
-            onDelete={() => setDeletingHabit(habit)}
-            onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
-            menuOpen={menu?.id === habit.id}
-            flyRefs={flyRefs}
-            tags={tags}
-            date={date}
-          />
-        ))}
-      </AnimatePresence>
+      <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-2 flex flex-col">
+      {visibleHabits.length === 0 ? (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <button
+            onClick={() => onAddRequested('', true)}
+            className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+          >
+            <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+              <CalendarCheck className="w-8 h-8 text-primary" />
+            </div>
+            <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
+              You're all caught up!
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+              Great job! All habits completed
+            </p>
+          </button>
+        </motion.div>
+      ) : (
+      <>
+        {/* Active Habits */}
+        <AnimatePresence mode="popLayout">
+          {activeHabits.map((habit) => (
+            <HabitItem
+              key={habit.id}
+              habit={habit}
+              isDone={false}
+              onToggle={onToggle}
+              onDelete={() => setDeletingHabit(habit)}
+              onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
+              menuOpen={menu?.id === habit.id}
+              flyRefs={flyRefs}
+              tags={tags}
+              date={date}
+            />
+          ))}
+        </AnimatePresence>
+
+        {/* Completed Habits Section */}
+        {showCompleted && completedHabits.length > 0 && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+              className="flex items-center gap-3 px-3 py-0"
+            >
+              <div className="flex-1 h-px bg-border/50" />
+              <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
+                Completed
+              </span>
+              <div className="flex-1 h-px bg-border/50" />
+            </motion.div>
+
+            <AnimatePresence mode="popLayout">
+              {completedHabits.map((habit) => (
+                <HabitItem
+                  key={habit.id}
+                  habit={habit}
+                  isDone={true}
+                  onToggle={onToggle}
+                  onDelete={() => setDeletingHabit(habit)}
+                  onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
+                  menuOpen={menu?.id === habit.id}
+                  flyRefs={flyRefs}
+                  tags={tags}
+                  date={date}
+                />
+              ))}
+            </AnimatePresence>
+          </>
+        )}
+      </>
+      )}
       </div>
 
       <TaskMenu
@@ -340,13 +409,29 @@ function HabitItem({
     <motion.div
       ref={containerRef}
       layout
-      initial={false}
+      initial={{ height: 0, opacity: 0, marginBottom: 0 }}
       animate={{
+        height: 'auto',
         opacity: 1,
+        marginBottom: 12,
         y: 0,
-        transition: { type: 'spring', stiffness: 400, damping: 30 },
+        transition: {
+          height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+          marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+          opacity: { duration: 0.2, ease: 'easeOut' },
+          y: { type: 'spring', stiffness: 400, damping: 30 },
+        },
       }}
-      exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+      exit={{
+        height: 0,
+        opacity: 0,
+        marginBottom: 0,
+        transition: {
+          height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+          marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+          opacity: { duration: 0.2, ease: 'easeOut' },
+        },
+      }}
       className={`relative group ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'} ${menuOpen ? 'z-50 shadow-sm border border-primary/30' : ''}`}
     >
       {/* Swipe Actions Layer (behind the card) */}
