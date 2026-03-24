@@ -135,7 +135,7 @@ export function HabitPanel({
       ) : (
       <>
         {/* Active Habits */}
-        <AnimatePresence mode="popLayout">
+        <AnimatePresence initial={false} mode="popLayout">
           {activeHabits.map((habit) => (
             <HabitItem
               key={habit.id}
@@ -168,7 +168,7 @@ export function HabitPanel({
               <div className="flex-1 h-px bg-border/50" />
             </motion.div>
 
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence initial={false} mode="popLayout">
               {completedHabits.map((habit) => (
                 <HabitItem
                   key={habit.id}
