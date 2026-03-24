@@ -334,8 +334,22 @@ const SortableTaskItem = React.forwardRef<
               : 1,
     };
 
+    // Measure height for collapse animation
+    const innerRef = React.useRef<HTMLDivElement>(null);
+    const [measuredHeight, setMeasuredHeight] = React.useState<number | 'auto'>('auto');
+
+    React.useEffect(() => {
+      if (innerRef.current) {
+        const ro = new ResizeObserver(([entry]) => {
+          setMeasuredHeight(entry.contentRect.height);
+        });
+        ro.observe(innerRef.current);
+        return () => ro.disconnect();
+      }
+    }, []);
+
     return (
-      <div
+      <motion.div
         ref={(node: HTMLDivElement | null) => {
           setNodeRef(node);
           (
@@ -350,16 +364,28 @@ const SortableTaskItem = React.forwardRef<
         style={style}
         {...attributes}
         {...listeners}
-        className={`relative mb-3 rounded-xl overflow-hidden ${isDragging ? 'z-[100]' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
+        className={`relative rounded-xl overflow-hidden ${isDragging ? 'z-[100]' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
+        initial={false}
+        animate={{ height: measuredHeight, marginBottom: 12, opacity: 1 }}
+        exit={isExitingLater
+          ? { opacity: 1 }
+          : { height: 0, marginBottom: 0, opacity: 0, transition: { height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1], delay: 0.05 }, marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1], delay: 0.05 }, opacity: { duration: 0.15, ease: 'easeOut' } } }
+        }
+        transition={{
+          height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+          marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+          opacity: { duration: 0.2, ease: 'easeOut' },
+        }}
       >
+        <div ref={innerRef} className="overflow-hidden">
         <motion.div
           layout={!disableLayout && !isDragging && !isExitingLater}
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, x: 0, y: 0 }}
-          exit={isExitingLater ? { opacity: 1 } : { opacity: 0, scale: 0.95 }}
           transition={{
-            layout: { type: 'spring', stiffness: 250, damping: 25 },
+            layout: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
+            opacity: { duration: 0.2, ease: 'easeOut' },
           }}
           className={`group relative rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden bg-transparent shadow-sm shadow-black/5 dark:shadow-black/20'} ${isExitingLater ? 'will-change-transform' : ''}`}
         >
@@ -664,7 +690,8 @@ const SortableTaskItem = React.forwardRef<
             </div>
           </motion.div>
         </motion.div>
-      </div>
+        </div>
+      </motion.div>
     );
   },
 );
@@ -949,40 +976,28 @@ export default function TaskList({
     return true;
   });
 
-  // Sort: Active first, then Completed (if we are showing them in one list)
-  // BUT the user said "added to the bottom without separator".
-  // AND "remove reordering completely".
-  // This is contradictory. "Remove reordering" implies preserving `order`.
-  // "Added to bottom" implies a visual grouping.
-  // Reconciling: We will sort by `order` primarily.
-  // IF the user wants completed at bottom, we might need a secondary sort.
-  // User said: "just make the task be added to the bottom of the list".
-  // Let's interpret this as: Active tasks sorted by order, THEN Completed tasks sorted by order.
-  const freshSortedTasks = [...visibleTasks].sort((a, b) => {
-    const aIsCompleted =
-      a.completed && !vSet.has(a.id) && !delayedCompleted.has(a.id);
-    const bIsCompleted =
-      b.completed && !vSet.has(b.id) && !delayedCompleted.has(b.id);
+  // Helper: is this task truly completed (not in grace period, not visually uncompleted)
+  const isTaskSettledCompleted = (t: Task) =>
+    t.completed && !vSet.has(t.id) && !delayedCompleted.has(t.id);
 
-    if (aIsCompleted !== bIsCompleted) {
-      return aIsCompleted ? 1 : -1;
-    }
+  // Split into two groups: active (including grace-period tasks) and completed
+  const activeTasks = visibleTasks
+    .filter((t) => !isTaskSettledCompleted(t))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-    return (a.order ?? 0) - (b.order ?? 0);
-  });
+  const completedTasks = visibleTasks
+    .filter((t) => isTaskSettledCompleted(t))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   // ---- Freeze sort order during tongue animation to prevent layout shifts ----
   const frozenOrderRef = useRef<string[]>([]);
   if (!isFrozen) {
-    // Snapshot the current ID order whenever the list is free to reorder
-    frozenOrderRef.current = freshSortedTasks.map((t) => t.id);
+    frozenOrderRef.current = activeTasks.map((t) => t.id);
   }
 
-  const sortedVisibleTasks = isFrozen
+  const sortedActiveTasks = isFrozen
     ? (() => {
-        // Rebuild the list in the frozen order, dropping IDs that no longer
-        // exist in visibleTasks and appending any new ones at the end.
-        const taskMap = new Map(visibleTasks.map((t) => [t.id, t]));
+        const taskMap = new Map(activeTasks.map((t) => [t.id, t]));
         const ordered: Task[] = [];
         const placed = new Set<string>();
         for (const id of frozenOrderRef.current) {
@@ -992,15 +1007,16 @@ export default function TaskList({
             placed.add(id);
           }
         }
-        // Append any tasks that appeared after the freeze (unlikely but safe)
-        for (const t of visibleTasks) {
+        for (const t of activeTasks) {
           if (!placed.has(t.id)) ordered.push(t);
         }
         return ordered;
       })()
-    : freshSortedTasks;
+    : activeTasks;
 
-  const activeTaskIds = sortedVisibleTasks.map((t) => t.id);
+  // Combined for DnD context and empty-state checks
+  const sortedVisibleTasks = [...sortedActiveTasks, ...completedTasks];
+  const activeTaskIds = sortedActiveTasks.map((t) => t.id);
 
   // We no longer need a separate completedTasks array for rendering elsewhere.
   const completedCount = tasks.filter(
@@ -1047,24 +1063,25 @@ export default function TaskList({
     if (!over || !onReorder) return;
 
     if (active.id !== over.id) {
-      // We reorder within the sortedVisibleTasks list
-      const oldIndex = sortedVisibleTasks.findIndex((t) => t.id === active.id);
-      const newIndex = sortedVisibleTasks.findIndex((t) => t.id === over.id);
+      // Only reorder within active tasks (completed are in a separate section)
+      const oldIndex = sortedActiveTasks.findIndex((t) => t.id === active.id);
+      const newIndex = sortedActiveTasks.findIndex((t) => t.id === over.id);
 
       if (oldIndex !== -1 && newIndex !== -1 && oldIndex !== newIndex) {
-        const reorderedVisible = arrayMove(
-          sortedVisibleTasks,
+        const reorderedActive = arrayMove(
+          sortedActiveTasks,
           oldIndex,
           newIndex,
         );
 
-        // Fix: Ensure we don't lose hidden/filtered tasks
-        const visibleIds = new Set(sortedVisibleTasks.map((t) => t.id));
-        const hiddenTasks = tasks.filter((t) => !visibleIds.has(t.id));
+        // Rebuild full list: reordered active + completed + hidden
+        const activeIds = new Set(sortedActiveTasks.map((t) => t.id));
+        const completedIds = new Set(completedTasks.map((t) => t.id));
+        const hiddenTasks = tasks.filter(
+          (t) => !activeIds.has(t.id) && !completedIds.has(t.id),
+        );
 
-        // New order = Reordered Visible + Hidden (appended to bottom)
-        const finalOrder = [...reorderedVisible, ...hiddenTasks];
-
+        const finalOrder = [...reorderedActive, ...completedTasks, ...hiddenTasks];
         onReorder(finalOrder);
       }
     }
@@ -1219,20 +1236,15 @@ export default function TaskList({
               modifiers={[restrictToActiveArea]}
             >
               <div className="relative">
-                {/* Unified Tasks Container */}
+                {/* Active Tasks */}
                 <div className="relative overflow-visible">
                   <SortableContext
                     items={activeTaskIds}
                     strategy={verticalListSortingStrategy}
                   >
-                    <AnimatePresence initial={false} mode="popLayout">
-                      {sortedVisibleTasks.map((task) => {
+                    <AnimatePresence initial={false}>
+                      {sortedActiveTasks.map((task) => {
                         const isCompleted = task.completed || vSet.has(task.id);
-
-                        // Use delayedCompleted to identify items in grace period
-                        // But for "isDone" visual state, we trust the task.completed unless it's in grace
-                        // Grace period items are technically completed, but displayed as if they were just receiving the check.
-
                         const isMenuOpen = menu?.id === task.id;
                         const isExitingLater =
                           exitAction?.id === task.id &&
@@ -1249,8 +1261,6 @@ export default function TaskList({
                             handleTaskToggle={handleTaskToggle}
                             onMenuOpen={openMenu}
                             getTagDetails={getTagDetails}
-                            // Disable drag if completed (grace period OR mostly settled)
-                            // Unless user wants to reorder completed tasks? Usually not.
                             isDragDisabled={isCompleted}
                             isWeekly={taskKind(task) === 'weekly'}
                             isGlowActive={isGlowActive}
@@ -1271,6 +1281,52 @@ export default function TaskList({
                     </AnimatePresence>
                   </SortableContext>
                 </div>
+
+                {/* Completed Tasks Section */}
+                {showCompleted && completedTasks.length > 0 && (
+                  <>
+                    {/* Subtle divider */}
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.3, delay: 0.1 }}
+                      className="flex items-center gap-3 px-3 py-2 mt-1 mb-2"
+                    >
+                      <div className="flex-1 h-px bg-border/50" />
+                      <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
+                        Completed
+                      </span>
+                      <div className="flex-1 h-px bg-border/50" />
+                    </motion.div>
+
+                    <div className="relative overflow-visible">
+                      <AnimatePresence initial={false}>
+                        {completedTasks.map((task) => {
+                          const isMenuOpen = menu?.id === task.id;
+
+                          return (
+                            <SortableTaskItem
+                              key={task.id}
+                              task={task}
+                              isDone={true}
+                              isMenuOpen={isMenuOpen}
+                              isExitingLater={false}
+                              renderBullet={renderBullet}
+                              handleTaskToggle={handleTaskToggle}
+                              onMenuOpen={openMenu}
+                              getTagDetails={getTagDetails}
+                              isDragDisabled={true}
+                              isWeekly={taskKind(task) === 'weekly'}
+                              isGlowActive={false}
+                              disableLayout={true}
+                              isSortDragging={isAnyDragging}
+                            />
+                          );
+                        })}
+                      </AnimatePresence>
+                    </div>
+                  </>
+                )}
               </div>
             </DndContext>
           )}
