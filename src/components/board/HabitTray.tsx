@@ -363,7 +363,7 @@ function HabitTrayItem({
       className={cn(
         "relative rounded-2xl border border-border/50 bg-card transition-all m-0.5",
         isDone ? "opacity-60" : "hover:border-border shadow-sm",
-        menuOpen && "ring-2 ring-primary/20 shadow-xl z-10"
+        menuOpen && "border-primary/30 shadow-sm z-10"
       )}
     >
       <motion.div

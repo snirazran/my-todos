@@ -350,7 +350,7 @@ const SortableTaskItem = React.forwardRef<
         style={style}
         {...attributes}
         {...listeners}
-        className={`relative mb-3 rounded-xl overflow-hidden ${isDragging ? 'z-[100]' : isMenuOpen ? 'z-50 shadow-sm ring-1 ring-primary/20' : 'z-auto'}`}
+        className={`relative mb-3 rounded-xl overflow-hidden ${isDragging ? 'z-[100]' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
       >
         <motion.div

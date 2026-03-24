@@ -347,7 +347,7 @@ function HabitItem({
         transition: { type: 'spring', stiffness: 400, damping: 30 },
       }}
       exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
-      className={`relative group ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'} ${menuOpen ? 'z-50 shadow-sm ring-1 ring-primary/20' : ''}`}
+      className={`relative group ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'} ${menuOpen ? 'z-50 shadow-sm border border-primary/30' : ''}`}
     >
       {/* Swipe Actions Layer (behind the card) */}
       <div

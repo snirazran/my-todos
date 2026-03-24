@@ -103,7 +103,7 @@ export default function Home() {
   /* State */
   const [activeTab, setActiveTab] = useState<'today' | 'habits'>('today');
   const [isBacklogOpen, setIsBacklogOpen] = useState(false);
-  const [showCompleted, setShowCompleted] = useState(true);
+  const [showCompleted, setShowCompleted] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [isHeaderMenuOpen, setIsHeaderMenuOpen] = useState(false);
   const headerMenuBtnRef = useRef<HTMLButtonElement>(null);
@@ -362,13 +362,13 @@ export default function Home() {
                     setIsHeaderMenuOpen(!isHeaderMenuOpen);
                   }}
                   className={`relative p-2 rounded-full transition-colors ${
-                    isHeaderMenuOpen || selectedTags.length > 0 || !showCompleted
+                    isHeaderMenuOpen || selectedTags.length > 0 || showCompleted
                       ? 'bg-primary/10 text-primary'
                       : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                   }`}
                 >
                   <EllipsisVertical className="w-5 h-5" />
-                  {(selectedTags.length > 0 || !showCompleted) && (
+                  {(selectedTags.length > 0 || showCompleted) && (
                     <div className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
                   )}
                 </button>
