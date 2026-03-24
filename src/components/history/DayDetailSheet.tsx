@@ -107,6 +107,12 @@ export default function DayDetailSheet({
     });
   }, [habitTasks, selectedTags, showCompleted]);
 
+  // Split into active and completed for separated rendering
+  const activeRegular = React.useMemo(() => filteredRegular.filter((t) => !t.completed), [filteredRegular]);
+  const completedRegular = React.useMemo(() => filteredRegular.filter((t) => t.completed), [filteredRegular]);
+  const activeHabits = React.useMemo(() => filteredHabits.filter((t) => !t.completed), [filteredHabits]);
+  const completedHabitsFiltered = React.useMemo(() => filteredHabits.filter((t) => t.completed), [filteredHabits]);
+
   const isFiltered = selectedTags.length > 0 || !showCompleted;
 
   // Animation State
@@ -318,7 +324,7 @@ export default function DayDetailSheet({
                     Habits
                     {habitTasks.length > 0 && (
                       <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm">
-                        {habitTasks.length}
+                        {showCompleted ? habitTasks.length : habitTasks.filter((t) => !t.completed).length}
                       </span>
                     )}
                   </button>
@@ -369,30 +375,67 @@ export default function DayDetailSheet({
                               </p>
                             </div>
                           ) : (
-                            filteredRegular.map((task) => {
-                              const uniqueKey = `${date}::${task.id}`;
-                              return (
-                                <HistoryTaskCard
-                                  key={uniqueKey}
-                                  id={task.id}
-                                  text={task.text}
-                                  completed={task.completed}
-                                  type={task.type}
-                                  tags={task.tags}
-                                  date={date}
-                                  completedDates={task.completedDates}
-                                  timesPerWeek={task.timesPerWeek}
-                                  frogodoroSession={task.frogodoroSession}
-                                  onToggle={handleToggleProxy}
-                                  setFlyRef={(el) => {
-                                    if (el) flyRefs.current[uniqueKey] = el;
-                                    else delete flyRefs.current[uniqueKey];
-                                  }}
-                                  isEaten={visuallyDone?.has(uniqueKey)}
-                                  userTags={userTags}
-                                />
-                              );
-                            })
+                            <>
+                              {activeRegular.map((task) => {
+                                const uniqueKey = `${date}::${task.id}`;
+                                return (
+                                  <HistoryTaskCard
+                                    key={uniqueKey}
+                                    id={task.id}
+                                    text={task.text}
+                                    completed={task.completed}
+                                    type={task.type}
+                                    tags={task.tags}
+                                    date={date}
+                                    completedDates={task.completedDates}
+                                    timesPerWeek={task.timesPerWeek}
+                                    frogodoroSession={task.frogodoroSession}
+                                    onToggle={handleToggleProxy}
+                                    setFlyRef={(el) => {
+                                      if (el) flyRefs.current[uniqueKey] = el;
+                                      else delete flyRefs.current[uniqueKey];
+                                    }}
+                                    isEaten={visuallyDone?.has(uniqueKey)}
+                                    userTags={userTags}
+                                  />
+                                );
+                              })}
+                              {showCompleted && completedRegular.length > 0 && (
+                                <>
+                                  <div className="flex items-center gap-3 px-3 py-2 mt-1 mb-1">
+                                    <div className="flex-1 h-px bg-border/50" />
+                                    <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
+                                      Completed
+                                    </span>
+                                    <div className="flex-1 h-px bg-border/50" />
+                                  </div>
+                                  {completedRegular.map((task) => {
+                                    const uniqueKey = `${date}::${task.id}`;
+                                    return (
+                                      <HistoryTaskCard
+                                        key={uniqueKey}
+                                        id={task.id}
+                                        text={task.text}
+                                        completed={task.completed}
+                                        type={task.type}
+                                        tags={task.tags}
+                                        date={date}
+                                        completedDates={task.completedDates}
+                                        timesPerWeek={task.timesPerWeek}
+                                        frogodoroSession={task.frogodoroSession}
+                                        onToggle={handleToggleProxy}
+                                        setFlyRef={(el) => {
+                                          if (el) flyRefs.current[uniqueKey] = el;
+                                          else delete flyRefs.current[uniqueKey];
+                                        }}
+                                        isEaten={visuallyDone?.has(uniqueKey)}
+                                        userTags={userTags}
+                                      />
+                                    );
+                                  })}
+                                </>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
@@ -409,30 +452,67 @@ export default function DayDetailSheet({
                               </p>
                             </div>
                           ) : (
-                            filteredHabits.map((task) => {
-                              const uniqueKey = `${date}::${task.id}`;
-                              return (
-                                <HistoryTaskCard
-                                  key={uniqueKey}
-                                  id={task.id}
-                                  text={task.text}
-                                  completed={task.completed}
-                                  type={task.type}
-                                  tags={task.tags}
-                                  date={date}
-                                  completedDates={task.completedDates}
-                                  timesPerWeek={task.timesPerWeek}
-                                  frogodoroSession={task.frogodoroSession}
-                                  onToggle={handleToggleProxy}
-                                  setFlyRef={(el) => {
-                                    if (el) flyRefs.current[uniqueKey] = el;
-                                    else delete flyRefs.current[uniqueKey];
-                                  }}
-                                  isEaten={visuallyDone?.has(uniqueKey)}
-                                  userTags={userTags}
-                                />
-                              );
-                            })
+                            <>
+                              {activeHabits.map((task) => {
+                                const uniqueKey = `${date}::${task.id}`;
+                                return (
+                                  <HistoryTaskCard
+                                    key={uniqueKey}
+                                    id={task.id}
+                                    text={task.text}
+                                    completed={task.completed}
+                                    type={task.type}
+                                    tags={task.tags}
+                                    date={date}
+                                    completedDates={task.completedDates}
+                                    timesPerWeek={task.timesPerWeek}
+                                    frogodoroSession={task.frogodoroSession}
+                                    onToggle={handleToggleProxy}
+                                    setFlyRef={(el) => {
+                                      if (el) flyRefs.current[uniqueKey] = el;
+                                      else delete flyRefs.current[uniqueKey];
+                                    }}
+                                    isEaten={visuallyDone?.has(uniqueKey)}
+                                    userTags={userTags}
+                                  />
+                                );
+                              })}
+                              {showCompleted && completedHabitsFiltered.length > 0 && (
+                                <>
+                                  <div className="flex items-center gap-3 px-3 py-2 mt-1 mb-1">
+                                    <div className="flex-1 h-px bg-border/50" />
+                                    <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
+                                      Completed
+                                    </span>
+                                    <div className="flex-1 h-px bg-border/50" />
+                                  </div>
+                                  {completedHabitsFiltered.map((task) => {
+                                    const uniqueKey = `${date}::${task.id}`;
+                                    return (
+                                      <HistoryTaskCard
+                                        key={uniqueKey}
+                                        id={task.id}
+                                        text={task.text}
+                                        completed={task.completed}
+                                        type={task.type}
+                                        tags={task.tags}
+                                        date={date}
+                                        completedDates={task.completedDates}
+                                        timesPerWeek={task.timesPerWeek}
+                                        frogodoroSession={task.frogodoroSession}
+                                        onToggle={handleToggleProxy}
+                                        setFlyRef={(el) => {
+                                          if (el) flyRefs.current[uniqueKey] = el;
+                                          else delete flyRefs.current[uniqueKey];
+                                        }}
+                                        isEaten={visuallyDone?.has(uniqueKey)}
+                                        userTags={userTags}
+                                      />
+                                    );
+                                  })}
+                                </>
+                              )}
+                            </>
                           )}
                         </div>
                       </div>
