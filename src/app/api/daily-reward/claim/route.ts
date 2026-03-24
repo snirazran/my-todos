@@ -7,7 +7,7 @@ import { getRewardForDay, getCurrentMonthKey } from '@/lib/dailyRewards';
 export async function POST(request: Request) {
   try {
     const { uid } = await requireAuth();
-    const { day } = await request.json();
+    const { day, timezone } = await request.json();
 
     if (!day || typeof day !== 'number') {
       return NextResponse.json({ error: 'Invalid day' }, { status: 400 });
@@ -20,8 +20,27 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const currentMonth = getCurrentMonthKey();
-    const currentDayOfMonth = new Date().getDate();
+    // Use the client's timezone to determine the current day/month
+    const now = new Date();
+    let currentDayOfMonth: number;
+    let currentMonth: string;
+    try {
+      const fmt = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone || 'UTC',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+      const parts = fmt.formatToParts(now);
+      const y = parts.find((p) => p.type === 'year')!.value;
+      const m = parts.find((p) => p.type === 'month')!.value;
+      const d = parts.find((p) => p.type === 'day')!.value;
+      currentDayOfMonth = parseInt(d, 10);
+      currentMonth = `${y}-${m}`;
+    } catch {
+      currentDayOfMonth = now.getDate();
+      currentMonth = getCurrentMonthKey();
+    }
 
     // Verify it is actually today (or strict enforcement)
     // For now, let's enforce that you can only claim "Today's" reward

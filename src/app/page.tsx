@@ -139,7 +139,8 @@ export default function Home() {
 
     const checkReward = async () => {
       try {
-        const res = await fetch('/api/daily-reward/status');
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        const res = await fetch(`/api/daily-reward/status?timezone=${encodeURIComponent(tz)}`);
         const data = await res.json();
         if (data.dailyRewards) {
           const today = new Date().getDate();

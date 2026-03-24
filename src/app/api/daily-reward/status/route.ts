@@ -6,7 +6,7 @@ import dbConnect from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import { getCurrentMonthKey } from '@/lib/dailyRewards';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { uid } = await requireAuth();
     await dbConnect();
@@ -19,7 +19,23 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const todayString = getCurrentMonthKey();
+    // Use client timezone from query param to determine current month
+    const { searchParams } = new URL(request.url);
+    const timezone = searchParams.get('timezone');
+    let todayString: string;
+    try {
+      const fmt = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone || 'UTC',
+        year: 'numeric',
+        month: '2-digit',
+      });
+      const parts = fmt.formatToParts(new Date());
+      const y = parts.find((p) => p.type === 'year')!.value;
+      const m = parts.find((p) => p.type === 'month')!.value;
+      todayString = `${y}-${m}`;
+    } catch {
+      todayString = getCurrentMonthKey();
+    }
     let userRewards = user.dailyRewards;
 
     // Reset if new month

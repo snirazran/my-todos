@@ -42,9 +42,12 @@ export function DailyRewardPopup({
   const { user } = useAuth();
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
+  const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { data: statusData, mutate: mutateStatus } =
     useSWR<DailyStatusResponse>(
-      user ? '/api/daily-reward/status' : null,
+      user
+        ? `/api/daily-reward/status?timezone=${encodeURIComponent(userTimezone)}`
+        : null,
       fetcher,
     );
 
@@ -78,7 +81,7 @@ export function DailyRewardPopup({
       const res = await fetch('/api/daily-reward/claim', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ day }),
+        body: JSON.stringify({ day, timezone: userTimezone }),
       });
       const data = await res.json();
       if (data.success) {
