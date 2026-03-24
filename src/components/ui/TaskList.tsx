@@ -1153,7 +1153,7 @@ export default function TaskList({
 
         <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
         <div
-          className={`p-2 space-y-0 md:overflow-y-auto overflow-y-visible min-h-[100px] md:max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+          className={`p-2 pb-0 space-y-0 md:overflow-y-auto overflow-y-visible md:max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && !exitAction ? (
