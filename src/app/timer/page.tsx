@@ -11,7 +11,7 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_SESSION_STATS,
 } from '@/lib/frogodoroStore';
-import { playTimerSound, type TimerSound } from '@/lib/timerSounds';
+import { playTimerSound, unlockAudio, type TimerSound } from '@/lib/timerSounds';
 import {
   Play,
   Pause,
@@ -128,6 +128,17 @@ export default function FrogodoroPage() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [localSettings, setLocalSettings] = useState(settings); // For the modal forms
+
+  // Unlock AudioContext on first user interaction (required for mobile)
+  useEffect(() => {
+    const handler = () => unlockAudio();
+    document.addEventListener('touchstart', handler, { once: true });
+    document.addEventListener('click', handler, { once: true });
+    return () => {
+      document.removeEventListener('touchstart', handler);
+      document.removeEventListener('click', handler);
+    };
+  }, []);
 
   // Lock body scroll when any modal is open
   useEffect(() => {

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useFrogodoroStore, PomodoroPhase, FrogodoroSettings } from '@/lib/frogodoroStore';
-import { playTimerSound } from '@/lib/timerSounds';
+import { playTimerSoundLooped, unlockAudio } from '@/lib/timerSounds';
 import { format } from 'date-fns';
 
 async function sendTimerNotification(phase: PomodoroPhase, autoStartBreak: boolean) {
@@ -37,6 +37,17 @@ export function GlobalTimer() {
   } = useFrogodoroStore();
 
   const prevIsRunning = useRef(isRunning);
+
+  // Unlock AudioContext on first user interaction (required for mobile)
+  useEffect(() => {
+    const handler = () => unlockAudio();
+    document.addEventListener('touchstart', handler, { once: true });
+    document.addEventListener('click', handler, { once: true });
+    return () => {
+      document.removeEventListener('touchstart', handler);
+      document.removeEventListener('click', handler);
+    };
+  }, []);
 
   // Save Progress API Caller
   const saveProgress = async (
@@ -112,8 +123,8 @@ export function GlobalTimer() {
       if (remaining === 0) {
         clearInterval(interval);
 
-        // Play finish sound
-        playTimerSound(settingsRef.current.timerSound);
+        // Play finish sound (loops up to 3x, stops on user interaction)
+        playTimerSoundLooped(settingsRef.current.timerSound);
 
         // Auto Save on Complete — save the full phase duration
         if (selectedTaskIdRef.current) {
