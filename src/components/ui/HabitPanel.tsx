@@ -70,17 +70,42 @@ export function HabitPanel({
     }
   };
 
+  const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(new Set());
+
+  const handleToggleWithDelay = React.useCallback((id: string) => {
+    const habit = habits.find((h) => h.id === id);
+    if (!habit) return;
+    const isDone = habit.completed || (habit.completedDates ?? []).includes(date) || (visuallyCompleted ? visuallyCompleted.has(habit.id) : false);
+    // If completing, keep it in active section for 3 seconds
+    if (!isDone) {
+      setDelayedCompleted((prev) => new Set(prev).add(id));
+      setTimeout(() => {
+        setDelayedCompleted((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 3000);
+    }
+    onToggle(id);
+  }, [habits, date, visuallyCompleted, onToggle]);
+
   const isHabitDone = React.useCallback((h: Task) => {
     return h.completed || (h.completedDates ?? []).includes(date) || (visuallyCompleted ? visuallyCompleted.has(h.id) : false);
   }, [date, visuallyCompleted]);
 
+  const isHabitSettledDone = React.useCallback((h: Task) => {
+    if (delayedCompleted.has(h.id)) return false;
+    return isHabitDone(h);
+  }, [delayedCompleted, isHabitDone]);
+
   const activeHabits = React.useMemo(() => {
-    return habits.filter((h) => !isHabitDone(h));
-  }, [habits, isHabitDone]);
+    return habits.filter((h) => !isHabitSettledDone(h));
+  }, [habits, isHabitSettledDone]);
 
   const completedHabits = React.useMemo(() => {
-    return habits.filter((h) => isHabitDone(h));
-  }, [habits, isHabitDone]);
+    return habits.filter((h) => isHabitSettledDone(h));
+  }, [habits, isHabitSettledDone]);
 
   const visibleHabits = React.useMemo(() => {
     if (showCompleted) return habits;
@@ -140,8 +165,8 @@ export function HabitPanel({
             <HabitItem
               key={habit.id}
               habit={habit}
-              isDone={false}
-              onToggle={onToggle}
+              isDone={isHabitDone(habit)}
+              onToggle={handleToggleWithDelay}
               onDelete={() => setDeletingHabit(habit)}
               onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
               menuOpen={menu?.id === habit.id}
@@ -174,7 +199,7 @@ export function HabitPanel({
                   key={habit.id}
                   habit={habit}
                   isDone={true}
-                  onToggle={onToggle}
+                  onToggle={handleToggleWithDelay}
                   onDelete={() => setDeletingHabit(habit)}
                   onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
                   menuOpen={menu?.id === habit.id}
