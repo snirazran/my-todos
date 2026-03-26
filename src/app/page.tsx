@@ -541,6 +541,7 @@ export default function Home() {
                       flyRefs={flyRefs}
                       showCompleted={showCompleted}
                       visuallyCompleted={visuallyDone}
+                      onReorder={reorderTasks}
                       date={format(new Date(), 'yyyy-MM-dd')}
                     />
                   </motion.div>

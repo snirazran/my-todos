@@ -324,7 +324,7 @@ const SortableTaskItem = React.forwardRef<
       transform: CSS.Translate.toString(transform),
       transition,
       zIndex: isDragging
-        ? 100
+        ? 30
         : isOpen
           ? 20
           : isMenuOpen
@@ -349,7 +349,7 @@ const SortableTaskItem = React.forwardRef<
         style={{ ...style, overflow: 'hidden' }}
         {...attributes}
         {...listeners}
-        className={`relative rounded-xl ${isDragging ? 'z-[100]' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
+        className={`relative rounded-xl ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
         initial={{ height: 0, opacity: 0, marginBottom: 0 }}
         animate={{ height: 'auto', opacity: 1, marginBottom: 12 }}
@@ -1162,6 +1162,7 @@ export default function TaskList({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
+              className="mb-2"
             >
               <button
                 onClick={() =>

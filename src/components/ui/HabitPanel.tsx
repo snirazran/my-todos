@@ -8,7 +8,36 @@ import {
   useMotionValue,
   animate,
 } from 'framer-motion';
-import { Trash2, CheckCircle2, EllipsisVertical, CalendarCheck, Flame } from 'lucide-react';
+import {
+  DndContext,
+  closestCorners,
+  MouseSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  Modifier,
+} from '@dnd-kit/core';
+import {
+  restrictToVerticalAxis,
+  restrictToParentElement,
+} from '@dnd-kit/modifiers';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import {
+  Trash2,
+  CheckCircle2,
+  EllipsisVertical,
+  CalendarCheck,
+  Flame,
+} from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { Task } from '@/hooks/useTaskData';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
@@ -33,6 +62,7 @@ interface HabitPanelProps {
   showCompleted: boolean;
   visuallyCompleted?: Set<string>;
   onAddRequested: (prefill: string, isHabit?: boolean) => void;
+  onReorder?: (habits: Task[]) => void;
   date: string;
 }
 
@@ -48,14 +78,150 @@ export function HabitPanel({
   showCompleted,
   visuallyCompleted,
   onAddRequested,
+  onReorder,
   date,
 }: HabitPanelProps) {
   const [editingHabit, setEditingHabit] = React.useState<Task | null>(null);
   const [deletingHabit, setDeletingHabit] = React.useState<Task | null>(null);
-  const [editingDaysHabit, setEditingDaysHabit] = React.useState<Task | null>(null);
+  const [editingDaysHabit, setEditingDaysHabit] = React.useState<Task | null>(
+    null,
+  );
   const [busy, setBusy] = React.useState(false);
-  const [menu, setMenu] = React.useState<{ id: string; top: number; left: number } | null>(null);
+  const [menu, setMenu] = React.useState<{
+    id: string;
+    top: number;
+    left: number;
+  } | null>(null);
   const [tagPopupId, setTagPopupId] = React.useState<string | null>(null);
+
+  const [isAnyDragging, setIsAnyDragging] = React.useState(false);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const activeAreaLimitsRef = React.useRef<{
+    top: number;
+    bottom: number;
+  } | null>(null);
+
+  React.useEffect(() => {
+    if (isAnyDragging) {
+      document.documentElement.classList.add('dragging');
+
+      // Lock the scroll aggressively for the current gesture
+      const handleTouchMove = (e: TouchEvent) => {
+        if (e.cancelable) e.preventDefault();
+      };
+
+      window.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+      return () => {
+        document.documentElement.classList.remove('dragging');
+        window.removeEventListener('touchmove', handleTouchMove);
+      };
+    }
+  }, [isAnyDragging]);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 5,
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 150,
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    }),
+  );
+
+  const handleDragStart = () => {
+    setIsAnyDragging(true);
+    // Calculate boundary
+    const activeNodes = document.querySelectorAll('[data-habit-active="true"]');
+    const container = scrollContainerRef.current;
+
+    if (activeNodes.length > 0 && container) {
+      const containerRect = container.getBoundingClientRect();
+      const rects = Array.from(activeNodes).map((n) =>
+        n.getBoundingClientRect(),
+      );
+
+      // Calculate limits relative to the container's *content* top
+      const top = Math.min(
+        ...rects.map((r) => r.top - containerRect.top + container.scrollTop),
+      );
+      const bottom = Math.max(
+        ...rects.map((r) => r.bottom - containerRect.top + container.scrollTop),
+      );
+
+      activeAreaLimitsRef.current = { top, bottom };
+    } else {
+      activeAreaLimitsRef.current = null;
+    }
+  };
+  const handleDragCancel = () => {
+    setIsAnyDragging(false);
+    activeAreaLimitsRef.current = null;
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setIsAnyDragging(false);
+    activeAreaLimitsRef.current = null;
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = activeHabits.findIndex((h) => h.id === active.id);
+    const newIndex = activeHabits.findIndex((h) => h.id === over.id);
+    if (oldIndex === -1 || newIndex === -1) return;
+    const reordered = arrayMove(activeHabits, oldIndex, newIndex);
+    onReorder?.(reordered);
+  };
+
+  const restrictToActiveArea: Modifier = ({ transform, draggingNodeRect }) => {
+    const limits = activeAreaLimitsRef.current;
+    const container = scrollContainerRef.current;
+
+    // Apply parent restriction first
+    const parentRestricted = restrictToParentElement({
+      transform,
+      draggingNodeRect,
+    } as any);
+    const verticalRestricted = restrictToVerticalAxis({
+      transform: parentRestricted,
+      draggingNodeRect,
+    } as any);
+
+    if (limits !== null && draggingNodeRect && container) {
+      const containerRect = container.getBoundingClientRect();
+      const currentScrollTop = container.scrollTop;
+
+      // Calculate absolute viewport boundaries for the active area based on current scroll
+      const limitTop = containerRect.top - currentScrollTop + limits.top;
+      const limitBottom = containerRect.top - currentScrollTop + limits.bottom;
+
+      let newY = verticalRestricted.y;
+
+      // Bottom restriction
+      const currentBottom = draggingNodeRect.bottom + newY;
+      if (currentBottom > limitBottom) {
+        newY = limitBottom - draggingNodeRect.bottom;
+      }
+
+      // Top restriction
+      const currentTop = draggingNodeRect.top + newY;
+      if (currentTop < limitTop) {
+        newY = limitTop - draggingNodeRect.top;
+      }
+
+      return {
+        ...verticalRestricted,
+        y: newY,
+      };
+    }
+    return verticalRestricted;
+  };
 
   const handleTagSave = async (taskId: string, newTags: string[]) => {
     try {
@@ -70,34 +236,52 @@ export function HabitPanel({
     }
   };
 
-  const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(new Set());
+  const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(
+    new Set(),
+  );
 
-  const handleToggleWithDelay = React.useCallback((id: string) => {
-    const habit = habits.find((h) => h.id === id);
-    if (!habit) return;
-    const isDone = habit.completed || (habit.completedDates ?? []).includes(date) || (visuallyCompleted ? visuallyCompleted.has(habit.id) : false);
-    // If completing, keep it in active section for 3 seconds
-    if (!isDone) {
-      setDelayedCompleted((prev) => new Set(prev).add(id));
-      setTimeout(() => {
-        setDelayedCompleted((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      }, 3000);
-    }
-    onToggle(id);
-  }, [habits, date, visuallyCompleted, onToggle]);
+  const handleToggleWithDelay = React.useCallback(
+    (id: string) => {
+      const habit = habits.find((h) => h.id === id);
+      if (!habit) return;
+      const isDone =
+        habit.completed ||
+        (habit.completedDates ?? []).includes(date) ||
+        (visuallyCompleted ? visuallyCompleted.has(habit.id) : false);
+      // If completing, keep it in active section for 3 seconds
+      if (!isDone) {
+        setDelayedCompleted((prev) => new Set(prev).add(id));
+        setTimeout(() => {
+          setDelayedCompleted((prev) => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        }, 3000);
+      }
+      onToggle(id);
+    },
+    [habits, date, visuallyCompleted, onToggle],
+  );
 
-  const isHabitDone = React.useCallback((h: Task) => {
-    return h.completed || (h.completedDates ?? []).includes(date) || (visuallyCompleted ? visuallyCompleted.has(h.id) : false);
-  }, [date, visuallyCompleted]);
+  const isHabitDone = React.useCallback(
+    (h: Task) => {
+      return (
+        h.completed ||
+        (h.completedDates ?? []).includes(date) ||
+        (visuallyCompleted ? visuallyCompleted.has(h.id) : false)
+      );
+    },
+    [date, visuallyCompleted],
+  );
 
-  const isHabitSettledDone = React.useCallback((h: Task) => {
-    if (delayedCompleted.has(h.id)) return false;
-    return isHabitDone(h);
-  }, [delayedCompleted, isHabitDone]);
+  const isHabitSettledDone = React.useCallback(
+    (h: Task) => {
+      if (delayedCompleted.has(h.id)) return false;
+      return isHabitDone(h);
+    },
+    [delayedCompleted, isHabitDone],
+  );
 
   const activeHabits = React.useMemo(() => {
     return habits.filter((h) => !isHabitSettledDone(h));
@@ -114,105 +298,126 @@ export function HabitPanel({
 
   if (habits.length === 0) {
     return (
-      <div className="px-6 pb-4">
-        <button
-          onClick={() => onAddRequested('', true)}
-          className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all pt-8 group cursor-pointer"
-        >
-          <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 md:grayscale md:opacity-70 opacity-100 grayscale-0 group-hover:grayscale-0 group-hover:opacity-100">
-            <Fly size={32} y={-4} />
-          </div>
-          <p className="text-sm font-bold md:text-muted-foreground text-primary group-hover:text-primary transition-colors">
-            No Habits Yet
-          </p>
-          <p className="mt-1 text-xs md:text-muted-foreground/60 text-muted-foreground group-hover:text-muted-foreground transition-colors max-w-[250px]">
-            Tap here to create your first habit and build your daily routine!
-          </p>
-        </button>
+      <div className="px-4 pt-2 pb-4">
+        <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-2">
+          <button
+            onClick={() => onAddRequested('', true)}
+            className="flex flex-col items-center justify-center w-full py-8 pt-8 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl group"
+          >
+            <div className="flex items-center justify-center mb-3 transition-all border rounded-full opacity-100 w-14 h-14 bg-muted border-muted-foreground/10 md:grayscale md:opacity-70 grayscale-0 group-hover:grayscale-0 group-hover:opacity-100">
+              <Fly size={32} y={-4} />
+            </div>
+            <p className="text-sm font-bold transition-colors md:text-muted-foreground text-primary group-hover:text-primary">
+              No Habits Yet
+            </p>
+            <p className="mt-1 text-xs md:text-muted-foreground/60 text-muted-foreground group-hover:text-muted-foreground transition-colors max-w-[250px]">
+              Tap here to create your first habit and build your daily routine!
+            </p>
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="pt-2 px-4 pb-24">
-      <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-2 flex flex-col">
-      {visibleHabits.length === 0 ? (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-        >
-          <button
-            onClick={() => onAddRequested('', true)}
-            className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+    <div className="px-4 pt-2 pb-4">
+      <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-2 pb-0 flex flex-col">
+        {visibleHabits.length === 0 ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
           >
-            <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
-              <CalendarCheck className="w-8 h-8 text-primary" />
-            </div>
-            <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
-              You're all caught up!
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
-              Great job! All habits completed
-            </p>
-          </button>
-        </motion.div>
-      ) : (
-      <>
-        {/* Active Habits */}
-        <AnimatePresence initial={false} mode="popLayout">
-          {activeHabits.map((habit) => (
-            <HabitItem
-              key={habit.id}
-              habit={habit}
-              isDone={isHabitDone(habit)}
-              onToggle={handleToggleWithDelay}
-              onDelete={() => setDeletingHabit(habit)}
-              onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
-              menuOpen={menu?.id === habit.id}
-              flyRefs={flyRefs}
-              tags={tags}
-              date={date}
-            />
-          ))}
-        </AnimatePresence>
-
-        {/* Completed Habits Section */}
-        {showCompleted && completedHabits.length > 0 && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3, delay: 0.1 }}
-              className="flex items-center gap-3 px-3 py-0"
+            <button
+              onClick={() => onAddRequested('', true)}
+              className="flex flex-col items-center justify-center w-full py-8 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl group"
             >
-              <div className="flex-1 h-px bg-border/50" />
-              <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
-                Completed
-              </span>
-              <div className="flex-1 h-px bg-border/50" />
-            </motion.div>
+              <div className="flex items-center justify-center mb-3 transition-all border rounded-full w-14 h-14 bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+                <CalendarCheck className="w-8 h-8 text-primary" />
+              </div>
+              <p className="text-sm font-bold transition-colors text-muted-foreground group-hover:text-primary">
+                You're all caught up!
+              </p>
+              <p className="mt-1 text-xs transition-colors text-muted-foreground/60 group-hover:text-muted-foreground">
+                Great job! All habits completed
+              </p>
+            </button>
+          </motion.div>
+        ) : (
+          <>
+            {/* Active Habits */}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCorners}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              onDragCancel={handleDragCancel}
+              modifiers={[restrictToActiveArea]}
+            >
+              <div className="relative" ref={scrollContainerRef}>
+                <SortableContext
+                  items={activeHabits.map((h) => h.id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <AnimatePresence initial={false}>
+                    {activeHabits.map((habit) => (
+                      <HabitItem
+                        key={habit.id}
+                        habit={habit}
+                        isDone={isHabitDone(habit)}
+                        onToggle={handleToggleWithDelay}
+                        onDelete={() => setDeletingHabit(habit)}
+                        onMenuOpen={(id, top, left) =>
+                          setMenu({ id, top, left })
+                        }
+                        menuOpen={menu?.id === habit.id}
+                        flyRefs={flyRefs}
+                        tags={tags}
+                        date={date}
+                        isSortDragging={isAnyDragging}
+                      />
+                    ))}
+                  </AnimatePresence>
+                </SortableContext>
+              </div>
+            </DndContext>
 
-            <AnimatePresence initial={false} mode="popLayout">
-              {completedHabits.map((habit) => (
-                <HabitItem
-                  key={habit.id}
-                  habit={habit}
-                  isDone={true}
-                  onToggle={handleToggleWithDelay}
-                  onDelete={() => setDeletingHabit(habit)}
-                  onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
-                  menuOpen={menu?.id === habit.id}
-                  flyRefs={flyRefs}
-                  tags={tags}
-                  date={date}
-                />
-              ))}
-            </AnimatePresence>
+            {/* Completed Habits Section */}
+            {showCompleted && completedHabits.length > 0 && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 0.3, delay: 0.1 }}
+                  className="flex items-center gap-3 px-3 py-0"
+                >
+                  <div className="flex-1 h-px bg-border/50" />
+                  <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
+                    Completed
+                  </span>
+                  <div className="flex-1 h-px bg-border/50" />
+                </motion.div>
+
+                <AnimatePresence initial={false} mode="popLayout">
+                  {completedHabits.map((habit) => (
+                    <HabitItem
+                      key={habit.id}
+                      habit={habit}
+                      isDone={true}
+                      onToggle={handleToggleWithDelay}
+                      onDelete={() => setDeletingHabit(habit)}
+                      onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
+                      menuOpen={menu?.id === habit.id}
+                      flyRefs={flyRefs}
+                      tags={tags}
+                      date={date}
+                    />
+                  ))}
+                </AnimatePresence>
+              </>
+            )}
           </>
         )}
-      </>
-      )}
       </div>
 
       <TaskMenu
@@ -307,7 +512,10 @@ export function HabitPanel({
               await fetch('/api/tasks', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ taskId: editingDaysHabit.id, timesPerWeek: newGoal }),
+                body: JSON.stringify({
+                  taskId: editingDaysHabit.id,
+                  timesPerWeek: newGoal,
+                }),
               });
               window.dispatchEvent(new Event('habits-updated'));
             } finally {
@@ -331,6 +539,7 @@ function HabitItem({
   flyRefs,
   tags,
   date,
+  isSortDragging,
 }: {
   habit: Task;
   isDone: boolean;
@@ -341,14 +550,25 @@ function HabitItem({
   flyRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
   tags: SavedTag[];
   date: string;
+  isSortDragging?: boolean;
 }) {
   const menuBtnRef = React.useRef<HTMLButtonElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isSwiping, setIsSwiping] = useState(false);
   const isDraggingRef = React.useRef(false);
+  const [swipeBlocked, setSwipeBlocked] = useState(false);
   const x = useMotionValue(0);
   const [isDesktop, setIsDesktop] = useState(false);
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setSortableRef,
+    transform,
+    transition: sortableTransition,
+    isDragging,
+  } = useSortable({ id: habit.id, disabled: isOpen });
 
   useEffect(() => {
     const check = () => setIsDesktop(window.innerWidth >= 768);
@@ -365,6 +585,19 @@ function HabitItem({
     }
   }, [menuOpen]);
 
+  // Reset swipe when sort drag starts
+  useEffect(() => {
+    if (isDragging || isSortDragging) {
+      setSwipeBlocked(true);
+      setIsOpen(false);
+      setIsSwiping(false);
+      animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
+    } else if (swipeBlocked) {
+      const timer = setTimeout(() => setSwipeBlocked(false), 200);
+      return () => clearTimeout(timer);
+    }
+  }, [isDragging, isSortDragging]);
+
   const handleDragStart = () => {
     isDraggingRef.current = true;
     setIsSwiping(true);
@@ -375,6 +608,11 @@ function HabitItem({
       isDraggingRef.current = false;
       setIsSwiping(false);
     }, 100);
+
+    if (swipeBlocked) {
+      animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
+      return;
+    }
 
     const offset = info.offset.x;
     const velocity = info.velocity.x;
@@ -400,7 +638,10 @@ function HabitItem({
     if (!isOpen) return;
     const handleGlobalClick = (e: MouseEvent) => {
       // Don't close if clicking inside this habit's container (e.g. 3-dots button)
-      if (containerRef.current && containerRef.current.contains(e.target as Node)) {
+      if (
+        containerRef.current &&
+        containerRef.current.contains(e.target as Node)
+      ) {
         return;
       }
       setIsOpen(false);
@@ -432,21 +673,17 @@ function HabitItem({
 
   return (
     <motion.div
-      ref={containerRef}
-      layout
-      initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-      animate={{
-        height: 'auto',
-        opacity: 1,
-        marginBottom: 12,
-        y: 0,
-        transition: {
-          height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
-          marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
-          opacity: { duration: 0.2, ease: 'easeOut' },
-          y: { type: 'spring', stiffness: 400, damping: 30 },
-        },
+      ref={(node: HTMLDivElement | null) => {
+        (
+          containerRef as React.MutableRefObject<HTMLDivElement | null>
+        ).current = node;
+        setSortableRef(node);
       }}
+      {...attributes}
+      {...listeners}
+      layout={!isSortDragging}
+      initial={{ height: 0, opacity: 0, marginBottom: 0 }}
+      animate={{ height: 'auto', opacity: 1, marginBottom: 12 }}
       exit={{
         height: 0,
         opacity: 0,
@@ -457,7 +694,18 @@ function HabitItem({
           opacity: { duration: 0.2, ease: 'easeOut' },
         },
       }}
-      className={`relative group ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'} ${menuOpen ? 'z-50 shadow-sm border border-primary/30' : ''}`}
+      transition={{
+        height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+        marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
+        opacity: { duration: 0.2, ease: 'easeOut' },
+      }}
+      style={{
+        transform: CSS.Translate.toString(transform),
+        transition: sortableTransition ?? undefined,
+        zIndex: isDragging ? 30 : menuOpen ? 50 : 1,
+      }}
+      className={`relative group ${isDragging ? 'opacity-50' : ''} ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'} ${menuOpen ? 'shadow-sm border border-primary/30' : ''}`}
+      data-habit-active={!isDone}
     >
       {/* Swipe Actions Layer (behind the card) */}
       <div
@@ -475,7 +723,7 @@ function HabitItem({
             left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
             onMenuOpen(habit.id, rect.bottom + 6, left);
           }}
-          className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
+          className="flex items-center justify-center w-10 h-10 transition-colors rounded-full shadow-sm bg-background text-foreground hover:bg-background/80"
           title="More options"
           tabIndex={isOpen ? 0 : -1}
         >
@@ -488,7 +736,7 @@ function HabitItem({
             onDelete();
             setIsOpen(false);
           }}
-          className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors"
+          className="flex items-center justify-center w-10 h-10 text-red-600 transition-colors bg-red-100 rounded-full shadow-sm dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50"
           title="Delete habit"
           tabIndex={isOpen ? 0 : -1}
         >
@@ -498,7 +746,11 @@ function HabitItem({
 
       {/* Foreground Card (Swipeable on touch only) */}
       <motion.div
-        drag={isDesktop ? false : 'x'}
+        drag={
+          isDesktop || isDragging || isSortDragging || swipeBlocked
+            ? false
+            : 'x'
+        }
         dragDirectionLock
         dragConstraints={{ left: -100, right: 0 }}
         dragElastic={0}
@@ -617,7 +869,7 @@ function HabitItem({
                 if (isDone) {
                   if (!allCompleted.includes(date)) allCompleted.push(date);
                 } else {
-                  allCompleted = allCompleted.filter(d => d !== date);
+                  allCompleted = allCompleted.filter((d) => d !== date);
                 }
 
                 // Helper: get Sun-Sat week dates for a given date
@@ -626,7 +878,7 @@ function HabitItem({
                   const dow = d.getDay();
                   const sun = new Date(d);
                   sun.setDate(d.getDate() - dow);
-                  sun.setHours(0,0,0,0);
+                  sun.setHours(0, 0, 0, 0);
                   const dates: string[] = [];
                   for (let i = 0; i < 7; i++) {
                     const wd = new Date(sun);
@@ -638,7 +890,9 @@ function HabitItem({
 
                 // Completions this week
                 const weekDates = getWeekDates(date);
-                const completedThisWeek = weekDates.filter(d => allCompleted.includes(d)).length;
+                const completedThisWeek = weekDates.filter((d) =>
+                  allCompleted.includes(d),
+                ).length;
 
                 // Weekly streak: consecutive weeks (backwards) where goal was met
                 // If current week isn't complete yet, skip it and count from last week
@@ -661,7 +915,9 @@ function HabitItem({
 
                 while (true) {
                   const wk = getWeekDates(checkDate);
-                  const count = wk.filter(d => allCompleted.includes(d)).length;
+                  const count = wk.filter((d) =>
+                    allCompleted.includes(d),
+                  ).length;
                   if (count >= goal) {
                     weekStreak++;
                     const prev = new Date(wk[0]);
@@ -690,7 +946,9 @@ function HabitItem({
                     {weekStreak > 0 && (
                       <span className="inline-flex items-center gap-0.5 ml-1 text-muted-foreground/50">
                         <Flame className="w-3.5 h-3.5 text-orange-400" />
-                        <span className="text-[11px] font-semibold text-muted-foreground/60">{weekStreak} {weekStreak === 1 ? 'week' : 'weeks'}</span>
+                        <span className="text-[11px] font-semibold text-muted-foreground/60">
+                          {weekStreak} {weekStreak === 1 ? 'week' : 'weeks'}
+                        </span>
                       </span>
                     )}
                   </>
@@ -701,7 +959,7 @@ function HabitItem({
         </div>
 
         {/* 3-dots menu button — desktop only, shows on hover */}
-        <div className="hidden md:group-hover:block absolute right-2 top-1/2 -translate-y-1/2 z-20 transition-opacity">
+        <div className="absolute z-20 hidden transition-opacity -translate-y-1/2 md:group-hover:block right-2 top-1/2">
           <button
             ref={menuBtnRef}
             onClick={(e) => {
@@ -717,7 +975,7 @@ function HabitItem({
               onMenuOpen(habit.id, rect.bottom + 6, left);
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
+            className="p-2 transition-colors rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80"
             title="Options"
             aria-label="Options"
           >
