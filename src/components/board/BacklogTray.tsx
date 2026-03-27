@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, FolderOpen, CalendarRange, Trash2, LayoutList, ListTodo, Repeat, EllipsisVertical } from 'lucide-react';
+import { FolderOpen, CalendarRange, EllipsisVertical } from 'lucide-react';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
@@ -8,6 +8,7 @@ import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import { FilterDropdown, FilterType } from '@/components/ui/FilterDropdown';
+import { SideOpenTray } from '@/components/ui/SideOpenTray';
 
 interface Props {
   isOpen: boolean;
@@ -58,7 +59,6 @@ export default React.memo(function BacklogTray({
   closeProgress = 0,
   onRemove,
   onEdit,
-  onToggleRepeat,
   onDoToday,
   userTags = [],
   filter = 'all',
@@ -69,20 +69,6 @@ export default React.memo(function BacklogTray({
   onShowCompletedChange,
   hideDoTodayButton = false,
 }: Props) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const startX = useRef(0);
-  const scrollLeft = useRef(0);
-  const [isDragging, setIsDragging] = useState(false);
-
-  const [isDesktop, setIsDesktop] = useState(false);
-  useEffect(() => {
-    const checkDesktop = () =>
-      setIsDesktop(window.matchMedia('(min-width: 768px)').matches);
-    checkDesktop();
-    window.addEventListener('resize', checkDesktop);
-    return () => window.removeEventListener('resize', checkDesktop);
-  }, []);
-
   // Menu & Dialog State
   const [menu, setMenu] = useState<{
     id: string;
@@ -100,58 +86,6 @@ export default React.memo(function BacklogTray({
 
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const filterMenuRef = useRef<HTMLDivElement>(null);
-
-  // Lock body scroll when open so the page behind doesn't scroll
-  useEffect(() => {
-    if (isOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isOpen]);
-
-  // Close on Escape
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) onClose();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose]);
-
-  // Lock scroll when dragging
-  useEffect(() => {
-    if (activeDragId && scrollRef.current) {
-      scrollRef.current.style.overflowX = 'hidden';
-      scrollRef.current.style.touchAction = 'none';
-    } else if (scrollRef.current) {
-      scrollRef.current.style.overflowX = 'auto';
-      scrollRef.current.style.touchAction = 'pan-x';
-    }
-  }, [activeDragId]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!scrollRef.current) return;
-    const target = e.target as HTMLElement;
-    if (target.closest('button') || target.closest('[data-card-id]')) return;
-
-    setIsDragging(true);
-    startX.current = e.pageX - scrollRef.current.offsetLeft;
-    scrollLeft.current = scrollRef.current.scrollLeft;
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging || !scrollRef.current) return;
-    e.preventDefault();
-    const x = e.pageX - scrollRef.current.offsetLeft;
-    const walk = (x - startX.current) * 1.5;
-    scrollRef.current.scrollLeft = scrollLeft.current - walk;
-  };
-
-  const stopDragging = () => setIsDragging(false);
 
   const handleDelete = async () => {
     if (!confirmItem || !onRemove) return;
@@ -183,26 +117,6 @@ export default React.memo(function BacklogTray({
   // Auto-hide when dragging FROM the tray
   const isDraggingAny = !!activeDragId;
 
-  const mobileVariants = {
-    initial: { y: '100%', opacity: 0 },
-    animate: {
-      y: `${closeProgress * 100}%`,
-      opacity: isDraggingAny ? 0 : 1,
-      scale: isDraggingAny ? 0.95 : 1,
-    },
-    exit: { y: '100%', opacity: 0 },
-  };
-
-  const desktopVariants = {
-    initial: { x: '-100%', opacity: 0 },
-    animate: {
-      x: '0%',
-      opacity: isDraggingAny ? 0 : 1,
-      scale: isDraggingAny ? 0.95 : 1,
-    },
-    exit: { x: '-100%', opacity: 0 },
-  };
-
   const isFiltered = filter !== 'all' || selectedTags.length > 0 || !showCompleted;
 
   const filteredTasks = tasks.filter((t) => {
@@ -217,315 +131,241 @@ export default React.memo(function BacklogTray({
   });
 
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: isDraggingAny ? 0 : 1 - closeProgress }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[80] bg-background/60 backdrop-blur-sm"
-            onClick={onClose}
-            style={{
-              pointerEvents:
-                closeProgress > 0.5 || isDraggingAny ? 'none' : 'auto',
-            }}
-          />
-
-          {/* The Vertical Tray/Drawer */}
-          <motion.div
-            ref={trayRef}
-            variants={isDesktop ? desktopVariants : mobileVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            drag={!isDesktop && !isDraggingAny ? 'y' : false}
-            dragConstraints={{ top: 0, bottom: 300 }}
-            dragElastic={0}
-            dragMomentum={false}
-            onDragEnd={(e, { offset, velocity }) => {
-              if (offset.y > 100 || velocity.y > 500) {
-                onClose();
-              }
-            }}
-            transition={{
-              type: 'spring',
-              damping: 30,
-              stiffness: 300,
-              mass: 0.8,
-            }}
-            className={`
-                fixed z-[90] flex flex-col bg-card/95 border-r border-border/50 shadow-2xl backdrop-blur-3xl overflow-hidden
-                
-                /* Mobile: Bottom Sheet */
-                inset-x-0 bottom-0 top-[15vh] rounded-t-[32px] border-t
-                
-                /* Desktop: Left Sidebar */
-                md:inset-y-0 md:left-0 md:right-auto md:w-[420px] md:top-0 md:bottom-0 md:rounded-none md:border-t-0
-            `}
-            onClick={(e) => e.stopPropagation()}
-            style={{ pointerEvents: isDraggingAny ? 'none' : 'auto' }}
-          >
-            {/* Drag Handle (Mobile Only) */}
-            {!isDesktop && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full z-50 pointer-events-none" />
-            )}
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-8 md:px-8 shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-primary/10 text-primary shadow-sm">
-                  <FolderOpen size={24} strokeWidth={2.5} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black tracking-tight text-foreground uppercase">
-                    Saved Tasks
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-2 relative">
-                      <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
-                        <CalendarRange size={12} strokeWidth={3} />
-                        <span>
-                          {filteredTasks.length}{' '}
-                          {filteredTasks.length === 1 ? 'Task' : 'Tasks'} Saved
-                        </span>
-                      </div>
-
-                      <div className="relative" ref={filterMenuRef}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setShowFilterMenu(!showFilterMenu);
-                          }}
-                          className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-90 ${
-                            showFilterMenu || isFiltered
-                              ? 'bg-primary/10 text-primary'
-                              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                          }`}
-                        >
-                          <EllipsisVertical size={16} />
-                          {isFiltered && (
-                            <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
-                          )}
-                        </button>
-
-                        <FilterDropdown
-                          isOpen={showFilterMenu}
-                          onClose={() => setShowFilterMenu(false)}
-                          triggerRef={filterMenuRef}
-                          align="left"
-                          filter={filter}
-                          onFilterChange={onFilterChange}
-                          availableTags={userTags}
-                          selectedTags={selectedTags}
-                          onTagsChange={(tags) => onTagsChange?.(tags)}
-                          showCompleted={showCompleted}
-                          onShowCompletedChange={(show) => onShowCompletedChange?.(show)}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
+    <>
+      <SideOpenTray
+        ref={trayRef}
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Saved Tasks"
+        icon={<FolderOpen size={24} strokeWidth={2.5} />}
+        iconContainerClassName="bg-primary/10 text-primary"
+        isDraggingAny={isDraggingAny}
+        closeProgress={closeProgress}
+        headerActions={
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 relative">
+              <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
+                <CalendarRange size={12} strokeWidth={3} />
+                <span>
+                  {filteredTasks.length}{' '}
+                  {filteredTasks.length === 1 ? 'Task' : 'Tasks'} Saved
+                </span>
               </div>
-              <button
-                onClick={onClose}
-                className="flex items-center justify-center w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground transition-all active:scale-95"
-              >
-                <X size={20} strokeWidth={2.5} />
-              </button>
-            </div>
 
-            {/* Vertical Scroll Content */}
-            <div
-              ref={scrollRef}
-              className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4 md:px-6 pb-8 flex flex-col gap-3"
-            >
-              <AnimatePresence mode="popLayout" initial={false}>
-                {filteredTasks.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
-                    <FolderOpen size={64} strokeWidth={1} />
-                    <p className="text-sm font-bold uppercase tracking-widest">
-                      No saved tasks
-                    </p>
+              <div className="relative" ref={filterMenuRef}>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowFilterMenu(!showFilterMenu);
+                  }}
+                  className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-90 ${
+                    showFilterMenu || isFiltered
+                      ? 'bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  <EllipsisVertical size={16} />
+                  {isFiltered && (
+                    <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
+                  )}
+                </button>
+
+                <FilterDropdown
+                  isOpen={showFilterMenu}
+                  onClose={() => setShowFilterMenu(false)}
+                  triggerRef={filterMenuRef}
+                  align="left"
+                  filter={filter}
+                  onFilterChange={onFilterChange}
+                  availableTags={userTags}
+                  selectedTags={selectedTags}
+                  onTagsChange={(tags) => onTagsChange?.(tags)}
+                  showCompleted={showCompleted}
+                  onShowCompletedChange={(show) => onShowCompletedChange?.(show)}
+                />
+              </div>
+            </div>
+          </div>
+        }
+      >
+        <AnimatePresence mode="popLayout" initial={false}>
+          {filteredTasks.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
+              <FolderOpen size={64} strokeWidth={1} />
+              <p className="text-sm font-bold uppercase tracking-widest">
+                No saved tasks
+              </p>
+            </div>
+          ) : (
+            filteredTasks.map((t) => {
+              const originalIndex = tasks.findIndex((it) => it.id === t.id);
+              return (
+                <motion.div
+                  initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{
+                    opacity: 0,
+                    scale: 0.9,
+                    transition: { duration: 0.15 },
+                  }}
+                  key={t.id}
+                  layout
+                  className="w-full relative"
+                >
+                  <div className="group relative">
+                    <TaskCard
+                      innerRef={(el) =>
+                        setCardRef(draggableIdFor(7, t.id), el)
+                      }
+                      dragId={draggableIdFor(7, t.id)}
+                      task={t}
+                      userTags={userTags}
+                      menuOpen={menu?.id === t.id}
+                      onToggleMenu={(rect) => {
+                        setMenu((prev) => {
+                          if (prev?.id === t.id) return null;
+                          const MENU_W = 160;
+                          const MENU_H = 180; // Approximate height with all options
+                          const MARGIN = 10;
+                          const vw = window.innerWidth;
+                          const vh = window.innerHeight;
+
+                          let left =
+                            rect.left + rect.width / 2 - MENU_W / 2;
+
+                          // Clamp horizontal position
+                          left = Math.max(
+                            MARGIN,
+                            Math.min(left, vw - MENU_W - MARGIN),
+                          );
+
+                          let top = rect.bottom + 8;
+                          // If menu would go off bottom, flip to above
+                          if (top + MENU_H > vh - MARGIN) {
+                            top = rect.top - MENU_H - 8;
+                          }
+
+                          return { id: t.id, top, left };
+                        });
+                      }}
+                      hiddenWhileDragging={activeDragId === t.id}
+                      isRepeating={t.type === 'weekly'}
+                      touchAction="auto" // Vertical scroll, so auto is fine? Or none? TaskCard usually handles handle
+                      isAnyDragging={!!activeDragId}
+                      onGrab={(payload) => {
+                        // Same grab logic
+                        const resolvedTags = t.tags?.map((tagId) => {
+                          const found = userTags?.find(
+                            (ut) => ut.id === tagId || ut.name === tagId,
+                          );
+                          return (
+                            found || { id: tagId, name: tagId, color: '' }
+                          );
+                        });
+                        onGrab({
+                          day: 7,
+                          index: originalIndex,
+                          taskId: t.id,
+                          taskText: t.text,
+                          taskType: t.type,
+                          clientX: payload.clientX,
+                          clientY: payload.clientY,
+                          pointerType: payload.pointerType,
+                          rectGetter: () => {
+                            const id = draggableIdFor(7, t.id);
+                            const el = document.querySelector(
+                              `[data-card-id="${id}"]`,
+                            );
+                            return (
+                              el?.getBoundingClientRect() ??
+                              new DOMRect(0, 0, 0, 0)
+                            );
+                          },
+                          tags: resolvedTags,
+                          calendarEventId: t.calendarEventId,
+                          startTime: t.startTime,
+                          endTime: t.endTime,
+                          frogodoroSession: t.frogodoroSession,
+                        });
+                      }}
+                      onDoToday={
+                        onDoToday ? () => onDoToday(t.id) : undefined
+                      }
+                      hideDoTodayButton={hideDoTodayButton}
+                    />
                   </div>
-                ) : (
-                  filteredTasks.map((t) => {
-                    const originalIndex = tasks.findIndex((it) => it.id === t.id);
-                    return (
-                      <motion.div
-                        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{
-                          opacity: 0,
-                          scale: 0.9,
-                          transition: { duration: 0.15 },
-                        }}
-                        key={t.id}
-                        layout
-                        className="w-full relative"
-                      >
-                        <div className="group relative">
-                          <TaskCard
-                            innerRef={(el) =>
-                              setCardRef(draggableIdFor(7, t.id), el)
-                            }
-                            dragId={draggableIdFor(7, t.id)}
-                            task={t}
-                            userTags={userTags}
-                            menuOpen={menu?.id === t.id}
-                            onToggleMenu={(rect) => {
-                              setMenu((prev) => {
-                                if (prev?.id === t.id) return null;
-                                const MENU_W = 160;
-                                const MENU_H = 180; // Approximate height with all options
-                                const MARGIN = 10;
-                                const vw = window.innerWidth;
-                                const vh = window.innerHeight;
-
-                                let left =
-                                  rect.left + rect.width / 2 - MENU_W / 2;
-
-                                // Clamp horizontal position
-                                left = Math.max(
-                                  MARGIN,
-                                  Math.min(left, vw - MENU_W - MARGIN),
-                                );
-
-                                let top = rect.bottom + 8;
-                                // If menu would go off bottom, flip to above
-                                if (top + MENU_H > vh - MARGIN) {
-                                  top = rect.top - MENU_H - 8;
-                                }
-
-                                return { id: t.id, top, left };
-                              });
-                            }}
-                            hiddenWhileDragging={activeDragId === t.id}
-                            isRepeating={t.type === 'weekly'}
-                            touchAction="auto" // Vertical scroll, so auto is fine? Or none? TaskCard usually handles handle
-                            isAnyDragging={!!activeDragId}
-                            onGrab={(payload) => {
-                              // Same grab logic
-                              const resolvedTags = t.tags?.map((tagId) => {
-                                const found = userTags?.find(
-                                  (ut) => ut.id === tagId || ut.name === tagId,
-                                );
-                                return (
-                                  found || { id: tagId, name: tagId, color: '' }
-                                );
-                              });
-                              onGrab({
-                                day: 7,
-                                index: originalIndex,
-                                taskId: t.id,
-                                taskText: t.text,
-                                taskType: t.type,
-                                clientX: payload.clientX,
-                                clientY: payload.clientY,
-                                pointerType: payload.pointerType,
-                                rectGetter: () => {
-                                  const id = draggableIdFor(7, t.id);
-                                  const el = document.querySelector(
-                                    `[data-card-id="${id}"]`,
-                                  );
-                                  return (
-                                    el?.getBoundingClientRect() ??
-                                    new DOMRect(0, 0, 0, 0)
-                                  );
-                                },
-                                tags: resolvedTags,
-                                calendarEventId: t.calendarEventId,
-                                startTime: t.startTime,
-                                endTime: t.endTime,
-                                frogodoroSession: t.frogodoroSession,
-                              });
-                            }}
-                            onDoToday={
-                              onDoToday ? () => onDoToday(t.id) : undefined
-                            }
-                            hideDoTodayButton={hideDoTodayButton}
-                          />
-                        </div>
-                      </motion.div>
-                    );
-                  })
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* Footer / Gradient Cover at bottom? */}
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
-          </motion.div>
-
-          <TaskMenu
-            menu={menu}
-            onClose={() => setMenu(null)}
-            onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
-            addTagsPosition="first"
-            isWeekly={
-              menu
-                ? tasks.find((t) => t.id === menu.id)?.type === 'weekly'
-                : false
-            }
-            onEdit={(id) => {
-              const t = tasks.find((it) => it.id === id);
-              if (t && onEdit) {
-                setEditItem(t);
-              }
-              setMenu(null);
-            }}
-            onDoToday={() => {
-              if (menu && onDoToday) onDoToday(menu.id);
-              setMenu(null);
-            }}
-            onDelete={() => {
-              if (menu) {
-                const t = tasks.find((it) => it.id === menu.id);
-                if (t) setConfirmItem(t);
-              }
-              setMenu(null);
-            }}
-          />
-
-          <TagPopup
-            open={tagPopup.open}
-            taskId={tagPopup.taskId}
-            initialTags={tasks.find((t) => t.id === tagPopup.taskId)?.tags}
-            onClose={() => setTagPopup({ open: false, taskId: null })}
-            onSave={handleTagSave}
-          />
-
-          {editItem && (
-            <EditTaskDialog
-              open={!!editItem}
-              initialText={editItem.text}
-              busy={busy}
-              onClose={() => setEditItem(null)}
-              onSave={async (newText) => {
-                if (onEdit) {
-                  setBusy(true);
-                  await onEdit(editItem.id, newText);
-                  setBusy(false);
-                  setEditItem(null);
-                }
-              }}
-            />
+                </motion.div>
+              );
+            })
           )}
+        </AnimatePresence>
+      </SideOpenTray>
 
-          <DeleteDialog
-            open={!!confirmItem}
-            variant="backlog"
-            itemLabel={confirmItem?.text}
-            busy={busy}
-            onClose={() => {
-              if (!busy) setConfirmItem(null);
-            }}
-            onDeleteAll={handleDelete}
-          />
-        </>
+      <TaskMenu
+        menu={menu}
+        onClose={() => setMenu(null)}
+        onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
+        addTagsPosition="first"
+        isWeekly={
+          menu
+            ? tasks.find((t) => t.id === menu.id)?.type === 'weekly'
+            : false
+        }
+        onEdit={(id) => {
+          const t = tasks.find((it) => it.id === id);
+          if (t && onEdit) {
+            setEditItem(t);
+          }
+          setMenu(null);
+        }}
+        onDoToday={() => {
+          if (menu && onDoToday) onDoToday(menu.id);
+          setMenu(null);
+        }}
+        onDelete={() => {
+          if (menu) {
+            const t = tasks.find((it) => it.id === menu.id);
+            if (t) setConfirmItem(t);
+          }
+          setMenu(null);
+        }}
+      />
+
+      <TagPopup
+        open={tagPopup.open}
+        taskId={tagPopup.taskId}
+        initialTags={tasks.find((t) => t.id === tagPopup.taskId)?.tags}
+        onClose={() => setTagPopup({ open: false, taskId: null })}
+        onSave={handleTagSave}
+      />
+
+      {editItem && (
+        <EditTaskDialog
+          open={!!editItem}
+          initialText={editItem.text}
+          busy={busy}
+          onClose={() => setEditItem(null)}
+          onSave={async (newText) => {
+            if (onEdit) {
+              setBusy(true);
+              await onEdit(editItem.id, newText);
+              setBusy(false);
+              setEditItem(null);
+            }
+          }}
+        />
       )}
-    </AnimatePresence>
+
+      <DeleteDialog
+        open={!!confirmItem}
+        variant="backlog"
+        itemLabel={confirmItem?.text}
+        busy={busy}
+        onClose={() => {
+          if (!busy) setConfirmItem(null);
+        }}
+        onDeleteAll={handleDelete}
+      />
+    </>
   );
 });

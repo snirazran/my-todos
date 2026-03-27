@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useMotionValue, animate, PanInfo } from 'framer-motion';
-import { X, CalendarClock, Trash2, Repeat, EllipsisVertical, CheckCircle2 } from 'lucide-react';
+import { CalendarClock, CheckCircle2, EllipsisVertical } from 'lucide-react';
 import { Task } from './helpers';
 import TaskMenu from './TaskMenu';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
@@ -9,6 +9,7 @@ import { EditHabitDaysDialog } from '@/components/ui/EditHabitDaysDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
+import { SideOpenTray } from '@/components/ui/SideOpenTray';
 
 interface Props {
   isOpen: boolean;
@@ -35,17 +36,6 @@ export default React.memo(function HabitTray({
   userTags = [],
   date,
 }: Props) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const [isDesktop, setIsDesktop] = useState(false);
-
-  useEffect(() => {
-    const checkDesktop = () =>
-      setIsDesktop(window.matchMedia('(min-width: 768px)').matches);
-    checkDesktop();
-    window.addEventListener('resize', checkDesktop);
-    return () => window.removeEventListener('resize', checkDesktop);
-  }, []);
-
   // Menu & Dialog State
   const [menu, setMenu] = useState<{
     id: string;
@@ -61,15 +51,6 @@ export default React.memo(function HabitTray({
     open: boolean;
     taskId: string | null;
   }>({ open: false, taskId: null });
-
-  // Close on Escape
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) onClose();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [isOpen, onClose]);
 
   const handleTagSave = async (taskId: string, newTags: string[]) => {
     try {
@@ -87,228 +68,140 @@ export default React.memo(function HabitTray({
     }
   };
 
-  const mobileVariants = {
-    initial: { y: '100%', opacity: 0 },
-    animate: { y: 0, opacity: 1 },
-    exit: { y: '100%', opacity: 0 },
-  };
-
-  const desktopVariants = {
-    initial: { x: '-100%', opacity: 0 },
-    animate: { x: '0%', opacity: 1 },
-    exit: { x: '-100%', opacity: 0 },
-  };
-
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <>
-          {/* Backdrop — on mobile only covers the tray area so the planner behind is still scrollable */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className={`fixed z-[80] bg-background/60 backdrop-blur-sm ${
-              isDesktop ? 'inset-0' : 'inset-x-0 bottom-0 top-[15vh]'
-            }`}
-            onClick={onClose}
-          />
-
-          {/* The Vertical Tray/Drawer */}
-          <motion.div
-            variants={isDesktop ? desktopVariants : mobileVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            drag={!isDesktop ? 'y' : false}
-            dragConstraints={{ top: 0, bottom: 300 }}
-            dragElastic={0}
-            dragMomentum={false}
-            onDragEnd={(e, { offset, velocity }) => {
-              if (offset.y > 100 || velocity.y > 500) {
-                onClose();
-              }
-            }}
-            transition={{
-              type: 'spring',
-              damping: 30,
-              stiffness: 300,
-              mass: 0.8,
-            }}
-            className={`
-                fixed z-[90] flex flex-col bg-card/95 border-r border-border/50 shadow-2xl backdrop-blur-3xl overflow-hidden
-                
-                /* Mobile: Bottom Sheet */
-                inset-x-0 bottom-0 top-[15vh] rounded-t-[32px] border-t
-                
-                /* Desktop: Left Sidebar */
-                md:inset-y-0 md:left-0 md:right-auto md:w-[420px] md:top-0 md:bottom-0 md:rounded-none md:border-t-0
-            `}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Drag Handle (Mobile Only) */}
-            {!isDesktop && (
-              <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full z-50 pointer-events-none" />
-            )}
-
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-8 md:px-8 shrink-0">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-500/10 text-emerald-500 shadow-sm">
-                  <CalendarClock size={24} strokeWidth={2.5} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black tracking-tight text-foreground uppercase">
-                    Habits
-                  </h3>
-                  <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
-                    {habits.length} {habits.length === 1 ? 'Habit' : 'Habits'} Active
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={onClose}
-                className="flex items-center justify-center w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground transition-all active:scale-95"
-              >
-                <X size={20} strokeWidth={2.5} />
-              </button>
+    <>
+      <SideOpenTray
+        isOpen={isOpen}
+        onClose={onClose}
+        title="Habits"
+        subtitle={`${habits.length} ${habits.length === 1 ? 'Habit' : 'Habits'} Active`}
+        icon={<CalendarClock size={24} strokeWidth={2.5} />}
+        iconContainerClassName="bg-emerald-500/10 text-emerald-500"
+        lockScroll={true}
+      >
+        <AnimatePresence mode="popLayout" initial={false}>
+          {habits.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
+              <CalendarClock size={64} strokeWidth={1} />
+              <p className="text-sm font-bold uppercase tracking-widest text-center px-8">
+                Build your routine. Add your first habit!
+              </p>
             </div>
-
-            {/* Vertical Scroll Content */}
-            <div
-              ref={scrollRef}
-              className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4 md:px-6 pb-24 flex flex-col gap-3"
-            >
-              <AnimatePresence mode="popLayout" initial={false}>
-                {habits.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
-                    <CalendarClock size={64} strokeWidth={1} />
-                    <p className="text-sm font-bold uppercase tracking-widest text-center px-8">
-                      Build your routine. Add your first habit!
-                    </p>
-                  </div>
-                ) : (
-                  habits.map((h) => (
-                    <HabitTrayItem
-                      key={h.id}
-                      habit={h}
-                      isDone={h.completed || (h.completedDates ?? []).includes(date)}
-                      onToggle={onToggle}
-                      onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
-                      menuOpen={menu?.id === h.id}
-                      tags={userTags}
-                      date={date}
-                    />
-                  ))
-                )}
-              </AnimatePresence>
-
-              {/* Add Habit Button inside list */}
-              <button
-                onClick={onAddRequested}
-                className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 transition-all group mt-2"
-              >
-                <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center transition-transform group-hover:scale-110">
-                  <CalendarClock size={16} strokeWidth={3} />
-                </div>
-                <span className="text-sm font-bold text-muted-foreground group-hover:text-foreground transition-colors">
-                  Add New Habit
-                </span>
-              </button>
-            </div>
-
-            {/* Footer gradient */}
-            <div className="absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-card to-transparent pointer-events-none" />
-          </motion.div>
-
-          <TaskMenu
-            menu={menu}
-            onClose={() => setMenu(null)}
-            isHabit
-            addTagsPosition="first"
-            onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
-            onChangeDays={() => {
-              const h = habits.find((h) => h.id === menu?.id);
-              if (h) setEditGoalItem(h);
-              setMenu(null);
-            }}
-            onEdit={(id) => {
-              const h = habits.find((it) => it.id === id);
-              if (h) setEditItem(h);
-              setMenu(null);
-            }}
-            onDelete={() => {
-              if (menu) {
-                const h = habits.find((it) => it.id === menu.id);
-                if (h) setConfirmItem(h);
-              }
-              setMenu(null);
-            }}
-          />
-
-          <TagPopup
-            open={tagPopup.open}
-            taskId={tagPopup.taskId}
-            initialTags={habits.find((t) => t.id === tagPopup.taskId)?.tags}
-            onClose={() => setTagPopup({ open: false, taskId: null })}
-            onSave={handleTagSave}
-          />
-
-          {editItem && (
-            <EditTaskDialog
-              open={!!editItem}
-              initialText={editItem.text}
-              title="Edit Habit"
-              subtitle="Make changes to your habit below."
-              busy={busy}
-              onClose={() => setEditItem(null)}
-              onSave={async (newText) => {
-                setBusy(true);
-                await onEdit(editItem.id, newText);
-                setBusy(false);
-                setEditItem(null);
-              }}
-            />
+          ) : (
+            habits.map((h) => (
+              <HabitTrayItem
+                key={h.id}
+                habit={h}
+                isDone={h.completed || (h.completedDates ?? []).includes(date)}
+                onToggle={onToggle}
+                onMenuOpen={(id, top, left) => setMenu({ id, top, left })}
+                menuOpen={menu?.id === h.id}
+                tags={userTags}
+                date={date}
+              />
+            ))
           )}
+        </AnimatePresence>
 
-          {editGoalItem && (
-            <EditHabitDaysDialog
-              open={!!editGoalItem}
-              taskId={editGoalItem.id}
-              taskLabel={editGoalItem.text}
-              initialGoal={editGoalItem.timesPerWeek ?? 7}
-              busy={busy}
-              onClose={() => setEditGoalItem(null)}
-              onSave={async (newGoal) => {
-                setBusy(true);
-                await onEditGoal(editGoalItem.id, newGoal);
-                setBusy(false);
-                setEditGoalItem(null);
-              }}
-            />
-          )}
+        {/* Add Habit Button inside list */}
+        <button
+          onClick={onAddRequested}
+          className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 transition-all group mt-2"
+        >
+          <div className="w-8 h-8 rounded-full bg-emerald-500/10 text-emerald-500 flex items-center justify-center transition-transform group-hover:scale-110">
+            <CalendarClock size={16} strokeWidth={3} />
+          </div>
+          <span className="text-sm font-bold text-muted-foreground group-hover:text-foreground transition-colors">
+            Add New Habit
+          </span>
+        </button>
+      </SideOpenTray>
 
-          <DeleteDialog
-            open={!!confirmItem}
-            variant="habit"
-            itemLabel={confirmItem?.text}
-            busy={busy}
-            onClose={() => {
-              if (!busy) setConfirmItem(null);
-            }}
-            onDeleteAll={async () => {
-              if (confirmItem) {
-                setBusy(true);
-                await onDelete(confirmItem.id);
-                setBusy(false);
-                setConfirmItem(null);
-              }
-            }}
-          />
-        </>
+      <TaskMenu
+        menu={menu}
+        onClose={() => setMenu(null)}
+        isHabit
+        addTagsPosition="first"
+        onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
+        onChangeDays={() => {
+          const h = habits.find((h) => h.id === menu?.id);
+          if (h) setEditGoalItem(h);
+          setMenu(null);
+        }}
+        onEdit={(id) => {
+          const h = habits.find((it) => it.id === id);
+          if (h) setEditItem(h);
+          setMenu(null);
+        }}
+        onDelete={() => {
+          if (menu) {
+            const h = habits.find((it) => it.id === menu.id);
+            if (h) setConfirmItem(h);
+          }
+          setMenu(null);
+        }}
+      />
+
+      <TagPopup
+        open={tagPopup.open}
+        taskId={tagPopup.taskId}
+        initialTags={habits.find((t) => t.id === tagPopup.taskId)?.tags}
+        onClose={() => setTagPopup({ open: false, taskId: null })}
+        onSave={handleTagSave}
+      />
+
+      {editItem && (
+        <EditTaskDialog
+          open={!!editItem}
+          initialText={editItem.text}
+          title="Edit Habit"
+          subtitle="Make changes to your habit below."
+          busy={busy}
+          onClose={() => setEditItem(null)}
+          onSave={async (newText) => {
+            setBusy(true);
+            await onEdit(editItem.id, newText);
+            setBusy(false);
+            setEditItem(null);
+          }}
+        />
       )}
-    </AnimatePresence>
+
+      {editGoalItem && (
+        <EditHabitDaysDialog
+          open={!!editGoalItem}
+          taskId={editGoalItem.id}
+          taskLabel={editGoalItem.text}
+          initialGoal={editGoalItem.timesPerWeek ?? 7}
+          busy={busy}
+          onClose={() => setEditGoalItem(null)}
+          onSave={async (newGoal) => {
+            setBusy(true);
+            await onEditGoal(editGoalItem.id, newGoal);
+            setBusy(false);
+            setEditGoalItem(null);
+          }}
+        />
+      )}
+
+      <DeleteDialog
+        open={!!confirmItem}
+        variant="habit"
+        itemLabel={confirmItem?.text}
+        busy={busy}
+        onClose={() => {
+          if (!busy) setConfirmItem(null);
+        }}
+        onDeleteAll={async () => {
+          if (confirmItem) {
+            setBusy(true);
+            await onDelete(confirmItem.id);
+            setBusy(false);
+            setConfirmItem(null);
+          }
+        }}
+      />
+    </>
   );
 });
 
