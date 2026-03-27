@@ -101,6 +101,18 @@ export default React.memo(function BacklogTray({
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const filterMenuRef = useRef<HTMLDivElement>(null);
 
+  // Lock body scroll when open so the page behind doesn't scroll
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+
   // Close on Escape
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {

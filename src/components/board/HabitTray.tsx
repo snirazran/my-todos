@@ -103,13 +103,15 @@ export default React.memo(function HabitTray({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop — on mobile only covers the tray area so the planner behind is still scrollable */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-[80] bg-background/60 backdrop-blur-sm"
+            className={`fixed z-[80] bg-background/60 backdrop-blur-sm ${
+              isDesktop ? 'inset-0' : 'inset-x-0 bottom-0 top-[15vh]'
+            }`}
             onClick={onClose}
           />
 
