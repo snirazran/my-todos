@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useUIStore } from '@/lib/uiStore';
+import { useReminderScheduler } from '@/hooks/useReminderScheduler';
 import Fly from '@/components/ui/fly';
 import { Gift } from 'lucide-react';
 
@@ -81,6 +82,7 @@ export function useTaskData() {
   const { user } = useAuth();
   const { showNotification, hideNotification } = useNotification();
   const { openGiftHub } = useUIStore();
+  const { scheduleNotification, cancelNotification } = useReminderScheduler();
 
   const today = new Date();
   const dateStr = format(today, 'yyyy-MM-dd');
@@ -609,6 +611,7 @@ export function useTaskData() {
             permanent: forcePermanent,
           }),
         });
+        cancelNotification(taskId);
       } catch (e) {
         console.error('Delete failed', e);
         // Rollback
@@ -767,12 +770,20 @@ export function useTaskData() {
       const prevToday = todayData;
 
       // Optimistic update
+      let updatedTask: Task | null = null;
       if (todayData) {
-        const updated = todayData.tasks.map((t) =>
-          t.id === taskId
-            ? { ...t, startTime: data.startTime || undefined, endTime: data.endTime || undefined, reminder: data.reminder || undefined }
-            : t,
-        );
+        const updated = todayData.tasks.map((t) => {
+          if (t.id === taskId) {
+            updatedTask = {
+              ...t,
+              startTime: data.startTime || undefined,
+              endTime: data.endTime || undefined,
+              reminder: data.reminder || undefined,
+            };
+            return updatedTask;
+          }
+          return t;
+        });
         mutateToday({ ...todayData, tasks: updated }, { revalidate: false });
       }
 
@@ -782,12 +793,16 @@ export function useTaskData() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ taskId, schedule: data, timezone: tz }),
         });
+
+        if (updatedTask) {
+          scheduleNotification(updatedTask);
+        }
       } catch (e) {
         console.error('Schedule failed', e);
         if (prevToday) mutateToday(prevToday, { revalidate: false });
       }
     },
-    [todayData, mutateToday, tz],
+    [todayData, mutateToday, tz, scheduleNotification],
   );
 
   const { data: tagsData, mutate: mutateTags } = useSWR<{
