@@ -394,11 +394,7 @@ function RightActions({
                   <Settings className="h-[1.2rem] w-[1.2rem] text-amber-500" />
                 </button>
 
-                {pathname === '/planner' && (
-                  <div className="w-full">
-                    <GoogleCalendarSync />
-                  </div>
-                )}
+                <GoogleCalendarSync />
 
                 <button
                   onClick={() => {
@@ -583,8 +579,8 @@ function MobileSheet({
                   </button>
                 )}
 
-                {pathname === '/planner' && showAuth && (
-                  <GoogleCalendarSync variant="mobile" />
+                {showAuth && (
+                  <GoogleCalendarSync />
                 )}
               </div>
             </div>

@@ -3,46 +3,109 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { Loader2, CalendarRange, Check, AlertCircle } from 'lucide-react';
+import { Loader2, CalendarRange } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/components/auth/AuthContext';
+import { useNotification } from '@/components/providers/NotificationProvider';
 
-type SyncState = 'idle' | 'loading' | 'success' | 'error';
+// Module-level lock to prevent duplicate syncs
+let syncInFlight = false;
 
-export default function GoogleCalendarSync({
-  variant = 'desktop',
-}: {
-  variant?: 'desktop' | 'mobile';
-}) {
+/**
+ * GlobalCalendarSync — renders nothing visible.
+ * Mount once in providers.tsx to auto-sync on every page load when enabled.
+ */
+export function GlobalCalendarSync() {
+  const { user } = useAuth();
+  const { showNotification } = useNotification();
+  const hasSynced = useRef(false);
+
+  useEffect(() => {
+    if (!user || hasSynced.current) return;
+    hasSynced.current = true;
+
+    (async () => {
+      try {
+        const res = await fetch('/api/user');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.calendarSyncEnabled) return;
+
+        if (syncInFlight) return;
+        syncInFlight = true;
+
+        const syncRes = await fetch('/api/calendar/sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          }),
+        });
+
+        const syncData = await syncRes.json().catch(() => ({}));
+        syncInFlight = false;
+
+        if (!syncRes.ok) return;
+
+        if (syncData.created > 0) {
+          showNotification(
+            <div className="flex items-center gap-3 pr-2">
+              <CalendarRange className="w-5 h-5 text-blue-500 shrink-0" />
+              <div className="flex flex-col leading-none">
+                <span className="font-black text-base">
+                  {syncData.created} event{syncData.created > 1 ? 's' : ''} synced
+                </span>
+                <span className="text-[10px] text-muted-foreground font-bold mt-0.5 uppercase tracking-wider">
+                  Google Calendar
+                </span>
+              </div>
+            </div>,
+          );
+        }
+
+        window.dispatchEvent(new Event('board-refresh'));
+      } catch {
+        syncInFlight = false;
+      }
+    })();
+  }, [user, showNotification]);
+
+  return null;
+}
+
+/**
+ * GoogleCalendarSync — compact toggle for the settings menu.
+ * Shown on all pages. Only handles enable/disable + re-auth.
+ */
+export default function GoogleCalendarSync() {
   const { user: authUser } = useAuth();
+  const { showNotification } = useNotification();
   const [enabled, setEnabled] = useState(false);
-  const [state, setState] = useState<SyncState>('idle');
-  const [message, setMessage] = useState('');
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
-  const hasSyncedOnMount = useRef(false);
-  const isToggling = useRef(false);
+  const [syncing, setSyncing] = useState(false);
+  const [loaded, setLoaded] = useState(false);
 
   // Fetch current sync status on mount
   useEffect(() => {
     if (!authUser) return;
-    const fetchStatus = async () => {
+    (async () => {
       try {
         const res = await fetch('/api/user');
         if (res.ok) {
           const data = await res.json();
           setEnabled(data.calendarSyncEnabled || false);
         }
-      } catch (err) {
-        console.error('Failed to fetch calendar status:', err);
+      } catch {
+        // silent
       } finally {
-        setIsInitialLoad(false);
+        setLoaded(true);
       }
-    };
-    fetchStatus();
+    })();
   }, [authUser]);
 
-  const triggerSync = useCallback(async (token?: string) => {
-    setState('loading');
+  const doSync = useCallback(async (token?: string) => {
+    if (syncInFlight) return 'DONE';
+    syncInFlight = true;
+    setSyncing(true);
     try {
       const res = await fetch('/api/calendar/sync', {
         method: 'POST',
@@ -52,41 +115,39 @@ export default function GoogleCalendarSync({
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         }),
       });
-
       const data = await res.json().catch(() => ({}));
-
       if (res.status === 401) return 'REAUTH_NEEDED';
       if (res.status === 400 && data.error?.includes('not connected')) return 'NOT_CONNECTED';
-      
-      if (!res.ok) {
-        throw new Error(data.error || `Sync failed (${res.status})`);
+      if (!res.ok) return 'DONE';
+
+      if (data.created > 0) {
+        showNotification(
+          <div className="flex items-center gap-3 pr-2">
+            <CalendarRange className="w-5 h-5 text-blue-500 shrink-0" />
+            <div className="flex flex-col leading-none">
+              <span className="font-black text-base">
+                {data.created} event{data.created > 1 ? 's' : ''} synced
+              </span>
+              <span className="text-[10px] text-muted-foreground font-bold mt-0.5 uppercase tracking-wider">
+                Google Calendar
+              </span>
+            </div>
+          </div>,
+        );
       }
 
-      if (data.created === 0 && data.skipped > 0) {
-        setMessage('Up to date');
-      } else if (data.created === 0 && data.deleted === 0) {
-        setMessage('No new events');
-      } else {
-        setMessage(`${data.created} added, ${data.deleted} removed`);
-      }
-
-      setState('success');
       window.dispatchEvent(new Event('board-refresh'));
-      setTimeout(() => {
-        setState('idle');
-        setMessage('');
-      }, 4000);
-    } catch (err: any) {
-      console.error('Sync error:', err);
-      setMessage(err.message || 'Connection error');
-      setState('error');
-      setTimeout(() => { setState('idle'); setMessage(''); }, 5000);
+    } catch {
+      // silent
+    } finally {
+      syncInFlight = false;
+      setSyncing(false);
     }
     return 'DONE';
-  }, []);
+  }, [showNotification]);
 
-  const handleReauthAndSync = useCallback(async () => {
-    setState('loading');
+  const handleReauth = useCallback(async () => {
+    setSyncing(true);
     try {
       const provider = new GoogleAuthProvider();
       provider.addScope('https://www.googleapis.com/auth/calendar.readonly');
@@ -102,38 +163,19 @@ export default function GoogleCalendarSync({
           calendarAccessToken: credential.accessToken,
         }),
       });
-      await triggerSync(credential.accessToken);
-    } catch (err: any) {
-      console.error('Re-auth failed:', err);
-      setState('error');
-      setMessage('Login failed');
-      setTimeout(() => { setState('idle'); setMessage(''); }, 3000);
+      await doSync(credential.accessToken);
+    } catch {
+      setSyncing(false);
     }
-  }, [triggerSync]);
-
-  // Auto-sync on mount ONLY (prevent triggering on manual toggle)
-  useEffect(() => {
-    if (!isInitialLoad && enabled && !hasSyncedOnMount.current && !isToggling.current) {
-      hasSyncedOnMount.current = true;
-      const autoSync = async () => {
-        const result = await triggerSync();
-        if (result === 'REAUTH_NEEDED') {
-          setState('error');
-          setMessage('Reconnect required');
-        }
-      };
-      autoSync();
-    }
-  }, [isInitialLoad, enabled, triggerSync]);
+  }, [doSync]);
 
   const handleToggle = async (checked: boolean) => {
-    isToggling.current = true;
     setEnabled(checked);
-    
+
     if (checked) {
-      const result = await triggerSync();
+      const result = await doSync();
       if (result === 'REAUTH_NEEDED' || result === 'NOT_CONNECTED') {
-        await handleReauthAndSync();
+        await handleReauth();
       } else {
         await fetch('/api/user', {
           method: 'PATCH',
@@ -147,74 +189,27 @@ export default function GoogleCalendarSync({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ calendarSyncEnabled: false }),
       });
-      setMessage('');
-      setState('idle');
     }
-    
-    // Allow auto-sync again after some time or next mount
-    setTimeout(() => { isToggling.current = false; }, 1000);
   };
 
-  const statusLabel = state === 'loading' ? 'Syncing now...' : message || (enabled ? 'Connected' : 'Not connected');
+  if (!loaded) return null;
 
   return (
-    <div className={`
-      w-full overflow-hidden transition-all duration-300 rounded-2xl border-2
-      ${enabled 
-        ? 'bg-blue-50/50 dark:bg-blue-500/5 border-blue-200/50 dark:border-blue-500/20 shadow-sm' 
-        : 'bg-muted/30 border-border/50 opacity-80 hover:opacity-100'}
-    `}>
-      <div className="p-3">
-        <div className="flex items-start gap-3">
-          <div className={`
-            flex-shrink-0 p-2 rounded-xl shadow-sm border transition-all duration-300
-            ${enabled 
-              ? 'bg-blue-500 border-blue-400 text-white' 
-              : 'bg-muted border-border text-muted-foreground'}
-            ${state === 'error' ? 'bg-red-500 border-red-400 text-white' : ''}
-          `}>
-            {state === 'loading' ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : state === 'error' ? (
-              <AlertCircle className="h-5 w-5" />
-            ) : (
-              <CalendarRange className="h-5 w-5" />
-            )}
-          </div>
-          
-          <div className="flex-1 min-w-0 py-0.5">
-            <h3 className="text-[11px] font-black uppercase tracking-widest text-foreground/80 leading-none mb-1">
-              Google Calendar
-            </h3>
-            <div className="flex items-center gap-1.5 min-w-0">
-              {state === 'success' && <Check className="h-3 w-3 text-emerald-500 shrink-0" />}
-              <p className={`
-                text-[10px] font-bold truncate transition-colors duration-300
-                ${state === 'error' ? 'text-red-500' : enabled ? 'text-blue-600 dark:text-blue-400' : 'text-muted-foreground'}
-              `}>
-                {statusLabel}
-              </p>
-            </div>
-          </div>
-
-          <div className="pt-1">
-            <Switch 
-              checked={enabled} 
-              onCheckedChange={handleToggle}
-              className="data-[state=checked]:bg-blue-500"
-            />
-          </div>
-        </div>
+    <button
+      onClick={() => handleToggle(!enabled)}
+      className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+    >
+      <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
+        Calendar Sync
+      </span>
+      <div className="flex items-center gap-2">
+        {syncing && <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />}
+        <Switch
+          checked={enabled}
+          onCheckedChange={handleToggle}
+          className="data-[state=checked]:bg-blue-500 pointer-events-none"
+        />
       </div>
-      
-      {enabled && (
-        <div className="bg-blue-100/30 dark:bg-blue-500/10 px-3 py-1.5 border-t border-blue-200/30 dark:border-blue-500/10">
-          <p className="text-[9px] font-medium text-blue-600/80 dark:text-blue-400/80 flex items-center justify-between">
-            <span>Automated event sync</span>
-            <span className={`w-1.5 h-1.5 rounded-full ${state === 'loading' ? 'bg-amber-500 animate-bounce' : 'bg-blue-500 animate-pulse'}`} />
-          </p>
-        </div>
-      )}
-    </div>
+    </button>
   );
 }

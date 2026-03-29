@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
 import { PushNotificationInit } from '@/components/providers/PushNotificationInit';
 import { GlobalTimer } from '@/components/providers/GlobalTimer';
+import { GlobalCalendarSync } from '@/components/ui/GoogleCalendarSync';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -18,6 +19,7 @@ export default function Providers({ children }: { children: ReactNode }) {
       >
         <NotificationProvider>
           <GlobalTimer />
+          <GlobalCalendarSync />
           <PushNotificationInit />
           {children}
         </NotificationProvider>
