@@ -9,6 +9,7 @@ import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import { FilterDropdown, FilterType } from '@/components/ui/FilterDropdown';
 import { SideOpenTray } from '@/components/ui/SideOpenTray';
+import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
 
 interface Props {
   isOpen: boolean;
@@ -28,6 +29,7 @@ interface Props {
     calendarEventId?: string;
     startTime?: string;
     endTime?: string;
+    reminder?: string;
     frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null;
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
@@ -38,6 +40,7 @@ interface Props {
   onEdit?: (id: string, newText: string) => void;
   onToggleRepeat?: (id: string) => void;
   onDoToday?: (id: string) => void;
+  onScheduleTask?: (taskId: string, data: { startTime: string; endTime: string; reminder: string }) => Promise<void> | void;
   userTags?: { id: string; name: string; color: string }[];
   filter?: FilterType;
   onFilterChange?: (filter: FilterType) => void;
@@ -60,6 +63,7 @@ export default React.memo(function BacklogTray({
   onRemove,
   onEdit,
   onDoToday,
+  onScheduleTask,
   userTags = [],
   filter = 'all',
   onFilterChange,
@@ -83,6 +87,8 @@ export default React.memo(function BacklogTray({
     open: boolean;
     taskId: string | null;
   }>({ open: false, taskId: null });
+
+  const [scheduleDialog, setScheduleDialog] = useState<{ task: Task } | null>(null);
 
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const filterMenuRef = useRef<HTMLDivElement>(null);
@@ -285,6 +291,7 @@ export default React.memo(function BacklogTray({
                           calendarEventId: t.calendarEventId,
                           startTime: t.startTime,
                           endTime: t.endTime,
+                          reminder: t.reminder,
                           frogodoroSession: t.frogodoroSession,
                         });
                       }}
@@ -329,7 +336,29 @@ export default React.memo(function BacklogTray({
           }
           setMenu(null);
         }}
+        onSchedule={onScheduleTask ? () => {
+          if (menu) {
+            const t = tasks.find(it => it.id === menu.id);
+            if (t) setScheduleDialog({ task: t });
+          }
+          setMenu(null);
+        } : undefined}
       />
+
+      {scheduleDialog && onScheduleTask && (
+        <ScheduleTaskDialog
+          open={!!scheduleDialog}
+          taskName={scheduleDialog.task.text}
+          initialStartTime={scheduleDialog.task.startTime || ''}
+          initialEndTime={scheduleDialog.task.endTime || ''}
+          initialReminder={scheduleDialog.task.reminder || ''}
+          onClose={() => setScheduleDialog(null)}
+          onSave={async (data) => {
+            await onScheduleTask(scheduleDialog.task.id, data);
+            setScheduleDialog(null);
+          }}
+        />
+      )}
 
       <TagPopup
         open={tagPopup.open}

@@ -39,6 +39,7 @@ export default function TaskBoard({
   todayDisplayIndex,
   daysOrder,
   onToggleRepeat,
+  onScheduleTask,
   onEditTask,
   onDoLater,
 }: {
@@ -68,6 +69,7 @@ export default function TaskBoard({
   todayDisplayIndex: Exclude<DisplayDay, 7>;
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>; // New Prop
   onToggleRepeat?: (taskId: string, day: DisplayDay) => Promise<void> | void;
+  onScheduleTask?: (taskId: string, data: { startTime: string; endTime: string; reminder: string }) => Promise<void> | void;
   onEditTask?: (
     day: DisplayDay,
     taskId: string,
@@ -538,6 +540,7 @@ export default function TaskBoard({
                   onToggleRepeat={onToggleRepeat}
                   onEditTask={handleEditTask}
                   onDoLater={handleDoLater}
+                  onScheduleTask={onScheduleTask}
                   isAnyDragging={!!drag?.active}
                   filter={getFilter(day)}
                   selectedTags={getSelectedTags(day)}
@@ -677,6 +680,7 @@ export default function TaskBoard({
         onEdit={(id, text) => onEditHabit?.(id, text)}
         onDelete={(id) => onDeleteHabit?.(id)}
         onEditGoal={(id, goal) => onEditHabitGoal?.(id, goal)}
+        onSchedule={(taskId, data) => onScheduleTask?.(taskId, data)}
         onAddRequested={() => {
           setHabitTrayOpen(false);
           setPageIndex(todayDisplayIndex);
@@ -726,6 +730,7 @@ export default function TaskBoard({
           calendarEventId={drag.calendarEventId}
           startTime={drag.startTime}
           endTime={drag.endTime}
+          reminder={drag.reminder}
           frogodoroSession={drag.frogodoroSession}
         />      )}
 

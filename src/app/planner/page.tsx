@@ -286,6 +286,41 @@ export default function ManageTasksPage() {
     fetchWeek();
   };
 
+  const onScheduleTask = async (
+    taskId: string,
+    data: { startTime: string; endTime: string; reminder: string },
+  ) => {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    // Optimistic Update
+    setWeek((prev) => {
+      return prev.map((col) =>
+        col.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                startTime: data.startTime || undefined,
+                endTime: data.endTime || undefined,
+                reminder: data.reminder || undefined,
+              }
+            : t,
+        ),
+      );
+    });
+
+    await fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        taskId,
+        schedule: data,
+        timezone: tz,
+      }),
+    });
+
+    fetchWeek();
+  };
+
   /** Titles in display order */
   const titles = useMemo(() => {
     const today = new Date();
@@ -360,6 +395,7 @@ export default function ManageTasksPage() {
           todayDisplayIndex={todayIdx} // Pass todayIdx as a prop
           daysOrder={processingWeekOrder} // Pass the rolling order
           onToggleRepeat={onToggleRepeat}
+          onScheduleTask={onScheduleTask}
         />
       </div>
 

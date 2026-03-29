@@ -119,7 +119,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             </button>
           )}
 
-          {onSchedule && !isHabit && (
+          {onSchedule && (
             <button
               onClick={() => {
                 onSchedule(menu.id);

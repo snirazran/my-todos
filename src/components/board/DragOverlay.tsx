@@ -1,6 +1,6 @@
 'use client';
 import Fly from '@/components/ui/fly';
-import { Repeat, RotateCcw, CalendarDays, Clock } from 'lucide-react';
+import { Repeat, RotateCcw, CalendarDays, Clock, Bell } from 'lucide-react';
 
 export default function DragOverlay({
   x,
@@ -15,6 +15,7 @@ export default function DragOverlay({
   calendarEventId,
   startTime,
   endTime,
+  reminder,
   frogodoroSession,
 }: {
   x: number;
@@ -29,6 +30,7 @@ export default function DragOverlay({
   calendarEventId?: string;
   startTime?: string;
   endTime?: string;
+  reminder?: string;
   frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null;
 }) {
   return (
@@ -51,7 +53,7 @@ export default function DragOverlay({
           <Fly size={28} x={-2} y={-2} />
         </span>
         <div className="flex-1 min-w-0 flex flex-col">
-          {(tags && tags.length > 0 || startTime) && (
+          {(tags && tags.length > 0 || startTime || reminder) && (
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
               {startTime && (
                 <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase bg-amber-500 text-white shadow-sm border border-amber-400">
@@ -60,6 +62,7 @@ export default function DragOverlay({
                     {startTime}
                     {endTime && endTime !== startTime ? ` - ${endTime}` : ''}
                   </span>
+                  {reminder && <Bell className="w-2.5 h-2.5" />}
                 </span>
               )}
               {tags?.map((tag) => (

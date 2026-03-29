@@ -4,13 +4,21 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
-import { Task, draggableIdFor, type DisplayDay, type ApiDay, apiDayFromDisplay, labelForDisplayDay } from './helpers';
+import {
+  Task,
+  draggableIdFor,
+  type DisplayDay,
+  type ApiDay,
+  apiDayFromDisplay,
+  labelForDisplayDay,
+} from './helpers';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { EditHabitDaysDialog } from '@/components/ui/EditHabitDaysDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import Fly from '@/components/ui/fly';
 import { Plus, LayoutList, ListTodo, Repeat } from 'lucide-react';
+import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
 
 export default React.memo(function TaskList({
   day,
@@ -29,6 +37,7 @@ export default React.memo(function TaskList({
   onAddRequested,
   onEditTask,
   onDoLater,
+  onScheduleTask,
   filter = 'all',
   selectedTags = [],
   showCompleted = true,
@@ -56,31 +65,63 @@ export default React.memo(function TaskList({
     calendarEventId?: string;
     startTime?: string;
     endTime?: string;
-    frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null;
+    reminder?: string;
+    frogodoroSession?: {
+      date: string;
+      completedCycles: number;
+      timeSpent: number;
+      shortBreaks?: number;
+      shortBreakTime?: number;
+      longBreaks?: number;
+      longBreakTime?: number;
+    } | null;
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
   onAddRequested: (text: string) => void;
   userTags?: { id: string; name: string; color: string }[];
   onToggleRepeat?: (taskId: string, day: DisplayDay) => void;
   isAnyDragging?: boolean;
-  onEditTask?: (day: DisplayDay, taskId: string, newText: string) => Promise<void>;
+  onEditTask?: (
+    day: DisplayDay,
+    taskId: string,
+    newText: string,
+  ) => Promise<void>;
   onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
+  onScheduleTask?: (
+    taskId: string,
+    data: { startTime: string; endTime: string; reminder: string },
+  ) => Promise<void> | void;
   filter?: 'all' | 'tasks' | 'habits';
   selectedTags?: string[];
   showCompleted?: boolean;
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
 }) {
-  const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
-  const [dialog, setDialog] = useState<{ task: Task; day: DisplayDay; kind?: 'edit' | 'editDays' } | null>(null);
+  const [menu, setMenu] = useState<{
+    id: string;
+    top: number;
+    left: number;
+  } | null>(null);
+  const [dialog, setDialog] = useState<{
+    task: Task;
+    day: DisplayDay;
+    kind?: 'edit' | 'editDays';
+  } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const [tagPopup, setTagPopup] = useState<{ open: boolean; taskId: string | null }>({ open: false, taskId: null });
+  const [tagPopup, setTagPopup] = useState<{
+    open: boolean;
+    taskId: string | null;
+  }>({ open: false, taskId: null });
+  const [scheduleDialog, setScheduleDialog] = useState<{ task: Task } | null>(
+    null,
+  );
 
   const placeholderAt =
     isDragging && targetDay === day && targetIndex != null ? targetIndex : null;
 
   const isSelfDrag = isDragging && dragFromDay === day;
-  const sourceIndex = isSelfDrag && dragFromIndex != null ? dragFromIndex : null;
+  const sourceIndex =
+    isSelfDrag && dragFromIndex != null ? dragFromIndex : null;
 
   const variantFor = (t: Task): 'regular' | 'weekly' | 'backlog' | 'habit' => {
     if (t.type === 'habit') return 'habit';
@@ -96,7 +137,11 @@ export default React.memo(function TaskList({
     const apiDay = apiDayFromDisplay(displayDay, daysOrder);
     if (apiDay === -1) return null;
     const base = new Date();
-    const sunday = new Date(base.getFullYear(), base.getMonth(), base.getDate());
+    const sunday = new Date(
+      base.getFullYear(),
+      base.getMonth(),
+      base.getDate(),
+    );
     sunday.setDate(base.getDate() - base.getDay());
     const target = new Date(sunday);
     target.setDate(sunday.getDate() + apiDay);
@@ -153,7 +198,7 @@ export default React.memo(function TaskList({
 
       window.dispatchEvent(new Event('tags-updated'));
     } catch (e) {
-      console.error("Failed to update tags", e);
+      console.error('Failed to update tags', e);
     }
   };
 
@@ -174,12 +219,12 @@ export default React.memo(function TaskList({
     />
   );
 
-  const filteredItems = items.filter(t => {
+  const filteredItems = items.filter((t) => {
     if (filter === 'tasks' && t.type === 'habit') return false;
     if (filter === 'habits' && t.type !== 'habit') return false;
     if (!showCompleted && t.completed) return false;
     if (selectedTags && selectedTags.length > 0) {
-      const hasTag = t.tags?.some(tagId => selectedTags.includes(tagId));
+      const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));
       if (!hasTag) return false;
     }
     return true;
@@ -195,15 +240,15 @@ export default React.memo(function TaskList({
         <button
           key={`empty-state-${day}`}
           onClick={() => onAddRequested('')}
-          className="w-full flex flex-col items-center justify-center py-4 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+          className="flex flex-col items-center justify-center w-full py-4 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl group"
         >
           <div className="flex items-center justify-center w-10 h-10 mb-2 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
             <Fly size={20} y={-2} />
           </div>
-          <p className="text-xs font-bold text-muted-foreground group-hover:text-primary transition-colors">
+          <p className="text-xs font-bold transition-colors text-muted-foreground group-hover:text-primary">
             Add a task
           </p>
-        </button>
+        </button>,
       );
     }
     return <>{rows}</>;
@@ -225,7 +270,7 @@ export default React.memo(function TaskList({
     if (filter === 'habits' && t.type !== 'habit') continue;
     if (!showCompleted && t.completed) continue;
     if (selectedTags && selectedTags.length > 0) {
-      const hasTag = t.tags?.some(tagId => selectedTags.includes(tagId));
+      const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));
       if (!hasTag) continue;
     }
 
@@ -251,8 +296,10 @@ export default React.memo(function TaskList({
                 const MENU_H = 60;
                 const GAP = 8;
                 const MARGIN = 10;
-                const vw = typeof window !== 'undefined' ? window.innerWidth : 480;
-                const vh = typeof window !== 'undefined' ? window.innerHeight : 800;
+                const vw =
+                  typeof window !== 'undefined' ? window.innerWidth : 480;
+                const vh =
+                  typeof window !== 'undefined' ? window.innerHeight : 800;
                 let left = rect.left + rect.width / 2 - MENU_W / 2;
                 left = Math.max(MARGIN, Math.min(left, vw - MENU_W - MARGIN));
                 let top = rect.bottom + GAP;
@@ -266,8 +313,10 @@ export default React.memo(function TaskList({
             onGrab={(payload) => {
               const id = draggableIdFor(day, t.id);
               // Resolve tags
-              const resolvedTags = t.tags?.map(tagId => {
-                const found = userTags?.find(ut => ut.id === tagId || ut.name === tagId);
+              const resolvedTags = t.tags?.map((tagId) => {
+                const found = userTags?.find(
+                  (ut) => ut.id === tagId || ut.name === tagId,
+                );
                 return found || { id: tagId, name: tagId, color: '' };
               });
 
@@ -283,7 +332,7 @@ export default React.memo(function TaskList({
                 rectGetter: () => {
                   const el =
                     document.querySelector<HTMLElement>(
-                      `[data-card-id="${id}"]`
+                      `[data-card-id="${id}"]`,
                     ) ?? null;
                   return (
                     el?.getBoundingClientRect() ??
@@ -294,6 +343,7 @@ export default React.memo(function TaskList({
                 calendarEventId: t.calendarEventId,
                 startTime: t.startTime,
                 endTime: t.endTime,
+                reminder: t.reminder,
                 frogodoroSession: t.frogodoroSession,
               });
             }}
@@ -302,7 +352,7 @@ export default React.memo(function TaskList({
             userTags={userTags}
             isAnyDragging={isAnyDragging}
           />
-        </div>
+        </div>,
       );
 
       if (placeholderAt === visibleIndex + 1) {
@@ -321,9 +371,22 @@ export default React.memo(function TaskList({
         onClose={() => setMenu(null)}
         onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
         addTagsPosition="second"
-        isHabit={menu ? items.find((t) => t.id === menu.id)?.type === 'habit' : false}
-        onToggleRepeat={onToggleRepeat ? () => { if (menu) { onToggleRepeat(menu.id, day); setMenu(null); } } : undefined}
-        isWeekly={menu ? items.find((t) => t.id === menu.id)?.type === 'weekly' : false}
+        isHabit={
+          menu ? items.find((t) => t.id === menu.id)?.type === 'habit' : false
+        }
+        onToggleRepeat={
+          onToggleRepeat
+            ? () => {
+                if (menu) {
+                  onToggleRepeat(menu.id, day);
+                  setMenu(null);
+                }
+              }
+            : undefined
+        }
+        isWeekly={
+          menu ? items.find((t) => t.id === menu.id)?.type === 'weekly' : false
+        }
         onDelete={() => {
           if (menu) {
             const t = items.find((it) => it.id === menu.id);
@@ -340,12 +403,16 @@ export default React.memo(function TaskList({
           }
           setMenu(null);
         }}
-        onDoLater={onDoLater ? () => {
-          if (menu && onDoLater) {
-            onDoLater(day, menu.id);
-            setMenu(null);
-          }
-        } : undefined}
+        onDoLater={
+          onDoLater
+            ? () => {
+                if (menu && onDoLater) {
+                  onDoLater(day, menu.id);
+                  setMenu(null);
+                }
+              }
+            : undefined
+        }
         onChangeDays={() => {
           if (menu) {
             const t = items.find((it) => it.id === menu.id);
@@ -353,14 +420,40 @@ export default React.memo(function TaskList({
           }
           setMenu(null);
         }}
+        onSchedule={
+          onScheduleTask
+            ? () => {
+                if (menu) {
+                  const t = items.find((it) => it.id === menu.id);
+                  if (t) setScheduleDialog({ task: t });
+                }
+                setMenu(null);
+              }
+            : undefined
+        }
       />
       <TagPopup
         open={tagPopup.open}
         taskId={tagPopup.taskId}
-        initialTags={items.find(t => t.id === tagPopup.taskId)?.tags}
+        initialTags={items.find((t) => t.id === tagPopup.taskId)?.tags}
         onClose={() => setTagPopup({ open: false, taskId: null })}
         onSave={handleTagSave}
       />
+
+      {scheduleDialog && onScheduleTask && (
+        <ScheduleTaskDialog
+          open={!!scheduleDialog}
+          taskName={scheduleDialog.task.text}
+          initialStartTime={scheduleDialog.task.startTime || ''}
+          initialEndTime={scheduleDialog.task.endTime || ''}
+          initialReminder={scheduleDialog.task.reminder || ''}
+          onClose={() => setScheduleDialog(null)}
+          onSave={async (data) => {
+            await onScheduleTask(scheduleDialog.task.id, data);
+            setScheduleDialog(null);
+          }}
+        />
+      )}
 
       {dialog && dialog.kind === 'edit' && onEditTask && (
         <EditTaskDialog
@@ -381,7 +474,14 @@ export default React.memo(function TaskList({
         open={!!dialog && dialog.kind !== 'edit' && dialog.kind !== 'editDays'}
         variant={dialogVariant}
         itemLabel={dialog?.task.text}
-        dayLabel={dialog && dialog.day < 7 ? labelForDisplayDay(dialog.day as Exclude<DisplayDay, 7>, daysOrder) : undefined}
+        dayLabel={
+          dialog && dialog.day < 7
+            ? labelForDisplayDay(
+                dialog.day as Exclude<DisplayDay, 7>,
+                daysOrder,
+              )
+            : undefined
+        }
         busy={busy}
         onClose={() => setDialog(null)}
         onDeleteToday={
@@ -396,7 +496,10 @@ export default React.memo(function TaskList({
         }
         onEditDays={
           dialogVariant === 'habit'
-            ? () => setDialog((prev) => prev ? { ...prev, kind: 'editDays' } : prev)
+            ? () =>
+                setDialog((prev) =>
+                  prev ? { ...prev, kind: 'editDays' } : prev,
+                )
             : undefined
         }
       />
@@ -415,7 +518,10 @@ export default React.memo(function TaskList({
               await fetch('/api/tasks', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ taskId: dialog.task.id, timesPerWeek: newGoal }),
+                body: JSON.stringify({
+                  taskId: dialog.task.id,
+                  timesPerWeek: newGoal,
+                }),
               });
               window.dispatchEvent(new Event('board-refresh'));
             } finally {

@@ -9,6 +9,7 @@ import {
   CalendarClock,
   CalendarDays,
   Clock,
+  Bell,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
@@ -234,7 +235,7 @@ export default function TaskCard({
         <div
           className={`flex-1 min-w-0 flex flex-col ${task.completed ? 'opacity-60' : ''}`}
         >
-          {( (task.tags && task.tags.length > 0) || task.startTime ) && (
+          {( (task.tags && task.tags.length > 0) || task.startTime || task.reminder ) && (
             <div className="mb-2 flex flex-wrap items-center gap-1.5">
               <AnimatePresence mode="popLayout">
                 {task.startTime && (
@@ -250,6 +251,7 @@ export default function TaskCard({
                       {task.startTime}
                       {task.endTime && task.endTime !== task.startTime ? ` - ${task.endTime}` : ''}
                     </span>
+                    {task.reminder && <Bell className="w-2.5 h-2.5" />}
                   </motion.span>
                 )}
                 {task.tags?.map((tagId) => {

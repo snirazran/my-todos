@@ -37,6 +37,8 @@ import {
   EllipsisVertical,
   CalendarCheck,
   Flame,
+  Clock,
+  Bell,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { Task } from '@/hooks/useTaskData';
@@ -45,6 +47,7 @@ import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { EditHabitDaysDialog } from '@/components/ui/EditHabitDaysDialog';
 import TaskMenu from '@/components/board/TaskMenu';
 import TagPopup from '@/components/ui/TagPopup';
+import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
 
 type SavedTag = {
   id: string;
@@ -57,6 +60,7 @@ interface HabitPanelProps {
   onToggle: (id: string) => void;
   onEdit: (id: string, text: string) => void;
   onDelete: (id: string) => void;
+  onSchedule?: (taskId: string, data: { startTime: string; endTime: string; reminder: string }) => void;
   tags: SavedTag[];
   flyRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
   showCompleted: boolean;
@@ -73,6 +77,7 @@ export function HabitPanel({
   onToggle,
   onEdit,
   onDelete,
+  onSchedule,
   tags,
   flyRefs,
   showCompleted,
@@ -93,6 +98,7 @@ export function HabitPanel({
     left: number;
   } | null>(null);
   const [tagPopupId, setTagPopupId] = React.useState<string | null>(null);
+  const [scheduleDialog, setScheduleDialog] = React.useState<{ task: Task } | null>(null);
 
   const [isAnyDragging, setIsAnyDragging] = React.useState(false);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -434,6 +440,11 @@ export function HabitPanel({
           setTagPopupId(id);
           setMenu(null);
         }}
+        onSchedule={() => {
+          const h = habits.find((h) => h.id === menu?.id) ?? null;
+          if (h) setScheduleDialog({ task: h });
+          setMenu(null);
+        }}
         onChangeDays={() => {
           const h = habits.find((h) => h.id === menu?.id) ?? null;
           if (h) setEditingDaysHabit(h);
@@ -445,6 +456,21 @@ export function HabitPanel({
           setMenu(null);
         }}
       />
+
+      {scheduleDialog && onSchedule && (
+        <ScheduleTaskDialog
+          open={!!scheduleDialog}
+          taskName={scheduleDialog.task.text}
+          initialStartTime={scheduleDialog.task.startTime || ''}
+          initialEndTime={scheduleDialog.task.endTime || ''}
+          initialReminder={scheduleDialog.task.reminder || ''}
+          onClose={() => setScheduleDialog(null)}
+          onSave={async (data) => {
+            await onSchedule(scheduleDialog.task.id, data);
+            setScheduleDialog(null);
+          }}
+        />
+      )}
 
       <TagPopup
         open={!!tagPopupId}
@@ -828,26 +854,48 @@ function HabitItem({
 
           {/* Text & Tags & Goal Tracker */}
           <div className="flex-1 min-w-0 overflow-hidden">
-            {/* Tags */}
-            {habit.tags && habit.tags.length > 0 && (
+            {/* Tags & Time */}
+            {( (habit.tags && habit.tags.length > 0) || habit.startTime ) && (
               <div className="flex flex-wrap gap-1 mb-1">
-                {habit.tags.map((tagId) => {
-                  const tag = tags.find((t) => t.id === tagId);
-                  if (!tag) return null;
-                  return (
-                    <span
-                      key={tagId}
-                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border shadow-sm"
-                      style={{
-                        backgroundColor: `${tag.color}20`,
-                        color: tag.color,
-                        borderColor: `${tag.color}40`,
-                      }}
+                <AnimatePresence mode="popLayout">
+                  {habit.startTime && (
+                    <motion.span
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0 }}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-500/20 shadow-sm"
+                      key="task-time-tag"
                     >
-                      {tag.name}
-                    </span>
-                  );
-                })}
+                      <Clock className="w-2.5 h-2.5" />
+                      <span>
+                        {habit.startTime}
+                        {habit.endTime && habit.endTime !== habit.startTime ? ` - ${habit.endTime}` : ''}
+                      </span>
+                      {habit.reminder && <Bell className="w-2.5 h-2.5" />}
+                    </motion.span>
+                  )}
+                  {habit.tags?.map((tagId) => {
+                    const tag = tags.find((t) => t.id === tagId);
+                    if (!tag) return null;
+                    return (
+                      <motion.span
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0 }}
+                        transition={{ duration: 0.2 }}
+                        key={tagId}
+                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border shadow-sm"
+                        style={{
+                          backgroundColor: `${tag.color}20`,
+                          color: tag.color,
+                          borderColor: `${tag.color}40`,
+                        }}
+                      >
+                        {tag.name}
+                      </motion.span>
+                    );
+                  })}
+                </AnimatePresence>
               </div>
             )}
             <span

@@ -20,6 +20,7 @@ export type DragState = {
   calendarEventId?: string;
   startTime?: string;
   endTime?: string;
+  reminder?: string;
   frogodoroSession?: {
     date: string;
     completedCycles: number;
@@ -142,6 +143,7 @@ export function useDragManager() {
       calendarEventId?: string,
       startTime?: string,
       endTime?: string,
+      reminder?: string,
       frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null
     ) => {
       document.body.style.userSelect = 'none';
@@ -178,6 +180,7 @@ export function useDragManager() {
         calendarEventId,
         startTime,
         endTime,
+        reminder,
         frogodoroSession,
       });
       setTargetDay(day);
@@ -200,19 +203,20 @@ export function useDragManager() {
       calendarEventId?: string;
       startTime?: string;
       endTime?: string;
+      reminder?: string;
       frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null;
     }) => {
       const {
         day, index, taskId, taskText, taskType,
         clientX, clientY, rectGetter, tags,
-        calendarEventId, startTime, endTime, frogodoroSession
+        calendarEventId, startTime, endTime, reminder, frogodoroSession
       } = params;
 
       const rect = rectGetter();
       beginDragFromCard(
         day, index, taskId, taskText, taskType,
         clientX, clientY, rect, tags,
-        calendarEventId, startTime, endTime, frogodoroSession
+        calendarEventId, startTime, endTime, reminder, frogodoroSession
       );
     },
     [beginDragFromCard]

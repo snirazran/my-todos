@@ -1,12 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useMotionValue, animate, PanInfo } from 'framer-motion';
-import { CalendarClock, CheckCircle2, EllipsisVertical } from 'lucide-react';
+import { CalendarClock, CheckCircle2, EllipsisVertical, Clock, Bell } from 'lucide-react';
 import { Task } from './helpers';
 import TaskMenu from './TaskMenu';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { EditHabitDaysDialog } from '@/components/ui/EditHabitDaysDialog';
 import TagPopup from '@/components/ui/TagPopup';
+import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import { SideOpenTray } from '@/components/ui/SideOpenTray';
@@ -19,6 +20,7 @@ interface Props {
   onEdit: (id: string, newText: string) => void;
   onDelete: (id: string) => void;
   onEditGoal: (id: string, newGoal: number) => void;
+  onSchedule?: (taskId: string, data: { startTime: string; endTime: string; reminder: string }) => void;
   onAddRequested: () => void;
   userTags?: { id: string; name: string; color: string }[];
   date: string;
@@ -32,6 +34,7 @@ export default React.memo(function HabitTray({
   onEdit,
   onDelete,
   onEditGoal,
+  onSchedule,
   onAddRequested,
   userTags = [],
   date,
@@ -45,6 +48,7 @@ export default React.memo(function HabitTray({
   const [confirmItem, setConfirmItem] = useState<Task | null>(null);
   const [editItem, setEditItem] = useState<Task | null>(null);
   const [editGoalItem, setEditGoalItem] = useState<Task | null>(null);
+  const [scheduleDialog, setScheduleDialog] = useState<{ task: Task } | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [tagPopup, setTagPopup] = useState<{
@@ -123,6 +127,11 @@ export default React.memo(function HabitTray({
         isHabit
         addTagsPosition="first"
         onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
+        onSchedule={() => {
+          const h = habits.find((h) => h.id === menu?.id);
+          if (h) setScheduleDialog({ task: h });
+          setMenu(null);
+        }}
         onChangeDays={() => {
           const h = habits.find((h) => h.id === menu?.id);
           if (h) setEditGoalItem(h);
@@ -141,6 +150,23 @@ export default React.memo(function HabitTray({
           setMenu(null);
         }}
       />
+
+      {scheduleDialog && onSchedule && (
+        <ScheduleTaskDialog
+          open={!!scheduleDialog}
+          taskName={scheduleDialog.task.text}
+          initialStartTime={scheduleDialog.task.startTime || ''}
+          initialEndTime={scheduleDialog.task.endTime || ''}
+          initialReminder={scheduleDialog.task.reminder || ''}
+          onClose={() => setScheduleDialog(null)}
+          onSave={async (data) => {
+            setBusy(true);
+            await onSchedule(scheduleDialog.task.id, data);
+            setBusy(false);
+            setScheduleDialog(null);
+          }}
+        />
+      )}
 
       <TagPopup
         open={tagPopup.open}
@@ -298,9 +324,19 @@ function HabitTrayItem({
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          {habit.tags && habit.tags.length > 0 && (
+          {( (habit.tags && habit.tags.length > 0) || habit.startTime ) && (
             <div className="flex flex-wrap gap-1 mb-1">
-              {habit.tags.map((tagId) => {
+              {habit.startTime && (
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-500/20 shadow-sm">
+                  <Clock className="w-2.5 h-2.5" />
+                  <span>
+                    {habit.startTime}
+                    {habit.endTime && habit.endTime !== habit.startTime ? ` - ${habit.endTime}` : ''}
+                  </span>
+                  {habit.reminder && <Bell className="w-2.5 h-2.5" />}
+                </span>
+              )}
+              {habit.tags?.map((tagId) => {
                 const tag = tags.find((t) => t.id === tagId);
                 if (!tag) return null;
                 return (

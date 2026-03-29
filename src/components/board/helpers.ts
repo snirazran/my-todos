@@ -23,6 +23,7 @@ export type Task = {
   calendarEventId?: string;
   startTime?: string;
   endTime?: string;
+  reminder?: string;
 };
 
 // Display has 7 weekday columns + 1 “Later” column at index 7

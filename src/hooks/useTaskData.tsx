@@ -35,6 +35,10 @@ export interface Task {
     longBreaks?: number;
     longBreakTime?: number;
   } | null;
+  calendarEventId?: string;
+  startTime?: string;
+  endTime?: string;
+  reminder?: string;
 }
 
 export type FlyStatus = {

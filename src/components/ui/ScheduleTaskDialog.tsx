@@ -274,7 +274,17 @@ export function ScheduleTaskDialog({
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setActiveField(activeField === 'start' ? null : 'start')}
+              onClick={() => {
+                if (!startTime) {
+                  const now = new Date();
+                  const h = now.getHours();
+                  const m = Math.round(now.getMinutes() / 5) * 5;
+                  const finalH = m === 60 ? (h + 1) % 24 : h;
+                  const finalM = m === 60 ? 0 : m;
+                  setStartTime(`${pad(finalH)}:${pad(finalM)}`);
+                }
+                setActiveField(activeField === 'start' ? null : 'start');
+              }}
               className={`flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all ${
                 activeField === 'start'
                   ? 'bg-primary/10 dark:bg-primary/20 ring-2 ring-primary/40'

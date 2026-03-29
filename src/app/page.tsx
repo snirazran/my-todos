@@ -553,6 +553,13 @@ export default function Home() {
                         }
                         deleteTask(id, true);
                       }}
+                      onSchedule={(id, data) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        scheduleTask(id, data);
+                      }}
                       onAddRequested={(prefill, isHabit) => {
                         if (!user) {
                           router.push('/login');
