@@ -285,17 +285,7 @@ function RightActions({
         className="hidden md:flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border border-border/50 bg-background hover:bg-accent/50 transition-all group"
       >
         <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm group-hover:shadow-md transition-all">
-          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm group-hover:shadow-md transition-all">
-            {user.photoURL ? (
-              <img
-                src={user.photoURL}
-                alt="User"
-                className="w-full h-full rounded-full object-cover"
-              />
-            ) : (
-              <span>{user.displayName?.[0] || 'U'}</span>
-            )}
-          </div>
+          <span>{user.displayName?.[0] || 'U'}</span>
         </div>
         <div
           className={`mr-2 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
@@ -502,15 +492,7 @@ function MobileSheet({
             {showAuth && user && (
               <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm text-lg">
-                  {user.photoURL ? (
-                    <img
-                      src={user.photoURL}
-                      alt="User"
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <span>{user.displayName?.[0] || 'U'}</span>
-                  )}
+                  <span>{user.displayName?.[0] || 'U'}</span>
                 </div>
                 <div className="min-w-0">
                   <p className="font-bold text-sm truncate">
