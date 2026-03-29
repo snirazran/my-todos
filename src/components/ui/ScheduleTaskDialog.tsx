@@ -37,36 +37,51 @@ function ScrollColumn({
   formatLabel?: (v: number) => string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const isUserScroll = useRef(true);
+  const isUpdatingRef = useRef(false);
   const label = formatLabel || pad;
 
-  // scroll to selected value on mount / when value changes externally
+  // Sync scroll position when value changes externally
   useEffect(() => {
     const el = ref.current;
-    if (!el) return;
+    if (!el || isUpdatingRef.current) return;
+    
     const idx = items.indexOf(value);
     if (idx < 0) return;
-    isUserScroll.current = false;
-    el.scrollTo({ top: idx * ITEM_H, behavior: 'smooth' });
-    // re-enable user scroll detection after animation
-    const t = setTimeout(() => {
-      isUserScroll.current = true;
-    }, 300);
-    return () => clearTimeout(t);
+
+    // Use a small timeout to ensure DOM is ready and prevent scroll-fight
+    const timeout = setTimeout(() => {
+      el.scrollTo({
+        top: idx * ITEM_H,
+        behavior: 'smooth'
+      });
+    }, 10);
+    return () => clearTimeout(timeout);
   }, [value, items]);
 
   const handleScroll = useCallback(() => {
     const el = ref.current;
-    if (!el || !isUserScroll.current) return;
+    if (!el) return;
+
+    // Calculate which item is at the center
     const idx = Math.round(el.scrollTop / ITEM_H);
     const clamped = Math.max(0, Math.min(idx, items.length - 1));
-    if (items[clamped] !== value) onChange(items[clamped]);
+    const newValue = items[clamped];
+
+    if (newValue !== value) {
+      isUpdatingRef.current = true;
+      onChange(newValue);
+      // Reset the flag after a short delay to allow smooth sync
+      setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 50);
+    }
   }, [items, value, onChange]);
 
   return (
-    <div className="relative h-[120px] w-[72px] overflow-hidden">
+    <div className="relative h-[120px] w-[72px] overflow-hidden select-none touch-none">
       {/* highlight band for the centre slot */}
       <div className="pointer-events-none absolute inset-x-0 top-[40px] h-[40px] rounded-lg bg-primary/10 dark:bg-primary/20 z-10" />
+      
       {/* fade edges */}
       <div className="pointer-events-none absolute inset-x-0 top-0 h-[40px] bg-gradient-to-b from-white dark:from-slate-900 to-transparent z-20" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[40px] bg-gradient-to-t from-white dark:from-slate-900 to-transparent z-20" />
@@ -74,25 +89,37 @@ function ScrollColumn({
       <div
         ref={ref}
         onScroll={handleScroll}
-        className="h-full overflow-y-auto snap-y snap-mandatory no-scrollbar"
-        style={{ scrollSnapType: 'y mandatory', paddingTop: ITEM_H, paddingBottom: ITEM_H }}
+        className="h-full overflow-y-auto overflow-x-hidden snap-y snap-mandatory no-scrollbar overscroll-none"
+        style={{ 
+          scrollSnapType: 'y mandatory', 
+          paddingTop: ITEM_H, 
+          paddingBottom: ITEM_H,
+          touchAction: 'pan-y' 
+        }}
       >
         {items.map((item) => {
           const active = item === value;
           return (
-            <button
+            <div
               key={item}
-              type="button"
-              onClick={() => onChange(item)}
               style={{ height: ITEM_H, scrollSnapAlign: 'center' }}
-              className={`w-full flex items-center justify-center text-base transition-all select-none ${
-                active
-                  ? 'font-black text-primary scale-110'
-                  : 'font-medium text-slate-400 dark:text-slate-500'
-              }`}
+              className="w-full flex items-center justify-center snap-center"
             >
-              {label(item)}
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onChange(item);
+                  ref.current?.scrollTo({ top: items.indexOf(item) * ITEM_H, behavior: 'smooth' });
+                }}
+                className={`w-full h-full flex items-center justify-center text-base transition-all duration-200 ${
+                  active
+                    ? 'font-black text-primary scale-110'
+                    : 'font-medium text-slate-400 dark:text-slate-500 hover:text-slate-600'
+                }`}
+              >
+                {label(item)}
+              </button>
+            </div>
           );
         })}
       </div>
