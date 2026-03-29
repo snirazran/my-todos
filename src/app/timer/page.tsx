@@ -368,6 +368,27 @@ export default function FrogodoroPage() {
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.completed) return;
 
+    // Capture timer state before pausing (values are from current render)
+    const wasRunning = selectedTaskId === taskId && isRunning;
+    const hadFocusTime = selectedTaskId === taskId && phase === 'focus' && liveElapsed > 0;
+
+    // Stop the timer — GlobalTimer's pause-detection saves timeSpent with completedCycles: 0
+    if (wasRunning) {
+      pauseTimer();
+    }
+
+    // If there's in-progress focus time, GlobalTimer's pause handler saved the time
+    // with completedCycles: 0. Add the cycle count and revalidate the cache so
+    // toggleTask's optimistic update picks up fresh data.
+    if (hadFocusTime) {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      fetch(`/api/tasks/${taskId}/frogodoro`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: { date: today, completedCycles: 1, timeSpent: 0 } }),
+      }).then(() => mutateToday()).catch(() => {});
+    }
+
     await triggerTongue({
       key: taskId,
       completed: true,
@@ -376,6 +397,11 @@ export default function FrogodoroPage() {
         // The 3-second disappearance is handled in the useEffect below
       },
     });
+
+    // Revalidate after everything to ensure homepage sees correct session data
+    if (hadFocusTime) {
+      mutateToday();
+    }
   };
 
   // Handle 3-second disappearance of completed selected task
@@ -459,7 +485,7 @@ export default function FrogodoroPage() {
   }
 
   return (
-    <main className="flex flex-col pt-6 transition-colors duration-500 md:pt-10">
+    <main className="flex flex-col min-h-screen pt-6 pb-24 transition-colors duration-500 bg-background md:pt-10 md:pb-12">
       <div className="w-full px-4 pb-8 mx-auto max-w-7xl md:px-8">
         <div className="relative grid items-start grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-8">
           {/* LEFT: FROG DISPLAY */}
@@ -496,7 +522,7 @@ export default function FrogodoroPage() {
           <div className="flex flex-col w-full max-w-2xl gap-4 mx-auto lg:col-span-8 lg:gap-6">
             {/* TIMER CARD */}
             <div
-              className={`px-4 py-4 md:px-6 md:py-5 lg:px-10 lg:py-8 rounded-[28px] md:rounded-[32px] shadow-2xl transition-colors duration-500 ${getPhaseColor()} relative overflow-hidden backdrop-blur-sm group`}
+              className={`px-4 py-4 md:px-6 md:py-5 lg:px-10 lg:py-8 rounded-[20px] md:rounded-[28px] shadow-lg transition-colors duration-500 ${getPhaseColor()} relative overflow-hidden backdrop-blur-sm group`}
             >
               {/* Top Phase Selector */}
               <div className="relative flex flex-wrap items-center justify-center gap-1 mb-5 md:gap-2 md:mb-6 lg:mb-12 sm:flex-nowrap">
@@ -577,7 +603,7 @@ export default function FrogodoroPage() {
                   className="relative z-20 w-full max-w-sm mx-auto"
                   style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
                 >
-                  <div className="bg-card border border-border/60 shadow-lg rounded-[28px] overflow-hidden">
+                  <div className="bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm rounded-[20px] overflow-hidden">
                     {/* Task Header */}
                     <div
                       className="flex items-center gap-3 p-4 pb-3 cursor-pointer group"
@@ -736,7 +762,7 @@ export default function FrogodoroPage() {
                 <div className="relative z-20 w-full max-w-sm mx-auto">
                   <button
                     onClick={() => setShowTaskDropdown(true)}
-                    className="w-full bg-card border border-border/60 shadow-lg rounded-[28px] p-4 flex items-center gap-3 cursor-pointer hover:border-primary/40 transition-all active:scale-[0.98] group"
+                    className="w-full bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm rounded-[20px] p-4 flex items-center gap-3 cursor-pointer hover:border-primary/40 transition-all active:scale-[0.98] group"
                   >
                     <div className="flex items-center justify-center flex-shrink-0 w-10 h-10 transition-colors rounded-full bg-primary/10 group-hover:bg-primary/15">
                       <Fly size={24} y={-2} />
@@ -766,7 +792,7 @@ export default function FrogodoroPage() {
                       initial={{ opacity: 0, scale: 0.95, y: 20 }}
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                      className="w-full sm:max-w-lg bg-card sm:border sm:rounded-[32px] rounded-t-[32px] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 shadow-2xl text-left relative z-10"
+                      className="w-full sm:max-w-lg bg-card sm:border sm:rounded-[28px] rounded-t-[28px] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 shadow-2xl text-left relative z-10"
                     >
                       {/* Header */}
                       <div className="flex items-center justify-between mb-6">
@@ -932,7 +958,7 @@ export default function FrogodoroPage() {
                         damping: 25,
                         stiffness: 300,
                       }}
-                      className="w-full sm:max-w-lg bg-card sm:border sm:rounded-[32px] rounded-t-[32px] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 shadow-2xl text-left max-h-[90vh] overflow-y-auto overscroll-y-contain relative z-10 scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+                      className="w-full sm:max-w-lg bg-card sm:border sm:rounded-[28px] rounded-t-[28px] p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 shadow-2xl text-left max-h-[90vh] overflow-y-auto overscroll-y-contain relative z-10 scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
                     >
                       {/* Header */}
                       <div className="flex items-center justify-between mb-7">
@@ -1334,7 +1360,7 @@ export default function FrogodoroPage() {
                           setShowTaskDropdown(false);
                         }
                       }}
-                      className="w-full sm:max-w-md bg-card border border-border/60 rounded-t-[32px] sm:rounded-[28px] shadow-2xl pointer-events-auto relative z-10 max-h-[85vh] flex flex-col overflow-hidden"
+                      className="w-full sm:max-w-md bg-card border border-border/50 rounded-t-[28px] sm:rounded-[28px] shadow-2xl pointer-events-auto relative z-10 max-h-[85vh] flex flex-col overflow-hidden"
                     >
                       {/* Drag Handle */}
                       <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full sm:hidden z-10" />
@@ -1460,7 +1486,7 @@ export default function FrogodoroPage() {
                             </button>
                           ))}
                         </div>
-                        {availableTasks.length === 0 && (
+                        {availableTasks.length === 0 ? (
                           <button
                             onClick={() => {
                               setShowTaskDropdown(false);
@@ -1479,6 +1505,21 @@ export default function FrogodoroPage() {
                             <p className="text-[11px] font-bold text-muted-foreground/50 mt-1">
                               Tap to add a new task
                             </p>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => {
+                              setShowTaskDropdown(false);
+                              setShowQuickAdd(true);
+                            }}
+                            className="w-full text-left p-3.5 flex items-center gap-3 rounded-2xl transition-all active:scale-[0.98] border border-dashed border-muted-foreground/20 hover:bg-muted/30 mt-1.5"
+                          >
+                            <div className="flex items-center justify-center flex-shrink-0 rounded-full w-9 h-9 bg-muted/50">
+                              <Plus className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                            <span className="flex items-center gap-1.5 text-sm font-bold text-muted-foreground">
+                              Add a <Fly size={22} y={-2} />
+                            </span>
                           </button>
                         )}
                       </div>

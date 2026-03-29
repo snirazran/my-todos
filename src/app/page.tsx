@@ -169,7 +169,7 @@ export default function Home() {
   }, [user]);
 
   // Live frogodoro session stats for the active task
-  const { selectedTaskId: frogTaskId, sessionStats, settings: frogSettings, phase: frogPhase, timeLeft: frogTimeLeft, isRunning: frogRunning } = useFrogodoroStore();
+  const { selectedTaskId: frogTaskId, sessionStats, settings: frogSettings, phase: frogPhase, timeLeft: frogTimeLeft, isRunning: frogRunning, pauseTimer: frogPauseTimer } = useFrogodoroStore();
   const frogPhaseDuration = frogPhase === 'focus'
     ? frogSettings.cycleDuration * 60
     : frogPhase === 'shortBreak'
@@ -249,6 +249,23 @@ export default function Home() {
       if (user) toggleTask(taskId, false);
       else persistGuestTask(taskId, false);
       return;
+    }
+
+    // If this task has an active timer running, stop it and save the session
+    if (frogTaskId === taskId && frogRunning) {
+      frogPauseTimer();
+      // pauseTimer triggers GlobalTimer's pause-detection effect which saves elapsed time to DB
+    }
+
+    // If there's in-progress focus time, the pause handler only saved time (completedCycles: 0).
+    // Count it as a completed cycle in the DB.
+    if (frogTaskId === taskId && frogPhase === 'focus' && frogLiveElapsed > 0) {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      fetch(`/api/tasks/${taskId}/frogodoro`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: { date: today, completedCycles: 1, timeSpent: 0 } }),
+      }).then(() => mutateToday()).catch(() => {});
     }
 
     await triggerTongue({
