@@ -758,6 +758,34 @@ export function useTaskData() {
     [backlogData, todayData, tasks, mutateBacklog, mutateToday, tz],
   );
 
+  const scheduleTask = useCallback(
+    async (taskId: string, data: { startTime: string; endTime: string; reminder: string }) => {
+      const prevToday = todayData;
+
+      // Optimistic update
+      if (todayData) {
+        const updated = todayData.tasks.map((t) =>
+          t.id === taskId
+            ? { ...t, startTime: data.startTime || undefined, endTime: data.endTime || undefined, reminder: data.reminder || undefined }
+            : t,
+        );
+        mutateToday({ ...todayData, tasks: updated }, { revalidate: false });
+      }
+
+      try {
+        await fetch('/api/tasks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, schedule: data, timezone: tz }),
+        });
+      } catch (e) {
+        console.error('Schedule failed', e);
+        if (prevToday) mutateToday(prevToday, { revalidate: false });
+      }
+    },
+    [todayData, mutateToday, tz],
+  );
+
   const { data: tagsData, mutate: mutateTags } = useSWR<{
     tags: { id: string; name: string; color: string }[];
   }>('/api/tags', fetcher, {
@@ -788,6 +816,7 @@ export function useTaskData() {
     deleteTask,
     reorderTasks,
     editTask,
+    scheduleTask,
     toggleRepeat,
   };
 }

@@ -13,6 +13,7 @@ import {
   Check,
   CalendarDays,
   Clock,
+  Bell,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import {
@@ -55,6 +56,7 @@ import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import TaskMenu from '../board/TaskMenu';
 import TagPopup from '@/components/ui/TagPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
+import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
 
 interface Task {
   id: string;
@@ -77,6 +79,7 @@ interface Task {
   calendarEventId?: string;
   startTime?: string;
   endTime?: string;
+  reminder?: string;
 }
 
 interface SortableTaskItemProps {
@@ -564,6 +567,7 @@ const SortableTaskItem = React.forwardRef<
                             {task.startTime}
                             {task.endTime && task.endTime !== task.startTime ? ` - ${task.endTime}` : ''}
                           </span>
+                          {task.reminder && <Bell className="w-2.5 h-2.5" />}
                         </motion.span>
                       )}
                       {task.tags?.map((tagId) => {
@@ -693,6 +697,7 @@ export default function TaskList({
   onReorder,
   onToggleRepeat,
   onEditTask,
+  onScheduleTask,
   pendingToToday,
   tags,
   showCompleted,
@@ -720,6 +725,7 @@ export default function TaskList({
   onReorder?: (tasks: Task[]) => void;
   onToggleRepeat?: (taskId: string) => Promise<void> | void;
   onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
+  onScheduleTask?: (taskId: string, data: { startTime: string; endTime: string; reminder: string }) => Promise<void> | void;
   pendingToToday?: number;
   tags?: { id: string; name: string; color: string }[];
   showCompleted: boolean;
@@ -756,6 +762,10 @@ export default function TaskList({
   const [dialog, setDialog] = useState<{
     task: Task;
     kind: 'regular' | 'weekly' | 'backlog' | 'edit';
+  } | null>(null);
+
+  const [scheduleDialog, setScheduleDialog] = useState<{
+    task: Task;
   } | null>(null);
 
   const [tagPopup, setTagPopup] = useState<{
@@ -1401,6 +1411,24 @@ export default function TaskList({
           }
           setMenu(null);
         }}
+        onSchedule={
+          onScheduleTask
+            ? (taskId) => {
+                if (isGuest) {
+                  router.push('/login');
+                  setMenu(null);
+                  return;
+                }
+                if (menu) {
+                  const t = tasks.find((it) => it.id === menu.id);
+                  if (t) {
+                    setScheduleDialog({ task: t });
+                  }
+                }
+                setMenu(null);
+              }
+            : undefined
+        }
       />
 
       <TagPopup
@@ -1436,6 +1464,24 @@ export default function TaskList({
             }}
           />
         )}
+
+      {scheduleDialog && onScheduleTask && (
+        <ScheduleTaskDialog
+          open={!!scheduleDialog}
+          taskName={scheduleDialog.task.text}
+          initialStartTime={scheduleDialog.task.startTime || ''}
+          initialEndTime={scheduleDialog.task.endTime || ''}
+          initialReminder={scheduleDialog.task.reminder || ''}
+          busy={busy}
+          onClose={() => setScheduleDialog(null)}
+          onSave={async (data) => {
+            setBusy(true);
+            await onScheduleTask(scheduleDialog.task.id, data);
+            setBusy(false);
+            setScheduleDialog(null);
+          }}
+        />
+      )}
 
       <DeleteDialog
         open={!!dialog && dialog.kind !== 'edit'}

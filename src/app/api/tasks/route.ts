@@ -642,6 +642,19 @@ export async function PUT(req: NextRequest) {
     );
     return NextResponse.json({ ok: true });
   }
+  // Handle schedule update (startTime, endTime, reminder) — before general validation
+  if (body.schedule !== undefined && taskId) {
+    const update: Record<string, unknown> = {};
+    if (body.schedule.startTime !== undefined) update.startTime = body.schedule.startTime || undefined;
+    if (body.schedule.endTime !== undefined) update.endTime = body.schedule.endTime || undefined;
+    if (body.schedule.reminder !== undefined) update.reminder = body.schedule.reminder || undefined;
+    await TaskModel.updateOne(
+      { userId: uid, id: taskId },
+      { $set: update },
+    );
+    return NextResponse.json({ ok: true });
+  }
+
   // Relaxed validation to allow text updates
   if (
     (!date &&
@@ -824,6 +837,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       calendarEventId: t.calendarEventId,
       startTime: t.startTime,
       endTime: t.endTime,
+      reminder: t.reminder,
     }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   const { flyStatus, hungerStatus } = await currentFlyStatus(userId, tz);
@@ -873,6 +887,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           calendarEventId: t.calendarEventId,
           startTime: t.startTime,
           endTime: t.endTime,
+          reminder: t.reminder,
         }))
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
       return NextResponse.json(out);
@@ -908,6 +923,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         calendarEventId: t.calendarEventId,
         startTime: t.startTime,
         endTime: t.endTime,
+        reminder: t.reminder,
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return NextResponse.json(out);
@@ -940,6 +956,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         calendarEventId: t.calendarEventId,
         startTime: t.startTime,
         endTime: t.endTime,
+        reminder: t.reminder,
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }
@@ -962,6 +979,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       calendarEventId: t.calendarEventId,
       startTime: t.startTime,
       endTime: t.endTime,
+      reminder: t.reminder,
     }))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   return NextResponse.json(week);
@@ -997,7 +1015,7 @@ async function handleBoardPut(
     });
     const docs: TaskDoc[] = await TaskModel.find(
       { userId: uid, id: { $in: ids } },
-      { id: 1, text: 1, type: 1, tags: 1, calendarEventId: 1, startTime: 1, endTime: 1 },
+      { id: 1, text: 1, type: 1, tags: 1, calendarEventId: 1, startTime: 1, endTime: 1, reminder: 1 },
     )
       .lean<TaskDoc[]>()
       .exec();
@@ -1018,6 +1036,7 @@ async function handleBoardPut(
     const calIdById = new Map<string, string | undefined>();
     const startById = new Map<string, string | undefined>();
     const endById = new Map<string, string | undefined>();
+    const reminderById = new Map<string, string | undefined>();
 
     for (const d of docs) {
       textById.set(d.id, d.text ?? '');
@@ -1025,6 +1044,7 @@ async function handleBoardPut(
       calIdById.set(d.id, d.calendarEventId);
       startById.set(d.id, d.startTime);
       endById.set(d.id, d.endTime);
+      reminderById.set(d.id, d.reminder);
     }
     await Promise.all(
       ids.map((id, i) => {
@@ -1041,6 +1061,7 @@ async function handleBoardPut(
               calendarEventId: t?.calendarEventId ?? calIdById.get(id),
               startTime: t?.startTime ?? startById.get(id),
               endTime: t?.endTime ?? endById.get(id),
+              reminder: t?.reminder ?? reminderById.get(id),
             },
             $setOnInsert: {
               userId: uid,
@@ -1076,7 +1097,7 @@ async function handleBoardPut(
 
   const docs: TaskDoc[] = await TaskModel.find(
     { userId: uid, id: { $in: ids } },
-    { id: 1, type: 1, text: 1, tags: 1, calendarEventId: 1, startTime: 1, endTime: 1 },
+    { id: 1, type: 1, text: 1, tags: 1, calendarEventId: 1, startTime: 1, endTime: 1, reminder: 1 },
   )
     .lean<TaskDoc[]>()
     .exec();
@@ -1086,17 +1107,19 @@ async function handleBoardPut(
   const calIdById = new Map(docs.map((d) => [d.id, d.calendarEventId]));
   const startById = new Map(docs.map((d) => [d.id, d.startTime]));
   const endById = new Map(docs.map((d) => [d.id, d.endTime]));
+  const reminderById = new Map(docs.map((d) => [d.id, d.reminder]));
 
   await Promise.all(
     batch.map((t: any, i) => {
       const ttype = typeById.get(t.id);
       const textFromReq = t.text ?? textById.get(t.id) ?? '';
       const tags = t.tags ?? tagsById.get(t.id) ?? [];
-      
+
       // Use request values if they exist, otherwise fallback to DB values
       const calendarEventId = t.calendarEventId ?? calIdById.get(t.id);
       const startTime = t.startTime ?? startById.get(t.id);
       const endTime = t.endTime ?? endById.get(t.id);
+      const reminderVal = t.reminder ?? reminderById.get(t.id);
 
       if (ttype === 'weekly')
         return TaskModel.updateOne(
@@ -1122,6 +1145,7 @@ async function handleBoardPut(
               calendarEventId,
               startTime,
               endTime,
+              reminder: reminderVal,
             },
           },
         );
@@ -1146,6 +1170,7 @@ async function handleBoardPut(
                 calendarEventId,
                 startTime,
                 endTime,
+                reminder: reminderVal,
               },
               $setOnInsert: { userId: uid, type: 'regular', createdAt: now },
             },
@@ -1165,6 +1190,7 @@ async function handleBoardPut(
             calendarEventId,
             startTime,
             endTime,
+            reminder: reminderVal,
           },
           $setOnInsert: { userId: uid, type: 'regular', createdAt: now },
         },

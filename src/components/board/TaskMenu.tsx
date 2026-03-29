@@ -20,9 +20,10 @@ interface TaskMenuProps {
   isDone?: boolean;
   onAddTags?: (taskId: string) => void;
   onChangeDays?: () => void;
+  onSchedule?: (taskId: string) => void;
 }
 
-export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, isHabit, onEdit, onDoToday, onChangeDays }: TaskMenuProps) {
+export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, isHabit, onEdit, onDoToday, onChangeDays, onSchedule }: TaskMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // We portal to document.body
@@ -115,6 +116,19 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             >
               <Tag className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
               Add Tags
+            </button>
+          )}
+
+          {onSchedule && !isHabit && (
+            <button
+              onClick={() => {
+                onSchedule(menu.id);
+                onClose();
+              }}
+              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+            >
+              <CalendarClock className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              Schedule
             </button>
           )}
 

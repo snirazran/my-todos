@@ -81,6 +81,7 @@ export default function Home() {
     deleteTask,
     reorderTasks,
     editTask,
+    scheduleTask,
     mutateToday,
     mutateBacklog,
     pendingToBacklog,
@@ -510,6 +511,13 @@ export default function Home() {
                           return;
                         }
                         editTask(id, text, false);
+                      }}
+                      onScheduleTask={(id, data) => {
+                        if (!user) {
+                          router.push('/login');
+                          return;
+                        }
+                        return scheduleTask(id, data);
                       }}
                       isGuest={!user}
                       tags={tags}
