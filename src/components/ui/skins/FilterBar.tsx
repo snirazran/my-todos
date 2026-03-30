@@ -24,7 +24,7 @@ const CATEGORY_CONFIG: Record<
   { label: string; icon: React.ReactNode }
 > = {
   all: { label: 'All Items', icon: <Sparkles className="w-5 h-5" /> },
-  container: { label: 'Gift Boxes', icon: <Gift className="w-5 h-5" /> },
+  container: { label: 'Gifts', icon: <Gift className="w-5 h-5" /> },
   skin: { label: 'Skins', icon: <Paintbrush className="w-5 h-5" /> },
   hat: { label: 'Hats', icon: <Crown className="w-5 h-5" /> },
   body: { label: 'Body', icon: <Shirt className="w-5 h-5" /> },
@@ -62,6 +62,11 @@ export function FilterBar({
       id: 'all',
       label: CATEGORY_CONFIG.all.label,
       icon: CATEGORY_CONFIG.all.icon,
+    },
+    {
+      id: 'container',
+      label: CATEGORY_CONFIG.container.label,
+      icon: CATEGORY_CONFIG.container.icon,
     },
     {
       id: 'skin',

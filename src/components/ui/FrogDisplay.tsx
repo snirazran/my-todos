@@ -63,7 +63,7 @@ export function FrogDisplay({
   onMutateToday,
   onOpenDailyReward,
 }: Props) {
-  const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory();
+  const { unseenCount, unseenContainerCount } = useInventory();
   const [clickedAt, setClickedAt] = React.useState(0);
   const [shopOpen, setShopOpen] = React.useState(false);
   
@@ -75,7 +75,8 @@ export function FrogDisplay({
     giftsClaimed ?? 0,
   );
   const readyGifts = progressSlots.filter((s) => s.status === 'READY').length;
-  const giftBadge = readyGifts + unseenContainerCount;
+  const giftBadge = readyGifts;
+  const wardrobeBadge = unseenCount + unseenContainerCount;
 
   // Local state for smooth hunger updates
   const [displayedHunger, setDisplayedHunger] = React.useState(hunger ?? 0);
@@ -305,9 +306,9 @@ export function FrogDisplay({
           >
             <div className="absolute inset-0 bg-primary/10 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <Shirt className="relative w-5 h-5 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
-            {unseenCount > 0 && (
+            {wardrobeBadge > 0 && (
               <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background shadow-sm z-20">
-                {unseenCount > 9 ? '9+' : unseenCount}
+                {wardrobeBadge > 9 ? '9+' : wardrobeBadge}
               </span>
             )}
           </button>

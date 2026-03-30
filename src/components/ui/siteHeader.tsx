@@ -25,7 +25,8 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { openWardrobe } = useUIStore();
-  const { unseenCount } = useInventory();
+  const { unseenCount, unseenContainerCount } = useInventory();
+  const inventoryBadge = unseenCount + unseenContainerCount;
 
   const navItems = [
     {
@@ -105,9 +106,9 @@ export default function SiteHeader() {
                 >
                   <Icon className="w-4 h-4" />
                   <span>{item.label}</span>
-                  {item.label === 'Inventory' && unseenCount > 0 && (
+                  {item.label === 'Inventory' && inventoryBadge > 0 && (
                     <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ml-1">
-                      {unseenCount > 9 ? '9+' : unseenCount}
+                      {inventoryBadge > 9 ? '9+' : inventoryBadge}
                     </span>
                   )}
                 </button>

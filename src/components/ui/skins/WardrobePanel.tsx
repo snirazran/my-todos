@@ -42,7 +42,14 @@ export function WardrobePanel({
   defaultTab?: 'inventory' | 'shop' | 'trade';
 }) {
   const { user } = useAuth();
-  const { data, mutate, unseenItems, markItemSeen, markAllSeen } =
+  const {
+    data,
+    mutate,
+    unseenItems,
+    unseenContainers,
+    markItemSeen,
+    markAllSeen,
+  } =
     useInventory(); // Always active
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
@@ -70,6 +77,11 @@ export function WardrobePanel({
 
   // --- Sell Dialog Logic ---
   const [itemToSell, setItemToSell] = useState<ItemDef | null>(null);
+
+  const unseenInventorySet = useMemo(
+    () => new Set(data?.wardrobe?.unseenItems ?? []),
+    [data?.wardrobe?.unseenItems],
+  );
 
   const confirmSell = (amount: number) => {
     if (itemToSell) {
@@ -183,15 +195,16 @@ export function WardrobePanel({
 
   // Compute Badges
   const filterBadges = useMemo(() => {
-    if (!data || !unseenItems.length) return {};
+    const unseenCatalogIds = [...unseenItems, ...unseenContainers];
+    if (!data || !unseenCatalogIds.length) return {};
     const counts: Partial<Record<FilterCategory, number>> = {};
 
-    unseenItems.forEach((id) => {
+    unseenCatalogIds.forEach((id) => {
       const item = data.catalog.find((i) => i.id === id);
       if (!item) return;
 
       let cat: FilterCategory | null = null;
-      if (item.slot === 'container') return;
+      if (item.slot === 'container') cat = 'container';
       else if (item.slot === 'skin') cat = 'skin';
       else if (item.slot === 'hat') cat = 'hat';
       else if (item.slot === 'body') cat = 'body';
@@ -207,7 +220,7 @@ export function WardrobePanel({
       }
     });
     return counts;
-  }, [data, unseenItems, visitedCategories]);
+  }, [data, unseenItems, unseenContainers, visitedCategories]);
 
   // --- Logic ---
   const getFilteredItems = (items: ItemDef[]) => {
@@ -256,7 +269,7 @@ export function WardrobePanel({
       return;
     }
 
-    if (unseenItems.includes(item.id)) {
+    if (unseenInventorySet.has(item.id)) {
       markItemSeen(item.id);
     }
 
@@ -346,15 +359,13 @@ export function WardrobePanel({
     const ownedIds = Object.keys(data.wardrobe.inventory).filter(
       (id) => (data.wardrobe.inventory[id] ?? 0) > 0,
     );
-    const owned = (data.catalog || []).filter(
-      (i) => ownedIds.includes(i.id) && i.slot !== 'container',
-    );
+    const owned = (data.catalog || []).filter((i) => ownedIds.includes(i.id));
     return getFilteredItems(owned);
   }, [data, activeFilter, sortBy]);
 
   const shopItems = useMemo(() => {
     if (!data?.catalog) return [];
-    return getFilteredItems(data.catalog.filter((i) => i.slot !== 'container'));
+    return getFilteredItems(data.catalog);
   }, [data, activeFilter, sortBy]);
 
   const balance = data?.wardrobe?.flies ?? 0;
@@ -583,7 +594,7 @@ export function WardrobePanel({
                           <FilterBar
                             active={activeFilter}
                             onChange={handleFilterChange}
-                            badges={filterBadges} // NEW
+                            badges={filterBadges}
                           />
                         </div>
                       )}
@@ -650,7 +661,7 @@ export function WardrobePanel({
                                   setItemToSell(item);
                                 }}
                                 actionLabel={null}
-                                isNew={unseenItems.includes(item.id)}
+                                isNew={unseenInventorySet.has(item.id)}
                               />
                             ))}
                           </div>
@@ -698,7 +709,9 @@ export function WardrobePanel({
                             catalog={data.catalog}
                             unseenItems={unseenItems}
                             onTradeSuccess={() => mutate()}
-                            activeFilter={activeFilter}
+                            activeFilter={
+                              activeFilter === 'container' ? 'all' : activeFilter
+                            }
                             sortBy={sortBy}
                           />
                         )}

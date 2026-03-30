@@ -12,7 +12,8 @@ export default function MobileNav() {
   const router = useRouter();
   const { user } = useAuth();
   const { openWardrobe } = useUIStore();
-  const { unseenCount } = useInventory(); // Always fetch
+  const { unseenCount, unseenContainerCount } = useInventory(); // Always fetch
+  const inventoryBadge = unseenCount + unseenContainerCount;
 
   if (pathname === '/login' || pathname === '/register') return null;
 
@@ -74,9 +75,9 @@ export default function MobileNav() {
                 <Icon
                   className={`w-6 h-6 mb-1 ${isActive ? 'fill-current/20' : ''}`}
                 />
-                {item.label === 'Inventory' && unseenCount > 0 && (
+                {item.label === 'Inventory' && inventoryBadge > 0 && (
                   <span className="absolute -top-1 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
-                    {unseenCount > 9 ? '9+' : unseenCount}
+                    {inventoryBadge > 9 ? '9+' : inventoryBadge}
                   </span>
                 )}
               </div>
