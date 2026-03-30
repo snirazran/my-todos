@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { clearAuthTokenCookie, setAuthTokenCookie } from '@/lib/authCookie';
 import { useRouter, usePathname } from 'next/navigation';
 
 interface AuthContextType {
@@ -47,12 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // We use a 7-day max-age for the cookie itself so it doesn't disappear 
           // between sessions, but the server will still reject the token if it's expired.
           // The proactive refresh in the client will keep the token fresh.
-          document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+          setAuthTokenCookie(token);
         } catch (e) {
           console.error('Error syncing token to cookie:', e);
         }
       } else {
-        document.cookie = `token=; path=/; max-age=0; SameSite=Lax; Secure`;
+        clearAuthTokenCookie();
       }
     };
 
@@ -74,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Force a fresh token when the user returns to the tab
         // This avoids expired token errors after idle periods
         const token = await auth.currentUser.getIdToken(true);
-        document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+        setAuthTokenCookie(token);
       }
     };
     window.addEventListener('visibilitychange', handleVisibilityChange);

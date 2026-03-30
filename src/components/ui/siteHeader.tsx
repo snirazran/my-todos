@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useUIStore } from '@/lib/uiStore';
+import { clearAuthTokenCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
 import GoogleCalendarSync from '@/components/ui/GoogleCalendarSync';
 
@@ -144,7 +145,7 @@ export default function SiteHeader() {
             user={user}
             loading={loading}
             onSignIn={() => router.push('/login')}
-            onSignOut={() => (document.cookie = 'token=; path=/; max-age=0;')} // AuthContext handles state but manual cleanup helps
+            onSignOut={() => clearAuthTokenCookie()} // AuthContext handles state but manual cleanup helps
           />
         </div>
         <style jsx>{`

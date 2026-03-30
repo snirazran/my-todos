@@ -6,8 +6,22 @@ import UserModel, { type UserDoc } from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 
 export async function GET(req: NextRequest) {
+  let uid: string;
   try {
-    const uid = await requireUserId();
+    uid = await requireUserId();
+  } catch (error) {
+    return NextResponse.json(
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Unauthorized' }
+        : {
+            error: 'Unauthorized',
+            details: error instanceof Error ? error.message : 'Unknown auth error',
+          },
+      { status: 401 },
+    );
+  }
+
+  try {
     await connectMongo();
     
     const user = await UserModel.findById(uid)
@@ -32,13 +46,35 @@ export async function GET(req: NextRequest) {
     });
   } catch (error) {
     console.error('Error fetching user data:', error);
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Failed to load user data' }
+        : {
+            error: 'Failed to load user data',
+            details: error instanceof Error ? error.message : 'Unknown user error',
+          },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(req: NextRequest) {
+  let decoded: Awaited<ReturnType<typeof requireAuth>>;
   try {
-    const decoded = await requireAuth();
+    decoded = await requireAuth();
+  } catch (error) {
+    return NextResponse.json(
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Unauthorized' }
+        : {
+            error: 'Unauthorized',
+            details: error instanceof Error ? error.message : 'Unknown auth error',
+          },
+      { status: 401 },
+    );
+  }
+
+  try {
     const { uid, email, name } = decoded;
     await connectMongo();
 
@@ -81,15 +117,34 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error('Error syncing user:', error);
     return NextResponse.json(
-      { error: 'Unauthorized or Internal Error' },
-      { status: 401 },
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Failed to sync user' }
+        : {
+            error: 'Failed to sync user',
+            details: error instanceof Error ? error.message : 'Unknown user sync error',
+          },
+      { status: 500 },
     );
   }
 }
 
 export async function PATCH(req: NextRequest) {
+  let uid: string;
   try {
-    const uid = await requireUserId();
+    uid = await requireUserId();
+  } catch (error) {
+    return NextResponse.json(
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Unauthorized' }
+        : {
+            error: 'Unauthorized',
+            details: error instanceof Error ? error.message : 'Unknown auth error',
+          },
+      { status: 401 },
+    );
+  }
+
+  try {
     await connectMongo();
 
     const body = await req.json();
@@ -116,6 +171,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, user: updatedUser });
   } catch (error) {
     console.error('Error updating user settings:', error);
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    return NextResponse.json(
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Failed to update user settings' }
+        : {
+            error: 'Failed to update user settings',
+            details: error instanceof Error ? error.message : 'Unknown user update error',
+          },
+      { status: 500 },
+    );
   }
 }

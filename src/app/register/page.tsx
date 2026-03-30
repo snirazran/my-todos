@@ -9,6 +9,7 @@ import {
   updateProfile,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { setAuthTokenCookie } from '@/lib/authCookie';
 import Link from 'next/link';
 import { Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -45,7 +46,7 @@ export default function RegisterPage() {
       const result = await signInWithPopup(auth, provider);
 
       const token = await result.user.getIdToken();
-      document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+      setAuthTokenCookie(token);
 
       // Create/Sync user in MongoDB
       await fetch('/api/user', { method: 'POST' });
@@ -87,7 +88,7 @@ export default function RegisterPage() {
 
       // 3. Set Cookie
       const token = await user.getIdToken();
-      document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+      setAuthTokenCookie(token);
 
       // 4. Sync to MongoDB
       await fetch('/api/user', { method: 'POST' });

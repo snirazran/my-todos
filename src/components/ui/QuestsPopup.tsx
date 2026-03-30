@@ -93,18 +93,18 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
     [data?.macroCategories],
   );
   const selectedCategories = useMemo(
-    () => (data?.onboarding.selectedCategoryIds ?? []).map((id) => categoryMap[id]).filter(Boolean),
-    [categoryMap, data?.onboarding.selectedCategoryIds],
+    () => (data?.onboarding?.selectedCategoryIds ?? []).map((id) => categoryMap[id]).filter(Boolean),
+    [categoryMap, data?.onboarding?.selectedCategoryIds],
   );
   const categoryTagMap = useMemo(
     () =>
       new Map(
-        (data?.onboarding.categoryTagMap ?? []).map((entry) => [
+        (data?.onboarding?.categoryTagMap ?? []).map((entry) => [
           entry.categoryId,
           entry.tagIds,
         ]),
       ),
-    [data?.onboarding.categoryTagMap],
+    [data?.onboarding?.categoryTagMap],
   );
   const tagCatalog = useMemo(
     () =>
@@ -130,8 +130,8 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
       ),
     [tagsData?.tags],
   );
-  const claimableDaily = data?.dailyQuests.filter((quest) => quest.claimable).length ?? 0;
-  const claimableCategory = data?.categoryQuests.filter((quest) => quest.claimable).length ?? 0;
+  const claimableDaily = data?.dailyQuests?.filter((quest) => quest.claimable).length ?? 0;
+  const claimableCategory = data?.categoryQuests?.filter((quest) => quest.claimable).length ?? 0;
   const editingFocusCategory = editingFocusCategoryId
     ? categoryMap[editingFocusCategoryId]
     : null;
@@ -319,9 +319,9 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
                   <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4 md:px-6 md:pb-6">
                     {activeTab === 'category' ? (
                       <div className="space-y-4">
-                        {!data.onboarding.complete && <PanelCard>Finish your onboarding on the home page to unlock quests for your focus areas.</PanelCard>}
-                        {data.onboarding.complete && selectedCategories.length === 0 && <PanelCard>Select at least one focus area to receive quests here.</PanelCard>}
-                        {data.categoryQuests.length === 0 ? <PanelCard>No active focus quests yet.</PanelCard> : data.categoryQuests.map((quest) => (
+                        {!data.onboarding?.complete && <PanelCard>Finish your onboarding on the home page to unlock quests for your focus areas.</PanelCard>}
+                        {data.onboarding?.complete && selectedCategories.length === 0 && <PanelCard>Select at least one focus area to receive quests here.</PanelCard>}
+                        {(data.categoryQuests?.length ?? 0) === 0 ? <PanelCard>No active focus quests yet.</PanelCard> : data.categoryQuests!.map((quest) => (
                           <CategoryQuestCard
                             key={quest.id}
                             quest={quest}
@@ -334,7 +334,7 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
                             onClaim={() => handleClaim('category', quest.id)}
                           />
                         ))}
-                        {data.onboarding.complete && selectedCategories.length > 0 && (
+                        {data.onboarding?.complete && selectedCategories.length > 0 && (
                           <div className="flex justify-center pt-2">
                             <Button
                               type="button"
@@ -356,8 +356,8 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                          {data.dailyQuests.map((quest) => <DailyQuestCard key={quest.id} quest={quest} rewardCatalog={data.rewardCatalog} isPremium={data.isPremium} claiming={claimingId === quest.id} onClaim={() => handleClaim('daily', quest.id)} />)}
+                        <div className="space-y-4">
+                          {(data.dailyQuests ?? []).map((quest) => <DailyQuestCard key={quest.id} quest={quest} rewardCatalog={data.rewardCatalog} isPremium={data.isPremium} claiming={claimingId === quest.id} onClaim={() => handleClaim('daily', quest.id)} />)}
                         </div>
                         <div className="flex justify-center pt-2">
                           <Button
@@ -459,8 +459,78 @@ function formatQuestObjective(block: CategoryQuestProgressView['logic'][number])
 }
 
 function DailyQuestCard({ quest, rewardCatalog, isPremium, claiming, onClaim }: { quest: DailyQuestProgressView; rewardCatalog: Record<string, ItemDef>; isPremium: boolean; claiming: boolean; onClaim: () => void }) {
-  const progressPercent = Math.min(100, (quest.progress / quest.target) * 100);
-  return <div className="rounded-[26px] border border-border/50 bg-card/90 p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-black uppercase tracking-[0.22em] text-primary">Daily</p><h3 className="mt-1 text-lg font-black leading-tight text-foreground">{quest.title}</h3><p className="mt-1 text-sm text-muted-foreground">{quest.description}</p></div><div className="rounded-2xl border border-border/50 bg-background/80 px-3 py-2 text-center"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">Progress</p><p className="mt-1 text-lg font-black text-foreground">{Math.min(quest.progress, quest.target)}/{quest.target}</p></div></div><div className="mt-4 h-3 overflow-hidden rounded-full bg-muted"><div className={cn('h-full rounded-full transition-all', quest.claimed ? 'bg-emerald-500' : quest.completed ? 'bg-primary' : 'bg-sky-500')} style={{ width: `${progressPercent}%` }} /></div><div className="mt-4 grid gap-3"><RewardTier rewards={quest.rewards} rewardCatalog={rewardCatalog} isPremium={isPremium} /></div><Button onClick={onClaim} disabled={!quest.claimable || claiming} className="mt-4 h-11 w-full rounded-2xl font-black uppercase tracking-wide">{quest.claimed ? 'Claimed' : claiming ? 'Claiming...' : quest.claimable ? isPremium ? 'Claim Double Reward' : 'Claim Reward' : 'Keep Going'}</Button></div>;
+  return (
+    <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
+      <div className="relative overflow-hidden">
+        {quest.coverImageUrl ? (
+          <img
+            src={quest.coverImageUrl}
+            alt={quest.title}
+            className="h-[220px] w-full object-cover"
+          />
+        ) : (
+          <div className="h-[220px] w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/28 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
+        <div className="absolute inset-x-0 top-0 flex items-start gap-3 p-4">
+          <span className="rounded-full border border-white/20 bg-black/35 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-white backdrop-blur-md">
+            Daily
+          </span>
+        </div>
+        <div className="absolute bottom-4 right-4 z-10 flex flex-wrap justify-end gap-2">
+          {quest.rewards.map((reward, index) => (
+            <RewardTile
+              key={`${reward.type}-${reward.itemId ?? reward.amount ?? index}`}
+              reward={reward}
+              rewardCatalog={rewardCatalog}
+              isPremium={isPremium}
+              compact
+            />
+          ))}
+        </div>
+        <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[116px]">
+          <h3 className="text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]">
+            {quest.title}
+          </h3>
+          <p className="mt-1.5 text-sm text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
+            {quest.description}
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-4 px-4 pb-4 pt-4">
+        <div className="space-y-3">
+          {quest.logic.map((block) => (
+            <div key={block.id} className="border-t border-border/40 pt-4 first:border-t-0 first:pt-0">
+              <div className="flex items-start justify-between gap-3 sm:items-end">
+                <p className="text-xl font-black leading-tight text-foreground">
+                  {formatQuestObjective(block)}
+                </p>
+                <div className="rounded-full border border-border/50 bg-background/80 px-3 py-1 text-sm font-black text-foreground">
+                  {Math.min(block.progress, block.target)}/{block.target}
+                </div>
+              </div>
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-muted/80 ring-1 ring-border/40">
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all',
+                    quest.claimed
+                      ? 'bg-[linear-gradient(90deg,#6ee7b7_0%,#34d399_45%,#10b981_100%)]'
+                      : quest.completed
+                        ? 'bg-[linear-gradient(90deg,#34d399_0%,#22c55e_50%,#16a34a_100%)]'
+                        : 'bg-[linear-gradient(90deg,#7dd3fc_0%,#38bdf8_45%,#0ea5e9_100%)]',
+                  )}
+                  style={{ width: `${Math.min(100, (block.progress / block.target) * 100)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+        <Button onClick={onClaim} disabled={!quest.claimable || claiming} className="h-11 w-full rounded-2xl font-black uppercase tracking-wide">{quest.claimed ? 'Claimed' : claiming ? 'Claiming...' : quest.claimable ? isPremium ? 'Claim Double Reward' : 'Claim Reward' : 'Keep Going'}</Button>
+      </div>
+    </div>
+  );
 }
 
 function CategoryQuestCard({ quest, category, rewardCatalog, isPremium, claiming, linkedTags, onEditTags, onClaim }: { quest: CategoryQuestProgressView; category?: MacroCategoryDefinition; rewardCatalog: Record<string, ItemDef>; isPremium: boolean; claiming: boolean; linkedTags: QuestTagChip[]; onEditTags: () => void; onClaim: () => void }) {
@@ -652,7 +722,7 @@ function RewardTile({ reward, rewardCatalog, isPremium, compact = false }: { rew
       className={cn(
         'group relative flex items-center justify-center overflow-hidden shadow-sm',
         compact
-          ? 'h-14 w-14 overflow-visible rounded-[18px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,245,0.96))] shadow-[0_14px_28px_rgba(15,23,42,0.24)] backdrop-blur-sm'
+          ? 'h-16 w-16 overflow-visible rounded-[20px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,245,0.96))] shadow-[0_14px_28px_rgba(15,23,42,0.24)] backdrop-blur-sm'
           : 'h-16 w-16 rounded-2xl border border-border/50 bg-card',
       )}
       title={rewardLabel(reward, rewardCatalog, isPremium)}
@@ -660,11 +730,11 @@ function RewardTile({ reward, rewardCatalog, isPremium, compact = false }: { rew
       {!compact && <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-black/5 dark:from-white/5 dark:to-black/10" />}
       {reward.type === 'FLIES' ? (
         <div className="relative flex h-full w-full items-center justify-center">
-          <Fly size={compact ? 28 : 28} y={-1} />
+          <Fly size={compact ? 30 : 28} y={-1} />
         </div>
       ) : item?.slot === 'container' ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
-          <div className={cn(compact ? 'h-[112%] w-[112%] -translate-y-1 drop-shadow-lg' : 'h-full w-full scale-[0.9]')}>
+          <div className={cn(compact ? 'h-[118%] w-[118%] drop-shadow-lg' : 'h-full w-full scale-[0.9]')}>
             <GiftRive className="h-full w-full" color={item.riveIndex} />
           </div>
         </div>
@@ -673,11 +743,11 @@ function RewardTile({ reward, rewardCatalog, isPremium, compact = false }: { rew
           <Frog
             className={cn(
               'object-contain',
-              compact ? 'h-[116%] w-[116%] translate-y-[6%]' : 'translate-y-[10%]',
+              compact ? 'h-[118%] w-[118%]' : 'translate-y-[10%]',
             )}
             indices={previewIndices}
-            width={compact ? 84 : 84}
-            height={compact ? 84 : 84}
+            width={compact ? 96 : 84}
+            height={compact ? 96 : 84}
           />
         </div>
       ) : reward.type === 'BOX' ? (

@@ -4,8 +4,22 @@ import connectMongo from '@/lib/mongoose';
 import { syncQuestState } from '@/lib/quests/engine';
 
 export async function GET(req: Request) {
+  let userId: string;
   try {
-    const userId = await requireUserId();
+    userId = await requireUserId();
+  } catch (error) {
+    return NextResponse.json(
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Unauthorized' }
+        : {
+            error: 'Unauthorized',
+            details: error instanceof Error ? error.message : 'Unknown auth error',
+          },
+      { status: 401 },
+    );
+  }
+
+  try {
     await connectMongo();
     const timezone = new URL(req.url).searchParams.get('timezone') || 'UTC';
 
@@ -28,7 +42,16 @@ export async function GET(req: Request) {
       unlockedAnimationIds: dashboard.focusProfile.unlockedAnimationIds ?? [],
       rewardCatalog: dashboard.rewardCatalog,
     });
-  } catch {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  } catch (error) {
+    console.error('Error loading quests:', error);
+    return NextResponse.json(
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Failed to load quests' }
+        : {
+            error: 'Failed to load quests',
+            details: error instanceof Error ? error.message : 'Unknown quests error',
+          },
+      { status: 500 },
+    );
   }
 }

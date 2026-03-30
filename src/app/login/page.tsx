@@ -9,6 +9,7 @@ import {
 import { Capacitor } from '@capacitor/core';
 import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 import { auth } from '@/lib/firebase';
+import { setAuthTokenCookie } from '@/lib/authCookie';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -68,7 +69,7 @@ export default function LoginPage() {
           const result = await signInWithCredential(auth, credential);
 
           const token = await result.user.getIdToken();
-          document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+          setAuthTokenCookie(token);
           await fetch('/api/user', { method: 'POST' });
           router.push('/');
         } else {
@@ -79,7 +80,7 @@ export default function LoginPage() {
         const provider = new GoogleAuthProvider();
         const result = await signInWithPopup(auth, provider);
         const token = await result.user.getIdToken();
-        document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+        setAuthTokenCookie(token);
         await fetch('/api/user', { method: 'POST' });
         router.push('/');
       }
@@ -114,7 +115,7 @@ export default function LoginPage() {
       const token = await user.getIdToken();
 
       // 3. Set Cookie
-      document.cookie = `token=${token}; path=/; max-age=604800; SameSite=Lax; Secure`;
+      setAuthTokenCookie(token);
 
       // 4. Sync user to MongoDB
       await fetch('/api/user', {

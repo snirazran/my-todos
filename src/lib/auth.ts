@@ -6,7 +6,7 @@ export async function requireAuth() {
   const token = cookieStore.get('token')?.value;
 
   if (!token) {
-    throw new Error('Unauthenticated - No token found');
+    throw new Error('Unauthenticated - No token cookie found');
   }
 
   try {
@@ -14,7 +14,11 @@ export async function requireAuth() {
     return decodedToken;
   } catch (error) {
     console.error('Error verifying Firebase token:', error);
-    throw new Error('Unauthenticated - Invalid token');
+    const message =
+      error instanceof Error && error.message
+        ? error.message
+        : 'Unknown token verification error';
+    throw new Error(`Unauthenticated - Invalid token - ${message}`);
   }
 }
 

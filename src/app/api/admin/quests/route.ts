@@ -200,10 +200,11 @@ function sanitizeTemplateBody(body: any) {
     return { error: 'Add at least one reward' };
   }
 
-  const normalizedLogic = (logic as QuestLogicBlock[]).map((block) =>
-    placement === 'category' || block.tagMode !== 'focus_category_tags'
-      ? block
-      : { ...block, tagMode: 'ignore' },
+  const normalizedLogic: QuestLogicBlock[] = (logic as QuestLogicBlock[]).map(
+    (block): QuestLogicBlock =>
+      placement === 'category' || block.tagMode !== 'focus_category_tags'
+        ? block
+        : { ...block, tagMode: 'ignore' as const },
   );
 
   return {
@@ -225,9 +226,11 @@ export async function GET() {
   try {
     await requireUserId();
     await connectMongo();
-    const templates = await QuestTemplateModel.find({}).sort({
-      createdAt: -1,
-    });
+    const templates = await QuestTemplateModel.find({}).lean();
+    templates.sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
     return json({ templates: templates.map(templateToView) });
   } catch {
     return json({ error: 'Unauthorized' }, 401);

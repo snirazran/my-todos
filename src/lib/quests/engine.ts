@@ -55,6 +55,16 @@ function shuffle<T>(items: T[], rng: () => number) {
   return copy;
 }
 
+function byTemplateOrder(a: QuestTemplateDoc, b: QuestTemplateDoc) {
+  if (a.placement !== b.placement) {
+    return a.placement.localeCompare(b.placement);
+  }
+
+  return (
+    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+}
+
 export function isPremiumUser(user: UserDoc) {
   return user.premiumUntil ? new Date(user.premiumUntil) > new Date() : false;
 }
@@ -105,7 +115,7 @@ function taskCompletionDates(task: TaskDoc) {
   if (task.type === 'regular' && task.completed && task.date) {
     dates.add(task.date);
   }
-  return [...dates];
+  return Array.from(dates);
 }
 
 function matchesSubject(task: TaskDoc, subject: QuestSubject) {
@@ -445,14 +455,14 @@ async function syncQuestForTemplate(args: {
         ...block,
         target,
         progress: 0,
-        resolvedTagId: getUserTagId(resolvedTag),
+        resolvedTagId: getUserTagId(resolvedTag) ?? undefined,
         resolvedTagIds:
           block.tagMode === 'focus_category_tags'
             ? categoryTags
                 .map((tag) => getUserTagId(tag))
                 .filter((tagId): tagId is string => !!tagId)
             : undefined,
-        resolvedTagName: getUserTagName(resolvedTag),
+        resolvedTagName: getUserTagName(resolvedTag) ?? undefined,
         resolvedTagNames:
           block.tagMode === 'focus_category_tags'
             ? categoryTags
@@ -519,10 +529,7 @@ export async function syncQuestState(args: {
     UserModel.findById(userId).lean<UserDoc | null>(),
     TaskModel.find({ userId, deletedAt: { $exists: false } }).lean<TaskDoc[]>(),
     args.catalog ? Promise.resolve(args.catalog) : getFullCatalog(),
-    QuestTemplateModel.find({ isActive: true }).sort({
-      placement: 1,
-      createdAt: -1,
-    }),
+    QuestTemplateModel.find({ isActive: true }).lean<QuestTemplateDoc[]>(),
   ]);
 
   if (!user) throw new Error('User not found');
@@ -539,7 +546,9 @@ export async function syncQuestState(args: {
     });
   }
 
-  const filteredTemplates = templates.filter((template) =>
+  const filteredTemplates = [...templates]
+    .sort(byTemplateOrder)
+    .filter((template) =>
     matchesVisibilityConditions(
       template.visibilityConditions,
       visibilityMetrics,
