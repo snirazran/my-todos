@@ -47,9 +47,9 @@ import { PremiumLimitDialog } from './PremiumLimitDialog';
 export default function TagManager({ selectedTags, onTagsChange, open, onOpenChange }: TagManagerProps) {
   const { data: tagsData } = useSWR('/api/tags', fetcher);
   const savedTags: SavedTag[] = useMemo(
-    () =>
-      (Array.isArray(tagsData?.tags) ? tagsData.tags : [])
-        .map((tag: any, index: number) => {
+    () => {
+      const normalizedTags = (Array.isArray(tagsData?.tags) ? tagsData.tags : []).map(
+        (tag: any, index: number): SavedTag | null => {
           const rawId =
             typeof tag?.id === 'string' && tag.id.trim()
               ? tag.id.trim()
@@ -76,8 +76,11 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
             key,
             disabled: !!tag?.disabled,
           };
-        })
-        .filter((tag) => !!tag.id),
+        },
+      );
+
+      return normalizedTags.filter((tag): tag is SavedTag => !!tag && !!tag.id);
+    },
     [tagsData?.tags],
   );
 
