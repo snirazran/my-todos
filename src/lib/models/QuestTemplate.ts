@@ -41,7 +41,7 @@ const QuestTemplateSchema = new Schema<QuestTemplateDoc>(
     },
     rewards: { type: Schema.Types.Mixed, required: true },
     logic: { type: [Schema.Types.Mixed], default: [] } as any,
-    visibilityConditions: { type: [Schema.Types.Mixed], default: [] },
+    visibilityConditions: { type: [Schema.Types.Mixed], default: [] } as any,
     isActive: { type: Boolean, default: true, index: true },
   },
   {
