@@ -12,9 +12,23 @@ interface TagPopupProps {
   taskId: string | null;
   initialTags?: string[];
   onSave: (taskId: string, newTags: string[]) => Promise<void> | void;
+  eyebrow?: string;
+  title?: string;
+  description?: string;
+  saveLabel?: string;
 }
 
-export default function TagPopup({ open, onClose, taskId, initialTags = [], onSave }: TagPopupProps) {
+export default function TagPopup({
+  open,
+  onClose,
+  taskId,
+  initialTags = [],
+  onSave,
+  eyebrow = 'Organization',
+  title = 'Manage Tags',
+  description = 'Select or create tags to organize your items',
+  saveLabel = 'Save tags',
+}: TagPopupProps) {
   const [tags, setTags] = useState<string[]>(initialTags);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -22,7 +36,7 @@ export default function TagPopup({ open, onClose, taskId, initialTags = [], onSa
     if (open) {
         setTags(initialTags);
     }
-  }, [open, initialTags]);
+  }, [open, taskId]);
 
   const handleSave = async () => {
     if (!taskId) return;
@@ -62,10 +76,10 @@ export default function TagPopup({ open, onClose, taskId, initialTags = [], onSa
         <div className="flex items-start justify-between px-5 pt-5 pb-3">
           <div className="flex-1 min-w-0 pr-3">
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-              Organization
+              {eyebrow}
             </p>
             <h4 className="text-base font-bold text-slate-900 dark:text-white leading-snug truncate">
-              Manage Tags
+              {title}
             </h4>
           </div>
           <button
@@ -79,7 +93,7 @@ export default function TagPopup({ open, onClose, taskId, initialTags = [], onSa
 
         <div className="px-5 pb-2">
           <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            Select or create tags to organize your items
+            {description}
           </p>
           <div className="max-h-[60vh] overflow-y-auto no-scrollbar">
             <TagManager
@@ -103,7 +117,7 @@ export default function TagPopup({ open, onClose, taskId, initialTags = [], onSa
             ) : (
               <>
                 <Check className="w-4 h-4" />
-                Save tags
+                {saveLabel}
               </>
             )}
           </button>

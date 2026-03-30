@@ -4,22 +4,22 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import useSWR, { mutate } from 'swr';
-import { Crown, Gift, Lock, ScrollText, Sparkles, TimerReset, Trophy, X } from 'lucide-react';
+import { Gift, ScrollText, TimerReset, Trophy, X, Compass, CalendarDays, RefreshCw, Tags } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import Fly from './fly';
+import TagPopup from './TagPopup';
 import type { ItemDef } from '@/lib/skins/catalog';
-import type { CampaignProgressView, DailyQuestProgressView, FocusCategoryTagMap, MacroCategoryDefinition, MacroCategoryId, QuestReward } from '@/lib/quests/types';
+import type { CategoryQuestProgressView, DailyQuestProgressView, FocusCategoryTagMap, MacroCategoryDefinition, MacroCategoryId, QuestReward } from '@/lib/quests/types';
 
-type SavedTag = { id: string; name: string; color: string; disabled?: boolean };
 type QuestsResponse = {
   isPremium: boolean;
   claimableCount: number;
   onboarding: { complete: boolean; selectedCategoryIds: MacroCategoryId[]; categoryTagMap: FocusCategoryTagMap[] };
   macroCategories: MacroCategoryDefinition[];
   dailyQuests: DailyQuestProgressView[];
-  campaigns: CampaignProgressView[];
+  categoryQuests: CategoryQuestProgressView[];
   rewardCatalog: Record<string, ItemDef>;
   unlockedAnimationIds: string[];
 };
@@ -32,13 +32,14 @@ const fetcher = async <T,>(url: string) => {
 
 export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose: () => void; isGuest?: boolean }) {
   const [mounted, setMounted] = useState(false);
-  const [activeTab, setActiveTab] = useState<'daily' | 'campaigns'>('campaigns');
+  const [activeTab, setActiveTab] = useState<'daily' | 'category'>('category');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
-  const [setupMessage, setSetupMessage] = useState<string | null>(null);
-  const [savingMappings, setSavingMappings] = useState(false);
+  const [refreshingDaily, setRefreshingDaily] = useState(false);
+  const [refreshingFocus, setRefreshingFocus] = useState(false);
+  const [editingFocusCategoryId, setEditingFocusCategoryId] =
+    useState<MacroCategoryId | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [draftMappings, setDraftMappings] = useState<FocusCategoryTagMap[]>([]);
   const dragControls = useDragControls();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -47,12 +48,6 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
     fetcher,
     { revalidateOnFocus: false },
   );
-  const { data: tagsData } = useSWR<{ tags: SavedTag[] }>(
-    show && !isGuest ? '/api/tags' : null,
-    fetcher,
-    { revalidateOnFocus: false },
-  );
-
   useEffect(() => {
     setMounted(true);
     const check = () => setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
@@ -69,10 +64,6 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
     };
   }, [show]);
 
-  useEffect(() => {
-    setDraftMappings(data?.onboarding.categoryTagMap ?? []);
-  }, [data?.onboarding.categoryTagMap]);
-
   const categoryMap = useMemo(
     () => Object.fromEntries((data?.macroCategories ?? []).map((entry) => [entry.id, entry])),
     [data?.macroCategories],
@@ -81,62 +72,23 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
     () => (data?.onboarding.selectedCategoryIds ?? []).map((id) => categoryMap[id]).filter(Boolean),
     [categoryMap, data?.onboarding.selectedCategoryIds],
   );
-  const savedMappedCategoryIds = useMemo(
+  const categoryTagMap = useMemo(
     () =>
-      new Set(
-        (data?.onboarding.categoryTagMap ?? [])
-          .filter((entry) => entry.tagIds.length > 0)
-          .map((entry) => entry.categoryId),
+      new Map(
+        (data?.onboarding.categoryTagMap ?? []).map((entry) => [
+          entry.categoryId,
+          entry.tagIds,
+        ]),
       ),
     [data?.onboarding.categoryTagMap],
   );
-  const availableTags = tagsData?.tags ?? [];
   const claimableDaily = data?.dailyQuests.filter((quest) => quest.claimable).length ?? 0;
-  const claimableCampaigns = data?.campaigns.filter((campaign) => campaign.claimable).length ?? 0;
+  const claimableCategory = data?.categoryQuests.filter((quest) => quest.claimable).length ?? 0;
+  const editingFocusCategory = editingFocusCategoryId
+    ? categoryMap[editingFocusCategoryId]
+    : null;
 
-  const getMappedTagIds = (categoryId: MacroCategoryId) =>
-    draftMappings.find((entry) => entry.categoryId === categoryId)?.tagIds ?? [];
-
-  const toggleTagForCategory = (categoryId: MacroCategoryId, tagId: string) => {
-    setDraftMappings((prev) => {
-      const current = prev.find((entry) => entry.categoryId === categoryId);
-      if (!current) return [...prev, { categoryId, tagIds: [tagId] }];
-      const hasTag = current.tagIds.includes(tagId);
-      return prev.map((entry) =>
-        entry.categoryId !== categoryId
-          ? entry
-          : { ...entry, tagIds: hasTag ? entry.tagIds.filter((id) => id !== tagId) : [...entry.tagIds, tagId] },
-      );
-    });
-  };
-
-  const saveMappings = async () => {
-    if (!data || savingMappings) return;
-    setSavingMappings(true);
-    setSetupMessage(null);
-    try {
-      const res = await fetch('/api/quests/onboarding', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          selectedCategoryIds: data.onboarding.selectedCategoryIds,
-          categoryTagMap: draftMappings.filter((entry) => entry.tagIds.length > 0),
-          createSuggestions: false,
-          timezone,
-        }),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || 'Could not save campaign setup');
-      setSetupMessage('Campaign setup saved');
-      await mutateQuests();
-    } catch (err: any) {
-      setSetupMessage(err.message || 'Could not save campaign setup');
-    } finally {
-      setSavingMappings(false);
-    }
-  };
-
-  const handleClaim = async (claimType: 'daily' | 'campaign', targetId: string) => {
+  const handleClaim = async (claimType: 'daily' | 'category', targetId: string) => {
     if (claimingId) return;
     setClaimingId(targetId);
     setClaimMessage(null);
@@ -151,7 +103,6 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
       const bits: string[] = [];
       if (payload.rewardSummary?.fliesGranted) bits.push(`${payload.rewardSummary.fliesGranted} flies`);
       if (payload.rewardSummary?.grantedItemIds?.length) bits.push(`${payload.rewardSummary.grantedItemIds.length} items`);
-      if (payload.rewardSummary?.grantedAnimationIds?.length) bits.push(`${payload.rewardSummary.grantedAnimationIds.length} animation unlocks`);
       setClaimMessage(bits.length ? `Claimed ${bits.join(' + ')}` : 'Reward claimed');
       await mutateQuests();
       mutate('/api/skins/inventory');
@@ -160,6 +111,83 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
     } finally {
       setClaimingId(null);
     }
+  };
+
+  const handleRefreshDaily = async () => {
+    if (refreshingDaily) return;
+    setRefreshingDaily(true);
+    setClaimMessage(null);
+    try {
+      const res = await fetch('/api/quests/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Could not refresh quests');
+      setClaimMessage('Daily quests refreshed');
+      await mutateQuests();
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Could not refresh quests');
+    } finally {
+      setRefreshingDaily(false);
+    }
+  };
+
+  const handleRefreshFocus = async () => {
+    if (refreshingFocus) return;
+    setRefreshingFocus(true);
+    setClaimMessage(null);
+    try {
+      const res = await fetch('/api/quests/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone, scope: 'focus' }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Could not refresh focus quests');
+      setClaimMessage('Focus quests refreshed');
+      await mutateQuests();
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Could not refresh focus quests');
+    } finally {
+      setRefreshingFocus(false);
+    }
+  };
+
+  const handleSaveFocusTags = async (
+    categoryId: string,
+    newTags: string[],
+  ) => {
+    if (!data) return;
+
+    const nextCategoryTagMap = (data.onboarding.categoryTagMap ?? []).filter(
+      (entry) => entry.categoryId !== categoryId,
+    );
+
+    if (newTags.length > 0) {
+      nextCategoryTagMap.push({
+        categoryId: categoryId as MacroCategoryId,
+        tagIds: newTags,
+      });
+    }
+
+    const res = await fetch('/api/quests/onboarding', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        selectedCategoryIds: data.onboarding.selectedCategoryIds,
+        categoryTagMap: nextCategoryTagMap,
+        createSuggestions: false,
+        timezone,
+      }),
+    });
+    const payload = await res.json();
+    if (!res.ok) {
+      throw new Error(payload.error || 'Could not save focus tags');
+    }
+    setClaimMessage('Focus tags updated');
+    await mutateQuests();
   };
 
   if (!mounted || !show) return null;
@@ -192,7 +220,6 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary"><ScrollText className="h-6 w-6" /></div>
                   <div>
                     <h2 className="text-2xl font-black tracking-tight text-foreground md:text-3xl">Quests</h2>
-                    <p className="text-sm text-muted-foreground">Daily quests plus category campaigns tied to your focus.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -205,54 +232,124 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
               {isGuest ? <EmptyState title="Sign in to unlock quests" description="Quests use your tasks, habits, timer sessions, and tags." /> : isLoading ? <LoadingState /> : error || !data ? <EmptyState title="Could not load quests" description="Try reopening the popup." /> : (
                 <div className="flex h-full flex-col">
                   <div className="px-4 pt-4 md:px-6">
-                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'daily' | 'campaigns')}>
-                      <TabsList className="grid h-14 w-full grid-cols-2 rounded-[20px] border border-border/50 bg-muted/40 p-1">
-                        <TabsTrigger value="campaigns" className="rounded-[16px] text-xs font-black uppercase tracking-[0.18em] text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground">Campaigns{claimableCampaigns > 0 && <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-[10px] text-primary-foreground">{claimableCampaigns}</span>}</TabsTrigger>
-                        <TabsTrigger value="daily" className="rounded-[16px] text-xs font-black uppercase tracking-[0.18em] text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground">Daily Quests{claimableDaily > 0 && <span className="ml-2 rounded-full bg-primary px-2 py-0.5 text-[10px] text-primary-foreground">{claimableDaily}</span>}</TabsTrigger>
+                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'daily' | 'category')}>
+                      <TabsList className="flex h-12 w-full items-center gap-1 rounded-[20px] border border-border/50 bg-card/80 p-1 shadow-sm backdrop-blur-2xl md:h-14">
+                        <TabsTrigger
+                          value="category"
+                          className="
+                            flex-1 h-full rounded-2xl relative
+                            flex items-center justify-center gap-2
+                            text-xs md:text-sm font-bold tracking-wide uppercase
+                            transition-all duration-300
+                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
+                            data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
+                          "
+                        >
+                          <Compass className="w-4 h-4" />
+                          <span>My Focus</span>
+                          {claimableCategory > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] text-primary-foreground">{claimableCategory}</span>}
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="daily"
+                          className="
+                            flex-1 h-full rounded-2xl relative
+                            flex items-center justify-center gap-2
+                            text-xs md:text-sm font-bold tracking-wide uppercase
+                            transition-all duration-300
+                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
+                            data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
+                          "
+                        >
+                          <CalendarDays className="w-4 h-4" />
+                          <span>Daily</span>
+                          {claimableDaily > 0 && <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] text-primary-foreground">{claimableDaily}</span>}
+                        </TabsTrigger>
                       </TabsList>
                     </Tabs>
                     {claimMessage && <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-medium text-foreground">{claimMessage}</div>}
                   </div>
                   <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-4 md:px-6 md:pb-6">
-                    {activeTab === 'campaigns' ? (
+                    {activeTab === 'category' ? (
                       <div className="space-y-4">
-                        {!data.onboarding.complete && <PanelCard>Finish your onboarding on the home page to unlock category campaigns.</PanelCard>}
+                        {!data.onboarding.complete && <PanelCard>Finish your onboarding on the home page to unlock quests for your focus areas.</PanelCard>}
+                        {data.onboarding.complete && selectedCategories.length === 0 && <PanelCard>Select at least one focus area to receive quests here.</PanelCard>}
                         {data.onboarding.complete && selectedCategories.length > 0 && (
-                          <div className="rounded-[28px] border border-border/50 bg-card/90 p-5 shadow-sm">
-                            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="rounded-[26px] border border-border/50 bg-card/70 p-4">
+                            <div className="mb-4 flex items-center justify-between gap-3">
                               <div>
-                                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">Campaign Setup</p>
-                                <h3 className="mt-1 text-xl font-black text-foreground">Choose which tags count for each focus area</h3>
-                                <p className="mt-1 text-sm text-muted-foreground">Tasks, habits, and focus sessions only count toward a campaign when they use one of the tags you link here.</p>
+                                <p className="text-sm font-black text-foreground">Focus Tags</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Link tags to each focus area so category quests can follow them.
+                                </p>
                               </div>
-                              <Button onClick={saveMappings} disabled={savingMappings} className="h-11 rounded-2xl font-black uppercase tracking-[0.12em]">{savingMappings ? 'Saving...' : 'Save Campaign Setup'}</Button>
+                              <button
+                                type="button"
+                                onClick={handleRefreshFocus}
+                                disabled={refreshingFocus}
+                                className="inline-flex h-9 items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 text-xs font-bold text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50"
+                              >
+                                <RefreshCw
+                                  className={cn(
+                                    'h-3.5 w-3.5',
+                                    refreshingFocus && 'animate-spin',
+                                  )}
+                                />
+                                {refreshingFocus ? 'Refreshing...' : 'Refresh'}
+                              </button>
                             </div>
-                            {setupMessage && <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm font-medium text-foreground">{setupMessage}</div>}
-                            {availableTags.length === 0 ? <div className="mt-4 rounded-[22px] border border-dashed border-border/50 bg-background/70 px-4 py-4 text-sm text-muted-foreground">Add tags to your tasks or habits first, then come back here to connect them to a campaign.</div> : (
-                              <div className="mt-4 space-y-3">
-                                {selectedCategories.map((category) => (
-                                  <div key={category.id} className="rounded-[22px] border border-border/50 bg-background/80 p-4">
-                                    <div className="mb-3 flex items-center justify-between gap-3">
-                                      <div><p className="text-sm font-black text-foreground">{category.name}</p><p className="text-sm text-muted-foreground">Link the tags that should count toward this campaign.</p></div>
-                                      <span className="rounded-full border border-border/50 bg-muted/40 px-3 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">{getMappedTagIds(category.id).length} linked</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                      {availableTags.map((tag) => {
-                                        const selected = getMappedTagIds(category.id).includes(tag.id);
-                                        return <button key={tag.id} onClick={() => toggleTagForCategory(category.id, tag.id)} className={cn('inline-flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-black uppercase tracking-wide transition-all', selected ? 'border-primary/25 bg-primary/10 text-foreground' : 'border-border/50 bg-background text-muted-foreground hover:bg-muted/50')}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: tag.color }} />{tag.name}</button>;
-                                      })}
+
+                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                              {selectedCategories.map((category) => {
+                                const linkedTagIds = categoryTagMap.get(category.id) ?? [];
+                                return (
+                                  <div
+                                    key={category.id}
+                                    className="rounded-[22px] border border-border/50 bg-background/80 p-4"
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div>
+                                        <p className="text-sm font-black text-foreground">
+                                          {category.name}
+                                        </p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                          {linkedTagIds.length > 0
+                                            ? `${linkedTagIds.length} linked tag${linkedTagIds.length === 1 ? '' : 's'}`
+                                            : 'No linked tags yet'}
+                                        </p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditingFocusCategoryId(category.id)}
+                                        className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border/50 bg-card px-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                                      >
+                                        <Tags className="h-3.5 w-3.5" />
+                                        {linkedTagIds.length > 0 ? 'Edit tags' : 'Link tags'}
+                                      </button>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
-                            )}
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
-                        {data.campaigns.length === 0 ? <PanelCard>{selectedCategories.length > 0 && savedMappedCategoryIds.size < selectedCategories.length ? 'Save your tag links to start those campaigns.' : 'No active campaigns yet.'}</PanelCard> : data.campaigns.map((campaign) => <CampaignCard key={campaign.id} campaign={campaign} category={categoryMap[campaign.categoryId]} rewardCatalog={data.rewardCatalog} isPremium={data.isPremium} claiming={claimingId === campaign.id} onClaim={() => handleClaim('campaign', campaign.id)} />)}
+                        {data.categoryQuests.length === 0 ? <PanelCard>No active focus quests yet.</PanelCard> : data.categoryQuests.map((quest) => <CategoryQuestCard key={quest.id} quest={quest} category={categoryMap[quest.categoryId]} rewardCatalog={data.rewardCatalog} isPremium={data.isPremium} claiming={claimingId === quest.id} onClaim={() => handleClaim('category', quest.id)} />)}
                       </div>
                     ) : (
-                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                        {data.dailyQuests.map((quest) => <DailyQuestCard key={quest.id} quest={quest} rewardCatalog={data.rewardCatalog} isPremium={data.isPremium} claiming={claimingId === quest.id} onClaim={() => handleClaim('daily', quest.id)} />)}
+                      <div className="space-y-4">
+                        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                          {data.dailyQuests.map((quest) => <DailyQuestCard key={quest.id} quest={quest} rewardCatalog={data.rewardCatalog} isPremium={data.isPremium} claiming={claimingId === quest.id} onClaim={() => handleClaim('daily', quest.id)} />)}
+                        </div>
+                        <div className="flex justify-center pt-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={handleRefreshDaily}
+                            disabled={refreshingDaily}
+                            className="rounded-2xl font-bold"
+                          >
+                            {refreshingDaily ? 'Refreshing...' : 'Refresh Daily Quests'}
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -261,6 +358,29 @@ export function QuestsPopup({ show, onClose, isGuest }: { show: boolean; onClose
             </div>
           </motion.div>
         </div>
+        <TagPopup
+          open={!!editingFocusCategoryId}
+          onClose={() => setEditingFocusCategoryId(null)}
+          taskId={editingFocusCategoryId}
+          initialTags={
+            editingFocusCategoryId
+              ? categoryTagMap.get(editingFocusCategoryId) ?? []
+              : []
+          }
+          onSave={handleSaveFocusTags}
+          eyebrow="My Focus"
+          title={
+            editingFocusCategory
+              ? `${editingFocusCategory.name} Tags`
+              : 'Focus Tags'
+          }
+          description={
+            editingFocusCategory
+              ? `Choose the tags that should guide quests for ${editingFocusCategory.name.toLowerCase()}.`
+              : 'Choose the tags that should guide quests for this focus area.'
+          }
+          saveLabel="Save focus tags"
+        />
       </>
     </AnimatePresence>,
     document.body,
@@ -281,36 +401,171 @@ function PanelCard({ children }: { children: React.ReactNode }) {
 
 function DailyQuestCard({ quest, rewardCatalog, isPremium, claiming, onClaim }: { quest: DailyQuestProgressView; rewardCatalog: Record<string, ItemDef>; isPremium: boolean; claiming: boolean; onClaim: () => void }) {
   const progressPercent = Math.min(100, (quest.progress / quest.target) * 100);
-  return <div className="rounded-[26px] border border-border/50 bg-card/90 p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-black uppercase tracking-[0.22em] text-primary">Daily</p><h3 className="mt-1 text-lg font-black leading-tight text-foreground">{quest.title}</h3><p className="mt-1 text-sm text-muted-foreground">{quest.description}</p></div><div className="rounded-2xl border border-border/50 bg-background/80 px-3 py-2 text-center"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">Progress</p><p className="mt-1 text-lg font-black text-foreground">{Math.min(quest.progress, quest.target)}/{quest.target}</p></div></div><div className="mt-4 h-3 overflow-hidden rounded-full bg-muted"><div className={cn('h-full rounded-full transition-all', quest.claimed ? 'bg-emerald-500' : quest.completed ? 'bg-primary' : 'bg-sky-500')} style={{ width: `${progressPercent}%` }} /></div><div className="mt-4 grid gap-3"><RewardTier title="Free" rewards={quest.rewards.free} rewardCatalog={rewardCatalog} /><RewardTier title="Premium" rewards={quest.rewards.premium} rewardCatalog={rewardCatalog} premium locked={!isPremium} /></div><Button onClick={onClaim} disabled={!quest.claimable || claiming} className="mt-4 h-11 w-full rounded-2xl font-black uppercase tracking-wide">{quest.claimed ? 'Claimed' : claiming ? 'Claiming...' : quest.claimable ? isPremium ? 'Claim Free + Premium' : 'Claim Free Reward' : 'Keep Going'}</Button></div>;
+  return <div className="rounded-[26px] border border-border/50 bg-card/90 p-4 shadow-sm"><div className="flex items-start justify-between gap-3"><div><p className="text-[11px] font-black uppercase tracking-[0.22em] text-primary">Daily</p><h3 className="mt-1 text-lg font-black leading-tight text-foreground">{quest.title}</h3><p className="mt-1 text-sm text-muted-foreground">{quest.description}</p></div><div className="rounded-2xl border border-border/50 bg-background/80 px-3 py-2 text-center"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">Progress</p><p className="mt-1 text-lg font-black text-foreground">{Math.min(quest.progress, quest.target)}/{quest.target}</p></div></div><div className="mt-4 h-3 overflow-hidden rounded-full bg-muted"><div className={cn('h-full rounded-full transition-all', quest.claimed ? 'bg-emerald-500' : quest.completed ? 'bg-primary' : 'bg-sky-500')} style={{ width: `${progressPercent}%` }} /></div><div className="mt-4 grid gap-3"><RewardTier rewards={quest.rewards} rewardCatalog={rewardCatalog} isPremium={isPremium} /></div><Button onClick={onClaim} disabled={!quest.claimable || claiming} className="mt-4 h-11 w-full rounded-2xl font-black uppercase tracking-wide">{quest.claimed ? 'Claimed' : claiming ? 'Claiming...' : quest.claimable ? isPremium ? 'Claim Double Reward' : 'Claim Reward' : 'Keep Going'}</Button></div>;
 }
 
-function CampaignCard({ campaign, category, rewardCatalog, isPremium, claiming, onClaim }: { campaign: CampaignProgressView; category?: MacroCategoryDefinition; rewardCatalog: Record<string, ItemDef>; isPremium: boolean; claiming: boolean; onClaim: () => void }) {
-  const completedObjectives = campaign.objectives.filter((objective) => objective.completed).length;
-  return <div className="relative overflow-hidden rounded-[28px] border border-border/50 bg-card/95 p-5 shadow-sm"><div className="absolute inset-x-0 top-0 h-1" style={{ backgroundColor: category?.accent ?? '#22c55e' }} /><div className="absolute inset-0 opacity-60" style={{ backgroundImage: `radial-gradient(circle at top right, ${category?.accent ?? '#22c55e'}22, transparent 30%)` }} /><div className="relative"><div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between"><div className="max-w-2xl"><div className="mb-3 flex flex-wrap items-center gap-2"><span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/80 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground"><TimerReset className="h-3.5 w-3.5" />{formatCountdown(campaign.secondsLeft)}</span><span className="rounded-full border border-border/50 bg-muted/40 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">{campaign.durationDays} Day Campaign</span></div><p className="text-sm font-black uppercase tracking-[0.22em] text-primary">{campaign.categoryName}</p><h3 className="mt-1 text-3xl font-black tracking-tight text-foreground">{campaign.title}</h3><p className="mt-1 text-sm text-muted-foreground">{campaign.subtitle}</p><div className="mt-5 grid gap-3 md:grid-cols-3">{campaign.objectives.map((objective) => <div key={objective.id} className="rounded-[22px] border border-border/50 bg-background/80 p-3"><p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">Objective</p><p className="mt-1 text-sm font-bold text-foreground">{objective.title}</p><p className="mt-1 text-xs text-muted-foreground">{objective.description}</p><div className="mt-3 flex items-center justify-between text-xs font-bold uppercase tracking-wide text-muted-foreground"><span>{Math.min(objective.progress, objective.target)}/{objective.target}</span><span>{objective.completed ? 'Done' : 'Active'}</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-muted"><div className={cn('h-full rounded-full transition-all', objective.completed ? 'bg-emerald-500' : 'bg-primary')} style={{ width: `${Math.min(100, (objective.progress / objective.target) * 100)}%` }} /></div></div>)}</div></div><div className="w-full max-w-sm rounded-[24px] border border-border/50 bg-background/80 p-4"><div className="mb-3 flex items-center justify-between"><div><p className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">Rewards</p><p className="mt-1 text-sm font-bold text-foreground">{completedObjectives}/{campaign.objectives.length} objectives done</p></div><div className="rounded-full border border-border/50 bg-muted/40 px-3 py-1 text-[11px] font-black uppercase tracking-wide text-muted-foreground">{campaign.claimed ? 'Claimed' : campaign.claimable ? 'Ready' : 'In progress'}</div></div><RewardTier title="Free" rewards={campaign.rewards.free} rewardCatalog={rewardCatalog} /><RewardTier title="Premium" rewards={campaign.rewards.premium} rewardCatalog={rewardCatalog} premium locked={!isPremium} /><Button onClick={onClaim} disabled={!campaign.claimable || claiming} className="mt-4 h-11 w-full rounded-2xl font-black uppercase tracking-wide">{campaign.claimed ? 'Claimed' : claiming ? 'Claiming...' : campaign.claimable ? isPremium ? 'Claim Full Bundle' : 'Claim Free Bundle' : campaign.expired ? 'Expired' : 'Keep Pushing'}</Button></div></div></div></div>;
+function CategoryQuestCard({ quest, category, rewardCatalog, isPremium, claiming, onClaim }: { quest: CategoryQuestProgressView; category?: MacroCategoryDefinition; rewardCatalog: Record<string, ItemDef>; isPremium: boolean; claiming: boolean; onClaim: () => void }) {
+  const progressPercent = Math.min(100, (quest.progress / quest.target) * 100);
+  return (
+    <div className="relative overflow-hidden rounded-[28px] border border-border/50 bg-card/95 p-5 shadow-sm">
+      <div
+        className="absolute inset-x-0 top-0 h-1"
+        style={{ backgroundColor: category?.accent ?? '#22c55e' }}
+      />
+      <div
+        className="absolute inset-0 opacity-60"
+        style={{
+          backgroundImage: `radial-gradient(circle at top right, ${category?.accent ?? '#22c55e'}22, transparent 32%)`,
+        }}
+      />
+      <div className="relative">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          {quest.coverImageUrl ? (
+            <div className="w-full max-w-xs overflow-hidden rounded-[24px] border border-border/50 bg-background/70">
+              <img
+                src={quest.coverImageUrl}
+                alt={quest.title}
+                className="h-44 w-full object-cover"
+              />
+            </div>
+          ) : null}
+
+          <div className="flex-1">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <span className="rounded-full border border-border/50 bg-background/80 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                {category?.name ?? 'Category'}
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background/80 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-muted-foreground">
+                <TimerReset className="h-3.5 w-3.5" />
+                {Math.min(quest.progress, quest.target)}/{quest.target}
+              </span>
+            </div>
+
+            <h3 className="text-3xl font-black tracking-tight text-foreground">
+              {quest.title}
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {quest.description}
+            </p>
+
+            <div className="mt-4 h-3 overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn(
+                  'h-full rounded-full transition-all',
+                  quest.claimed
+                    ? 'bg-emerald-500'
+                    : quest.completed
+                      ? 'bg-primary'
+                      : 'bg-sky-500',
+                )}
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {quest.logic.map((block) => (
+                <div
+                  key={block.id}
+                  className="rounded-[22px] border border-border/50 bg-background/80 p-3"
+                >
+                  <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                    {block.type === 'focus_minutes'
+                      ? 'Focus Minutes'
+                      : block.action === 'add'
+                        ? 'Add'
+                        : 'Complete'}
+                  </p>
+                  <p className="mt-1 text-sm font-bold text-foreground">
+                    {block.subject === 'any'
+                      ? 'Tasks + Habits'
+                      : block.subject === 'habit'
+                        ? 'Habits'
+                        : 'Tasks'}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {block.resolvedTagNames?.length
+                      ? `Tags: ${block.resolvedTagNames.join(', ')}`
+                      : block.tagMode === 'focus_category_tags'
+                        ? 'No linked focus tags yet'
+                      : block.resolvedTagName
+                        ? `Tag: ${block.resolvedTagName}`
+                        : 'All items count'}
+                  </p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {Math.min(block.progress, block.target)}/{block.target}
+                  </p>
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          (block.progress / block.target) * 100,
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="w-full max-w-sm rounded-[24px] border border-border/50 bg-background/80 p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">
+                  Reward
+                </p>
+                <p className="mt-1 text-sm font-bold text-foreground">
+                  {quest.claimed
+                    ? 'Claimed'
+                    : quest.claimable
+                      ? 'Ready to claim'
+                      : 'In progress'}
+                </p>
+              </div>
+            </div>
+
+            <RewardTier
+              rewards={quest.rewards}
+              rewardCatalog={rewardCatalog}
+              isPremium={isPremium}
+            />
+
+            <Button
+              onClick={onClaim}
+              disabled={!quest.claimable || claiming}
+              className="mt-4 h-11 w-full rounded-2xl font-black uppercase tracking-wide"
+            >
+              {quest.claimed
+                ? 'Claimed'
+                : claiming
+                  ? 'Claiming...'
+                  : quest.claimable
+                    ? isPremium
+                      ? 'Claim Double Reward'
+                      : 'Claim Reward'
+                    : 'Keep Going'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
-function RewardTier({ title, rewards, rewardCatalog, premium, locked }: { title: string; rewards: QuestReward[]; rewardCatalog: Record<string, ItemDef>; premium?: boolean; locked?: boolean }) {
-  return <div className={cn('mt-3 rounded-[20px] border p-3', premium ? 'border-primary/20 bg-primary/10' : 'border-border/50 bg-card/80', locked && 'opacity-70')}><div className="mb-2 flex items-center justify-between"><p className={cn('text-[11px] font-black uppercase tracking-[0.2em]', premium ? 'text-primary' : 'text-muted-foreground')}>{title}</p>{locked ? <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-muted-foreground"><Lock className="h-3 w-3" />Locked</span> : premium ? <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wide text-primary"><Crown className="h-3 w-3" />Premium</span> : null}</div><div className="flex flex-wrap gap-2">{rewards.map((reward, index) => <div key={`${reward.type}-${reward.itemId ?? reward.animationId ?? reward.amount ?? index}`} className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-2 text-xs font-bold text-foreground"><RewardIcon reward={reward} /><span>{rewardLabel(reward, rewardCatalog)}</span></div>)}</div></div>;
+function RewardTier({ rewards, rewardCatalog, isPremium }: { rewards: QuestReward[]; rewardCatalog: Record<string, ItemDef>; isPremium: boolean }) {
+  return <div className="mt-3 rounded-[20px] border border-border/50 bg-card/80 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">Reward</p><span className={cn('text-[10px] font-black uppercase tracking-wide', isPremium ? 'text-primary' : 'text-muted-foreground')}>{isPremium ? 'Premium x2' : 'Base reward'}</span></div><div className="flex flex-wrap gap-2">{rewards.map((reward, index) => <div key={`${reward.type}-${reward.itemId ?? reward.amount ?? index}`} className="inline-flex items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-2 text-xs font-bold text-foreground"><RewardIcon reward={reward} /><span>{rewardLabel(reward, rewardCatalog, isPremium)}</span></div>)}</div></div>;
 }
 
 function RewardIcon({ reward }: { reward: QuestReward }) {
   if (reward.type === 'FLIES') return <Fly size={16} y={-1} />;
   if (reward.type === 'BOX') return <Gift className="h-4 w-4 text-primary" />;
-  if (reward.type === 'ANIMATION') return <Sparkles className="h-4 w-4 text-primary" />;
   return <Trophy className="h-4 w-4 text-primary" />;
 }
 
-function rewardLabel(reward: QuestReward, rewardCatalog: Record<string, ItemDef>) {
-  if (reward.type === 'FLIES') return `${reward.amount ?? 0} flies`;
-  if (reward.type === 'ANIMATION') return reward.label ?? reward.animationId ?? 'Animation';
-  if (reward.itemId) return rewardCatalog[reward.itemId]?.name ?? reward.itemId;
+function rewardLabel(reward: QuestReward, rewardCatalog: Record<string, ItemDef>, isPremium = false) {
+  if (reward.type === 'FLIES') return `${(reward.amount ?? 0) * (isPremium ? 2 : 1)} flies`;
+  if (reward.itemId) return `${rewardCatalog[reward.itemId]?.name ?? reward.itemId}${isPremium ? ' x2' : ''}`;
   return 'Reward';
-}
-
-function formatCountdown(secondsLeft: number) {
-  const days = Math.floor(secondsLeft / 86400);
-  const hours = Math.floor((secondsLeft % 86400) / 3600);
-  if (days > 0) return `${days}D ${hours}H`;
-  const minutes = Math.floor((secondsLeft % 3600) / 60);
-  return `${hours}H ${minutes}M`;
 }

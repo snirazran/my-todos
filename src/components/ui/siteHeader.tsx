@@ -13,6 +13,7 @@ import {
   LogIn,
   LogOut,
   Timer,
+  Compass,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -197,8 +198,10 @@ function RightActions({
   const [isOpen, setIsOpen] = useState(false);
   const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const { openQuestOnboarding } = useUIStore();
 
   // Close on click outside (desktop only — mobile has its own close via MobileSheet)
   useEffect(() => {
@@ -216,6 +219,14 @@ function RightActions({
   const handleSignOut = async () => {
     await signOut(auth);
     onSignOut();
+  };
+
+  const handleOpenQuestOnboarding = () => {
+    openQuestOnboarding();
+    setIsOpen(false);
+    if (pathname !== '/') {
+      router.push('/');
+    }
   };
 
   const cycleTheme = () => {
@@ -373,6 +384,16 @@ function RightActions({
                 </button>
 
                 <button
+                  onClick={handleOpenQuestOnboarding}
+                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                >
+                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
+                    Quest Focus
+                  </span>
+                  <Compass className="h-[1.2rem] w-[1.2rem] text-emerald-500" />
+                </button>
+
+                <button
                   onClick={() => {
                     setAdminDialogOpen(true);
                     setIsOpen(false);
@@ -413,6 +434,7 @@ function RightActions({
         theme={theme}
         setTheme={setTheme}
         onSignIn={onSignIn}
+        onOpenQuestOnboarding={handleOpenQuestOnboarding}
         adminDialogOpen={adminDialogOpen}
         setAdminDialogOpen={setAdminDialogOpen}
         pathname={pathname}
@@ -453,6 +475,7 @@ function MobileSheet({
   showAuth,
   theme,
   setTheme,
+  onOpenQuestOnboarding,
   adminDialogOpen,
   setAdminDialogOpen,
   pathname,
@@ -546,6 +569,21 @@ function MobileSheet({
                     </AnimatePresence>
                   </div>
                 </button>
+
+                {showAuth && (
+                  <button
+                    onClick={() => {
+                      onOpenQuestOnboarding();
+                      onClose();
+                    }}
+                    className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
+                  >
+                    <span className="font-bold text-sm group-hover:text-foreground transition-colors">
+                      Quest Focus
+                    </span>
+                    <Compass className="h-5 w-5 text-emerald-500" />
+                  </button>
+                )}
 
                 {setAdminDialogOpen && (
                   <button

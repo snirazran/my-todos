@@ -7,6 +7,47 @@ import { v4 as uuid } from 'uuid';
 
 export const dynamic = 'force-dynamic';
 
+function normalizeUserTag(tag: any, index: number) {
+  if (typeof tag === 'string') {
+    const name = tag.trim();
+    if (!name) return null;
+    return {
+      id: name,
+      name,
+      color: '#22c55e',
+    };
+  }
+
+  if (!tag || typeof tag !== 'object') return null;
+
+  const name =
+    typeof tag.name === 'string' && tag.name.trim()
+      ? tag.name.trim()
+      : typeof tag.id === 'string' && tag.id.trim()
+        ? tag.id.trim()
+        : '';
+
+  if (!name) return null;
+
+  const id =
+    typeof tag.id === 'string' && tag.id.trim()
+      ? tag.id.trim()
+      : name;
+
+  const color =
+    typeof tag.color === 'string' && tag.color.trim()
+      ? tag.color.trim()
+      : '#22c55e';
+
+  return {
+    ...tag,
+    id,
+    name,
+    color,
+    _key: `${id}-${index}`,
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const userId = await requireUserId();
@@ -22,10 +63,16 @@ export async function GET(req: NextRequest) {
       : false;
     const freeLimit = 3;
 
-    const tags = (user?.tags ?? []).map((tag: any, index: number) => ({
-      ...tag,
-      disabled: !isPremium && index >= freeLimit,
-    }));
+    const tags = (user?.tags ?? [])
+      .map((tag: any, index: number) => normalizeUserTag(tag, index))
+      .filter(Boolean)
+      .map((tag: any, index: number) => ({
+        id: tag.id,
+        name: tag.name,
+        color: tag.color,
+        key: tag._key ?? `${tag.id}-${index}`,
+        disabled: !isPremium && index >= freeLimit,
+      }));
 
     return NextResponse.json({ tags, isPremium });
   } catch {

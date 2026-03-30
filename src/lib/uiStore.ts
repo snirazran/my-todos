@@ -11,6 +11,11 @@ interface UIState {
   openQuests: () => void;
   closeQuests: () => void;
   setQuestsOpen: (open: boolean) => void;
+
+  isQuestOnboardingOpen: boolean;
+  openQuestOnboarding: () => void;
+  closeQuestOnboarding: () => void;
+  setQuestOnboardingOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -24,4 +29,9 @@ export const useUIStore = create<UIState>((set) => ({
   openQuests: () => set({ isQuestsOpen: true }),
   closeQuests: () => set({ isQuestsOpen: false }),
   setQuestsOpen: (open: boolean) => set({ isQuestsOpen: open }),
+
+  isQuestOnboardingOpen: false,
+  openQuestOnboarding: () => set({ isQuestOnboardingOpen: true }),
+  closeQuestOnboarding: () => set({ isQuestOnboardingOpen: false }),
+  setQuestOnboardingOpen: (open: boolean) => set({ isQuestOnboardingOpen: open }),
 }));

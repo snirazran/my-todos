@@ -67,6 +67,12 @@ export default function Home() {
   const { user, loading } = useAuth();
   const sessionLoading = loading;
   const router = useRouter();
+  const {
+    isQuestOnboardingOpen,
+    closeQuestOnboarding,
+    isWardrobeOpen,
+    setWardrobeOpen,
+  } = useUIStore();
 
   // -- NEW STATE HOOK --
   const {
@@ -96,7 +102,6 @@ export default function Home() {
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const isInitialLoad = useRef(true);
 
-  const { isWardrobeOpen, setWardrobeOpen } = useUIStore();
   const [guestTasks, setGuestTasks] = useState<Task[]>(demoTasks);
 
   const [quickText, setQuickText] = useState('');
@@ -219,7 +224,7 @@ export default function Home() {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [dismissQuestOnboarding, setDismissQuestOnboarding] = useState(false);
   const { data: questsData, mutate: mutateQuests } = useSWR<{
-    onboarding: {
+    onboarding?: {
       complete: boolean;
       selectedCategoryIds: MacroCategoryId[];
       categoryTagMap: FocusCategoryTagMap[];
@@ -229,12 +234,13 @@ export default function Home() {
     (url: string) => fetch(url).then((res) => res.json()),
     { revalidateOnFocus: false },
   );
+  const questOnboarding = questsData?.onboarding;
 
   useEffect(() => {
-    if (questsData?.onboarding.complete) {
+    if (questOnboarding?.complete) {
       setDismissQuestOnboarding(false);
     }
-  }, [questsData?.onboarding.complete]);
+  }, [questOnboarding?.complete]);
 
   // Block Scrolling during cinematic
   useEffect(() => {
@@ -739,14 +745,19 @@ export default function Home() {
       <QuestOnboardingPopup
         show={
           !!user &&
-          !!questsData &&
-          !questsData.onboarding.complete &&
-          !dismissQuestOnboarding
+          !!questOnboarding &&
+          (isQuestOnboardingOpen ||
+            (!questOnboarding.complete && !dismissQuestOnboarding))
         }
-        initialSelectedCategoryIds={questsData?.onboarding.selectedCategoryIds ?? []}
-        initialCategoryTagMap={questsData?.onboarding.categoryTagMap ?? []}
-        onClose={() => setDismissQuestOnboarding(true)}
+        isCompleted={!!questOnboarding?.complete}
+        initialSelectedCategoryIds={questOnboarding?.selectedCategoryIds ?? []}
+        initialCategoryTagMap={questOnboarding?.categoryTagMap ?? []}
+        onClose={() => {
+          closeQuestOnboarding();
+          setDismissQuestOnboarding(true);
+        }}
         onCompleted={() => {
+          closeQuestOnboarding();
           setDismissQuestOnboarding(false);
           mutateQuests();
           mutateToday();

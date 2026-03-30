@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useMemo } from 'react';
 import useSWR, { mutate } from 'swr';
-import { Tag, Palette, Plus, X, Loader2, Pencil, Check, Lock } from 'lucide-react';
+import { Tag, Palette, Plus, X, Pencil, Check, Lock } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const TAG_COLORS = [
@@ -25,14 +25,13 @@ const TAG_COLORS = [
 ];
 
 const TAG_MAX_LENGTH = 20;
-const MAX_SAVED_TAGS = 50;
-
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 type SavedTag = {
   id: string;
   name: string;
   color: string;
+  key?: string;
   disabled?: boolean;
 };
 
@@ -47,7 +46,40 @@ import { PremiumLimitDialog } from './PremiumLimitDialog';
 
 export default function TagManager({ selectedTags, onTagsChange, open, onOpenChange }: TagManagerProps) {
   const { data: tagsData } = useSWR('/api/tags', fetcher);
-  const savedTags: SavedTag[] = tagsData?.tags || [];
+  const savedTags: SavedTag[] = useMemo(
+    () =>
+      (Array.isArray(tagsData?.tags) ? tagsData.tags : [])
+        .map((tag: any, index: number) => {
+          const rawId =
+            typeof tag?.id === 'string' && tag.id.trim()
+              ? tag.id.trim()
+              : '';
+          const rawName =
+            typeof tag?.name === 'string' && tag.name.trim()
+              ? tag.name.trim()
+              : rawId;
+          const id = rawId || rawName || `tag-${index}`;
+          const name = rawName || id;
+          const color =
+            typeof tag?.color === 'string' && tag.color.trim()
+              ? tag.color.trim()
+              : '#22c55e';
+          const key =
+            typeof tag?.key === 'string' && tag.key.trim()
+              ? tag.key.trim()
+              : `${id}-${index}`;
+
+          return {
+            id,
+            name,
+            color,
+            key,
+            disabled: !!tag?.disabled,
+          };
+        })
+        .filter((tag) => !!tag.id),
+    [tagsData?.tags],
+  );
 
   const [tagInput, setTagInput] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -59,7 +91,6 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
 
   const tagInputRef = useRef<HTMLInputElement>(null);
   const ignoreClickRef = useRef(false);
-
   // Auto-focus input when opening
   React.useEffect(() => {
     if (open) {
@@ -174,9 +205,11 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
   };
 
   return (
-    <AnimatePresence>
-      {open && (
+    <>
+      <AnimatePresence>
+        {open && (
         <motion.div
+            key="tag-manager-panel"
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
@@ -294,21 +327,20 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                         </div>
                         <div className="flex flex-wrap gap-2">
                           <AnimatePresence>
-                            {filteredTags.map((st) => {
+                            {filteredTags.map((st, index) => {
                                 const isSelected = selectedTags.includes(st.id);
                                 return (
                                     <motion.button
                                         exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
-                                        key={st.id}
+                                        key={st.key && st.key.trim() ? st.key : `${st.id}-${st.name}-${index}`}
                                         type="button"
-                                        // Long Press
                                         onPointerDown={(e) => {
                                             ignoreClickRef.current = false;
                                             const timer = setTimeout(() => {
                                                 setManageTagsMode(true);
                                                 ignoreClickRef.current = true;
                                                 if (navigator.vibrate) navigator.vibrate(50);
-                                            }, 500); 
+                                            }, 500);
                                             (e.target as any)._longPressTimer = timer;
                                         }}
                                         onPointerUp={(e) => {
@@ -370,8 +402,9 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                 )}
             </div>
         </motion.div>
-      )}
+        )}
+      </AnimatePresence>
       <PremiumLimitDialog open={showPremiumLimit} onClose={() => setShowPremiumLimit(false)} />
-    </AnimatePresence>
+    </>
   );
 }

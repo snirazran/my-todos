@@ -5,35 +5,72 @@ export type MacroCategoryId =
   | 'house_chores'
   | 'sleep';
 
-export type QuestRewardType = 'FLIES' | 'ITEM' | 'BOX' | 'ANIMATION';
+export type QuestRewardType = 'FLIES' | 'ITEM' | 'BOX';
 
 export type QuestReward = {
   type: QuestRewardType;
+  amountMode?: QuestAmountMode;
   amount?: number;
+  minAmount?: number;
+  maxAmount?: number;
   itemId?: string;
-  animationId?: string;
-  label?: string;
 };
 
-export type TierRewards = {
-  free: QuestReward[];
-  premium: QuestReward[];
+export type QuestRewards = QuestReward[];
+
+export type QuestPlacement = 'daily' | 'category';
+export type QuestSubject = 'task' | 'habit' | 'any';
+export type QuestCountAction = 'complete' | 'add';
+export type QuestAmountMode = 'fixed' | 'random';
+export type QuestLogicType = 'count' | 'focus_minutes';
+export type QuestVisibilityMetric =
+  | 'daily_tasks_count'
+  | 'total_habits_count'
+  | 'tags_count';
+export type QuestVisibilityOperator = 'gt' | 'lt';
+
+export type QuestLogicBlock = {
+  id: string;
+  type: QuestLogicType;
+  subject: QuestSubject;
+  amountMode: QuestAmountMode;
+  amount?: number;
+  minAmount?: number;
+  maxAmount?: number;
+  action?: QuestCountAction;
+  tagMode?: 'ignore' | 'random_user_tag' | 'focus_category_tags';
 };
 
-export type DailyQuestKind =
-  | 'complete_tasks'
-  | 'add_tasks'
-  | 'complete_habits'
-  | 'add_habits'
-  | 'focus_minutes';
+export type QuestVisibilityCondition = {
+  id: string;
+  metric: QuestVisibilityMetric;
+  operator: QuestVisibilityOperator;
+  value: number;
+};
 
-export type CampaignObjectiveKind =
-  | 'complete_tag_tasks'
-  | 'add_tag_tasks'
-  | 'complete_tag_habits'
-  | 'add_tag_habits'
-  | 'focus_tag_minutes'
-  | 'habit_streak';
+export type ResolvedQuestLogicBlock = QuestLogicBlock & {
+  target: number;
+  progress: number;
+  resolvedTagId?: string;
+  resolvedTagIds?: string[];
+  resolvedTagName?: string;
+  resolvedTagNames?: string[];
+};
+
+export type QuestTemplateView = {
+  id: string;
+  name: string;
+  description: string;
+  coverImageUrl?: string;
+  placement: QuestPlacement;
+  categoryId?: MacroCategoryId;
+  rewards: QuestRewards;
+  logic: QuestLogicBlock[];
+  visibilityConditions: QuestVisibilityCondition[];
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
 
 export type FocusCategoryTagMap = {
   categoryId: MacroCategoryId;
@@ -48,49 +85,31 @@ export type FocusProfile = {
   unlockedAnimationIds?: string[];
 };
 
-export type DailyQuestProgressView = {
+export type QuestProgressView = {
   id: string;
-  kind: DailyQuestKind;
+  templateId: string;
+  placement: QuestPlacement;
+  categoryId?: MacroCategoryId;
   windowKey: string;
   title: string;
   description: string;
+  coverImageUrl?: string;
   target: number;
   progress: number;
   completed: boolean;
   claimable: boolean;
   claimed: boolean;
-  rewards: TierRewards;
+  rewards: QuestRewards;
+  logic: ResolvedQuestLogicBlock[];
 };
 
-export type CampaignObjectiveView = {
-  id: string;
-  kind: CampaignObjectiveKind;
-  title: string;
-  description: string;
-  target: number;
-  progress: number;
-  completed: boolean;
-  tagIds?: string[];
-  habitId?: string;
-  habitName?: string;
+export type DailyQuestProgressView = QuestProgressView & {
+  placement: 'daily';
 };
 
-export type CampaignProgressView = {
-  id: string;
+export type CategoryQuestProgressView = QuestProgressView & {
+  placement: 'category';
   categoryId: MacroCategoryId;
-  categoryName: string;
-  title: string;
-  subtitle: string;
-  durationDays: number;
-  startsAt: string;
-  endsAt: string;
-  secondsLeft: number;
-  objectives: CampaignObjectiveView[];
-  completed: boolean;
-  claimable: boolean;
-  claimed: boolean;
-  expired: boolean;
-  rewards: TierRewards;
 };
 
 export type MacroCategoryDefinition = {

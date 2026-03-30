@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X,
@@ -15,6 +16,7 @@ import {
   CheckCircle,
   XCircle,
   Paintbrush,
+  ScrollText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
@@ -35,6 +37,7 @@ export function AdminSettingsDialog({
   open,
   onOpenChange,
 }: AdminSettingsDialogProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
 
@@ -455,6 +458,26 @@ export function AdminSettingsDialog({
                     <div className="font-bold text-sm">Cosmetics Manager</div>
                     <div className="text-xs text-muted-foreground font-normal">
                       View all skins & add new items to DB
+                    </div>
+                  </div>
+                </Button>
+
+                <Button
+                  onClick={() => {
+                    onOpenChange(false);
+                    router.push('/admin/quests');
+                  }}
+                  disabled={loading !== null}
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-auto py-4 px-4"
+                >
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <ScrollText className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-sm">Quest Manager</div>
+                    <div className="text-xs text-muted-foreground font-normal">
+                      Create and edit DB-backed daily and category quests
                     </div>
                   </div>
                 </Button>

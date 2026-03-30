@@ -1,0 +1,301 @@
+import { v4 as uuid } from 'uuid';
+import { NextRequest, NextResponse } from 'next/server';
+import { requireUserId } from '@/lib/auth';
+import connectMongo from '@/lib/mongoose';
+import QuestTemplateModel from '@/lib/models/QuestTemplate';
+import { templateToView } from '@/lib/quests/engine';
+import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
+import type {
+  MacroCategoryId,
+  QuestAmountMode,
+  QuestCountAction,
+  QuestLogicBlock,
+  QuestLogicType,
+  QuestPlacement,
+  QuestReward,
+  QuestRewards,
+  QuestRewardType,
+  QuestSubject,
+  QuestVisibilityCondition,
+  QuestVisibilityMetric,
+  QuestVisibilityOperator,
+} from '@/lib/quests/types';
+
+const json = (body: unknown, status = 200) =>
+  NextResponse.json(body, { status });
+
+const VALID_CATEGORIES = new Set(
+  QUEST_MACRO_CATEGORIES.map((category) => category.id),
+);
+const VALID_PLACEMENTS = new Set<QuestPlacement>(['daily', 'category']);
+const VALID_LOGIC_TYPES = new Set<QuestLogicType>(['count', 'focus_minutes']);
+const VALID_SUBJECTS = new Set<QuestSubject>(['task', 'habit', 'any']);
+const VALID_ACTIONS = new Set<QuestCountAction>(['complete', 'add']);
+const VALID_AMOUNT_MODES = new Set<QuestAmountMode>(['fixed', 'random']);
+const VALID_REWARD_TYPES = new Set<QuestRewardType>([
+  'FLIES',
+  'ITEM',
+  'BOX',
+]);
+const VALID_VISIBILITY_METRICS = new Set<QuestVisibilityMetric>([
+  'daily_tasks_count',
+  'total_habits_count',
+  'tags_count',
+]);
+const VALID_VISIBILITY_OPERATORS = new Set<QuestVisibilityOperator>([
+  'gt',
+  'lt',
+]);
+
+function sanitizeReward(input: any): QuestReward | null {
+  if (!input || !VALID_REWARD_TYPES.has(input.type)) return null;
+  const reward: QuestReward = { type: input.type };
+
+  if (input.type === 'FLIES') {
+    const amountMode = VALID_AMOUNT_MODES.has(input.amountMode)
+      ? input.amountMode
+      : 'fixed';
+    reward.amountMode = amountMode;
+    if (amountMode === 'fixed') {
+      const amount = Number(input.amount);
+      if (!Number.isFinite(amount) || amount <= 0) return null;
+      reward.amount = Math.floor(amount);
+    } else {
+      const fallbackAmount = Number(input.amount);
+      const minAmount = Number.isFinite(Number(input.minAmount))
+        ? Number(input.minAmount)
+        : 1;
+      const maxAmount = Number.isFinite(Number(input.maxAmount))
+        ? Number(input.maxAmount)
+        : Number.isFinite(fallbackAmount) && fallbackAmount > 0
+          ? fallbackAmount
+          : NaN;
+      if (
+        !Number.isFinite(minAmount) ||
+        !Number.isFinite(maxAmount) ||
+        minAmount <= 0 ||
+        maxAmount < minAmount
+      ) {
+        return null;
+      }
+      reward.minAmount = Math.floor(minAmount);
+      reward.maxAmount = Math.floor(maxAmount);
+    }
+  }
+
+  if (input.type === 'ITEM' || input.type === 'BOX') {
+    if (typeof input.itemId !== 'string' || !input.itemId.trim()) return null;
+    reward.itemId = input.itemId.trim();
+  }
+
+  return reward;
+}
+
+function sanitizeRewards(input: any): QuestRewards {
+  const rewards = Array.isArray(input)
+    ? input.map(sanitizeReward).filter(Boolean)
+    : [];
+  return rewards as QuestReward[];
+}
+
+function sanitizeLogicBlock(input: any): QuestLogicBlock | null {
+  if (!input || !VALID_LOGIC_TYPES.has(input.type)) return null;
+  if (!VALID_SUBJECTS.has(input.subject)) return null;
+  if (!VALID_AMOUNT_MODES.has(input.amountMode)) return null;
+
+  const block: QuestLogicBlock = {
+    id:
+      typeof input.id === 'string' && input.id.trim()
+        ? input.id.trim()
+        : uuid(),
+    type: input.type,
+    subject: input.subject,
+    amountMode: input.amountMode,
+    tagMode:
+      input.tagMode === 'random_user_tag'
+        ? 'random_user_tag'
+        : input.tagMode === 'focus_category_tags'
+          ? 'focus_category_tags'
+          : 'ignore',
+  };
+
+  if (block.type === 'count') {
+    if (!VALID_ACTIONS.has(input.action)) return null;
+    block.action = input.action;
+  }
+
+  if (block.amountMode === 'fixed') {
+    const amount = Number(input.amount);
+    if (!Number.isFinite(amount) || amount <= 0) return null;
+    block.amount = Math.floor(amount);
+  } else {
+    const fallbackAmount = Number(input.amount);
+    const minAmount = Number.isFinite(Number(input.minAmount))
+      ? Number(input.minAmount)
+      : 1;
+    const maxAmount = Number.isFinite(Number(input.maxAmount))
+      ? Number(input.maxAmount)
+      : Number.isFinite(fallbackAmount) && fallbackAmount > 0
+        ? fallbackAmount
+        : NaN;
+    if (
+      !Number.isFinite(minAmount) ||
+      !Number.isFinite(maxAmount) ||
+      minAmount <= 0 ||
+      maxAmount < minAmount
+    ) {
+      return null;
+    }
+    block.minAmount = Math.floor(minAmount);
+    block.maxAmount = Math.floor(maxAmount);
+  }
+
+  return block;
+}
+
+function sanitizeVisibilityCondition(input: any): QuestVisibilityCondition | null {
+  if (!input || !VALID_VISIBILITY_METRICS.has(input.metric)) return null;
+  if (!VALID_VISIBILITY_OPERATORS.has(input.operator)) return null;
+
+  const value = Number(input.value);
+  if (!Number.isFinite(value) || value < 0) return null;
+
+  return {
+    id:
+      typeof input.id === 'string' && input.id.trim()
+        ? input.id.trim()
+        : uuid(),
+    metric: input.metric,
+    operator: input.operator,
+    value: Math.floor(value),
+  };
+}
+
+function sanitizeTemplateBody(body: any) {
+  const name = typeof body?.name === 'string' ? body.name.trim() : '';
+  const description =
+    typeof body?.description === 'string' ? body.description.trim() : '';
+  const placement = body?.placement as QuestPlacement;
+  const categoryId = body?.categoryId as MacroCategoryId | undefined;
+  const coverImageUrl =
+    typeof body?.coverImageUrl === 'string' && body.coverImageUrl.startsWith('data:image/')
+      ? body.coverImageUrl
+      : undefined;
+  const logic = Array.isArray(body?.logic)
+    ? body.logic.map(sanitizeLogicBlock).filter(Boolean)
+    : [];
+  const visibilityConditions = Array.isArray(body?.visibilityConditions)
+    ? body.visibilityConditions.map(sanitizeVisibilityCondition).filter(Boolean)
+    : [];
+  const rewards = sanitizeRewards(body?.rewards);
+  const isActive = body?.isActive !== false;
+
+  if (!name) return { error: 'Quest name is required' };
+  if (!VALID_PLACEMENTS.has(placement)) return { error: 'Invalid placement' };
+  if (placement === 'category' && (!categoryId || !VALID_CATEGORIES.has(categoryId))) {
+    return { error: 'A category quest needs a valid category' };
+  }
+  if (!logic.length) return { error: 'Add at least one logic block' };
+  if (rewards.length === 0) {
+    return { error: 'Add at least one reward' };
+  }
+
+  const normalizedLogic = (logic as QuestLogicBlock[]).map((block) =>
+    placement === 'category' || block.tagMode !== 'focus_category_tags'
+      ? block
+      : { ...block, tagMode: 'ignore' },
+  );
+
+  return {
+    payload: {
+      name,
+      description,
+      placement,
+      categoryId: placement === 'category' ? categoryId : undefined,
+      coverImageUrl,
+      logic: normalizedLogic,
+      visibilityConditions: visibilityConditions as QuestVisibilityCondition[],
+      rewards,
+      isActive,
+    },
+  };
+}
+
+export async function GET() {
+  try {
+    await requireUserId();
+    await connectMongo();
+    const templates = await QuestTemplateModel.find({}).sort({
+      createdAt: -1,
+    });
+    return json({ templates: templates.map(templateToView) });
+  } catch {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    await requireUserId();
+    const body = await req.json();
+    const sanitized = sanitizeTemplateBody(body);
+    if ('error' in sanitized) return json({ error: sanitized.error }, 400);
+
+    await connectMongo();
+    const template = await QuestTemplateModel.create({
+      templateId: uuid(),
+      ...sanitized.payload,
+    });
+
+    return json({ ok: true, template: templateToView(template) });
+  } catch (error) {
+    return json(
+      { error: error instanceof Error ? error.message : 'Failed to create quest' },
+      400,
+    );
+  }
+}
+
+export async function PUT(req: NextRequest) {
+  try {
+    await requireUserId();
+    const body = await req.json();
+    const templateId =
+      typeof body?.id === 'string' && body.id.trim() ? body.id.trim() : '';
+    if (!templateId) return json({ error: 'Missing template id' }, 400);
+
+    const sanitized = sanitizeTemplateBody(body);
+    if ('error' in sanitized) return json({ error: sanitized.error }, 400);
+
+    await connectMongo();
+    const template = await QuestTemplateModel.findOneAndUpdate(
+      { templateId },
+      { $set: sanitized.payload },
+      { new: true },
+    );
+    if (!template) return json({ error: 'Quest template not found' }, 404);
+
+    return json({ ok: true, template: templateToView(template) });
+  } catch (error) {
+    return json(
+      { error: error instanceof Error ? error.message : 'Failed to update quest' },
+      400,
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    await requireUserId();
+    const body = await req.json();
+    const templateId =
+      typeof body?.id === 'string' && body.id.trim() ? body.id.trim() : '';
+    if (!templateId) return json({ error: 'Missing template id' }, 400);
+
+    await connectMongo();
+    await QuestTemplateModel.deleteOne({ templateId });
+    return json({ ok: true });
+  } catch {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+}

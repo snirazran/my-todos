@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
     const body = await req.json();
-    const claimType = body.claimType === 'campaign' ? 'campaign' : 'daily';
+    const claimType = body.claimType === 'category' ? 'category' : 'daily';
     const targetId = String(body.targetId ?? '');
     const timezone = body.timezone || 'UTC';
 

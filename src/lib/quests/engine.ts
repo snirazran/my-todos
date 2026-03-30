@@ -1,25 +1,29 @@
-import { v4 as uuid } from 'uuid';
 import QuestModel, { type QuestDoc } from '@/lib/models/Quest';
-import CampaignModel, {
-  type CampaignDoc,
-  type CampaignObjectiveDoc,
-} from '@/lib/models/Campaign';
+import QuestTemplateModel, {
+  type QuestTemplateDoc,
+} from '@/lib/models/QuestTemplate';
 import UserModel from '@/lib/models/User';
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import type { UserDoc } from '@/lib/types/UserDoc';
-import type { ItemDef, Rarity } from '@/lib/skins/catalog';
+import type { ItemDef } from '@/lib/skins/catalog';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
-import { getMacroCategory, QUEST_MACRO_CATEGORIES } from './catalog';
+import { QUEST_MACRO_CATEGORIES } from './catalog';
 import type {
-  CampaignProgressView,
-  DailyQuestKind,
+  CategoryQuestProgressView,
   DailyQuestProgressView,
   FocusCategoryTagMap,
   FocusProfile,
   MacroCategoryId,
+  QuestLogicBlock,
+  QuestPlacement,
+  QuestProgressView,
   QuestReward,
-  TierRewards,
+  QuestRewards,
+  QuestSubject,
+  QuestTemplateView,
+  QuestVisibilityCondition,
+  ResolvedQuestLogicBlock,
 } from './types';
 
 function hashString(value: string) {
@@ -40,10 +44,6 @@ function createSeededRandom(seed: string) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
-}
-
-function pickOne<T>(items: T[], rng: () => number) {
-  return items[Math.floor(rng() * items.length)];
 }
 
 function shuffle<T>(items: T[], rng: () => number) {
@@ -70,17 +70,71 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
   };
 }
 
+function getUserTagId(tag: unknown) {
+  if (!tag || typeof tag !== 'object') return null;
+  const tagRecord = tag as { id?: unknown; name?: unknown };
+  if (typeof tagRecord.id === 'string' && tagRecord.id.trim()) {
+    return tagRecord.id.trim();
+  }
+  if (typeof tagRecord.name === 'string' && tagRecord.name.trim()) {
+    return tagRecord.name.trim();
+  }
+  return null;
+}
+
+function getUserTagName(tag: unknown) {
+  if (!tag || typeof tag !== 'object') return null;
+  const tagRecord = tag as { id?: unknown; name?: unknown };
+  if (typeof tagRecord.name === 'string' && tagRecord.name.trim()) {
+    return tagRecord.name.trim();
+  }
+  if (typeof tagRecord.id === 'string' && tagRecord.id.trim()) {
+    return tagRecord.id.trim();
+  }
+  return null;
+}
+
 function hasAnyTag(task: TaskDoc, tagIds?: string[]) {
-  if (!tagIds?.length) return false;
+  if (!tagIds?.length) return true;
   const taskTags = task.tags ?? [];
   return tagIds.some((tagId) => taskTags.includes(tagId));
 }
 
 function taskCompletionDates(task: TaskDoc) {
   const dates = new Set(task.completedDates ?? []);
-  if (task.type === 'regular' && task.completed && task.date)
+  if (task.type === 'regular' && task.completed && task.date) {
     dates.add(task.date);
+  }
   return [...dates];
+}
+
+function matchesSubject(task: TaskDoc, subject: QuestSubject) {
+  if (subject === 'any') return true;
+  if (subject === 'habit') return task.type === 'habit';
+  return task.type !== 'habit';
+}
+
+function matchesLogicBlock(task: TaskDoc, block: QuestLogicBlock) {
+  if (!matchesSubject(task, block.subject)) return false;
+  const tagIds =
+    block.tagMode === 'random_user_tag' &&
+    'resolvedTagId' in block &&
+    block.resolvedTagId
+      ? [block.resolvedTagId]
+      : block.tagMode === 'focus_category_tags' &&
+          'resolvedTagIds' in block &&
+          Array.isArray(block.resolvedTagIds)
+        ? block.resolvedTagIds
+        : undefined;
+  if (
+    (block.tagMode === 'random_user_tag' ||
+      block.tagMode === 'focus_category_tags') &&
+    (!tagIds || tagIds.length === 0)
+  ) {
+    return false;
+  }
+  if (!hasAnyTag(task, tagIds)) return false;
+  return true;
 }
 
 function countAddedTasks(
@@ -134,567 +188,129 @@ function sumFocusSeconds(
   }, 0);
 }
 
-function longestConsecutiveDates(dateStrs: string[]) {
-  const uniqueSorted = [...new Set(dateStrs)].sort();
-  let best = 0;
-  let current = 0;
-  let previous: string | null = null;
-
-  for (const dateStr of uniqueSorted) {
-    if (!previous) {
-      current = 1;
-    } else {
-      const diff =
-        (new Date(`${dateStr}T12:00:00Z`).getTime() -
-          new Date(`${previous}T12:00:00Z`).getTime()) /
-        86400000;
-      current = diff === 1 ? current + 1 : 1;
-    }
-    best = Math.max(best, current);
-    previous = dateStr;
+function resolveLogicTarget(
+  block: QuestLogicBlock,
+  seed: string,
+) {
+  if (block.amountMode === 'fixed') {
+    return Math.max(1, block.amount ?? 1);
   }
 
-  return best;
-}
-
-function rewardCatalogPick(
-  catalog: ItemDef[],
-  predicate: (item: ItemDef) => boolean,
-  rng: () => number,
-) {
-  const matches = catalog.filter(predicate);
-  if (!matches.length) return null;
-  return pickOne(matches, rng);
-}
-
-function getMappedTagIds(profile: FocusProfile, categoryId: MacroCategoryId) {
-  return (
-    profile.categoryTagMap.find((entry) => entry.categoryId === categoryId)
-      ?.tagIds ?? []
-  );
-}
-
-function dailyQuestProgress(
-  kind: DailyQuestKind,
-  tasks: TaskDoc[],
-  timezone: string,
-) {
-  const today = getZonedToday(timezone);
-  switch (kind) {
-    case 'complete_tasks':
-      return countCompletedEvents(
-        tasks,
-        today,
-        today,
-        (task) => task.type !== 'habit',
-      );
-    case 'add_tasks':
-      return countAddedTasks(
-        tasks,
-        timezone,
-        today,
-        today,
-        (task) => task.type !== 'habit',
-      );
-    case 'complete_habits':
-      return countCompletedEvents(
-        tasks,
-        today,
-        today,
-        (task) => task.type === 'habit',
-      );
-    case 'add_habits':
-      return countAddedTasks(
-        tasks,
-        timezone,
-        today,
-        today,
-        (task) => task.type === 'habit',
-      );
-    case 'focus_minutes':
-      return Math.floor(sumFocusSeconds(tasks, today, today, () => true) / 60);
-    default:
-      return 0;
-  }
-}
-
-function campaignObjectiveProgress(
-  objective: CampaignObjectiveDoc,
-  tasks: TaskDoc[],
-  timezone: string,
-  startsAt: Date,
-  endsAt: Date,
-) {
-  const startDate = getZonedYMD(startsAt, timezone);
-  const endDate = getZonedYMD(endsAt, timezone);
-
-  switch (objective.kind) {
-    case 'complete_tag_tasks':
-      return countCompletedEvents(
-        tasks,
-        startDate,
-        endDate,
-        (task) => task.type !== 'habit' && hasAnyTag(task, objective.tagIds),
-      );
-    case 'add_tag_tasks':
-      return countAddedTasks(
-        tasks,
-        timezone,
-        startDate,
-        endDate,
-        (task) => task.type !== 'habit' && hasAnyTag(task, objective.tagIds),
-      );
-    case 'complete_tag_habits':
-      return countCompletedEvents(
-        tasks,
-        startDate,
-        endDate,
-        (task) => task.type === 'habit' && hasAnyTag(task, objective.tagIds),
-      );
-    case 'add_tag_habits':
-      return countAddedTasks(
-        tasks,
-        timezone,
-        startDate,
-        endDate,
-        (task) => task.type === 'habit' && hasAnyTag(task, objective.tagIds),
-      );
-    case 'focus_tag_minutes':
-      return Math.floor(
-        sumFocusSeconds(tasks, startDate, endDate, (task) =>
-          hasAnyTag(task, objective.tagIds),
-        ) / 60,
-      );
-    case 'habit_streak': {
-      const habit = tasks.find(
-        (task) => task.type === 'habit' && task.id === objective.habitId,
-      );
-      if (!habit) return 0;
-      const dates = taskCompletionDates(habit).filter(
-        (dateStr) => dateStr >= startDate && dateStr <= endDate,
-      );
-      return longestConsecutiveDates(dates);
-    }
-    default:
-      return 0;
-  }
-}
-
-function buildDailyRewards(rng: () => number): TierRewards {
-  return {
-    free: [{ type: 'FLIES', amount: pickOne([20, 35, 50], rng) }],
-    premium: [{ type: 'FLIES', amount: pickOne([35, 50, 75], rng) }],
-  };
-}
-
-function buildCampaignRewards(
-  categoryId: MacroCategoryId,
-  durationDays: number,
-  catalog: ItemDef[],
-  rng: () => number,
-): TierRewards {
-  const freeFlies =
-    durationDays === 14
-      ? pickOne([900, 1200, 1600], rng)
-      : pickOne([450, 600, 800], rng);
-  const premiumFlies =
-    durationDays === 14
-      ? pickOne([1800, 2400, 3000], rng)
-      : pickOne([900, 1200, 1600], rng);
-  const freeItem =
-    rewardCatalogPick(
-      catalog,
-      (item) =>
-        item.slot !== 'container' && ['rare', 'epic'].includes(item.rarity),
-      rng,
-    ) ?? rewardCatalogPick(catalog, (item) => item.slot !== 'container', rng);
-  const premiumItem =
-    rewardCatalogPick(
-      catalog,
-      (item) =>
-        item.slot !== 'container' &&
-        (['epic', 'legendary'] as Rarity[]).includes(item.rarity),
-      rng,
-    ) ?? rewardCatalogPick(catalog, (item) => item.slot !== 'container', rng);
-  const box = rewardCatalogPick(
-    catalog,
-    (item) => item.slot === 'container',
-    rng,
-  );
-  const animationId =
-    getMacroCategory(categoryId)?.premiumAnimationId ??
-    `${categoryId}_signature_move`;
-
-  return {
-    free: [
-      { type: 'FLIES', amount: freeFlies },
-      ...(freeItem ? [{ type: 'ITEM' as const, itemId: freeItem.id }] : []),
-      ...(box ? [{ type: 'BOX' as const, itemId: box.id }] : []),
-    ],
-    premium: [
-      { type: 'FLIES', amount: premiumFlies },
-      ...(premiumItem
-        ? [{ type: 'ITEM' as const, itemId: premiumItem.id }]
-        : []),
-      { type: 'ANIMATION', animationId, label: 'Exclusive frog animation' },
-    ],
-  };
-}
-
-function buildDailyQuestDefinitions(seed: string) {
+  const min = Math.max(1, Math.min(block.minAmount ?? 1, block.maxAmount ?? 1));
+  const max = Math.max(min, block.maxAmount ?? min);
   const rng = createSeededRandom(seed);
-  const completeTasksTarget = pickOne([3, 4, 5], rng);
-  const addTasksTarget = pickOne([2, 3], rng);
-  const completeHabitsTarget = pickOne([2, 3, 4], rng);
-  const addHabitsTarget = pickOne([1, 2], rng);
-  const focusTarget = pickOne([15, 20, 30], rng);
-  return shuffle(
-    [
-      {
-        kind: 'complete_tasks' as const,
-        title: `Complete ${completeTasksTarget} tasks today`,
-        description: 'Short push. Clear a few non-habit tasks today.',
-        target: completeTasksTarget,
-      },
-      {
-        kind: 'add_tasks' as const,
-        title: `Add ${addTasksTarget} new tasks`,
-        description: 'Capture a couple of new tasks while your brain is warm.',
-        target: addTasksTarget,
-      },
-      {
-        kind: 'complete_habits' as const,
-        title: `Complete ${completeHabitsTarget} habits today`,
-        description: 'Keep your routines moving with a few habit check-ins.',
-        target: completeHabitsTarget,
-      },
-      {
-        kind: 'add_habits' as const,
-        title: `Add ${addHabitsTarget} new habit${addHabitsTarget > 1 ? 's' : ''}`,
-        description: 'Set up a habit that you want to build next.',
-        target: addHabitsTarget,
-      },
-      {
-        kind: 'focus_minutes' as const,
-        title: `Use the focus timer for ${focusTarget} minutes`,
-        description: 'Log a short focus session on anything important today.',
-        target: focusTarget,
-      },
-    ],
-    rng,
-  ).slice(0, 3);
+  return Math.floor(rng() * (max - min + 1)) + min;
 }
 
-function buildCampaignObjectives(args: {
-  userId: string;
-  categoryId: MacroCategoryId;
-  tagIds: string[];
-  tasks: TaskDoc[];
-  durationDays: number;
-}) {
-  const { userId, categoryId, tagIds, tasks, durationDays } = args;
-  const category = getMacroCategory(categoryId);
-  const rng = createSeededRandom(
-    `${userId}:${categoryId}:${tagIds.join(',')}:${durationDays}`,
-  );
-  const taggedHabits = tasks.filter(
-    (task) => task.type === 'habit' && hasAnyTag(task, tagIds),
-  );
-  const objectives: CampaignObjectiveDoc[] = [
-    {
-      id: uuid(),
-      kind: 'complete_tag_tasks',
-      title: `Complete ${durationDays === 14 ? 10 : 5} tagged tasks`,
-      description: `Finish ${category?.name ?? 'focus'} tasks tied to this campaign.`,
-      target: durationDays === 14 ? 10 : 5,
-      progress: 0,
-      tagIds,
-    },
-    {
-      id: uuid(),
-      kind: 'focus_tag_minutes',
-      title: `Focus for ${durationDays === 14 ? 180 : 90} minutes`,
-      description: 'Use the timer on work tied to this campaign.',
-      target: durationDays === 14 ? 180 : 90,
-      progress: 0,
-      tagIds,
-    },
-  ];
+function resolveRewardAmount(reward: QuestReward, seed: string) {
+  const amountMode = reward.amountMode ?? 'fixed';
+  if (amountMode === 'fixed') {
+    return Math.max(1, reward.amount ?? 1);
+  }
 
-  if (taggedHabits.length > 0) {
-    const habit = pickOne(taggedHabits, rng);
-    objectives.push({
-      id: uuid(),
-      kind: 'habit_streak',
-      title: `Build a ${durationDays === 14 ? 7 : 5} day streak`,
-      description: `Stay consistent with ${habit.text}.`,
-      target: durationDays === 14 ? 7 : 5,
-      progress: 0,
-      tagIds,
-      habitId: habit.id,
-      habitName: habit.text,
-    });
-  } else {
-    objectives.push(
-      pickOne(
-        [
-          {
-            id: uuid(),
-            kind: 'add_tag_tasks' as const,
-            title: `Add ${durationDays === 14 ? 5 : 3} tagged tasks`,
-            description: 'Create fresh tasks that belong to this category.',
-            target: durationDays === 14 ? 5 : 3,
-            progress: 0,
-            tagIds,
-          },
-          {
-            id: uuid(),
-            kind: 'add_tag_habits' as const,
-            title: `Add ${durationDays === 14 ? 2 : 1} tagged habits`,
-            description: 'Create habits that belong to this category.',
-            target: durationDays === 14 ? 2 : 1,
-            progress: 0,
-            tagIds,
-          },
-          {
-            id: uuid(),
-            kind: 'complete_tag_habits' as const,
-            title: `Complete ${durationDays === 14 ? 10 : 5} tagged habits`,
-            description: 'Check off habits linked to this category.',
-            target: durationDays === 14 ? 10 : 5,
-            progress: 0,
-            tagIds,
-          },
-        ],
-        rng,
-      ),
+  const min = Math.max(1, Math.min(reward.minAmount ?? 1, reward.maxAmount ?? 1));
+  const max = Math.max(min, reward.maxAmount ?? min);
+  const rng = createSeededRandom(seed);
+  return Math.floor(rng() * (max - min + 1)) + min;
+}
+
+function progressForLogicBlock(args: {
+  block: QuestLogicBlock;
+  tasks: TaskDoc[];
+  timezone: string;
+  startDate: string;
+  endDate: string;
+}) {
+  const { block, tasks, timezone, startDate, endDate } = args;
+
+  if (block.type === 'focus_minutes') {
+    return Math.floor(
+      sumFocusSeconds(tasks, startDate, endDate, (task) =>
+        matchesLogicBlock(task, block),
+      ) / 60,
     );
   }
 
-  return objectives;
-}
-
-async function ensureDailyQuests(args: {
-  userId: string;
-  tasks: TaskDoc[];
-  timezone: string;
-}) {
-  const { userId, tasks, timezone } = args;
-  const windowKey = getZonedToday(timezone);
-  let docs = await QuestModel.find({ userId, windowKey }).sort({
-    createdAt: 1,
-  });
-
-  if (!docs.length) {
-    const defs = buildDailyQuestDefinitions(`${userId}:${windowKey}`);
-    docs = await QuestModel.insertMany(
-      defs.map((entry) => ({
-        userId,
-        questId: `${windowKey}:${entry.kind}:${uuid()}`,
-        kind: entry.kind,
-        windowKey,
-        title: entry.title,
-        description: entry.description,
-        target: entry.target,
-        progress: 0,
-        rewards: buildDailyRewards(
-          createSeededRandom(`${userId}:${windowKey}:${entry.kind}`),
-        ),
-      })),
+  if (block.action === 'add') {
+    return countAddedTasks(tasks, timezone, startDate, endDate, (task) =>
+      matchesLogicBlock(task, block),
     );
   }
 
-  for (const doc of docs) {
-    const progress = dailyQuestProgress(doc.kind, tasks, timezone);
-    const completed = progress >= doc.target;
-    if (doc.progress !== progress) doc.progress = progress;
-    if (completed && !doc.completedAt) doc.completedAt = new Date();
-    if (!completed && doc.completedAt) doc.completedAt = null;
-    if (doc.isModified()) await doc.save();
+  return countCompletedEvents(tasks, startDate, endDate, (task) =>
+    matchesLogicBlock(task, block),
+  );
+}
+
+function sanitizeReward(reward: QuestReward) {
+  const next: QuestReward = {
+    type: reward.type,
+  };
+  if (typeof reward.amount === 'number') next.amount = reward.amount;
+  if (reward.amountMode) next.amountMode = reward.amountMode;
+  if (typeof reward.minAmount === 'number') next.minAmount = reward.minAmount;
+  if (typeof reward.maxAmount === 'number') next.maxAmount = reward.maxAmount;
+  if (reward.itemId) next.itemId = reward.itemId;
+  return next;
+}
+
+function isSupportedReward(reward: { type?: string }): reward is QuestReward {
+  return (
+    reward.type === 'FLIES' ||
+    reward.type === 'ITEM' ||
+    reward.type === 'BOX'
+  );
+}
+
+function sanitizeRewardSet(rewards: unknown): QuestRewards {
+  if (!Array.isArray(rewards)) return [];
+  return rewards
+    .filter((reward): reward is QuestReward => isSupportedReward(reward as { type?: string }))
+    .map(sanitizeReward);
+}
+
+function resolveReward(reward: QuestReward, seed: string): QuestReward {
+  if (reward.type === 'FLIES') {
+    return {
+      type: 'FLIES',
+      amount: resolveRewardAmount(reward, seed),
+    };
   }
 
-  return docs;
+  return sanitizeReward(reward);
 }
 
-async function ensureCampaigns(args: {
-  user: UserDoc;
-  tasks: TaskDoc[];
-  timezone: string;
-  catalog: ItemDef[];
-}) {
-  const { user, tasks, timezone, catalog } = args;
-  const profile = normalizeFocusProfile(user);
-  if (!profile.completedAt || !profile.selectedCategoryIds.length) return [];
-
-  const now = new Date();
-  const docs: CampaignDoc[] = [];
-
-  for (const categoryId of profile.selectedCategoryIds) {
-    const tagIds = getMappedTagIds(profile, categoryId);
-    if (!tagIds.length) continue;
-
-    let doc = await CampaignModel.findOne({
-      userId: user._id,
-      categoryId,
-      claimedAt: null,
-    }).sort({ startsAt: -1 });
-
-    if (
-      doc &&
-      doc.endsAt < now &&
-      doc.objectives.some((objective) => objective.progress < objective.target)
-    ) {
-      doc = null;
-    }
-
-    if (!doc) {
-      const category = getMacroCategory(categoryId);
-      const rng = createSeededRandom(
-        `${user._id}:${categoryId}:${getZonedToday(timezone)}`,
-      );
-      const durationDays = pickOne(category?.durationDaysOptions ?? [7], rng);
-      doc = await CampaignModel.create({
-        userId: user._id,
-        campaignId: `${categoryId}:${uuid()}`,
-        categoryId,
-        categoryName: category?.name ?? categoryId,
-        title: pickOne(
-          category?.campaignHeadlines ?? ['Category Campaign'],
-          rng,
-        ),
-        subtitle: `Stay with ${category?.name ?? 'your focus'} for ${durationDays} days.`,
-        durationDays,
-        startsAt: now,
-        endsAt: new Date(now.getTime() + durationDays * 86400000),
-        objectives: buildCampaignObjectives({
-          userId: user._id,
-          categoryId,
-          tagIds,
-          tasks,
-          durationDays,
-        }),
-        rewards: buildCampaignRewards(categoryId, durationDays, catalog, rng),
-      });
-    }
-
-    for (const objective of doc.objectives) {
-      const progress = campaignObjectiveProgress(
-        objective,
-        tasks,
-        timezone,
-        doc.startsAt,
-        doc.endsAt,
-      );
-      if (objective.progress !== progress) objective.progress = progress;
-    }
-
-    if (doc.isModified()) {
-      doc.markModified('objectives');
-      await doc.save();
-    }
-
-    docs.push(doc);
-  }
-
-  return docs;
-}
-
-function questDocToView(doc: QuestDoc): DailyQuestProgressView {
-  const completed = doc.progress >= doc.target;
-  const claimed = !!doc.claimedAt;
-  return {
-    id: doc.questId,
-    kind: doc.kind,
-    windowKey: doc.windowKey,
-    title: doc.title,
-    description: doc.description,
-    target: doc.target,
-    progress: doc.progress,
-    completed,
-    claimable: completed && !claimed,
-    claimed,
-    rewards: doc.rewards,
-  };
-}
-
-function campaignDocToView(doc: CampaignDoc): CampaignProgressView {
-  const now = new Date();
-  const objectives = doc.objectives.map((objective) => ({
-    id: objective.id,
-    kind: objective.kind,
-    title: objective.title,
-    description: objective.description,
-    target: objective.target,
-    progress: objective.progress,
-    completed: objective.progress >= objective.target,
-    tagIds: objective.tagIds,
-    habitId: objective.habitId,
-    habitName: objective.habitName,
-  }));
-  const completed = objectives.every((objective) => objective.completed);
-  const claimed = !!doc.claimedAt;
-  const expired = doc.endsAt < now;
-
-  return {
-    id: doc.campaignId,
-    categoryId: doc.categoryId,
-    categoryName: doc.categoryName,
-    title: doc.title,
-    subtitle: doc.subtitle,
-    durationDays: doc.durationDays,
-    startsAt: doc.startsAt.toISOString(),
-    endsAt: doc.endsAt.toISOString(),
-    secondsLeft: Math.max(
-      0,
-      Math.floor((doc.endsAt.getTime() - now.getTime()) / 1000),
-    ),
-    objectives,
-    completed,
-    claimable: completed && !claimed,
-    claimed,
-    expired: expired && !completed && !claimed,
-    rewards: doc.rewards,
-  };
-}
-
-export async function syncQuestState(args: {
-  userId: string;
-  timezone: string;
-  catalog?: ItemDef[];
-}) {
-  const { userId, timezone } = args;
-  const [user, tasks, catalog] = await Promise.all([
-    UserModel.findById(userId).lean<UserDoc | null>(),
-    TaskModel.find({ userId, deletedAt: { $exists: false } }).lean<TaskDoc[]>(),
-    args.catalog ? Promise.resolve(args.catalog) : getFullCatalog(),
-  ]);
-
-  if (!user) throw new Error('User not found');
-
-  const [dailyDocs, campaignDocs] = await Promise.all([
-    ensureDailyQuests({ userId, tasks, timezone }),
-    ensureCampaigns({ user, tasks, timezone, catalog }),
-  ]);
-
-  return {
-    user,
-    tasks,
-    catalog,
-    isPremium: isPremiumUser(user),
-    focusProfile: normalizeFocusProfile(user),
-    macroCategories: QUEST_MACRO_CATEGORIES,
-    dailyQuests: dailyDocs.map(questDocToView),
-    campaigns: campaignDocs.map(campaignDocToView),
-  };
-}
-
-export function buildRewardCatalog(
-  catalog: ItemDef[],
-  rewardSets: TierRewards[],
+function buildVisibilityMetrics(
+  user: UserDoc,
+  tasks: TaskDoc[],
+  todayKey: string,
 ) {
+  return {
+    daily_tasks_count: tasks.filter(
+      (task) => task.type !== 'habit' && task.date === todayKey,
+    ).length,
+    total_habits_count: tasks.filter((task) => task.type === 'habit').length,
+    tags_count: user.tags?.length ?? 0,
+  };
+}
+
+function matchesVisibilityConditions(
+  conditions: QuestVisibilityCondition[] | undefined,
+  metrics: ReturnType<typeof buildVisibilityMetrics>,
+) {
+  if (!conditions?.length) return true;
+
+  return conditions.every((condition) => {
+    const current = metrics[condition.metric];
+    if (condition.operator === 'gt') return current > condition.value;
+    return current < condition.value;
+  });
+}
+
+function buildRewardCatalog(catalog: ItemDef[], rewardSets: QuestRewards[]) {
   const itemIds = new Set<string>();
   rewardSets.forEach((set) => {
-    [...set.free, ...set.premium].forEach((reward) => {
+    set.forEach((reward) => {
       if (reward.itemId) itemIds.add(reward.itemId);
     });
   });
@@ -705,6 +321,323 @@ export function buildRewardCatalog(
       .map((item) => [item.id, item]),
   );
 }
+
+function templateToView(doc: QuestTemplateDoc): QuestTemplateView {
+  return {
+    id: doc.templateId,
+    name: doc.name,
+    description: doc.description,
+    coverImageUrl: doc.coverImageUrl,
+    placement: doc.placement,
+    categoryId: doc.categoryId,
+    rewards: sanitizeRewardSet(doc.rewards),
+    logic: doc.logic,
+    visibilityConditions: doc.visibilityConditions ?? [],
+    isActive: doc.isActive,
+    createdAt: doc.createdAt?.toISOString(),
+    updatedAt: doc.updatedAt?.toISOString(),
+  };
+}
+
+function questDocToView(doc: QuestDoc): QuestProgressView {
+  const completed = doc.progress >= doc.target;
+  const claimed = !!doc.claimedAt;
+  return {
+    id: doc.questId,
+    templateId: doc.templateId,
+    placement: doc.placement,
+    categoryId: doc.categoryId,
+    windowKey: doc.windowKey,
+    title: doc.title,
+    description: doc.description,
+    coverImageUrl: doc.coverImageUrl,
+    target: doc.target,
+    progress: doc.progress,
+    completed,
+    claimable: completed && !claimed,
+    claimed,
+    rewards: sanitizeRewardSet(doc.rewards),
+    logic: doc.logic,
+  };
+}
+
+function placementWindowKey(
+  placement: QuestPlacement,
+  templateId: string,
+  timezone: string,
+) {
+  if (placement === 'daily') return getZonedToday(timezone);
+  return `category:${templateId}`;
+}
+
+async function syncQuestForTemplate(args: {
+  template: QuestTemplateDoc;
+  userId: string;
+  user: UserDoc;
+  tasks: TaskDoc[];
+  timezone: string;
+}) {
+  const { template, userId, user, tasks, timezone } = args;
+  const windowKey = placementWindowKey(template.placement, template.templateId, timezone);
+  const questId =
+    template.placement === 'daily'
+      ? `${template.templateId}:${windowKey}`
+      : `${template.templateId}:category`;
+
+  let doc =
+    (await QuestModel.findOne({ userId, templateId: template.templateId, windowKey })) ??
+    new QuestModel({
+      userId,
+      questId,
+      templateId: template.templateId,
+      rollKey: crypto.randomUUID(),
+      placement: template.placement,
+      categoryId: template.categoryId,
+      windowKey,
+      title: template.name,
+      description: template.description,
+      coverImageUrl: template.coverImageUrl,
+      target: 0,
+      progress: 0,
+      logic: [],
+      rewards: template.rewards,
+    });
+
+  if (!doc.rollKey) {
+    doc.rollKey = crypto.randomUUID();
+  }
+
+  const startDate =
+    template.placement === 'daily'
+      ? windowKey
+      : getZonedYMD(doc.createdAt ?? new Date(), timezone);
+  const endDate = getZonedToday(timezone);
+  const userTags = (user.tags ?? []).filter(
+    (tag) => !!getUserTagId(tag),
+  );
+  const profile = normalizeFocusProfile(user);
+  const categoryTagIds =
+    template.categoryId
+      ? profile.categoryTagMap.find(
+          (entry) => entry.categoryId === template.categoryId,
+        )?.tagIds ?? []
+      : [];
+  const categoryTags = userTags.filter((tag) => {
+    const tagId = getUserTagId(tag);
+    return tagId ? categoryTagIds.includes(tagId) : false;
+  });
+  const resolvedLogic: ResolvedQuestLogicBlock[] = template.logic.map((block) => {
+      const resolvedTag =
+        block.tagMode === 'random_user_tag' && userTags.length > 0
+        ? userTags[
+            Math.floor(
+              createSeededRandom(
+                `${userId}:${template.templateId}:${windowKey}:${block.id}:tag`,
+              )() * userTags.length,
+            )
+          ]
+        : null;
+    const target = resolveLogicTarget(
+      block,
+      `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:${block.id}`,
+    );
+      const resolvedBlock: ResolvedQuestLogicBlock = {
+        ...block,
+        target,
+        progress: 0,
+        resolvedTagId: getUserTagId(resolvedTag),
+        resolvedTagIds:
+          block.tagMode === 'focus_category_tags'
+            ? categoryTags
+                .map((tag) => getUserTagId(tag))
+                .filter((tagId): tagId is string => !!tagId)
+            : undefined,
+        resolvedTagName: getUserTagName(resolvedTag),
+        resolvedTagNames:
+          block.tagMode === 'focus_category_tags'
+            ? categoryTags
+                .map((tag) => getUserTagName(tag))
+                .filter((tagName): tagName is string => !!tagName)
+            : undefined,
+      };
+    const progress = progressForLogicBlock({
+      block: resolvedBlock,
+      tasks,
+      timezone,
+      startDate,
+      endDate,
+    });
+    return { ...resolvedBlock, progress };
+  });
+
+  const target = resolvedLogic.reduce((sum, block) => sum + block.target, 0);
+  const progress = resolvedLogic.reduce(
+    (sum, block) => sum + Math.min(block.progress, block.target),
+    0,
+  );
+  const completed = progress >= target;
+
+  doc.questId = questId;
+  doc.placement = template.placement;
+  doc.categoryId = template.categoryId;
+  doc.title = template.name;
+  doc.description = template.description;
+  doc.coverImageUrl = template.coverImageUrl;
+  doc.logic = resolvedLogic;
+  doc.rewards = template.rewards
+    .filter((reward): reward is QuestReward =>
+      isSupportedReward(reward as { type?: string }),
+    )
+    .map((reward, index) =>
+      resolveReward(
+        reward,
+        `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:reward:${index}`,
+      ),
+    );
+  doc.target = target;
+  doc.progress = progress;
+  doc.completedAt = completed ? doc.completedAt ?? new Date() : null;
+
+  if (doc.isModified()) {
+    doc.markModified('logic');
+    doc.markModified('rewards');
+    await doc.save();
+  }
+
+  return doc;
+}
+
+export async function syncQuestState(args: {
+  userId: string;
+  timezone: string;
+  catalog?: ItemDef[];
+  refreshDaily?: boolean;
+  dailySelectionSeed?: string;
+}) {
+  const { userId, timezone } = args;
+  const [user, tasks, catalog, templates] = await Promise.all([
+    UserModel.findById(userId).lean<UserDoc | null>(),
+    TaskModel.find({ userId, deletedAt: { $exists: false } }).lean<TaskDoc[]>(),
+    args.catalog ? Promise.resolve(args.catalog) : getFullCatalog(),
+    QuestTemplateModel.find({ isActive: true }).sort({
+      placement: 1,
+      createdAt: -1,
+    }),
+  ]);
+
+  if (!user) throw new Error('User not found');
+
+  const profile = normalizeFocusProfile(user);
+  const todayKey = getZonedToday(timezone);
+  const visibilityMetrics = buildVisibilityMetrics(user, tasks, todayKey);
+
+  if (args.refreshDaily) {
+    await QuestModel.deleteMany({
+      userId,
+      placement: 'daily',
+      windowKey: todayKey,
+    });
+  }
+
+  const filteredTemplates = templates.filter((template) =>
+    matchesVisibilityConditions(
+      template.visibilityConditions,
+      visibilityMetrics,
+    ),
+  );
+
+  const dailyTemplates = filteredTemplates.filter(
+    (template) => template.placement === 'daily',
+  );
+  const categoryTemplates = filteredTemplates.filter((template) => {
+    if (template.placement !== 'category' || !template.categoryId) return false;
+    return profile.selectedCategoryIds.includes(template.categoryId);
+  });
+
+  const existingDailyDocs = await QuestModel.find({
+    userId,
+    placement: 'daily',
+    windowKey: todayKey,
+  }).lean<QuestDoc[]>();
+
+  let selectedDailyTemplates: QuestTemplateDoc[] = [];
+  if (existingDailyDocs.length > 0) {
+    const templateIds = new Set(existingDailyDocs.map((doc) => doc.templateId));
+    const matchedTemplates = dailyTemplates.filter((template) =>
+      templateIds.has(template.templateId),
+    );
+    if (matchedTemplates.length > 0) {
+      selectedDailyTemplates = matchedTemplates;
+    }
+  }
+
+  if (selectedDailyTemplates.length === 0) {
+    const rng = createSeededRandom(
+      `${userId}:${todayKey}:${args.dailySelectionSeed ?? 'default'}`,
+    );
+    selectedDailyTemplates = shuffle(dailyTemplates, rng).slice(0, 3);
+  }
+
+  const eligibleTemplates = [...selectedDailyTemplates, ...categoryTemplates];
+  const eligibleDailyTemplateIds = selectedDailyTemplates.map(
+    (template) => template.templateId,
+  );
+  const eligibleCategoryTemplateIds = categoryTemplates.map(
+    (template) => template.templateId,
+  );
+
+  await Promise.all([
+    QuestModel.deleteMany({
+      userId,
+      placement: 'daily',
+      windowKey: todayKey,
+      templateId: { $nin: eligibleDailyTemplateIds },
+    }),
+    QuestModel.deleteMany({
+      userId,
+      placement: 'category',
+      templateId: { $nin: eligibleCategoryTemplateIds },
+    }),
+  ]);
+
+  const docs = await Promise.all(
+    eligibleTemplates.map((template) =>
+      syncQuestForTemplate({ template, userId, user, tasks, timezone }),
+    ),
+  );
+
+  const questViews = docs.map(questDocToView);
+  const dailyQuests = questViews
+    .filter((quest): quest is DailyQuestProgressView => quest.placement === 'daily')
+    .sort((a, b) => a.title.localeCompare(b.title));
+  const categoryQuests = questViews
+    .filter(
+      (quest): quest is CategoryQuestProgressView => quest.placement === 'category',
+    )
+    .sort((a, b) => {
+      if ((a.categoryId ?? '') !== (b.categoryId ?? '')) {
+        return (a.categoryId ?? '').localeCompare(b.categoryId ?? '');
+      }
+      return a.title.localeCompare(b.title);
+    });
+
+  return {
+    user,
+    tasks,
+    catalog,
+    isPremium: isPremiumUser(user),
+    focusProfile: profile,
+    macroCategories: QUEST_MACRO_CATEGORIES,
+    dailyQuests,
+    categoryQuests,
+    rewardCatalog: buildRewardCatalog(catalog, [
+      ...dailyQuests.map((quest) => quest.rewards),
+      ...categoryQuests.map((quest) => quest.rewards),
+    ]),
+  };
+}
+
+export { buildRewardCatalog, templateToView };
 
 export async function saveFocusProfile(args: {
   userId: string;
@@ -735,63 +668,6 @@ export async function saveFocusProfile(args: {
   await user.save();
 
   if (createSuggestions && !existing.suggestedContentCreatedAt) {
-    const today = getZonedToday(timezone);
-    const existingTasks = await TaskModel.find({
-      userId,
-      deletedAt: { $exists: false },
-      $or: [{ type: 'regular', date: today }, { type: 'habit' }],
-    })
-      .sort({ order: 1 })
-      .lean<TaskDoc[]>();
-
-    let nextOrder =
-      (existingTasks.length
-        ? existingTasks[existingTasks.length - 1].order
-        : 0) + 1;
-    const docs: TaskDoc[] = [];
-
-    for (const categoryId of selectedCategoryIds) {
-      const category = getMacroCategory(categoryId);
-      const tagIds = getMappedTagIds(
-        {
-          completedAt: new Date(),
-          selectedCategoryIds,
-          categoryTagMap,
-          unlockedAnimationIds: [],
-        },
-        categoryId,
-      );
-      if (!category || !tagIds.length) continue;
-
-      docs.push({
-        userId,
-        type: 'regular',
-        id: uuid(),
-        text: category.taskSuggestions[0],
-        order: nextOrder,
-        completed: false,
-        date: today,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        tags: tagIds,
-      });
-      nextOrder += 1;
-      docs.push({
-        userId,
-        type: 'habit',
-        id: uuid(),
-        text: category.habitSuggestions[0].text,
-        order: nextOrder,
-        completed: false,
-        timesPerWeek: category.habitSuggestions[0].timesPerWeek,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        tags: tagIds,
-      });
-      nextOrder += 1;
-    }
-
-    if (docs.length) await TaskModel.insertMany(docs);
     user.focusProfile = {
       ...((user.focusProfile as FocusProfile) ?? {}),
       selectedCategoryIds,
@@ -810,7 +686,7 @@ export async function saveFocusProfile(args: {
 
 export async function claimQuestReward(args: {
   userId: string;
-  claimType: 'daily' | 'campaign';
+  claimType: 'daily' | 'category';
   targetId: string;
   timezone: string;
 }) {
@@ -822,10 +698,9 @@ export async function claimQuestReward(args: {
   const summary = {
     fliesGranted: 0,
     grantedItemIds: [] as string[],
-    grantedAnimationIds: [] as string[],
   };
 
-  const applyRewards = (rewards: QuestReward[]) => {
+  const applyRewards = (rewards: QuestReward[], multiplier = 1) => {
     if (!user.wardrobe) {
       user.wardrobe = {
         equipped: {},
@@ -837,70 +712,37 @@ export async function claimQuestReward(args: {
     user.wardrobe.inventory = user.wardrobe.inventory ?? {};
     user.wardrobe.unseenItems = user.wardrobe.unseenItems ?? [];
     user.wardrobe.flies = user.wardrobe.flies ?? 0;
-    const profile = normalizeFocusProfile(user.toObject());
 
     rewards.forEach((reward) => {
       if (reward.type === 'FLIES') {
-        const amount = reward.amount ?? 0;
+        const amount = (reward.amount ?? 0) * multiplier;
         user.wardrobe!.flies += amount;
         summary.fliesGranted += amount;
         return;
       }
-      if (reward.type === 'ANIMATION' && reward.animationId) {
-        user.focusProfile = {
-          ...profile,
-          unlockedAnimationIds: Array.from(
-            new Set([
-              ...(profile.unlockedAnimationIds ?? []),
-              reward.animationId,
-            ]),
-          ),
-        };
-        summary.grantedAnimationIds.push(reward.animationId);
-        return;
-      }
       if (reward.itemId) {
-        user.wardrobe!.inventory[reward.itemId] =
-          (user.wardrobe!.inventory[reward.itemId] ?? 0) + 1;
-        user.wardrobe!.unseenItems!.push(reward.itemId);
-        summary.grantedItemIds.push(reward.itemId);
+        for (let i = 0; i < multiplier; i += 1) {
+          user.wardrobe!.inventory[reward.itemId] =
+            (user.wardrobe!.inventory[reward.itemId] ?? 0) + 1;
+          user.wardrobe!.unseenItems!.push(reward.itemId);
+          summary.grantedItemIds.push(reward.itemId);
+        }
       }
     });
   };
 
-  if (claimType === 'daily') {
-    const quest = await QuestModel.findOne({ userId, questId: targetId });
-    if (!quest) throw new Error('Quest not found');
-    if (quest.claimedAt || quest.progress < quest.target) {
-      throw new Error('Quest is not claimable');
-    }
-    applyRewards([
-      ...quest.rewards.free,
-      ...(isPremium ? quest.rewards.premium : []),
-    ]);
-    quest.claimedAt = new Date();
-    await quest.save();
-  } else {
-    const campaign = await CampaignModel.findOne({
-      userId,
-      campaignId: targetId,
-    });
-    if (!campaign) throw new Error('Campaign not found');
-    if (
-      campaign.claimedAt ||
-      campaign.objectives.some(
-        (objective) => objective.progress < objective.target,
-      )
-    ) {
-      throw new Error('Campaign is not claimable');
-    }
-    applyRewards([
-      ...campaign.rewards.free,
-      ...(isPremium ? campaign.rewards.premium : []),
-    ]);
-    campaign.claimedAt = new Date();
-    await campaign.save();
+  const quest = await QuestModel.findOne({ userId, questId: targetId });
+  if (!quest) throw new Error('Quest not found');
+  if (quest.placement !== claimType) {
+    throw new Error('Quest type mismatch');
   }
+  if (quest.claimedAt || quest.progress < quest.target) {
+    throw new Error('Quest is not claimable');
+  }
+
+  applyRewards(quest.rewards, isPremium ? 2 : 1);
+  quest.claimedAt = new Date();
+  await quest.save();
 
   user.markModified('wardrobe');
   user.markModified('focusProfile');
