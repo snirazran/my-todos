@@ -48,7 +48,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
   const { data: tagsData } = useSWR('/api/tags', fetcher);
   const savedTags: SavedTag[] = useMemo(
     () => {
-      const normalizedTags = (Array.isArray(tagsData?.tags) ? tagsData.tags : []).map(
+      const normalizedTags: Array<SavedTag | null> = (Array.isArray(tagsData?.tags) ? tagsData.tags : []).map(
         (tag: any, index: number): SavedTag | null => {
           const rawId =
             typeof tag?.id === 'string' && tag.id.trim()
