@@ -91,6 +91,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
 
   const tagInputRef = useRef<HTMLInputElement>(null);
   const ignoreClickRef = useRef(false);
+  const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Auto-focus input when opening
   React.useEffect(() => {
     if (open) {
@@ -202,6 +203,13 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
 
   const removeTag = (tagId: string) => {
     onTagsChange(selectedTags.filter((t) => t !== tagId));
+  };
+
+  const clearLongPressTimer = () => {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
   };
 
   return (
@@ -334,21 +342,18 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                         exit={{ opacity: 0, scale: 0.5, transition: { duration: 0.2 } }}
                                         key={st.key && st.key.trim() ? st.key : `${st.id}-${st.name}-${index}`}
                                         type="button"
-                                        onPointerDown={(e) => {
+                                        onPointerDown={() => {
                                             ignoreClickRef.current = false;
-                                            const timer = setTimeout(() => {
+                                            clearLongPressTimer();
+                                            longPressTimerRef.current = setTimeout(() => {
                                                 setManageTagsMode(true);
                                                 ignoreClickRef.current = true;
                                                 if (navigator.vibrate) navigator.vibrate(50);
                                             }, 500);
-                                            (e.target as any)._longPressTimer = timer;
                                         }}
-                                        onPointerUp={(e) => {
-                                            if ((e.target as any)._longPressTimer) clearTimeout((e.target as any)._longPressTimer);
-                                        }}
-                                        onPointerLeave={(e) => {
-                                            if ((e.target as any)._longPressTimer) clearTimeout((e.target as any)._longPressTimer);
-                                        }}
+                                        onPointerUp={clearLongPressTimer}
+                                        onPointerLeave={clearLongPressTimer}
+                                        onPointerCancel={clearLongPressTimer}
                                         onClick={(e) => {
                                             if (ignoreClickRef.current) {
                                                 ignoreClickRef.current = false;
@@ -364,7 +369,7 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
                                             }
 
                                             if (isSelected) removeTag(st.id);
-                                            else onTagsChange([...selectedTags, st.id]);
+                                            else onTagsChange(Array.from(new Set([...selectedTags, st.id])));
                                         }}
                                         className={`
                                             relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold uppercase tracking-wider transition-all
