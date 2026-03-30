@@ -1,4 +1,4 @@
-import mongoose, { Schema, type Model } from 'mongoose';
+import mongoose, { Schema, type Model, type SchemaDefinitionProperty } from 'mongoose';
 import type {
   MacroCategoryId,
   QuestPlacement,
@@ -50,7 +50,10 @@ const QuestSchema = new Schema<QuestDoc>(
     coverImageUrl: { type: String, default: undefined },
     target: { type: Number, required: true },
     progress: { type: Number, default: 0 },
-    logic: { type: [Schema.Types.Mixed], default: [] },
+    logic: { type: [Schema.Types.Mixed], default: [] } as SchemaDefinitionProperty<
+      ResolvedQuestLogicBlock[],
+      QuestDoc
+    >,
     rewards: { type: Schema.Types.Mixed, required: true },
     completedAt: { type: Date, default: null },
     claimedAt: { type: Date, default: null },
