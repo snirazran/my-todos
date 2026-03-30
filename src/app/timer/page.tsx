@@ -89,7 +89,6 @@ export default function FrogodoroPage() {
     mutateToday,
     flyStatus,
     hungerStatus,
-    dailyGiftCount,
     tags: userTags,
   } = useTaskData();
 
@@ -270,6 +269,7 @@ export default function FrogodoroPage() {
   const saveSessionToDb = async (taskId: string, currentPhase: typeof phase, elapsed: number) => {
     if (elapsed <= 0) return;
     const today = format(new Date(), 'yyyy-MM-dd');
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     let session: Record<string, unknown> = { date: today, completedCycles: 0, timeSpent: 0 };
     if (currentPhase === 'focus') {
       session = { date: today, completedCycles: 1, timeSpent: elapsed };
@@ -284,7 +284,7 @@ export default function FrogodoroPage() {
       await fetch(`/api/tasks/${taskId}/frogodoro`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session }),
+        body: JSON.stringify({ session, timezone }),
       });
     } catch {
       // silent fail
@@ -345,10 +345,14 @@ export default function FrogodoroPage() {
         updated.focusSessions = sessionStats.focusSessions + 1;
         updated.focusTime = sessionStats.focusTime + liveElapsed;
         const today = format(new Date(), 'yyyy-MM-dd');
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ session: { date: today, completedCycles: 1, timeSpent: 0 } }),
+          body: JSON.stringify({
+            session: { date: today, completedCycles: 1, timeSpent: 0 },
+            timezone,
+          }),
         }).then(() => mutateToday()).catch(() => {});
       } else if (phase === 'shortBreak') {
         // DB already got shortBreaks+1 on pause; just sync sessionStats
@@ -382,10 +386,14 @@ export default function FrogodoroPage() {
     // toggleTask's optimistic update picks up fresh data.
     if (hadFocusTime) {
       const today = format(new Date(), 'yyyy-MM-dd');
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       fetch(`/api/tasks/${taskId}/frogodoro`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session: { date: today, completedCycles: 1, timeSpent: 0 } }),
+        body: JSON.stringify({
+          session: { date: today, completedCycles: 1, timeSpent: 0 },
+          timezone,
+        }),
       }).then(() => mutateToday()).catch(() => {});
     }
 
@@ -449,6 +457,7 @@ export default function FrogodoroPage() {
           longBreakDuration,
           longBreakInterval,
         } = localSettings;
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         await fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -459,6 +468,7 @@ export default function FrogodoroPage() {
               longBreakDuration,
               longBreakInterval,
             },
+            timezone,
           }),
         });
       } catch (e) {
@@ -507,14 +517,10 @@ export default function FrogodoroPage() {
               }
               done={tasks.filter((t) => t.completed).length}
               total={tasks.length}
-              giftsClaimed={dailyGiftCount}
               hunger={user ? hungerStatus.hunger : 1000}
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
               isGuest={!user}
-              onAddTask={() => router.push('/')}
-              onMutateToday={() => mutateToday()}
-              onOpenDailyReward={() => {}}
             />
           </div>
 

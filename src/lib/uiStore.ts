@@ -7,10 +7,10 @@ interface UIState {
   toggleWardrobe: () => void;
   setWardrobeOpen: (open: boolean) => void;
 
-  isGiftHubOpen: boolean;
-  openGiftHub: () => void;
-  closeGiftHub: () => void;
-  setGiftHubOpen: (open: boolean) => void;
+  isQuestsOpen: boolean;
+  openQuests: () => void;
+  closeQuests: () => void;
+  setQuestsOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -20,8 +20,8 @@ export const useUIStore = create<UIState>((set) => ({
   toggleWardrobe: () => set((state) => ({ isWardrobeOpen: !state.isWardrobeOpen })),
   setWardrobeOpen: (open: boolean) => set({ isWardrobeOpen: open }),
 
-  isGiftHubOpen: false,
-  openGiftHub: () => set({ isGiftHubOpen: true }),
-  closeGiftHub: () => set({ isGiftHubOpen: false }),
-  setGiftHubOpen: (open: boolean) => set({ isGiftHubOpen: open }),
+  isQuestsOpen: false,
+  openQuests: () => set({ isQuestsOpen: true }),
+  closeQuests: () => set({ isQuestsOpen: false }),
+  setQuestsOpen: (open: boolean) => set({ isQuestsOpen: open }),
 }));

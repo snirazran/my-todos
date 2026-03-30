@@ -3,16 +3,16 @@
 import React from 'react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
-import { Shirt, Gift } from 'lucide-react';
+import { Shirt, ScrollText } from 'lucide-react';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { useInventory } from '@/hooks/useInventory';
 import { cn } from '@/lib/utils';
 import { CurrencyShop } from '@/components/ui/shop/CurrencyShop';
-import { GiftHubPopup } from './GiftHubPopup';
-import { useProgressLogic } from '@/hooks/useProgressLogic';
+import { QuestsPopup } from './QuestsPopup';
 import { useUIStore } from '@/lib/uiStore';
+import useSWR from 'swr';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle>;
@@ -27,16 +27,12 @@ type Props = {
   rate?: number;
   done?: number;
   total?: number;
-  giftsClaimed?: number;
   isCatching?: boolean;
   animateBalance?: boolean;
   animateHunger?: boolean;
   hunger?: number;
   maxHunger?: number;
   isGuest?: boolean;
-  onAddTask?: () => void;
-  onMutateToday?: () => void;
-  onOpenDailyReward?: () => void;
 };
 
 export function FrogDisplay({
@@ -52,30 +48,26 @@ export function FrogDisplay({
   rate,
   done,
   total,
-  giftsClaimed,
   isCatching,
   animateBalance = true,
   animateHunger = true,
   hunger,
   maxHunger,
   isGuest,
-  onAddTask,
-  onMutateToday,
-  onOpenDailyReward,
 }: Props) {
   const { unseenCount, unseenContainerCount } = useInventory();
   const [clickedAt, setClickedAt] = React.useState(0);
   const [shopOpen, setShopOpen] = React.useState(false);
-  
-  const { isGiftHubOpen, setGiftHubOpen } = useUIStore();
 
-  const progressSlots = useProgressLogic(
-    done ?? 0,
-    total ?? 0,
-    giftsClaimed ?? 0,
+  const { isQuestsOpen, setQuestsOpen } = useUIStore();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const { data: questsData } = useSWR<{ claimableCount: number }>(
+    !isGuest ? `/api/quests?timezone=${encodeURIComponent(timezone)}` : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
   );
-  const readyGifts = progressSlots.filter((s) => s.status === 'READY').length;
-  const giftBadge = readyGifts;
+
+  const readyQuests = questsData?.claimableCount ?? 0;
   const wardrobeBadge = unseenCount + unseenContainerCount;
 
   // Local state for smooth hunger updates
@@ -161,13 +153,12 @@ export function FrogDisplay({
 
         {typeof rate === 'number' &&
           typeof done === 'number' &&
-          typeof total === 'number' &&
-          typeof giftsClaimed === 'number' && (
+          typeof total === 'number' && (
             <FrogSpeechBubble
               rate={rate}
               done={done}
               total={total}
-              giftsClaimed={giftsClaimed}
+              readyQuests={readyQuests}
               isCatching={isCatching}
               clickedAt={clickedAt}
             />
@@ -274,7 +265,7 @@ export function FrogDisplay({
         {/* Right: Gift & Wardrobe Buttons */}
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setGiftHubOpen(true)}
+            onClick={() => setQuestsOpen(true)}
             className="group relative flex items-center justify-center w-[52px] h-[52px] rounded-[15px]
                     bg-card/80 backdrop-blur-2xl
                     text-muted-foreground hover:text-primary
@@ -282,13 +273,13 @@ export function FrogDisplay({
                     border border-border/50
                     transition-all duration-300 ease-out
                     active:scale-95 active:translate-y-0.5"
-            title="Gift Center"
+            title="Quests"
           >
             <div className="absolute inset-0 bg-primary/10 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <Gift className="relative w-5 h-5 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
-            {giftBadge > 0 && (
+            <ScrollText className="relative w-5 h-5 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
+            {readyQuests > 0 && (
               <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-primary-foreground bg-primary rounded-full border-2 border-background shadow-sm z-20">
-                {giftBadge > 9 ? '9+' : giftBadge}
+                {readyQuests > 9 ? '9+' : readyQuests}
               </span>
             )}
           </button>
@@ -315,17 +306,10 @@ export function FrogDisplay({
         </div>
       </div>
 
-      <GiftHubPopup
-        show={isGiftHubOpen}
-        onClose={() => setGiftHubOpen(false)}
-        done={done ?? 0}
-        total={total ?? 0}
-        giftsClaimed={giftsClaimed ?? 0}
-        flyBalance={flyBalance ?? 0}
-        onAddTask={onAddTask ?? (() => {})}
-        onMutateToday={onMutateToday ?? (() => {})}
+      <QuestsPopup
+        show={isQuestsOpen}
+        onClose={() => setQuestsOpen(false)}
         isGuest={isGuest}
-        onOpenDailyReward={onOpenDailyReward}
       />
 
       <WardrobePanel open={openWardrobe} onOpenChange={onOpenChange} />

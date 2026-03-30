@@ -931,17 +931,6 @@ export default function TaskList({
           });
         }, 3000);
       }
-
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      fetch('/api/statistics', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'complete_task',
-          taskId: task.id,
-          timezone: tz,
-        }),
-      }).catch((err) => console.error('Failed to update stats', err));
     }
 
     toggle(task.id, forceState);

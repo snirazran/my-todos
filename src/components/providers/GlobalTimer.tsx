@@ -57,6 +57,7 @@ export function GlobalTimer() {
     breaks?: { shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number },
   ) => {
     const today = format(new Date(), 'yyyy-MM-dd');
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     try {
       await fetch(`/api/tasks/${taskId}/frogodoro`, {
         method: 'PUT',
@@ -68,6 +69,7 @@ export function GlobalTimer() {
             timeSpent: spend,
             ...breaks,
           },
+          timezone,
         }),
       });
     } catch (e) {

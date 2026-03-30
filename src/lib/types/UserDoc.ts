@@ -1,4 +1,5 @@
 import type { WardrobeSlot } from '@/lib/skins/catalog';
+import type { FocusProfile } from '@/lib/quests/types';
 
 export type DailyFlyProgress = {
   date: string;
@@ -58,6 +59,8 @@ export type UserDoc = {
   statistics?: UserStatistics;
   tags?: UserTag[];
   premiumUntil?: Date;
+  focusProfile?: FocusProfile;
+  quests?: unknown;
   dailyRewards?: DailyRewardProgress;
   notificationPrefs?: NotificationPrefs;
   calendarSyncEnabled?: boolean;

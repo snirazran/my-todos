@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import TaskModel from '@/lib/models/Task';
+import { syncQuestState } from '@/lib/quests/engine';
 
 export async function PUT(
   req: NextRequest,
@@ -11,7 +12,7 @@ export async function PUT(
     const userId = await requireUserId();
     const { id } = params; // This is the string `id` of the task, not the ObjectId
     const body = await req.json();
-    const { settings, session } = body;
+    const { settings, session, timezone = 'UTC' } = body;
 
     await connectMongo();
 
@@ -58,6 +59,9 @@ export async function PUT(
       task.markModified('frogodoroSettings');
       task.markModified('frogodoroSessions');
       await task.save();
+      await syncQuestState({ userId, timezone }).catch((syncError) => {
+        console.error('Quest sync failed after frogodoro update:', syncError);
+      });
     }
 
     return NextResponse.json({ success: true, task });

@@ -46,6 +46,18 @@ const UserSchema = new Schema<UserDoc>(
       default: [],
     },
     premiumUntil: { type: Date },
+    focusProfile: {
+      type: Schema.Types.Mixed,
+      default: () => ({
+        selectedCategoryIds: [],
+        categoryTagMap: [],
+        unlockedAnimationIds: [],
+      }),
+    },
+    quests: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
     dailyRewards: {
       lastClaimDate: { type: Date },
       claimedDays: { type: [Number], default: [] },

@@ -34,6 +34,7 @@ import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { DailyRewardPopup } from '@/components/ui/daily-reward/DailyRewardPopup';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
+import useSWR from 'swr';
 import {
   useTaskData,
   Task,
@@ -41,6 +42,8 @@ import {
   HungerStatus,
 } from '@/hooks/useTaskData';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
+import type { FocusCategoryTagMap, MacroCategoryId } from '@/lib/quests/types';
 
 // Force re-compilation of this file to pick up useTaskData.tsx change
 
@@ -73,7 +76,6 @@ export default function Home() {
     isLoading,
     flyStatus,
     hungerStatus,
-    dailyGiftCount,
     weeklyIds,
     toggleTask,
     moveTaskToBacklog,
@@ -214,6 +216,25 @@ export default function Home() {
   const giftTotal = data.length + (user ? habits.length : 0);
   const flyBalance = user ? flyStatus.balance : 5;
   const laterThisWeek = user ? backlogTasks : [];
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [dismissQuestOnboarding, setDismissQuestOnboarding] = useState(false);
+  const { data: questsData, mutate: mutateQuests } = useSWR<{
+    onboarding: {
+      complete: boolean;
+      selectedCategoryIds: MacroCategoryId[];
+      categoryTagMap: FocusCategoryTagMap[];
+    };
+  }>(
+    user ? `/api/quests?timezone=${encodeURIComponent(timezone)}` : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
+
+  useEffect(() => {
+    if (questsData?.onboarding.complete) {
+      setDismissQuestOnboarding(false);
+    }
+  }, [questsData?.onboarding.complete]);
 
   // Block Scrolling during cinematic
   useEffect(() => {
@@ -262,10 +283,14 @@ export default function Home() {
     // Count it as a completed cycle in the DB.
     if (frogTaskId === taskId && frogPhase === 'focus' && frogLiveElapsed > 0) {
       const today = format(new Date(), 'yyyy-MM-dd');
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       fetch(`/api/tasks/${taskId}/frogodoro`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session: { date: today, completedCycles: 1, timeSpent: 0 } }),
+        body: JSON.stringify({
+          session: { date: today, completedCycles: 1, timeSpent: 0 },
+          timezone,
+        }),
       }).then(() => mutateToday()).catch(() => {});
     }
 
@@ -304,23 +329,11 @@ export default function Home() {
               rate={rate}
               done={giftDone}
               total={giftTotal}
-              giftsClaimed={dailyGiftCount}
               isCatching={cinematic}
               hunger={user ? hungerStatus.hunger : 1000}
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
               isGuest={!user}
-              onAddTask={() => {
-                if (!user) {
-                  router.push('/login');
-                  return;
-                }
-                setQuickText('');
-                setQuickAddMode(activeTab === 'habits' ? 'habit' : 'pick');
-                setShowQuickAdd(true);
-              }}
-              onMutateToday={() => mutateToday()}
-              onOpenDailyReward={() => setShowDailyReward(true)}
             />
           </div>
 
@@ -721,6 +734,23 @@ export default function Home() {
       <DailyRewardPopup
         show={showDailyReward}
         onClose={() => setShowDailyReward(false)}
+      />
+
+      <QuestOnboardingPopup
+        show={
+          !!user &&
+          !!questsData &&
+          !questsData.onboarding.complete &&
+          !dismissQuestOnboarding
+        }
+        initialSelectedCategoryIds={questsData?.onboarding.selectedCategoryIds ?? []}
+        initialCategoryTagMap={questsData?.onboarding.categoryTagMap ?? []}
+        onClose={() => setDismissQuestOnboarding(true)}
+        onCompleted={() => {
+          setDismissQuestOnboarding(false);
+          mutateQuests();
+          mutateToday();
+        }}
       />
 
       {/* Floating Add Task Button - Home Page Version */}

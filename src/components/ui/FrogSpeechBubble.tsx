@@ -2,30 +2,27 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useProgressLogic } from '@/hooks/useProgressLogic';
 import { FROG_MESSAGES } from '@/lib/frogMessages';
 
 interface FrogSpeechBubbleProps {
   rate: number;
   done: number;
   total: number;
-  giftsClaimed: number;
+  readyQuests?: number;
   clickedAt?: number;
 }
 
 export function FrogSpeechBubble({
-  rate,
   done,
   total,
-  giftsClaimed,
+  readyQuests = 0,
   isCatching,
   clickedAt = 0,
 }: FrogSpeechBubbleProps & { isCatching?: boolean }) {
-  const slots = useProgressLogic(done, total, giftsClaimed);
   const [message, setMessage] = useState('');
   const [isVisible, setIsVisible] = useState(false);
   const prevDoneRef = useRef(done);
-  const prevGiftsRef = useRef(giftsClaimed);
+  const prevReadyQuestsRef = useRef(readyQuests);
   const prevCatchingRef = useRef(!!isCatching);
   const prevClickedRef = useRef(clickedAt);
   const lastHandledDoneRef = useRef<number | null>(null);
@@ -40,35 +37,16 @@ export function FrogSpeechBubble({
     return picked;
   };
 
-  const getMessage = (currentDone: number, isC?: boolean) => {
-    // 0. Catching? (Highest priority if active)
+  const getMessage = (
+    currentDone: number,
+    isC?: boolean,
+    currentReadyQuests = readyQuests,
+  ) => {
     if (isC) return getRandom(FROG_MESSAGES.catching);
-
-    // 1. Gift Ready?
-    const readySlot = slots.find((s) => s.status === 'READY');
-    if (readySlot) return getRandom(FROG_MESSAGES.gift_ready);
-
-    // 2. Next Gift Locked/Pending?
-    const nextSlot = slots.find(
-      (s) => s.status === 'PENDING' || s.status === 'LOCKED'
-    );
-    if (nextSlot) {
-      let tasksNeeded = 0;
-      if (nextSlot.status === 'PENDING') {
-        tasksNeeded = (nextSlot.target as number) - currentDone;
-      } else {
-        // @ts-ignore
-        tasksNeeded = nextSlot.neededToUnlock as number;
-      }
-
-      if (tasksNeeded > 0 && tasksNeeded <= 2) {
-        const templates = FROG_MESSAGES.locked_gift(tasksNeeded);
-        return templates[Math.floor(Math.random() * templates.length)];
-      }
+    if (currentReadyQuests > 0) {
+      return getRandom(FROG_MESSAGES.quest_ready);
     }
 
-    // 3. General Progress
-    // Recalculate rate based on currentDone
     const currentRate = total > 0 ? (currentDone / total) * 100 : 0;
 
     if (total === 0) return getRandom(FROG_MESSAGES.start);
@@ -81,21 +59,19 @@ export function FrogSpeechBubble({
 
   useEffect(() => {
     const doneIncreased = done > prevDoneRef.current;
-    const giftsChanged = giftsClaimed !== prevGiftsRef.current;
+    const readyQuestsChanged = readyQuests !== prevReadyQuestsRef.current;
     const catchingStarted = !!isCatching && !prevCatchingRef.current;
     const frogClicked = clickedAt > prevClickedRef.current;
 
-    // Handle Clicks (Tickles) - Highest Priority
     if (frogClicked) {
       setMessage(getRandom(FROG_MESSAGES.click));
       setIsVisible(true);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => setIsVisible(false), 3000);
     }
-    // Also show on initial load if there are tasks and we haven't shown a message yet
     else if (
       prevDoneRef.current === done &&
-      prevGiftsRef.current === giftsClaimed &&
+      prevReadyQuestsRef.current === readyQuests &&
       total > 0 &&
       !message
     ) {
@@ -107,11 +83,10 @@ export function FrogSpeechBubble({
         setIsVisible(false);
       }, 5000);
     } else if (catchingStarted) {
-      // Anticipate the next done count and mark it as handled
       const effectiveDone = done + 1;
       lastHandledDoneRef.current = effectiveDone;
 
-      const newMessage = getMessage(effectiveDone, true);
+      const newMessage = getMessage(effectiveDone, true, readyQuests);
       setMessage(newMessage);
       setIsVisible(true);
 
@@ -119,10 +94,17 @@ export function FrogSpeechBubble({
       timeoutRef.current = setTimeout(() => {
         setIsVisible(false);
       }, 5000);
+    } else if (readyQuestsChanged && readyQuests > 0) {
+      setMessage(getRandom(FROG_MESSAGES.quest_ready));
+      setIsVisible(true);
+
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        setIsVisible(false);
+      }, 5000);
     } else if (doneIncreased) {
-      // Only show if we haven't already handled this specific done count via anticipation
       if (done !== lastHandledDoneRef.current) {
-        const newMessage = getMessage(done);
+        const newMessage = getMessage(done, false, readyQuests);
         setMessage(newMessage);
         setIsVisible(true);
 
@@ -131,25 +113,15 @@ export function FrogSpeechBubble({
           setIsVisible(false);
         }, 5000);
       }
-    } else if (giftsChanged) {
-      const newMessage = getMessage(done);
-      setMessage(newMessage);
-      setIsVisible(true);
-
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => {
-        setIsVisible(false);
-      }, 5000);
     } else if (done < prevDoneRef.current) {
-      // Explicitly hide on undo
       setIsVisible(false);
     }
 
     prevDoneRef.current = done;
-    prevGiftsRef.current = giftsClaimed;
+    prevReadyQuestsRef.current = readyQuests;
     prevCatchingRef.current = !!isCatching;
     prevClickedRef.current = clickedAt;
-  }, [done, total, giftsClaimed, rate, slots, message, isCatching, clickedAt]);
+  }, [clickedAt, done, isCatching, message, readyQuests, total]);
 
   const isLongMessage = message.length > 33;
 

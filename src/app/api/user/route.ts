@@ -70,6 +70,11 @@ export async function POST(req: NextRequest) {
           taskCountAtLastGift: 0,
         },
       },
+      focusProfile: {
+        selectedCategoryIds: [],
+        categoryTagMap: [],
+        unlockedAnimationIds: [],
+      },
     });
 
     return NextResponse.json({ ok: true, user: newUser });

@@ -3,10 +3,8 @@ import { useCallback, useState, useRef, useEffect } from 'react';
 import { format } from 'date-fns';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
-import { useUIStore } from '@/lib/uiStore';
 import { useReminderScheduler } from '@/hooks/useReminderScheduler';
 import Fly from '@/components/ui/fly';
-import { Gift } from 'lucide-react';
 
 // --- Types ---
 export interface Task {
@@ -61,9 +59,7 @@ interface TasksResponse {
   weeklyIds?: string[];
   flyStatus: FlyStatus;
   hungerStatus?: HungerStatus;
-  dailyGiftCount?: number;
   dailyTasksCount?: number;
-  taskCountAtLastGift?: number;
 }
 
 type ExclusionSource = 'today' | 'backlog';
@@ -81,7 +77,6 @@ const sortTasks = (ts: Task[]) => {
 export function useTaskData() {
   const { user } = useAuth();
   const { showNotification, hideNotification } = useNotification();
-  const { openGiftHub } = useUIStore();
   const { scheduleNotification, cancelNotification } = useReminderScheduler();
 
   const today = new Date();
@@ -199,8 +194,6 @@ export function useTaskData() {
     stolenFlies: 0,
     maxHunger: 0,
   };
-  const dailyGiftCount = todayData?.dailyGiftCount ?? (user ? 0 : 2);
-
   // Filter Backlog: Hide if excluded from 'backlog'
   const backlogTasks = (Array.isArray(backlogData) ? backlogData : []).filter(
     (t) => pendingExclusions.get(t.id) !== 'backlog',
@@ -294,40 +287,6 @@ export function useTaskData() {
                       </span>
                       <span className="text-[10px] text-muted-foreground font-bold mt-0.5 uppercase tracking-wider">
                         Keep it up!
-                      </span>
-                    </div>
-                  </div>,
-                );
-              }
-            }
-
-            // GIFT NOTIFICATION
-            if (json.dailyTasksCount !== undefined) {
-              const prevTasksCount = prevToday.dailyTasksCount ?? 0;
-              const nextTasksCount = json.dailyTasksCount;
-              const milestones = [2, 4, 6];
-              const reached = milestones.some(
-                (m) => prevTasksCount < m && nextTasksCount >= m,
-              );
-
-              if (reached) {
-                showNotification(
-                  <div
-                    className="flex items-center gap-3 pr-2 cursor-pointer group"
-                    onClick={() => {
-                      openGiftHub();
-                      hideNotification();
-                    }}
-                  >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary group-hover:bg-primary/20 transition-colors">
-                      <Gift size={20} />
-                    </div>
-                    <div className="flex flex-col leading-none">
-                      <span className="font-black text-base group-hover:text-primary transition-colors">
-                        Gift Box Ready!
-                      </span>
-                      <span className="text-[10px] text-muted-foreground font-bold mt-0.5 uppercase tracking-wider">
-                        Claim it in Gift Center
                       </span>
                     </div>
                   </div>,
@@ -821,7 +780,6 @@ export function useTaskData() {
     pendingToToday,
     flyStatus,
     hungerStatus,
-    dailyGiftCount,
     weeklyIds,
     tags,
     isLoading: isLoadingToday || isLoadingBacklog,
