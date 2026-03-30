@@ -1,4 +1,4 @@
-import mongoose, { Schema, type Model, type SchemaDefinitionProperty } from 'mongoose';
+import mongoose, { Schema, type Model } from 'mongoose';
 import type {
   MacroCategoryId,
   QuestLogicBlock,
@@ -40,10 +40,7 @@ const QuestTemplateSchema = new Schema<QuestTemplateDoc>(
       default: undefined,
     },
     rewards: { type: Schema.Types.Mixed, required: true },
-    logic: { type: [Schema.Types.Mixed], default: [] } as SchemaDefinitionProperty<
-      QuestLogicBlock[],
-      QuestTemplateDoc
-    >,
+    logic: { type: [Schema.Types.Mixed], default: [] } as any,
     visibilityConditions: { type: [Schema.Types.Mixed], default: [] },
     isActive: { type: Boolean, default: true, index: true },
   },
