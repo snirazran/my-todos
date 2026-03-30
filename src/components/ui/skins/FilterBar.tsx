@@ -3,10 +3,10 @@
 import React, { useRef } from 'react';
 import {
   Sparkles,
+  Paintbrush,
   Crown,
   Shirt,
   Hand,
-  Ghost,
   Gift,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -14,10 +14,10 @@ import { cn } from '@/lib/utils';
 export type FilterCategory =
   | 'all'
   | 'container'
+  | 'skin'
   | 'hat'
   | 'body'
-  | 'held'
-  | 'costume';
+  | 'held';
 
 const CATEGORY_CONFIG: Record<
   FilterCategory,
@@ -25,10 +25,10 @@ const CATEGORY_CONFIG: Record<
 > = {
   all: { label: 'All Items', icon: <Sparkles className="w-5 h-5" /> },
   container: { label: 'Gift Boxes', icon: <Gift className="w-5 h-5" /> },
+  skin: { label: 'Skins', icon: <Paintbrush className="w-5 h-5" /> },
   hat: { label: 'Hats', icon: <Crown className="w-5 h-5" /> },
   body: { label: 'Body', icon: <Shirt className="w-5 h-5" /> },
   held: { label: 'Held', icon: <Hand className="w-5 h-5" /> },
-  costume: { label: 'Costumes', icon: <Ghost className="w-5 h-5" /> },
 };
 
 export interface FilterOption {
@@ -64,6 +64,11 @@ export function FilterBar({
       icon: CATEGORY_CONFIG.all.icon,
     },
     {
+      id: 'skin',
+      label: CATEGORY_CONFIG.skin.label,
+      icon: CATEGORY_CONFIG.skin.icon,
+    },
+    {
       id: 'hat',
       label: CATEGORY_CONFIG.hat.label,
       icon: CATEGORY_CONFIG.hat.icon,
@@ -77,11 +82,6 @@ export function FilterBar({
       id: 'held',
       label: CATEGORY_CONFIG.held.label,
       icon: CATEGORY_CONFIG.held.icon,
-    },
-    {
-      id: 'costume',
-      label: CATEGORY_CONFIG.costume.label,
-      icon: CATEGORY_CONFIG.costume.icon,
     },
   ];
 

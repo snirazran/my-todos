@@ -133,10 +133,10 @@ export function TradePanel({
       
       // Apply activeFilter
       if (activeFilter !== 'all') {
-        if (activeFilter === 'costume') {
-          if (item.slot !== 'skin' || (item.rarity !== 'epic' && item.rarity !== 'legendary')) return false;
+        if (activeFilter === 'skin') {
+          if (item.slot !== 'skin') return false;
         } else if (activeFilter === 'body') {
-          if (item.slot !== 'skin' || (item.rarity === 'epic' || item.rarity === 'legendary')) return false;
+          if (item.slot !== 'body') return false;
         } else if (activeFilter === 'held') {
           if (item.slot !== 'hand_item') return false;
         } else {

@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { FilterBar, FilterCategory } from './skins/FilterBar';
+import { FilterBar } from './skins/FilterBar';
 import { cn } from '@/lib/utils';
 import { GiftRive } from './gift-box/GiftBox';
 import GiftBoxOpening from './gift-box/GiftBoxOpening';

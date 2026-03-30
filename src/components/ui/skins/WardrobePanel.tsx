@@ -192,10 +192,10 @@ export function WardrobePanel({
 
       let cat: FilterCategory | null = null;
       if (item.slot === 'container') return;
+      else if (item.slot === 'skin') cat = 'skin';
       else if (item.slot === 'hat') cat = 'hat';
       else if (item.slot === 'body') cat = 'body';
       else if (item.slot === 'hand_item') cat = 'held';
-      else if (item.slot === 'skin') cat = 'costume';
 
       if (cat) {
         if (!visitedCategories.has(cat)) {
@@ -213,10 +213,8 @@ export function WardrobePanel({
   const getFilteredItems = (items: ItemDef[]) => {
     let result = items;
     if (activeFilter !== 'all') {
-      if (activeFilter === 'costume') {
+      if (activeFilter === 'skin') {
         result = result.filter((i) => i.slot === 'skin');
-      } else if (activeFilter === 'body') {
-        result = result.filter((i) => i.slot === 'body');
       } else if (activeFilter === 'held') {
         result = result.filter((i) => i.slot === 'hand_item');
       } else {
