@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
-import { CATALOG, byId, type WardrobeSlot } from '@/lib/skins/catalog';
+import { CATALOG, type WardrobeSlot } from '@/lib/skins/catalog';
+import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 
 const json = (body: unknown, init = 200) =>
@@ -24,7 +25,7 @@ async function ensureWardrobe(uid: string) {
 
   // If equipped item is not owned anymore, null it
   const nextEquipped: UserWardrobe['equipped'] = { ...current.equipped };
-  for (const slot of ['skin', 'hat', 'scarf', 'hand_item', 'glasses'] as WardrobeSlot[]) {
+  for (const slot of ['skin', 'hat', 'body', 'hand_item'] as WardrobeSlot[]) {
     const id = nextEquipped[slot];
     if (id && (!current.inventory[id] || current.inventory[id] <= 0)) {
       nextEquipped[slot] = null;
@@ -86,9 +87,12 @@ export async function GET() {
 
     const wardrobe = await ensureWardrobe(userId);
     if (!wardrobe) return json({ error: 'User not found' }, 404);
-    return json({ wardrobe, catalog: CATALOG });
+    const fullCatalog = await getFullCatalog();
+    return json({ wardrobe, catalog: fullCatalog });
   } catch {
     // Guest Mode or Unauthorized
+    let guestCatalog;
+    try { guestCatalog = await getFullCatalog(); } catch { guestCatalog = CATALOG; }
     return json({
       wardrobe: {
         equipped: {},
@@ -96,7 +100,7 @@ export async function GET() {
         flies: 5, // Match intro scene
         unseenItems: [],
       },
-      catalog: CATALOG,
+      catalog: guestCatalog,
     });
   }
 }
@@ -115,7 +119,7 @@ export async function PUT(req: NextRequest) {
     const slot = body.slot;
     const itemId = body.itemId ?? null; // null => unequip
 
-    if (!slot || !['skin', 'hat', 'scarf', 'hand_item', 'glasses'].includes(slot))
+    if (!slot || !['skin', 'hat', 'body', 'hand_item'].includes(slot))
       return json({ error: 'Unknown slot' }, 400);
 
     await connectMongo();
@@ -134,7 +138,9 @@ export async function PUT(req: NextRequest) {
     }
 
     // Equip: must exist in catalog, match the slot, and be owned
-    const def = byId[itemId];
+    const fullCatalog = await getFullCatalog();
+    const fullById = buildById(fullCatalog);
+    const def = fullById[itemId];
     if (!def) return json({ error: 'Unknown itemId' }, 400);
     if (def.slot !== slot)
       return json({ error: 'Item does not match slot' }, 400);
@@ -211,7 +217,9 @@ export async function POST(req: NextRequest) {
     }
 
     const itemId = body.itemId;
-    if (!itemId || !byId[itemId]) return json({ error: 'Unknown itemId' }, 400);
+    const fullCat = await getFullCatalog();
+    const fullLookup = buildById(fullCat);
+    if (!itemId || !fullLookup[itemId]) return json({ error: 'Unknown itemId' }, 400);
 
     await connectMongo();
     const user = (await UserModel.findById(userId).lean()) as LeanUser | null;

@@ -7,9 +7,7 @@ import {
   Shirt,
   Hand,
   Ghost,
-  Ribbon,
   Gift,
-  Glasses,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -17,10 +15,8 @@ export type FilterCategory =
   | 'all'
   | 'container'
   | 'hat'
-  | 'scarf'
   | 'body'
   | 'held'
-  | 'glasses'
   | 'costume';
 
 const CATEGORY_CONFIG: Record<
@@ -30,10 +26,8 @@ const CATEGORY_CONFIG: Record<
   all: { label: 'All Items', icon: <Sparkles className="w-5 h-5" /> },
   container: { label: 'Gift Boxes', icon: <Gift className="w-5 h-5" /> },
   hat: { label: 'Hats', icon: <Crown className="w-5 h-5" /> },
-  scarf: { label: 'Scarves', icon: <Ribbon className="w-5 h-5" /> },
   body: { label: 'Body', icon: <Shirt className="w-5 h-5" /> },
   held: { label: 'Held', icon: <Hand className="w-5 h-5" /> },
-  glasses: { label: 'Glasses', icon: <Glasses className="w-5 h-5" /> },
   costume: { label: 'Costumes', icon: <Ghost className="w-5 h-5" /> },
 };
 
@@ -75,11 +69,6 @@ export function FilterBar({
       icon: CATEGORY_CONFIG.hat.icon,
     },
     {
-      id: 'scarf',
-      label: CATEGORY_CONFIG.scarf.label,
-      icon: CATEGORY_CONFIG.scarf.icon,
-    },
-    {
       id: 'body',
       label: CATEGORY_CONFIG.body.label,
       icon: CATEGORY_CONFIG.body.icon,
@@ -88,11 +77,6 @@ export function FilterBar({
       id: 'held',
       label: CATEGORY_CONFIG.held.label,
       icon: CATEGORY_CONFIG.held.icon,
-    },
-    {
-      id: 'glasses',
-      label: CATEGORY_CONFIG.glasses.label,
-      icon: CATEGORY_CONFIG.glasses.icon,
     },
     {
       id: 'costume',

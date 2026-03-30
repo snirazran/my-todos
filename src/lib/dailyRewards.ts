@@ -47,10 +47,10 @@ export const REWARD_SCHEDULE: DailyRewardDef[] = Array.from(
 
       // Inject specific items
       if (day === 3) {
-        freeReward = { type: 'ITEM', itemId: 'scarf_red' };
+        freeReward = { type: 'ITEM', itemId: 'body_red_scarf' };
       }
       if (day === 7) {
-        premiumReward = { type: 'ITEM', itemId: 'glasses_patch' };
+        premiumReward = { type: 'ITEM', itemId: 'hat_girl_hair' };
       }
       if (day === 14) {
         premiumReward = { type: 'ITEM', itemId: 'hat_pirate' };

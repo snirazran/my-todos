@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
-import { CATALOG, byId, ItemDef, Rarity } from '@/lib/skins/catalog';
+import { ItemDef, Rarity } from '@/lib/skins/catalog';
+import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import { DROP_RATES } from '@/lib/skins/dropRates';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 
@@ -22,7 +23,7 @@ const rollRarity = (containerRarity: Rarity = 'common'): Rarity => {
   return 'common';
 };
 
-const getRandomItem = (containerRarity: Rarity = 'common'): ItemDef => {
+const getRandomItem = (catalog: ItemDef[], containerRarity: Rarity = 'common'): ItemDef => {
   const catalogByRarity: Record<Rarity, ItemDef[]> = {
     common: [],
     uncommon: [],
@@ -31,9 +32,7 @@ const getRandomItem = (containerRarity: Rarity = 'common'): ItemDef => {
     legendary: [],
   };
 
-  CATALOG.forEach((item) => {
-    // Don't award containers as prizes for now to prevent loops, or do?
-    // Let's exclude containers.
+  catalog.forEach((item) => {
     if (item.slot !== 'container') {
       if (catalogByRarity[item.rarity]) catalogByRarity[item.rarity].push(item);
     }
@@ -63,12 +62,16 @@ export async function POST(req: NextRequest) {
     }
 
     const giftBoxId = body.giftBoxId;
+
+    const fullCatalog = await getFullCatalog();
+    const byId = buildById(fullCatalog);
+
     if (!giftBoxId || !byId[giftBoxId])
       return json({ error: 'Unknown giftBoxId' }, 400);
 
     // 1. Pick a prize (use container rarity for better odds)
     const containerDef = byId[giftBoxId];
-    const prize = getRandomItem(containerDef?.rarity ?? 'common');
+    const prize = getRandomItem(fullCatalog, containerDef?.rarity ?? 'common');
 
     await connectMongo();
     const user = (await UserModel.findById(userId).lean()) as LeanUser | null;

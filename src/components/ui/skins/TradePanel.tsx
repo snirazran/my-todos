@@ -372,7 +372,7 @@ export function TradePanel({
                             indices={{
                               skin: 0,
                               hat: 0,
-                              scarf: 0,
+                              body: 0,
                               hand_item: 0,
                               [item.slot]: item.riveIndex,
                             }}

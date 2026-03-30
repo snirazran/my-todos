@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
-import { CATALOG, RARITY_ORDER, ItemDef } from '@/lib/skins/catalog';
+import { RARITY_ORDER, ItemDef } from '@/lib/skins/catalog';
+import { getFullCatalog } from '@/lib/skins/getCatalog';
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest) {
     }
 
     await dbConnect();
+    const CATALOG = await getFullCatalog();
     const user = await User.findById(userId);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

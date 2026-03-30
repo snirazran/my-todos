@@ -131,7 +131,7 @@ export default function RegisterPage() {
             <Frog
               width={240}
               height={240}
-              indices={{ skin: 0, hat: 0, scarf: 0, hand_item: 0 }}
+              indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
             />
           </div>
         </motion.div>

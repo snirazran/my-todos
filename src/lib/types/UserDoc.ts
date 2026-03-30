@@ -62,6 +62,7 @@ export type UserDoc = {
   notificationPrefs?: NotificationPrefs;
   calendarSyncEnabled?: boolean;
   calendarAccessToken?: string;
+  cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
 };
 
 export type NotificationPrefs = {

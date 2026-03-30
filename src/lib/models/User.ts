@@ -58,6 +58,10 @@ const UserSchema = new Schema<UserDoc>(
     },
     calendarSyncEnabled: { type: Boolean, default: false },
     calendarAccessToken: { type: String },
+    cosmeticOverrides: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
   },
   { collection: 'users' },
 );

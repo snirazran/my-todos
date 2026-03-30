@@ -174,7 +174,7 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                         indices={{
                           skin: prize.slot === 'skin' ? prize.riveIndex : 0,
                           hat: prize.slot === 'hat' ? prize.riveIndex : 0,
-                          scarf: prize.slot === 'scarf' ? prize.riveIndex : 0,
+                          body: prize.slot === 'body' ? prize.riveIndex : 0,
                           hand_item:
                             prize.slot === 'hand_item' ? prize.riveIndex : 0,
                         }}

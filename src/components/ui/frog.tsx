@@ -25,11 +25,10 @@ const MOUTH_TRIGGER = 'open_mouth';
 // Rive numeric inputs (all are integers in your state machine)
 const INPUTS = {
   skin: 'skin',
-  hat: 'hat',
-  scarf: 'scarf',
-  hand_item: 'hand_item',
-  glasses: 'glasses',
   mood: 'mood',
+  hat: 'hat',
+  body: 'body',
+  hand_item: 'hand_item',
 } as const;
 
 export type WardrobeSlot = keyof typeof INPUTS;
@@ -91,15 +90,14 @@ const Frog = memo(
       MOUTH_TRIGGER
     );
     const skinInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.skin);
+    const moodInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.mood);
     const hatInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.hat);
-    const scarfInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.scarf);
+    const bodyInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.body);
     const handItemInput = useStateMachineInput(
       rive,
       STATE_MACHINE,
       INPUTS.hand_item
     );
-    const glassesInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.glasses);
-    const moodInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.mood);
 
     /* ---- mouth trigger ---- */
     useEffect(() => {
@@ -111,17 +109,15 @@ const Frog = memo(
       if (!indices) return;
       if (typeof indices.skin === 'number' && skinInput)
         skinInput.value = indices.skin;
-      if (typeof indices.hat === 'number' && hatInput)
-        hatInput.value = indices.hat;
-      if (typeof indices.scarf === 'number' && scarfInput)
-        scarfInput.value = indices.scarf;
-      if (typeof indices.hand_item === 'number' && handItemInput)
-        handItemInput.value = indices.hand_item;
-      if (typeof indices.glasses === 'number' && glassesInput)
-        glassesInput.value = indices.glasses;
       if (typeof indices.mood === 'number' && moodInput)
         moodInput.value = indices.mood;
-    }, [indices, skinInput, hatInput, scarfInput, handItemInput, glassesInput, moodInput]);
+      if (typeof indices.hat === 'number' && hatInput)
+        hatInput.value = indices.hat;
+      if (typeof indices.body === 'number' && bodyInput)
+        bodyInput.value = indices.body;
+      if (typeof indices.hand_item === 'number' && handItemInput)
+        handItemInput.value = indices.hand_item;
+    }, [indices, skinInput, moodInput, hatInput, bodyInput, handItemInput]);
 
     /* ---- expose helpers to parent ---- */
     useImperativeHandle(ref, () => ({
@@ -150,11 +146,10 @@ const Frog = memo(
       },
       setSlotIndex(slot, index) {
         if (slot === 'skin' && skinInput) skinInput.value = index;
-        if (slot === 'hat' && hatInput) hatInput.value = index;
-        if (slot === 'scarf' && scarfInput) scarfInput.value = index;
-        if (slot === 'hand_item' && handItemInput) handItemInput.value = index;
-        if (slot === 'glasses' && glassesInput) glassesInput.value = index;
         if (slot === 'mood' && moodInput) moodInput.value = index;
+        if (slot === 'hat' && hatInput) hatInput.value = index;
+        if (slot === 'body' && bodyInput) bodyInput.value = index;
+        if (slot === 'hand_item' && handItemInput) handItemInput.value = index;
       },
     }));
 

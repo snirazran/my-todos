@@ -14,9 +14,11 @@ import {
   Send,
   CheckCircle,
   XCircle,
+  Paintbrush,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
+import { AdminCosmeticsPopup } from './AdminCosmeticsPopup';
 
 interface Template {
   id: string;
@@ -46,6 +48,9 @@ export function AdminSettingsDialog({
     type: 'success' | 'error';
     message: string;
   } | null>(null);
+
+  // Cosmetics popup state
+  const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
 
   // Load notification data when dialog opens
   useEffect(() => {
@@ -223,7 +228,9 @@ export function AdminSettingsDialog({
     }
   };
 
-  return createPortal(
+  /* cosmetics popup is now a separate component */
+
+  const mainDialog = createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -434,6 +441,24 @@ export function AdminSettingsDialog({
                   )}
                 </Button>
 
+                {/* Cosmetics Override */}
+                <Button
+                  onClick={() => setCosmeticsOpen(true)}
+                  disabled={loading !== null}
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-auto py-4 px-4"
+                >
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-purple-500/10 text-purple-600 dark:text-purple-400">
+                    <Paintbrush className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-sm">Cosmetics Manager</div>
+                    <div className="text-xs text-muted-foreground font-normal">
+                      View all skins & add new items to DB
+                    </div>
+                  </div>
+                </Button>
+
                 {/* ── Notification Test Section ── */}
                 <div className="pt-2">
                   <div className="border-t border-border/40 pt-4">
@@ -526,5 +551,12 @@ export function AdminSettingsDialog({
       )}
     </AnimatePresence>,
     document.body,
+  );
+
+  return (
+    <>
+      {mainDialog}
+      <AdminCosmeticsPopup open={cosmeticsOpen} onClose={() => setCosmeticsOpen(false)} />
+    </>
   );
 }

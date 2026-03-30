@@ -3,7 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
-import { byId } from '@/lib/skins/catalog';
+import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -21,9 +21,11 @@ export async function POST(req: NextRequest) {
       return json({ error: 'Invalid JSON' }, 400);
     }
     const itemId = body.itemId;
-    if (!itemId || !byId[itemId]) return json({ error: 'Unknown itemId' }, 400);
 
     await connectMongo();
+    const fullCatalog = await getFullCatalog();
+    const byId = buildById(fullCatalog);
+    if (!itemId || !byId[itemId]) return json({ error: 'Unknown itemId' }, 400);
     const user = (await UserModel.findById(userId).lean()) as LeanUser | null;
     if (!user) return json({ error: 'User not found' }, 404);
 

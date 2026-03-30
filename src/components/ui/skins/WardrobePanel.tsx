@@ -193,14 +193,9 @@ export function WardrobePanel({
       let cat: FilterCategory | null = null;
       if (item.slot === 'container') return;
       else if (item.slot === 'hat') cat = 'hat';
-      else if (item.slot === 'scarf') cat = 'scarf';
+      else if (item.slot === 'body') cat = 'body';
       else if (item.slot === 'hand_item') cat = 'held';
-      else if (item.slot === 'glasses') cat = 'glasses';
-      else if (item.slot === 'skin') {
-        if (item.rarity === 'epic' || item.rarity === 'legendary')
-          cat = 'costume';
-        else cat = 'body';
-      }
+      else if (item.slot === 'skin') cat = 'costume';
 
       if (cat) {
         if (!visitedCategories.has(cat)) {
@@ -219,22 +214,11 @@ export function WardrobePanel({
     let result = items;
     if (activeFilter !== 'all') {
       if (activeFilter === 'costume') {
-        result = result.filter(
-          (i) =>
-            i.slot === 'skin' &&
-            (i.rarity === 'epic' || i.rarity === 'legendary'),
-        );
+        result = result.filter((i) => i.slot === 'skin');
       } else if (activeFilter === 'body') {
-        result = result.filter(
-          (i) =>
-            i.slot === 'skin' &&
-            i.rarity !== 'epic' &&
-            i.rarity !== 'legendary',
-        );
+        result = result.filter((i) => i.slot === 'body');
       } else if (activeFilter === 'held') {
         result = result.filter((i) => i.slot === 'hand_item');
-      } else if (activeFilter === 'glasses') {
-        result = result.filter((i) => i.slot === 'glasses');
       } else {
         result = result.filter((i) => i.slot === activeFilter);
       }
