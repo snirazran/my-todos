@@ -125,7 +125,9 @@ function matchesSubject(task: TaskDoc, subject: QuestSubject) {
 }
 
 function matchesLogicBlock(task: TaskDoc, block: QuestLogicBlock) {
-  if (!matchesSubject(task, block.subject)) return false;
+  const effectiveSubject: QuestSubject =
+    block.type === 'focus_minutes' ? 'task' : block.subject;
+  if (!matchesSubject(task, effectiveSubject)) return false;
   const tagIds =
     block.tagMode === 'random_user_tag' &&
     'resolvedTagId' in block &&

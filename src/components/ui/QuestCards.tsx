@@ -68,17 +68,13 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
     block.targetLabel ?? String(Math.max(0, block.target ?? 0));
 
   if (block.type === 'focus_minutes') {
-    if (block.subject === 'habit')
-      return `Focus for ${targetLabel} minutes on habits`;
-    if (block.subject === 'task')
-      return `Focus for ${targetLabel} minutes on tasks`;
-    return `Focus for ${targetLabel} minutes`;
+    return `Focus for ${targetLabel} minutes on tasks`;
   }
 
   const numericTarget = Math.max(0, block.target ?? 0);
   const subjectLabel =
     block.subject === 'any'
-      ? 'items'
+      ? 'tasks / habits'
       : block.subject === 'habit'
         ? numericTarget === 1 && !targetLabel.includes('-')
           ? 'habit'
@@ -89,6 +85,29 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
 
   const actionLabel = block.action === 'add' ? 'Add' : 'Complete';
   return `${actionLabel} ${targetLabel} ${subjectLabel}`;
+}
+
+function getTaggedSubjectCopy(block: QuestCardLogicBlock) {
+  if (block.type === 'focus_minutes') return 'tasks';
+
+  const subject = block.subject;
+  if (subject === 'task') return 'tasks';
+  if (subject === 'habit') return 'habits';
+  return 'tasks or habits';
+}
+
+function getTagScopeMessage(block: QuestCardLogicBlock) {
+  const scopedSubject = getTaggedSubjectCopy(block);
+
+  if (block.tagMode === 'focus_category_tags') {
+    return `Only ${scopedSubject} with the selected tags count.`;
+  }
+
+  if (block.resolvedTagName || block.resolvedTagNames?.length || block.previewTagLabel) {
+    return `Only ${scopedSubject} with the shown tag${block.resolvedTagNames?.length && block.resolvedTagNames.length > 1 ? 's' : ''} count.`;
+  }
+
+  return null;
 }
 
 export function DailyQuestPresentationCard({
@@ -245,6 +264,11 @@ export function CategoryQuestPresentationCard({
               className="pt-4 border-t border-border/40 first:border-t-0 first:pt-0"
             >
               <QuestProgressBlock block={block} completeTone="focus" />
+              {getTagScopeMessage(block) ? (
+                <p className="mt-2 text-xs font-medium text-muted-foreground">
+                  {getTagScopeMessage(block)}
+                </p>
+              ) : null}
               <div className="flex flex-wrap items-center gap-2 mt-3">
                 {block.tagMode === 'focus_category_tags' ? (
                   <>
@@ -315,11 +339,7 @@ export function CategoryQuestPresentationCard({
                     label={block.previewTagLabel}
                     color={category?.accent ?? '#22c55e'}
                   />
-                ) : (
-                  <span className="text-sm text-muted-foreground">
-                    All items count
-                  </span>
-                )}
+                ) : null}
               </div>
             </div>
           ))}
@@ -405,7 +425,7 @@ function PreviewTagHint({ label, color }: { label: string; color: string }) {
   );
 }
 
-function RewardTile({
+export function RewardTile({
   reward,
   rewardCatalog,
   isPremium,

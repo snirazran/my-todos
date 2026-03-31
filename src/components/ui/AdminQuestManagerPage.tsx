@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   ArrowLeft,
   CheckCircle,
+  Gift,
   ImagePlus,
   Layers3,
   Plus,
@@ -14,6 +15,14 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
 import type {
@@ -34,6 +43,7 @@ import {
   formatQuestObjective,
   type QuestCardLogicBlock,
   type QuestRewardCatalogItem,
+  RewardTile,
 } from './QuestCards';
 
 type AdminQuestTemplate = {
@@ -64,6 +74,8 @@ type FormState = {
   visibilityConditions: QuestVisibilityCondition[];
   isActive: boolean;
 };
+
+type RewardPickerTab = 'flies' | 'item' | 'box';
 
 const createReward = (): QuestReward => ({
   type: 'FLIES',
@@ -178,6 +190,26 @@ function rewardSummary(
   return reward.type === 'BOX' ? 'Mystery box' : 'Item reward';
 }
 
+function rewardKey(reward: QuestReward) {
+  if (reward.type === 'FLIES') return 'FLIES';
+  return `${reward.type}:${reward.itemId ?? ''}`;
+}
+
+function normalizeRewardList(rewards: QuestReward[]) {
+  const flies = rewards
+    .filter((reward) => reward.type === 'FLIES')
+    .slice(0, 1);
+  const items = rewards.filter((reward) => reward.type === 'ITEM' && reward.itemId);
+  const boxes = rewards.filter((reward) => reward.type === 'BOX' && reward.itemId);
+  return [...flies, ...items, ...boxes];
+}
+
+function rewardTypeLabel(type: QuestRewardType) {
+  if (type === 'FLIES') return 'Flies';
+  if (type === 'BOX') return 'Box';
+  return 'Item';
+}
+
 function summarizeItems(items: string[]) {
   if (items.length === 0) return '';
   if (items.length <= 2) return items.join(' + ');
@@ -197,6 +229,7 @@ export function AdminQuestManagerPage() {
   const [rewardItems, setRewardItems] = useState<MetaRewardItem[]>([]);
   const [categories, setCategories] = useState<MetaCategory[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [rewardPickerOpen, setRewardPickerOpen] = useState(false);
   const [result, setResult] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -253,15 +286,6 @@ export function AdminQuestManagerPage() {
       isActive: template.isActive,
     });
     setResult(null);
-  };
-
-  const updateReward = (index: number, patch: Partial<QuestReward>) => {
-    setForm((prev) => ({
-      ...prev,
-      rewards: prev.rewards.map((reward, rewardIndex) =>
-        rewardIndex === index ? { ...reward, ...patch } : reward,
-      ),
-    }));
   };
 
   const updateLogic = (id: string, patch: Partial<QuestLogicBlock>) => {
@@ -742,11 +766,16 @@ export function AdminQuestManagerPage() {
 
               <div className="space-y-4">
                 {form.logic.map((block, index) => (
-                  <div key={block.id} className="rounded-[24px] border border-border/50 bg-background/70 p-4">
-                    <div className="mb-4 flex items-center justify-between">
+                  <div key={block.id} className="rounded-[26px] border border-border/50 bg-background/80 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+                    <div className="mb-4 flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-sm font-black text-foreground">Block {index + 1}</p>
-                        <p className="text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-black text-foreground">Block {index + 1}</p>
+                          <span className="rounded-full border border-border/50 bg-card px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+                            {block.type === 'focus_minutes' ? 'Focus minutes' : 'Count'}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">
                           {formatQuestObjective(buildPreviewLogicBlock(block))}
                         </p>
                       </div>
@@ -757,10 +786,10 @@ export function AdminQuestManagerPage() {
                       )}
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-4">
+                    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                       <label className="grid gap-2">
                         <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Type</span>
-                        <select value={block.type} onChange={(event) => updateLogic(block.id, { type: event.target.value as QuestLogicBlock['type'] })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
+                        <select value={block.type} onChange={(event) => updateLogic(block.id, event.target.value === 'focus_minutes' ? { type: 'focus_minutes', subject: 'task', action: undefined } : { type: 'count', subject: block.subject === 'any' || block.subject === 'habit' || block.subject === 'task' ? block.subject : 'task', action: block.action ?? 'complete' })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
                           <option value="count">Count</option>
                           <option value="focus_minutes">Focus Minutes</option>
                         </select>
@@ -774,14 +803,23 @@ export function AdminQuestManagerPage() {
                           </select>
                         </label>
                       )}
-                      <label className="grid gap-2">
-                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Subject</span>
-                        <select value={block.subject} onChange={(event) => updateLogic(block.id, { subject: event.target.value as QuestSubject })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
-                          <option value="task">Tasks</option>
-                          <option value="habit">Habits</option>
-                          <option value="any">Any</option>
-                        </select>
-                      </label>
+                      {block.type === 'focus_minutes' ? (
+                        <div className="grid gap-2">
+                          <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Subject</span>
+                          <div className="flex h-11 items-center rounded-2xl border border-border bg-muted/40 px-4 text-sm font-semibold text-foreground">
+                            Tasks only
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="grid gap-2">
+                          <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Subject</span>
+                          <select value={block.subject} onChange={(event) => updateLogic(block.id, { subject: event.target.value as QuestSubject })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
+                            <option value="task">Tasks</option>
+                            <option value="habit">Habits</option>
+                            <option value="any">Any</option>
+                          </select>
+                        </label>
+                      )}
                       <label className="grid gap-2">
                         <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Tag Scope</span>
                         <select value={block.tagMode ?? 'ignore'} onChange={(event) => updateLogic(block.id, { tagMode: event.target.value as QuestLogicBlock['tagMode'] })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
@@ -794,8 +832,8 @@ export function AdminQuestManagerPage() {
                       </label>
                     </div>
 
-                    <div className="mt-4 grid gap-4 md:grid-cols-3">
-                      <label className="grid gap-2">
+                    <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      <label className="grid gap-2 md:col-span-1">
                         <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Goal</span>
                         <select value={block.amountMode} onChange={(event) => updateLogic(block.id, event.target.value === 'random' ? { amountMode: 'random', amount: undefined, minAmount: block.minAmount ?? 1, maxAmount: block.maxAmount ?? Math.max(block.amount ?? 3, 1) } : { amountMode: 'fixed', amount: block.amount ?? block.maxAmount ?? 1, minAmount: undefined, maxAmount: undefined })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
                           <option value="fixed">Fixed</option>
@@ -804,17 +842,17 @@ export function AdminQuestManagerPage() {
                       </label>
 
                       {block.amountMode === 'fixed' ? (
-                        <label className="grid gap-2">
+                        <label className="grid gap-2 md:col-span-1">
                           <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">{block.type === 'focus_minutes' ? 'Minutes' : 'Target'}</span>
                           <input type="number" min={1} value={String(block.amount ?? 1)} onChange={(event) => updateLogic(block.id, { amount: Number(event.target.value) || 1 })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm" />
                         </label>
                       ) : (
                         <>
-                          <label className="grid gap-2">
+                          <label className="grid gap-2 md:col-span-1">
                             <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Min</span>
                             <input type="number" min={1} value={String(block.minAmount ?? 1)} onChange={(event) => updateLogic(block.id, { minAmount: Number(event.target.value) || 1 })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm" />
                           </label>
-                          <label className="grid gap-2">
+                          <label className="grid gap-2 md:col-span-1">
                             <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Max</span>
                             <input type="number" min={1} value={String(block.maxAmount ?? 3)} onChange={(event) => updateLogic(block.id, { maxAmount: Number(event.target.value) || 1 })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm" />
                           </label>
@@ -829,7 +867,7 @@ export function AdminQuestManagerPage() {
                     )}
                     {block.tagMode === 'focus_category_tags' && (
                       <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-                        This block will only count tasks or habits linked to the user&apos;s saved tags for this focus category.
+                        This block will only count matching {block.subject === 'task' ? 'tasks' : block.subject === 'habit' ? 'habits' : 'tasks or habits'} linked to the user&apos;s saved tags for this focus category.
                       </div>
                     )}
                   </div>
@@ -873,7 +911,7 @@ export function AdminQuestManagerPage() {
                       key={condition.id}
                       className="rounded-[24px] border border-border/50 bg-background/70 p-4"
                     >
-                      <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="mb-4 flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-black text-foreground">
                             Rule {index + 1}
@@ -897,7 +935,7 @@ export function AdminQuestManagerPage() {
                         </button>
                       </div>
 
-                      <div className="grid gap-4 md:grid-cols-3">
+                      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                         <label className="grid gap-2">
                           <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Metric</span>
                           <select
@@ -958,156 +996,73 @@ export function AdminQuestManagerPage() {
             </section>
 
             <section className="rounded-[28px] border border-border/50 bg-card/80 p-6 shadow-sm">
-              <div className="mb-5">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-primary" />
-                  <p className="text-lg font-black text-foreground">4. Rewards</p>
+              <div className="mb-5 flex items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    <p className="text-lg font-black text-foreground">4. Rewards</p>
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Pick flies, items, and boxes from one reward picker. Premium users still get double.
+                  </p>
                 </div>
-                <p className="mt-1 text-sm text-muted-foreground">Set the base reward once. Premium users will receive double automatically.</p>
+                <Button
+                  variant="outline"
+                  className="rounded-xl"
+                  onClick={() => setRewardPickerOpen(true)}
+                >
+                  <Gift className="mr-2 h-4 w-4" />
+                  Edit Rewards
+                </Button>
               </div>
 
-              <div className="space-y-3">
-                {form.rewards.map((reward, index) => (
-                  <div key={index} className="rounded-2xl border border-border/50 bg-background/70 p-4">
-                    <div className="mb-4 flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-sm font-black text-foreground">Reward {index + 1}</p>
-                        <p className="text-xs text-muted-foreground">
+              {form.rewards.length === 0 ? (
+                <div className="rounded-[24px] border border-dashed border-border/50 bg-background/60 p-5 text-sm text-muted-foreground">
+                  No rewards selected yet. Open the reward picker to add flies, items, or boxes.
+                </div>
+              ) : (
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {form.rewards.map((reward) => (
+                    <div
+                      key={rewardKey(reward)}
+                      className="flex items-center gap-4 rounded-[24px] border border-border/50 bg-background/75 p-4"
+                    >
+                      <RewardTile
+                        reward={reward}
+                        rewardCatalog={rewardCatalog}
+                        isPremium={false}
+                      />
+                      <div className="min-w-0">
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                          {rewardTypeLabel(reward.type)}
+                        </p>
+                        <p className="mt-1 text-sm font-bold text-foreground">
                           {rewardSummary(reward, rewardCatalog)}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {reward.type === 'FLIES'
+                            ? reward.amountMode === 'random'
+                              ? `Random range: ${amountRangeLabel(reward.minAmount, reward.maxAmount)}`
+                              : 'Fixed amount'
+                            : 'Base quantity x1, doubled for premium users'}
                         </p>
                       </div>
                     </div>
-                    <div className="grid gap-3 xl:grid-cols-[160px_minmax(0,1fr)_40px]">
-                      <label className="grid gap-2">
-                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Type</span>
-                        <select
-                          value={reward.type}
-                          onChange={(event) => {
-                            const nextType = event.target.value as QuestRewardType;
-                            if (nextType === 'FLIES') {
-                              updateReward(index, {
-                                type: 'FLIES',
-                                amountMode: 'fixed',
-                                amount: reward.amount ?? 50,
-                                minAmount: undefined,
-                                maxAmount: undefined,
-                                itemId: undefined,
-                              });
-                              return;
-                            }
-
-                            updateReward(index, {
-                              type: nextType,
-                              itemId: '',
-                              amountMode: undefined,
-                              amount: undefined,
-                              minAmount: undefined,
-                              maxAmount: undefined,
-                            });
-                          }}
-                          className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
-                        >
-                          <option value="FLIES">Flies</option>
-                          <option value="ITEM">Item</option>
-                          <option value="BOX">Box</option>
-                        </select>
-                      </label>
-
-                      {reward.type === 'FLIES' && (
-                        <div className="grid gap-3 xl:grid-cols-3">
-                          <label className="grid gap-2">
-                            <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Amount</span>
-                            <select
-                              value={reward.amountMode ?? 'fixed'}
-                              onChange={(event) =>
-                                updateReward(
-                                  index,
-                                  event.target.value === 'random'
-                                    ? {
-                                        amountMode: 'random',
-                                        amount: undefined,
-                                        minAmount: reward.minAmount ?? 25,
-                                        maxAmount: reward.maxAmount ?? Math.max(reward.amount ?? 50, 25),
-                                      }
-                                    : {
-                                        amountMode: 'fixed',
-                                        amount: reward.amount ?? reward.maxAmount ?? 50,
-                                        minAmount: undefined,
-                                        maxAmount: undefined,
-                                      },
-                                )
-                              }
-                              className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
-                            >
-                              <option value="fixed">Fixed</option>
-                              <option value="random">Random Range</option>
-                            </select>
-                          </label>
-
-                          {(reward.amountMode ?? 'fixed') === 'fixed' ? (
-                            <label className="grid gap-2 xl:col-span-2">
-                              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Flies Amount</span>
-                              <input
-                                type="number"
-                                min={1}
-                                value={String(reward.amount ?? 50)}
-                                onChange={(event) =>
-                                  updateReward(index, {
-                                    amount: Number(event.target.value) || 1,
-                                  })
-                                }
-                                className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
-                              />
-                            </label>
-                          ) : (
-                            <>
-                              <label className="grid gap-2">
-                                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Min Flies</span>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={String(reward.minAmount ?? 25)}
-                                  onChange={(event) =>
-                                    updateReward(index, {
-                                      minAmount: Number(event.target.value) || 1,
-                                    })
-                                  }
-                                  className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
-                                />
-                              </label>
-                              <label className="grid gap-2">
-                                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Max Flies</span>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={String(reward.maxAmount ?? 50)}
-                                  onChange={(event) =>
-                                    updateReward(index, {
-                                      maxAmount: Number(event.target.value) || 1,
-                                    })
-                                  }
-                                  className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
-                                />
-                              </label>
-                            </>
-                          )}
-                        </div>
-                      )}
-                      {(reward.type === 'ITEM' || reward.type === 'BOX') && <label className="grid gap-2"><span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">{reward.type === 'BOX' ? 'Box Item' : 'Item'}</span><select value={reward.itemId ?? ''} onChange={(event) => updateReward(index, { itemId: event.target.value })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"><option value="">Select item</option>{rewardItems.filter((item) => reward.type === 'BOX' ? item.slot === 'container' : item.slot !== 'container').map((item) => <option key={item.id} value={item.id}>{item.name} ({item.rarity})</option>)}</select></label>}
-
-                      <button onClick={() => setForm((prev) => ({ ...prev, rewards: prev.rewards.filter((_, rewardIndex) => rewardIndex !== index) }))} className="flex h-10 w-10 items-center justify-center self-end rounded-full text-red-500 hover:bg-red-500/10 xl:mt-6">
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                <Button variant="outline" className="rounded-2xl" onClick={() => setForm((prev) => ({ ...prev, rewards: [...prev.rewards, createReward()] }))}>
-                  <Plus className="mr-1 h-4 w-4" />
-                  Add Reward
-                </Button>
-              </div>
+                  ))}
+                </div>
+              )}
             </section>
+
+            <RewardPickerDialog
+              open={rewardPickerOpen}
+              onOpenChange={setRewardPickerOpen}
+              rewards={form.rewards}
+              rewardItems={rewardItems}
+              rewardCatalog={rewardCatalog}
+              onSave={(rewards) =>
+                setForm((prev) => ({ ...prev, rewards: normalizeRewardList(rewards) }))
+              }
+            />
 
             <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-[24px] border border-border/50 bg-background/95 p-4 shadow-lg backdrop-blur md:flex-row md:items-center md:justify-between">
               <div className="text-sm text-muted-foreground">
@@ -1123,6 +1078,327 @@ export function AdminQuestManagerPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+function RewardPickerDialog({
+  open,
+  onOpenChange,
+  rewards,
+  rewardItems,
+  rewardCatalog,
+  onSave,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  rewards: QuestReward[];
+  rewardItems: MetaRewardItem[];
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  onSave: (rewards: QuestReward[]) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<RewardPickerTab>('flies');
+  const [draft, setDraft] = useState<QuestReward[]>(() =>
+    normalizeRewardList(rewards),
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    setDraft(normalizeRewardList(rewards));
+  }, [open, rewards]);
+
+  const fliesReward = draft.find((reward) => reward.type === 'FLIES');
+  const itemOptions = rewardItems.filter((item) => item.slot !== 'container');
+  const boxOptions = rewardItems.filter((item) => item.slot === 'container');
+
+  const toggleFliesReward = () => {
+    setDraft((current) => {
+      const existing = current.find((reward) => reward.type === 'FLIES');
+      if (existing) {
+        return current.filter((reward) => reward.type !== 'FLIES');
+      }
+      return [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }, ...current];
+    });
+  };
+
+  const patchFliesReward = (patch: Partial<QuestReward>) => {
+    setDraft((current) =>
+      current.map((reward) =>
+        reward.type === 'FLIES' ? { ...reward, ...patch } : reward,
+      ),
+    );
+  };
+
+  const toggleCatalogReward = (type: 'ITEM' | 'BOX', itemId: string) => {
+    setDraft((current) => {
+      const exists = current.some(
+        (reward) => reward.type === type && reward.itemId === itemId,
+      );
+      if (exists) {
+        return current.filter(
+          (reward) => !(reward.type === type && reward.itemId === itemId),
+        );
+      }
+      return [...current, { type, itemId }];
+    });
+  };
+
+  const handleSave = () => {
+    onSave(normalizeRewardList(draft));
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl rounded-[32px] p-0 overflow-hidden">
+        <div className="border-b border-border/50 bg-card/95 px-6 py-5">
+          <DialogHeader className="mb-0">
+            <DialogTitle className="text-2xl font-black">
+              Reward Picker
+            </DialogTitle>
+            <DialogDescription>
+              Select multiple rewards from flies, items, and boxes. Fly rewards support amounts. Item and box rewards grant one copy each.
+            </DialogDescription>
+          </DialogHeader>
+        </div>
+
+        <div className="max-h-[75vh] overflow-y-auto px-6 py-5">
+          <div className="mb-5 flex flex-wrap gap-2">
+            {(['flies', 'item', 'box'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  'rounded-2xl border px-4 py-2 text-sm font-black uppercase tracking-[0.16em] transition',
+                  activeTab === tab
+                    ? 'border-primary/30 bg-primary/10 text-primary'
+                    : 'border-border/50 bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground',
+                )}
+              >
+                {tab === 'flies' ? 'Flies' : tab === 'item' ? 'Items' : 'Boxes'}
+              </button>
+            ))}
+          </div>
+
+          <div className="mb-6 rounded-[24px] border border-border/50 bg-background/70 p-4">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+              Selected Rewards
+            </p>
+            {draft.length === 0 ? (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Nothing selected yet.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-wrap gap-3">
+                {draft.map((reward) => (
+                  <div
+                    key={rewardKey(reward)}
+                    className="flex items-center gap-3 rounded-2xl border border-border/50 bg-card px-3 py-2"
+                  >
+                    <RewardTile
+                      reward={reward}
+                      rewardCatalog={rewardCatalog}
+                      isPremium={false}
+                    />
+                    <div>
+                      <p className="text-sm font-bold text-foreground">
+                        {rewardSummary(reward, rewardCatalog)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {rewardTypeLabel(reward.type)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {activeTab === 'flies' ? (
+            <div className="space-y-4">
+              <button
+                type="button"
+                onClick={toggleFliesReward}
+                className={cn(
+                  'flex w-full items-center gap-4 rounded-[26px] border p-4 text-left transition',
+                  fliesReward
+                    ? 'border-primary/30 bg-primary/10'
+                    : 'border-border/50 bg-background/70 hover:bg-muted/40',
+                )}
+              >
+                <RewardTile
+                  reward={fliesReward ?? { type: 'FLIES', amount: 50, amountMode: 'fixed' }}
+                  rewardCatalog={rewardCatalog}
+                  isPremium={false}
+                />
+                <div>
+                  <p className="text-base font-black text-foreground">Fly Reward</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {fliesReward
+                      ? rewardSummary(fliesReward, rewardCatalog)
+                      : 'Add flies as a reward'}
+                  </p>
+                </div>
+              </button>
+
+              {fliesReward ? (
+                <div className="grid gap-4 rounded-[26px] border border-border/50 bg-background/70 p-4 md:grid-cols-3">
+                  <label className="grid gap-2">
+                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                      Amount Mode
+                    </span>
+                    <select
+                      value={fliesReward.amountMode ?? 'fixed'}
+                      onChange={(event) =>
+                        patchFliesReward(
+                          event.target.value === 'random'
+                            ? {
+                                amountMode: 'random',
+                                amount: undefined,
+                                minAmount: fliesReward.minAmount ?? 25,
+                                maxAmount:
+                                  fliesReward.maxAmount ??
+                                  Math.max(fliesReward.amount ?? 50, 25),
+                              }
+                            : {
+                                amountMode: 'fixed',
+                                amount:
+                                  fliesReward.amount ??
+                                  fliesReward.maxAmount ??
+                                  50,
+                                minAmount: undefined,
+                                maxAmount: undefined,
+                              },
+                        )
+                      }
+                      className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+                    >
+                      <option value="fixed">Fixed</option>
+                      <option value="random">Random Range</option>
+                    </select>
+                  </label>
+
+                  {(fliesReward.amountMode ?? 'fixed') === 'fixed' ? (
+                    <label className="grid gap-2 md:col-span-2">
+                      <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        Flies Amount
+                      </span>
+                      <input
+                        type="number"
+                        min={1}
+                        value={String(fliesReward.amount ?? 50)}
+                        onChange={(event) =>
+                          patchFliesReward({
+                            amount: Number(event.target.value) || 1,
+                          })
+                        }
+                        className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+                      />
+                    </label>
+                  ) : (
+                    <>
+                      <label className="grid gap-2">
+                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                          Min Flies
+                        </span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={String(fliesReward.minAmount ?? 25)}
+                          onChange={(event) =>
+                            patchFliesReward({
+                              minAmount: Number(event.target.value) || 1,
+                            })
+                          }
+                          className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+                        />
+                      </label>
+                      <label className="grid gap-2">
+                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                          Max Flies
+                        </span>
+                        <input
+                          type="number"
+                          min={1}
+                          value={String(fliesReward.maxAmount ?? 50)}
+                          onChange={(event) =>
+                            patchFliesReward({
+                              maxAmount: Number(event.target.value) || 1,
+                            })
+                          }
+                          className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+                        />
+                      </label>
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {(activeTab === 'item' ? itemOptions : boxOptions).map((item) => {
+                const rewardType: 'ITEM' | 'BOX' =
+                  activeTab === 'item' ? 'ITEM' : 'BOX';
+                const selected = draft.some(
+                  (reward) =>
+                    reward.type === rewardType && reward.itemId === item.id,
+                );
+
+                return (
+                  <button
+                    key={`${rewardType}-${item.id}`}
+                    type="button"
+                    onClick={() => toggleCatalogReward(rewardType, item.id)}
+                    className={cn(
+                      'flex items-center gap-4 rounded-[24px] border p-4 text-left transition',
+                      selected
+                        ? 'border-primary/30 bg-primary/10'
+                        : 'border-border/50 bg-background/70 hover:bg-muted/40',
+                    )}
+                  >
+                    <RewardTile
+                      reward={{ type: rewardType, itemId: item.id }}
+                      rewardCatalog={rewardCatalog}
+                      isPremium={false}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-foreground">
+                        {item.name}
+                      </p>
+                      <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        {item.rarity}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {rewardType === 'BOX'
+                          ? 'One box reward'
+                          : 'One item reward'}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="border-t border-border/50 bg-card/95 px-6 py-4 sm:space-x-0 sm:gap-3">
+          <Button
+            variant="outline"
+            className="rounded-2xl"
+            onClick={() => onOpenChange(false)}
+          >
+            Cancel
+          </Button>
+          <Button
+            className="rounded-2xl font-black"
+            onClick={handleSave}
+            disabled={draft.length === 0}
+          >
+            Save Rewards
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

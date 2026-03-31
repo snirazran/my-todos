@@ -122,6 +122,8 @@ function sanitizeLogicBlock(input: any): QuestLogicBlock | null {
   if (block.type === 'count') {
     if (!VALID_ACTIONS.has(input.action)) return null;
     block.action = input.action;
+  } else {
+    block.subject = 'task';
   }
 
   if (block.amountMode === 'fixed') {
