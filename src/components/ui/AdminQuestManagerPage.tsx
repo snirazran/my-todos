@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
 import type {
   MacroCategoryId,
   QuestLogicBlock,
@@ -27,6 +28,13 @@ import type {
   QuestVisibilityMetric,
   QuestVisibilityOperator,
 } from '@/lib/quests/types';
+import {
+  CategoryQuestPresentationCard,
+  DailyQuestPresentationCard,
+  formatQuestObjective,
+  type QuestCardLogicBlock,
+  type QuestRewardCatalogItem,
+} from './QuestCards';
 
 type AdminQuestTemplate = {
   id: string;
@@ -41,7 +49,7 @@ type AdminQuestTemplate = {
   isActive: boolean;
 };
 
-type MetaRewardItem = { id: string; name: string; slot: string; rarity: string };
+type MetaRewardItem = QuestRewardCatalogItem;
 type MetaCategory = { id: MacroCategoryId; name: string };
 
 type FormState = {
@@ -109,6 +117,77 @@ async function readFileAsDataUrl(file: File) {
     reader.onerror = () => reject(new Error('Could not read image'));
     reader.readAsDataURL(file);
   });
+}
+
+function positiveNumber(value: number | undefined, fallback: number) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : fallback;
+}
+
+function amountRangeLabel(min: number | undefined, max: number | undefined) {
+  const safeMin = positiveNumber(min, 1);
+  const safeMax = Math.max(safeMin, positiveNumber(max, safeMin));
+  return safeMin === safeMax ? String(safeMax) : `${safeMin}-${safeMax}`;
+}
+
+function buildPreviewLogicBlock(block: QuestLogicBlock): QuestCardLogicBlock {
+  const isRandom = block.amountMode === 'random';
+  const target = isRandom
+    ? Math.max(
+        positiveNumber(block.minAmount, 1),
+        positiveNumber(block.maxAmount, positiveNumber(block.minAmount, 1)),
+      )
+    : positiveNumber(block.amount, 1);
+
+  return {
+    id: block.id,
+    type: block.type,
+    subject: block.subject,
+    action: block.action,
+    target,
+    progress: 0,
+    tagMode: block.tagMode,
+    targetLabel: isRandom
+      ? amountRangeLabel(block.minAmount, block.maxAmount)
+      : String(target),
+    resolvedTagName:
+      block.tagMode === 'random_user_tag' ? 'Random user tag' : undefined,
+    previewTagLabel:
+      block.tagMode === 'focus_category_tags'
+        ? 'Saved focus tags'
+        : block.tagMode === 'random_user_tag'
+          ? 'Random user tag'
+          : undefined,
+  };
+}
+
+function rewardSummary(
+  reward: QuestReward,
+  rewardCatalog: Record<string, QuestRewardCatalogItem>,
+) {
+  if (reward.type === 'FLIES') {
+    return reward.amountMode === 'random'
+      ? `${amountRangeLabel(reward.minAmount, reward.maxAmount)} flies`
+      : `${positiveNumber(reward.amount, 1)} flies`;
+  }
+
+  if (reward.itemId) {
+    return rewardCatalog[reward.itemId]?.name ?? reward.itemId;
+  }
+
+  return reward.type === 'BOX' ? 'Mystery box' : 'Item reward';
+}
+
+function summarizeItems(items: string[]) {
+  if (items.length === 0) return '';
+  if (items.length <= 2) return items.join(' + ');
+  return `${items.slice(0, 2).join(' + ')} +${items.length - 2} more`;
+}
+
+function describeVisibilityCondition(condition: QuestVisibilityCondition) {
+  return `${visibilityMetricLabel[condition.metric]} ${visibilityOperatorLabel[
+    condition.operator
+  ].toLowerCase()} ${condition.value}`;
 }
 
 export function AdminQuestManagerPage() {
@@ -263,9 +342,82 @@ export function AdminQuestManagerPage() {
     [categories],
   );
 
+  const categoryCatalog = useMemo(
+    () =>
+      Object.fromEntries(
+        QUEST_MACRO_CATEGORIES.map((category) => [category.id, category]),
+      ),
+    [],
+  );
+
+  const rewardCatalog = useMemo(
+    () => Object.fromEntries(rewardItems.map((reward) => [reward.id, reward])),
+    [rewardItems],
+  );
+
+  const previewLogic = useMemo(
+    () => form.logic.map(buildPreviewLogicBlock),
+    [form.logic],
+  );
+
+  const previewCategory = form.categoryId ? categoryCatalog[form.categoryId] : undefined;
+
+  const placementSummary =
+    form.placement === 'daily'
+      ? 'Daily quest tab'
+      : previewCategory
+        ? `${previewCategory.name} focus tab`
+        : 'Choose a focus category';
+
+  const objectiveSummary =
+    previewLogic.length === 0
+      ? 'Add at least one goal block'
+      : previewLogic.length === 1
+        ? formatQuestObjective(previewLogic[0])
+        : `${previewLogic.length} goal blocks`;
+
+  const rewardSummaryText =
+    form.rewards.length === 0
+      ? 'Add a reward'
+      : summarizeItems(
+          form.rewards.map((reward) => rewardSummary(reward, rewardCatalog)),
+        );
+
+  const visibilitySummary =
+    form.visibilityConditions.length === 0
+      ? 'Visible to everyone'
+      : summarizeItems(
+          form.visibilityConditions.map((condition) =>
+            describeVisibilityCondition(condition),
+          ),
+        );
+
+  const previewNotes = useMemo(() => {
+    const notes: string[] = [];
+
+    if (form.logic.some((block) => block.amountMode === 'random')) {
+      notes.push('Random goal ranges resolve when quests are generated per user.');
+    }
+    if (
+      form.rewards.some(
+        (reward) => reward.type === 'FLIES' && reward.amountMode === 'random',
+      )
+    ) {
+      notes.push('Random fly rewards are rolled when the quest is created.');
+    }
+    if (form.logic.some((block) => block.tagMode === 'focus_category_tags')) {
+      notes.push('Focus-tag blocks pull from each user’s saved tags for that category.');
+    }
+    if (form.logic.some((block) => block.tagMode === 'random_user_tag')) {
+      notes.push('Random-tag blocks pick one of the user’s existing tags.');
+    }
+
+    return notes;
+  }, [form.logic, form.rewards]);
+
   return (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-7xl px-4 py-6 md:px-8">
+      <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-8">
         <div className="mb-6 flex flex-col gap-4 rounded-[32px] border border-border/50 bg-card/80 p-6 shadow-sm lg:flex-row lg:items-end lg:justify-between">
           <div>
             <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-muted-foreground transition hover:text-foreground">
@@ -280,8 +432,9 @@ export function AdminQuestManagerPage() {
                 <h1 className="text-3xl font-black tracking-tight text-foreground md:text-4xl">
                   Quest Manager
                 </h1>
-                <p className="mt-1 max-w-2xl text-sm text-muted-foreground md:text-base">
-                  Create app-wide quest templates. Each template defines the rule, reward, and whether it shows in the daily list or a specific category.
+                <p className="mt-1 max-w-3xl text-sm text-muted-foreground md:text-base">
+                  Build the quest, see the quest-hub preview immediately, and save a reusable
+                  template for every user.
                 </p>
               </div>
             </div>
@@ -291,17 +444,24 @@ export function AdminQuestManagerPage() {
           </div>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+        <div className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)_440px]">
           <aside className="rounded-[28px] border border-border/50 bg-card/80 p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-black text-foreground">Templates</p>
-                <p className="text-xs text-muted-foreground">Reusable quests for all users.</p>
+                <p className="text-xs text-muted-foreground">Reusable quests shared across the app.</p>
               </div>
               <Button size="sm" className="rounded-xl" onClick={resetForm}>
                 <Plus className="mr-1 h-4 w-4" />
                 New
               </Button>
+            </div>
+
+            <div className="mb-4 rounded-[24px] border border-border/50 bg-background/70 px-4 py-3">
+              <p className="text-2xl font-black text-foreground">{templates.length}</p>
+              <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                saved templates
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -318,7 +478,19 @@ export function AdminQuestManagerPage() {
                       : 'border-border/50 bg-background/70 hover:bg-muted/30',
                   )}
                 >
-                  <p className="truncate text-sm font-black text-foreground">{template.name}</p>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="truncate text-sm font-black text-foreground">{template.name}</p>
+                    <span
+                      className={cn(
+                        'rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]',
+                        template.isActive
+                          ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400'
+                          : 'bg-muted text-muted-foreground',
+                      )}
+                    >
+                      {template.isActive ? 'Active' : 'Paused'}
+                    </span>
+                  </div>
                     <p className="mt-1 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                       {template.placement === 'daily'
                         ? 'Daily'
@@ -337,7 +509,98 @@ export function AdminQuestManagerPage() {
             </div>
           </aside>
 
-          <main className="grid gap-6">
+          <aside className="order-2 xl:order-3">
+            <div className="space-y-6 xl:sticky xl:top-6">
+              <section className="rounded-[28px] border border-border/50 bg-card/80 p-5 shadow-sm">
+                <div className="mb-4 flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-primary" />
+                  <div>
+                    <p className="text-lg font-black text-foreground">Live Preview</p>
+                    <p className="text-sm text-muted-foreground">
+                      This mirrors the quest hub card style.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  {form.placement === 'daily' ? (
+                    <DailyQuestPresentationCard
+                      quest={{
+                        placement: 'daily',
+                        title: form.name.trim() || 'Quest title preview',
+                        description:
+                          form.description.trim() ||
+                          'Quest description will appear here in the quest hub.',
+                        coverImageUrl: form.coverImageUrl,
+                        rewards: form.rewards,
+                        logic: previewLogic,
+                        completed: false,
+                        claimable: false,
+                        claimed: false,
+                      }}
+                      rewardCatalog={rewardCatalog}
+                      isPremium={false}
+                      buttonLabel="Preview Only"
+                      buttonDisabled
+                    />
+                  ) : (
+                    <CategoryQuestPresentationCard
+                      quest={{
+                        placement: 'category',
+                        categoryId: form.categoryId ?? QUEST_MACRO_CATEGORIES[0].id,
+                        title: form.name.trim() || 'Quest title preview',
+                        description:
+                          form.description.trim() ||
+                          'Quest description will appear here in the quest hub.',
+                        coverImageUrl: form.coverImageUrl,
+                        rewards: form.rewards,
+                        logic: previewLogic,
+                        completed: false,
+                        claimable: false,
+                        claimed: false,
+                      }}
+                      category={previewCategory}
+                      rewardCatalog={rewardCatalog}
+                      isPremium={false}
+                      linkedTags={[]}
+                      buttonLabel="Preview Only"
+                      buttonDisabled
+                    />
+                  )}
+
+                  {form.placement === 'category' && !form.categoryId ? (
+                    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+                      Pick a category to preview the real gradient and focus label.
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
+              <section className="rounded-[28px] border border-border/50 bg-card/80 p-5 shadow-sm">
+                <p className="text-sm font-black uppercase tracking-[0.16em] text-muted-foreground">
+                  Preview Notes
+                </p>
+                <div className="mt-3 space-y-2">
+                  {previewNotes.length > 0 ? (
+                    previewNotes.map((note) => (
+                      <div
+                        key={note}
+                        className="rounded-2xl border border-border/50 bg-background/70 px-4 py-3 text-sm text-muted-foreground"
+                      >
+                        {note}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-border/50 bg-background/70 px-4 py-3 text-sm text-muted-foreground">
+                      This quest preview is deterministic. No runtime substitutions are used yet.
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+          </aside>
+
+          <main className="order-3 grid gap-6 xl:order-2">
             {result && (
               <div className={cn(
                 'flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium',
@@ -350,41 +613,100 @@ export function AdminQuestManagerPage() {
               </div>
             )}
 
+            <section className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              <SummaryCard label="Placement" value={placementSummary} />
+              <SummaryCard label="Goal" value={objectiveSummary} />
+              <SummaryCard label="Rewards" value={rewardSummaryText} />
+              <SummaryCard label="Visibility" value={visibilitySummary} />
+            </section>
+
             <section className="rounded-[28px] border border-border/50 bg-card/80 p-6 shadow-sm">
               <div className="mb-5">
                 <p className="text-lg font-black text-foreground">1. Basics</p>
-                <p className="text-sm text-muted-foreground">Set where this quest appears and how it should look to the user.</p>
+                <p className="text-sm text-muted-foreground">
+                  Start with where the quest appears and what the player sees first.
+                </p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-2">
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Quest Name</span>
-                  <input value={form.name} onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))} className="h-12 rounded-2xl border border-border bg-background px-4 text-sm outline-none transition focus:border-primary/30" />
-                </label>
-                <label className="grid gap-2">
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Placement</span>
-                  <select value={form.placement} onChange={(event) => setForm((prev) => ({ ...prev, placement: event.target.value as QuestPlacement, categoryId: event.target.value === 'category' ? prev.categoryId : undefined }))} className="h-12 rounded-2xl border border-border bg-background px-4 text-sm outline-none transition focus:border-primary/30">
-                    <option value="daily">Daily List</option>
-                    <option value="category">Specific Category</option>
-                  </select>
-                </label>
+              <div className="grid gap-3 md:grid-cols-2">
+                {(['daily', 'category'] as const).map((placement) => (
+                  <button
+                    key={placement}
+                    type="button"
+                    onClick={() =>
+                      setForm((prev) => ({
+                        ...prev,
+                        placement,
+                        categoryId:
+                          placement === 'category' ? prev.categoryId : undefined,
+                      }))
+                    }
+                    className={cn(
+                      'rounded-[24px] border p-4 text-left transition-all',
+                      form.placement === placement
+                        ? 'border-primary/30 bg-primary/10'
+                        : 'border-border/50 bg-background/70 hover:bg-muted/40',
+                    )}
+                  >
+                    <p className="text-sm font-black text-foreground">
+                      {placement === 'daily' ? 'Daily Quest' : 'Focus Quest'}
+                    </p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {placement === 'daily'
+                        ? 'Shows in the daily tab with the blue quest card style.'
+                        : 'Shows inside one focus category with the quest hub category style.'}
+                    </p>
+                  </button>
+                ))}
               </div>
 
-              <div className="mt-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
-                <label className="grid gap-2">
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Description</span>
-                  <textarea rows={3} value={form.description} onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))} className="rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary/30" />
-                </label>
+              <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
+                <div className="grid gap-4">
+                  <label className="grid gap-2">
+                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Quest Name</span>
+                    <input
+                      value={form.name}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, name: event.target.value }))
+                      }
+                      placeholder="Complete 3 important tasks"
+                      className="h-12 rounded-2xl border border-border bg-background px-4 text-sm outline-none transition focus:border-primary/30"
+                    />
+                  </label>
+                  <label className="grid gap-2">
+                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Description</span>
+                    <textarea
+                      rows={4}
+                      value={form.description}
+                      onChange={(event) =>
+                        setForm((prev) => ({ ...prev, description: event.target.value }))
+                      }
+                      placeholder="Tell the user what this quest asks them to do."
+                      className="rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary/30"
+                    />
+                  </label>
+                </div>
                 <label className="grid gap-2">
                   <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Cover Photo</span>
                   <div className="rounded-[24px] border border-dashed border-border bg-background/70 p-3">
-                    {form.coverImageUrl ? <img src={form.coverImageUrl} alt="Quest cover" className="h-28 w-full rounded-2xl object-cover" /> : <div className="flex h-28 flex-col items-center justify-center gap-2 text-center text-muted-foreground"><ImagePlus className="h-6 w-6" /><span className="text-sm font-bold">Upload cover</span></div>}
+                    {form.coverImageUrl ? <img src={form.coverImageUrl} alt="Quest cover" className="h-40 w-full rounded-2xl object-cover" /> : <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-muted-foreground"><ImagePlus className="h-6 w-6" /><span className="text-sm font-bold">Upload cover</span></div>}
                     <input type="file" accept="image/*" className="mt-3 block w-full text-xs" onChange={async (event) => {
                       const file = event.target.files?.[0];
                       if (!file) return;
                       const coverImageUrl = await readFileAsDataUrl(file);
                       setForm((prev) => ({ ...prev, coverImageUrl }));
                     }} />
+                    {form.coverImageUrl && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-3 w-full rounded-xl"
+                        onClick={() => setForm((prev) => ({ ...prev, coverImageUrl: undefined }))}
+                      >
+                        Remove Cover
+                      </Button>
+                    )}
                   </div>
                 </label>
               </div>
@@ -424,7 +746,9 @@ export function AdminQuestManagerPage() {
                     <div className="mb-4 flex items-center justify-between">
                       <div>
                         <p className="text-sm font-black text-foreground">Block {index + 1}</p>
-                        <p className="text-xs text-muted-foreground">Each block contributes to the total quest target.</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatQuestObjective(buildPreviewLogicBlock(block))}
+                        </p>
                       </div>
                       {form.logic.length > 1 && (
                         <button onClick={() => setForm((prev) => ({ ...prev, logic: prev.logic.filter((entry) => entry.id !== block.id) }))} className="flex h-9 w-9 items-center justify-center rounded-full text-red-500 hover:bg-red-500/10">
@@ -516,7 +840,7 @@ export function AdminQuestManagerPage() {
             <section className="rounded-[28px] border border-border/50 bg-card/80 p-6 shadow-sm">
               <div className="mb-5 flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-lg font-black text-foreground">3. Show Rules</p>
+                  <p className="text-lg font-black text-foreground">3. Availability</p>
                   <p className="text-sm text-muted-foreground">Control when this quest is allowed to appear for a user.</p>
                 </div>
                 <Button
@@ -645,6 +969,14 @@ export function AdminQuestManagerPage() {
               <div className="space-y-3">
                 {form.rewards.map((reward, index) => (
                   <div key={index} className="rounded-2xl border border-border/50 bg-background/70 p-4">
+                    <div className="mb-4 flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-foreground">Reward {index + 1}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {rewardSummary(reward, rewardCatalog)}
+                        </p>
+                      </div>
+                    </div>
                     <div className="grid gap-3 xl:grid-cols-[160px_minmax(0,1fr)_40px]">
                       <label className="grid gap-2">
                         <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Type</span>
@@ -790,6 +1122,17 @@ export function AdminQuestManagerPage() {
           </main>
         </div>
       </div>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[24px] border border-border/50 bg-card/80 p-4 shadow-sm">
+      <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </p>
+      <p className="mt-2 text-sm font-bold text-foreground">{value}</p>
     </div>
   );
 }

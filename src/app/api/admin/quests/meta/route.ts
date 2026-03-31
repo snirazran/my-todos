@@ -21,6 +21,7 @@ export async function GET() {
         name: item.name,
         slot: item.slot,
         rarity: item.rarity,
+        riveIndex: item.riveIndex,
       })),
     });
   } catch {

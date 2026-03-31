@@ -271,9 +271,27 @@ export async function PUT(req: NextRequest) {
     if ('error' in sanitized) return json({ error: sanitized.error }, 400);
 
     await connectMongo();
+    const updateSet = {
+      ...sanitized.payload,
+    };
+    const unsetFields: Record<string, 1> = {};
+
+    if (!sanitized.payload.coverImageUrl) {
+      delete updateSet.coverImageUrl;
+      unsetFields.coverImageUrl = 1;
+    }
+
+    if (!sanitized.payload.categoryId) {
+      delete updateSet.categoryId;
+      unsetFields.categoryId = 1;
+    }
+
     const template = await QuestTemplateModel.findOneAndUpdate(
       { templateId },
-      { $set: sanitized.payload },
+      {
+        $set: updateSet,
+        ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}),
+      },
       { new: true },
     );
     if (!template) return json({ error: 'Quest template not found' }, 404);
