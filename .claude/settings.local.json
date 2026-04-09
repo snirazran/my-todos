@@ -23,7 +23,8 @@
       "Bash(find C:UserssniraDesktopFull-Stackfrog-tasksrc -type f -name *page* -o -name *home*)",
       "Bash(find /Users/snirazran/Fullstack/my-todos/src -type f -name *habit* -o -name *store*)",
       "Bash(find /Users/snirazran/Fullstack/my-todos/src -type f -name *store* -o -name *Store*)",
-      "Bash(find /c/Users/snira/Desktop/Full-Stack/frog-task -type f -name *.rive)"
+      "Bash(find /c/Users/snira/Desktop/Full-Stack/frog-task -type f -name *.rive)",
+      "Bash(npx cap:*)"
     ]
   }
 }

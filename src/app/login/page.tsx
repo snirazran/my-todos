@@ -46,7 +46,7 @@ export default function LoginPage() {
     if (Capacitor.isNativePlatform()) {
       GoogleAuth.initialize({
         clientId:
-          '324868480648-mcnp29sgs2r9ip4nsbfs82phhiuv4tos.apps.googleusercontent.com',
+          '324868480648-qv2h2spg5jl3mmhek4u6vvefm7k7m0f4.apps.googleusercontent.com',
         scopes: ['profile', 'email'],
         grantOfflineAccess: true,
       });
