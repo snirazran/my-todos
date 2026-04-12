@@ -1,28 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
-import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
+import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { saveFocusProfile } from '@/lib/quests/engine';
 import type { FocusCategoryTagMap, MacroCategoryId } from '@/lib/quests/types';
-
-function isMacroCategoryId(value: string): value is MacroCategoryId {
-  return QUEST_MACRO_CATEGORIES.some((category) => category.id === value);
-}
 
 export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
     const body = await req.json();
     const timezone = body.timezone || 'UTC';
+    await connectMongo();
+
+    const categories = await QuestCategoryModel.find({})
+      .select('categoryId')
+      .lean<Array<{ categoryId: string }>>();
+    const validCategoryIds = new Set(
+      categories.map((category) => category.categoryId),
+    );
+    const isValidCategoryId = (value: string): value is MacroCategoryId =>
+      validCategoryIds.has(value);
+
     const selectedCategoryIds = Array.isArray(body.selectedCategoryIds)
-      ? body.selectedCategoryIds.filter((value: string) => isMacroCategoryId(value))
+      ? body.selectedCategoryIds.filter((value: string) => isValidCategoryId(value))
       : [];
     const categoryTagMap = (Array.isArray(body.categoryTagMap)
       ? body.categoryTagMap
       : []
     ).filter(
       (entry: FocusCategoryTagMap) =>
-        isMacroCategoryId(entry.categoryId) &&
+        isValidCategoryId(entry.categoryId) &&
         Array.isArray(entry.tagIds) &&
         entry.tagIds.length > 0,
     );
@@ -34,7 +41,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await connectMongo();
     const dashboard = await saveFocusProfile({
       userId,
       selectedCategoryIds,

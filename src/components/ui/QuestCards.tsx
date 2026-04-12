@@ -209,13 +209,15 @@ export function CategoryQuestPresentationCard({
   linkedTags: QuestTagChip[];
   onEditTags?: () => void;
 }) {
+  const heroImageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
+
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
       <div className="relative min-h-[310px] overflow-hidden">
-        {quest.coverImageUrl ? (
+        {heroImageUrl ? (
           <img
-            src={quest.coverImageUrl}
-            alt={quest.title}
+            src={heroImageUrl}
+            alt={category?.name ?? quest.title}
             className="h-[250px] w-full object-cover sm:h-[285px]"
           />
         ) : (
@@ -226,12 +228,12 @@ export function CategoryQuestPresentationCard({
             }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/28 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/32 to-black/10" />
+        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/80 to-transparent" />
         <div className="absolute inset-x-0 top-0 flex items-start gap-3 p-4">
           <div className="flex items-start gap-2">
             <span className="rounded-full border border-white/20 bg-black/35 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-white backdrop-blur-md">
-              {category?.shortLabel ?? category?.name ?? 'Focus'}
+              {category?.shortLabel || category?.name || 'Focus'}
             </span>
           </div>
         </div>
@@ -247,16 +249,32 @@ export function CategoryQuestPresentationCard({
           ))}
         </div>
         <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[116px] sm:p-5 sm:pr-[132px]">
-          <h3 className="text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)] sm:text-4xl">
-            {quest.title}
+          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
+            {category?.shortLabel || 'Focus'}
+          </p>
+          <h3 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)] sm:text-4xl">
+            {category?.name || 'Focus Quest'}
           </h3>
-          <p className="mt-1.5 max-w-2xl text-sm text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] sm:text-base">
-            {quest.description}
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] sm:text-base">
+            {category?.description || quest.description}
           </p>
         </div>
       </div>
 
       <div className="px-4 pt-4 pb-4 space-y-4 sm:px-5 sm:pb-5">
+        <div className="border-b border-border/40 pb-4">
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            Quest
+          </p>
+          <h4 className="mt-1 text-lg font-black leading-tight text-foreground">
+            {quest.title}
+          </h4>
+          {quest.description && (
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+              {quest.description}
+            </p>
+          )}
+        </div>
         <div className="space-y-3">
           {quest.logic.map((block) => (
             <div

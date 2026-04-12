@@ -4,16 +4,17 @@ import QuestTemplateModel, {
 } from '@/lib/models/QuestTemplate';
 import UserModel from '@/lib/models/User';
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
+import QuestCategoryModel, { type QuestCategoryDoc } from '@/lib/models/QuestCategory';
 import type { UserDoc } from '@/lib/types/UserDoc';
 import type { ItemDef } from '@/lib/skins/catalog';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
-import { QUEST_MACRO_CATEGORIES } from './catalog';
 import type {
   CategoryQuestProgressView,
   DailyQuestProgressView,
   FocusCategoryTagMap,
   FocusProfile,
+  MacroCategoryDefinition,
   MacroCategoryId,
   QuestLogicBlock,
   QuestPlacement,
@@ -334,6 +335,24 @@ function buildRewardCatalog(catalog: ItemDef[], rewardSets: QuestRewards[]) {
   );
 }
 
+function categoryDocToDefinition(doc: QuestCategoryDoc): MacroCategoryDefinition {
+  return {
+    id: doc.categoryId,
+    name: doc.name,
+    shortLabel: doc.shortLabel,
+    description: doc.description,
+    coverImageUrl: doc.coverImageUrl,
+    accent: doc.accent,
+    backgroundFrom: doc.backgroundFrom,
+    backgroundTo: doc.backgroundTo,
+    taskSuggestions: [],
+    habitSuggestions: [],
+    campaignHeadlines: [],
+    durationDaysOptions: [],
+    premiumAnimationId: '',
+  };
+}
+
 function templateToView(doc: QuestTemplateDoc): QuestTemplateView {
   return {
     id: doc.templateId,
@@ -527,11 +546,12 @@ export async function syncQuestState(args: {
   dailySelectionSeed?: string;
 }) {
   const { userId, timezone } = args;
-  const [user, tasks, catalog, templates] = await Promise.all([
+  const [user, tasks, catalog, templates, categories] = await Promise.all([
     UserModel.findById(userId).lean<UserDoc | null>(),
     TaskModel.find({ userId, deletedAt: { $exists: false } }).lean<TaskDoc[]>(),
     args.catalog ? Promise.resolve(args.catalog) : getFullCatalog(),
     QuestTemplateModel.find({ isActive: true }).lean<QuestTemplateDoc[]>(),
+    QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean<QuestCategoryDoc[]>(),
   ]);
 
   if (!user) throw new Error('User not found');
@@ -638,7 +658,7 @@ export async function syncQuestState(args: {
     catalog,
     isPremium: isPremiumUser(user),
     focusProfile: profile,
-    macroCategories: QUEST_MACRO_CATEGORIES,
+    macroCategories: categories.map(categoryDocToDefinition),
     dailyQuests,
     categoryQuests,
     rewardCatalog: buildRewardCatalog(catalog, [

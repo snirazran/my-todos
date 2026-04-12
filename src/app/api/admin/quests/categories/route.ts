@@ -3,6 +3,12 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 
+function sanitizeCoverImageUrl(value: unknown) {
+  return typeof value === 'string' && value.startsWith('data:image/')
+    ? value
+    : undefined;
+}
+
 export async function GET() {
   try {
     await requireUserId();
@@ -18,6 +24,7 @@ export async function GET() {
         name: c.name,
         shortLabel: c.shortLabel,
         description: c.description,
+        coverImageUrl: c.coverImageUrl,
         accent: c.accent,
         backgroundFrom: c.backgroundFrom,
         backgroundTo: c.backgroundTo,
@@ -35,6 +42,7 @@ export async function POST(req: NextRequest) {
     await connectMongo();
     const body = await req.json();
     const { name, shortLabel, description, accent, backgroundFrom, backgroundTo } = body;
+    const coverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
 
     if (!name?.trim()) {
       return NextResponse.json({ error: 'Category name is required' }, { status: 400 });
@@ -46,6 +54,7 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       shortLabel: shortLabel?.trim() ?? '',
       description: description?.trim() ?? '',
+      ...(coverImageUrl ? { coverImageUrl } : {}),
       accent: accent ?? '#6366f1',
       backgroundFrom: backgroundFrom ?? '#1e1b4b',
       backgroundTo: backgroundTo ?? '#312e81',
@@ -59,6 +68,7 @@ export async function POST(req: NextRequest) {
         name: category.name,
         shortLabel: category.shortLabel,
         description: category.description,
+        coverImageUrl: category.coverImageUrl,
         accent: category.accent,
         backgroundFrom: category.backgroundFrom,
         backgroundTo: category.backgroundTo,
@@ -76,22 +86,27 @@ export async function PUT(req: NextRequest) {
     await connectMongo();
     const body = await req.json();
     const { id, name, shortLabel, description, accent, backgroundFrom, backgroundTo } = body;
+    const coverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
 
     if (!id) return NextResponse.json({ error: 'Category id required' }, { status: 400 });
     if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 });
 
+    const updateSet = {
+      name: name.trim(),
+      shortLabel: shortLabel?.trim() ?? '',
+      description: description?.trim() ?? '',
+      accent: accent ?? '#6366f1',
+      backgroundFrom: backgroundFrom ?? '#1e1b4b',
+      backgroundTo: backgroundTo ?? '#312e81',
+      isBuiltIn: false,
+      ...(coverImageUrl ? { coverImageUrl } : {}),
+    };
+
     const category = await QuestCategoryModel.findOneAndUpdate(
       { categoryId: id },
       {
-        $set: {
-          name: name.trim(),
-          shortLabel: shortLabel?.trim() ?? '',
-          description: description?.trim() ?? '',
-          accent: accent ?? '#6366f1',
-          backgroundFrom: backgroundFrom ?? '#1e1b4b',
-          backgroundTo: backgroundTo ?? '#312e81',
-          isBuiltIn: false,
-        },
+        $set: updateSet,
+        ...(!coverImageUrl ? { $unset: { coverImageUrl: 1 } } : {}),
       },
       { new: true },
     );
@@ -105,6 +120,7 @@ export async function PUT(req: NextRequest) {
         name: category.name,
         shortLabel: category.shortLabel,
         description: category.description,
+        coverImageUrl: category.coverImageUrl,
         accent: category.accent,
         backgroundFrom: category.backgroundFrom,
         backgroundTo: category.backgroundTo,

@@ -41,7 +41,6 @@ const QuestSchema = new Schema<QuestDoc>(
     },
     categoryId: {
       type: String,
-      enum: ['sport', 'family', 'mindfulness', 'house_chores', 'sleep'],
       default: undefined,
     },
     windowKey: { type: String, required: true, index: true },

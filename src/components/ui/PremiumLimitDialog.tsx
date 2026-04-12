@@ -7,11 +7,22 @@ import { createPortal } from 'react-dom';
 interface Props {
   open: boolean;
   onClose: () => void;
+  title?: string;
+  description?: React.ReactNode;
+  actionLabel?: string;
 }
 
 export function PremiumLimitDialog({
   open,
   onClose,
+  title = 'Limit Reached',
+  description = (
+    <>
+      Unlock unlimited tags with <b>Premium</b> or delete unused ones to make
+      space.
+    </>
+  ),
+  actionLabel = 'Okay',
 }: Props) {
   if (!open) return null;
 
@@ -44,10 +55,10 @@ export function PremiumLimitDialog({
           </div>
           <div className="flex-1 space-y-1">
             <h4 className="text-lg font-semibold text-slate-900 dark:text-white">
-              Limit Reached
+              {title}
             </h4>
             <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-              Unlock unlimited tags with <b>Premium</b> or delete unused ones to make space.
+              {description}
             </p>
           </div>
           <button
@@ -65,7 +76,7 @@ export function PremiumLimitDialog({
               className="flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-white font-bold text-[15px] shadow-sm hover:brightness-110 active:scale-[0.98] transition-all"
               onClick={onClose}
             >
-              Okay
+              {actionLabel}
             </button>
         </div>
       </div>

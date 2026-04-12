@@ -43,7 +43,7 @@ import {
 } from '@/hooks/useTaskData';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
-import type { FocusCategoryTagMap, MacroCategoryId } from '@/lib/quests/types';
+import type { FocusCategoryTagMap, MacroCategoryDefinition, MacroCategoryId } from '@/lib/quests/types';
 
 // Force re-compilation of this file to pick up useTaskData.tsx change
 
@@ -224,11 +224,13 @@ export default function Home() {
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [dismissQuestOnboarding, setDismissQuestOnboarding] = useState(false);
   const { data: questsData, mutate: mutateQuests } = useSWR<{
+    isPremium?: boolean;
     onboarding?: {
       complete: boolean;
       selectedCategoryIds: MacroCategoryId[];
       categoryTagMap: FocusCategoryTagMap[];
     };
+    macroCategories?: MacroCategoryDefinition[];
   }>(
     user ? `/api/quests?timezone=${encodeURIComponent(timezone)}` : null,
     (url: string) => fetch(url).then((res) => res.json()),
@@ -752,6 +754,8 @@ export default function Home() {
         isCompleted={!!questOnboarding?.complete}
         initialSelectedCategoryIds={questOnboarding?.selectedCategoryIds ?? []}
         initialCategoryTagMap={questOnboarding?.categoryTagMap ?? []}
+        categories={questsData?.macroCategories ?? []}
+        isPremium={!!questsData?.isPremium}
         onClose={() => {
           closeQuestOnboarding();
           setDismissQuestOnboarding(true);

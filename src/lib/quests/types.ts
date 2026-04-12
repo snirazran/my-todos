@@ -1,9 +1,4 @@
-export type MacroCategoryId =
-  | 'sport'
-  | 'family'
-  | 'mindfulness'
-  | 'house_chores'
-  | 'sleep';
+export type MacroCategoryId = string;
 
 export type QuestRewardType = 'FLIES' | 'ITEM' | 'BOX';
 
@@ -117,6 +112,7 @@ export type MacroCategoryDefinition = {
   name: string;
   shortLabel: string;
   description: string;
+  coverImageUrl?: string;
   accent: string;
   backgroundFrom: string;
   backgroundTo: string;

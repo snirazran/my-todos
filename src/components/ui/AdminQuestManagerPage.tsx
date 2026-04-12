@@ -66,6 +66,7 @@ type AdminCategory = {
   name: string;
   shortLabel: string;
   description: string;
+  coverImageUrl?: string;
   accent: string;
   backgroundFrom: string;
   backgroundTo: string;
@@ -76,6 +77,7 @@ type CategoryFormState = {
   name: string;
   shortLabel: string;
   description: string;
+  coverImageUrl?: string;
   accent: string;
   backgroundFrom: string;
   backgroundTo: string;
@@ -251,6 +253,7 @@ export function AdminQuestManagerPage() {
   const [conditionsPopupOpen, setConditionsPopupOpen] = useState(false);
   const [availabilityPopupOpen, setAvailabilityPopupOpen] = useState(false);
   const [coverFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
+  const [categoryFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -269,6 +272,7 @@ export function AdminQuestManagerPage() {
     name: '',
     shortLabel: '',
     description: '',
+    coverImageUrl: undefined,
     accent: '#6366f1',
     backgroundFrom: '#1e1b4b',
     backgroundTo: '#312e81',
@@ -416,8 +420,8 @@ export function AdminQuestManagerPage() {
     setEditingCategory(cat ?? null);
     setCategoryForm(
       cat
-        ? { name: cat.name, shortLabel: cat.shortLabel, description: cat.description, accent: cat.accent, backgroundFrom: cat.backgroundFrom, backgroundTo: cat.backgroundTo }
-        : { name: '', shortLabel: '', description: '', accent: '#6366f1', backgroundFrom: '#1e1b4b', backgroundTo: '#312e81' },
+        ? { name: cat.name, shortLabel: cat.shortLabel, description: cat.description, coverImageUrl: cat.coverImageUrl, accent: cat.accent, backgroundFrom: cat.backgroundFrom, backgroundTo: cat.backgroundTo }
+        : { name: '', shortLabel: '', description: '', coverImageUrl: undefined, accent: '#6366f1', backgroundFrom: '#1e1b4b', backgroundTo: '#312e81' },
     );
     setConfirmAction(null);
     setCategoryDialogOpen(true);
@@ -669,9 +673,17 @@ export function AdminQuestManagerPage() {
           return (
             <div key={cat.id} className="group flex items-center gap-4 rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5 transition hover:border-primary/20 hover:bg-primary/[0.03]">
               <div
-                className="h-10 w-10 shrink-0 rounded-xl shadow-sm"
-                style={{ background: `linear-gradient(135deg, ${cat.backgroundFrom}, ${cat.backgroundTo})` }}
-              />
+                className="h-10 w-10 shrink-0 overflow-hidden rounded-xl bg-muted/40 shadow-sm"
+                style={{
+                  background: cat.coverImageUrl
+                    ? undefined
+                    : `linear-gradient(135deg, ${cat.backgroundFrom}, ${cat.backgroundTo})`,
+                }}
+              >
+                {cat.coverImageUrl && (
+                  <img src={cat.coverImageUrl} alt="" className="h-full w-full object-cover" />
+                )}
+              </div>
               <button
                 onClick={() => { setSelectedCategoryId(cat.id); setView('category'); }}
                 className="min-w-0 flex-1 text-left"
@@ -1083,8 +1095,49 @@ export function AdminQuestManagerPage() {
                 </label>
               </div>
               <div className="rounded-2xl border border-border/50 bg-background/70 p-3">
-                <p className="mb-2 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Preview</p>
-                <div className="h-12 rounded-xl" style={{ background: `linear-gradient(135deg, ${categoryForm.backgroundFrom}, ${categoryForm.backgroundTo})` }} />
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Category Photo</p>
+                  {categoryForm.coverImageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setCategoryForm((prev) => ({ ...prev, coverImageUrl: undefined }))}
+                      className="text-xs font-bold text-muted-foreground transition hover:text-foreground"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <input
+                  ref={(el) => { categoryFileInputRef.current = el; }}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (event) => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    const coverImageUrl = await readFileAsDataUrl(file);
+                    setCategoryForm((prev) => ({ ...prev, coverImageUrl }));
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => categoryFileInputRef.current?.click()}
+                  className="relative flex h-32 w-full items-center justify-center overflow-hidden rounded-xl border border-dashed border-border/60 bg-muted/30 text-sm font-bold text-muted-foreground transition hover:border-primary/25 hover:bg-primary/5 hover:text-foreground"
+                >
+                  {categoryForm.coverImageUrl ? (
+                    <>
+                      <img src={categoryForm.coverImageUrl} alt="" className="absolute inset-0 h-full w-full object-cover" />
+                      <span className="relative rounded-full bg-black/55 px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-white backdrop-blur-sm">
+                        Change Photo
+                      </span>
+                    </>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <Camera className="h-4 w-4" />
+                      Add Category Photo
+                    </span>
+                  )}
+                </button>
               </div>
             </div>
             <DialogFooter className="border-t border-border/50 bg-card/95 px-6 py-4 sm:gap-3">
