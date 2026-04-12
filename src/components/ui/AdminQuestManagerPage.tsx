@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type {
+  MacroCategoryDefinition,
   MacroCategoryId,
   QuestLogicBlock,
   QuestPlacement,
@@ -1111,7 +1112,7 @@ export function AdminQuestManagerPage() {
           ) : (
             <CategoryQuestPresentationCard
               quest={{ placement: 'category', categoryId: (form.categoryId ?? adminCategories[0]?.id ?? '') as MacroCategoryId, title: form.name.trim() || 'Quest title preview', description: form.description.trim() || 'Quest description will appear here in the quest hub.', coverImageUrl: form.coverImageUrl, rewards: form.rewards, logic: previewLogic, completed: false, claimable: false, claimed: false }}
-              category={previewCategory}
+              category={previewCategory as MacroCategoryDefinition | undefined}
               rewardCatalog={rewardCatalog}
               isPremium={false}
               linkedTags={[]}
