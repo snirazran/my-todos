@@ -430,11 +430,13 @@ export function RewardTile({
   rewardCatalog,
   isPremium,
   compact = false,
+  className,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   compact?: boolean;
+  className?: string;
 }) {
   const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
   const quantityLabel = getRewardQuantityLabel(reward, isPremium);
@@ -455,6 +457,7 @@ export function RewardTile({
         compact
           ? 'h-16 w-16 rounded-[20px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,245,0.96))] shadow-[0_14px_28px_rgba(15,23,42,0.24)] backdrop-blur-sm'
           : 'h-12 w-12 rounded-xl border border-border/40 bg-muted/30',
+        className,
       )}
       title={rewardLabel(reward, rewardCatalog, isPremium)}
     >

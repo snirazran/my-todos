@@ -61,8 +61,6 @@ type AdminQuestTemplate = {
 };
 
 type MetaRewardItem = QuestRewardCatalogItem;
-type MetaCategory = { id: string; name: string };
-
 type AdminCategory = {
   id: string;
   name: string;
@@ -99,6 +97,11 @@ type FormState = {
 };
 
 type RewardPickerTab = 'flies' | 'item' | 'box';
+type ConfirmAction =
+  | 'save-quest'
+  | 'delete-quest'
+  | 'save-category'
+  | `delete-category:${string}`;
 
 const createReward = (): QuestReward => ({
   type: 'FLIES',
@@ -242,7 +245,6 @@ export function AdminQuestManagerPage() {
   const [saving, setSaving] = useState(false);
   const [templates, setTemplates] = useState<AdminQuestTemplate[]>([]);
   const [rewardItems, setRewardItems] = useState<MetaRewardItem[]>([]);
-  const [categories, setCategories] = useState<MetaCategory[]>([]);
   const [adminCategories, setAdminCategories] = useState<AdminCategory[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [rewardPickerOpen, setRewardPickerOpen] = useState(false);
@@ -252,6 +254,7 @@ export function AdminQuestManagerPage() {
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
   // Navigation
   const [view, setView] = useState<ViewLevel>('home');
@@ -260,6 +263,7 @@ export function AdminQuestManagerPage() {
   // Category dialog
   const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [savingCategory, setSavingCategory] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<string | null>(null);
   const [editingCategory, setEditingCategory] = useState<AdminCategory | null>(null);
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>({
     name: '',
@@ -291,7 +295,6 @@ export function AdminQuestManagerPage() {
       }
       setTemplates(templatesData.templates ?? []);
       setRewardItems(metaData.rewardsCatalog ?? []);
-      setCategories(metaData.categories ?? []);
       setAdminCategories(categoriesData.categories ?? []);
     } catch (error) {
       setResult({
@@ -306,6 +309,7 @@ export function AdminQuestManagerPage() {
   const resetForm = () => {
     setForm(emptyForm());
     setResult(null);
+    setConfirmAction(null);
   };
 
   const startEditing = (template: AdminQuestTemplate) => {
@@ -324,6 +328,16 @@ export function AdminQuestManagerPage() {
       isActive: template.isActive,
     });
     setResult(null);
+    setConfirmAction(null);
+  };
+
+  const confirmBeforeAction = (action: ConfirmAction) => {
+    if (confirmAction !== action) {
+      setConfirmAction(action);
+      return false;
+    }
+    setConfirmAction(null);
+    return true;
   };
 
   const updateLogic = (id: string, patch: Partial<QuestLogicBlock>) => {
@@ -345,6 +359,7 @@ export function AdminQuestManagerPage() {
   };
 
   const saveQuest = async () => {
+    if (!confirmBeforeAction('save-quest')) return;
     setSaving(true);
     setResult(null);
     try {
@@ -371,6 +386,7 @@ export function AdminQuestManagerPage() {
 
   const deleteQuest = async () => {
     if (!form.id) return;
+    if (!confirmBeforeAction('delete-quest')) return;
     setSaving(true);
     setResult(null);
     try {
@@ -403,10 +419,12 @@ export function AdminQuestManagerPage() {
         ? { name: cat.name, shortLabel: cat.shortLabel, description: cat.description, accent: cat.accent, backgroundFrom: cat.backgroundFrom, backgroundTo: cat.backgroundTo }
         : { name: '', shortLabel: '', description: '', accent: '#6366f1', backgroundFrom: '#1e1b4b', backgroundTo: '#312e81' },
     );
+    setConfirmAction(null);
     setCategoryDialogOpen(true);
   };
 
   const saveCategory = async () => {
+    if (!confirmBeforeAction('save-category')) return;
     setSavingCategory(true);
     try {
       const res = await fetch('/api/admin/quests/categories', {
@@ -427,6 +445,9 @@ export function AdminQuestManagerPage() {
   };
 
   const deleteCategory = async (cat: AdminCategory) => {
+    const action = `delete-category:${cat.id}` as const;
+    if (!confirmBeforeAction(action)) return;
+    setDeletingCategoryId(cat.id);
     try {
       const res = await fetch('/api/admin/quests/categories', {
         method: 'DELETE',
@@ -439,6 +460,8 @@ export function AdminQuestManagerPage() {
       await loadData();
     } catch (error) {
       setResult({ type: 'error', message: error instanceof Error ? error.message : 'Could not delete category' });
+    } finally {
+      setDeletingCategoryId(null);
     }
   };
 
@@ -457,6 +480,31 @@ export function AdminQuestManagerPage() {
 
 
   const selectedCategory = selectedCategoryId ? adminCategoryMap[selectedCategoryId] : null;
+  const formCategory = form.categoryId ? adminCategoryMap[form.categoryId] : null;
+  const formPlacementLabel =
+    form.placement === 'daily'
+      ? 'Daily'
+      : formCategory?.name ?? selectedCategory?.name ?? 'Focus';
+  const questSaveButtonLabel = saving
+    ? 'Saving...'
+    : confirmAction === 'save-quest'
+      ? form.id
+        ? 'Tap Again to Save'
+        : 'Tap Again to Create'
+      : form.id
+        ? 'Save Changes'
+        : 'Create Quest';
+  const questDeleteButtonLabel =
+    confirmAction === 'delete-quest' ? 'Tap Again to Delete' : 'Delete';
+  const categorySaveButtonLabel = savingCategory
+    ? 'Saving...'
+    : confirmAction === 'save-category'
+      ? editingCategory
+        ? 'Tap Again to Save'
+        : 'Tap Again to Create'
+      : editingCategory
+        ? 'Save Changes'
+        : 'Create Category';
   const dailyTemplates = templates.filter((t) => t.placement === 'daily');
   const categoryTemplates = templates.filter(
     (t) => t.placement === 'category' && t.categoryId === selectedCategoryId,
@@ -566,17 +614,19 @@ export function AdminQuestManagerPage() {
 
           {/* Reward tiles */}
           {template.rewards.length > 0 && (
-            <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+            <div className="hidden shrink-0 items-center gap-2 sm:flex">
               {template.rewards.slice(0, 3).map((reward, i) => (
                 <RewardTile
                   key={`${reward.type}-${reward.itemId ?? i}`}
                   reward={reward}
                   rewardCatalog={rewardCatalog}
                   isPremium={false}
+                  compact
+                  className="shadow-none"
                 />
               ))}
               {template.rewards.length > 3 && (
-                <span className="text-xs font-bold text-muted-foreground">+{template.rewards.length - 3}</span>
+                <span className="text-sm font-black text-muted-foreground">+{template.rewards.length - 3}</span>
               )}
             </div>
           )}
@@ -613,6 +663,9 @@ export function AdminQuestManagerPage() {
       <div className="space-y-2">
         {adminCategories.map((cat) => {
           const questCount = templates.filter((t) => t.placement === 'category' && t.categoryId === cat.id).length;
+          const deleteAction = `delete-category:${cat.id}` as const;
+          const confirmingDelete = confirmAction === deleteAction;
+          const deletingCategory = deletingCategoryId === cat.id;
           return (
             <div key={cat.id} className="group flex items-center gap-4 rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5 transition hover:border-primary/20 hover:bg-primary/[0.03]">
               <div
@@ -628,7 +681,10 @@ export function AdminQuestManagerPage() {
                   {questCount} quest{questCount !== 1 ? 's' : ''}{cat.description ? ` · ${cat.description}` : ''}
                 </p>
               </button>
-              <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
+              <div className={cn(
+                'flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100',
+                confirmingDelete && 'opacity-100',
+              )}>
                 <button
                   onClick={() => openCategoryDialog(cat)}
                   className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -637,9 +693,23 @@ export function AdminQuestManagerPage() {
                 </button>
                 <button
                   onClick={() => void deleteCategory(cat)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
+                  disabled={deletingCategory}
+                  title={confirmingDelete ? 'Tap again to delete' : 'Delete category'}
+                  className={cn(
+                    'flex h-8 items-center justify-center rounded-full text-xs font-bold transition',
+                    confirmingDelete || deletingCategory
+                      ? 'w-auto bg-red-500/10 px-2 text-red-500'
+                      : 'w-8 text-muted-foreground hover:bg-red-500/10 hover:text-red-500',
+                    deletingCategory && 'cursor-not-allowed opacity-60',
+                  )}
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
+                  {deletingCategory ? (
+                    'Deleting...'
+                  ) : confirmingDelete ? (
+                    'Tap again'
+                  ) : (
+                    <Trash2 className="h-3.5 w-3.5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -708,7 +778,7 @@ export function AdminQuestManagerPage() {
           {/* Top bar: badge + cover actions */}
           <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-4">
             <span className="rounded-full border border-white/20 bg-black/35 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-white backdrop-blur-md">
-              Daily
+              {formPlacementLabel}
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -847,16 +917,6 @@ export function AdminQuestManagerPage() {
                 ? `${form.visibilityConditions.length} rule${form.visibilityConditions.length > 1 ? 's' : ''}`
                 : 'Availability'}
             </button>
-            {form.placement === 'category' && (
-              <select
-                value={form.categoryId ?? ''}
-                onChange={(event) => setForm((prev) => ({ ...prev, categoryId: event.target.value || undefined }))}
-                className="h-7 rounded-full border border-border/50 bg-background/80 px-3 text-xs font-bold text-muted-foreground outline-none transition hover:bg-muted/60"
-              >
-                <option value="">Category...</option>
-                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-              </select>
-            )}
             <label className="ml-auto flex cursor-pointer items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:bg-muted/60">
               <input type="checkbox" checked={form.isActive} onChange={(event) => setForm((prev) => ({ ...prev, isActive: event.target.checked }))} className="h-3 w-3" />
               Active
@@ -868,9 +928,9 @@ export function AdminQuestManagerPage() {
       {/* Save / Cancel / Delete bar */}
       <div className="flex items-center gap-3 rounded-[24px] border border-border/50 bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
         <p className="flex-1 text-sm text-muted-foreground">{form.id ? 'Editing existing template.' : 'Creating a new template.'}</p>
-        {form.id && <Button size="sm" variant="destructive" onClick={deleteQuest} disabled={saving} className="rounded-xl">Delete</Button>}
+        {form.id && <Button size="sm" variant="destructive" onClick={deleteQuest} disabled={saving} className="rounded-xl">{questDeleteButtonLabel}</Button>}
         <Button size="sm" variant="outline" onClick={() => { resetForm(); setView(form.placement === 'daily' ? 'daily' : 'category'); }} disabled={saving} className="rounded-xl">Cancel</Button>
-        <Button size="sm" onClick={saveQuest} disabled={saving} className="rounded-xl font-black">{saving ? 'Saving...' : form.id ? 'Save Changes' : 'Create Quest'}</Button>
+        <Button size="sm" onClick={saveQuest} disabled={saving} className="rounded-xl font-black">{questSaveButtonLabel}</Button>
       </div>
 
       {/* Popups */}
@@ -974,7 +1034,7 @@ export function AdminQuestManagerPage() {
         )}
 
         {/* Category dialog */}
-        <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <Dialog open={categoryDialogOpen} onOpenChange={(open) => { setCategoryDialogOpen(open); if (!open) setConfirmAction(null); }}>
           <DialogContent className="max-w-lg rounded-[32px] p-0 overflow-hidden">
             <div className="border-b border-border/50 bg-card/95 px-6 py-5">
               <DialogHeader>
@@ -1028,9 +1088,9 @@ export function AdminQuestManagerPage() {
               </div>
             </div>
             <DialogFooter className="border-t border-border/50 bg-card/95 px-6 py-4 sm:gap-3">
-              <Button variant="outline" className="rounded-2xl" onClick={() => setCategoryDialogOpen(false)}>Cancel</Button>
+              <Button variant="outline" className="rounded-2xl" onClick={() => { setCategoryDialogOpen(false); setConfirmAction(null); }}>Cancel</Button>
               <Button className="rounded-2xl font-black" onClick={() => void saveCategory()} disabled={savingCategory || !categoryForm.name.trim()}>
-                {savingCategory ? 'Saving...' : editingCategory ? 'Save Changes' : 'Create Category'}
+                {categorySaveButtonLabel}
               </Button>
             </DialogFooter>
           </DialogContent>

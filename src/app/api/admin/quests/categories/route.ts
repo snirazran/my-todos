@@ -2,35 +2,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
-import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
-
-async function seedBuiltIns() {
-  for (const cat of QUEST_MACRO_CATEGORIES) {
-    await QuestCategoryModel.updateOne(
-      { categoryId: cat.id },
-      {
-        $setOnInsert: {
-          categoryId: cat.id,
-          name: cat.name,
-          shortLabel: cat.shortLabel,
-          description: cat.description,
-          accent: cat.accent,
-          backgroundFrom: cat.backgroundFrom,
-          backgroundTo: cat.backgroundTo,
-          isBuiltIn: true,
-        },
-      },
-      { upsert: true },
-    );
-  }
-}
 
 export async function GET() {
   try {
     await requireUserId();
     await connectMongo();
-    await seedBuiltIns();
-    const categories = await QuestCategoryModel.find().sort({ isBuiltIn: -1, createdAt: 1 });
+    await QuestCategoryModel.updateMany(
+      { isBuiltIn: true },
+      { $set: { isBuiltIn: false } },
+    );
+    const categories = await QuestCategoryModel.find().sort({ createdAt: 1 });
     return NextResponse.json({
       categories: categories.map((c) => ({
         id: c.categoryId,
@@ -40,7 +21,7 @@ export async function GET() {
         accent: c.accent,
         backgroundFrom: c.backgroundFrom,
         backgroundTo: c.backgroundTo,
-        isBuiltIn: c.isBuiltIn,
+        isBuiltIn: false,
       })),
     });
   } catch {
@@ -109,6 +90,7 @@ export async function PUT(req: NextRequest) {
           accent: accent ?? '#6366f1',
           backgroundFrom: backgroundFrom ?? '#1e1b4b',
           backgroundTo: backgroundTo ?? '#312e81',
+          isBuiltIn: false,
         },
       },
       { new: true },
@@ -145,9 +127,6 @@ export async function DELETE(req: NextRequest) {
 
     const category = await QuestCategoryModel.findOne({ categoryId: id });
     if (!category) return NextResponse.json({ error: 'Category not found' }, { status: 404 });
-    if (category.isBuiltIn) {
-      return NextResponse.json({ error: 'Built-in categories cannot be deleted' }, { status: 400 });
-    }
 
     await QuestCategoryModel.deleteOne({ categoryId: id });
     return NextResponse.json({ ok: true });

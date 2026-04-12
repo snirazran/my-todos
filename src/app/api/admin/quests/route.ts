@@ -3,10 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import QuestTemplateModel from '@/lib/models/QuestTemplate';
+import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { templateToView } from '@/lib/quests/engine';
-import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
 import type {
-  MacroCategoryId,
   QuestAmountMode,
   QuestCountAction,
   QuestLogicBlock,
@@ -24,9 +23,6 @@ import type {
 const json = (body: unknown, status = 200) =>
   NextResponse.json(body, { status });
 
-const VALID_CATEGORIES = new Set(
-  QUEST_MACRO_CATEGORIES.map((category) => category.id),
-);
 const VALID_PLACEMENTS = new Set<QuestPlacement>(['daily', 'category']);
 const VALID_LOGIC_TYPES = new Set<QuestLogicType>(['count', 'focus_minutes']);
 const VALID_SUBJECTS = new Set<QuestSubject>(['task', 'habit', 'any']);
@@ -178,7 +174,10 @@ function sanitizeTemplateBody(body: any) {
   const description =
     typeof body?.description === 'string' ? body.description.trim() : '';
   const placement = body?.placement as QuestPlacement;
-  const categoryId = body?.categoryId as MacroCategoryId | undefined;
+  const categoryId =
+    typeof body?.categoryId === 'string' && body.categoryId.trim()
+      ? body.categoryId.trim()
+      : undefined;
   const coverImageUrl =
     typeof body?.coverImageUrl === 'string' && body.coverImageUrl.startsWith('data:image/')
       ? body.coverImageUrl
@@ -194,7 +193,7 @@ function sanitizeTemplateBody(body: any) {
 
   if (!name) return { error: 'Quest name is required' };
   if (!VALID_PLACEMENTS.has(placement)) return { error: 'Invalid placement' };
-  if (placement === 'category' && (!categoryId || !VALID_CATEGORIES.has(categoryId))) {
+  if (placement === 'category' && !categoryId) {
     return { error: 'A category quest needs a valid category' };
   }
   if (!logic.length) return { error: 'Add at least one logic block' };
@@ -224,6 +223,11 @@ function sanitizeTemplateBody(body: any) {
   };
 }
 
+async function categoryExists(categoryId: string | undefined) {
+  if (!categoryId) return false;
+  return !!(await QuestCategoryModel.exists({ categoryId }));
+}
+
 export async function GET() {
   try {
     await requireUserId();
@@ -247,6 +251,12 @@ export async function POST(req: NextRequest) {
     if ('error' in sanitized) return json({ error: sanitized.error }, 400);
 
     await connectMongo();
+    if (
+      sanitized.payload.placement === 'category' &&
+      !(await categoryExists(sanitized.payload.categoryId))
+    ) {
+      return json({ error: 'A category quest needs a valid category' }, 400);
+    }
     const template = await QuestTemplateModel.create({
       templateId: uuid(),
       ...sanitized.payload,
@@ -273,6 +283,12 @@ export async function PUT(req: NextRequest) {
     if ('error' in sanitized) return json({ error: sanitized.error }, 400);
 
     await connectMongo();
+    if (
+      sanitized.payload.placement === 'category' &&
+      !(await categoryExists(sanitized.payload.categoryId))
+    ) {
+      return json({ error: 'A category quest needs a valid category' }, 400);
+    }
     const updateSet = {
       ...sanitized.payload,
     };
