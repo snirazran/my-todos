@@ -477,33 +477,37 @@ export function AdminQuestManagerPage() {
 
   // ── Home view ────────────────────────────────────────────────────────────
   const renderHome = () => (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-4 sm:grid-cols-2">
       <button
         onClick={() => setView('daily')}
-        className="group flex items-center gap-4 rounded-2xl border border-border/40 bg-card/60 p-5 text-left transition hover:border-blue-500/25 hover:bg-blue-500/[0.04]"
+        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-blue-500/25 hover:bg-blue-500/[0.04]"
       >
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-          <ScrollText className="h-5 w-5" />
+        <div className="flex items-center justify-between">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <ScrollText className="h-6 w-6" />
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-foreground">Daily Quests</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{dailyTemplates.length} template{dailyTemplates.length !== 1 ? 's' : ''}</p>
-        </div>
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:text-muted-foreground" />
+        <p className="mt-5 text-lg font-black text-foreground">Daily Quests</p>
+        <p className="mt-1 text-sm text-muted-foreground">Quests that appear for all users each day.</p>
+        <p className="mt-4 text-3xl font-black text-foreground">{dailyTemplates.length}</p>
+        <p className="text-xs text-muted-foreground">template{dailyTemplates.length !== 1 ? 's' : ''}</p>
       </button>
 
       <button
         onClick={() => setView('focus')}
-        className="group flex items-center gap-4 rounded-2xl border border-border/40 bg-card/60 p-5 text-left transition hover:border-emerald-500/25 hover:bg-emerald-500/[0.04]"
+        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-emerald-500/25 hover:bg-emerald-500/[0.04]"
       >
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-          <Sparkles className="h-5 w-5" />
+        <div className="flex items-center justify-between">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            <Sparkles className="h-6 w-6" />
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
         </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-bold text-foreground">Focus Quests</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">{adminCategories.length} categor{adminCategories.length !== 1 ? 'ies' : 'y'}</p>
-        </div>
-        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:text-muted-foreground" />
+        <p className="mt-5 text-lg font-black text-foreground">Focus Quests</p>
+        <p className="mt-1 text-sm text-muted-foreground">Quests organized by focus category.</p>
+        <p className="mt-4 text-3xl font-black text-foreground">{adminCategories.length}</p>
+        <p className="text-xs text-muted-foreground">categor{adminCategories.length !== 1 ? 'ies' : 'y'}</p>
       </button>
     </div>
   );
@@ -521,8 +525,17 @@ export function AdminQuestManagerPage() {
         <button
           key={template.id}
           onClick={() => navigateToQuestForm(template)}
-          className="group flex w-full items-center gap-4 rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5 text-left transition hover:border-primary/20 hover:bg-primary/[0.03]"
+          className="group flex w-full items-center gap-5 rounded-2xl border border-border/40 bg-card/60 p-4 text-left transition hover:border-primary/20 hover:bg-primary/[0.03]"
         >
+          {/* Cover thumbnail */}
+          <div className="h-20 w-28 shrink-0 overflow-hidden rounded-xl bg-muted/40">
+            {template.coverImageUrl ? (
+              <img src={template.coverImageUrl} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <div className="h-full w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
+            )}
+          </div>
+
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2.5">
               <p className="truncate text-sm font-bold text-foreground">{template.name}</p>
@@ -535,10 +548,39 @@ export function AdminQuestManagerPage() {
                 {template.isActive ? 'Active' : 'Paused'}
               </span>
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {template.logic.length} block{template.logic.length !== 1 ? 's' : ''} · {template.rewards.length} reward{template.rewards.length !== 1 ? 's' : ''}
-            </p>
+            {template.description && (
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">{template.description}</p>
+            )}
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+              <span>{template.logic.length} block{template.logic.length !== 1 ? 's' : ''}</span>
+              <span className="text-border">·</span>
+              <span>{template.rewards.length} reward{template.rewards.length !== 1 ? 's' : ''}</span>
+              {template.visibilityConditions.length > 0 && (
+                <>
+                  <span className="text-border">·</span>
+                  <span>{template.visibilityConditions.length} condition{template.visibilityConditions.length !== 1 ? 's' : ''}</span>
+                </>
+              )}
+            </div>
           </div>
+
+          {/* Reward tiles */}
+          {template.rewards.length > 0 && (
+            <div className="hidden shrink-0 items-center gap-1.5 sm:flex">
+              {template.rewards.slice(0, 3).map((reward, i) => (
+                <RewardTile
+                  key={`${reward.type}-${reward.itemId ?? i}`}
+                  reward={reward}
+                  rewardCatalog={rewardCatalog}
+                  isPremium={false}
+                />
+              ))}
+              {template.rewards.length > 3 && (
+                <span className="text-xs font-bold text-muted-foreground">+{template.rewards.length - 3}</span>
+              )}
+            </div>
+          )}
+
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:text-muted-foreground" />
         </button>
       ))}

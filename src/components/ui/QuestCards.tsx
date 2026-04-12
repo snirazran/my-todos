@@ -451,20 +451,16 @@ export function RewardTile({
   return (
     <div
       className={cn(
-        'group relative flex items-center justify-center overflow-visible shadow-sm',
+        'group relative flex items-center justify-center overflow-visible',
         compact
-          ? 'h-16 w-16 overflow-visible rounded-[20px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,245,0.96))] shadow-[0_14px_28px_rgba(15,23,42,0.24)] backdrop-blur-sm'
-          : 'h-16 w-16 rounded-2xl border border-border/50 bg-card',
+          ? 'h-16 w-16 rounded-[20px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,245,0.96))] shadow-[0_14px_28px_rgba(15,23,42,0.24)] backdrop-blur-sm'
+          : 'h-12 w-12 rounded-xl border border-border/40 bg-muted/30',
       )}
       title={rewardLabel(reward, rewardCatalog, isPremium)}
     >
-      {!compact ? (
-        <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-black/5 dark:from-white/5 dark:to-black/10" />
-      ) : null}
-
       {reward.type === 'FLIES' ? (
         <div className="relative flex items-center justify-center w-full h-full">
-          <Fly size={compact ? 30 : 28} y={-1} />
+          <Fly size={compact ? 30 : 22} y={-1} />
         </div>
       ) : item?.slot === 'container' ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
@@ -472,7 +468,7 @@ export function RewardTile({
             className={cn(
               compact
                 ? 'h-[118%] w-[118%] drop-shadow-lg'
-                : 'h-full w-full scale-[0.9]',
+                : 'h-[120%] w-[120%]',
             )}
           >
             <GiftRive className="w-full h-full" color={item.riveIndex} />
@@ -483,31 +479,37 @@ export function RewardTile({
           <Frog
             className={cn(
               'object-contain',
-              compact ? 'h-[118%] w-[118%]' : 'translate-y-[10%]',
+              compact ? 'h-[118%] w-[118%]' : 'h-[120%] w-[120%] translate-y-[8%]',
             )}
             indices={previewIndices}
-            width={compact ? 96 : 84}
-            height={compact ? 96 : 84}
+            width={compact ? 96 : 64}
+            height={compact ? 96 : 64}
           />
         </div>
       ) : reward.type === 'BOX' ? (
         <Gift
           className={cn(
             'relative text-primary',
-            compact ? 'h-5 w-5' : 'h-6 w-6',
+            compact ? 'h-5 w-5' : 'h-4 w-4',
           )}
         />
       ) : (
         <Trophy
           className={cn(
             'relative text-primary',
-            compact ? 'h-5 w-5' : 'h-6 w-6',
+            compact ? 'h-5 w-5' : 'h-4 w-4',
           )}
         />
       )}
 
-      <div className="absolute -right-1.5 -top-1.5 z-20 flex justify-center">
-        <span className="flex min-w-5 items-center justify-center rounded-full border border-white/20 bg-black px-1.5 py-1 text-[9px] font-black uppercase tracking-wide text-white shadow-sm">
+      <div className={cn(
+        'absolute z-20 flex justify-center',
+        compact ? '-right-1.5 -top-1.5' : '-right-1 -top-1',
+      )}>
+        <span className={cn(
+          'flex items-center justify-center rounded-full border border-white/20 bg-black font-black uppercase tracking-wide text-white',
+          compact ? 'min-w-5 px-1.5 py-1 text-[9px]' : 'min-w-4 px-1 py-0.5 text-[8px]',
+        )}>
           {quantityLabel}
         </span>
       </div>
