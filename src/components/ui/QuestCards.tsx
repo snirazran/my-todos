@@ -451,7 +451,7 @@ export function RewardTile({
   return (
     <div
       className={cn(
-        'group relative flex items-center justify-center overflow-hidden shadow-sm',
+        'group relative flex items-center justify-center overflow-visible shadow-sm',
         compact
           ? 'h-16 w-16 overflow-visible rounded-[20px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,245,0.96))] shadow-[0_14px_28px_rgba(15,23,42,0.24)] backdrop-blur-sm'
           : 'h-16 w-16 rounded-2xl border border-border/50 bg-card',
@@ -506,20 +506,8 @@ export function RewardTile({
         />
       )}
 
-      <div
-        className={cn(
-          'absolute flex justify-center',
-          compact ? '-right-1.5 -top-1.5' : 'inset-x-1 bottom-1',
-        )}
-      >
-        <span
-          className={cn(
-            'font-black uppercase tracking-wide text-white shadow-sm',
-            compact
-              ? 'flex min-w-5 items-center justify-center rounded-full border border-white/20 bg-black px-1.5 py-1 text-[9px]'
-              : 'rounded-full bg-black/75 px-1.5 py-0.5 text-[9px]',
-          )}
-        >
+      <div className="absolute -right-1.5 -top-1.5 z-20 flex justify-center">
+        <span className="flex min-w-5 items-center justify-center rounded-full border border-white/20 bg-black px-1.5 py-1 text-[9px] font-black uppercase tracking-wide text-white shadow-sm">
           {quantityLabel}
         </span>
       </div>
@@ -551,7 +539,9 @@ function getRewardQuantityLabel(reward: QuestReward, isPremium: boolean) {
     return String(Math.max(0, (reward.amount ?? 0) * (isPremium ? 2 : 1)));
   }
 
-  return isPremium ? 'x2' : 'x1';
+  const base = reward.amount && reward.amount > 1 ? reward.amount : 1;
+  const multiplied = base * (isPremium ? 2 : 1);
+  return `x${multiplied}`;
 }
 
 function getQuestButtonLabel(

@@ -25,7 +25,8 @@
       "Bash(find /Users/snirazran/Fullstack/my-todos/src -type f -name *store* -o -name *Store*)",
       "Bash(find /c/Users/snira/Desktop/Full-Stack/frog-task -type f -name *.rive)",
       "Bash(npx cap:*)",
-      "Bash(perl -i -pe 's/\\\\x{e2}\\\\x{80}\\\\x{98}/'\"'\"'/g; s/\\\\x{e2}\\\\x{80}\\\\x{99}/'\"'\"'/g' /Users/snirazran/Fullstack/my-todos/src/components/ui/AdminQuestManagerPage.tsx)"
+      "Bash(perl -i -pe 's/\\\\x{e2}\\\\x{80}\\\\x{98}/'\"'\"'/g; s/\\\\x{e2}\\\\x{80}\\\\x{99}/'\"'\"'/g' /Users/snirazran/Fullstack/my-todos/src/components/ui/AdminQuestManagerPage.tsx)",
+      "Bash(curl:*)"
     ]
   }
 }

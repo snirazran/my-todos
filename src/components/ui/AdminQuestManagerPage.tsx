@@ -4,12 +4,15 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
+  Camera,
   CheckCircle,
+  ChevronDown,
   ChevronRight,
   Edit2,
+  Eye,
   Gift,
-  ImagePlus,
   Layers3,
+  Pencil,
   Plus,
   ScrollText,
   Sparkles,
@@ -27,8 +30,6 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import type {
-  MacroCategoryDefinition,
-  MacroCategoryId,
   QuestLogicBlock,
   QuestPlacement,
   QuestReward,
@@ -40,8 +41,6 @@ import type {
   QuestVisibilityOperator,
 } from '@/lib/quests/types';
 import {
-  CategoryQuestPresentationCard,
-  DailyQuestPresentationCard,
   formatQuestObjective,
   type QuestCardLogicBlock,
   type QuestRewardCatalogItem,
@@ -208,7 +207,11 @@ function rewardSummary(
   }
 
   if (reward.itemId) {
-    return rewardCatalog[reward.itemId]?.name ?? reward.itemId;
+    const name = rewardCatalog[reward.itemId]?.name ?? reward.itemId;
+    if (reward.type === 'BOX' && reward.amount && reward.amount > 1) {
+      return `${name} ×${reward.amount}`;
+    }
+    return name;
   }
 
   return reward.type === 'BOX' ? 'Mystery box' : 'Item reward';
@@ -234,18 +237,6 @@ function rewardTypeLabel(type: QuestRewardType) {
   return 'Item';
 }
 
-function summarizeItems(items: string[]) {
-  if (items.length === 0) return '';
-  if (items.length <= 2) return items.join(' + ');
-  return `${items.slice(0, 2).join(' + ')} +${items.length - 2} more`;
-}
-
-function describeVisibilityCondition(condition: QuestVisibilityCondition) {
-  return `${visibilityMetricLabel[condition.metric]} ${visibilityOperatorLabel[
-    condition.operator
-  ].toLowerCase()} ${condition.value}`;
-}
-
 export function AdminQuestManagerPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -255,6 +246,11 @@ export function AdminQuestManagerPage() {
   const [adminCategories, setAdminCategories] = useState<AdminCategory[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [rewardPickerOpen, setRewardPickerOpen] = useState(false);
+  const [conditionsPopupOpen, setConditionsPopupOpen] = useState(false);
+  const [availabilityPopupOpen, setAvailabilityPopupOpen] = useState(false);
+  const [coverFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
+  const [editingTitle, setEditingTitle] = useState(false);
+  const [editingDesc, setEditingDesc] = useState(false);
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Navigation
@@ -446,11 +442,6 @@ export function AdminQuestManagerPage() {
     }
   };
 
-  const categoryLabel = useMemo(
-    () => Object.fromEntries(categories.map((category) => [category.id, category.name])),
-    [categories],
-  );
-
   const adminCategoryMap = useMemo(
     () => Object.fromEntries(adminCategories.map((c) => [c.id, c])),
     [adminCategories],
@@ -463,50 +454,7 @@ export function AdminQuestManagerPage() {
 
   const previewLogic = useMemo(() => form.logic.map(buildPreviewLogicBlock), [form.logic]);
 
-  const previewCategory = form.categoryId ? adminCategoryMap[form.categoryId] : undefined;
 
-  const placementSummary =
-    form.placement === 'daily'
-      ? 'Daily quest tab'
-      : previewCategory
-        ? `${previewCategory.name} focus tab`
-        : form.categoryId
-          ? `${categoryLabel[form.categoryId] ?? form.categoryId} focus tab`
-          : 'Choose a focus category';
-
-  const objectiveSummary =
-    previewLogic.length === 0
-      ? 'Add at least one goal block'
-      : previewLogic.length === 1
-        ? formatQuestObjective(previewLogic[0])
-        : `${previewLogic.length} goal blocks`;
-
-  const rewardSummaryText =
-    form.rewards.length === 0
-      ? 'Add a reward'
-      : summarizeItems(form.rewards.map((reward) => rewardSummary(reward, rewardCatalog)));
-
-  const visibilitySummary =
-    form.visibilityConditions.length === 0
-      ? 'Visible to everyone'
-      : summarizeItems(form.visibilityConditions.map((condition) => describeVisibilityCondition(condition)));
-
-  const previewNotes = useMemo(() => {
-    const notes: string[] = [];
-    if (form.logic.some((block) => block.amountMode === 'random')) {
-      notes.push('Random goal ranges resolve when quests are generated per user.');
-    }
-    if (form.rewards.some((reward) => reward.type === 'FLIES' && reward.amountMode === 'random')) {
-      notes.push('Random fly rewards are rolled when the quest is created.');
-    }
-    if (form.logic.some((block) => block.tagMode === 'focus_category_tags')) {
-      notes.push('Focus-tag blocks pull from each user\'s saved tags for that category.');
-    }
-    if (form.logic.some((block) => block.tagMode === 'random_user_tag')) {
-      notes.push('Random-tag blocks pick one of the user\'s existing tags.');
-    }
-    return notes;
-  }, [form.logic, form.rewards]);
 
   const selectedCategory = selectedCategoryId ? adminCategoryMap[selectedCategoryId] : null;
   const dailyTemplates = templates.filter((t) => t.placement === 'daily');
@@ -724,9 +672,9 @@ export function AdminQuestManagerPage() {
     );
   };
 
-  // ── Quest form view ───────────────────────────────────────────────────────
+  // ── Interactive preview-centered quest editor ─────────────────────────────
   const renderForm = () => (
-    <div className="grid gap-6">
+    <div className="mx-auto w-full max-w-xl space-y-6">
       {result && (
         <div className={cn(
           'flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium',
@@ -739,320 +687,200 @@ export function AdminQuestManagerPage() {
         </div>
       )}
 
-      <section className="grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
-        <SummaryCard label="Placement" value={placementSummary} />
-        <SummaryCard label="Goal" value={objectiveSummary} />
-        <SummaryCard label="Rewards" value={rewardSummaryText} />
-        <SummaryCard label="Visibility" value={visibilitySummary} />
-      </section>
+      {/* Interactive quest card */}
+      <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
+        {/* ── Cover photo area ── */}
+        <div className="relative overflow-hidden">
+          {/* Photo background (visual only) */}
+          {form.coverImageUrl ? (
+            <img src={form.coverImageUrl} alt="Quest cover" className="h-[220px] w-full object-cover" />
+          ) : (
+            <div className="h-[220px] w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/28 to-transparent pointer-events-none" />
 
-      <section className="rounded-[28px] border border-border/50 bg-card/80 p-6 shadow-sm">
-        <div className="mb-5">
-          <p className="text-lg font-black text-foreground">1. Basics</p>
-          <p className="text-sm text-muted-foreground">Start with where the quest appears and what the player sees first.</p>
+          <input
+            ref={(el) => { coverFileInputRef.current = el; }}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              const coverImageUrl = await readFileAsDataUrl(file);
+              setForm((prev) => ({ ...prev, coverImageUrl }));
+            }}
+          />
+
+          {/* Top bar: badge + cover actions */}
+          <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-4">
+            <span className="rounded-full border border-white/20 bg-black/35 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-white backdrop-blur-md">
+              Daily
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => coverFileInputRef.current?.click()}
+                className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs font-bold text-white/90 backdrop-blur-sm transition hover:bg-black/70"
+              >
+                <Camera className="h-3.5 w-3.5" />
+                {form.coverImageUrl ? 'Change' : 'Add photo'}
+              </button>
+              {form.coverImageUrl && (
+                <button
+                  type="button"
+                  onClick={() => setForm((prev) => ({ ...prev, coverImageUrl: undefined }))}
+                  className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs font-bold text-white/90 backdrop-blur-sm transition hover:bg-black/70"
+                >
+                  <XCircle className="h-3.5 w-3.5" />
+                  Remove
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Rewards + add button */}
+          <button
+            type="button"
+            onClick={() => setRewardPickerOpen(true)}
+            className="absolute z-20 flex cursor-pointer flex-wrap items-center justify-end gap-2 bottom-4 right-4"
+          >
+            {form.rewards.map((reward, index) => (
+              <RewardTile
+                key={`${reward.type}-${reward.itemId ?? reward.amount ?? reward.minAmount ?? index}`}
+                reward={reward}
+                rewardCatalog={rewardCatalog}
+                isPremium={false}
+                compact
+              />
+            ))}
+            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-black/40 text-white/80 backdrop-blur-sm transition hover:bg-black/60 hover:text-white">
+              <Plus className="h-4 w-4" />
+            </span>
+          </button>
+
+          {/* Title and description */}
+          <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[116px]">
+            {editingTitle ? (
+              <input
+                autoFocus
+                value={form.name}
+                onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                onBlur={() => setEditingTitle(false)}
+                onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
+                placeholder="Quest title..."
+                className="w-full bg-transparent text-3xl font-black tracking-tight text-white placeholder-white/50 outline-none drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
+              />
+            ) : (
+              <button type="button" onClick={() => setEditingTitle(true)} className="group/title flex w-full items-start gap-2 text-left">
+                <h3 className="text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]">
+                  {form.name || <span className="text-white/50">Quest title...</span>}
+                </h3>
+                <Pencil className="mt-2 h-3.5 w-3.5 shrink-0 text-white/0 transition group-hover/title:text-white/70" />
+              </button>
+            )}
+            {editingDesc ? (
+              <input
+                autoFocus
+                value={form.description}
+                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
+                onBlur={() => setEditingDesc(false)}
+                onKeyDown={(e) => e.key === 'Enter' && setEditingDesc(false)}
+                placeholder="Quest description..."
+                className="mt-1.5 w-full bg-transparent text-sm text-white/90 placeholder-white/40 outline-none drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]"
+              />
+            ) : (
+              <button type="button" onClick={() => setEditingDesc(true)} className="group/desc mt-1.5 flex w-full items-start gap-2 text-left">
+                <p className="text-sm text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
+                  {form.description || <span className="text-white/40">Quest description...</span>}
+                </p>
+                <Pencil className="mt-0.5 h-3 w-3 shrink-0 text-white/0 transition group-hover/desc:text-white/70" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-2">
-          {(['daily', 'category'] as const).map((placement) => (
+        {/* ── Conditions / progress blocks - clickable ── */}
+        <div className="px-4 pt-4 pb-4 space-y-4">
+          <button
+            type="button"
+            onClick={() => setConditionsPopupOpen(true)}
+            className="group/cond w-full text-left"
+          >
+            <div className="space-y-3">
+              {previewLogic.length > 0 ? (
+                previewLogic.map((block) => (
+                  <div key={block.id}>
+                    <div className="flex items-start justify-between gap-3 sm:items-end">
+                      <p className="text-xl font-black leading-tight text-foreground">
+                        {formatQuestObjective(block)}
+                      </p>
+                      <div className="px-3 py-1 text-sm font-black border rounded-full border-border/50 bg-background/80 text-foreground">
+                        0/{block.targetLabel ?? block.target}
+                      </div>
+                    </div>
+                    <div className="h-3 mt-4 overflow-hidden rounded-full bg-muted/80 ring-1 ring-border/40">
+                      <div className="h-full rounded-full bg-[linear-gradient(90deg,#7dd3fc_0%,#38bdf8_45%,#0ea5e9_100%)]" style={{ width: '0%' }} />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-dashed border-border/50 bg-background/60 px-4 py-5 text-center text-sm text-muted-foreground">
+                  <Layers3 className="mx-auto mb-2 h-5 w-5" />
+                  Click to add conditions
+                </div>
+              )}
+            </div>
+            <div className="mt-3 flex items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-bold text-muted-foreground opacity-0 transition group-hover/cond:opacity-100">
+              <Pencil className="h-3 w-3" />
+              Edit conditions
+            </div>
+          </button>
+
+          {/* Action buttons row */}
+          <div className="flex items-center gap-2 pt-1">
             <button
-              key={placement}
               type="button"
-              onClick={() => setForm((prev) => ({ ...prev, placement, categoryId: placement === 'category' ? prev.categoryId : undefined }))}
+              onClick={() => setAvailabilityPopupOpen(true)}
               className={cn(
-                'rounded-[24px] border p-4 text-left transition-all',
-                form.placement === placement
-                  ? 'border-primary/30 bg-primary/10'
-                  : 'border-border/50 bg-background/70 hover:bg-muted/40',
+                'flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-bold transition hover:bg-muted/60',
+                form.visibilityConditions.length > 0
+                  ? 'border-primary/30 bg-primary/10 text-primary'
+                  : 'border-border/50 bg-background/80 text-muted-foreground',
               )}
             >
-              <p className="text-sm font-black text-foreground">
-                {placement === 'daily' ? 'Daily Quest' : 'Focus Quest'}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {placement === 'daily'
-                  ? 'Shows in the daily tab with the blue quest card style.'
-                  : 'Shows inside one focus category with the quest hub category style.'}
-              </p>
+              <Eye className="h-3 w-3" />
+              {form.visibilityConditions.length > 0
+                ? `${form.visibilityConditions.length} rule${form.visibilityConditions.length > 1 ? 's' : ''}`
+                : 'Availability'}
             </button>
-          ))}
-        </div>
-
-        <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="grid gap-4">
-            <label className="grid gap-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Quest Name</span>
-              <input
-                value={form.name}
-                onChange={(event) => setForm((prev) => ({ ...prev, name: event.target.value }))}
-                placeholder="Complete 3 important tasks"
-                className="h-12 rounded-2xl border border-border bg-background px-4 text-sm outline-none transition focus:border-primary/30"
-              />
-            </label>
-            <label className="grid gap-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Description</span>
-              <textarea
-                rows={4}
-                value={form.description}
-                onChange={(event) => setForm((prev) => ({ ...prev, description: event.target.value }))}
-                placeholder="Tell the user what this quest asks them to do."
-                className="rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none transition focus:border-primary/30"
-              />
-            </label>
-          </div>
-          <label className="grid gap-2">
-            <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Cover Photo</span>
-            <div className="rounded-[24px] border border-dashed border-border bg-background/70 p-3">
-              {form.coverImageUrl ? (
-                <img src={form.coverImageUrl} alt="Quest cover" className="h-40 w-full rounded-2xl object-cover" />
-              ) : (
-                <div className="flex h-40 flex-col items-center justify-center gap-2 text-center text-muted-foreground">
-                  <ImagePlus className="h-6 w-6" />
-                  <span className="text-sm font-bold">Upload cover</span>
-                </div>
-              )}
-              <input type="file" accept="image/*" className="mt-3 block w-full text-xs" onChange={async (event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                const coverImageUrl = await readFileAsDataUrl(file);
-                setForm((prev) => ({ ...prev, coverImageUrl }));
-              }} />
-              {form.coverImageUrl && (
-                <Button type="button" variant="outline" size="sm" className="mt-3 w-full rounded-xl" onClick={() => setForm((prev) => ({ ...prev, coverImageUrl: undefined }))}>
-                  Remove Cover
-                </Button>
-              )}
-            </div>
-          </label>
-        </div>
-
-        <div className="mt-4 flex flex-wrap items-center gap-4">
-          {form.placement === 'category' && (
-            <label className="grid gap-2">
-              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Category</span>
-              <select value={form.categoryId ?? ''} onChange={(event) => setForm((prev) => ({ ...prev, categoryId: event.target.value || undefined }))} className="h-12 min-w-[220px] rounded-2xl border border-border bg-background px-4 text-sm outline-none transition focus:border-primary/30">
-                <option value="">Select category</option>
+            {form.placement === 'category' && (
+              <select
+                value={form.categoryId ?? ''}
+                onChange={(event) => setForm((prev) => ({ ...prev, categoryId: event.target.value || undefined }))}
+                className="h-7 rounded-full border border-border/50 bg-background/80 px-3 text-xs font-bold text-muted-foreground outline-none transition hover:bg-muted/60"
+              >
+                <option value="">Category...</option>
                 {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
               </select>
+            )}
+            <label className="ml-auto flex cursor-pointer items-center gap-2 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-xs font-bold text-muted-foreground transition hover:bg-muted/60">
+              <input type="checkbox" checked={form.isActive} onChange={(event) => setForm((prev) => ({ ...prev, isActive: event.target.checked }))} className="h-3 w-3" />
+              Active
             </label>
-          )}
-          <label className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background px-4 py-3">
-            <input type="checkbox" checked={form.isActive} onChange={(event) => setForm((prev) => ({ ...prev, isActive: event.target.checked }))} className="h-4 w-4" />
-            <span className="text-sm font-bold text-foreground">Active template</span>
-          </label>
+          </div>
         </div>
-      </section>
+      </div>
 
-      <section className="rounded-[28px] border border-border/50 bg-card/80 p-6 shadow-sm">
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-lg font-black text-foreground">2. Conditions</p>
-            <p className="text-sm text-muted-foreground">Build the quest from generic rules that work for every user.</p>
-          </div>
-          <Button size="sm" variant="outline" className="rounded-xl" onClick={() => setForm((prev) => ({ ...prev, logic: [...prev.logic, createLogic()] }))}>
-            <Layers3 className="mr-1 h-4 w-4" />
-            Add Block
-          </Button>
-        </div>
+      {/* Save / Cancel / Delete bar */}
+      <div className="flex items-center gap-3 rounded-[24px] border border-border/50 bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
+        <p className="flex-1 text-sm text-muted-foreground">{form.id ? 'Editing existing template.' : 'Creating a new template.'}</p>
+        {form.id && <Button size="sm" variant="destructive" onClick={deleteQuest} disabled={saving} className="rounded-xl">Delete</Button>}
+        <Button size="sm" variant="outline" onClick={() => { resetForm(); setView(form.placement === 'daily' ? 'daily' : 'category'); }} disabled={saving} className="rounded-xl">Cancel</Button>
+        <Button size="sm" onClick={saveQuest} disabled={saving} className="rounded-xl font-black">{saving ? 'Saving...' : form.id ? 'Save Changes' : 'Create Quest'}</Button>
+      </div>
 
-        <div className="space-y-4">
-          {form.logic.map((block, index) => (
-            <div key={block.id} className="rounded-[26px] border border-border/50 bg-background/80 p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-sm font-black text-foreground">Block {index + 1}</p>
-                    <span className="rounded-full border border-border/50 bg-card px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-                      {block.type === 'focus_minutes' ? 'Focus minutes' : 'Count'}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-muted-foreground">{formatQuestObjective(buildPreviewLogicBlock(block))}</p>
-                </div>
-                {form.logic.length > 1 && (
-                  <button onClick={() => setForm((prev) => ({ ...prev, logic: prev.logic.filter((entry) => entry.id !== block.id) }))} className="flex h-9 w-9 items-center justify-center rounded-full text-red-500 hover:bg-red-500/10">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <label className="grid gap-2">
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Type</span>
-                  <select value={block.type} onChange={(event) => updateLogic(block.id, event.target.value === 'focus_minutes' ? { type: 'focus_minutes', subject: 'task', action: undefined } : { type: 'count', subject: block.subject === 'any' || block.subject === 'habit' || block.subject === 'task' ? block.subject : 'task', action: block.action ?? 'complete' })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
-                    <option value="count">Count</option>
-                    <option value="focus_minutes">Focus Minutes</option>
-                  </select>
-                </label>
-                {block.type === 'count' && (
-                  <label className="grid gap-2">
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Action</span>
-                    <select value={block.action ?? 'complete'} onChange={(event) => updateLogic(block.id, { action: event.target.value as QuestLogicBlock['action'] })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
-                      <option value="complete">Complete</option>
-                      <option value="add">Add</option>
-                    </select>
-                  </label>
-                )}
-                {block.type === 'focus_minutes' ? (
-                  <div className="grid gap-2">
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Subject</span>
-                    <div className="flex h-11 items-center rounded-2xl border border-border bg-muted/40 px-4 text-sm font-semibold text-foreground">Tasks only</div>
-                  </div>
-                ) : (
-                  <label className="grid gap-2">
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Subject</span>
-                    <select value={block.subject} onChange={(event) => updateLogic(block.id, { subject: event.target.value as QuestSubject })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
-                      <option value="task">Tasks</option>
-                      <option value="habit">Habits</option>
-                      <option value="any">Any</option>
-                    </select>
-                  </label>
-                )}
-                <label className="grid gap-2">
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Tag Scope</span>
-                  <select value={block.tagMode ?? 'ignore'} onChange={(event) => updateLogic(block.id, { tagMode: event.target.value as QuestLogicBlock['tagMode'] })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
-                    <option value="ignore">Ignore Tags</option>
-                    {form.placement === 'category' && <option value="focus_category_tags">Focus Category Tags</option>}
-                    <option value="random_user_tag">Random User Tag</option>
-                  </select>
-                </label>
-              </div>
-
-              <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <label className="grid gap-2 md:col-span-1">
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Goal</span>
-                  <select value={block.amountMode} onChange={(event) => updateLogic(block.id, event.target.value === 'random' ? { amountMode: 'random', amount: undefined, minAmount: block.minAmount ?? 1, maxAmount: block.maxAmount ?? Math.max(block.amount ?? 3, 1) } : { amountMode: 'fixed', amount: block.amount ?? block.maxAmount ?? 1, minAmount: undefined, maxAmount: undefined })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
-                    <option value="fixed">Fixed</option>
-                    <option value="random">Random Range</option>
-                  </select>
-                </label>
-                {block.amountMode === 'fixed' ? (
-                  <label className="grid gap-2 md:col-span-1">
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">{block.type === 'focus_minutes' ? 'Minutes' : 'Target'}</span>
-                    <input type="number" min={1} value={String(block.amount ?? 1)} onChange={(event) => updateLogic(block.id, { amount: Number(event.target.value) || 1 })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm" />
-                  </label>
-                ) : (
-                  <>
-                    <label className="grid gap-2 md:col-span-1">
-                      <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Min</span>
-                      <input type="number" min={1} value={String(block.minAmount ?? 1)} onChange={(event) => updateLogic(block.id, { minAmount: Number(event.target.value) || 1 })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm" />
-                    </label>
-                    <label className="grid gap-2 md:col-span-1">
-                      <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Max</span>
-                      <input type="number" min={1} value={String(block.maxAmount ?? 3)} onChange={(event) => updateLogic(block.id, { maxAmount: Number(event.target.value) || 1 })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm" />
-                    </label>
-                  </>
-                )}
-              </div>
-
-              {block.tagMode === 'random_user_tag' && (
-                <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-                  This block will pick one of the user&apos;s tags when the quest is created and only count progress on that tag.
-                </div>
-              )}
-              {block.tagMode === 'focus_category_tags' && (
-                <div className="mt-4 rounded-2xl border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-                  This block will only count matching {block.subject === 'task' ? 'tasks' : block.subject === 'habit' ? 'habits' : 'tasks or habits'} linked to the user&apos;s saved tags for this focus category.
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-border/50 bg-card/80 p-6 shadow-sm">
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-lg font-black text-foreground">3. Availability</p>
-            <p className="text-sm text-muted-foreground">Control when this quest is allowed to appear for a user.</p>
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            className="rounded-xl"
-            onClick={() => setForm((prev) => ({ ...prev, visibilityConditions: [...prev.visibilityConditions, createVisibilityCondition()] }))}
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            Add Rule
-          </Button>
-        </div>
-
-        {form.visibilityConditions.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-border/50 bg-background/60 p-4 text-sm text-muted-foreground">
-            No show rules yet. Leave this empty if the quest should be eligible for everyone.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {form.visibilityConditions.map((condition, index) => (
-              <div key={condition.id} className="rounded-[24px] border border-border/50 bg-background/70 p-4">
-                <div className="mb-4 flex items-start justify-between gap-3">
-                  <div>
-                    <p className="text-sm font-black text-foreground">Rule {index + 1}</p>
-                    <p className="text-xs text-muted-foreground">All rules must pass before the quest is shown.</p>
-                  </div>
-                  <button onClick={() => setForm((prev) => ({ ...prev, visibilityConditions: prev.visibilityConditions.filter((entry) => entry.id !== condition.id) }))} className="flex h-9 w-9 items-center justify-center rounded-full text-red-500 hover:bg-red-500/10">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                  <label className="grid gap-2">
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Metric</span>
-                    <select value={condition.metric} onChange={(event) => updateVisibilityCondition(condition.id, { metric: event.target.value as QuestVisibilityMetric })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
-                      {Object.entries(visibilityMetricLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                  </label>
-                  <label className="grid gap-2">
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Operator</span>
-                    <select value={condition.operator} onChange={(event) => updateVisibilityCondition(condition.id, { operator: event.target.value as QuestVisibilityOperator })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm">
-                      {Object.entries(visibilityOperatorLabel).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                  </label>
-                  <label className="grid gap-2">
-                    <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Value</span>
-                    <input type="number" min={0} value={String(condition.value)} onChange={(event) => updateVisibilityCondition(condition.id, { value: Number(event.target.value) || 0 })} className="h-11 rounded-2xl border border-border bg-background px-4 text-sm" />
-                  </label>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section className="rounded-[28px] border border-border/50 bg-card/80 p-6 shadow-sm">
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <p className="text-lg font-black text-foreground">4. Rewards</p>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">Pick flies, items, and boxes from one reward picker. Premium users still get double.</p>
-          </div>
-          <Button variant="outline" className="rounded-xl" onClick={() => setRewardPickerOpen(true)}>
-            <Gift className="mr-2 h-4 w-4" />
-            Edit Rewards
-          </Button>
-        </div>
-
-        {form.rewards.length === 0 ? (
-          <div className="rounded-[24px] border border-dashed border-border/50 bg-background/60 p-5 text-sm text-muted-foreground">
-            No rewards selected yet. Open the reward picker to add flies, items, or boxes.
-          </div>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {form.rewards.map((reward) => (
-              <div key={rewardKey(reward)} className="flex items-center gap-4 rounded-[24px] border border-border/50 bg-background/75 p-4">
-                <RewardTile reward={reward} rewardCatalog={rewardCatalog} isPremium={false} />
-                <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">{rewardTypeLabel(reward.type)}</p>
-                  <p className="mt-1 text-sm font-bold text-foreground">{rewardSummary(reward, rewardCatalog)}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {reward.type === 'FLIES' ? (reward.amountMode === 'random' ? `Random range: ${amountRangeLabel(reward.minAmount, reward.maxAmount)}` : 'Fixed amount') : 'Base quantity x1, doubled for premium users'}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
+      {/* Popups */}
       <RewardPickerDialog
         open={rewardPickerOpen}
         onOpenChange={setRewardPickerOpen}
@@ -1062,16 +890,24 @@ export function AdminQuestManagerPage() {
         onSave={(rewards) => setForm((prev) => ({ ...prev, rewards: normalizeRewardList(rewards) }))}
       />
 
-      <div className="sticky bottom-4 z-10 flex flex-col gap-3 rounded-[24px] border border-border/50 bg-background/95 p-4 shadow-lg backdrop-blur md:flex-row md:items-center md:justify-between">
-        <div className="text-sm text-muted-foreground">
-          {form.id ? 'Editing existing template.' : 'Creating a new template.'}
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row">
-          {form.id && <Button variant="destructive" onClick={deleteQuest} disabled={saving} className="rounded-2xl">Delete Quest</Button>}
-          <Button variant="outline" onClick={() => { resetForm(); setView(form.placement === 'daily' ? 'daily' : 'category'); }} disabled={saving} className="rounded-2xl">Cancel</Button>
-          <Button onClick={saveQuest} disabled={saving} className="rounded-2xl font-black">{saving ? 'Saving...' : form.id ? 'Save Changes' : 'Create Quest'}</Button>
-        </div>
-      </div>
+      <ConditionsEditorDialog
+        open={conditionsPopupOpen}
+        onOpenChange={setConditionsPopupOpen}
+        logic={form.logic}
+        placement={form.placement}
+        onUpdate={updateLogic}
+        onAdd={() => setForm((prev) => ({ ...prev, logic: [...prev.logic, createLogic()] }))}
+        onRemove={(id) => setForm((prev) => ({ ...prev, logic: prev.logic.filter((b) => b.id !== id) }))}
+      />
+
+      <AvailabilityEditorDialog
+        open={availabilityPopupOpen}
+        onOpenChange={setAvailabilityPopupOpen}
+        conditions={form.visibilityConditions}
+        onUpdate={updateVisibilityCondition}
+        onAdd={() => setForm((prev) => ({ ...prev, visibilityConditions: [...prev.visibilityConditions, createVisibilityCondition()] }))}
+        onRemove={(id) => setForm((prev) => ({ ...prev, visibilityConditions: prev.visibilityConditions.filter((c) => c.id !== id) }))}
+      />
     </div>
   );
 
@@ -1089,61 +925,6 @@ export function AdminQuestManagerPage() {
     else if (view === 'form') setView(form.placement === 'daily' ? 'daily' : 'category');
   };
 
-  // ── Preview panel (only shown in form view) ───────────────────────────────
-  const renderPreview = () => (
-    <aside className="space-y-6 xl:sticky xl:top-6">
-      <section className="rounded-[28px] border border-border/50 bg-card/80 p-5 shadow-sm">
-        <div className="mb-4 flex items-center gap-2">
-          <Sparkles className="h-5 w-5 text-primary" />
-          <div>
-            <p className="text-lg font-black text-foreground">Live Preview</p>
-            <p className="text-sm text-muted-foreground">This mirrors the quest hub card style.</p>
-          </div>
-        </div>
-        <div className="space-y-4">
-          {form.placement === 'daily' ? (
-            <DailyQuestPresentationCard
-              quest={{ placement: 'daily', title: form.name.trim() || 'Quest title preview', description: form.description.trim() || 'Quest description will appear here in the quest hub.', coverImageUrl: form.coverImageUrl, rewards: form.rewards, logic: previewLogic, completed: false, claimable: false, claimed: false }}
-              rewardCatalog={rewardCatalog}
-              isPremium={false}
-              buttonLabel="Preview Only"
-              buttonDisabled
-            />
-          ) : (
-            <CategoryQuestPresentationCard
-              quest={{ placement: 'category', categoryId: (form.categoryId ?? adminCategories[0]?.id ?? '') as MacroCategoryId, title: form.name.trim() || 'Quest title preview', description: form.description.trim() || 'Quest description will appear here in the quest hub.', coverImageUrl: form.coverImageUrl, rewards: form.rewards, logic: previewLogic, completed: false, claimable: false, claimed: false }}
-              category={previewCategory as MacroCategoryDefinition | undefined}
-              rewardCatalog={rewardCatalog}
-              isPremium={false}
-              linkedTags={[]}
-              buttonLabel="Preview Only"
-              buttonDisabled
-            />
-          )}
-          {form.placement === 'category' && !form.categoryId && (
-            <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
-              Pick a category to preview the real gradient and focus label.
-            </div>
-          )}
-        </div>
-      </section>
-
-      <section className="rounded-[28px] border border-border/50 bg-card/80 p-5 shadow-sm">
-        <p className="text-sm font-black uppercase tracking-[0.16em] text-muted-foreground">Preview Notes</p>
-        <div className="mt-3 space-y-2">
-          {previewNotes.length > 0 ? (
-            previewNotes.map((note) => (
-              <div key={note} className="rounded-2xl border border-border/50 bg-background/70 px-4 py-3 text-sm text-muted-foreground">{note}</div>
-            ))
-          ) : (
-            <div className="rounded-2xl border border-border/50 bg-background/70 px-4 py-3 text-sm text-muted-foreground">
-              This quest preview is deterministic. No runtime substitutions are used yet.
-            </div>
-          )}
-        </div>
-      </section>
-    </aside>
-  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -1198,10 +979,7 @@ export function AdminQuestManagerPage() {
 
         {/* Content */}
         {view === 'form' ? (
-          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_440px]">
-            <div>{renderForm()}</div>
-            {renderPreview()}
-          </div>
+          renderForm()
         ) : (
           <div className="rounded-[28px] border border-border/50 bg-card/80 p-6 shadow-sm">
             {loading && view === 'home' ? (
@@ -1284,6 +1062,258 @@ export function AdminQuestManagerPage() {
   );
 }
 
+function InlinePillSelect({ value, onChange, children, className }: { value: string; onChange: (value: string) => void; children: React.ReactNode; className?: string }) {
+  return (
+    <span className="relative inline-flex">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={cn(
+          "h-[30px] cursor-pointer appearance-none rounded-full border border-primary/25 bg-primary/8 pl-2.5 pr-7 text-[13px] font-bold text-primary outline-none transition hover:bg-primary/15 focus:ring-2 focus:ring-primary/20",
+          className,
+        )}
+      >
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-primary/60" />
+    </span>
+  );
+}
+
+function InlinePillNumber({ value, onChange, min = 1, className }: { value: number; onChange: (v: number) => void; min?: number; className?: string }) {
+  return (
+    <input
+      type="number"
+      min={min}
+      value={String(value)}
+      onChange={(e) => onChange(Number(e.target.value) || min)}
+      className={cn(
+        "h-[30px] w-[52px] rounded-full border border-primary/25 bg-primary/8 px-1 text-center text-[13px] font-bold text-primary outline-none transition hover:bg-primary/15 focus:ring-2 focus:ring-primary/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
+        className,
+      )}
+    />
+  );
+}
+
+function ConditionsEditorDialog({
+  open,
+  onOpenChange,
+  logic,
+  placement,
+  onUpdate,
+  onAdd,
+  onRemove,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  logic: QuestLogicBlock[];
+  placement: QuestPlacement;
+  onUpdate: (id: string, patch: Partial<QuestLogicBlock>) => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+}) {
+  const word = "text-[13px] font-medium text-foreground";
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="!max-w-lg !rounded-[28px] !p-0 overflow-hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Conditions</DialogTitle>
+          <DialogDescription>What the user needs to do.</DialogDescription>
+        </DialogHeader>
+
+        <div className="px-5 pt-5 pb-1">
+          <p className="text-base font-black text-foreground">What does the user need to do?</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Each goal reads as a sentence. The user must complete all of them.</p>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto px-5 py-3 space-y-3">
+          {logic.map((block, index) => (
+            <div key={block.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
+              {/* Delete row */}
+              <div className="mb-2.5 flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Goal {index + 1}</span>
+                {logic.length > 1 && (
+                  <button onClick={() => onRemove(block.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Sentence builder */}
+              {block.type === 'count' ? (
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
+                  <InlinePillSelect value={block.action ?? 'complete'} onChange={(v) => onUpdate(block.id, { action: v as QuestLogicBlock['action'] })}>
+                    <option value="complete">Complete</option>
+                    <option value="add">Add</option>
+                  </InlinePillSelect>
+
+                  {block.amountMode === 'fixed' ? (
+                    <InlinePillNumber value={block.amount ?? 1} onChange={(v) => onUpdate(block.id, { amount: v })} />
+                  ) : (
+                    <>
+                      <InlinePillNumber value={block.minAmount ?? 1} onChange={(v) => onUpdate(block.id, { minAmount: v })} />
+                      <span className={word}>to</span>
+                      <InlinePillNumber value={block.maxAmount ?? 3} onChange={(v) => onUpdate(block.id, { maxAmount: v })} />
+                    </>
+                  )}
+
+                  <InlinePillSelect value={block.subject} onChange={(v) => onUpdate(block.id, { subject: v as QuestSubject })}>
+                    <option value="task">tasks</option>
+                    <option value="habit">habits</option>
+                    <option value="any">tasks or habits</option>
+                  </InlinePillSelect>
+
+                  {block.tagMode !== 'ignore' && (
+                    <span className={word}>
+                      tagged with {block.tagMode === 'focus_category_tags' ? 'their focus tags' : 'a random tag'}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
+                  <span className={word}>Focus on tasks for</span>
+                  {block.amountMode === 'fixed' ? (
+                    <InlinePillNumber value={block.amount ?? 1} onChange={(v) => onUpdate(block.id, { amount: v })} />
+                  ) : (
+                    <>
+                      <InlinePillNumber value={block.minAmount ?? 1} onChange={(v) => onUpdate(block.id, { minAmount: v })} />
+                      <span className={word}>to</span>
+                      <InlinePillNumber value={block.maxAmount ?? 3} onChange={(v) => onUpdate(block.id, { maxAmount: v })} />
+                    </>
+                  )}
+                  <span className={word}>minutes</span>
+                </div>
+              )}
+
+              {/* Bottom options row */}
+              <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">
+                <button
+                  type="button"
+                  onClick={() => onUpdate(block.id, block.type === 'count' ? { type: 'focus_minutes', subject: 'task', action: undefined } : { type: 'count', subject: 'task', action: 'complete' })}
+                  className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+                >
+                  {block.type === 'count' ? 'Switch to focus time' : 'Switch to count'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onUpdate(block.id, block.amountMode === 'fixed' ? { amountMode: 'random', amount: undefined, minAmount: block.minAmount ?? 1, maxAmount: block.maxAmount ?? Math.max(block.amount ?? 3, 1) } : { amountMode: 'fixed', amount: block.amount ?? block.maxAmount ?? 1, minAmount: undefined, maxAmount: undefined })}
+                  className="inline-flex items-center gap-1 rounded-full border border-border/50 bg-background px-2.5 py-1 text-[11px] font-bold text-muted-foreground transition hover:border-primary/30 hover:text-foreground"
+                >
+                  {block.amountMode === 'fixed' ? 'Use random range' : 'Use fixed amount'}
+                </button>
+                {block.type === 'count' && (
+                  <button
+                    type="button"
+                    onClick={() => onUpdate(block.id, { tagMode: block.tagMode === 'ignore' ? (placement === 'category' ? 'focus_category_tags' : 'random_user_tag') : 'ignore' })}
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+                      block.tagMode !== 'ignore' ? 'border-primary/25 bg-primary/8 text-primary hover:bg-primary/15' : 'border-border/50 bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground',
+                    )}
+                  >
+                    {block.tagMode !== 'ignore' ? 'Tag filter on' : 'Add tag filter'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={onAdd}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/50 py-3 text-xs font-bold text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add another goal
+          </button>
+        </div>
+
+        <div className="border-t border-border/40 px-5 py-3 text-right">
+          <Button size="sm" className="rounded-xl font-bold" onClick={() => onOpenChange(false)}>Done</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function AvailabilityEditorDialog({
+  open,
+  onOpenChange,
+  conditions,
+  onUpdate,
+  onAdd,
+  onRemove,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  conditions: QuestVisibilityCondition[];
+  onUpdate: (id: string, patch: Partial<QuestVisibilityCondition>) => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="!max-w-lg !rounded-[28px] !p-0 overflow-hidden">
+        <DialogHeader className="sr-only">
+          <DialogTitle>Availability</DialogTitle>
+          <DialogDescription>Control when this quest can appear.</DialogDescription>
+        </DialogHeader>
+
+        <div className="px-5 pt-5 pb-1">
+          <p className="text-base font-black text-foreground">Who can see this quest?</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">All rules must pass before the quest appears for a user.</p>
+        </div>
+
+        <div className="max-h-[70vh] overflow-y-auto px-5 py-3 space-y-3">
+          {conditions.length === 0 ? (
+            <div className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-6 text-center">
+              <p className="text-sm font-bold text-foreground">Everyone</p>
+              <p className="mt-1 text-xs text-muted-foreground">No restrictions. Add a rule below to limit visibility.</p>
+            </div>
+          ) : (
+            conditions.map((condition) => (
+              <div key={condition.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 leading-[30px]">
+                    <span className="text-[13px] font-medium text-foreground">Only show when</span>
+                    <InlinePillSelect value={condition.metric} onChange={(v) => onUpdate(condition.id, { metric: v as QuestVisibilityMetric })}>
+                      <option value="daily_tasks_count">tasks today</option>
+                      <option value="total_habits_count">total habits</option>
+                      <option value="tags_count">tags count</option>
+                    </InlinePillSelect>
+                    <span className="text-[13px] font-medium text-foreground">is</span>
+                    <InlinePillSelect value={condition.operator} onChange={(v) => onUpdate(condition.id, { operator: v as QuestVisibilityOperator })}>
+                      <option value="gt">more than</option>
+                      <option value="lt">less than</option>
+                    </InlinePillSelect>
+                    <InlinePillNumber value={condition.value} onChange={(v) => onUpdate(condition.id, { value: v })} min={0} />
+                  </div>
+                  <button onClick={() => onRemove(condition.id)} className="mt-0.5 shrink-0 rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+
+          <button
+            type="button"
+            onClick={onAdd}
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/50 py-3 text-xs font-bold text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Add rule
+          </button>
+        </div>
+
+        <div className="border-t border-border/40 px-5 py-3 text-right">
+          <Button size="sm" className="rounded-xl font-bold" onClick={() => onOpenChange(false)}>Done</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function RewardPickerDialog({
   open,
   onOpenChange,
@@ -1331,6 +1361,16 @@ function RewardPickerDialog({
     );
   };
 
+  const patchBoxReward = (itemId: string, patch: Partial<QuestReward>) => {
+    setDraft((current) =>
+      current.map((reward) =>
+        reward.type === 'BOX' && reward.itemId === itemId
+          ? { ...reward, ...patch }
+          : reward,
+      ),
+    );
+  };
+
   const toggleCatalogReward = (type: 'ITEM' | 'BOX', itemId: string) => {
     setDraft((current) => {
       const exists = current.some(
@@ -1341,7 +1381,7 @@ function RewardPickerDialog({
           (reward) => !(reward.type === type && reward.itemId === itemId),
         );
       }
-      return [...current, { type, itemId }];
+      return [...current, { type, itemId, ...(type === 'BOX' ? { amount: 1, amountMode: 'fixed' as const } : {}) }];
     });
   };
 
@@ -1359,7 +1399,7 @@ function RewardPickerDialog({
               Reward Picker
             </DialogTitle>
             <DialogDescription>
-              Select multiple rewards from flies, items, and boxes. Fly rewards support amounts. Item and box rewards grant one copy each.
+              Select multiple rewards from flies, items, and boxes. Fly and box rewards support amounts. Item rewards grant one copy each.
             </DialogDescription>
           </DialogHeader>
         </div>
@@ -1542,42 +1582,94 @@ function RewardPickerDialog({
               {(activeTab === 'item' ? itemOptions : boxOptions).map((item) => {
                 const rewardType: 'ITEM' | 'BOX' =
                   activeTab === 'item' ? 'ITEM' : 'BOX';
-                const selected = draft.some(
+                const selectedReward = draft.find(
                   (reward) =>
                     reward.type === rewardType && reward.itemId === item.id,
                 );
+                const selected = !!selectedReward;
 
                 return (
-                  <button
-                    key={`${rewardType}-${item.id}`}
-                    type="button"
-                    onClick={() => toggleCatalogReward(rewardType, item.id)}
-                    className={cn(
-                      'flex items-center gap-4 rounded-[24px] border p-4 text-left transition',
-                      selected
-                        ? 'border-primary/30 bg-primary/10'
-                        : 'border-border/50 bg-background/70 hover:bg-muted/40',
+                  <div key={`${rewardType}-${item.id}`} className="flex flex-col gap-0">
+                    <button
+                      type="button"
+                      onClick={() => toggleCatalogReward(rewardType, item.id)}
+                      className={cn(
+                        'flex items-center gap-4 rounded-[24px] border p-4 text-left transition',
+                        selected
+                          ? 'border-primary/30 bg-primary/10'
+                          : 'border-border/50 bg-background/70 hover:bg-muted/40',
+                        selected && rewardType === 'BOX' && 'rounded-b-none border-b-0',
+                      )}
+                    >
+                      <RewardTile
+                        reward={selectedReward ?? { type: rewardType, itemId: item.id }}
+                        rewardCatalog={rewardCatalog}
+                        isPremium={false}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-foreground">
+                          {item.name}
+                        </p>
+                        <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                          {item.rarity}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {rewardType === 'BOX'
+                            ? selected
+                              ? `×${selectedReward.amount ?? 1}`
+                              : 'Click to add'
+                            : selected
+                              ? 'One item reward'
+                              : 'Click to add'}
+                        </p>
+                      </div>
+                    </button>
+                    {selected && rewardType === 'BOX' && (
+                      <div
+                        className="flex items-center gap-3 rounded-b-[24px] border border-t-0 border-primary/30 bg-primary/5 px-4 py-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                          Amount
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              patchBoxReward(item.id, {
+                                amount: Math.max(1, (selectedReward.amount ?? 1) - 1),
+                              })
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-background text-sm font-bold hover:bg-muted/60 transition"
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            value={String(selectedReward.amount ?? 1)}
+                            onChange={(e) =>
+                              patchBoxReward(item.id, {
+                                amount: Math.max(1, Number(e.target.value) || 1),
+                              })
+                            }
+                            className="h-7 w-12 rounded-lg border border-border bg-background text-center text-sm font-bold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              patchBoxReward(item.id, {
+                                amount: (selectedReward.amount ?? 1) + 1,
+                              })
+                            }
+                            className="flex h-7 w-7 items-center justify-center rounded-full border border-border/50 bg-background text-sm font-bold hover:bg-muted/60 transition"
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
                     )}
-                  >
-                    <RewardTile
-                      reward={{ type: rewardType, itemId: item.id }}
-                      rewardCatalog={rewardCatalog}
-                      isPremium={false}
-                    />
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-black text-foreground">
-                        {item.name}
-                      </p>
-                      <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
-                        {item.rarity}
-                      </p>
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {rewardType === 'BOX'
-                          ? 'One box reward'
-                          : 'One item reward'}
-                      </p>
-                    </div>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -1605,13 +1697,3 @@ function RewardPickerDialog({
   );
 }
 
-function SummaryCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-[24px] border border-border/50 bg-card/80 p-4 shadow-sm">
-      <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
-        {label}
-      </p>
-      <p className="mt-2 text-sm font-bold text-foreground">{value}</p>
-    </div>
-  );
-}
