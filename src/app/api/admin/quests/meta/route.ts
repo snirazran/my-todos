@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
-import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
+import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
 
 export async function GET() {
@@ -9,12 +9,15 @@ export async function GET() {
     await requireUserId();
     await connectMongo();
 
-    const catalog = await getFullCatalog();
+    const [categories, catalog] = await Promise.all([
+      QuestCategoryModel.find().sort({ createdAt: 1 }),
+      getFullCatalog(),
+    ]);
 
     return NextResponse.json({
-      categories: QUEST_MACRO_CATEGORIES.map((category) => ({
-        id: category.id,
-        name: category.name,
+      categories: categories.map((c) => ({
+        id: c.categoryId,
+        name: c.name,
       })),
       rewardsCatalog: catalog.map((item) => ({
         id: item.id,

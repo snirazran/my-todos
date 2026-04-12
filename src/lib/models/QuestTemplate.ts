@@ -36,7 +36,6 @@ const QuestTemplateSchema = new Schema<QuestTemplateDoc>(
     },
     categoryId: {
       type: String,
-      enum: ['sport', 'family', 'mindfulness', 'house_chores', 'sleep'],
       default: undefined,
     },
     rewards: { type: Schema.Types.Mixed, required: true },
