@@ -477,89 +477,70 @@ export function AdminQuestManagerPage() {
 
   // ── Home view ────────────────────────────────────────────────────────────
   const renderHome = () => (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-2">
       <button
         onClick={() => setView('daily')}
-        className="group rounded-[28px] border border-border/50 bg-card/80 p-6 text-left shadow-sm transition hover:border-blue-500/30 hover:bg-blue-500/5"
+        className="group flex items-center gap-4 rounded-2xl border border-border/40 bg-card/60 p-5 text-left transition hover:border-blue-500/25 hover:bg-blue-500/[0.04]"
       >
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-500/12 text-blue-600 dark:text-blue-400">
-            <ScrollText className="h-6 w-6" />
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-1" />
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
+          <ScrollText className="h-5 w-5" />
         </div>
-        <p className="text-xl font-black text-foreground">Daily Quests</p>
-        <p className="mt-1 text-sm text-muted-foreground">Quests that appear in the daily tab for all users.</p>
-        <div className="mt-4 rounded-2xl border border-border/50 bg-background/70 px-4 py-3">
-          <p className="text-2xl font-black text-foreground">{dailyTemplates.length}</p>
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">quest templates</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-foreground">Daily Quests</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{dailyTemplates.length} template{dailyTemplates.length !== 1 ? 's' : ''}</p>
         </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:text-muted-foreground" />
       </button>
 
       <button
         onClick={() => setView('focus')}
-        className="group rounded-[28px] border border-border/50 bg-card/80 p-6 text-left shadow-sm transition hover:border-emerald-500/30 hover:bg-emerald-500/5"
+        className="group flex items-center gap-4 rounded-2xl border border-border/40 bg-card/60 p-5 text-left transition hover:border-emerald-500/25 hover:bg-emerald-500/[0.04]"
       >
-        <div className="mb-4 flex items-center justify-between">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/12 text-emerald-600 dark:text-emerald-400">
-            <Sparkles className="h-6 w-6" />
-          </div>
-          <ChevronRight className="h-5 w-5 text-muted-foreground transition group-hover:translate-x-1" />
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <Sparkles className="h-5 w-5" />
         </div>
-        <p className="text-xl font-black text-foreground">Focus Quests</p>
-        <p className="mt-1 text-sm text-muted-foreground">Quests organized by focus category (sport, mindfulness, etc).</p>
-        <div className="mt-4 rounded-2xl border border-border/50 bg-background/70 px-4 py-3">
-          <p className="text-2xl font-black text-foreground">{adminCategories.length}</p>
-          <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">categories</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-foreground">Focus Quests</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{adminCategories.length} categor{adminCategories.length !== 1 ? 'ies' : 'y'}</p>
         </div>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:text-muted-foreground" />
       </button>
     </div>
   );
 
   // ── Quest list (shared by Daily and Category views) ───────────────────────
   const renderQuestList = (questTemplates: AdminQuestTemplate[], placement: QuestPlacement, catId?: string) => (
-    <div className="space-y-3">
-      {loading && <div className="rounded-2xl border border-border/50 bg-muted/30 p-4 text-sm text-muted-foreground">Loading...</div>}
+    <div className="space-y-2">
+      {loading && <div className="rounded-2xl bg-muted/30 p-4 text-sm text-muted-foreground">Loading...</div>}
       {!loading && questTemplates.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-border/50 bg-muted/20 p-6 text-center text-sm text-muted-foreground">
-          No quests yet. Click &quot;Add Quest&quot; to create the first one.
+        <div className="rounded-2xl border border-dashed border-border/40 py-10 text-center text-sm text-muted-foreground">
+          No quests yet. Add one to get started.
         </div>
       )}
       {questTemplates.map((template) => (
-        <div
+        <button
           key={template.id}
-          className="flex items-center gap-3 rounded-2xl border border-border/50 bg-background/70 p-4"
+          onClick={() => navigateToQuestForm(template)}
+          className="group flex w-full items-center gap-4 rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5 text-left transition hover:border-primary/20 hover:bg-primary/[0.03]"
         >
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="truncate text-sm font-black text-foreground">{template.name}</p>
+            <div className="flex items-center gap-2.5">
+              <p className="truncate text-sm font-bold text-foreground">{template.name}</p>
               <span className={cn(
-                'rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]',
+                'shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em]',
                 template.isActive
-                  ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400'
+                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
                   : 'bg-muted text-muted-foreground',
               )}>
                 {template.isActive ? 'Active' : 'Paused'}
               </span>
             </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <span className="rounded-full border border-border/50 bg-card px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-                {template.logic.length} blocks
-              </span>
-              <span className="rounded-full border border-border/50 bg-card px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-muted-foreground">
-                {template.rewards.length} rewards
-              </span>
-            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {template.logic.length} block{template.logic.length !== 1 ? 's' : ''} · {template.rewards.length} reward{template.rewards.length !== 1 ? 's' : ''}
+            </p>
           </div>
-          <div className="flex shrink-0 gap-2">
-            <button
-              onClick={() => navigateToQuestForm(template)}
-              className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <Edit2 className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:text-muted-foreground" />
+        </button>
       ))}
     </div>
   );
@@ -567,11 +548,7 @@ export function AdminQuestManagerPage() {
   // ── Daily view ────────────────────────────────────────────────────────────
   const renderDaily = () => (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-lg font-black text-foreground">Daily Quests</p>
-          <p className="text-sm text-muted-foreground">{dailyTemplates.length} templates shared across all users.</p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button size="sm" className="rounded-xl" onClick={() => navigateToQuestForm(undefined, 'daily')}>
           <Plus className="mr-1 h-4 w-4" />
           Add Quest
@@ -584,59 +561,43 @@ export function AdminQuestManagerPage() {
   // ── Focus categories view ─────────────────────────────────────────────────
   const renderFocus = () => (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-lg font-black text-foreground">Focus Categories</p>
-          <p className="text-sm text-muted-foreground">Manage categories and the quests inside them.</p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button size="sm" className="rounded-xl" onClick={() => openCategoryDialog()}>
           <Plus className="mr-1 h-4 w-4" />
           Add Category
         </Button>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2">
         {adminCategories.map((cat) => {
           const questCount = templates.filter((t) => t.placement === 'category' && t.categoryId === cat.id).length;
           return (
-            <div key={cat.id} className="flex items-center gap-4 rounded-2xl border border-border/50 bg-background/70 p-4">
+            <div key={cat.id} className="group flex items-center gap-4 rounded-2xl border border-border/40 bg-card/60 px-4 py-3.5 transition hover:border-primary/20 hover:bg-primary/[0.03]">
               <div
-                className="h-10 w-10 shrink-0 rounded-xl"
+                className="h-10 w-10 shrink-0 rounded-xl shadow-sm"
                 style={{ background: `linear-gradient(135deg, ${cat.backgroundFrom}, ${cat.backgroundTo})` }}
               />
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={() => { setSelectedCategoryId(cat.id); setView('category'); }}
-                    className="text-sm font-black text-foreground hover:underline"
-                  >
-                    {cat.name}
-                  </button>
-
-                </div>
-                {cat.description && (
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{cat.description}</p>
-                )}
-                <p className="mt-1 text-xs text-muted-foreground">{questCount} quest{questCount !== 1 ? 's' : ''}</p>
-              </div>
-              <div className="flex shrink-0 gap-1">
-                <button
-                  onClick={() => { setSelectedCategoryId(cat.id); setView('category'); }}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+              <button
+                onClick={() => { setSelectedCategoryId(cat.id); setView('category'); }}
+                className="min-w-0 flex-1 text-left"
+              >
+                <p className="truncate text-sm font-bold text-foreground">{cat.name}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {questCount} quest{questCount !== 1 ? 's' : ''}{cat.description ? ` · ${cat.description}` : ''}
+                </p>
+              </button>
+              <div className="flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100">
                 <button
                   onClick={() => openCategoryDialog(cat)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
-                  <Edit2 className="h-4 w-4" />
+                  <Edit2 className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={() => void deleteCategory(cat)}
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-red-500 hover:bg-red-500/10"
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground hover:bg-red-500/10 hover:text-red-500"
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
@@ -651,17 +612,7 @@ export function AdminQuestManagerPage() {
     if (!selectedCategory) return null;
     return (
       <div className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div
-              className="h-10 w-10 shrink-0 rounded-xl"
-              style={{ background: `linear-gradient(135deg, ${selectedCategory.backgroundFrom}, ${selectedCategory.backgroundTo})` }}
-            />
-            <div>
-              <p className="text-lg font-black text-foreground">{selectedCategory.name}</p>
-              <p className="text-sm text-muted-foreground">{categoryTemplates.length} quest templates in this category.</p>
-            </div>
-          </div>
+        <div className="flex items-center justify-end">
           <Button size="sm" className="rounded-xl" onClick={() => navigateToQuestForm(undefined, 'category', selectedCategoryId ?? undefined)}>
             <Plus className="mr-1 h-4 w-4" />
             Add Quest
@@ -677,10 +628,10 @@ export function AdminQuestManagerPage() {
     <div className="mx-auto w-full max-w-xl space-y-6">
       {result && (
         <div className={cn(
-          'flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium',
+          'flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium',
           result.type === 'success'
-            ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-            : 'border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400',
+            ? 'bg-emerald-500/8 text-emerald-600 dark:text-emerald-400'
+            : 'bg-red-500/8 text-red-600 dark:text-red-400',
         )}>
           {result.type === 'success' ? <CheckCircle className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
           {result.message}
@@ -930,47 +881,32 @@ export function AdminQuestManagerPage() {
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-[1600px] px-4 py-6 md:px-8">
         {/* Header */}
-        <div className="mb-6 flex flex-col gap-4 rounded-[32px] border border-border/50 bg-card/80 p-6 shadow-sm lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            {backLabel ? (
-              <button onClick={handleBack} className="inline-flex items-center gap-2 text-sm font-bold text-muted-foreground transition hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" />
-                {backLabel}
-              </button>
-            ) : (
-              <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-muted-foreground transition hover:text-foreground">
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Link>
-            )}
-            <div className="mt-4 flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-emerald-500/12 text-emerald-600 dark:text-emerald-400">
-                <ScrollText className="h-6 w-6" />
-              </div>
-              <div>
-                <h1 className="text-3xl font-black tracking-tight text-foreground md:text-4xl">Quest Manager</h1>
-                <p className="mt-1 max-w-3xl text-sm text-muted-foreground md:text-base">
-                  {view === 'home' && 'Browse and manage quest templates by type.'}
-                  {view === 'daily' && 'Daily quests appear for all users each day.'}
-                  {view === 'focus' && 'Focus categories group quests by life area.'}
-                  {view === 'category' && `Quests inside the ${selectedCategory?.name ?? ''} category.`}
-                  {view === 'form' && (form.id ? 'Editing an existing quest template.' : 'Creating a new quest template.')}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="rounded-[24px] border border-border/50 bg-background/80 px-4 py-3 text-sm text-muted-foreground">
-            Premium users automatically get double the base reward.
-          </div>
+        <div className="mb-8 flex items-center gap-4">
+          {backLabel ? (
+            <button onClick={handleBack} className="flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-card text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+          ) : (
+            <Link href="/" className="flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-card text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground">
+              <ArrowLeft className="h-4 w-4" />
+            </Link>
+          )}
+          <h1 className="text-2xl font-black tracking-tight text-foreground">
+            {view === 'home' && 'Quest Manager'}
+            {view === 'daily' && 'Daily Quests'}
+            {view === 'focus' && 'Focus Quests'}
+            {view === 'category' && (selectedCategory?.name ?? 'Category')}
+            {view === 'form' && (form.id ? 'Edit Quest' : 'New Quest')}
+          </h1>
         </div>
 
         {/* Global result message */}
         {result && view !== 'form' && (
           <div className={cn(
-            'mb-6 flex items-center gap-2 rounded-2xl border px-4 py-3 text-sm font-medium',
+            'mb-6 flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium',
             result.type === 'success'
-              ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-              : 'border-red-500/20 bg-red-500/10 text-red-600 dark:text-red-400',
+              ? 'bg-emerald-500/8 text-emerald-600 dark:text-emerald-400'
+              : 'bg-red-500/8 text-red-600 dark:text-red-400',
           )}>
             {result.type === 'success' ? <CheckCircle className="h-4 w-4 shrink-0" /> : <XCircle className="h-4 w-4 shrink-0" />}
             {result.message}
@@ -981,7 +917,7 @@ export function AdminQuestManagerPage() {
         {view === 'form' ? (
           renderForm()
         ) : (
-          <div className="rounded-[28px] border border-border/50 bg-card/80 p-6 shadow-sm">
+          <>
             {loading && view === 'home' ? (
               <div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>
             ) : (
@@ -992,7 +928,7 @@ export function AdminQuestManagerPage() {
                 {view === 'category' && renderCategory()}
               </>
             )}
-          </div>
+          </>
         )}
 
         {/* Category dialog */}
