@@ -974,6 +974,80 @@ function QuestCarousel({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const scrollStart = useRef(0);
+  const lastX = useRef(0);
+  const lastTime = useRef(0);
+  const velocity = useRef(0);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    isDragging.current = true;
+    startX.current = e.clientX;
+    lastX.current = e.clientX;
+    lastTime.current = Date.now();
+    velocity.current = 0;
+    scrollStart.current = el.scrollLeft;
+    el.style.cursor = 'grabbing';
+    el.style.scrollSnapType = 'none';
+    el.style.scrollBehavior = 'auto';
+    el.setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!isDragging.current || !scrollRef.current) return;
+    const now = Date.now();
+    const dt = now - lastTime.current;
+    if (dt > 0) {
+      velocity.current = (lastX.current - e.clientX) / dt;
+    }
+    lastX.current = e.clientX;
+    lastTime.current = now;
+    const dx = e.clientX - startX.current;
+    scrollRef.current.scrollLeft = scrollStart.current - dx;
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (!isDragging.current || !scrollRef.current) return;
+    isDragging.current = false;
+    const el = scrollRef.current;
+    el.releasePointerCapture(e.pointerId);
+    el.style.cursor = 'grab';
+
+    // Find the nearest card based on drag direction + velocity
+    const containerRect = el.getBoundingClientRect();
+    const containerCenter = containerRect.left + containerRect.width / 2;
+    let closestIdx = 0;
+    let closestDist = Infinity;
+
+    itemRefs.current.forEach((item, i) => {
+      if (!item) return;
+      const rect = item.getBoundingClientRect();
+      const itemCenter = rect.left + rect.width / 2;
+      // Bias toward the direction of the flick
+      const dist = Math.abs(itemCenter - containerCenter) - velocity.current * 150;
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestIdx = i;
+      }
+    });
+
+    // Smooth scroll to the target card, then re-enable snap
+    el.style.scrollBehavior = 'smooth';
+    itemRefs.current[closestIdx]?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    });
+    setTimeout(() => {
+      if (scrollRef.current) {
+        scrollRef.current.style.scrollSnapType = 'x mandatory';
+        scrollRef.current.style.scrollBehavior = '';
+      }
+    }, 350);
+  };
 
   // Track which card is most visible via IntersectionObserver
   useEffect(() => {
@@ -998,7 +1072,11 @@ function QuestCarousel({
     <div>
       <div
         ref={scrollRef}
-        className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 cursor-grab select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {React.Children.map(children, (child, i) => (
