@@ -27,6 +27,7 @@ import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
+import { cn } from '@/lib/utils';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -354,7 +355,7 @@ export default function Home() {
                 <button
                   onClick={() => setActiveTab('today')}
                   className={`
-        flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap
+        flex-1 md:flex-none justify-center relative px-5 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all flex items-center whitespace-nowrap
         ${
           activeTab === 'today'
             ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
@@ -362,23 +363,26 @@ export default function Home() {
         }
       `}
                 >
-                  <CalendarCheck
-                    className={`w-4 h-4 ${activeTab === 'today' ? 'text-primary' : 'text-muted-foreground'}`}
-                  />
-                  Tasks
-                  <TaskCounter
-                    count={
-                      showCompleted
-                        ? data.length
-                        : data.filter((t) => !t.completed).length
-                    }
-                    pendingCount={pendingToToday}
-                  />
+                  <div className="flex items-center justify-center gap-2 mr-[-0.15em]">
+                    <CalendarCheck
+                      className={`w-3.5 h-3.5 ${activeTab === 'today' ? 'text-primary' : 'text-muted-foreground'}`}
+                    />
+                    <span>Tasks</span>
+                    <TaskCounter
+                      count={
+                        showCompleted
+                          ? data.length
+                          : data.filter((t) => !t.completed).length
+                      }
+                      pendingCount={pendingToToday}
+                      isActive={activeTab === 'today'}
+                    />
+                  </div>
                 </button>
                 <button
                   onClick={() => setActiveTab('habits')}
                   className={`
-        flex-1 md:flex-none justify-center relative px-6 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap
+        flex-1 md:flex-none justify-center relative px-5 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all flex items-center whitespace-nowrap
         ${
           activeTab === 'habits'
             ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
@@ -386,15 +390,20 @@ export default function Home() {
         }
       `}
                 >
-                  <CalendarClock
-                    className={`w-4 h-4 ${activeTab === 'habits' ? 'text-primary' : 'text-muted-foreground'}`}
-                  />
-                  Habits
-                  <TaskCounter count={
-                      showCompleted
-                        ? habits.length
-                        : habits.filter((h) => !h.completedDates?.includes(todayDateStr) && !h.completed).length
-                    } />
+                  <div className="flex items-center justify-center gap-2 mr-[-0.15em]">
+                    <CalendarClock
+                      className={`w-3.5 h-3.5 ${activeTab === 'habits' ? 'text-primary' : 'text-muted-foreground'}`}
+                    />
+                    <span>Habits</span>
+                    <TaskCounter 
+                      count={
+                        showCompleted
+                          ? habits.length
+                          : habits.filter((h) => !h.completedDates?.includes(todayDateStr) && !h.completed).length
+                      } 
+                      isActive={activeTab === 'habits'}
+                    />
+                  </div>
                 </button>
 
                 {/* 3-DOTS MENU ADDED HERE */}
@@ -926,9 +935,11 @@ function Header({ router }: { router: any }) {
 function TaskCounter({
   count,
   pendingCount,
+  isActive = false,
 }: {
   count: number;
   pendingCount?: number;
+  isActive?: boolean;
 }) {
   const controls = useAnimation();
   const prevCount = React.useRef(count);
@@ -955,11 +966,16 @@ function TaskCounter({
   if (count === 0 && (!pendingCount || pendingCount === 0)) return null;
 
   return (
-    <div className="flex items-center gap-1.5 ">
+    <div className="flex items-center gap-1.5 ml-1">
       {count > 0 && (
         <motion.span
           animate={controls}
-          className={`flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm ${count === 0 ? 'hidden' : ''}`}
+          className={cn(
+            "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black shadow-sm !text-white",
+            isActive 
+              ? "bg-primary" 
+              : "bg-primary"
+          )}
         >
           {count}
         </motion.span>

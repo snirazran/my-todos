@@ -203,7 +203,7 @@ export function FilterBar({
               {opt.icon}
               {opt.label}
               {badgeCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background shadow-sm animate-in zoom-in">
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center text-[10px] font-bold text-primary-foreground bg-primary rounded-full border-2 border-background shadow-sm animate-in zoom-in">
                   {badgeCount}
                 </span>
               )}

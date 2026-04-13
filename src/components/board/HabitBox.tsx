@@ -58,11 +58,12 @@ export default function HabitBox({
       {/* Count Badge */}
       <AnimatePresence>
         {count > 0 && (
-          <motion.div 
+          <motion.div
+            key="habit-count"
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            className="absolute -top-2 -right-2 z-10 flex items-center justify-center min-w-[20px] h-[20px] px-1 text-[10px] font-black text-white bg-emerald-500 rounded-full shadow-sm ring-2 ring-background pointer-events-none"
+            className="absolute -top-2.5 -right-2.5 z-10 flex items-center justify-center w-5 h-5 text-[10px] font-black text-primary-foreground bg-primary rounded-full shadow-sm ring-2 ring-background pointer-events-none"
           >
             {count}
           </motion.div>

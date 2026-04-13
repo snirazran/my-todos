@@ -4,11 +4,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import useSWR, { mutate } from 'swr';
-import { ScrollText, X, Compass, CalendarDays, RefreshCw } from 'lucide-react';
+import { ScrollText, X, Compass, CalendarDays, RefreshCw, Sparkles } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import TagPopup from './TagPopup';
+import { FilterBar, type FilterOption } from './skins/FilterBar';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type {
   CategoryQuestProgressView,
@@ -94,6 +95,7 @@ export function QuestsPopup({
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const [refreshingDaily, setRefreshingDaily] = useState(false);
   const [refreshingFocus, setRefreshingFocus] = useState(false);
+  const [activeSubCategoryId, setActiveSubCategoryId] = useState<string>('all');
   const [editingFocusCategoryId, setEditingFocusCategoryId] =
     useState<MacroCategoryId | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
@@ -225,6 +227,54 @@ export function QuestsPopup({
       return sum + 1 + objectivesLeft;
     }, 0);
   }, [data?.categoryQuests]);
+
+  const subCategoryOptions: FilterOption[] = useMemo(() => {
+    const options: FilterOption[] = [
+      { id: 'all', label: 'All', icon: <Sparkles className="w-4 h-4" /> },
+    ];
+    if (data?.macroCategories) {
+      data.macroCategories.forEach((cat) => {
+        options.push({
+          id: cat.id,
+          label: cat.shortLabel || cat.name,
+          icon: <Compass className="w-4 h-4" />,
+        });
+      });
+    }
+    return options;
+  }, [data?.macroCategories]);
+
+  const categoryBadges = useMemo(() => {
+    const badges: Record<string, number> = {};
+    if (!data?.categoryQuests) return badges;
+
+    // "all" badge
+    badges['all'] = countCategory;
+
+    // per category badge
+    data.categoryQuests.forEach((quest) => {
+      if (!quest.categoryId || quest.claimed) return;
+      const objectivesLeft = quest.logic.filter((block) => {
+        const hasRewards = (block.rewards?.length ?? 0) > 0;
+        if (hasRewards) {
+          return !quest.claimedObjectiveIds.includes(block.id);
+        }
+        return block.progress < block.target;
+      }).length;
+      const count = 1 + objectivesLeft;
+      badges[quest.categoryId] = (badges[quest.categoryId] ?? 0) + count;
+    });
+
+    return badges;
+  }, [data?.categoryQuests, countCategory]);
+
+  const filteredCategoryQuests = useMemo(() => {
+    if (!data?.categoryQuests) return [];
+    if (activeSubCategoryId === 'all') return data.categoryQuests;
+    return data.categoryQuests.filter(
+      (q) => q.categoryId === activeSubCategoryId,
+    );
+  }, [data?.categoryQuests, activeSubCategoryId]);
 
   const editingFocusCategory = editingFocusCategoryId
     ? categoryMap[editingFocusCategoryId]
@@ -528,15 +578,15 @@ export function QuestsPopup({
                         setActiveTab(value as 'daily' | 'category')
                       }
                     >
-                      <TabsList className="flex h-12 w-full items-center gap-1 rounded-[20px] border border-border/50 bg-card/80 p-1 shadow-sm backdrop-blur-2xl md:h-14">
+                      <TabsList className="flex h-12 w-full items-center gap-2 rounded-full border border-border/50 bg-background/50 p-1 shadow-sm backdrop-blur-2xl md:h-14">
                         <TabsTrigger
                           value="category"
                           className="
-                            flex-1 h-full rounded-2xl relative
+                            flex-1 h-full rounded-full relative
                             flex items-center justify-center gap-2
-                            text-xs md:text-sm font-bold tracking-wide uppercase
+                            text-[11px] md:text-sm font-black tracking-widest uppercase
                             transition-all duration-300
-                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
+                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-primary/20 data-[state=active]:ring-1 data-[state=active]:ring-primary/20
                             data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
                           "
                         >
@@ -551,11 +601,11 @@ export function QuestsPopup({
                         <TabsTrigger
                           value="daily"
                           className="
-                            flex-1 h-full rounded-2xl relative
+                            flex-1 h-full rounded-full relative
                             flex items-center justify-center gap-2
-                            text-xs md:text-sm font-bold tracking-wide uppercase
+                            text-[11px] md:text-sm font-black tracking-widest uppercase
                             transition-all duration-300
-                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
+                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-primary/20 data-[state=active]:ring-1 data-[state=active]:ring-primary/20
                             data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
                           "
                         >
@@ -591,10 +641,18 @@ export function QuestsPopup({
                               here.
                             </PanelCard>
                           )}
-                        {(data.categoryQuests?.length ?? 0) === 0 ? (
-                          <PanelCard>No active focus quests yet.</PanelCard>
+                        {data.onboarding?.complete && (
+                          <FilterBar
+                            active={activeSubCategoryId}
+                            onChange={setActiveSubCategoryId}
+                            options={subCategoryOptions}
+                            badges={categoryBadges}
+                          />
+                        )}
+                        {filteredCategoryQuests.length === 0 ? (
+                          <PanelCard>No active focus quests here.</PanelCard>
                         ) : (
-                          data.categoryQuests!.map((quest) => (
+                          filteredCategoryQuests.map((quest) => (
                             <CategoryQuestPresentationCard
                               key={quest.id}
                               quest={quest}
