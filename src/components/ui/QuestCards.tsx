@@ -83,7 +83,9 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
     block.targetLabel ?? String(Math.max(0, block.target ?? 0));
 
   if (block.type === 'focus_minutes') {
-    return `Focus for ${targetLabel} minutes on tasks`;
+    return block.tagMode === 'focus_category_tags'
+      ? `Focus for ${targetLabel} minutes on tagged tasks`
+      : `Focus for ${targetLabel} minutes on tasks`;
   }
 
   const numericTarget = Math.max(0, block.target ?? 0);
@@ -99,7 +101,11 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
           : 'tasks';
 
   const actionLabel = block.action === 'add' ? 'Add' : 'Complete';
-  return `${actionLabel} ${targetLabel} ${subjectLabel}`;
+  const scopeLabel =
+    block.tagMode === 'focus_category_tags'
+      ? `${subjectLabel} with focus tags`
+      : subjectLabel;
+  return `${actionLabel} ${targetLabel} ${scopeLabel}`;
 }
 
 function getTaggedSubjectCopy(block: QuestCardLogicBlock) {
@@ -314,19 +320,23 @@ export function CategoryQuestPresentationCard({
   const heroImageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
   const timeLeft = useCountdownLabel(quest.expiresAt);
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
+  const usesFocusTags = quest.logic.some(
+    (block) => block.tagMode === 'focus_category_tags',
+  );
+  const needsFocusTags = usesFocusTags && linkedTags.length === 0;
 
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
-      <div className="relative min-h-[310px] overflow-hidden">
+      <div className="relative overflow-hidden">
         {heroImageUrl ? (
           <img
             src={heroImageUrl}
             alt={category?.name ?? quest.title}
-            className="h-[250px] w-full object-cover sm:h-[285px]"
+            className="h-[220px] w-full object-cover"
           />
         ) : (
           <div
-            className="h-[250px] w-full sm:h-[285px]"
+            className="h-[220px] w-full"
             style={{
               background: `linear-gradient(135deg, ${category?.backgroundFrom ?? '#0f172a'}, ${category?.backgroundTo ?? '#1e293b'})`,
             }}
@@ -361,33 +371,23 @@ export function CategoryQuestPresentationCard({
           ))}
         </div>
         <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[108px] sm:p-5 sm:pr-[132px]">
-          <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
-            {category?.shortLabel || 'Focus'}
-          </p>
-          <h3 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)] sm:text-4xl">
-            {category?.name || 'Focus Quest'}
+          <h3 className="text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]">
+            {quest.title}
           </h3>
-          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)] sm:text-base">
-            {category?.description || quest.description}
+          <p className="mt-1.5 text-sm text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
+            {quest.description}
           </p>
         </div>
       </div>
 
       <div className="px-4 pt-1 pb-4 sm:px-5 sm:pb-5">
-        <div className="pb-2">
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-            Quest
-          </p>
-          <h4 className="mt-1 text-lg font-black leading-tight text-foreground">
-            {quest.title}
-          </h4>
-          {quest.description && (
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              {quest.description}
-            </p>
-          )}
-        </div>
-
+        {usesFocusTags && (
+          <FocusQuestTagPanel
+            linkedTags={linkedTags}
+            accent={category?.accent ?? '#22c55e'}
+            onEditTags={onEditTags}
+          />
+        )}
         {quest.logic.map((block, i) => (
           <div key={block.id}>
             <ObjectiveRow
@@ -405,51 +405,14 @@ export function CategoryQuestPresentationCard({
               onClaimObjective={onClaimObjective ? () => onClaimObjective(block.id) : undefined}
               isLast={i === quest.logic.length - 1}
             />
-            {getTagScopeMessage(block) ? (
+            {block.tagMode !== 'focus_category_tags' && getTagScopeMessage(block) ? (
               <p className="-mt-2 mb-2 px-1 text-xs font-medium text-muted-foreground">
                 {getTagScopeMessage(block)}
               </p>
             ) : null}
-            <div className="flex flex-wrap items-center gap-2 -mt-1.5 mb-1 px-1">
-              {block.tagMode === 'focus_category_tags' ? (
-                <>
-                  {linkedTags.length > 0 ? (
-                    <>
-                      {onEditTags ? (
-                        <button
-                          type="button"
-                          onClick={onEditTags}
-                          className="inline-flex items-center justify-center w-8 h-8 transition border rounded-xl border-border/50 bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"
-                          aria-label="Edit linked tags"
-                          title="Edit linked tags"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
-                      ) : null}
-                      {linkedTags.map((tag) => (
-                        <QuestTagPill
-                          key={`${block.id}-${tag.id}`}
-                          tag={tag}
-                        />
-                      ))}
-                    </>
-                  ) : onEditTags ? (
-                    <button
-                      type="button"
-                      onClick={onEditTags}
-                      className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-primary transition hover:bg-primary/15"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      Select a tag to start
-                    </button>
-                  ) : (
-                    <PreviewTagHint
-                      label={block.previewTagLabel ?? 'Saved focus tags'}
-                      color={category?.accent ?? '#22c55e'}
-                    />
-                  )}
-                </>
-              ) : block.resolvedTagNames?.length ? (
+            {block.tagMode !== 'focus_category_tags' && (
+              <div className="flex flex-wrap items-center gap-2 -mt-1.5 mb-1 px-1">
+                {block.resolvedTagNames?.length ? (
                 block.resolvedTagNames.map((tagName, index) => {
                   const matchedTag = linkedTags.find(
                     (tag) => tag.name.toLowerCase() === tagName.toLowerCase(),
@@ -481,7 +444,8 @@ export function CategoryQuestPresentationCard({
                   color={category?.accent ?? '#22c55e'}
                 />
               ) : null}
-            </div>
+              </div>
+            )}
           </div>
         ))}
 
@@ -490,7 +454,7 @@ export function CategoryQuestPresentationCard({
           rewardCatalog={rewardCatalog}
           isPremium={isPremium}
           claiming={claiming}
-          buttonLabel={buttonLabel}
+          buttonLabel={buttonLabel ?? (needsFocusTags ? 'Select a tag to start' : undefined)}
           buttonDisabled={buttonDisabled}
           onClaim={onClaim}
         />
@@ -662,6 +626,68 @@ function QuestTagPill({ tag }: { tag: QuestTagChip }) {
     >
       {tag.name}
     </span>
+  );
+}
+
+function FocusQuestTagPanel({
+  linkedTags,
+  accent,
+  onEditTags,
+}: {
+  linkedTags: QuestTagChip[];
+  accent: string;
+  onEditTags?: () => void;
+}) {
+  if (linkedTags.length > 0) {
+    return (
+      <div className="mt-3 mb-1 flex flex-wrap items-center gap-2 px-1">
+        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+          Focus tags
+        </span>
+        {linkedTags.map((tag) => (
+          <QuestTagPill key={tag.id} tag={tag} />
+        ))}
+        {onEditTags ? (
+          <button
+            type="button"
+            onClick={onEditTags}
+            className="rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            Edit
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-3 mb-1 rounded-2xl border border-primary/15 bg-primary/5 px-3 py-3">
+      <div className="flex items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+            Focus tags
+          </p>
+          <p className="mt-0.5 text-xs font-medium text-muted-foreground">
+            Choose which tags count for this quest.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {onEditTags ? (
+          <button
+            type="button"
+            onClick={onEditTags}
+            className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-primary transition hover:bg-primary/15"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Select a tag to start
+          </button>
+        ) : (
+          <PreviewTagHint label="Saved focus tags" color={accent} />
+        )}
+      </div>
+    </div>
   );
 }
 

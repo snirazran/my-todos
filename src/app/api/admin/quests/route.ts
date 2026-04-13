@@ -214,10 +214,15 @@ function sanitizeTemplateBody(body: any) {
   }
 
   const normalizedLogic: QuestLogicBlock[] = (logic as QuestLogicBlock[]).map(
-    (block): QuestLogicBlock =>
-      placement === 'category' || block.tagMode !== 'focus_category_tags'
+    (block): QuestLogicBlock => {
+      if (placement === 'category') {
+        return { ...block, tagMode: 'focus_category_tags' as const };
+      }
+
+      return block.tagMode !== 'focus_category_tags'
         ? block
-        : { ...block, tagMode: 'ignore' as const },
+        : { ...block, tagMode: 'ignore' as const };
+    },
   );
 
   return {

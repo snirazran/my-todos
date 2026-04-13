@@ -301,7 +301,6 @@ export function QuestsPopup({
     if (!res.ok) {
       throw new Error(payload.error || 'Could not save focus tags');
     }
-    setClaimMessage('Focus tags updated');
     await mutateQuests();
   };
 

@@ -113,7 +113,7 @@ const createReward = (): QuestReward => ({
   amountMode: 'fixed',
   amount: 50,
 });
-const createLogic = (): QuestLogicBlock => ({
+const createLogic = (placement: QuestPlacement = 'daily'): QuestLogicBlock => ({
   id: crypto.randomUUID(),
   type: 'count',
   subject: 'task',
@@ -122,7 +122,7 @@ const createLogic = (): QuestLogicBlock => ({
   amount: 3,
   minAmount: undefined,
   maxAmount: undefined,
-  tagMode: 'ignore',
+  tagMode: placement === 'category' ? 'focus_category_tags' : 'ignore',
 });
 const createVisibilityCondition = (): QuestVisibilityCondition => ({
   id: crypto.randomUUID(),
@@ -370,7 +370,13 @@ export function AdminQuestManagerPage() {
       categoryId: template.categoryId,
       durationMinutes: template.durationMinutes,
       rewards: template.rewards.map((reward) => ({ ...reward })),
-      logic: template.logic.map((block) => ({ ...block })),
+      logic: template.logic.map((block) => ({
+        ...block,
+        tagMode:
+          template.placement === 'category'
+            ? 'focus_category_tags'
+            : block.tagMode,
+      })),
       visibilityConditions: (template.visibilityConditions ?? []).map((condition) => ({
         ...condition,
       })),
@@ -393,7 +399,16 @@ export function AdminQuestManagerPage() {
     setForm((prev) => ({
       ...prev,
       logic: prev.logic.map((block) =>
-        block.id === id ? { ...block, ...patch } : block,
+        block.id === id
+          ? {
+              ...block,
+              ...patch,
+              tagMode:
+                prev.placement === 'category'
+                  ? 'focus_category_tags'
+                  : patch.tagMode ?? block.tagMode,
+            }
+          : block,
       ),
     }));
   };
@@ -565,6 +580,12 @@ export function AdminQuestManagerPage() {
       const newForm = emptyForm();
       newForm.placement = placementOverride ?? 'daily';
       newForm.categoryId = categoryIdOverride;
+      if (newForm.placement === 'category') {
+        newForm.logic = newForm.logic.map((block) => ({
+          ...block,
+          tagMode: 'focus_category_tags',
+        }));
+      }
       setForm(newForm);
       setResult(null);
     }
@@ -1063,7 +1084,7 @@ export function AdminQuestManagerPage() {
         rewardItems={rewardItems}
         rewardCatalog={rewardCatalog}
         onUpdate={updateLogic}
-        onAdd={() => setForm((prev) => ({ ...prev, logic: [...prev.logic, createLogic()] }))}
+        onAdd={() => setForm((prev) => ({ ...prev, logic: [...prev.logic, createLogic(prev.placement)] }))}
         onRemove={(id) => setForm((prev) => ({ ...prev, logic: prev.logic.filter((b) => b.id !== id) }))}
       />
 
@@ -1423,10 +1444,10 @@ function ObjectivesEditorDialog({
                 >
                   {block.amountMode === 'fixed' ? 'Use random range' : 'Use fixed amount'}
                 </button>
-                {block.type === 'count' && (
+                {block.type === 'count' && placement !== 'category' && (
                   <button
                     type="button"
-                    onClick={() => onUpdate(block.id, { tagMode: block.tagMode === 'ignore' ? (placement === 'category' ? 'focus_category_tags' : 'random_user_tag') : 'ignore' })}
+                    onClick={() => onUpdate(block.id, { tagMode: block.tagMode === 'ignore' ? 'random_user_tag' : 'ignore' })}
                     className={cn(
                       "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
                       block.tagMode !== 'ignore' ? 'border-primary/25 bg-primary/8 text-primary hover:bg-primary/15' : 'border-border/50 bg-background text-muted-foreground hover:border-primary/30 hover:text-foreground',
@@ -1434,6 +1455,11 @@ function ObjectivesEditorDialog({
                   >
                     {block.tagMode !== 'ignore' ? 'Tag filter on' : 'Add tag filter'}
                   </button>
+                )}
+                {block.type === 'count' && placement === 'category' && (
+                  <span className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/8 px-2.5 py-1 text-[11px] font-bold text-primary">
+                    Tag filter on
+                  </span>
                 )}
                 <button
                   type="button"

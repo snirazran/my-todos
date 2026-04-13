@@ -489,7 +489,15 @@ async function syncQuestForTemplate(args: {
     const tagId = getUserTagId(tag);
     return tagId ? categoryTagIds.includes(tagId) : false;
   });
-  const resolvedLogic: ResolvedQuestLogicBlock[] = template.logic.map((block) => {
+  const templateLogic =
+    template.placement === 'category'
+      ? template.logic.map((block) => ({
+          ...block,
+          tagMode: 'focus_category_tags' as const,
+        }))
+      : template.logic;
+
+  const resolvedLogic: ResolvedQuestLogicBlock[] = templateLogic.map((block) => {
       const resolvedTag =
         block.tagMode === 'random_user_tag' && userTags.length > 0
         ? userTags[
@@ -708,6 +716,12 @@ export async function syncQuestState(args: {
     rewardCatalog: buildRewardCatalog(catalog, [
       ...dailyQuests.map((quest) => quest.rewards),
       ...categoryQuests.map((quest) => quest.rewards),
+      ...dailyQuests.flatMap((quest) =>
+        quest.logic.map((block) => block.rewards ?? []),
+      ),
+      ...categoryQuests.flatMap((quest) =>
+        quest.logic.map((block) => block.rewards ?? []),
+      ),
     ]),
   };
 }
