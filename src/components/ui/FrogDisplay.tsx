@@ -35,6 +35,7 @@ type Props = {
   questClaimableCount?: number;
   questActiveCount?: number;
   onQuestsChanged?: () => void | Promise<void>;
+  deferInventorySummary?: boolean;
 };
 
 export function FrogDisplay({
@@ -59,8 +60,12 @@ export function FrogDisplay({
   questClaimableCount = 0,
   questActiveCount = 0,
   onQuestsChanged,
+  deferInventorySummary = false,
 }: Props) {
-  const { unseenCount, unseenContainerCount } = useInventory(!isGuest, true);
+  const { unseenCount, unseenContainerCount } = useInventory(
+    !isGuest && (!deferInventorySummary || openWardrobe),
+    true,
+  );
   const [clickedAt, setClickedAt] = React.useState(0);
   const [shopOpen, setShopOpen] = React.useState(false);
 

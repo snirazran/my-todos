@@ -352,7 +352,7 @@ const SortableTaskItem = React.forwardRef<
         style={{ ...style, overflow: 'hidden' }}
         {...attributes}
         {...listeners}
-        className={`relative rounded-xl ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
+        className={`relative w-full rounded-xl ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
         initial={{ height: 0, opacity: 0, marginBottom: 0 }}
         animate={{ height: 'auto', opacity: 1, marginBottom: 12 }}
@@ -367,14 +367,14 @@ const SortableTaskItem = React.forwardRef<
         }}
       >
         <motion.div
-          layout={!disableLayout && !isDragging && !isExitingLater}
+          layout={false}
           initial={{ opacity: 0 }}
           animate={{ opacity: 1, x: 0, y: 0 }}
           transition={{
             layout: { duration: 0.25, ease: [0.25, 0.1, 0.25, 1] },
             opacity: { duration: 0.2, ease: 'easeOut', delay: 0.15 },
           }}
-          className={`group relative rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden bg-transparent shadow-sm shadow-black/5 dark:shadow-black/20'} ${isExitingLater ? 'will-change-transform' : ''}`}
+          className={`group relative w-full rounded-xl ${isDragging ? 'overflow-visible shadow-none' : isExitingLater ? 'overflow-visible shadow-none' : isGlowActive && !isDone ? 'overflow-visible shadow-none' : isOpen || isSwiping ? 'overflow-hidden bg-muted/70 shadow-none' : 'overflow-hidden bg-transparent shadow-sm shadow-black/5 dark:shadow-black/20'} ${isExitingLater ? 'will-change-transform' : ''}`}
         >
           {/* Swipe Actions Layer (Behind) - Now on Left (revealed by Right Swipe) */}
           {/* Swipe Actions Layer (Visible when dragging Right -> Do Later) */}
@@ -459,7 +459,7 @@ const SortableTaskItem = React.forwardRef<
                 : { type: 'spring', stiffness: 600, damping: 28, mass: 1 }
             }
             className={`
-              relative flex items-center gap-1.5 px-2 py-3.5 
+              relative flex w-full items-center gap-1.5 px-2 py-3.5
               transition-colors duration-200 rounded-xl 
               bg-card
               border border-border/50 shadow-none
@@ -1145,12 +1145,12 @@ export default function TaskList({
 
   return (
     <>
-      <div dir="ltr" className="px-4 pt-0 pb-4 overflow-visible">
+      <div dir="ltr" className="w-full px-4 pt-0 pb-4 overflow-visible">
         <div className="flex flex-row items-center justify-end mb-2 gap-3 relative">
           {/* Header Menu Removed - Moved to Page */}
         </div>
 
-        <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
+        <div className="w-full rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
         <div
           className={`p-2 pb-0 space-y-0 md:overflow-y-auto overflow-y-visible md:max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}

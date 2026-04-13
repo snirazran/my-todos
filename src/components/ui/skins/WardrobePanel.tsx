@@ -507,7 +507,6 @@ export function WardrobePanel({
                 >
                   <TabsContent
                     value="inventory"
-                    forceMount
                     className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
                   >
                     {inventoryItems.length === 0 ? (
@@ -549,7 +548,6 @@ export function WardrobePanel({
 
                   <TabsContent
                     value="shop"
-                    forceMount
                     className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
                   >
                     <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">

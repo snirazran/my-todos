@@ -61,7 +61,7 @@ export default function RootLayout({
           <Providers>
             <div className="flex flex-col h-full">
               <SiteHeader />
-              <main id="main-scroll" className="flex-1 overflow-y-auto relative pb-16 md:pb-0">
+              <main id="main-scroll" className="flex-1 overflow-y-auto [scrollbar-gutter:stable] relative pb-16 md:pb-0">
                 {children}
               </main>
               <MobileNav />

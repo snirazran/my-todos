@@ -64,6 +64,11 @@ interface TasksResponse {
 
 type ExclusionSource = 'today' | 'backlog';
 
+type UseTaskDataOptions = {
+  includeBacklog?: boolean;
+  includeHabits?: boolean;
+};
+
 // --- Fetcher ---
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -74,7 +79,10 @@ const sortTasks = (ts: Task[]) => {
   });
 };
 
-export function useTaskData() {
+export function useTaskData({
+  includeBacklog = true,
+  includeHabits = true,
+}: UseTaskDataOptions = {}) {
   const { user } = useAuth();
   const { showNotification, hideNotification } = useNotification();
   const { scheduleNotification, cancelNotification } = useReminderScheduler();
@@ -95,9 +103,12 @@ export function useTaskData() {
 
   // --- SWR Keys ---
   const todayKey = user
-    ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`
+    ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}${
+        includeHabits ? '' : '&includeHabits=0'
+      }`
     : null;
-  const backlogKey = user ? `/api/tasks?view=board&day=-1` : null;
+  const backlogKey =
+    user && includeBacklog ? `/api/tasks?view=board&day=-1` : null;
 
   // --- Data Fetching ---
   const {
@@ -122,7 +133,7 @@ export function useTaskData() {
   useEffect(() => {
     const handleUpdate = () => {
       mutateToday();
-      mutateBacklog();
+      if (includeBacklog) mutateBacklog();
     };
 
     window.addEventListener('habits-updated', handleUpdate);
@@ -134,7 +145,7 @@ export function useTaskData() {
       window.removeEventListener('tags-updated', handleUpdate);
       window.removeEventListener('board-refresh', handleUpdate);
     };
-  }, [mutateToday, mutateBacklog]);
+  }, [includeBacklog, mutateToday, mutateBacklog]);
 
   // --- Cleanup Effect ---
   // Remove exclusions when task is confirmed gone from source list

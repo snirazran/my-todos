@@ -90,7 +90,7 @@ export default function FrogodoroPage() {
     flyStatus,
     hungerStatus,
     tags: userTags,
-  } = useTaskData();
+  } = useTaskData({ includeBacklog: false, includeHabits: false });
 
   // Global Store hook
   const {
@@ -155,7 +155,7 @@ export default function FrogodoroPage() {
 
   // FrogDisplay state
   const { isWardrobeOpen, setWardrobeOpen } = useUIStore();
-  const { indices } = useWardrobeIndices(!!user);
+  const { indices } = useWardrobeIndices(!!user && isWardrobeOpen);
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -521,6 +521,7 @@ export default function FrogodoroPage() {
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
               isGuest={!user}
+              deferInventorySummary
             />
           </div>
 

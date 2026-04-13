@@ -820,6 +820,7 @@ export async function DELETE(req: NextRequest) {
 async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
   const url = new URL(req.url);
   const dateParam = url.searchParams.get('date');
+  const includeHabits = url.searchParams.get('includeHabits') !== '0';
   const todayLocal = getZonedToday(tz);
   const date = dateParam ?? todayLocal;
   const dow = dowFromYMD(date);
@@ -829,7 +830,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
     $or: [
       { type: 'weekly', dayOfWeek: dow },
       { type: 'regular', date },
-      { type: 'habit' }, // Include ALL habits
+      ...(includeHabits ? [{ type: 'habit' }] : []),
     ],
   })
     .sort({ order: 1 })

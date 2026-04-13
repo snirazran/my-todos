@@ -448,10 +448,11 @@ export default function Home() {
             </div>
 
             <div className="min-h-[400px] pb-20" ref={taskListRef}>
-              <AnimatePresence mode="wait">
+              <AnimatePresence mode="wait" initial={false}>
                 {activeTab === 'today' ? (
                   <motion.div
                     key="today"
+                    className="w-full"
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: 10 }}
@@ -568,6 +569,7 @@ export default function Home() {
                 ) : (
                   <motion.div
                     key="habits"
+                    className="w-full"
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
