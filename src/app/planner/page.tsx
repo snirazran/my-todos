@@ -18,6 +18,7 @@ import {
 } from '@/components/board/helpers';
 
 const EXTRA = 'Maybe Today';
+type BoardResponse = Task[][] | { week: Task[][]; habits?: Task[] };
 
 export default function ManageTasksPage() {
   const [week, setWeek] = useState<Task[][]>(
@@ -75,17 +76,16 @@ export default function ManageTasksPage() {
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const res = await fetch(
-        `/api/tasks?view=board&timezone=${encodeURIComponent(tz)}`,
+        `/api/tasks?view=board&includeHabits=1&timezone=${encodeURIComponent(tz)}`,
       );
       if (!res.ok) throw new Error(`status ${res.status}`);
-      const data = (await res.json()) as Task[][];
-      if (Array.isArray(data)) setWeek(mapApiToDisplay(data));
-
-      // Fetch habits too
-      const habitsRes = await fetch(`/api/tasks?timezone=${encodeURIComponent(tz)}`);
-      const habitsData = await habitsRes.json();
-      if (habitsData && habitsData.tasks) {
-        setHabits(habitsData.tasks.filter((t: any) => t.type === 'habit'));
+      const data = (await res.json()) as BoardResponse;
+      if (Array.isArray(data)) {
+        setWeek(mapApiToDisplay(data));
+        setHabits([]);
+      } else {
+        setWeek(mapApiToDisplay(data.week));
+        setHabits(data.habits ?? []);
       }
     } catch (err) {
       console.error('Failed to fetch weekly tasks:', err);

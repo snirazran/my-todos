@@ -879,6 +879,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
 async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
   const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
   const dayParam = req.nextUrl.searchParams.get('day');
+  const includeHabits = req.nextUrl.searchParams.get('includeHabits') === '1';
   if (dayParam !== null) {
     const dayNum = Number(dayParam);
     if (dayNum === -1) {
@@ -944,60 +945,117 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
     return NextResponse.json(out);
   }
   const week: any[][] = Array.from({ length: 8 }, () => []);
-  for (let d: Weekday = 0; d <= 6; d = (d + 1) as Weekday) {
-    const docs: TaskDoc[] = await TaskModel.find({
-      userId: uid,
-      deletedAt: { $exists: false },
-      $or: [
-        { type: 'weekly', dayOfWeek: d },
-        { type: 'regular', date: weekDates[d] },
-      ],
-    })
-      .sort({ order: 1 })
-      .lean<TaskDoc[]>()
-      .exec();
-    week[d] = docs
-      .filter((t: TaskDoc) => !(t.suppressedDates ?? []).includes(weekDates[d]))
-      .map((t: TaskDoc) => ({
-        id: t.id,
-        text: t.text,
-        order: t.order,
-        type: t.type,
-        completed:
-          (t.completedDates ?? []).includes(weekDates[d]) ||
-          (!!t.completed && t.type === 'regular'),
-        tags: t.tags ?? [],
-        frogodoroSession: t.frogodoroSessions?.find((s) => s.date === weekDates[d]) ?? null,
-        calendarEventId: t.calendarEventId,
-        startTime: t.startTime,
-        endTime: t.endTime,
-        reminder: t.reminder,
-      }))
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  }
-  const backlogDocs: TaskDoc[] = await TaskModel.find({
+
+  const dateToDay = new Map(
+    weekDates.map((date, index) => [date, index as Weekday]),
+  );
+  const boardDocs: TaskDoc[] = await TaskModel.find({
     userId: uid,
-    type: 'backlog',
-    weekStart,
+    $or: [
+      {
+        type: 'weekly',
+        deletedAt: { $exists: false },
+        dayOfWeek: { $in: [0, 1, 2, 3, 4, 5, 6] },
+      },
+      {
+        type: 'regular',
+        deletedAt: { $exists: false },
+        date: { $in: weekDates },
+      },
+      {
+        type: 'backlog',
+        weekStart,
+      },
+      ...(includeHabits
+        ? [
+            {
+              type: 'habit',
+              deletedAt: { $exists: false },
+            },
+          ]
+        : []),
+    ],
   })
     .sort({ order: 1 })
     .lean<TaskDoc[]>()
     .exec();
-  week[7] = backlogDocs
-    .map((t: TaskDoc) => ({
-      id: t.id,
-      text: t.text,
-      order: t.order,
-      type: t.type,
-      completed: !!t.completed,
-      tags: t.tags ?? [],
-      calendarEventId: t.calendarEventId,
-      startTime: t.startTime,
-      endTime: t.endTime,
-      reminder: t.reminder,
-    }))
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  return NextResponse.json(week);
+
+  const habits: any[] = [];
+
+  for (const doc of boardDocs) {
+    if (doc.type === 'habit') {
+      habits.push({
+        id: doc.id,
+        text: doc.text,
+        order: doc.order ?? 0,
+        completed: !!doc.completed,
+        type: doc.type,
+        origin: doc.type as Origin,
+        tags: doc.tags ?? [],
+        completedDates: doc.completedDates ?? [],
+        timesPerWeek: doc.timesPerWeek,
+        frogodoroSettings: doc.frogodoroSettings,
+        calendarEventId: doc.calendarEventId,
+        startTime: doc.startTime,
+        endTime: doc.endTime,
+        reminder: doc.reminder,
+      });
+      continue;
+    }
+
+    if (doc.type === 'backlog') {
+      week[7].push({
+        id: doc.id,
+        text: doc.text,
+        order: doc.order,
+        type: doc.type,
+        completed: !!doc.completed,
+        tags: doc.tags ?? [],
+        frogodoroSettings: doc.frogodoroSettings,
+        calendarEventId: doc.calendarEventId,
+        startTime: doc.startTime,
+        endTime: doc.endTime,
+        reminder: doc.reminder,
+      });
+      continue;
+    }
+
+    const day =
+      doc.type === 'weekly'
+        ? doc.dayOfWeek
+        : doc.date
+          ? dateToDay.get(doc.date)
+          : undefined;
+    if (day === undefined) continue;
+
+    const date = weekDates[day];
+    if ((doc.suppressedDates ?? []).includes(date)) continue;
+
+    week[day].push({
+      id: doc.id,
+      text: doc.text,
+      order: doc.order,
+      type: doc.type,
+      completed:
+        (doc.completedDates ?? []).includes(date) ||
+        (!!doc.completed && doc.type === 'regular'),
+      tags: doc.tags ?? [],
+      frogodoroSession:
+        doc.frogodoroSessions?.find((session) => session.date === date) ??
+        null,
+      calendarEventId: doc.calendarEventId,
+      startTime: doc.startTime,
+      endTime: doc.endTime,
+      reminder: doc.reminder,
+    });
+  }
+
+  week.forEach((items) =>
+    items.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+  );
+  habits.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  return NextResponse.json(includeHabits ? { week, habits } : week);
 }
 
 async function handleBoardPut(
