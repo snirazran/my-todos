@@ -40,11 +40,18 @@ interface TagManagerProps {
   onTagsChange: (tags: string[]) => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  autoFocus?: boolean;
 }
 
 import { PremiumLimitDialog } from './PremiumLimitDialog';
 
-export default function TagManager({ selectedTags, onTagsChange, open, onOpenChange }: TagManagerProps) {
+export default function TagManager({
+  selectedTags,
+  onTagsChange,
+  open,
+  onOpenChange,
+  autoFocus = true,
+}: TagManagerProps) {
   const { data: tagsData } = useSWR('/api/tags', fetcher);
   const savedTags: SavedTag[] = useMemo(
     () => {
@@ -97,10 +104,10 @@ export default function TagManager({ selectedTags, onTagsChange, open, onOpenCha
   const longPressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Auto-focus input when opening
   React.useEffect(() => {
-    if (open) {
-        setTimeout(() => tagInputRef.current?.focus(), 100);
+    if (open && autoFocus) {
+      setTimeout(() => tagInputRef.current?.focus(), 100);
     }
-  }, [open]);
+  }, [open, autoFocus]);
 
   const filteredTags = useMemo(() => {
     if (!tagInput) return savedTags;

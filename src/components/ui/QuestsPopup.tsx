@@ -88,7 +88,9 @@ export function QuestsPopup({
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'daily' | 'category'>('category');
   const [claimingId, setClaimingId] = useState<string | null>(null);
-  const [claimingObjectiveId, setClaimingObjectiveId] = useState<string | null>(null);
+  const [claimingObjectiveId, setClaimingObjectiveId] = useState<string | null>(
+    null,
+  );
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const [refreshingDaily, setRefreshingDaily] = useState(false);
   const [refreshingFocus, setRefreshingFocus] = useState(false);
@@ -196,10 +198,34 @@ export function QuestsPopup({
       ),
     [tagsData?.tags],
   );
-  const claimableDaily =
-    data?.dailyQuests?.filter((quest) => quest.claimable).length ?? 0;
-  const claimableCategory =
-    data?.categoryQuests?.filter((quest) => quest.claimable).length ?? 0;
+  const countDaily = useMemo(() => {
+    return (data?.dailyQuests ?? []).reduce((sum, quest) => {
+      if (quest.claimed) return sum;
+      const objectivesLeft = quest.logic.filter((block) => {
+        const hasRewards = (block.rewards?.length ?? 0) > 0;
+        if (hasRewards) {
+          return !quest.claimedObjectiveIds.includes(block.id);
+        }
+        return block.progress < block.target;
+      }).length;
+      return sum + 1 + objectivesLeft;
+    }, 0);
+  }, [data?.dailyQuests]);
+
+  const countCategory = useMemo(() => {
+    return (data?.categoryQuests ?? []).reduce((sum, quest) => {
+      if (quest.claimed) return sum;
+      const objectivesLeft = quest.logic.filter((block) => {
+        const hasRewards = (block.rewards?.length ?? 0) > 0;
+        if (hasRewards) {
+          return !quest.claimedObjectiveIds.includes(block.id);
+        }
+        return block.progress < block.target;
+      }).length;
+      return sum + 1 + objectivesLeft;
+    }, 0);
+  }, [data?.categoryQuests]);
+
   const editingFocusCategory = editingFocusCategoryId
     ? categoryMap[editingFocusCategoryId]
     : null;
@@ -315,10 +341,7 @@ export function QuestsPopup({
     }
   };
 
-  const handleClaimObjective = async (
-    questId: string,
-    objectiveId: string,
-  ) => {
+  const handleClaimObjective = async (questId: string, objectiveId: string) => {
     if (claimingObjectiveId) return;
     setClaimingObjectiveId(objectiveId);
     setClaimMessage(null);
@@ -519,9 +542,9 @@ export function QuestsPopup({
                         >
                           <Compass className="w-4 h-4" />
                           <span>My Focus</span>
-                          {claimableCategory > 0 && (
-                            <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] text-primary-foreground">
-                              {claimableCategory}
+                          {countCategory > 0 && (
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+                              {countCategory}
                             </span>
                           )}
                         </TabsTrigger>
@@ -538,9 +561,9 @@ export function QuestsPopup({
                         >
                           <CalendarDays className="w-4 h-4" />
                           <span>Daily</span>
-                          {claimableDaily > 0 && (
-                            <span className="rounded-full bg-primary px-2 py-0.5 text-[10px] text-primary-foreground">
-                              {claimableDaily}
+                          {countDaily > 0 && (
+                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+                              {countDaily}
                             </span>
                           )}
                         </TabsTrigger>
@@ -589,7 +612,9 @@ export function QuestsPopup({
                                 setEditingFocusCategoryId(quest.categoryId)
                               }
                               onClaim={() => handleClaim('category', quest.id)}
-                              onClaimObjective={(objectiveId) => handleClaimObjective(quest.id, objectiveId)}
+                              onClaimObjective={(objectiveId) =>
+                                handleClaimObjective(quest.id, objectiveId)
+                              }
                             />
                           ))
                         )}
@@ -628,7 +653,9 @@ export function QuestsPopup({
                               claiming={claimingId === quest.id}
                               claimingObjectiveId={claimingObjectiveId}
                               onClaim={() => handleClaim('daily', quest.id)}
-                              onClaimObjective={(objectiveId) => handleClaimObjective(quest.id, objectiveId)}
+                              onClaimObjective={(objectiveId) =>
+                                handleClaimObjective(quest.id, objectiveId)
+                              }
                             />
                           ))}
                         </div>
@@ -726,7 +753,7 @@ function QuestRewardRevealOverlay({
             />
             <div className="absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80" />
           </motion.div>
-          <div className="relative z-10 flex w-full max-w-md flex-col items-center justify-center p-6">
+          <div className="relative z-10 flex flex-col items-center justify-center w-full max-w-md p-6">
             <RewardCard
               key={entry.key}
               prize={entry.item}
@@ -741,9 +768,9 @@ function QuestRewardRevealOverlay({
               }
               customPreview={
                 entry.fliesGranted ? (
-                  <div className="relative flex h-full w-full items-center justify-center">
+                  <div className="relative flex items-center justify-center w-full h-full">
                     <Fly size={132} />
-                    <span className="absolute right-3 top-3 z-40 rounded-xl border border-white/20 bg-black/45 px-3 py-1 text-sm font-black text-white shadow-sm backdrop-blur-sm">
+                    <span className="absolute z-40 px-3 py-1 text-sm font-black text-white border shadow-sm right-3 top-3 rounded-xl border-white/20 bg-black/45 backdrop-blur-sm">
                       x{entry.fliesGranted}
                     </span>
                   </div>

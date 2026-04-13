@@ -29,10 +29,15 @@ export async function GET(req: Request) {
       dashboard.categoryQuests.filter((quest) => quest.claimable).length;
     const todoCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
       (sum, quest) => {
-        const questLeft = quest.completed ? 0 : 1;
-        const objectivesLeft = quest.logic.filter(
-          (block) => block.progress < block.target,
-        ).length;
+        if (quest.claimed) return sum;
+        const questLeft = 1;
+        const objectivesLeft = quest.logic.filter((block) => {
+          const hasRewards = (block.rewards?.length ?? 0) > 0;
+          if (hasRewards) {
+            return !quest.claimedObjectiveIds.includes(block.id);
+          }
+          return block.progress < block.target;
+        }).length;
         return sum + questLeft + objectivesLeft;
       },
       0,

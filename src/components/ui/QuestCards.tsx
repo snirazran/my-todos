@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Clock, Gift, Plus, Trophy, X } from 'lucide-react';
+import { Check, Clock, Gift, Plus, Trophy, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { ItemDef } from '@/lib/skins/catalog';
@@ -167,7 +167,11 @@ function getTagScopeMessage(block: QuestCardLogicBlock) {
     return `Only ${scopedSubject} with the selected tags count.`;
   }
 
-  if (block.resolvedTagName || block.resolvedTagNames?.length || block.previewTagLabel) {
+  if (
+    block.resolvedTagName ||
+    block.resolvedTagNames?.length ||
+    block.previewTagLabel
+  ) {
     return `Only ${scopedSubject} with the shown tag${block.resolvedTagNames?.length && block.resolvedTagNames.length > 1 ? 's' : ''} count.`;
   }
 
@@ -313,7 +317,7 @@ export function DailyQuestPresentationCard({
         <div className="absolute inset-x-0 top-0 flex items-start gap-3 p-4">
           {timeLeft && (
             <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
-              <Clock className="h-3 w-3 shrink-0" />
+              <Clock className="w-3 h-3 shrink-0" />
               <span className="leading-none">{timeLeft}</span>
             </span>
           )}
@@ -363,7 +367,9 @@ export function DailyQuestPresentationCard({
                 rewards,
               })
             }
-            onClaimObjective={onClaimObjective ? () => onClaimObjective(block.id) : undefined}
+            onClaimObjective={
+              onClaimObjective ? () => onClaimObjective(block.id) : undefined
+            }
             isLast={i === visibleLogic.length - 1}
           />
         ))}
@@ -451,7 +457,7 @@ export function CategoryQuestPresentationCard({
         {timeLeft && (
           <div className="absolute inset-x-0 top-0 flex items-start gap-3 p-4">
             <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
-              <Clock className="h-3 w-3 shrink-0" />
+              <Clock className="w-3 h-3 shrink-0" />
               <span className="leading-none">{timeLeft}</span>
             </span>
           </div>
@@ -508,48 +514,51 @@ export function CategoryQuestPresentationCard({
                   rewards,
                 })
               }
-              onClaimObjective={onClaimObjective ? () => onClaimObjective(block.id) : undefined}
+              onClaimObjective={
+                onClaimObjective ? () => onClaimObjective(block.id) : undefined
+              }
               isLast={i === visibleLogic.length - 1}
             />
-            {block.tagMode !== 'focus_category_tags' && getTagScopeMessage(block) ? (
-              <p className="-mt-2 mb-2 px-1 text-xs font-medium text-muted-foreground">
+            {block.tagMode !== 'focus_category_tags' &&
+            getTagScopeMessage(block) ? (
+              <p className="px-1 mb-2 -mt-2 text-xs font-medium text-muted-foreground">
                 {getTagScopeMessage(block)}
               </p>
             ) : null}
             {block.tagMode !== 'focus_category_tags' && (
               <div className="flex flex-wrap items-center gap-2 -mt-1.5 mb-1 px-1">
                 {block.resolvedTagNames?.length ? (
-                block.resolvedTagNames.map((tagName, index) => {
-                  const matchedTag = linkedTags.find(
-                    (tag) => tag.name.toLowerCase() === tagName.toLowerCase(),
-                  );
-                  return (
-                    <QuestTagPill
-                      key={`${block.id}-${matchedTag?.id ?? tagName}-${index}`}
-                      tag={
-                        matchedTag ?? {
-                          id: `${block.id}-${tagName}-${index}`,
-                          name: tagName,
-                          color: category?.accent ?? '#22c55e',
+                  block.resolvedTagNames.map((tagName, index) => {
+                    const matchedTag = linkedTags.find(
+                      (tag) => tag.name.toLowerCase() === tagName.toLowerCase(),
+                    );
+                    return (
+                      <QuestTagPill
+                        key={`${block.id}-${matchedTag?.id ?? tagName}-${index}`}
+                        tag={
+                          matchedTag ?? {
+                            id: `${block.id}-${tagName}-${index}`,
+                            name: tagName,
+                            color: category?.accent ?? '#22c55e',
+                          }
                         }
-                      }
-                    />
-                  );
-                })
-              ) : block.resolvedTagName ? (
-                <QuestTagPill
-                  tag={{
-                    id: `${block.id}-${block.resolvedTagName}`,
-                    name: block.resolvedTagName,
-                    color: category?.accent ?? '#22c55e',
-                  }}
-                />
-              ) : block.previewTagLabel ? (
-                <PreviewTagHint
-                  label={block.previewTagLabel}
-                  color={category?.accent ?? '#22c55e'}
-                />
-              ) : null}
+                      />
+                    );
+                  })
+                ) : block.resolvedTagName ? (
+                  <QuestTagPill
+                    tag={{
+                      id: `${block.id}-${block.resolvedTagName}`,
+                      name: block.resolvedTagName,
+                      color: category?.accent ?? '#22c55e',
+                    }}
+                  />
+                ) : block.previewTagLabel ? (
+                  <PreviewTagHint
+                    label={block.previewTagLabel}
+                    color={category?.accent ?? '#22c55e'}
+                  />
+                ) : null}
               </div>
             )}
           </div>
@@ -560,7 +569,10 @@ export function CategoryQuestPresentationCard({
           rewardCatalog={rewardCatalog}
           isPremium={isPremium}
           claiming={claiming}
-          buttonLabel={buttonLabel ?? (needsFocusTags ? 'Select a tag to start' : undefined)}
+          buttonLabel={
+            buttonLabel ??
+            (needsFocusTags ? 'Select a tag to start' : undefined)
+          }
           buttonDisabled={buttonDisabled}
           onClaim={onClaim}
         />
@@ -609,25 +621,31 @@ function ObjectiveRow({
   const objectiveComplete = block.progress >= safeTarget;
   const pct = Math.min(100, (block.progress / safeTarget) * 100);
   const hasRewards = (block.rewards?.length ?? 0) > 0;
-  const objectiveClaimable = hasRewards && objectiveComplete && !objectiveClaimed;
+  const objectiveClaimable =
+    hasRewards && objectiveComplete && !objectiveClaimed;
 
   return (
     <div className={cn('py-3', !isLast && 'border-b border-border/20')}>
       {/* Title row: label + counter + claim/status */}
       <div className="flex items-center gap-3">
-        <p className={cn(
-          'flex-1 text-[14px] font-black leading-snug',
-          objectiveClaimed ? 'text-muted-foreground line-through decoration-muted-foreground/40' : 'text-foreground',
-        )}>
+        <p
+          className={cn(
+            'flex-1 text-[14px] font-black leading-snug',
+            objectiveClaimed
+              ? 'text-muted-foreground line-through decoration-muted-foreground/40'
+              : 'text-foreground',
+          )}
+        >
           {formatQuestObjective(block)}
         </p>
         <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
-          {Math.min(block.progress, safeTarget)}/{block.targetLabel ?? block.target}
+          {Math.min(block.progress, safeTarget)}/
+          {block.targetLabel ?? block.target}
         </span>
       </div>
 
       {/* Progress bar — color shifts by percentage */}
-      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted/50">
+      <div className="h-2 mt-2 overflow-hidden rounded-full bg-muted/50">
         <div
           className={cn(
             'h-full rounded-full transition-all duration-500',
@@ -639,7 +657,7 @@ function ObjectiveRow({
 
       {/* Reward row */}
       {hasRewards && (
-        <div className="mt-2 flex items-center gap-2">
+        <div className="flex items-center gap-2 mt-2">
           <div className="flex flex-wrap gap-1.5">
             {block.rewards!.map((reward, index) => (
               <RewardTile
@@ -653,21 +671,33 @@ function ObjectiveRow({
           </div>
 
           <div className="ml-auto shrink-0">
-            {objectiveClaimable && onClaimObjective ? (
-              <button
-                type="button"
-                onClick={onClaimObjective}
-                disabled={claimingObjective}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {!claimingObjective && <Gift className="h-3.5 w-3.5" />}
-                {claimingObjective ? 'Claiming...' : 'Claim Reward'}
-              </button>
-            ) : objectiveClaimed ? (
-              <span className="text-[11px] font-black uppercase tracking-[0.12em] text-emerald-600 dark:text-emerald-400">
-                Claimed
-              </span>
-            ) : null}
+            {(() => {
+              if (objectiveClaimable && onClaimObjective) {
+                return (
+                  <button
+                    type="button"
+                    onClick={onClaimObjective}
+                    disabled={claimingObjective}
+                    className="group relative inline-flex h-9 items-center justify-center overflow-hidden rounded-xl bg-emerald-500 px-5 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#059669] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#059669] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className="mr-[-0.15em]">
+                      {claimingObjective ? 'Claiming...' : 'Claim Reward'}
+                    </span>
+                  </button>
+                );
+              }
+              if (objectiveClaimed) {
+                return (
+                  <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5">
+                    <Check className="w-3 h-3 text-emerald-500" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-600/70 dark:text-emerald-400/70">
+                      Claimed
+                    </span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
           </div>
         </div>
       )}
@@ -691,12 +721,13 @@ function QuestRewardFooter({
   buttonDisabled?: boolean;
   onClaim?: () => void;
 }) {
-  const label = buttonLabel ?? getQuestButtonLabel(quest, isPremium, claiming ?? false);
+  const label =
+    buttonLabel ?? getQuestButtonLabel(quest, isPremium, claiming ?? false);
   const disabled = (buttonDisabled ?? !quest.claimable) || (claiming ?? false);
 
   if (quest.claimed) {
     return (
-      <div className="mt-2 flex items-center justify-center py-2">
+      <div className="flex items-center justify-center py-2 mt-2">
         <span className="text-[12px] font-black uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
           Quest Complete
         </span>
@@ -705,18 +736,21 @@ function QuestRewardFooter({
   }
 
   return (
-    <div className="mt-2 pt-2">
+    <div className="pt-2 mt-2">
       <Button
         onClick={onClaim}
         disabled={disabled}
         className={cn(
-          'w-full font-black tracking-wide uppercase h-10 rounded-xl text-[12px]',
+          'w-full font-black tracking-[0.2em] uppercase h-11 rounded-2xl text-[11px] transition-all border-0 flex items-center justify-center',
           quest.claimable && !claiming
-            ? 'bg-emerald-500 text-white border-0 shadow-sm hover:bg-emerald-600'
-            : '',
+            ? 'bg-emerald-500 text-white shadow-[0_4px_0_0_#059669] hover:translate-y-[-1px] hover:shadow-[0_5px_0_0_#059669] active:translate-y-[2px] active:shadow-none'
+            : 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed shadow-none',
         )}
       >
-        {label}
+        <div className="flex items-center justify-center gap-2 mr-[-0.2em]">
+          {quest.claimable && !claiming && <Trophy className="h-3.5 w-3.5" />}
+          <span>{label}</span>
+        </div>
       </Button>
     </div>
   );
@@ -748,7 +782,7 @@ function FocusQuestTagPanel({
 }) {
   if (linkedTags.length > 0) {
     return (
-      <div className="mt-3 mb-1 flex flex-wrap items-center gap-2 px-1">
+      <div className="flex flex-wrap items-center gap-2 px-1 mt-3 mb-1">
         <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
           Focus tags
         </span>
@@ -769,9 +803,9 @@ function FocusQuestTagPanel({
   }
 
   return (
-    <div className="mt-3 mb-1 rounded-2xl border border-primary/15 bg-primary/5 px-3 py-3">
+    <div className="px-3 py-3 mt-3 mb-1 border rounded-2xl border-primary/15 bg-primary/5">
       <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="flex-1 min-w-0">
           <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
             Focus tags
           </p>
@@ -781,7 +815,7 @@ function FocusQuestTagPanel({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 mt-3">
         {onEditTags ? (
           <button
             type="button"
@@ -842,7 +876,7 @@ function RewardDetailsPopup({
         className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-[24px] border border-border bg-card p-4 text-card-foreground shadow-2xl sm:p-6"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-center justify-between gap-4 border-b border-border/40 pb-4">
+        <div className="flex items-center justify-between gap-4 pb-4 border-b border-border/40">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
               {eyebrow}
@@ -854,14 +888,14 @@ function RewardDetailsPopup({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            className="inline-flex items-center justify-center transition border rounded-lg h-9 w-9 border-border/50 bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"
             aria-label="Close reward details"
           >
-            <X className="h-4 w-4" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4">
+        <div className="grid grid-cols-2 gap-3 mt-5 sm:gap-4">
           {rewards.map((reward, index) => (
             <QuestRewardDetailCard
               key={`${reward.type}-${reward.itemId ?? reward.amount ?? reward.minAmount ?? index}`}
@@ -942,8 +976,11 @@ export function RewardTile({
   onClick?: () => void;
 }) {
   const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
-  const tone =
-    item ? REWARD_TILE_TONE[item.rarity] : reward.type === 'FLIES' ? REWARD_TILE_TONE.flies : REWARD_TILE_TONE.default;
+  const tone = item
+    ? REWARD_TILE_TONE[item.rarity]
+    : reward.type === 'FLIES'
+      ? REWARD_TILE_TONE.flies
+      : REWARD_TILE_TONE.default;
   const quantityLabel = getRewardQuantityLabel(reward, isPremium);
   const previewIndices = item
     ? {
@@ -963,7 +1000,8 @@ export function RewardTile({
         tone.bg,
         tone.shadow,
         compact ? 'h-16 w-16 rounded-[20px]' : 'h-12 w-12 rounded-xl',
-        onClick && 'cursor-pointer transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
+        onClick &&
+          'cursor-pointer transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
         className,
       )}
       title={rewardLabel(reward, rewardCatalog, isPremium)}
@@ -999,7 +1037,9 @@ export function RewardTile({
           <Frog
             className={cn(
               'object-contain',
-              compact ? 'h-[118%] w-[118%]' : 'h-[120%] w-[120%] translate-y-[8%]',
+              compact
+                ? 'h-[118%] w-[118%]'
+                : 'h-[120%] w-[120%] translate-y-[8%]',
             )}
             indices={previewIndices}
             width={compact ? 96 : 64}
@@ -1022,14 +1062,20 @@ export function RewardTile({
         />
       )}
 
-      <div className={cn(
-        'absolute z-20 flex justify-center',
-        compact ? '-right-1 -top-1' : '-right-0.5 -top-0.5',
-      )}>
-        <span className={cn(
-          'flex items-center justify-center rounded-md border border-white/10 bg-black/50 font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm',
-          compact ? 'min-w-5 px-1.5 py-0.5 text-[9px]' : 'min-w-4 px-1 py-0.5 text-[8px]',
-        )}>
+      <div
+        className={cn(
+          'absolute z-20 flex justify-center',
+          compact ? '-right-1 -top-1' : '-right-0.5 -top-0.5',
+        )}
+      >
+        <span
+          className={cn(
+            'flex items-center justify-center rounded-md border border-white/10 bg-black/50 font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm',
+            compact
+              ? 'min-w-5 px-1.5 py-0.5 text-[9px]'
+              : 'min-w-4 px-1 py-0.5 text-[8px]',
+          )}
+        >
           {quantityLabel}
         </span>
       </div>

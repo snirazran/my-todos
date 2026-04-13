@@ -101,6 +101,7 @@ export default function TagPopup({
               onOpenChange={() => {}}
               selectedTags={tags}
               onTagsChange={setTags}
+              autoFocus={false}
             />
           </div>
         </div>

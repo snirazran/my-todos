@@ -282,7 +282,7 @@ export function FrogDisplay({
             <ScrollText className="relative w-5 h-5 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
             {questTodoCount > 0 && (
               <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-primary-foreground bg-primary rounded-full border-2 border-background shadow-sm z-20">
-                {questTodoCount > 9 ? '9+' : questTodoCount}
+                {questTodoCount > 99 ? '99+' : questTodoCount}
               </span>
             )}
           </button>
