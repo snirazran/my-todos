@@ -61,6 +61,7 @@ export function QuestsPopup({
   const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'daily' | 'category'>('category');
   const [claimingId, setClaimingId] = useState<string | null>(null);
+  const [claimingObjectiveId, setClaimingObjectiveId] = useState<string | null>(null);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const [refreshingDaily, setRefreshingDaily] = useState(false);
   const [refreshingFocus, setRefreshingFocus] = useState(false);
@@ -194,6 +195,38 @@ export function QuestsPopup({
       setClaimMessage(err.message || 'Claim failed');
     } finally {
       setClaimingId(null);
+    }
+  };
+
+  const handleClaimObjective = async (
+    questId: string,
+    objectiveId: string,
+  ) => {
+    if (claimingObjectiveId) return;
+    setClaimingObjectiveId(objectiveId);
+    setClaimMessage(null);
+    try {
+      const res = await fetch('/api/quests/claim-objective', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ questId, objectiveId, timezone }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Claim failed');
+      const bits: string[] = [];
+      if (payload.rewardSummary?.fliesGranted)
+        bits.push(`${payload.rewardSummary.fliesGranted} flies`);
+      if (payload.rewardSummary?.grantedItemIds?.length)
+        bits.push(`${payload.rewardSummary.grantedItemIds.length} items`);
+      setClaimMessage(
+        bits.length ? `Claimed ${bits.join(' + ')}` : 'Objective reward claimed',
+      );
+      await mutateQuests();
+      mutate('/api/skins/inventory');
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Claim failed');
+    } finally {
+      setClaimingObjectiveId(null);
     }
   };
 
@@ -437,6 +470,7 @@ export function QuestsPopup({
                               rewardCatalog={data.rewardCatalog}
                               isPremium={data.isPremium}
                               claiming={claimingId === quest.id}
+                              claimingObjectiveId={claimingObjectiveId}
                               linkedTags={
                                 (categoryTagMap.get(quest.categoryId) ?? [])
                                   .map((tagId) => tagCatalog.get(tagId))
@@ -446,6 +480,7 @@ export function QuestsPopup({
                                 setEditingFocusCategoryId(quest.categoryId)
                               }
                               onClaim={() => handleClaim('category', quest.id)}
+                              onClaimObjective={(objectiveId) => handleClaimObjective(quest.id, objectiveId)}
                             />
                           ))
                         )}
@@ -482,7 +517,9 @@ export function QuestsPopup({
                               rewardCatalog={data.rewardCatalog}
                               isPremium={data.isPremium}
                               claiming={claimingId === quest.id}
+                              claimingObjectiveId={claimingObjectiveId}
                               onClaim={() => handleClaim('daily', quest.id)}
+                              onClaimObjective={(objectiveId) => handleClaimObjective(quest.id, objectiveId)}
                             />
                           ))}
                         </div>

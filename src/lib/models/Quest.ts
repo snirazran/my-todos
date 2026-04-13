@@ -18,10 +18,14 @@ export interface QuestDoc {
   title: string;
   description: string;
   coverImageUrl?: string;
+  durationMinutes?: number;
+  startedAt?: Date | null;
+  expiresAt?: Date | null;
   target: number;
   progress: number;
   logic: ResolvedQuestLogicBlock[];
   rewards: QuestRewards;
+  claimedObjectiveIds: string[];
   completedAt?: Date | null;
   claimedAt?: Date | null;
   createdAt: Date;
@@ -47,10 +51,14 @@ const QuestSchema = new Schema<QuestDoc>(
     title: { type: String, required: true },
     description: { type: String, default: '' },
     coverImageUrl: { type: String, default: undefined },
+    durationMinutes: { type: Number, default: undefined },
+    startedAt: { type: Date, default: null },
+    expiresAt: { type: Date, default: null, index: true },
     target: { type: Number, required: true },
     progress: { type: Number, default: 0 },
     logic: { type: [Schema.Types.Mixed], default: [] } as any,
     rewards: { type: Schema.Types.Mixed, required: true },
+    claimedObjectiveIds: { type: [String], default: [] },
     completedAt: { type: Date, default: null },
     claimedAt: { type: Date, default: null },
   },

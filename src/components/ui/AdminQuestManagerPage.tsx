@@ -8,6 +8,7 @@ import {
   CheckCircle,
   ChevronDown,
   ChevronRight,
+  Clock,
   Edit2,
   Eye,
   Gift,
@@ -54,6 +55,7 @@ type AdminQuestTemplate = {
   coverImageUrl?: string;
   placement: QuestPlacement;
   categoryId?: string;
+  durationMinutes?: number;
   rewards: QuestRewards;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
@@ -92,6 +94,7 @@ type FormState = {
   coverImageUrl?: string;
   placement: QuestPlacement;
   categoryId?: string;
+  durationMinutes?: number;
   rewards: QuestRewards;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
@@ -133,6 +136,7 @@ const emptyForm = (): FormState => ({
   coverImageUrl: undefined,
   placement: 'daily',
   categoryId: undefined,
+  durationMinutes: undefined,
   rewards: [createReward()],
   logic: [createLogic()],
   visibilityConditions: [],
@@ -170,6 +174,45 @@ function amountRangeLabel(min: number | undefined, max: number | undefined) {
   return safeMin === safeMax ? String(safeMax) : `${safeMin}-${safeMax}`;
 }
 
+function formatDurationMinutes(minutes: number | undefined) {
+  if (!minutes || minutes <= 0) return 'No time limit';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainingMinutes = minutes % 60;
+  if (hours < 24) {
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
+  }
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+}
+
+function formatAdminPreviewTime(placement: QuestPlacement, minutes: number | undefined) {
+  if (placement === 'daily') return '24H';
+  return minutes && minutes > 0 ? formatDurationMinutes(minutes) : 'No time limit';
+}
+
+function getDurationDays(minutes: number | undefined) {
+  if (!minutes || minutes <= 0) return '';
+  const days = Math.floor(minutes / 1_440);
+  return days > 0 ? String(days) : '';
+}
+
+function getDurationHours(minutes: number | undefined) {
+  if (!minutes || minutes <= 0) return '';
+  const hours = Math.ceil((minutes % 1_440) / 60);
+  return hours > 0 ? String(hours) : '';
+}
+
+function durationFromParts(daysValue: string, hoursValue: string) {
+  const days = Number(daysValue);
+  const hours = Number(hoursValue);
+  const safeDays = Number.isFinite(days) && days > 0 ? Math.floor(days) : 0;
+  const safeHours = Number.isFinite(hours) && hours > 0 ? Math.floor(hours) : 0;
+  const total = safeDays * 1_440 + safeHours * 60;
+  return total > 0 ? total : undefined;
+}
+
 function buildPreviewLogicBlock(block: QuestLogicBlock): QuestCardLogicBlock {
   const isRandom = block.amountMode === 'random';
   const target = isRandom
@@ -198,6 +241,7 @@ function buildPreviewLogicBlock(block: QuestLogicBlock): QuestCardLogicBlock {
         : block.tagMode === 'random_user_tag'
           ? 'Random user tag'
           : undefined,
+    rewards: block.rewards,
   };
 }
 
@@ -324,6 +368,7 @@ export function AdminQuestManagerPage() {
       coverImageUrl: template.coverImageUrl,
       placement: template.placement,
       categoryId: template.categoryId,
+      durationMinutes: template.durationMinutes,
       rewards: template.rewards.map((reward) => ({ ...reward })),
       logic: template.logic.map((block) => ({ ...block })),
       visibilityConditions: (template.visibilityConditions ?? []).map((condition) => ({
@@ -484,11 +529,10 @@ export function AdminQuestManagerPage() {
 
 
   const selectedCategory = selectedCategoryId ? adminCategoryMap[selectedCategoryId] : null;
-  const formCategory = form.categoryId ? adminCategoryMap[form.categoryId] : null;
-  const formPlacementLabel =
-    form.placement === 'daily'
-      ? 'Daily'
-      : formCategory?.name ?? selectedCategory?.name ?? 'Focus';
+  const formTimeLabel = formatAdminPreviewTime(
+    form.placement,
+    form.durationMinutes,
+  );
   const questSaveButtonLabel = saving
     ? 'Saving...'
     : confirmAction === 'save-quest'
@@ -607,6 +651,12 @@ export function AdminQuestManagerPage() {
               <span>{template.logic.length} block{template.logic.length !== 1 ? 's' : ''}</span>
               <span className="text-border">·</span>
               <span>{template.rewards.length} reward{template.rewards.length !== 1 ? 's' : ''}</span>
+              {placement === 'category' && template.durationMinutes && (
+                <>
+                  <span className="text-border">&middot;</span>
+                  <span>{formatDurationMinutes(template.durationMinutes)}</span>
+                </>
+              )}
               {template.visibilityConditions.length > 0 && (
                 <>
                   <span className="text-border">·</span>
@@ -789,8 +839,9 @@ export function AdminQuestManagerPage() {
 
           {/* Top bar: badge + cover actions */}
           <div className="absolute inset-x-0 top-0 z-20 flex items-start justify-between p-4">
-            <span className="rounded-full border border-white/20 bg-black/35 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-white backdrop-blur-md">
-              {formPlacementLabel}
+            <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
+              <Clock className="h-3 w-3 shrink-0" />
+              <span className="leading-none">{formTimeLabel}</span>
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -875,45 +926,94 @@ export function AdminQuestManagerPage() {
           </div>
         </div>
 
-        {/* ── Conditions / progress blocks - clickable ── */}
+        {/* ── Objectives / progress blocks - clickable ── */}
         <div className="px-4 pt-4 pb-4 space-y-4">
           <button
             type="button"
             onClick={() => setConditionsPopupOpen(true)}
             className="group/cond w-full text-left"
           >
-            <div className="space-y-3">
+            <div>
               {previewLogic.length > 0 ? (
-                previewLogic.map((block) => (
-                  <div key={block.id}>
-                    <div className="flex items-start justify-between gap-3 sm:items-end">
-                      <p className="text-xl font-black leading-tight text-foreground">
+                previewLogic.map((block, i) => (
+                  <div key={block.id} className={cn('py-3', i < previewLogic.length - 1 && 'border-b border-border/20')}>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-[14px] font-black leading-snug text-foreground">
                         {formatQuestObjective(block)}
                       </p>
-                      <div className="px-3 py-1 text-sm font-black border rounded-full border-border/50 bg-background/80 text-foreground">
+                      <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
                         0/{block.targetLabel ?? block.target}
+                      </span>
+                    </div>
+                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted/50">
+                      <div className="h-full rounded-full bg-red-400 dark:bg-red-500" style={{ width: '0%' }} />
+                    </div>
+                    {(block.rewards?.length ?? 0) > 0 && (
+                      <div className="mt-2 flex items-center gap-2">
+                        <div className="flex flex-wrap gap-1.5">
+                          {block.rewards!.map((r, ri) => (
+                            <RewardTile key={`${r.type}-${r.itemId ?? r.amount ?? ri}`} reward={r} rewardCatalog={rewardCatalog} isPremium={false} />
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                    <div className="h-3 mt-4 overflow-hidden rounded-full bg-muted/80 ring-1 ring-border/40">
-                      <div className="h-full rounded-full bg-[linear-gradient(90deg,#7dd3fc_0%,#38bdf8_45%,#0ea5e9_100%)]" style={{ width: '0%' }} />
-                    </div>
+                    )}
                   </div>
                 ))
               ) : (
                 <div className="rounded-2xl border border-dashed border-border/50 bg-background/60 px-4 py-5 text-center text-sm text-muted-foreground">
                   <Layers3 className="mx-auto mb-2 h-5 w-5" />
-                  Click to add conditions
+                  Click to add objectives
                 </div>
               )}
             </div>
             <div className="mt-3 flex items-center justify-center gap-1.5 rounded-xl py-1.5 text-xs font-bold text-muted-foreground opacity-0 transition group-hover/cond:opacity-100">
               <Pencil className="h-3 w-3" />
-              Edit conditions
+              Edit objectives
             </div>
           </button>
 
           {/* Action buttons row */}
-          <div className="flex items-center gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-2 pt-1">
+            {form.placement === 'category' && (
+              <label className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-xs font-bold text-muted-foreground">
+                <Clock className="h-3 w-3" />
+                <span>Time</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={getDurationDays(form.durationMinutes)}
+                  onChange={(event) => {
+                    const daysValue = event.target.value;
+                    const hoursValue = getDurationHours(form.durationMinutes);
+                    setForm((prev) => ({
+                      ...prev,
+                      durationMinutes: durationFromParts(daysValue, hoursValue),
+                    }));
+                  }}
+                  placeholder="0"
+                  className="h-5 w-10 bg-transparent text-center text-xs font-black text-foreground outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <span>d</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={getDurationHours(form.durationMinutes)}
+                  onChange={(event) => {
+                    const daysValue = getDurationDays(form.durationMinutes);
+                    const hoursValue = event.target.value;
+                    setForm((prev) => ({
+                      ...prev,
+                      durationMinutes: durationFromParts(daysValue, hoursValue),
+                    }));
+                  }}
+                  placeholder="0"
+                  className="h-5 w-10 bg-transparent text-center text-xs font-black text-foreground outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <span>h</span>
+              </label>
+            )}
             <button
               type="button"
               onClick={() => setAvailabilityPopupOpen(true)}
@@ -955,11 +1055,13 @@ export function AdminQuestManagerPage() {
         onSave={(rewards) => setForm((prev) => ({ ...prev, rewards: normalizeRewardList(rewards) }))}
       />
 
-      <ConditionsEditorDialog
+      <ObjectivesEditorDialog
         open={conditionsPopupOpen}
         onOpenChange={setConditionsPopupOpen}
         logic={form.logic}
         placement={form.placement}
+        rewardItems={rewardItems}
+        rewardCatalog={rewardCatalog}
         onUpdate={updateLogic}
         onAdd={() => setForm((prev) => ({ ...prev, logic: [...prev.logic, createLogic()] }))}
         onRemove={(id) => setForm((prev) => ({ ...prev, logic: prev.logic.filter((b) => b.id !== id) }))}
@@ -1186,11 +1288,13 @@ function InlinePillNumber({ value, onChange, min = 1, className }: { value: numb
   );
 }
 
-function ConditionsEditorDialog({
+function ObjectivesEditorDialog({
   open,
   onOpenChange,
   logic,
   placement,
+  rewardItems,
+  rewardCatalog,
   onUpdate,
   onAdd,
   onRemove,
@@ -1199,23 +1303,27 @@ function ConditionsEditorDialog({
   onOpenChange: (open: boolean) => void;
   logic: QuestLogicBlock[];
   placement: QuestPlacement;
+  rewardItems: MetaRewardItem[];
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
   onUpdate: (id: string, patch: Partial<QuestLogicBlock>) => void;
   onAdd: () => void;
   onRemove: (id: string) => void;
 }) {
   const word = "text-[13px] font-medium text-foreground";
+  const [rewardPickerForBlockId, setRewardPickerForBlockId] = useState<string | null>(null);
+  const rewardPickerBlock = rewardPickerForBlockId ? logic.find((b) => b.id === rewardPickerForBlockId) : null;
+  const allHaveRewards = logic.length > 0 && logic.every((b) => (b.rewards?.length ?? 0) > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="!max-w-lg !rounded-[28px] !p-0 overflow-hidden">
         <DialogHeader className="sr-only">
-          <DialogTitle>Conditions</DialogTitle>
+          <DialogTitle>Objectives</DialogTitle>
           <DialogDescription>What the user needs to do.</DialogDescription>
         </DialogHeader>
 
         <div className="px-5 pt-5 pb-1">
-          <p className="text-base font-black text-foreground">What does the user need to do?</p>
-          <p className="mt-0.5 text-xs text-muted-foreground">Each goal reads as a sentence. The user must complete all of them.</p>
+          <p className="text-base font-black text-foreground">Quest Objectives</p>
         </div>
 
         <div className="max-h-[70vh] overflow-y-auto px-5 py-3 space-y-3">
@@ -1223,7 +1331,7 @@ function ConditionsEditorDialog({
             <div key={block.id} className="rounded-2xl border border-border/50 bg-muted/30 px-4 py-3.5">
               {/* Delete row */}
               <div className="mb-2.5 flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Goal {index + 1}</span>
+                <span className="text-[10px] font-black uppercase tracking-[0.18em] text-muted-foreground">Objective {index + 1}</span>
                 {logic.length > 1 && (
                   <button onClick={() => onRemove(block.id)} className="rounded-lg p-1 text-muted-foreground/60 transition hover:bg-red-500/10 hover:text-red-500">
                     <Trash2 className="h-3 w-3" />
@@ -1277,6 +1385,28 @@ function ConditionsEditorDialog({
                 </div>
               )}
 
+              {/* Objective rewards */}
+              {(block.rewards?.length ?? 0) > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setRewardPickerForBlockId(block.id)}
+                  className="mt-2.5 flex w-full items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-left transition hover:bg-emerald-500/10"
+                >
+                  <span className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400 shrink-0">Reward</span>
+                  <div className="flex flex-wrap gap-2">
+                    {block.rewards!.map((reward, ri) => (
+                      <RewardTile
+                        key={`${reward.type}-${reward.itemId ?? reward.amount ?? ri}`}
+                        reward={reward}
+                        rewardCatalog={rewardCatalog}
+                        isPremium={false}
+                      />
+                    ))}
+                  </div>
+                  <Pencil className="ml-auto h-3 w-3 shrink-0 text-emerald-600/40 dark:text-emerald-400/40" />
+                </button>
+              )}
+
               {/* Bottom options row */}
               <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border/30 pt-2.5">
                 <button
@@ -1305,6 +1435,19 @@ function ConditionsEditorDialog({
                     {block.tagMode !== 'ignore' ? 'Tag filter on' : 'Add tag filter'}
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setRewardPickerForBlockId(block.id)}
+                  className={cn(
+                    "inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold transition",
+                    (block.rewards?.length ?? 0) > 0
+                      ? 'border-emerald-500/25 bg-emerald-500/8 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/15'
+                      : 'border-border/50 bg-background text-muted-foreground hover:border-emerald-500/30 hover:text-emerald-600 dark:hover:text-emerald-400',
+                  )}
+                >
+                  <Gift className="h-3 w-3" />
+                  {(block.rewards?.length ?? 0) > 0 ? 'Edit reward' : 'Add reward'}
+                </button>
               </div>
             </div>
           ))}
@@ -1315,14 +1458,33 @@ function ConditionsEditorDialog({
             className="flex w-full items-center justify-center gap-2 rounded-2xl border border-dashed border-border/50 py-3 text-xs font-bold text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 hover:text-primary"
           >
             <Plus className="h-3.5 w-3.5" />
-            Add another goal
+            Add another objective
           </button>
         </div>
 
-        <div className="border-t border-border/40 px-5 py-3 text-right">
-          <Button size="sm" className="rounded-xl font-bold" onClick={() => onOpenChange(false)}>Done</Button>
+        <div className="border-t border-border/40 px-5 py-3 flex items-center justify-between gap-3">
+          {!allHaveRewards && (
+            <p className="text-xs font-medium text-red-500">Every objective needs a reward.</p>
+          )}
+          <div className="ml-auto">
+            <Button size="sm" className="rounded-xl font-bold" onClick={() => onOpenChange(false)} disabled={!allHaveRewards}>Done</Button>
+          </div>
         </div>
       </DialogContent>
+
+      {rewardPickerBlock && (
+        <RewardPickerDialog
+          open={!!rewardPickerForBlockId}
+          onOpenChange={(isOpen) => { if (!isOpen) setRewardPickerForBlockId(null); }}
+          rewards={rewardPickerBlock.rewards ?? []}
+          rewardItems={rewardItems}
+          rewardCatalog={rewardCatalog}
+          onSave={(rewards) => {
+            onUpdate(rewardPickerForBlockId!, { rewards: normalizeRewardList(rewards).length > 0 ? normalizeRewardList(rewards) : undefined });
+            setRewardPickerForBlockId(null);
+          }}
+        />
+      )}
     </Dialog>
   );
 }

@@ -148,6 +148,11 @@ function sanitizeLogicBlock(input: any): QuestLogicBlock | null {
     block.maxAmount = Math.floor(maxAmount);
   }
 
+  if (Array.isArray(input.rewards) && input.rewards.length > 0) {
+    const rewards = sanitizeRewards(input.rewards);
+    if (rewards.length > 0) block.rewards = rewards;
+  }
+
   return block;
 }
 
@@ -167,6 +172,12 @@ function sanitizeVisibilityCondition(input: any): QuestVisibilityCondition | nul
     operator: input.operator,
     value: Math.floor(value),
   };
+}
+
+function sanitizeDurationMinutes(input: any) {
+  const numeric = Number(input);
+  if (!Number.isFinite(numeric) || numeric <= 0) return undefined;
+  return Math.min(Math.floor(numeric), 525_600);
 }
 
 function sanitizeTemplateBody(body: any) {
@@ -190,6 +201,7 @@ function sanitizeTemplateBody(body: any) {
     : [];
   const rewards = sanitizeRewards(body?.rewards);
   const isActive = body?.isActive !== false;
+  const durationMinutes = sanitizeDurationMinutes(body?.durationMinutes);
 
   if (!name) return { error: 'Quest name is required' };
   if (!VALID_PLACEMENTS.has(placement)) return { error: 'Invalid placement' };
@@ -214,6 +226,7 @@ function sanitizeTemplateBody(body: any) {
       description,
       placement,
       categoryId: placement === 'category' ? categoryId : undefined,
+      durationMinutes: placement === 'category' ? durationMinutes : undefined,
       coverImageUrl,
       logic: normalizedLogic,
       visibilityConditions: visibilityConditions as QuestVisibilityCondition[],
@@ -302,6 +315,11 @@ export async function PUT(req: NextRequest) {
     if (!sanitized.payload.categoryId) {
       delete updateSet.categoryId;
       unsetFields.categoryId = 1;
+    }
+
+    if (!sanitized.payload.durationMinutes) {
+      delete updateSet.durationMinutes;
+      unsetFields.durationMinutes = 1;
     }
 
     const template = await QuestTemplateModel.findOneAndUpdate(

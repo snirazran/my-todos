@@ -34,6 +34,7 @@ export type QuestLogicBlock = {
   maxAmount?: number;
   action?: QuestCountAction;
   tagMode?: 'ignore' | 'random_user_tag' | 'focus_category_tags';
+  rewards?: QuestRewards;
 };
 
 export type QuestVisibilityCondition = {
@@ -59,6 +60,7 @@ export type QuestTemplateView = {
   coverImageUrl?: string;
   placement: QuestPlacement;
   categoryId?: MacroCategoryId;
+  durationMinutes?: number;
   rewards: QuestRewards;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
@@ -89,6 +91,9 @@ export type QuestProgressView = {
   title: string;
   description: string;
   coverImageUrl?: string;
+  durationMinutes?: number;
+  startedAt?: string;
+  expiresAt?: string;
   target: number;
   progress: number;
   completed: boolean;
@@ -96,6 +101,7 @@ export type QuestProgressView = {
   claimed: boolean;
   rewards: QuestRewards;
   logic: ResolvedQuestLogicBlock[];
+  claimedObjectiveIds: string[];
 };
 
 export type DailyQuestProgressView = QuestProgressView & {

@@ -361,6 +361,10 @@ function templateToView(doc: QuestTemplateDoc): QuestTemplateView {
     coverImageUrl: doc.coverImageUrl,
     placement: doc.placement,
     categoryId: doc.categoryId,
+    durationMinutes:
+      doc.placement === 'category' && doc.durationMinutes && doc.durationMinutes > 0
+        ? doc.durationMinutes
+        : undefined,
     rewards: sanitizeRewardSet(doc.rewards),
     logic: doc.logic,
     visibilityConditions: doc.visibilityConditions ?? [],
@@ -382,6 +386,9 @@ function questDocToView(doc: QuestDoc): QuestProgressView {
     title: doc.title,
     description: doc.description,
     coverImageUrl: doc.coverImageUrl,
+    durationMinutes: doc.durationMinutes,
+    startedAt: doc.startedAt?.toISOString(),
+    expiresAt: doc.expiresAt?.toISOString(),
     target: doc.target,
     progress: doc.progress,
     completed,
@@ -389,6 +396,7 @@ function questDocToView(doc: QuestDoc): QuestProgressView {
     claimed,
     rewards: sanitizeRewardSet(doc.rewards),
     logic: doc.logic,
+    claimedObjectiveIds: doc.claimedObjectiveIds ?? [],
   };
 }
 
@@ -436,6 +444,30 @@ async function syncQuestForTemplate(args: {
 
   if (!doc.rollKey) {
     doc.rollKey = crypto.randomUUID();
+  }
+
+  const templateDurationMinutes =
+    template.placement === 'category' &&
+    typeof template.durationMinutes === 'number' &&
+    Number.isFinite(template.durationMinutes) &&
+    template.durationMinutes > 0
+      ? Math.floor(template.durationMinutes)
+      : undefined;
+
+  if (templateDurationMinutes) {
+    if (!doc.startedAt) {
+      doc.startedAt = new Date();
+    }
+    if (!doc.durationMinutes || !doc.expiresAt) {
+      doc.durationMinutes = templateDurationMinutes;
+      doc.expiresAt = new Date(
+        doc.startedAt.getTime() + templateDurationMinutes * 60_000,
+      );
+    }
+  } else {
+    doc.durationMinutes = undefined;
+    doc.startedAt = null;
+    doc.expiresAt = null;
   }
 
   const startDate =
@@ -498,7 +530,19 @@ async function syncQuestForTemplate(args: {
       startDate,
       endDate,
     });
-    return { ...resolvedBlock, progress };
+    const resolvedRewards = (block.rewards ?? [])
+      .filter((r): r is QuestReward => isSupportedReward(r as { type?: string }))
+      .map((r, ri) =>
+        resolveReward(
+          r,
+          `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:obj-reward:${block.id}:${ri}`,
+        ),
+      );
+    return {
+      ...resolvedBlock,
+      progress,
+      rewards: resolvedRewards.length > 0 ? resolvedRewards : undefined,
+    };
   });
 
   const target = resolvedLogic.reduce((sum, block) => sum + block.target, 0);
@@ -777,6 +821,64 @@ export async function claimQuestReward(args: {
 
   user.markModified('wardrobe');
   user.markModified('focusProfile');
+  await user.save();
+  return summary;
+}
+
+export async function claimObjectiveReward(args: {
+  userId: string;
+  questId: string;
+  objectiveId: string;
+  timezone: string;
+}) {
+  const { userId, questId, objectiveId, timezone } = args;
+  await syncQuestState({ userId, timezone });
+  const user = await UserModel.findById(userId);
+  if (!user) throw new Error('User not found');
+  const isPremium = isPremiumUser(user.toObject());
+
+  const quest = await QuestModel.findOne({ userId, questId });
+  if (!quest) throw new Error('Quest not found');
+
+  const alreadyClaimed = (quest.claimedObjectiveIds ?? []).includes(objectiveId);
+  if (alreadyClaimed) throw new Error('Objective reward already claimed');
+
+  const block = quest.logic.find((b) => b.id === objectiveId);
+  if (!block) throw new Error('Objective not found');
+  if (!block.rewards?.length) throw new Error('Objective has no rewards');
+  if (block.progress < block.target) throw new Error('Objective not completed');
+
+  const summary = { fliesGranted: 0, grantedItemIds: [] as string[] };
+
+  if (!user.wardrobe) {
+    user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
+  }
+  user.wardrobe.inventory = user.wardrobe.inventory ?? {};
+  user.wardrobe.unseenItems = user.wardrobe.unseenItems ?? [];
+  user.wardrobe.flies = user.wardrobe.flies ?? 0;
+
+  const multiplier = isPremium ? 2 : 1;
+
+  for (const reward of block.rewards) {
+    if (reward.type === 'FLIES') {
+      const amount = (reward.amount ?? 0) * multiplier;
+      user.wardrobe.flies += amount;
+      summary.fliesGranted += amount;
+    } else if (reward.itemId) {
+      for (let i = 0; i < multiplier; i += 1) {
+        user.wardrobe.inventory[reward.itemId] =
+          (user.wardrobe.inventory[reward.itemId] ?? 0) + 1;
+        user.wardrobe.unseenItems!.push(reward.itemId);
+        summary.grantedItemIds.push(reward.itemId);
+      }
+    }
+  }
+
+  quest.claimedObjectiveIds = [...(quest.claimedObjectiveIds ?? []), objectiveId];
+  quest.markModified('claimedObjectiveIds');
+  await quest.save();
+
+  user.markModified('wardrobe');
   await user.save();
   return summary;
 }

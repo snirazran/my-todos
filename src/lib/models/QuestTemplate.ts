@@ -15,6 +15,7 @@ export interface QuestTemplateDoc {
   coverImageUrl?: string;
   placement: QuestPlacement;
   categoryId?: MacroCategoryId;
+  durationMinutes?: number;
   rewards: QuestRewards;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
@@ -36,6 +37,10 @@ const QuestTemplateSchema = new Schema<QuestTemplateDoc>(
     },
     categoryId: {
       type: String,
+      default: undefined,
+    },
+    durationMinutes: {
+      type: Number,
       default: undefined,
     },
     rewards: { type: Schema.Types.Mixed, required: true },
