@@ -683,7 +683,7 @@ function ObjectiveRow({
                     className="group relative inline-flex h-9 items-center justify-center overflow-hidden rounded-xl bg-emerald-500 px-5 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#059669] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#059669] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <span className="mr-[-0.15em]">
-                      {claimingObjective ? 'Claiming...' : 'Claim Reward'}
+                      {claimingObjective ? 'Claiming...' : 'Claim'}
                     </span>
                   </button>
                 );
@@ -1138,6 +1138,6 @@ function getQuestButtonLabel(
 ) {
   if (quest.claimed) return 'Claimed';
   if (claiming) return 'Claiming...';
-  if (quest.claimable) return 'Claim Reward';
+  if (quest.claimable) return 'Claim All Rewards';
   return 'In Progress';
 }
