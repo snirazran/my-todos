@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { mutate } from 'swr';
 import { ScrollText, X, Compass, CalendarDays, RefreshCw, Sparkles } from 'lucide-react';
@@ -739,7 +740,7 @@ function QuestRewardRevealOverlay({
   onClaim: () => void;
   onOpenGift: (entry: QuestRewardRevealEntry) => void;
 }) {
-  return (
+  return createPortal(
     <AnimatePresence mode="wait">
       {entry && (
         <motion.div
@@ -794,7 +795,8 @@ function QuestRewardRevealOverlay({
           </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 
