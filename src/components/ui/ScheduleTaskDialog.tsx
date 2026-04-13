@@ -9,10 +9,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
 const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5); // 0,5,10…55
-const ITEM_H = 40; // px height of each row
+const ITEM_H = 32; // px height of each row
 
 const REMINDER_OPTIONS = [
-  { value: '', label: 'None' },
   { value: 'at_time', label: 'At time of event' },
   { value: '5m', label: '5 minutes before' },
   { value: '10m', label: '10 minutes before' },
@@ -38,90 +37,114 @@ function ScrollColumn({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const isUpdatingRef = useRef(false);
+  const isDraggingRef = useRef(false);
+  const lastValueRef = useRef<number | null>(null);
+  const startYRef = useRef(0);
+  const scrollTopRef = useRef(0);
   const label = formatLabel || pad;
 
   // Sync scroll position when value changes externally
   useEffect(() => {
     const el = ref.current;
-    if (!el || isUpdatingRef.current) return;
+    if (!el) return;
+    
+    // Only sync if the value changed from OUTSIDE the scroll component
+    if (value === lastValueRef.current) return;
     
     const idx = items.indexOf(value);
     if (idx < 0) return;
 
-    // Use a small timeout to ensure DOM is ready and prevent scroll-fight
+    isUpdatingRef.current = true;
+    el.scrollTo({ top: idx * ITEM_H, behavior: 'auto' });
+    lastValueRef.current = value;
+    
     const timeout = setTimeout(() => {
-      el.scrollTo({
-        top: idx * ITEM_H,
-        behavior: 'smooth'
-      });
-    }, 10);
+      isUpdatingRef.current = false;
+    }, 50);
+    
     return () => clearTimeout(timeout);
   }, [value, items]);
 
-  const handleScroll = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const el = ref.current;
+      if (!el) return;
+      const y = e.pageY;
+      const walk = (y - startYRef.current) * 1.0; // 1:1 ratio
+      el.scrollTop = scrollTopRef.current - walk;
+    };
 
-    // Calculate which item is at the center
+    const handleGlobalMouseUp = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      const el = ref.current;
+      if (el) {
+        el.style.cursor = '';
+        el.style.scrollSnapType = 'y mandatory';
+        const idx = Math.round(el.scrollTop / ITEM_H);
+        el.scrollTo({ top: idx * ITEM_H, behavior: 'smooth' });
+      }
+    };
+
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, []);
+
+  const handleScroll = () => {
+    const el = ref.current;
+    if (!el || isDraggingRef.current || isUpdatingRef.current) return;
+    
     const idx = Math.round(el.scrollTop / ITEM_H);
     const clamped = Math.max(0, Math.min(idx, items.length - 1));
     const newValue = items[clamped];
-
-    if (newValue !== value) {
-      isUpdatingRef.current = true;
+    
+    // Only update if it's a real change and we're close to a snap point
+    const isCloseToSnap = Math.abs(el.scrollTop - idx * ITEM_H) < 5;
+    if (newValue !== value && isCloseToSnap) {
+      lastValueRef.current = newValue;
       onChange(newValue);
-      // Reset the flag after a short delay to allow smooth sync
-      setTimeout(() => {
-        isUpdatingRef.current = false;
-      }, 50);
     }
-  }, [items, value, onChange]);
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    isDraggingRef.current = true;
+    startYRef.current = e.pageY;
+    scrollTopRef.current = el.scrollTop;
+    el.style.cursor = 'grabbing';
+    el.style.scrollSnapType = 'none';
+  };
 
   return (
-    <div className="relative h-[120px] w-[72px] overflow-hidden select-none touch-none">
-      {/* highlight band for the centre slot */}
-      <div className="pointer-events-none absolute inset-x-0 top-[40px] h-[40px] rounded-lg bg-primary/10 dark:bg-primary/20 z-10" />
-      
-      {/* fade edges */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[40px] bg-gradient-to-b from-white dark:from-slate-900 to-transparent z-20" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[40px] bg-gradient-to-t from-white dark:from-slate-900 to-transparent z-20" />
-
+    <div className="relative h-[100px] w-[50px] overflow-hidden select-none">
+      <div className="pointer-events-none absolute inset-x-0 top-[34px] h-[32px] rounded-lg bg-primary/10 z-10" />
       <div
         ref={ref}
         onScroll={handleScroll}
-        className="h-full overflow-y-auto overflow-x-hidden snap-y snap-mandatory no-scrollbar overscroll-none"
-        style={{ 
-          scrollSnapType: 'y mandatory', 
-          paddingTop: ITEM_H, 
-          paddingBottom: ITEM_H,
-          touchAction: 'pan-y' 
-        }}
+        onMouseDown={handleMouseDown}
+        className="h-full overflow-y-auto no-scrollbar snap-y snap-mandatory"
+        style={{ paddingTop: 34, paddingBottom: 34 }}
       >
-        {items.map((item) => {
-          const active = item === value;
-          return (
-            <div
-              key={item}
-              style={{ height: ITEM_H, scrollSnapAlign: 'center' }}
-              className="w-full flex items-center justify-center snap-center"
+        {items.map((item) => (
+          <div key={item} style={{ height: ITEM_H }} className="w-full flex items-center justify-center snap-center">
+            <button
+              type="button"
+              onClick={() => {
+                onChange(item);
+                ref.current?.scrollTo({ top: items.indexOf(item) * ITEM_H, behavior: 'smooth' });
+              }}
+              className={`text-sm font-bold transition-all ${item === value ? 'text-primary scale-110' : 'text-slate-400'}`}
             >
-              <button
-                type="button"
-                onClick={() => {
-                  onChange(item);
-                  ref.current?.scrollTo({ top: items.indexOf(item) * ITEM_H, behavior: 'smooth' });
-                }}
-                className={`w-full h-full flex items-center justify-center text-base transition-all duration-200 ${
-                  active
-                    ? 'font-black text-primary scale-110'
-                    : 'font-medium text-slate-400 dark:text-slate-500 hover:text-slate-600'
-                }`}
-              >
-                {label(item)}
-              </button>
-            </div>
-          );
-        })}
+              {label(item)}
+            </button>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -141,50 +164,25 @@ function TimePicker({
   const minH = minTime ? parseInt(minTime.split(':')[0], 10) : -1;
   const minM = minTime ? parseInt(minTime.split(':')[1], 10) : -1;
 
-  // Filter hours: only show hours after minTime's hour (or same hour if there are valid minutes)
-  const availableHours = minTime
-    ? HOURS.filter((hr) => {
-        if (hr > minH) return true;
-        // same hour — only if there's at least one valid 5-min slot after minM
-        if (hr === minH) return Math.ceil((minM + 1) / 5) * 5 < 60;
-        return false;
-      })
-    : HOURS;
-
+  const availableHours = minTime ? HOURS.filter(h => h >= minH) : HOURS;
   const h = value ? parseInt(value.split(':')[0], 10) : (availableHours[0] ?? 0);
   const m = value ? parseInt(value.split(':')[1], 10) : 0;
   const snappedM = Math.round(m / 5) * 5 === 60 ? 55 : Math.round(m / 5) * 5;
 
-  // Filter minutes: if selected hour equals minTime hour, hide minutes <= minM
-  const availableMinutes = (minTime && h === minH)
-    ? MINUTES.filter((mn) => mn > minM)
-    : MINUTES;
-
-  const setTime = useCallback(
-    (newH: number, newM: number) => {
-      onChange(`${pad(newH)}:${pad(newM)}`);
-    },
-    [onChange],
-  );
-
-  // When hour changes, auto-clamp minute if needed
-  const handleHourChange = useCallback(
-    (newH: number) => {
-      let validM = snappedM;
-      if (minTime && newH === minH) {
-        const firstValid = MINUTES.find((mn) => mn > minM);
-        if (firstValid !== undefined && validM <= minM) validM = firstValid;
-      }
-      setTime(newH, validM);
-    },
-    [snappedM, minTime, minH, minM, setTime],
-  );
+  const availableMinutes = (minTime && h === minH) ? MINUTES.filter(mn => mn > minM) : MINUTES;
 
   return (
     <div className="flex items-center justify-center gap-1">
-      <ScrollColumn items={availableHours} value={h} onChange={handleHourChange} />
-      <span className="text-xl font-black text-slate-300 dark:text-slate-600 -mx-1 select-none">:</span>
-      <ScrollColumn items={availableMinutes} value={snappedM} onChange={(v) => setTime(h, v)} />
+      <ScrollColumn items={availableHours} value={h} onChange={(newH) => {
+        let validM = snappedM;
+        if (minTime && newH === minH) {
+           const first = MINUTES.find(mn => mn > minM);
+           if (first !== undefined && validM <= minM) validM = first;
+        }
+        onChange(`${pad(newH)}:${pad(validM)}`);
+      }} />
+      <span className="text-lg font-black text-slate-300 dark:text-slate-600">:</span>
+      <ScrollColumn items={availableMinutes} value={snappedM} onChange={(v) => onChange(`${pad(h)}:${pad(v)}`)} />
     </div>
   );
 }
@@ -303,12 +301,7 @@ export function ScheduleTaskDialog({
               type="button"
               onClick={() => {
                 if (!startTime) {
-                  const now = new Date();
-                  const h = now.getHours();
-                  const m = Math.round(now.getMinutes() / 5) * 5;
-                  const finalH = m === 60 ? (h + 1) % 24 : h;
-                  const finalM = m === 60 ? 0 : m;
-                  setStartTime(`${pad(finalH)}:${pad(finalM)}`);
+                  setStartTime('00:00');
                 }
                 setActiveField(activeField === 'start' ? null : 'start');
               }}
@@ -333,7 +326,7 @@ export function ScheduleTaskDialog({
                 if (!startTime) return;
                 setActiveField(activeField === 'end' ? null : 'end');
               }}
-              className={`flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all ${
+              className={`flex-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl transition-all relative ${
                 !startTime
                   ? 'bg-slate-50 dark:bg-slate-800/50 opacity-40 cursor-not-allowed'
                   : activeField === 'end'
@@ -348,37 +341,39 @@ export function ScheduleTaskDialog({
                   {formatDisplay(endTime)}
                 </p>
               </div>
+              {endTime && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEndTime('');
+                    if (activeField === 'end') setActiveField(null);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
             </button>
           </div>
 
           {/* Scroll picker — shown when a field is active */}
-          <AnimatePresence>
-            {activeField && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="overflow-hidden"
-              >
-                <div className="py-2 flex justify-center">
-                  <TimePicker
-                    key={activeField}
-                    value={activeField === 'start' ? startTime : endTime}
-                    minTime={activeField === 'end' ? startTime : undefined}
-                    onChange={(v) => {
-                      if (activeField === 'start') {
-                        setStartTime(v);
-                        if (endTime && v >= endTime) setEndTime('');
-                      } else {
-                        setEndTime(v);
-                      }
-                    }}
-                  />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {activeField && (
+            <div className="py-2 flex justify-center">
+              <TimePicker
+                key={activeField}
+                value={activeField === 'start' ? startTime : endTime}
+                minTime={activeField === 'end' ? startTime : undefined}
+                onChange={(v) => {
+                  if (activeField === 'start') {
+                    setStartTime(v);
+                  } else {
+                    setEndTime(v);
+                  }
+                }}
+              />
+            </div>
+          )}
 
           {/* Notify Me Toggle */}
           <div>
@@ -411,67 +406,47 @@ export function ScheduleTaskDialog({
             </button>
 
             {/* Reminder Picker */}
-            <AnimatePresence>
-              {notifyEnabled && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2 }}
-                  className="overflow-hidden"
+            {notifyEnabled && (
+              <div className="pt-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowReminderPicker(!showReminderPicker)}
+                  className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition-colors"
                 >
-                  <div className="pt-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setShowReminderPicker(!showReminderPicker)}
-                      className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200/80 dark:hover:bg-slate-700 transition-colors"
-                    >
-                      <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
-                        {selectedReminderLabel}
-                      </span>
-                      <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${
-                        showReminderPicker ? 'rotate-180' : ''
-                      }`} />
-                    </button>
+                  <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+                    {selectedReminderLabel}
+                  </span>
+                  <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${
+                    showReminderPicker ? 'rotate-180' : ''
+                  }`} />
+                </button>
 
-                    <AnimatePresence>
-                      {showReminderPicker && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.15 }}
-                          className="overflow-hidden"
-                        >
-                          <div className="mt-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
-                            {REMINDER_OPTIONS.filter((o) => o.value).map((option) => (
-                              <button
-                                key={option.value}
-                                type="button"
-                                onClick={() => {
-                                  setReminder(option.value);
-                                  setShowReminderPicker(false);
-                                }}
-                                className={`w-full flex items-center justify-between px-3.5 py-2.5 text-sm transition-colors ${
-                                  reminder === option.value
-                                    ? 'bg-primary/10 text-primary font-bold'
-                                    : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 font-medium'
-                                }`}
-                              >
-                                {option.label}
-                                {reminder === option.value && (
-                                  <Check className="w-3.5 h-3.5 text-primary" />
-                                )}
-                              </button>
-                            ))}
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
+                {showReminderPicker && (
+                  <div className="mt-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700/60 overflow-hidden">
+                    {REMINDER_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => {
+                          setReminder(option.value);
+                          setShowReminderPicker(false);
+                        }}
+                        className={`w-full flex items-center justify-between px-3.5 py-2.5 text-sm transition-colors ${
+                          reminder === option.value
+                            ? 'bg-primary/10 text-primary font-bold'
+                            : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 font-medium'
+                        }`}
+                      >
+                        {option.label}
+                        {reminder === option.value && (
+                          <Check className="w-3.5 h-3.5 text-primary" />
+                        )}
+                      </button>
+                    ))}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

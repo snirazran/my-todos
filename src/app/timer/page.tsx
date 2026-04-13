@@ -1604,12 +1604,12 @@ export default function FrogodoroPage() {
         defaultMode="pick"
         hideDayPicker={true}
         hideRepeatPicker={true}
-        onSubmit={async ({ text, days, repeat, tags }) => {
+        onSubmit={async ({ text, days, repeat, tags, startTime, endTime, reminder }) => {
           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
           const res = await fetch('/api/tasks?view=board', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, days, repeat, tags, timezone: tz }),
+            body: JSON.stringify({ text, days, repeat, tags, timezone: tz, startTime, endTime, reminder }),
           });
 
           if (res.ok) {

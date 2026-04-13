@@ -395,6 +395,10 @@ export async function POST(req: NextRequest) {
   const text = String(body?.text ?? '').trim();
   const rawDays: number[] = Array.isArray(body?.days) ? body.days : [];
   const tags: string[] = Array.isArray(body?.tags) ? body.tags.map(String) : [];
+  const startTime = body.startTime;
+  const endTime = body.endTime;
+  const reminder = body.reminder;
+
   const repeat =
     body?.repeat === 'backlog'
       ? 'backlog'
@@ -441,6 +445,9 @@ export async function POST(req: NextRequest) {
         createdAt: now,
         updatedAt: now,
         tags,
+        startTime,
+        endTime,
+        reminder,
       });
       createdIds.push(id);
       createdTasks.push({
@@ -451,6 +458,9 @@ export async function POST(req: NextRequest) {
         type: 'weekly',
         tags: task.tags || [],
         dayOfWeek: dayOfWeek,
+        startTime: task.startTime,
+        endTime: task.endTime,
+        reminder: task.reminder,
       });
     }
     await syncGamification(uid, tz);
@@ -476,6 +486,9 @@ export async function POST(req: NextRequest) {
       createdAt: now,
       updatedAt: now,
       tags,
+      startTime,
+      endTime,
+      reminder,
     });
     createdIds.push(id);
     createdTasks.push({
@@ -486,6 +499,9 @@ export async function POST(req: NextRequest) {
       type: 'habit',
       tags: task.tags || [],
       timesPerWeek: task.timesPerWeek,
+      startTime: task.startTime,
+      endTime: task.endTime,
+      reminder: task.reminder,
     });
     await syncGamification(uid, tz);
     return NextResponse.json({
@@ -510,6 +526,9 @@ export async function POST(req: NextRequest) {
         createdAt: now,
         updatedAt: now,
         tags,
+        startTime,
+        endTime,
+        reminder,
       });
       createdTasks.push({
         id: task.id,
@@ -518,6 +537,9 @@ export async function POST(req: NextRequest) {
         completed: false,
         type: 'backlog',
         tags: task.tags || [],
+        startTime: task.startTime,
+        endTime: task.endTime,
+        reminder: task.reminder,
       });
     } else {
       const weekday = d as Weekday;
@@ -534,6 +556,9 @@ export async function POST(req: NextRequest) {
         createdAt: now,
         updatedAt: now,
         tags,
+        startTime,
+        endTime,
+        reminder,
       });
       createdTasks.push({
         id: task.id,
@@ -543,6 +568,9 @@ export async function POST(req: NextRequest) {
         type: 'regular',
         tags: task.tags || [],
         date: task.date,
+        startTime: task.startTime,
+        endTime: task.endTime,
+        reminder: task.reminder,
       });
     }
   }

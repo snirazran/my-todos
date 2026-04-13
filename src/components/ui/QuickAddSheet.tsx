@@ -26,6 +26,9 @@ import {
   Pencil,
   Check,
   Lock,
+  Clock,
+  Bell,
+  ChevronDown,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -44,6 +47,9 @@ type Props = Readonly<{
     repeat: RepeatChoice;
     tags: string[];
     timesPerWeek?: number;
+    startTime?: string;
+    endTime?: string;
+    reminder?: string;
   }) => Promise<void> | void;
   initialText?: string;
   defaultRepeat?: RepeatChoice;
@@ -60,6 +66,172 @@ type SavedTag = {
   color: string;
   disabled?: boolean;
 };
+
+const REMINDER_OPTIONS = [
+  { value: 'at_time', label: 'At time of event' },
+  { value: '5m', label: '5 minutes before' },
+  { value: '10m', label: '10 minutes before' },
+  { value: '15m', label: '15 minutes before' },
+  { value: '30m', label: '30 minutes before' },
+  { value: '1h', label: '1 hour before' },
+] as const;
+
+const HOURS = Array.from({ length: 24 }, (_, i) => i);
+const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5);
+const ITEM_H = 32;
+const pad = (n: number) => String(n).padStart(2, '0');
+
+function ScrollColumn({
+  items,
+  value,
+  onChange,
+  formatLabel,
+}: {
+  items: number[];
+  value: number;
+  onChange: (v: number) => void;
+  formatLabel?: (v: number) => string;
+}) {
+  const ref = React.useRef<HTMLDivElement>(null);
+  const isUpdatingRef = React.useRef(false);
+  const isDraggingRef = React.useRef(false);
+  const lastValueRef = React.useRef<number | null>(null);
+  const startYRef = React.useRef(0);
+  const scrollTopRef = React.useRef(0);
+  const label = formatLabel || pad;
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    
+    // Only sync if the value changed from OUTSIDE the scroll component
+    if (value === lastValueRef.current) return;
+    
+    const idx = items.indexOf(value);
+    if (idx < 0) return;
+
+    isUpdatingRef.current = true;
+    el.scrollTo({ top: idx * ITEM_H, behavior: 'auto' });
+    lastValueRef.current = value;
+    
+    const timeout = setTimeout(() => {
+      isUpdatingRef.current = false;
+    }, 50);
+    
+    return () => clearTimeout(timeout);
+  }, [value, items]);
+
+  useEffect(() => {
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const el = ref.current;
+      if (!el) return;
+      const y = e.pageY;
+      const walk = (y - startYRef.current) * 1.0; // 1:1 ratio for more control
+      el.scrollTop = scrollTopRef.current - walk;
+    };
+
+    const handleGlobalMouseUp = () => {
+      if (!isDraggingRef.current) return;
+      isDraggingRef.current = false;
+      const el = ref.current;
+      if (el) {
+        el.style.cursor = '';
+        el.style.scrollSnapType = 'y mandatory';
+        const idx = Math.round(el.scrollTop / ITEM_H);
+        el.scrollTo({ top: idx * ITEM_H, behavior: 'smooth' });
+      }
+    };
+
+    window.addEventListener('mousemove', handleGlobalMouseMove);
+    window.addEventListener('mouseup', handleGlobalMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleGlobalMouseMove);
+      window.removeEventListener('mouseup', handleGlobalMouseUp);
+    };
+  }, []);
+
+  const handleScroll = () => {
+    const el = ref.current;
+    if (!el || isDraggingRef.current || isUpdatingRef.current) return;
+    
+    const idx = Math.round(el.scrollTop / ITEM_H);
+    const clamped = Math.max(0, Math.min(idx, items.length - 1));
+    const newValue = items[clamped];
+    
+    // Only update if it's a real change and we're close to a snap point
+    const isCloseToSnap = Math.abs(el.scrollTop - idx * ITEM_H) < 5;
+    if (newValue !== value && isCloseToSnap) {
+      lastValueRef.current = newValue;
+      onChange(newValue);
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    isDraggingRef.current = true;
+    startYRef.current = e.pageY;
+    scrollTopRef.current = el.scrollTop;
+    el.style.cursor = 'grabbing';
+    el.style.scrollSnapType = 'none';
+  };
+
+  return (
+    <div className="relative h-[100px] w-[50px] overflow-hidden select-none">
+      <div className="pointer-events-none absolute inset-x-0 top-[34px] h-[32px] rounded-lg bg-primary/10 z-10" />
+      <div
+        ref={ref}
+        onScroll={handleScroll}
+        onMouseDown={handleMouseDown}
+        className="h-full overflow-y-auto no-scrollbar snap-y snap-mandatory"
+        style={{ paddingTop: 34, paddingBottom: 34 }}
+      >
+        {items.map((item) => (
+          <div key={item} style={{ height: ITEM_H }} className="w-full flex items-center justify-center snap-center">
+            <button
+              type="button"
+              onClick={() => {
+                onChange(item);
+                ref.current?.scrollTo({ top: items.indexOf(item) * ITEM_H, behavior: 'smooth' });
+              }}
+              className={`text-sm font-bold transition-all ${item === value ? 'text-primary scale-110' : 'text-slate-400'}`}
+            >
+              {label(item)}
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TimePicker({ value, onChange, minTime }: { value: string; onChange: (v: string) => void; minTime?: string }) {
+  const minH = minTime ? parseInt(minTime.split(':')[0], 10) : -1;
+  const minM = minTime ? parseInt(minTime.split(':')[1], 10) : -1;
+
+  const availableHours = minTime ? HOURS.filter(h => h >= minH) : HOURS;
+  const h = value ? parseInt(value.split(':')[0], 10) : (availableHours[0] ?? 0);
+  const m = value ? parseInt(value.split(':')[1], 10) : 0;
+  const snappedM = Math.round(m / 5) * 5 === 60 ? 55 : Math.round(m / 5) * 5;
+
+  const availableMinutes = (minTime && h === minH) ? MINUTES.filter(mn => mn > minM) : MINUTES;
+
+  return (
+    <div className="flex items-center justify-center gap-1">
+      <ScrollColumn items={availableHours} value={h} onChange={(newH) => {
+        let validM = snappedM;
+        if (minTime && newH === minH) {
+           const first = MINUTES.find(mn => mn > minM);
+           if (first !== undefined && validM <= minM) validM = first;
+        }
+        onChange(`${pad(newH)}:${pad(validM)}`);
+      }} />
+      <span className="text-lg font-black text-slate-300">:</span>
+      <ScrollColumn items={availableMinutes} value={snappedM} onChange={(v) => onChange(`${pad(h)}:${pad(v)}`)} />
+    </div>
+  );
+}
 
 const TAG_COLORS = [
   {
@@ -199,6 +371,15 @@ export default function QuickAddSheet({
   const [isCreatingTag, setIsCreatingTag] = useState(false);
   const [showPremiumLimit, setShowPremiumLimit] = useState(false);
 
+  // Scheduling State
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [reminder, setReminder] = useState('at_time');
+  const [notifyEnabled, setNotifyEnabled] = useState(false);
+  const [isSchedulePanelOpen, setIsSchedulePanelOpen] = useState(false);
+  const [showReminderPicker, setShowReminderPicker] = useState(false);
+  const [activeTimeField, setActiveTimeField] = useState<'start' | 'end' | null>(null);
+
   const tagInputRef = React.useRef<HTMLInputElement>(null);
   const ignoreClickRef = React.useRef(false);
 
@@ -207,9 +388,7 @@ export default function QuickAddSheet({
   }, []);
 
   // Indices
-  const [pickedDays, setPickedDays] = useState<Array<Exclude<DisplayDay, 7>>>(
-    [],
-  );
+  const [pickedDays, setPickedDays] = useState<Array<DisplayDay>>([]);
 
   useEffect(() => {
     if (open) {
@@ -218,9 +397,9 @@ export default function QuickAddSheet({
       // Use defaultPickedDay if provided, otherwise fallback to today
       const initialDay =
         defaultPickedDay !== undefined
-          ? defaultPickedDay
+          ? (defaultPickedDay as DisplayDay)
           : todayDisplayIndex(daysOrder);
-      setPickedDays([initialDay as Exclude<DisplayDay, 7>]);
+      setPickedDays([initialDay]);
       setRepeat(defaultRepeat);
       setTimesPerWeek(7);
       setTags([]);
@@ -229,6 +408,15 @@ export default function QuickAddSheet({
       setShowColorPicker(false);
       setManageTagsMode(false);
       setIsCreatingTag(false);
+      
+      // Reset Schedule
+      setStartTime('');
+      setEndTime('');
+      setReminder('at_time');
+      setNotifyEnabled(false);
+      setIsSchedulePanelOpen(false);
+      setShowReminderPicker(false);
+      setActiveTimeField(null);
     }
     // Always reset tag panel state when open changes to prevent animation flash
     setIsTagPanelOpen(false);
@@ -249,19 +437,28 @@ export default function QuickAddSheet({
 
   // ... rest of useEffects
 
-  const dayLabels = useMemo(
-    () =>
-      Array.from({ length: 7 }, (_, d) => {
-        const full = labelForDisplayDay(d as Exclude<DisplayDay, 7>, daysOrder);
-        return { short: full.slice(0, 2), title: full };
-      }),
-    [daysOrder],
-  );
+  const dayLabels = useMemo(() => {
+    return Array.from({ length: 7 }, (_, d) => {
+      const full = labelForDisplayDay(d as Exclude<DisplayDay, 7>, daysOrder);
+      return { short: full.slice(0, 2), title: full };
+    });
+  }, [daysOrder]);
 
-  const toggleDay = (d: Exclude<DisplayDay, 7>) =>
-    setPickedDays((prev) =>
-      prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d],
-    );
+  const toggleDay = (d: DisplayDay) =>
+    setPickedDays((prev) => {
+      // If picking a real day, remove 'Later' (7)
+      const withoutLater = prev.filter((x) => x !== 7);
+      if (withoutLater.includes(d)) {
+        return withoutLater.filter((x) => x !== d);
+      }
+      return [...withoutLater, d];
+    });
+
+  const toggleLater = () => {
+    setPickedDays((prev) => (prev.includes(7) ? [todayDisplayIndex(daysOrder)] : [7]));
+  };
+
+  const isLater = pickedDays.includes(7);
 
   const handleAddTag = () => {
     if (isCreatingTag) return;
@@ -393,6 +590,9 @@ export default function QuickAddSheet({
         repeat: finalRepeat,
         tags,
         timesPerWeek: when === 'habit' ? timesPerWeek : undefined,
+        startTime: startTime || undefined,
+        endTime: endTime || undefined,
+        reminder: notifyEnabled ? reminder : undefined,
       });
       onOpenChange(false);
     } finally {
@@ -404,6 +604,15 @@ export default function QuickAddSheet({
 
   const repeatsOn = repeat === 'weekly';
   const isHabit = when === 'habit';
+  const selectedReminderLabel = REMINDER_OPTIONS.find((o) => o.value === reminder)?.label || 'At time of event';
+  
+  const formatDisplay = (t: string) => {
+    if (!t) return '--:--';
+    const [hh, mm] = t.split(':').map(Number);
+    const suffix = hh >= 12 ? 'PM' : 'AM';
+    const h12 = hh % 12 || 12;
+    return `${h12}:${pad(mm)} ${suffix}`;
+  };
 
   return (
     <>
@@ -456,9 +665,25 @@ export default function QuickAddSheet({
                       />
 
                       {/* Selected Tags Display (Horizontal Scroll) */}
-                      {tags.length > 0 && (
+                      {(tags.length > 0 || startTime) && (
                         <div className="relative mb-3 mt-2 px-1 overflow-visible">
                           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 pt-1 px-1 -mx-1 mask-fade-right">
+                            {startTime && (
+                               <button
+                                  type="button"
+                                  onClick={() => {
+                                      setStartTime('');
+                                      setEndTime('');
+                                      setNotifyEnabled(false);
+                                      setIsSchedulePanelOpen(false);
+                                  }}
+                                  className="group shrink-0 relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border border-primary/20 bg-primary/10 text-primary transition-all shadow-sm hover:opacity-75 active:scale-95"
+                                >
+                                  <Clock className="w-3 h-3" />
+                                  <span>{formatDisplay(startTime)}{endTime && ` - ${formatDisplay(endTime)}`}</span>
+                                  <X className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                </button>
+                            )}
                             {tags.map((tagId) => {
                               const tag = getTagDetails(tagId);
                               const color = tag?.color;
@@ -501,40 +726,66 @@ export default function QuickAddSheet({
                       )}
 
                       <div className="flex items-center justify-between px-1 mb-4 mt-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsTagPanelOpen(!isTagPanelOpen);
-                            // Auto-focus input when opening
-                            if (!isTagPanelOpen) {
-                              setTimeout(
-                                () => tagInputRef.current?.focus(),
-                                100,
-                              );
-                            }
-                          }}
-                          className={`
-                                inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-bold transition-all
-                                border shadow-sm
-                                ${
-                                  isTagPanelOpen
-                                    ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15'
-                                    : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted/80 hover:text-foreground'
+                        <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsTagPanelOpen(!isTagPanelOpen);
+                                setIsSchedulePanelOpen(false);
+                                // Auto-focus input when opening
+                                if (!isTagPanelOpen) {
+                                  setTimeout(
+                                    () => tagInputRef.current?.focus(),
+                                    100,
+                                  );
                                 }
-                            `}
-                        >
-                          {isTagPanelOpen ? (
-                            <>
-                              <X className="w-3.5 h-3.5" />
-                              Close Tags
-                            </>
-                          ) : (
-                            <>
-                              <Tag className="w-3.5 h-3.5" />
-                              Add Tags
-                            </>
-                          )}
-                        </button>
+                              }}
+                              className={`
+                                    inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-bold transition-all
+                                    border shadow-sm
+                                    ${
+                                      isTagPanelOpen
+                                        ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15'
+                                        : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted/80 hover:text-foreground'
+                                    }
+                                `}
+                            >
+                              {isTagPanelOpen ? (
+                                <X className="w-3.5 h-3.5" />
+                              ) : (
+                                <Tag className="w-3.5 h-3.5" />
+                              )}
+                              Tags
+                            </button>
+                            
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsSchedulePanelOpen(!isSchedulePanelOpen);
+                                setIsTagPanelOpen(false);
+                                if (!isSchedulePanelOpen && !startTime) {
+                                    setStartTime('00:00');
+                                    setActiveTimeField('start');
+                                }
+                              }}
+                              className={`
+                                    inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-bold transition-all
+                                    border shadow-sm
+                                    ${
+                                      isSchedulePanelOpen || startTime
+                                        ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15'
+                                        : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted/80 hover:text-foreground'
+                                    }
+                                `}
+                            >
+                              {isSchedulePanelOpen ? (
+                                <X className="w-3.5 h-3.5" />
+                              ) : (
+                                <Clock className="w-3.5 h-3.5" />
+                              )}
+                              {startTime ? formatDisplay(startTime) : 'Schedule'}
+                            </button>
+                        </div>
                         <span
                           className={`text-[11px] font-bold ${
                             text.length >= 40
@@ -553,15 +804,11 @@ export default function QuickAddSheet({
                             initial={{ opacity: 0 }}
                             animate={{
                               opacity: 1,
-                              transition: {
-                                duration: 0,
-                              },
+                              transition: { duration: 0 },
                             }}
                             exit={{
                               opacity: 0,
-                              transition: {
-                                duration: 0,
-                              },
+                              transition: { duration: 0 },
                             }}
                             style={{ transformOrigin: 'top' }}
                             className="overflow-hidden mb-3"
@@ -857,6 +1104,128 @@ export default function QuickAddSheet({
                           </motion.div>
                         )}
                       </AnimatePresence>
+
+                      {/* Schedule Panel */}
+                      <AnimatePresence initial={false}>
+                        {isSchedulePanelOpen && (
+                          <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{
+                              opacity: 1,
+                              transition: { duration: 0 },
+                            }}
+                            exit={{
+                              opacity: 0,
+                              transition: { duration: 0 },
+                            }}
+                            className="overflow-hidden mb-3"
+                          >
+                            <div className="p-4 mb-3 bg-muted/30 rounded-xl border border-border/50">
+                               <div className="flex gap-2 mb-4">
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveTimeField(activeTimeField === 'start' ? null : 'start')}
+                                      className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+                                        activeTimeField === 'start'
+                                          ? 'bg-primary/10 border-primary text-primary ring-2 ring-primary/20'
+                                          : 'bg-card border-border text-foreground hover:bg-accent'
+                                      }`}
+                                    >
+                                      <Clock className="w-4 h-4" />
+                                      <div className="text-left">
+                                        <p className="text-[10px] font-bold uppercase text-slate-400">Start</p>
+                                        <p className="text-sm font-bold">{formatDisplay(startTime)}</p>
+                                      </div>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => setActiveTimeField(activeTimeField === 'end' ? null : 'end')}
+                                      className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+                                        activeTimeField === 'end'
+                                          ? 'bg-primary/10 border-primary text-primary ring-2 ring-primary/20'
+                                          : 'bg-card border-border text-foreground hover:bg-accent'
+                                      }`}
+                                    >
+                                      <Clock className="w-4 h-4" />
+                                      <div className="text-left">
+                                        <p className="text-[10px] font-bold uppercase text-slate-400">End</p>
+                                        <p className="text-sm font-bold">{endTime ? formatDisplay(endTime) : '--:--'}</p>
+                                      </div>
+                                      {endTime && (
+                                          <X 
+                                            className="w-3.5 h-3.5 ml-auto text-slate-400 hover:text-rose-500" 
+                                            onClick={(e) => { e.stopPropagation(); setEndTime(''); }}
+                                          />
+                                      )}
+                                    </button>
+                               </div>
+
+                               {activeTimeField && (
+                                  <div className="flex justify-center mb-4 overflow-hidden">
+                                    <TimePicker
+                                      key={activeTimeField}
+                                      value={activeTimeField === 'start' ? startTime : endTime}
+                                      minTime={activeTimeField === 'end' ? startTime : undefined}
+                                      onChange={(v) => {
+                                        if (activeTimeField === 'start') {
+                                          setStartTime(v);
+                                        } else {
+                                          setEndTime(v);
+                                        }
+                                      }}
+                                    />
+                                  </div>
+                               )}
+                               <div className="pt-2 border-t border-border/50">
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                          type="button"
+                                          onClick={() => setNotifyEnabled(!notifyEnabled)}
+                                          className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition-all ${
+                                            notifyEnabled ? 'bg-primary/10 text-primary border-primary/20' : 'bg-card border-border text-slate-500'
+                                          }`}
+                                        >
+                                          <Bell className="w-4 h-4" />
+                                          <span className="text-[11px] font-black uppercase tracking-wider">Notify me</span>
+                                          <div className={`w-7 h-3.5 rounded-full relative transition-colors ${notifyEnabled ? 'bg-primary' : 'bg-slate-300'}`}>
+                                            <div className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-transform ${notifyEnabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                                          </div>
+                                        </button>
+
+                                        {notifyEnabled && (
+                                          <div className="flex-1 min-w-0 relative">
+                                            <button
+                                              type="button"
+                                              onClick={() => setShowReminderPicker(!showReminderPicker)}
+                                              className="w-full h-[38px] flex items-center justify-between px-3 rounded-xl bg-card border border-border text-[11px] font-bold text-slate-600"
+                                            >
+                                              <span className="truncate">{selectedReminderLabel}</span>
+                                              <ChevronDown className={`w-3.5 h-3.5 shrink-0 transition-transform ${showReminderPicker ? 'rotate-180' : ''}`} />
+                                            </button>
+                                            
+                                            {showReminderPicker && (
+                                              <div className="absolute bottom-full left-0 right-0 mb-1 z-[1010] grid grid-cols-1 gap-1 p-1 bg-popover border border-border rounded-xl shadow-lg max-h-[160px] overflow-y-auto no-scrollbar">
+                                                {REMINDER_OPTIONS.map((opt) => (
+                                                  <button
+                                                    key={opt.value}
+                                                    type="button"
+                                                    onClick={() => { setReminder(opt.value); setShowReminderPicker(false); }}
+                                                    className={`w-full px-3 py-2 text-left text-[11px] rounded-lg transition-colors ${reminder === opt.value ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-accent'}`}
+                                                  >
+                                                    {opt.label}
+                                                  </button>
+                                                ))}
+                                              </div>
+                                            )}
+                                          </div>
+                                        )}
+                                    </div>
+                               </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
 
                     {/* Segmented control */}
@@ -895,7 +1264,7 @@ export default function QuickAddSheet({
                               setWhen('habit');
                               if (pickedDays.length === 0)
                                 setPickedDays([
-                                  todayDisplayIndex() as Exclude<DisplayDay, 7>,
+                                  todayDisplayIndex() as DisplayDay,
                                 ]);
                               setRepeat('habit');
                             }}
@@ -977,32 +1346,41 @@ export default function QuickAddSheet({
                       >
                         {!hideDayPicker && when !== 'habit' && (
                           <div className="flex-1 min-w-0 -mx-2 px-2">
-                            <div className="flex justify-start gap-2 sm:gap-2 py-2 px-1 overflow-x-auto no-scrollbar mask-fade-right">
-                              {dayLabels.map(({ short, title }, idx) => {
-                                const d = idx as Exclude<DisplayDay, 7>;
-                                const on = pickedDays.includes(d);
-                                return (
-                                  <button
-                                    key={d}
-                                    type="button"
-                                    onClick={() => toggleDay(d)}
-                                    aria-pressed={on}
-                                    data-active={on}
-                                    title={title}
-                                    className={[
-                                      'shrink-0 inline-flex items-center justify-center select-none',
-                                      'h-10 w-10 sm:h-11 sm:w-11 rounded-full text-[11px] font-black uppercase tracking-tighter sm:tracking-normal',
-                                      'border border-border/70 shadow-sm transition-all duration-300',
-                                      'bg-card text-foreground',
-                                      'data-[active=true]:bg-primary/20 data-[active=true]:border-primary data-[active=true]:text-primary data-[active=true]:scale-110 data-[active=true]:shadow-md data-[active=true]:shadow-primary/10',
-                                      'hover:bg-accent/50 hover:border-border',
-                                    ].join(' ')}
-                                  >
-                                    {short}
-                                  </button>
-                                );
-                              })}
-                            </div>
+                            {isLater ? (
+                              <div className="h-10 sm:h-11 flex items-center px-3 bg-primary/5 rounded-2xl border border-primary/10">
+                                <Info className="w-3.5 h-3.5 text-primary mr-2" />
+                                <span className="text-[11px] font-bold text-primary uppercase tracking-wider">
+                                  Task will be saved for later
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex justify-start gap-2 sm:gap-2 py-2 px-1 overflow-x-auto no-scrollbar mask-fade-right">
+                                {dayLabels.map(({ short, title }, idx) => {
+                                  const d = idx as DisplayDay;
+                                  const on = pickedDays.includes(d);
+                                  return (
+                                    <button
+                                      key={d}
+                                      type="button"
+                                      onClick={() => toggleDay(d)}
+                                      aria-pressed={on}
+                                      data-active={on}
+                                      title={title}
+                                      className={[
+                                        'shrink-0 inline-flex items-center justify-center select-none',
+                                        'h-10 w-10 sm:h-11 sm:w-11 rounded-full text-[11px] font-black uppercase tracking-tighter sm:tracking-normal',
+                                        'border border-border/70 shadow-sm transition-all duration-300',
+                                        'bg-card text-foreground',
+                                        'data-[active=true]:bg-primary/20 data-[active=true]:border-primary data-[active=true]:text-primary data-[active=true]:scale-110 data-[active=true]:shadow-md data-[active=true]:shadow-primary/10',
+                                        'hover:bg-accent/50 hover:border-border',
+                                      ].join(' ')}
+                                    >
+                                      {short}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -1034,7 +1412,24 @@ export default function QuickAddSheet({
                         )}
 
                         {!hideRepeatPicker && when !== 'habit' && (
-                          <div className="sm:shrink-0 sm:pl-1">
+                          <div className="flex gap-2 sm:shrink-0 sm:pl-1">
+                            <button
+                              type="button"
+                              onClick={toggleLater}
+                              className={`
+                                inline-flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-bold transition-all
+                                border shadow-sm
+                                ${
+                                  isLater
+                                    ? 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/15'
+                                    : 'bg-muted/50 text-muted-foreground border-border hover:bg-muted/80 hover:text-foreground'
+                                }
+                            `}
+                            >
+                              <CalendarDays className={`w-3.5 h-3.5 ${isLater ? 'text-primary' : 'text-muted-foreground'}`} />
+                              {isLater ? 'Saved for later' : 'Save for later'}
+                            </button>
+
                             <button
                               type="button"
                               onClick={() =>

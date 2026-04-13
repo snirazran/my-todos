@@ -65,6 +65,9 @@ export default function TaskBoard({
     repeat: RepeatChoice;
     tags: string[];
     timesPerWeek?: number;
+    startTime?: string;
+    endTime?: string;
+    reminder?: string;
   }) => Promise<void> | void;
   todayDisplayIndex: Exclude<DisplayDay, 7>;
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>; // New Prop
@@ -699,7 +702,7 @@ export default function TaskBoard({
         defaultMode={quickAddMode}
         defaultPickedDay={initialDay !== undefined ? initialDay : (isMobile ? pageIndex : todayDisplayIndex)}
         daysOrder={daysOrder}
-        onSubmit={async ({ text, days, repeat, tags, timesPerWeek }) => {
+        onSubmit={async ({ text, days, repeat, tags, timesPerWeek, startTime, endTime, reminder }) => {
           if (onQuickAdd) {
             await onQuickAdd({
               text,
@@ -707,6 +710,9 @@ export default function TaskBoard({
               repeat: repeat as RepeatChoice,
               tags,
               timesPerWeek,
+              startTime,
+              endTime,
+              reminder,
             });
           } else {
             onRequestAdd(null, text, null, repeat as RepeatChoice);

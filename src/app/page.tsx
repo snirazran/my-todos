@@ -685,7 +685,7 @@ export default function Home() {
         initialText={quickText}
         defaultRepeat="this-week"
         defaultMode={quickAddMode}
-        onSubmit={async ({ text, days, repeat, tags, timesPerWeek }) => {
+        onSubmit={async ({ text, days, repeat, tags, timesPerWeek, startTime, endTime, reminder }) => {
           try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const dateStr = format(new Date(), 'yyyy-MM-dd');
@@ -693,7 +693,7 @@ export default function Home() {
             const res = await fetch('/api/tasks?view=board', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text, days, repeat, tags, timesPerWeek, timezone: tz }),
+              body: JSON.stringify({ text, days, repeat, tags, timesPerWeek, timezone: tz, startTime, endTime, reminder }),
             });
             const data = await res.json();
 
