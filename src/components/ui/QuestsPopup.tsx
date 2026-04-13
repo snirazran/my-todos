@@ -1010,6 +1010,7 @@ function QuestCarousel({
   const velocity = useRef(0);
 
   const onPointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType !== 'mouse') return; // let touch use native scroll
     const el = scrollRef.current;
     if (!el) return;
     isDragging.current = true;

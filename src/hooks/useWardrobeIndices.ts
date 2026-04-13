@@ -1,8 +1,21 @@
 'use client';
 
+import { useEffect } from 'react';
 import useSWR from 'swr';
 import { byId as staticById } from '@/lib/skins/catalog';
 import type { ItemDef } from '@/lib/skins/catalog';
+
+const CACHE_KEY = 'frog-wardrobe-indices';
+
+type Indices = { skin: number; mood: number; hat: number; body: number; hand_item: number };
+
+function getCachedIndices(): Indices | null {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (raw) return JSON.parse(raw) as Indices;
+  } catch {}
+  return null;
+}
 
 export function useWardrobeIndices(enabled: boolean) {
   const { data } = useSWR(
@@ -27,14 +40,29 @@ export function useWardrobeIndices(enabled: boolean) {
     return item ? item.riveIndex : 0;
   };
 
+  const loaded = !!data;
+
+  const indices: Indices = loaded
+    ? {
+        skin: getIndex(eq.skin),
+        mood: 0,
+        hat: getIndex(eq.hat),
+        body: getIndex(eq.body),
+        hand_item: getIndex(eq.hand_item),
+      }
+    : getCachedIndices() ?? { skin: 0, mood: 0, hat: 0, body: 0, hand_item: 0 };
+
+  // Persist to localStorage when fresh data arrives
+  useEffect(() => {
+    if (loaded) {
+      try {
+        localStorage.setItem(CACHE_KEY, JSON.stringify(indices));
+      } catch {}
+    }
+  }, [loaded, indices.skin, indices.hat, indices.body, indices.hand_item]);
+
   return {
-    indices: {
-      skin: getIndex(eq.skin),
-      mood: 0,
-      hat: getIndex(eq.hat),
-      body: getIndex(eq.body),
-      hand_item: getIndex(eq.hand_item),
-    },
+    indices,
     wardrobeData: data,
   };
 }
