@@ -30,6 +30,7 @@ import Fly from './fly';
 type QuestsResponse = {
   isPremium: boolean;
   claimableCount: number;
+  todoCount?: number;
   onboarding: {
     complete: boolean;
     selectedCategoryIds: MacroCategoryId[];

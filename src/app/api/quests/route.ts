@@ -27,10 +27,21 @@ export async function GET(req: Request) {
     const claimableCount =
       dashboard.dailyQuests.filter((quest) => quest.claimable).length +
       dashboard.categoryQuests.filter((quest) => quest.claimable).length;
+    const todoCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
+      (sum, quest) => {
+        const questLeft = quest.completed ? 0 : 1;
+        const objectivesLeft = quest.logic.filter(
+          (block) => block.progress < block.target,
+        ).length;
+        return sum + questLeft + objectivesLeft;
+      },
+      0,
+    );
 
     return NextResponse.json({
       isPremium: dashboard.isPremium,
       claimableCount,
+      todoCount,
       onboarding: {
         complete: !!dashboard.focusProfile.completedAt,
         selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
