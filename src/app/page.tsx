@@ -966,16 +966,11 @@ function TaskCounter({
   if (count === 0 && (!pendingCount || pendingCount === 0)) return null;
 
   return (
-    <div className="flex items-center gap-1.5 ml-1">
+    <div className="flex items-center -ml-0.5">
       {count > 0 && (
         <motion.span
           animate={controls}
-          className={cn(
-            "flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-black shadow-sm !text-white",
-            isActive 
-              ? "bg-primary" 
-              : "bg-primary"
-          )}
+          className="flex h-[18px] min-w-[18px] px-0.5 items-center justify-center rounded-full text-[9px] font-black shadow-sm !text-white bg-primary leading-none tracking-normal pt-px"
         >
           {count}
         </motion.span>

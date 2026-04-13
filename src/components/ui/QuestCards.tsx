@@ -630,7 +630,7 @@ function ObjectiveRow({
       <div className="flex items-center gap-3">
         <p
           className={cn(
-            'flex-1 text-[14px] font-black leading-snug',
+            'flex-1 text-sm md:text-base font-black leading-snug',
             objectiveClaimed
               ? 'text-muted-foreground line-through decoration-muted-foreground/40'
               : 'text-foreground',
@@ -638,14 +638,14 @@ function ObjectiveRow({
         >
           {formatQuestObjective(block)}
         </p>
-        <span className="shrink-0 text-[12px] font-black tabular-nums text-muted-foreground">
+        <span className="shrink-0 text-xs md:text-sm font-black tabular-nums text-muted-foreground">
           {Math.min(block.progress, safeTarget)}/
           {block.targetLabel ?? block.target}
         </span>
       </div>
 
       {/* Progress bar — color shifts by percentage */}
-      <div className="h-2 mt-2 overflow-hidden rounded-full bg-muted/50">
+      <div className="h-2 md:h-2.5 mt-2 overflow-hidden rounded-full bg-muted/50">
         <div
           className={cn(
             'h-full rounded-full transition-all duration-500',
@@ -665,6 +665,8 @@ function ObjectiveRow({
                 reward={reward}
                 rewardCatalog={rewardCatalog}
                 isPremium={isPremium ?? false}
+                compact
+                className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
                 onClick={() => onOpenRewards?.(block.rewards ?? [])}
               />
             ))}
@@ -696,9 +698,22 @@ function ObjectiveRow({
                   </div>
                 );
               }
-              return null;
+              return (
+                <div className="flex items-center justify-center gap-1.5 rounded-xl bg-muted/50 px-3 py-1.5">
+                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/50 mr-[-0.15em]">
+                    In Progress
+                  </span>
+                </div>
+              );
             })()}
           </div>
+        </div>
+      )}
+      {!hasRewards && !objectiveComplete && (
+        <div className="flex items-center justify-center gap-1.5 mt-2 rounded-xl bg-muted/50 px-3 py-1.5 w-fit">
+          <span className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/50 mr-[-0.15em]">
+            In Progress
+          </span>
         </div>
       )}
     </div>

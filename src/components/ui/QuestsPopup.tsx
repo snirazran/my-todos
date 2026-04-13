@@ -539,7 +539,7 @@ export function QuestsPopup({
                           value="category"
                           className="
                             flex-1 h-full rounded-full relative
-                            flex items-center justify-center gap-2
+                            flex items-center justify-center gap-1.5
                             text-[11px] md:text-sm font-black tracking-widest uppercase
                             transition-all duration-300
                             data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-primary/20 data-[state=active]:ring-1 data-[state=active]:ring-primary/20
@@ -549,7 +549,7 @@ export function QuestsPopup({
                           <Compass className="w-4 h-4" />
                           <span>My Focus</span>
                           {countCategory > 0 && (
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm -ml-0.5 leading-none tracking-normal">
                               {countCategory}
                             </span>
                           )}
@@ -558,7 +558,7 @@ export function QuestsPopup({
                           value="daily"
                           className="
                             flex-1 h-full rounded-full relative
-                            flex items-center justify-center gap-2
+                            flex items-center justify-center gap-1.5
                             text-[11px] md:text-sm font-black tracking-widest uppercase
                             transition-all duration-300
                             data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-primary/20 data-[state=active]:ring-1 data-[state=active]:ring-primary/20
@@ -568,7 +568,7 @@ export function QuestsPopup({
                           <CalendarDays className="w-4 h-4" />
                           <span>Daily</span>
                           {countDaily > 0 && (
-                            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm -ml-0.5 leading-none tracking-normal">
                               {countDaily}
                             </span>
                           )}
