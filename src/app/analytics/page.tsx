@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Loader2 } from 'lucide-react';
@@ -12,21 +12,30 @@ import {
   startOfToday,
   startOfDay,
 } from 'date-fns';
-import useSWR from 'swr';
+import useSWR, { useSWRConfig } from 'swr';
 
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import HistoryCalendar from '@/components/history/HistoryCalendar';
 import DayDetailSheet from '@/components/history/DayDetailSheet';
 import HistoryInsights from '@/components/history/HistoryInsights';
 import { DateRangeOption } from '@/components/history/HistoryTimeSelector';
-import { useTaskData } from '@/hooks/useTaskData';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 
+type HistoryDateRange = { from: string; to: string };
+
+function rangeContains(outer: HistoryDateRange, inner: HistoryDateRange) {
+  return outer.from <= inner.from && outer.to >= inner.to;
+}
+
+function filterHistoryRange(data: any[], range: HistoryDateRange) {
+  return data.filter((day) => day.date >= range.from && day.date <= range.to);
+}
+
 export default function HistoryPage() {
   const { user, loading } = useAuth();
-  const { hungerStatus, flyStatus, mutateToday, mutateBacklog } = useTaskData();
+  const { mutate } = useSWRConfig();
   const router = useRouter();
 
   // --- State: Calendar View ---
@@ -62,8 +71,23 @@ export default function HistoryPage() {
   );
   const availableTags = tagsData?.tags || [];
 
+  const revalidateTaskCaches = useCallback(() => {
+    mutate(
+      (key: unknown) =>
+        typeof key === 'string' && key.startsWith('/api/tasks'),
+    );
+  }, [mutate]);
+
   // Fetch user data to get join date
   const { data: userData } = useSWR(user ? '/api/user' : null, (url) =>
+    fetch(url).then((r) => r.json()),
+  );
+
+  const todayStatusKey =
+    user && selectedDate
+      ? `/api/tasks?date=${format(new Date(), 'yyyy-MM-dd')}&timezone=${encodeURIComponent(Intl.DateTimeFormat().resolvedOptions().timeZone)}`
+      : null;
+  const { data: todayStatusData } = useSWR(todayStatusKey, (url) =>
     fetch(url).then((r) => r.json()),
   );
 
@@ -72,6 +96,43 @@ export default function HistoryPage() {
     ? startOfDay(new Date(userData.createdAt))
     : undefined;
   const maxDate = startOfDay(new Date()); // Today
+
+  const calendarFetchRange = useMemo(
+    () => ({
+      from: format(startOfMonth(viewDate), 'yyyy-MM-dd'),
+      to: format(endOfMonth(viewDate), 'yyyy-MM-dd'),
+    }),
+    [viewDate],
+  );
+
+  const statsRange = useMemo(() => {
+    const today = startOfToday();
+    let fromDate = today;
+    let toDate = today;
+
+    switch (statsFilter) {
+      case '7d':
+        fromDate = subDays(today, 6);
+        break;
+      case '30d':
+        fromDate = subDays(today, 29);
+        break;
+      case 'custom':
+        if (customFrom) fromDate = new Date(customFrom);
+        if (customTo) toDate = new Date(customTo);
+        break;
+    }
+
+    return {
+      from: format(fromDate, 'yyyy-MM-dd'),
+      to: format(toDate, 'yyyy-MM-dd'),
+    };
+  }, [statsFilter, customFrom, customTo]);
+
+  const calendarScopedStatsData = useMemo(() => {
+    if (!rangeContains(calendarFetchRange, statsRange)) return null;
+    return filterHistoryRange(calendarData, statsRange);
+  }, [calendarData, calendarFetchRange, statsRange]);
 
   // --- Auth Check ---
   useEffect(() => {
@@ -88,12 +149,10 @@ export default function HistoryPage() {
     const fetchMonth = async () => {
       setLoadingCalendar(true);
       try {
-        const fromStr = format(startOfMonth(viewDate), 'yyyy-MM-dd');
-        const toStr = format(endOfMonth(viewDate), 'yyyy-MM-dd');
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
         const res = await fetch(
-          `/api/history?from=${fromStr}&to=${toStr}&timezone=${encodeURIComponent(userTimezone)}`,
+          `/api/history?from=${calendarFetchRange.from}&to=${calendarFetchRange.to}&timezone=${encodeURIComponent(userTimezone)}`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -107,38 +166,22 @@ export default function HistoryPage() {
     };
 
     fetchMonth();
-  }, [viewDate, user]);
+  }, [calendarFetchRange, user]);
 
   // --- 2. Fetch Stats Data (When needed) ---
   useEffect(() => {
     if (!user) return;
+    if (calendarScopedStatsData) {
+      setStatsData(calendarScopedStatsData);
+      return;
+    }
 
     const fetchStats = async () => {
       try {
-        // Logic similar to old page
-        const today = startOfToday();
-        let fromDate = new Date();
-        let toDate = today;
-
-        switch (statsFilter) {
-          case '7d':
-            fromDate = subDays(today, 6);
-            break;
-          case '30d':
-            fromDate = subDays(today, 29);
-            break;
-          case 'custom':
-            if (customFrom) fromDate = new Date(customFrom);
-            if (customTo) toDate = new Date(customTo);
-            break;
-        }
-
-        const fromStr = format(fromDate, 'yyyy-MM-dd');
-        const toStr = format(toDate, 'yyyy-MM-dd');
         const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
         const res = await fetch(
-          `/api/history?from=${fromStr}&to=${toStr}&timezone=${encodeURIComponent(userTimezone)}`,
+          `/api/history?from=${statsRange.from}&to=${statsRange.to}&timezone=${encodeURIComponent(userTimezone)}`,
         );
         if (res.ok) {
           const data = await res.json();
@@ -150,7 +193,7 @@ export default function HistoryPage() {
     };
 
     fetchStats();
-  }, [statsFilter, customFrom, customTo, user]);
+  }, [calendarScopedStatsData, statsRange, user]);
 
   // Live frogodoro overlay for today
   const { selectedTaskId: frogTaskId, sessionStats, settings: frogSettings, phase: frogPhase, timeLeft: frogTimeLeft, isRunning: frogRunning } = useFrogodoroStore();
@@ -295,8 +338,7 @@ export default function HistoryPage() {
         body: JSON.stringify({ taskId, date }),
       });
       // Also mutate today/backlog just in case
-      mutateToday();
-      mutateBacklog();
+      revalidateTaskCaches();
     } catch (error) {
       console.error('Delete failed', error);
       // Re-fetch calendar to be safe
@@ -330,8 +372,7 @@ export default function HistoryPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ taskId, text: newText }),
       });
-      mutateToday();
-      mutateBacklog();
+      revalidateTaskCaches();
     } catch (error) {
       console.error('Edit failed', error);
     }
@@ -340,11 +381,11 @@ export default function HistoryPage() {
 
   // Frog Props for Day Detail
   const frogProps = {
-    flyBalance: flyStatus.balance,
+    flyBalance: todayStatusData?.flyStatus?.balance,
     animateBalance: false,
     animateHunger: false,
-    hunger: hungerStatus.hunger,
-    maxHunger: hungerStatus.maxHunger,
+    hunger: todayStatusData?.hungerStatus?.hunger,
+    maxHunger: todayStatusData?.hungerStatus?.maxHunger,
     // Note: rate/done/total are calculated inside DayDetailSheet for that specific day
   };
 
@@ -397,22 +438,24 @@ export default function HistoryPage() {
         </div>
 
         {/* Day Popup */}
-        <DayDetailSheet
-          open={!!selectedDate}
-          onClose={() => setSelectedDate(null)}
-          date={selectedDate || format(new Date(), 'yyyy-MM-dd')}
-          tasks={selectedDayTasks}
-          onToggleTask={handleToggleTask}
-          onDeleteTask={handleDeleteTask}
-          onEditTask={(id, text, type) => setEditingTask({ id, text, type })}
-          frogProps={{
-            ...frogProps,
-          }}
-          selectedTags={popupSelectedTags}
-          onTagsChange={setPopupSelectedTags}
-          showCompleted={popupShowCompleted}
-          onShowCompletedChange={setPopupShowCompleted}
-        />
+        {selectedDate && (
+          <DayDetailSheet
+            open
+            onClose={() => setSelectedDate(null)}
+            date={selectedDate}
+            tasks={selectedDayTasks}
+            onToggleTask={handleToggleTask}
+            onDeleteTask={handleDeleteTask}
+            onEditTask={(id, text, type) => setEditingTask({ id, text, type })}
+            frogProps={{
+              ...frogProps,
+            }}
+            selectedTags={popupSelectedTags}
+            onTagsChange={setPopupSelectedTags}
+            showCompleted={popupShowCompleted}
+            onShowCompletedChange={setPopupShowCompleted}
+          />
+        )}
 
         <EditTaskDialog
           open={!!editingTask}
