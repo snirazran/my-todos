@@ -447,7 +447,7 @@ export default function QuickAddSheet({
   const toggleDay = (d: DisplayDay) =>
     setPickedDays((prev) => {
       // If picking a real day, remove 'Later' (7)
-      const withoutLater = prev.filter((x) => x !== 7);
+      const withoutLater: DisplayDay[] = prev.filter((x) => x !== 7);
       if (withoutLater.includes(d)) {
         return withoutLater.filter((x) => x !== d);
       }
