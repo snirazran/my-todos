@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 export interface BaseSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  children: (props: { isDesktop: boolean }) => React.ReactNode;
+  children: (props: { isDesktop: boolean; dragControls: any }) => React.ReactNode;
   /** Extra classes on the sheet panel itself */
   className?: string;
   /** Extra classes on the backdrop */
@@ -96,15 +96,19 @@ export function BaseSheet({
                 className,
               )}
             >
+              {children({ isDesktop, dragControls })}
+
               {/* Drag handle – mobile only */}
               {!isDesktop && (
                 <div
-                  className="absolute inset-x-0 top-0 z-20 h-8 touch-none"
-                  onPointerDown={(e) => dragControls.start(e)}
-                />
+                  className="absolute inset-x-0 top-0 z-[60] h-10 pointer-events-none flex items-center justify-center"
+                >
+                   <div 
+                    className="w-12 h-1.5 rounded-full bg-border/60 pointer-events-auto touch-none" 
+                    onPointerDown={(e) => dragControls.start(e)}
+                   />
+                </div>
               )}
-
-              {children({ isDesktop })}
             </motion.div>
           </div>
         </>

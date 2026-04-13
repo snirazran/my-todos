@@ -201,13 +201,18 @@ export default function HistoryPage() {
   const frogLiveElapsed = frogPhaseDuration - frogTimeLeft;
   const frogHasActivity = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || frogRunning || frogLiveElapsed > 0;
 
-  // --- Helpers ---
-  const selectedDayTasks = useMemo(() => {
-    if (!selectedDate) return [];
-    const day = calendarData.find((d) => d.date === selectedDate);
+  const [lastSelectedDate, setLastSelectedDate] = useState<string | null>(null);
+  useEffect(() => {
+    if (selectedDate) setLastSelectedDate(selectedDate);
+  }, [selectedDate]);
+
+  const popupTasks = useMemo(() => {
+    const dateToUse = selectedDate || lastSelectedDate;
+    if (!dateToUse) return [];
+    const day = calendarData.find((d) => d.date === dateToUse);
     const tasks = day ? day.tasks : [];
     const todayStr = format(new Date(), 'yyyy-MM-dd');
-    if (selectedDate !== todayStr || !frogTaskId || !frogHasActivity) return tasks;
+    if (dateToUse !== todayStr || !frogTaskId || !frogHasActivity) return tasks;
     return tasks.map((t: any) =>
       t.id === frogTaskId
         ? {
@@ -224,7 +229,7 @@ export default function HistoryPage() {
           }
         : t,
     );
-  }, [calendarData, selectedDate, frogTaskId, frogHasActivity, sessionStats, frogPhase, frogLiveElapsed]);
+  }, [calendarData, selectedDate, lastSelectedDate, frogTaskId, frogHasActivity, sessionStats, frogPhase, frogLiveElapsed]);
 
   const filteredStatsData = useMemo(() => {
     if (selectedTagIds.length === 0) return statsData;
@@ -341,15 +346,13 @@ export default function HistoryPage() {
       revalidateTaskCaches();
     } catch (error) {
       console.error('Delete failed', error);
-      // Re-fetch calendar to be safe
-      // fetchMonth() is triggered by viewDate, but we can just wait for revalidation or re-fetch manually.
     }
   };
 
   const handleSaveEdit = async (newText: string) => {
-    if (!editingTask || !selectedDate) return;
+    const date = selectedDate || lastSelectedDate;
+    if (!editingTask || !date) return;
     const taskId = editingTask.id;
-    const date = selectedDate;
 
     // Optimistic
     const updateData = (prev: any[]) =>
@@ -386,7 +389,6 @@ export default function HistoryPage() {
     animateHunger: false,
     hunger: todayStatusData?.hungerStatus?.hunger,
     maxHunger: todayStatusData?.hungerStatus?.maxHunger,
-    // Note: rate/done/total are calculated inside DayDetailSheet for that specific day
   };
 
   if (loading) return <LoadingScreen message="Loading..." />;
@@ -438,24 +440,22 @@ export default function HistoryPage() {
         </div>
 
         {/* Day Popup */}
-        {selectedDate && (
-          <DayDetailSheet
-            open
-            onClose={() => setSelectedDate(null)}
-            date={selectedDate}
-            tasks={selectedDayTasks}
-            onToggleTask={handleToggleTask}
-            onDeleteTask={handleDeleteTask}
-            onEditTask={(id, text, type) => setEditingTask({ id, text, type })}
-            frogProps={{
-              ...frogProps,
-            }}
-            selectedTags={popupSelectedTags}
-            onTagsChange={setPopupSelectedTags}
-            showCompleted={popupShowCompleted}
-            onShowCompletedChange={setPopupShowCompleted}
-          />
-        )}
+        <DayDetailSheet
+          open={!!selectedDate}
+          onClose={() => setSelectedDate(null)}
+          date={selectedDate || lastSelectedDate || format(new Date(), 'yyyy-MM-dd')}
+          tasks={popupTasks}
+          onToggleTask={handleToggleTask}
+          onDeleteTask={handleDeleteTask}
+          onEditTask={(id, text, type) => setEditingTask({ id, text, type })}
+          frogProps={{
+            ...frogProps,
+          }}
+          selectedTags={popupSelectedTags}
+          onTagsChange={setPopupSelectedTags}
+          showCompleted={popupShowCompleted}
+          onShowCompletedChange={setPopupShowCompleted}
+        />
 
         <EditTaskDialog
           open={!!editingTask}

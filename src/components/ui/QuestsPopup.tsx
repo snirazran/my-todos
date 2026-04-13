@@ -4,7 +4,14 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR from 'swr';
-import { ScrollText, X, Compass, CalendarDays, RefreshCw, Sparkles } from 'lucide-react';
+import {
+  ScrollText,
+  X,
+  Compass,
+  CalendarDays,
+  RefreshCw,
+  Sparkles,
+} from 'lucide-react';
 import { BaseSheet } from './BaseSheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -196,7 +203,11 @@ export function QuestsPopup({
       if (quest.claimable) count++;
       // Count completed objectives with unclaimed rewards
       quest.logic.forEach((block) => {
-        if ((block.rewards?.length ?? 0) > 0 && block.progress >= block.target && !quest.claimedObjectiveIds.includes(block.id)) {
+        if (
+          (block.rewards?.length ?? 0) > 0 &&
+          block.progress >= block.target &&
+          !quest.claimedObjectiveIds.includes(block.id)
+        ) {
           count++;
         }
       });
@@ -210,7 +221,11 @@ export function QuestsPopup({
       let count = 0;
       if (quest.claimable) count++;
       quest.logic.forEach((block) => {
-        if ((block.rewards?.length ?? 0) > 0 && block.progress >= block.target && !quest.claimedObjectiveIds.includes(block.id)) {
+        if (
+          (block.rewards?.length ?? 0) > 0 &&
+          block.progress >= block.target &&
+          !quest.claimedObjectiveIds.includes(block.id)
+        ) {
           count++;
         }
       });
@@ -220,11 +235,14 @@ export function QuestsPopup({
 
   // Count active (in-progress, not yet claimable) quests as fallback
   const activeDailyCount = useMemo(() => {
-    return (data?.dailyQuests ?? []).filter((q) => !q.claimed && !q.claimable).length;
+    return (data?.dailyQuests ?? []).filter((q) => !q.claimed && !q.claimable)
+      .length;
   }, [data?.dailyQuests]);
 
   const activeCategoryCount = useMemo(() => {
-    return (data?.categoryQuests ?? []).filter((q) => !q.claimed && !q.claimable).length;
+    return (data?.categoryQuests ?? []).filter(
+      (q) => !q.claimed && !q.claimable,
+    ).length;
   }, [data?.categoryQuests]);
 
   const subCategoryOptions: FilterOption[] = useMemo(() => {
@@ -253,7 +271,11 @@ export function QuestsPopup({
       let count = 0;
       if (quest.claimable) count++;
       quest.logic.forEach((block) => {
-        if ((block.rewards?.length ?? 0) > 0 && block.progress >= block.target && !quest.claimedObjectiveIds.includes(block.id)) {
+        if (
+          (block.rewards?.length ?? 0) > 0 &&
+          block.progress >= block.target &&
+          !quest.claimedObjectiveIds.includes(block.id)
+        ) {
           count++;
         }
       });
@@ -523,245 +545,271 @@ export function QuestsPopup({
     <>
       <BaseSheet
         open={show}
-        onOpenChange={(v) => { if (!v) onClose(); }}
+        onOpenChange={(v) => {
+          if (!v) onClose();
+        }}
         className="h-[92vh] sm:h-[88vh] sm:max-w-[1080px]"
         zIndex={1050}
       >
-        {({ isDesktop }) => (
-          <>
-            <div className="px-4 py-4 border-b border-border/50 md:px-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center h-11 w-11 rounded-2xl bg-primary/10 text-primary">
-                    <ScrollText className="w-6 h-6" />
+        {({ isDesktop, dragControls }) => {
+          const handleSheetDrag = (
+            e: React.PointerEvent,
+            scrollEl: HTMLDivElement | null,
+          ) => {
+            if (isDesktop || !scrollEl) return;
+            if (
+              scrollEl.scrollTop <= 0 &&
+              e.nativeEvent instanceof PointerEvent
+            ) {
+              dragControls.start(e);
+            }
+          };
+
+          return (
+            <>
+              <div
+                onPointerDown={(e) => !isDesktop && dragControls.start(e)}
+                className="px-4 py-4 border-b border-border/50 md:px-6"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center h-11 w-11 rounded-2xl bg-primary/10 text-primary">
+                      <ScrollText className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-black tracking-tight text-foreground md:text-3xl">
+                        Quests
+                      </h2>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-2xl font-black tracking-tight text-foreground md:text-3xl">
-                      Quests
-                    </h2>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={onClose}
+                      className="flex items-center justify-center w-10 h-10 transition-colors border rounded-full border-border/50 bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
                   </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={onClose}
-                    className="flex items-center justify-center w-10 h-10 transition-colors border rounded-full border-border/50 bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
                 </div>
               </div>
-            </div>
-            <div className="flex-1 overflow-hidden">
-              {isGuest ? (
-                <EmptyState
-                  title="Sign in to unlock quests"
-                  description="Quests use your tasks, habits, timer sessions, and tags."
-                />
-              ) : isLoading ? (
-                <LoadingState />
-              ) : error || !data ? (
-                <EmptyState
-                  title="Could not load quests"
-                  description="Try reopening the popup."
-                />
-              ) : (
-                <div className="flex flex-col h-full">
-                  <div className="px-4 pt-4 md:px-6">
-                    <Tabs
-                      value={activeTab}
-                      onValueChange={(value) =>
-                        setActiveTab(value as 'daily' | 'category')
-                      }
+              <div className="flex-1 overflow-hidden">
+                {isGuest ? (
+                  <EmptyState
+                    title="Sign in to unlock quests"
+                    description="Quests use your tasks, habits, timer sessions, and tags."
+                  />
+                ) : isLoading ? (
+                  <LoadingState />
+                ) : error || !data ? (
+                  <EmptyState
+                    title="Could not load quests"
+                    description="Try reopening the popup."
+                  />
+                ) : (
+                  <div className="flex flex-col h-full">
+                    <div className="px-4 pt-4 md:px-6">
+                      <Tabs
+                        value={activeTab}
+                        onValueChange={(value) =>
+                          setActiveTab(value as 'daily' | 'category')
+                        }
+                      >
+                        <TabsList className="flex items-center w-full h-12 gap-2 p-1 border rounded-full shadow-sm border-border/50 bg-background/50 backdrop-blur-2xl md:h-14">
+                          <TabsTrigger
+                            value="category"
+                            className="
+                              flex-1 h-full rounded-full relative
+                              flex items-center justify-center gap-1.5
+                              text-[11px] md:text-sm font-black tracking-widest uppercase
+                              transition-all duration-300
+                              data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-primary/20 data-[state=active]:ring-1 data-[state=active]:ring-primary/20
+                              data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
+                            "
+                          >
+                            <Compass className="w-4 h-4" />
+                            <span>My Focus</span>
+                            {countCategory > 0 ? (
+                              <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal animate-in zoom-in">
+                                {countCategory}
+                              </span>
+                            ) : activeCategoryCount > 0 ? (
+                              <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-muted-foreground/50 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal">
+                                {activeCategoryCount}
+                              </span>
+                            ) : null}
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="daily"
+                            className="
+                              flex-1 h-full rounded-full relative
+                              flex items-center justify-center gap-1.5
+                              text-[11px] md:text-sm font-black tracking-widest uppercase
+                              transition-all duration-300
+                              data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-primary/20 data-[state=active]:ring-1 data-[state=active]:ring-primary/20
+                              data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
+                            "
+                          >
+                            <CalendarDays className="w-4 h-4" />
+                            <span>Daily</span>
+                            {countDaily > 0 ? (
+                              <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal animate-in zoom-in">
+                                {countDaily}
+                              </span>
+                            ) : activeDailyCount > 0 ? (
+                              <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-muted-foreground/50 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal">
+                                {activeDailyCount}
+                              </span>
+                            ) : null}
+                          </TabsTrigger>
+                        </TabsList>
+                      </Tabs>
+                      {claimMessage && (
+                        <div className="px-4 py-3 mt-4 text-sm font-medium border rounded-2xl border-primary/20 bg-primary/10 text-foreground">
+                          {claimMessage}
+                        </div>
+                      )}
+                    </div>
+                    <div
+                      className="flex-1 min-h-0 px-4 pt-4 pb-4 overflow-y-auto md:px-6 md:pb-6 overscroll-none"
+                      onPointerDown={(e) => handleSheetDrag(e, e.currentTarget)}
                     >
-                      <TabsList className="flex h-12 w-full items-center gap-2 rounded-full border border-border/50 bg-background/50 p-1 shadow-sm backdrop-blur-2xl md:h-14">
-                        <TabsTrigger
-                          value="category"
-                          className="
-                            flex-1 h-full rounded-full relative
-                            flex items-center justify-center gap-1.5
-                            text-[11px] md:text-sm font-black tracking-widest uppercase
-                            transition-all duration-300
-                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-primary/20 data-[state=active]:ring-1 data-[state=active]:ring-primary/20
-                            data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                          "
-                        >
-                          <Compass className="w-4 h-4" />
-                          <span>My Focus</span>
-                          {countCategory > 0 ? (
-                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal animate-in zoom-in">
-                              {countCategory}
-                            </span>
-                          ) : activeCategoryCount > 0 ? (
-                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-muted-foreground/50 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal">
-                              {activeCategoryCount}
-                            </span>
-                          ) : null}
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="daily"
-                          className="
-                            flex-1 h-full rounded-full relative
-                            flex items-center justify-center gap-1.5
-                            text-[11px] md:text-sm font-black tracking-widest uppercase
-                            transition-all duration-300
-                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-primary/20 data-[state=active]:ring-1 data-[state=active]:ring-primary/20
-                            data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                          "
-                        >
-                          <CalendarDays className="w-4 h-4" />
-                          <span>Daily</span>
-                          {countDaily > 0 ? (
-                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal animate-in zoom-in">
-                              {countDaily}
-                            </span>
-                          ) : activeDailyCount > 0 ? (
-                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-muted-foreground/50 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal">
-                              {activeDailyCount}
-                            </span>
-                          ) : null}
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                    {claimMessage && (
-                      <div className="px-4 py-3 mt-4 text-sm font-medium border rounded-2xl border-primary/20 bg-primary/10 text-foreground">
-                        {claimMessage}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-h-0 px-4 pt-4 pb-4 overflow-y-auto md:px-6 md:pb-6">
-                    {activeTab === 'category' ? (
-                      <div className="space-y-4">
-                        {!data.onboarding?.complete && (
-                          <PanelCard>
-                            Finish your onboarding on the home page to unlock
-                            quests for your focus areas.
-                          </PanelCard>
-                        )}
-                        {data.onboarding?.complete &&
-                          selectedCategories.length === 0 && (
+                      {activeTab === 'category' ? (
+                        <div className="space-y-4">
+                          {!data.onboarding?.complete && (
                             <PanelCard>
-                              Select at least one focus area to receive quests
-                              here.
+                              Finish your onboarding on the home page to unlock
+                              quests for your focus areas.
                             </PanelCard>
                           )}
-                        {data.onboarding?.complete && (
-                          <FilterBar
-                            active={activeSubCategoryId}
-                            onChange={(id: string) => { setActiveSubCategoryId(id); setCategoryPage(0); }}
-                            options={subCategoryOptions}
-                            badges={categoryBadges}
-                            badgeClassName="text-white bg-amber-500"
-                            fallbackBadges={activeCategoryBadges}
-                            fallbackBadgeClassName="text-white bg-muted-foreground/50"
-                          />
-                        )}
-                        {filteredCategoryQuests.length === 0 ? (
-                          <PanelCard>No active focus quests here.</PanelCard>
-                        ) : filteredCategoryQuests.length === 1 ? (
-                          <CategoryQuestPresentationCard
-                            quest={filteredCategoryQuests[0]}
-                            category={categoryMap[filteredCategoryQuests[0].categoryId]}
-                            rewardCatalog={data.rewardCatalog}
-                            isPremium={data.isPremium}
-                            claiming={claimingId === filteredCategoryQuests[0].id}
-                            claimingObjectiveId={claimingObjectiveId}
-                            linkedTags={
-                              (categoryTagMap.get(filteredCategoryQuests[0].categoryId) ?? [])
-                                .map((tagId) => tagCatalog.get(tagId))
-                                .filter(Boolean) as QuestTagChip[]
-                            }
-                            onEditTags={() =>
-                              setEditingFocusCategoryId(filteredCategoryQuests[0].categoryId)
-                            }
-                            onClaim={() => handleClaim('category', filteredCategoryQuests[0].id)}
-                            onClaimObjective={(objectiveId) =>
-                              handleClaimObjective(filteredCategoryQuests[0].id, objectiveId)
-                            }
-                          />
-                        ) : (
-                          <QuestCarousel
-                            activePage={categoryPage}
-                            onPageChange={setCategoryPage}
-                            count={filteredCategoryQuests.length}
-                          >
-                            {filteredCategoryQuests.map((quest) => (
-                              <CategoryQuestPresentationCard
-                                key={quest.id}
-                                quest={quest}
-                                category={categoryMap[quest.categoryId]}
-                                rewardCatalog={data.rewardCatalog}
-                                isPremium={data.isPremium}
-                                claiming={claimingId === quest.id}
-                                claimingObjectiveId={claimingObjectiveId}
-                                linkedTags={
-                                  (categoryTagMap.get(quest.categoryId) ?? [])
-                                    .map((tagId) => tagCatalog.get(tagId))
-                                    .filter(Boolean) as QuestTagChip[]
-                                }
-                                onEditTags={() =>
-                                  setEditingFocusCategoryId(quest.categoryId)
-                                }
-                                onClaim={() => handleClaim('category', quest.id)}
-                                onClaimObjective={(objectiveId) =>
-                                  handleClaimObjective(quest.id, objectiveId)
-                                }
-                              />
-                            ))}
-                          </QuestCarousel>
-                        )}
-                        {data.onboarding?.complete &&
-                          selectedCategories.length > 0 && (
-                            <div className="flex justify-center pt-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={handleRefreshFocus}
-                                disabled={refreshingFocus}
-                                className="font-bold rounded-2xl"
-                              >
-                                <RefreshCw
-                                  className={cn(
-                                    'mr-2 h-4 w-4',
-                                    refreshingFocus && 'animate-spin',
-                                  )}
-                                />
-                                {refreshingFocus
-                                  ? 'Refreshing...'
-                                  : 'Refresh My Focus'}
-                              </Button>
-                            </div>
+                          {data.onboarding?.complete &&
+                            selectedCategories.length === 0 && (
+                              <PanelCard>
+                                Select at least one focus area to receive quests
+                                here.
+                              </PanelCard>
+                            )}
+                          {data.onboarding?.complete && (
+                            <FilterBar
+                              active={activeSubCategoryId}
+                              onChange={(id: string) => {
+                                setActiveSubCategoryId(id);
+                                setCategoryPage(0);
+                              }}
+                              options={subCategoryOptions}
+                              badges={categoryBadges}
+                              badgeClassName="text-white bg-amber-500"
+                              fallbackBadges={activeCategoryBadges}
+                              fallbackBadgeClassName="text-white bg-muted-foreground/50"
+                            />
                           )}
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {(() => {
-                          const dailyQuests = data.dailyQuests ?? [];
-                          if (dailyQuests.length === 0) return null;
-                          if (dailyQuests.length === 1) {
-                            const quest = dailyQuests[0];
-                            return (
-                              <DailyQuestPresentationCard
-                                quest={quest}
-                                rewardCatalog={data.rewardCatalog}
-                                isPremium={data.isPremium}
-                                claiming={claimingId === quest.id}
-                                claimingObjectiveId={claimingObjectiveId}
-                                onClaim={() => handleClaim('daily', quest.id)}
-                                onClaimObjective={(objectiveId) =>
-                                  handleClaimObjective(quest.id, objectiveId)
-                                }
-                              />
-                            );
-                          }
-                          return (
+                          {filteredCategoryQuests.length === 0 ? (
+                            <PanelCard>No active focus quests here.</PanelCard>
+                          ) : filteredCategoryQuests.length === 1 ? (
+                            <CategoryQuestPresentationCard
+                              quest={filteredCategoryQuests[0]}
+                              category={
+                                categoryMap[
+                                  filteredCategoryQuests[0].categoryId
+                                ]
+                              }
+                              rewardCatalog={data.rewardCatalog}
+                              isPremium={data.isPremium}
+                              claiming={
+                                claimingId === filteredCategoryQuests[0].id
+                              }
+                              claimingObjectiveId={claimingObjectiveId}
+                              linkedTags={
+                                (
+                                  categoryTagMap.get(
+                                    filteredCategoryQuests[0].categoryId,
+                                  ) ?? []
+                                )
+                                  .map((tagId) => tagCatalog.get(tagId))
+                                  .filter(Boolean) as QuestTagChip[]
+                              }
+                              onEditTags={() =>
+                                setEditingFocusCategoryId(
+                                  filteredCategoryQuests[0].categoryId,
+                                )
+                              }
+                              onClaim={() =>
+                                handleClaim(
+                                  'category',
+                                  filteredCategoryQuests[0].id,
+                                )
+                              }
+                              onClaimObjective={(objectiveId) =>
+                                handleClaimObjective(
+                                  filteredCategoryQuests[0].id,
+                                  objectiveId,
+                                )
+                              }
+                            />
+                          ) : (
                             <QuestCarousel
-                              activePage={dailyPage}
-                              onPageChange={setDailyPage}
-                              count={dailyQuests.length}
+                              activePage={categoryPage}
+                              onPageChange={setCategoryPage}
+                              count={filteredCategoryQuests.length}
                             >
-                              {dailyQuests.map((quest) => (
-                                <DailyQuestPresentationCard
+                              {filteredCategoryQuests.map((quest) => (
+                                <CategoryQuestPresentationCard
                                   key={quest.id}
+                                  quest={quest}
+                                  category={categoryMap[quest.categoryId]}
+                                  rewardCatalog={data.rewardCatalog}
+                                  isPremium={data.isPremium}
+                                  claiming={claimingId === quest.id}
+                                  claimingObjectiveId={claimingObjectiveId}
+                                  linkedTags={
+                                    (categoryTagMap.get(quest.categoryId) ?? [])
+                                      .map((tagId) => tagCatalog.get(tagId))
+                                      .filter(Boolean) as QuestTagChip[]
+                                  }
+                                  onEditTags={() =>
+                                    setEditingFocusCategoryId(quest.categoryId)
+                                  }
+                                  onClaim={() =>
+                                    handleClaim('category', quest.id)
+                                  }
+                                  onClaimObjective={(objectiveId) =>
+                                    handleClaimObjective(quest.id, objectiveId)
+                                  }
+                                />
+                              ))}
+                            </QuestCarousel>
+                          )}
+                          {data.onboarding?.complete &&
+                            selectedCategories.length > 0 && (
+                              <div className="flex justify-center pt-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={handleRefreshFocus}
+                                  disabled={refreshingFocus}
+                                  className="font-bold rounded-2xl"
+                                >
+                                  <RefreshCw
+                                    className={cn(
+                                      'mr-2 h-4 w-4',
+                                      refreshingFocus && 'animate-spin',
+                                    )}
+                                  />
+                                  {refreshingFocus
+                                    ? 'Refreshing...'
+                                    : 'Refresh My Focus'}
+                                </Button>
+                              </div>
+                            )}
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          {(() => {
+                            const dailyQuests = data.dailyQuests ?? [];
+                            if (dailyQuests.length === 0) return null;
+                            if (dailyQuests.length === 1) {
+                              const quest = dailyQuests[0];
+                              return (
+                                <DailyQuestPresentationCard
                                   quest={quest}
                                   rewardCatalog={data.rewardCatalog}
                                   isPremium={data.isPremium}
@@ -772,31 +820,58 @@ export function QuestsPopup({
                                     handleClaimObjective(quest.id, objectiveId)
                                   }
                                 />
-                              ))}
-                            </QuestCarousel>
-                          );
-                        })()}
-                        <div className="flex justify-center pt-2">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={handleRefreshDaily}
-                            disabled={refreshingDaily}
-                            className="font-bold rounded-2xl"
-                          >
-                            {refreshingDaily
-                              ? 'Refreshing...'
-                              : 'Refresh Daily Quests'}
-                          </Button>
+                              );
+                            }
+                            return (
+                              <QuestCarousel
+                                activePage={dailyPage}
+                                onPageChange={setDailyPage}
+                                count={dailyQuests.length}
+                              >
+                                {dailyQuests.map((quest) => (
+                                  <DailyQuestPresentationCard
+                                    key={quest.id}
+                                    quest={quest}
+                                    rewardCatalog={data.rewardCatalog}
+                                    isPremium={data.isPremium}
+                                    claiming={claimingId === quest.id}
+                                    claimingObjectiveId={claimingObjectiveId}
+                                    onClaim={() =>
+                                      handleClaim('daily', quest.id)
+                                    }
+                                    onClaimObjective={(objectiveId) =>
+                                      handleClaimObjective(
+                                        quest.id,
+                                        objectiveId,
+                                      )
+                                    }
+                                  />
+                                ))}
+                              </QuestCarousel>
+                            );
+                          })()}
+                          <div className="flex justify-center pt-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={handleRefreshDaily}
+                              disabled={refreshingDaily}
+                              className="font-bold rounded-2xl"
+                            >
+                              {refreshingDaily
+                                ? 'Refreshing...'
+                                : 'Refresh Daily Quests'}
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
-            </div>
-          </>
-        )}
+                )}
+              </div>
+            </>
+          );
+        }}
       </BaseSheet>
       <TagPopup
         open={!!editingFocusCategoryId}
@@ -822,7 +897,7 @@ export function QuestsPopup({
         saveLabel="Save focus tags"
       />
       <QuestRewardRevealOverlay
-        entry={rewardRevealQueue[0] ?? null}
+        queue={rewardRevealQueue}
         openingGiftKey={openingGiftKey}
         isPremium={data?.isPremium ?? false}
         onClaim={handleRewardRevealClaim}
@@ -832,7 +907,13 @@ export function QuestsPopup({
   );
 }
 
-function PremiumFlyCounter({ baseAmount, finalAmount }: { baseAmount: number; finalAmount: number }) {
+function PremiumFlyCounter({
+  baseAmount,
+  finalAmount,
+}: {
+  baseAmount: number;
+  finalAmount: number;
+}) {
   const [displayAmount, setDisplayAmount] = useState(baseAmount);
   const [showDouble, setShowDouble] = useState(false);
 
@@ -847,7 +928,10 @@ function PremiumFlyCounter({ baseAmount, finalAmount }: { baseAmount: number; fi
       let step = 0;
       const interval = setInterval(() => {
         step++;
-        current = Math.min(baseAmount + Math.round(increment * step), finalAmount);
+        current = Math.min(
+          baseAmount + Math.round(increment * step),
+          finalAmount,
+        );
         setDisplayAmount(current);
         if (step >= steps) clearInterval(interval);
       }, duration / steps);
@@ -872,18 +956,19 @@ function PremiumFlyCounter({ baseAmount, finalAmount }: { baseAmount: number; fi
 }
 
 function QuestRewardRevealOverlay({
-  entry,
+  queue,
   openingGiftKey,
   isPremium,
   onClaim,
   onOpenGift,
 }: {
-  entry: QuestRewardRevealEntry | null;
+  queue: QuestRewardRevealEntry[];
   openingGiftKey: string | null;
   isPremium: boolean;
   onClaim: () => void;
   onOpenGift: (entry: QuestRewardRevealEntry) => void;
 }) {
+  const entry = queue[0] ?? null;
   return createPortal(
     <AnimatePresence mode="wait">
       {entry && (
@@ -1055,7 +1140,8 @@ function QuestCarousel({
       const rect = item.getBoundingClientRect();
       const itemCenter = rect.left + rect.width / 2;
       // Bias toward the direction of the flick
-      const dist = Math.abs(itemCenter - containerCenter) - velocity.current * 150;
+      const dist =
+        Math.abs(itemCenter - containerCenter) - velocity.current * 150;
       if (dist < closestDist) {
         closestDist = dist;
         closestIdx = i;
@@ -1085,7 +1171,9 @@ function QuestCarousel({
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
-            const idx = itemRefs.current.indexOf(entry.target as HTMLDivElement);
+            const idx = itemRefs.current.indexOf(
+              entry.target as HTMLDivElement,
+            );
             if (idx !== -1) onPageChange(idx);
           }
         }
@@ -1110,7 +1198,9 @@ function QuestCarousel({
         {React.Children.map(children, (child, i) => (
           <div
             key={i}
-            ref={(el) => { itemRefs.current[i] = el; }}
+            ref={(el) => {
+              itemRefs.current[i] = el;
+            }}
             className="flex-none w-[88%] snap-center"
           >
             {child}

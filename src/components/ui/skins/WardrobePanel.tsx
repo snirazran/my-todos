@@ -345,265 +345,277 @@ export function WardrobePanel({
         className="h-[90vh] sm:h-[90vh] sm:max-w-[95vw] lg:max-w-[1200px] select-none bg-background"
         zIndex={999}
       >
-        {({ isDesktop }) => (
-          <div
-            className="flex flex-col h-full"
-            onClick={() => confirmingBuyId && setConfirmingBuyId(null)}
-          >
-            {/* --- HEADER --- */}
+        {({ isDesktop, dragControls }) => {
+          const handleSheetDrag = (e: React.PointerEvent, scrollEl: HTMLDivElement | null) => {
+            if (isDesktop || !scrollEl) return;
+            if (scrollEl.scrollTop <= 0 && e.nativeEvent instanceof PointerEvent) {
+              dragControls.start(e);
+            }
+          };
+
+          return (
             <div
-              className={cn(
-                'relative z-20 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-border/40',
-                isDesktop
-                  ? 'bg-background/50 backdrop-blur-xl'
-                  : 'bg-transparent',
-              )}
+              className="flex flex-col h-full"
+              onClick={() => confirmingBuyId && setConfirmingBuyId(null)}
             >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div>
-                    <h2 className="text-2xl md:text-5xl font-bold tracking-tight text-foreground">
-                      Wardrobe
-                    </h2>
-                    <p className="hidden md:block text-base font-medium text-muted-foreground mt-1">
-                      Customize Your Companion
-                    </p>
-                  </div>
-
-                  {/* Balance Badge */}
-                  <motion.div
-                    animate={shakeBalance ? { x: [-5, 5, -5, 5, 0] } : {}}
-                    transition={{ duration: 0.4 }}
-                    className={cn(
-                      'flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full transition-colors duration-300',
-                      shakeBalance
-                        ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-800'
-                        : 'bg-secondary border-border dark:bg-slate-800/50 dark:border-slate-700',
-                    )}
-                  >
-                    <div className="relative flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0 dark:bg-slate-900">
-                      <Fly
-                        size={24}
-                        className="text-muted-foreground"
-                        y={-2}
-                      />
-                      <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
-                        +
-                      </span>
-                    </div>
-                    <AnimatedNumber
-                      value={balance}
-                      className="text-sm font-black leading-none md:text-xl text-foreground tabular-nums"
-                    />
-                  </motion.div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  {/* Mobile Close Button (X) */}
-                  <button
-                    onClick={() => onOpenChange(false)}
-                    className="flex items-center justify-center w-10 h-10 rounded-full md:hidden bg-secondary/80 text-foreground"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-
-                  {/* Desktop Close Button */}
-                  <button
-                    onClick={() => onOpenChange(false)}
-                    className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-secondary hover:bg-secondary/80 border-border dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
-                  >
-                    <X className="w-5 h-5 text-muted-foreground" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* --- MAIN CONTENT WRAPPER --- */}
-            <div
-              className={cn(
-                'flex flex-col flex-1 min-h-0',
-                isDesktop
-                  ? 'bg-background/50 backdrop-blur-2xl'
-                  : 'bg-transparent',
-              )}
-            >
-              <Tabs
-                value={activeTab}
-                onValueChange={setActiveTab}
-                className="flex flex-col h-full"
+              {/* --- HEADER --- */}
+              <div
+                onPointerDown={(e) => !isDesktop && dragControls.start(e)}
+                className={cn(
+                  'relative z-20 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-border/40',
+                  isDesktop
+                    ? 'bg-background/50 backdrop-blur-xl'
+                    : 'bg-transparent',
+                )}
               >
-                {/* Controls Area (Tabs + Filter) */}
-                <div className="px-4 pt-4 space-y-4 shrink-0 md:px-6 md:pt-5">
-                  <div className="flex items-center justify-between gap-2 md:gap-4">
-                    <TabsList
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div>
+                      <h2 className="text-2xl md:text-5xl font-bold tracking-tight text-foreground">
+                        Wardrobe
+                      </h2>
+                      <p className="hidden md:block text-base font-medium text-muted-foreground mt-1">
+                        Customize Your Companion
+                      </p>
+                    </div>
+
+                    {/* Balance Badge */}
+                    <motion.div
+                      animate={shakeBalance ? { x: [-5, 5, -5, 5, 0] } : {}}
+                      transition={{ duration: 0.4 }}
                       className={cn(
-                        'flex-1 h-12 md:h-14 p-1 rounded-[20px] border border-border/50 shadow-sm flex items-center gap-1',
-                        isDesktop
-                          ? 'bg-card/80 backdrop-blur-2xl'
-                          : 'bg-muted/30',
+                        'flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full transition-colors duration-300',
+                        shakeBalance
+                          ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-800'
+                          : 'bg-secondary border-border dark:bg-slate-800/50 dark:border-slate-700',
                       )}
                     >
-                      <TabsTrigger
-                        value="inventory"
-                        className="
-                          flex-1 h-full rounded-2xl relative
-                          flex items-center justify-center gap-2
-                          text-xs md:text-sm font-bold tracking-wide uppercase
-                          data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
-                          data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                        "
-                      >
-                        <Shirt className="w-4 h-4" />
-                        <span className="hidden xs:inline">Wardrobe</span>
-                        <span className="xs:hidden">WRD</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="shop"
-                        className="
-                          flex-1 h-full rounded-2xl relative
-                          flex items-center justify-center gap-2
-                          text-xs md:text-sm font-bold tracking-wide uppercase
-                          data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
-                          data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                        "
-                      >
-                        <ShoppingBag className="w-4 h-4" />
-                        <span>Shop</span>
-                      </TabsTrigger>
-                      <TabsTrigger
-                        value="trade"
-                        className="
-                          flex-1 h-full rounded-2xl relative
-                          flex items-center justify-center gap-2
-                          text-xs md:text-sm font-bold tracking-wide uppercase
-                          data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
-                          data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                        "
-                      >
-                        <Repeat className="w-4 h-4" />
-                        <span>Trade</span>
-                      </TabsTrigger>
-                    </TabsList>
-
-                    <SortMenu value={sortBy} onChange={setSortBy} />
+                      <div className="relative flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0 dark:bg-slate-900">
+                        <Fly
+                          size={24}
+                          className="text-muted-foreground"
+                          y={-2}
+                        />
+                        <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+                          +
+                        </span>
+                      </div>
+                      <AnimatedNumber
+                        value={balance}
+                        className="text-sm font-black leading-none md:text-xl text-foreground tabular-nums"
+                      />
+                    </motion.div>
                   </div>
 
-                  {activeTab !== 'trade' && (
-                    <div className="w-full min-w-0">
-                      <FilterBar
-                        active={activeFilter}
-                        onChange={handleFilterChange}
-                        badges={filterBadges}
-                      />
-                    </div>
-                  )}
-                </div>
+                  <div className="flex items-center gap-3">
+                    {/* Mobile Close Button (X) */}
+                    <button
+                      onClick={() => onOpenChange(false)}
+                      className="flex items-center justify-center w-10 h-10 rounded-full md:hidden bg-secondary/80 text-foreground"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
 
-                {/* Content Area (Grid) */}
-                <div
-                  className={cn(
-                    'flex-1 relative mt-4 overflow-hidden',
-                    'rounded-t-[32px] border-t border-border/40',
-                    isDesktop
-                      ? 'bg-card/40 backdrop-blur-md'
-                      : 'bg-card/20',
-                    'md:mx-8 md:mb-8 md:rounded-[32px] md:border md:border-border/40 md:shadow-inner',
-                  )}
+                    {/* Desktop Close Button */}
+                    <button
+                      onClick={() => onOpenChange(false)}
+                      className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-secondary hover:bg-secondary/80 border-border dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                    >
+                      <X className="w-5 h-5 text-muted-foreground" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* --- MAIN CONTENT WRAPPER --- */}
+              <div
+                className={cn(
+                  'flex flex-col flex-1 min-h-0',
+                  isDesktop
+                    ? 'bg-background/50 backdrop-blur-2xl'
+                    : 'bg-transparent',
+                )}
+              >
+                <Tabs
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  className="flex flex-col h-full"
                 >
-                  <TabsContent
-                    value="inventory"
-                    className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
-                  >
-                    {inventoryItems.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center h-full opacity-50">
-                        <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
-                          <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
-                        </div>
-                        <p className="text-lg font-black text-muted-foreground">
-                          Empty
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                        {inventoryItems.map((item) => (
-                          <ItemCard
-                            key={item.id}
-                            item={item}
-                            mode="inventory"
-                            ownedCount={
-                              data?.wardrobe?.inventory?.[item.id] ?? 0
-                            }
-                            isEquipped={
-                              data?.wardrobe?.equipped?.[item.slot] ===
-                              item.id
-                            }
-                            canAfford={true}
-                            actionLoading={equippingId === item.id}
-                            onAction={() => handleItemAction(item)}
-                            onSell={() => {
-                              setItemToSell(item);
-                            }}
-                            actionLabel={null}
-                            isNew={unseenInventorySet.has(item.id)}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </TabsContent>
+                  {/* Controls Area (Tabs + Filter) */}
+                  <div className="px-4 pt-4 space-y-4 shrink-0 md:px-6 md:pt-5">
+                    <div className="flex items-center justify-between gap-2 md:gap-4">
+                      <TabsList
+                        className={cn(
+                          'flex-1 h-12 md:h-14 p-1 rounded-[20px] border border-border/50 shadow-sm flex items-center gap-1',
+                          isDesktop
+                            ? 'bg-card/80 backdrop-blur-2xl'
+                            : 'bg-muted/30',
+                        )}
+                      >
+                        <TabsTrigger
+                          value="inventory"
+                          className="
+                            flex-1 h-full rounded-2xl relative
+                            flex items-center justify-center gap-2
+                            text-xs md:text-sm font-bold tracking-wide uppercase
+                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
+                            data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
+                          "
+                        >
+                          <Shirt className="w-4 h-4" />
+                          <span className="hidden xs:inline">Wardrobe</span>
+                          <span className="xs:hidden">WRD</span>
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="shop"
+                          className="
+                            flex-1 h-full rounded-2xl relative
+                            flex items-center justify-center gap-2
+                            text-xs md:text-sm font-bold tracking-wide uppercase
+                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
+                            data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
+                          "
+                        >
+                          <ShoppingBag className="w-4 h-4" />
+                          <span>Shop</span>
+                        </TabsTrigger>
+                        <TabsTrigger
+                          value="trade"
+                          className="
+                            flex-1 h-full rounded-2xl relative
+                            flex items-center justify-center gap-2
+                            text-xs md:text-sm font-bold tracking-wide uppercase
+                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
+                            data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
+                          "
+                        >
+                          <Repeat className="w-4 h-4" />
+                          <span>Trade</span>
+                        </TabsTrigger>
+                      </TabsList>
 
-                  <TabsContent
-                    value="shop"
-                    className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
-                  >
-                    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                      {shopItems.map((item) => {
-                        const count =
-                          data?.wardrobe?.inventory?.[item.id] ?? 0;
-                        return (
-                          <ItemCard
-                            key={item.id}
-                            item={item}
-                            mode="shop"
-                            ownedCount={count}
-                            isEquipped={false}
-                            canAfford={
-                              balance >= (item.priceFlies ?? 0) && !isGuest
-                            }
-                            actionLoading={buyingId === item.id}
-                            actionLabel={
-                              confirmingBuyId === item.id
-                                ? 'CONFIRM'
-                                : undefined
-                            }
-                            onAction={(e) => handleBuyItem(item, e)}
-                          />
-                        );
-                      })}
+                      <SortMenu value={sortBy} onChange={setSortBy} />
                     </div>
-                  </TabsContent>
 
-                  <TabsContent
-                    value="trade"
-                    className="absolute inset-0 overflow-hidden data-[state=inactive]:hidden"
-                  >
-                    {data?.wardrobe?.inventory && data.catalog && (
-                      <TradePanel
-                        inventory={data.wardrobe.inventory}
-                        catalog={data.catalog}
-                        unseenItems={unseenItems}
-                        onTradeSuccess={refreshInventory}
-                        activeFilter={
-                          activeFilter === 'container' ? 'all' : activeFilter
-                        }
-                        sortBy={sortBy}
-                      />
+                    {activeTab !== 'trade' && (
+                      <div className="w-full min-w-0">
+                        <FilterBar
+                          active={activeFilter}
+                          onChange={handleFilterChange}
+                          badges={filterBadges}
+                        />
+                      </div>
                     )}
-                  </TabsContent>
-                </div>
-              </Tabs>
+                  </div>
+
+                  {/* Content Area (Grid) */}
+                  <div
+                    className={cn(
+                      'flex-1 relative mt-4 overflow-hidden',
+                      'rounded-t-[32px] border-t border-border/40',
+                      isDesktop
+                        ? 'bg-card/40 backdrop-blur-md'
+                        : 'bg-card/20',
+                      'md:mx-8 md:mb-8 md:rounded-[32px] md:border md:border-border/40 md:shadow-inner',
+                    )}
+                  >
+                    <TabsContent
+                      value="inventory"
+                      onPointerDown={(e) => handleSheetDrag(e, e.currentTarget)}
+                      className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
+                    >
+                      {inventoryItems.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-full opacity-50">
+                          <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
+                            <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
+                          </div>
+                          <p className="text-lg font-black text-muted-foreground">
+                            Empty
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                          {inventoryItems.map((item) => (
+                            <ItemCard
+                              key={item.id}
+                              item={item}
+                              mode="inventory"
+                              ownedCount={
+                                data?.wardrobe?.inventory?.[item.id] ?? 0
+                              }
+                              isEquipped={
+                                data?.wardrobe?.equipped?.[item.slot] ===
+                                item.id
+                              }
+                              canAfford={true}
+                              actionLoading={equippingId === item.id}
+                              onAction={() => handleItemAction(item)}
+                              onSell={() => {
+                                setItemToSell(item);
+                              }}
+                              actionLabel={null}
+                              isNew={unseenInventorySet.has(item.id)}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </TabsContent>
+
+                    <TabsContent
+                      value="shop"
+                      onPointerDown={(e) => handleSheetDrag(e, e.currentTarget)}
+                      className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
+                    >
+                      <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                        {shopItems.map((item) => {
+                          const count =
+                            data?.wardrobe?.inventory?.[item.id] ?? 0;
+                          return (
+                            <ItemCard
+                              key={item.id}
+                              item={item}
+                              mode="shop"
+                              ownedCount={count}
+                              isEquipped={false}
+                              canAfford={
+                                balance >= (item.priceFlies ?? 0) && !isGuest
+                              }
+                              actionLoading={buyingId === item.id}
+                              actionLabel={
+                                confirmingBuyId === item.id
+                                  ? 'CONFIRM'
+                                  : undefined
+                              }
+                              onAction={(e) => handleBuyItem(item, e)}
+                            />
+                          );
+                        })}
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent
+                      value="trade"
+                      className="absolute inset-0 overflow-hidden data-[state=inactive]:hidden"
+                    >
+                      {data?.wardrobe?.inventory && data.catalog && (
+                        <TradePanel
+                          inventory={data.wardrobe.inventory}
+                          catalog={data.catalog}
+                          unseenItems={unseenItems}
+                          onTradeSuccess={refreshInventory}
+                          activeFilter={
+                            activeFilter === 'container' ? 'all' : activeFilter
+                          }
+                          sortBy={sortBy}
+                        />
+                      )}
+                    </TabsContent>
+                  </div>
+                </Tabs>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        }}
       </BaseSheet>
 
       <SellConfirmationDialog
