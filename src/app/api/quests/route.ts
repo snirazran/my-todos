@@ -24,21 +24,18 @@ export async function GET(req: Request) {
     const timezone = new URL(req.url).searchParams.get('timezone') || 'UTC';
 
     const dashboard = await syncQuestState({ userId, timezone });
-    const claimableCount =
-      dashboard.dailyQuests.filter((quest) => quest.claimable).length +
-      dashboard.categoryQuests.filter((quest) => quest.claimable).length;
-    const todoCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
+    // Count prizes ready to collect (claimable quests + completed objectives with unclaimed rewards)
+    const claimableCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
       (sum, quest) => {
         if (quest.claimed) return sum;
-        const questLeft = 1;
-        const objectivesLeft = quest.logic.filter((block) => {
-          const hasRewards = (block.rewards?.length ?? 0) > 0;
-          if (hasRewards) {
-            return !quest.claimedObjectiveIds.includes(block.id);
+        let count = 0;
+        if (quest.claimable) count++;
+        quest.logic.forEach((block) => {
+          if ((block.rewards?.length ?? 0) > 0 && block.progress >= block.target && !quest.claimedObjectiveIds.includes(block.id)) {
+            count++;
           }
-          return block.progress < block.target;
-        }).length;
-        return sum + questLeft + objectivesLeft;
+        });
+        return sum + count;
       },
       0,
     );
@@ -46,7 +43,6 @@ export async function GET(req: Request) {
     return NextResponse.json({
       isPremium: dashboard.isPremium,
       claimableCount,
-      todoCount,
       onboarding: {
         complete: !!dashboard.focusProfile.completedAt,
         selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,

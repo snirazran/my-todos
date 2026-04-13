@@ -70,7 +70,7 @@ export function FrogDisplay({
     { revalidateOnFocus: false },
   );
 
-  const questTodoCount = questsData?.todoCount ?? questsData?.claimableCount ?? 0;
+  const questClaimableCount = questsData?.claimableCount ?? 0;
   const wardrobeBadge = unseenCount + unseenContainerCount;
 
   // Local state for smooth hunger updates
@@ -161,7 +161,7 @@ export function FrogDisplay({
               rate={rate}
               done={done}
               total={total}
-              readyQuests={questTodoCount}
+              readyQuests={questClaimableCount}
               isCatching={isCatching}
               clickedAt={clickedAt}
             />
@@ -280,9 +280,9 @@ export function FrogDisplay({
           >
             <div className="absolute inset-0 bg-primary/10 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <ScrollText className="relative w-5 h-5 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
-            {questTodoCount > 0 && (
-              <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-primary-foreground bg-primary rounded-full border-2 border-background shadow-sm z-20">
-                {questTodoCount > 99 ? '99+' : questTodoCount}
+            {questClaimableCount > 0 && (
+              <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background shadow-sm z-20 animate-in zoom-in">
+                {questClaimableCount > 99 ? '99+' : questClaimableCount}
               </span>
             )}
           </button>

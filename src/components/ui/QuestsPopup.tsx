@@ -186,31 +186,34 @@ export function QuestsPopup({
       ),
     [tagsData?.tags],
   );
+  // Count only claimable rewards (completed objectives with unclaimed rewards + claimable quests)
   const countDaily = useMemo(() => {
     return (data?.dailyQuests ?? []).reduce((sum, quest) => {
       if (quest.claimed) return sum;
-      const objectivesLeft = quest.logic.filter((block) => {
-        const hasRewards = (block.rewards?.length ?? 0) > 0;
-        if (hasRewards) {
-          return !quest.claimedObjectiveIds.includes(block.id);
+      let count = 0;
+      // Count quest itself if claimable
+      if (quest.claimable) count++;
+      // Count completed objectives with unclaimed rewards
+      quest.logic.forEach((block) => {
+        if ((block.rewards?.length ?? 0) > 0 && block.progress >= block.target && !quest.claimedObjectiveIds.includes(block.id)) {
+          count++;
         }
-        return block.progress < block.target;
-      }).length;
-      return sum + 1 + objectivesLeft;
+      });
+      return sum + count;
     }, 0);
   }, [data?.dailyQuests]);
 
   const countCategory = useMemo(() => {
     return (data?.categoryQuests ?? []).reduce((sum, quest) => {
       if (quest.claimed) return sum;
-      const objectivesLeft = quest.logic.filter((block) => {
-        const hasRewards = (block.rewards?.length ?? 0) > 0;
-        if (hasRewards) {
-          return !quest.claimedObjectiveIds.includes(block.id);
+      let count = 0;
+      if (quest.claimable) count++;
+      quest.logic.forEach((block) => {
+        if ((block.rewards?.length ?? 0) > 0 && block.progress >= block.target && !quest.claimedObjectiveIds.includes(block.id)) {
+          count++;
         }
-        return block.progress < block.target;
-      }).length;
-      return sum + 1 + objectivesLeft;
+      });
+      return sum + count;
     }, 0);
   }, [data?.categoryQuests]);
 
@@ -237,18 +240,19 @@ export function QuestsPopup({
     // "all" badge
     badges['all'] = countCategory;
 
-    // per category badge
+    // per category badge — only claimable rewards
     data.categoryQuests.forEach((quest) => {
       if (!quest.categoryId || quest.claimed) return;
-      const objectivesLeft = quest.logic.filter((block) => {
-        const hasRewards = (block.rewards?.length ?? 0) > 0;
-        if (hasRewards) {
-          return !quest.claimedObjectiveIds.includes(block.id);
+      let count = 0;
+      if (quest.claimable) count++;
+      quest.logic.forEach((block) => {
+        if ((block.rewards?.length ?? 0) > 0 && block.progress >= block.target && !quest.claimedObjectiveIds.includes(block.id)) {
+          count++;
         }
-        return block.progress < block.target;
-      }).length;
-      const count = 1 + objectivesLeft;
-      badges[quest.categoryId] = (badges[quest.categoryId] ?? 0) + count;
+      });
+      if (count > 0) {
+        badges[quest.categoryId] = (badges[quest.categoryId] ?? 0) + count;
+      }
     });
 
     return badges;
@@ -565,7 +569,7 @@ export function QuestsPopup({
                           <Compass className="w-4 h-4" />
                           <span>My Focus</span>
                           {countCategory > 0 && (
-                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm -ml-0.5 leading-none tracking-normal">
+                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal animate-in zoom-in">
                               {countCategory}
                             </span>
                           )}
@@ -584,7 +588,7 @@ export function QuestsPopup({
                           <CalendarDays className="w-4 h-4" />
                           <span>Daily</span>
                           {countDaily > 0 && (
-                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm -ml-0.5 leading-none tracking-normal">
+                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal animate-in zoom-in">
                               {countDaily}
                             </span>
                           )}
@@ -619,6 +623,7 @@ export function QuestsPopup({
                             onChange={setActiveSubCategoryId}
                             options={subCategoryOptions}
                             badges={categoryBadges}
+                            badgeClassName="text-white bg-amber-500"
                           />
                         )}
                         {filteredCategoryQuests.length === 0 ? (

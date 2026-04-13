@@ -323,9 +323,9 @@ export const RewardCard = ({
             type="button"
             onClick={() => setShowUpsellPopup(true)}
             disabled={isProcessing || !showContent}
-            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-black uppercase tracking-[0.14em] text-white shadow-lg shadow-amber-500/25 transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-orange-500 to-amber-400 bg-[length:200%_100%] animate-[shimmer_2s_ease-in-out_infinite] py-3.5 text-[15px] font-black uppercase tracking-[0.14em] text-white shadow-lg shadow-amber-500/30 ring-2 ring-amber-400/40 transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <span className="flex items-center justify-center w-6 h-6 text-[10px] font-black text-amber-900 rounded-md bg-white/25">
+            <span className="flex items-center justify-center w-7 h-7 text-[11px] font-black text-amber-900 rounded-lg bg-white/30 shadow-inner">
               x2
             </span>
             Double Reward

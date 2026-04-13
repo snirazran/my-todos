@@ -42,11 +42,13 @@ export function FilterBar({
   onChange,
   badges,
   options,
+  badgeClassName,
 }: {
   active: string;
   onChange: (s: any) => void;
   badges?: Partial<Record<string, number>>;
   options?: FilterOption[];
+  badgeClassName?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -203,7 +205,7 @@ export function FilterBar({
               {opt.icon}
               {opt.label}
               {badgeCount > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center text-[10px] font-bold text-primary-foreground bg-primary rounded-full border-2 border-background shadow-sm animate-in zoom-in">
+                <span className={cn("absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center text-[10px] font-bold rounded-full border-2 border-background shadow-sm animate-in zoom-in", badgeClassName || "text-white bg-rose-500")}>
                   {badgeCount}
                 </span>
               )}
