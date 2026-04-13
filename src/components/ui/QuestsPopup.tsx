@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import useSWR, { mutate } from 'swr';
@@ -22,6 +22,10 @@ import {
   DailyQuestPresentationCard,
   type QuestTagChip,
 } from './QuestCards';
+import { RewardCard } from './gift-box/RewardCard';
+import { RotatingRays } from './gift-box/RotatingRays';
+import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
+import Fly from './fly';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -43,11 +47,33 @@ type TagsResponse = {
   isPremium: boolean;
 };
 
+type QuestRewardSummary = {
+  fliesGranted?: number;
+  grantedItemIds?: string[];
+};
+
+type QuestRewardRevealEntry = {
+  key: string;
+  item: ItemDef;
+  fliesGranted?: number;
+};
+
 const fetcher = async <T,>(url: string) => {
   const res = await fetch(url);
   if (!res.ok) throw new Error('Request failed');
   return res.json() as Promise<T>;
 };
+
+function createFlyRewardItem(amount: number): ItemDef {
+  return {
+    id: `flies-${amount}`,
+    name: `${amount} Flies`,
+    slot: 'hand_item',
+    rarity: 'uncommon',
+    riveIndex: 0,
+    icon: '',
+  };
+}
 
 export function QuestsPopup({
   show,
@@ -68,6 +94,11 @@ export function QuestsPopup({
   const [editingFocusCategoryId, setEditingFocusCategoryId] =
     useState<MacroCategoryId | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [rewardRevealQueue, setRewardRevealQueue] = useState<
+    QuestRewardRevealEntry[]
+  >([]);
+  const [openingGiftKey, setOpeningGiftKey] = useState<string | null>(null);
+  const rewardRevealIdRef = useRef(0);
   const dragControls = useDragControls();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -110,6 +141,12 @@ export function QuestsPopup({
     const timeout = window.setTimeout(() => setClaimMessage(null), 5000);
     return () => window.clearTimeout(timeout);
   }, [claimMessage]);
+
+  useEffect(() => {
+    if (show) return;
+    setRewardRevealQueue([]);
+    setOpeningGiftKey(null);
+  }, [show]);
 
   const categoryMap = useMemo(
     () =>
@@ -166,6 +203,82 @@ export function QuestsPopup({
     ? categoryMap[editingFocusCategoryId]
     : null;
 
+  const queueRewardReveal = (summary?: QuestRewardSummary) => {
+    const grantedItemIds = Array.isArray(summary?.grantedItemIds)
+      ? summary.grantedItemIds
+      : [];
+    const catalog = data?.rewardCatalog ?? {};
+    const nextEntries: QuestRewardRevealEntry[] = [];
+    const fliesGranted = Math.max(0, Math.floor(summary?.fliesGranted ?? 0));
+
+    if (fliesGranted > 0) {
+      nextEntries.push({
+        key: `flies-${fliesGranted}-${rewardRevealIdRef.current}`,
+        item: createFlyRewardItem(fliesGranted),
+        fliesGranted,
+      });
+      rewardRevealIdRef.current += 1;
+    }
+
+    nextEntries.push(
+      ...grantedItemIds
+        .map((itemId) => catalog[itemId])
+        .filter((item): item is ItemDef => Boolean(item))
+        .map((item) => {
+          const key = `${item.id}-${rewardRevealIdRef.current}`;
+          rewardRevealIdRef.current += 1;
+          return { key, item };
+        }),
+    );
+
+    if (!nextEntries.length) return 0;
+    setRewardRevealQueue((current) => [...current, ...nextEntries]);
+    return nextEntries.length;
+  };
+
+  const handleRewardRevealClaim = () => {
+    setRewardRevealQueue((current) => current.slice(1));
+  };
+
+  const handleRewardRevealOpenGift = async (entry: QuestRewardRevealEntry) => {
+    if (entry.item.slot !== 'container') {
+      handleRewardRevealClaim();
+      return;
+    }
+    if (openingGiftKey) return;
+
+    setOpeningGiftKey(entry.key);
+    setClaimMessage(null);
+    try {
+      const res = await fetch('/api/skins/open-gift', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ giftBoxId: entry.item.id }),
+      });
+      const payload = await res.json();
+      if (!res.ok || !payload.prize) {
+        throw new Error(payload.error || 'Could not open gift');
+      }
+
+      const prize = payload.prize as ItemDef;
+      const prizeEntry = {
+        key: `${prize.id}-${rewardRevealIdRef.current}`,
+        item: prize,
+      };
+      rewardRevealIdRef.current += 1;
+      setRewardRevealQueue((current) =>
+        current[0]?.key === entry.key
+          ? [prizeEntry, ...current.slice(1)]
+          : current,
+      );
+      mutate('/api/skins/inventory');
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Could not open gift');
+    } finally {
+      setOpeningGiftKey(null);
+    }
+  };
+
   const handleClaim = async (
     claimType: 'daily' | 'category',
     targetId: string,
@@ -181,14 +294,17 @@ export function QuestsPopup({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
-      const bits: string[] = [];
-      if (payload.rewardSummary?.fliesGranted)
-        bits.push(`${payload.rewardSummary.fliesGranted} flies`);
-      if (payload.rewardSummary?.grantedItemIds?.length)
-        bits.push(`${payload.rewardSummary.grantedItemIds.length} items`);
-      setClaimMessage(
-        bits.length ? `Claimed ${bits.join(' + ')}` : 'Reward claimed',
-      );
+      const revealedCount = queueRewardReveal(payload.rewardSummary);
+      if (revealedCount === 0) {
+        const bits: string[] = [];
+        if (payload.rewardSummary?.fliesGranted)
+          bits.push(`${payload.rewardSummary.fliesGranted} flies`);
+        if (payload.rewardSummary?.grantedItemIds?.length)
+          bits.push(`${payload.rewardSummary.grantedItemIds.length} items`);
+        setClaimMessage(
+          bits.length ? `Claimed ${bits.join(' + ')}` : 'Reward claimed',
+        );
+      }
       await mutateQuests();
       mutate('/api/skins/inventory');
     } catch (err: any) {
@@ -213,6 +329,7 @@ export function QuestsPopup({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
+      queueRewardReveal(payload.rewardSummary);
       await mutateQuests();
       mutate('/api/skins/inventory');
     } catch (err: any) {
@@ -558,9 +675,85 @@ export function QuestsPopup({
           }
           saveLabel="Save focus tags"
         />
+        <QuestRewardRevealOverlay
+          entry={rewardRevealQueue[0] ?? null}
+          openingGiftKey={openingGiftKey}
+          onClaim={handleRewardRevealClaim}
+          onOpenGift={handleRewardRevealOpenGift}
+        />
       </>
     </AnimatePresence>,
     document.body,
+  );
+}
+
+function QuestRewardRevealOverlay({
+  entry,
+  openingGiftKey,
+  onClaim,
+  onOpenGift,
+}: {
+  entry: QuestRewardRevealEntry | null;
+  openingGiftKey: string | null;
+  onClaim: () => void;
+  onOpenGift: (entry: QuestRewardRevealEntry) => void;
+}) {
+  return (
+    <AnimatePresence mode="wait">
+      {entry && (
+        <motion.div
+          key={entry.key}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden pointer-events-auto"
+        >
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
+          />
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 z-0 flex items-center justify-center"
+          >
+            <RotatingRays
+              colorClass={GIFT_RARITY_CONFIG[entry.item.rarity].rays}
+            />
+            <div className="absolute inset-0 bg-radial-gradient from-transparent to-slate-950/80" />
+          </motion.div>
+          <div className="relative z-10 flex w-full max-w-md flex-col items-center justify-center p-6">
+            <RewardCard
+              key={entry.key}
+              prize={entry.item}
+              claiming={openingGiftKey === entry.key}
+              onClaim={
+                entry.item.slot === 'container'
+                  ? () => onOpenGift(entry)
+                  : onClaim
+              }
+              onOpenLater={
+                entry.item.slot === 'container' ? onClaim : undefined
+              }
+              customPreview={
+                entry.fliesGranted ? (
+                  <div className="relative flex h-full w-full items-center justify-center">
+                    <Fly size={132} />
+                    <span className="absolute right-3 top-3 z-40 rounded-xl border border-white/20 bg-black/45 px-3 py-1 text-sm font-black text-white shadow-sm backdrop-blur-sm">
+                      x{entry.fliesGranted}
+                    </span>
+                  </div>
+                ) : undefined
+              }
+              slotLabel={entry.fliesGranted ? 'currency' : undefined}
+            />
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 

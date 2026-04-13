@@ -11,6 +11,10 @@ type RewardCardProps = {
   prize: ItemDef;
   claiming: boolean;
   onClaim: () => void;
+  customPreview?: React.ReactNode;
+  slotLabel?: string;
+  onOpenLater?: () => void;
+  openLaterLabel?: string;
 };
 
 const GLOW_COLORS = {
@@ -21,7 +25,15 @@ const GLOW_COLORS = {
   legendary: 'bg-amber-400',
 };
 
-export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
+export const RewardCard = ({
+  prize,
+  claiming,
+  onClaim,
+  customPreview,
+  slotLabel,
+  onOpenLater,
+  openLaterLabel = 'Open Later',
+}: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
   const [localClaiming, setLocalClaiming] = useState(false);
   const config = RARITY_CONFIG[prize.rarity];
@@ -164,7 +176,9 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
                       prize.slot === 'container' ? 'items-end' : 'items-center'
                     )}
                   >
-                    {prize.slot === 'container' ? (
+                    {customPreview ? (
+                      customPreview
+                    ) : prize.slot === 'container' ? (
                       <div className="h-[120%] w-auto aspect-[282/381] mb-2">
                         <GiftRive className="w-full h-full" color={prize.riveIndex} />
                       </div>
@@ -203,42 +217,58 @@ export const RewardCard = ({ prize, claiming, onClaim }: RewardCardProps) => {
               {prize.name}
             </h3>
             <p className="text-sm font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
-              {prize.slot.replace('_', ' ')}
+              {slotLabel ?? prize.slot.replace('_', ' ')}
             </p>
           </motion.div>
         </div>
       </div>
 
       {/* Claim Button - Simplified animation for better performance */}
-      <button
-        onClick={handleClaimClick}
-        disabled={isProcessing || !showContent}
+      <div
         className={cn(
-          'group relative mt-10 w-full max-w-[280px] py-4 rounded-2xl font-black text-lg shadow-xl transition-all duration-500 active:scale-95 hover:brightness-110 flex items-center justify-center gap-3 overflow-hidden',
-          config.button,
+          'mt-10 flex w-full max-w-[280px] flex-col gap-3 transition-all duration-500',
           showContent
             ? 'opacity-100 translate-y-0'
-            : 'opacity-0 translate-y-4 pointer-events-none'
+            : 'opacity-0 translate-y-4 pointer-events-none',
         )}
       >
-        {isProcessing ? (
-          <>
-            <Loader2 className="relative z-20 w-5 h-5 animate-spin" />
-            <span className="relative z-20">
-              {prize.slot === 'container' ? 'Opening...' : 'Claiming...'}
-            </span>
-          </>
-        ) : (
-          <>
-            {prize.slot !== 'container' && (
-              <Sparkles className="relative z-20 w-5 h-5" />
-            )}
-            <span className="relative z-20">
-              {prize.slot === 'container' ? 'Open Now' : 'Claim Reward'}
-            </span>
-          </>
+        <button
+          onClick={handleClaimClick}
+          disabled={isProcessing || !showContent}
+          className={cn(
+            'group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl py-4 text-lg font-black shadow-xl transition-all duration-500 active:scale-95 hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-80',
+            config.button,
+          )}
+        >
+          {isProcessing ? (
+            <>
+              <Loader2 className="relative z-20 w-5 h-5 animate-spin" />
+              <span className="relative z-20">
+                {prize.slot === 'container' ? 'Opening...' : 'Claiming...'}
+              </span>
+            </>
+          ) : (
+            <>
+              {prize.slot !== 'container' && (
+                <Sparkles className="relative z-20 w-5 h-5" />
+              )}
+              <span className="relative z-20">
+                {prize.slot === 'container' ? 'Open Now' : 'Claim Reward'}
+              </span>
+            </>
+          )}
+        </button>
+        {prize.slot === 'container' && onOpenLater && (
+          <button
+            type="button"
+            onClick={onOpenLater}
+            disabled={isProcessing || !showContent}
+            className="w-full rounded-2xl border border-white/15 bg-white/10 py-3 text-sm font-black uppercase tracking-[0.14em] text-white shadow-lg transition hover:bg-white/15 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {openLaterLabel}
+          </button>
         )}
-      </button>
+      </div>
     </motion.div>
   );
 };
