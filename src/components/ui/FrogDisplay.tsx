@@ -63,7 +63,7 @@ export function FrogDisplay({
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { data: questsData } = useSWR<{
     claimableCount?: number;
-    todoCount?: number;
+    activeCount?: number;
   }>(
     !isGuest ? `/api/quests?timezone=${encodeURIComponent(timezone)}` : null,
     (url: string) => fetch(url).then((res) => res.json()),
@@ -71,6 +71,7 @@ export function FrogDisplay({
   );
 
   const questClaimableCount = questsData?.claimableCount ?? 0;
+  const questActiveCount = questsData?.activeCount ?? 0;
   const wardrobeBadge = unseenCount + unseenContainerCount;
 
   // Local state for smooth hunger updates
@@ -280,11 +281,15 @@ export function FrogDisplay({
           >
             <div className="absolute inset-0 bg-primary/10 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
             <ScrollText className="relative w-5 h-5 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
-            {questClaimableCount > 0 && (
+            {questClaimableCount > 0 ? (
               <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background shadow-sm z-20 animate-in zoom-in">
                 {questClaimableCount > 99 ? '99+' : questClaimableCount}
               </span>
-            )}
+            ) : questActiveCount > 0 ? (
+              <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-muted-foreground/60 rounded-full border-2 border-background shadow-sm z-20">
+                {questActiveCount > 9 ? '9+' : questActiveCount}
+              </span>
+            ) : null}
           </button>
 
           <button

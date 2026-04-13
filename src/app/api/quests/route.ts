@@ -40,9 +40,15 @@ export async function GET(req: Request) {
       0,
     );
 
+    // Count active quests the user can still work on (not claimed, not yet fully claimable)
+    const activeCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].filter(
+      (quest) => !quest.claimed && !quest.claimable,
+    ).length;
+
     return NextResponse.json({
       isPremium: dashboard.isPremium,
       claimableCount,
+      activeCount,
       onboarding: {
         complete: !!dashboard.focusProfile.completedAt,
         selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,

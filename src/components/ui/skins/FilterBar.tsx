@@ -43,12 +43,16 @@ export function FilterBar({
   badges,
   options,
   badgeClassName,
+  fallbackBadges,
+  fallbackBadgeClassName,
 }: {
   active: string;
   onChange: (s: any) => void;
   badges?: Partial<Record<string, number>>;
   options?: FilterOption[];
   badgeClassName?: string;
+  fallbackBadges?: Partial<Record<string, number>>;
+  fallbackBadgeClassName?: string;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -180,6 +184,7 @@ export function FilterBar({
         {displayOptions.map((opt) => {
           const isActive = active === opt.id;
           const badgeCount = badges?.[opt.id] ?? 0;
+          const fallbackCount = fallbackBadges?.[opt.id] ?? 0;
 
           return (
             <button
@@ -204,11 +209,15 @@ export function FilterBar({
             >
               {opt.icon}
               {opt.label}
-              {badgeCount > 0 && (
+              {badgeCount > 0 ? (
                 <span className={cn("absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center text-[10px] font-bold rounded-full border-2 border-background shadow-sm animate-in zoom-in", badgeClassName || "text-white bg-rose-500")}>
                   {badgeCount}
                 </span>
-              )}
+              ) : fallbackCount > 0 ? (
+                <span className={cn("absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center text-[10px] font-bold rounded-full border-2 border-background shadow-sm", fallbackBadgeClassName || "text-white bg-muted-foreground/50")}>
+                  {fallbackCount}
+                </span>
+              ) : null}
             </button>
           );
         })}

@@ -219,6 +219,15 @@ export function QuestsPopup({
     }, 0);
   }, [data?.categoryQuests]);
 
+  // Count active (in-progress, not yet claimable) quests as fallback
+  const activeDailyCount = useMemo(() => {
+    return (data?.dailyQuests ?? []).filter((q) => !q.claimed && !q.claimable).length;
+  }, [data?.dailyQuests]);
+
+  const activeCategoryCount = useMemo(() => {
+    return (data?.categoryQuests ?? []).filter((q) => !q.claimed && !q.claimable).length;
+  }, [data?.categoryQuests]);
+
   const subCategoryOptions: FilterOption[] = useMemo(() => {
     const options: FilterOption[] = [
       { id: 'all', label: 'All', icon: <Sparkles className="w-4 h-4" /> },
@@ -239,9 +248,6 @@ export function QuestsPopup({
     const badges: Record<string, number> = {};
     if (!data?.categoryQuests) return badges;
 
-    // "all" badge
-    badges['all'] = countCategory;
-
     // per category badge — only claimable rewards
     data.categoryQuests.forEach((quest) => {
       if (!quest.categoryId || quest.claimed) return;
@@ -259,6 +265,18 @@ export function QuestsPopup({
 
     return badges;
   }, [data?.categoryQuests, countCategory]);
+
+  const activeCategoryBadges = useMemo(() => {
+    const badges: Record<string, number> = {};
+    if (!data?.categoryQuests) return badges;
+
+    data.categoryQuests.forEach((quest) => {
+      if (!quest.categoryId || quest.claimed || quest.claimable) return;
+      badges[quest.categoryId] = (badges[quest.categoryId] ?? 0) + 1;
+    });
+
+    return badges;
+  }, [data?.categoryQuests, activeCategoryCount]);
 
   const filteredCategoryQuests = useMemo(() => {
     if (!data?.categoryQuests) return [];
@@ -570,11 +588,15 @@ export function QuestsPopup({
                         >
                           <Compass className="w-4 h-4" />
                           <span>My Focus</span>
-                          {countCategory > 0 && (
+                          {countCategory > 0 ? (
                             <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal animate-in zoom-in">
                               {countCategory}
                             </span>
-                          )}
+                          ) : activeCategoryCount > 0 ? (
+                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-muted-foreground/50 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal">
+                              {activeCategoryCount}
+                            </span>
+                          ) : null}
                         </TabsTrigger>
                         <TabsTrigger
                           value="daily"
@@ -589,11 +611,15 @@ export function QuestsPopup({
                         >
                           <CalendarDays className="w-4 h-4" />
                           <span>Daily</span>
-                          {countDaily > 0 && (
+                          {countDaily > 0 ? (
                             <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal animate-in zoom-in">
                               {countDaily}
                             </span>
-                          )}
+                          ) : activeDailyCount > 0 ? (
+                            <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-muted-foreground/50 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal">
+                              {activeDailyCount}
+                            </span>
+                          ) : null}
                         </TabsTrigger>
                       </TabsList>
                     </Tabs>
@@ -626,6 +652,8 @@ export function QuestsPopup({
                             options={subCategoryOptions}
                             badges={categoryBadges}
                             badgeClassName="text-white bg-amber-500"
+                            fallbackBadges={activeCategoryBadges}
+                            fallbackBadgeClassName="text-white bg-muted-foreground/50"
                           />
                         )}
                         {filteredCategoryQuests.length === 0 ? (
