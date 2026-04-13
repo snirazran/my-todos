@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useDragControls } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { mutate } from 'swr';
 import { ScrollText, X, Compass, CalendarDays, RefreshCw, Sparkles } from 'lucide-react';
+import { BaseSheet } from './BaseSheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -86,7 +86,6 @@ export function QuestsPopup({
   onClose: () => void;
   isGuest?: boolean;
 }) {
-  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<'daily' | 'category'>('category');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [claimingObjectiveId, setClaimingObjectiveId] = useState<string | null>(
@@ -98,13 +97,11 @@ export function QuestsPopup({
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string>('all');
   const [editingFocusCategoryId, setEditingFocusCategoryId] =
     useState<MacroCategoryId | null>(null);
-  const [isDesktop, setIsDesktop] = useState(false);
   const [rewardRevealQueue, setRewardRevealQueue] = useState<
     QuestRewardRevealEntry[]
   >([]);
   const [openingGiftKey, setOpeningGiftKey] = useState<string | null>(null);
   const rewardRevealIdRef = useRef(0);
-  const dragControls = useDragControls();
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const {
@@ -124,22 +121,6 @@ export function QuestsPopup({
     fetcher,
     { revalidateOnFocus: false },
   );
-  useEffect(() => {
-    setMounted(true);
-    const check = () =>
-      setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
-
-  useEffect(() => {
-    if (!show) return;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [show]);
 
   useEffect(() => {
     if (!claimMessage) return;
@@ -487,41 +468,16 @@ export function QuestsPopup({
     await mutateQuests();
   };
 
-  if (!mounted || !show) return null;
-
-  return createPortal(
-    <AnimatePresence>
-      <>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 z-[1050] bg-background/70 backdrop-blur-md"
-        />
-        <div className="pointer-events-none fixed inset-0 z-[1051] flex items-end justify-center p-0 sm:items-center sm:p-6">
-          <motion.div
-            initial={isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%' }}
-            animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
-            exit={isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%' }}
-            transition={{ type: 'spring', damping: 26, stiffness: 260 }}
-            drag={!isDesktop ? 'y' : false}
-            dragControls={dragControls}
-            dragListener={false}
-            dragElastic={{ top: 0, bottom: 0.45 }}
-            dragMomentum={false}
-            dragSnapToOrigin
-            onDragEnd={(_event, { offset, velocity }) => {
-              if (offset.y > 120 || velocity.y > 650) onClose();
-            }}
-            className="pointer-events-auto flex h-[92vh] w-full flex-col overflow-hidden rounded-t-[32px] border border-border/50 bg-card/95 text-card-foreground shadow-2xl backdrop-blur-2xl sm:h-[88vh] sm:max-w-[1080px] sm:rounded-[34px]"
-          >
-            {!isDesktop && (
-              <div
-                className="absolute inset-x-0 top-0 z-20 h-8"
-                onPointerDown={(event) => dragControls.start(event)}
-              />
-            )}
+  return (
+    <>
+      <BaseSheet
+        open={show}
+        onOpenChange={(v) => { if (!v) onClose(); }}
+        className="h-[92vh] sm:h-[88vh] sm:max-w-[1080px]"
+        zIndex={1050}
+      >
+        {({ isDesktop }) => (
+          <>
             <div className="px-4 py-4 border-b border-border/50 md:px-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -736,40 +692,39 @@ export function QuestsPopup({
                 </div>
               )}
             </div>
-          </motion.div>
-        </div>
-        <TagPopup
-          open={!!editingFocusCategoryId}
-          onClose={() => setEditingFocusCategoryId(null)}
-          taskId={editingFocusCategoryId}
-          initialTags={
-            editingFocusCategoryId
-              ? (categoryTagMap.get(editingFocusCategoryId) ?? [])
-              : []
-          }
-          onSave={handleSaveFocusTags}
-          eyebrow="My Focus"
-          title={
-            editingFocusCategory
-              ? `${editingFocusCategory.name} Tags`
-              : 'Focus Tags'
-          }
-          description={
-            editingFocusCategory
-              ? `Choose which tags should count toward your ${editingFocusCategory.name.toLowerCase()} quests.`
-              : 'Choose the tags that should guide quests for this focus area.'
-          }
-          saveLabel="Save focus tags"
-        />
-        <QuestRewardRevealOverlay
-          entry={rewardRevealQueue[0] ?? null}
-          openingGiftKey={openingGiftKey}
-          onClaim={handleRewardRevealClaim}
-          onOpenGift={handleRewardRevealOpenGift}
-        />
-      </>
-    </AnimatePresence>,
-    document.body,
+          </>
+        )}
+      </BaseSheet>
+      <TagPopup
+        open={!!editingFocusCategoryId}
+        onClose={() => setEditingFocusCategoryId(null)}
+        taskId={editingFocusCategoryId}
+        initialTags={
+          editingFocusCategoryId
+            ? (categoryTagMap.get(editingFocusCategoryId) ?? [])
+            : []
+        }
+        onSave={handleSaveFocusTags}
+        eyebrow="My Focus"
+        title={
+          editingFocusCategory
+            ? `${editingFocusCategory.name} Tags`
+            : 'Focus Tags'
+        }
+        description={
+          editingFocusCategory
+            ? `Choose which tags should count toward your ${editingFocusCategory.name.toLowerCase()} quests.`
+            : 'Choose the tags that should guide quests for this focus area.'
+        }
+        saveLabel="Save focus tags"
+      />
+      <QuestRewardRevealOverlay
+        entry={rewardRevealQueue[0] ?? null}
+        openingGiftKey={openingGiftKey}
+        onClaim={handleRewardRevealClaim}
+        onOpenGift={handleRewardRevealOpenGift}
+      />
+    </>
   );
 }
 

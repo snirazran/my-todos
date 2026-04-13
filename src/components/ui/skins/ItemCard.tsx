@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Check, Lock, Loader2, CircleDollarSign, X, Info } from 'lucide-react';
@@ -120,6 +120,24 @@ export function ItemCard({
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
   const [shake, setShake] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const previewIndices = {
     skin: 0,
@@ -145,6 +163,7 @@ export function ItemCard({
 
   return (
     <motion.div
+      ref={cardRef}
       animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}}
       transition={{ duration: 0.4 }}
       onClick={(e) => {
@@ -222,7 +241,7 @@ export function ItemCard({
         <div className="absolute inset-0 z-10 flex items-end justify-center">
           {customPreview ? (
             customPreview
-          ) : item.slot === 'container' ? (
+          ) : !visible ? null : item.slot === 'container' ? (
             <div className="w-[110%] h-[110%] -translate-y-1 drop-shadow-xl">
               <GiftRive color={item.riveIndex} />
             </div>

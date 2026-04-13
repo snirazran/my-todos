@@ -1,7 +1,6 @@
 import { useInventory } from '@/hooks/useInventory';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
-import { createPortal } from 'react-dom';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Lock, Shirt, X, ArrowLeft, ShoppingBag, Repeat } from 'lucide-react';
@@ -13,8 +12,9 @@ import { FilterBar, FilterCategory } from './FilterBar';
 import { SortMenu, SortOrder } from './SortMenu';
 import { cn } from '@/lib/utils';
 import confetti from 'canvas-confetti';
-import { motion, AnimatePresence, useDragControls } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
+import { BaseSheet } from '@/components/ui/BaseSheet';
 
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
@@ -68,13 +68,6 @@ export function WardrobePanel({
   const [shakeBalance, setShakeBalance] = useState(false);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
 
-  // Deferred rendering state for smooth open animation
-  const [isReady, setIsReady] = useState(false);
-
-  const [mounted, setMounted] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
-  const dragControls = useDragControls();
-
   // --- Sell Dialog Logic ---
   const [itemToSell, setItemToSell] = useState<ItemDef | null>(null);
 
@@ -89,15 +82,6 @@ export function WardrobePanel({
       setItemToSell(null);
     }
   };
-
-  // Reset deferred loading when opening
-  useEffect(() => {
-    if (open) {
-      setIsReady(false);
-      const timer = setTimeout(() => setIsReady(true), 300); // Wait for slide-up
-      return () => clearTimeout(timer);
-    }
-  }, [open]);
 
   // Re-added sellItem
   const sellItem = async (item: ItemDef, qty: number = 1) => {
@@ -148,15 +132,6 @@ export function WardrobePanel({
     }
   };
 
-  useEffect(() => {
-    setMounted(true);
-    const checkDesktop = () =>
-      setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
-    checkDesktop();
-    window.addEventListener('resize', checkDesktop);
-    return () => window.removeEventListener('resize', checkDesktop);
-  }, []);
-
   // Handle Mark Seen on Close
   const prevOpen = React.useRef(open);
   useEffect(() => {
@@ -166,26 +141,7 @@ export function WardrobePanel({
     prevOpen.current = open;
   }, [open, markAllSeen]);
 
-  // Lock scroll when open
-  useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [open]);
-
-  // Handle Mark Seen on Tab Change (Leaving Inventory)
-  const prevTab = React.useRef(activeTab);
-  useEffect(() => {
-    if (prevTab.current === 'inventory' && activeTab !== 'inventory') {
-      markAllSeen();
-    }
-    prevTab.current = activeTab;
-  }, [activeTab, markAllSeen]);
+  // Removed Handle Mark Seen on Tab Change to improve performance when switching away from inventory
 
   // Filter change handler to mark category as visited
   const handleFilterChange = (cat: FilterCategory) => {
@@ -371,359 +327,273 @@ export function WardrobePanel({
   const balance = data?.wardrobe?.flies ?? 0;
   const isGuest = !user;
 
-  // Track if touch started from right edge (for drag-to-close gesture)
-  // const [isDragEnabled, setIsDragEnabled] = useState(false);
-  // const EDGE_THRESHOLD = 80; // pixels from right edge
-
-  if (!mounted) return null;
-
-  const mobileVariants = {
-    initial: { y: '100%', opacity: 0, scale: 0.96 },
-    animate: { y: 0, opacity: 1, scale: 1 },
-    exit: { y: '100%', opacity: 0, scale: 0.96 },
-  };
-
-  const desktopVariants = {
-    initial: { opacity: 0, scale: 0.95, y: 0 },
-    animate: { opacity: 1, scale: 1, y: 0 },
-    exit: { opacity: 0, scale: 0.95, y: 0 },
-  };
-
-  return createPortal(
+  return (
     <>
-      <AnimatePresence>
-        {open && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => onOpenChange(false)}
-              className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-md"
-            />
-
-            {/* Sheet Container */}
-            <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center pointer-events-none p-0 sm:p-6">
-              <motion.div
-                variants={isDesktop ? desktopVariants : mobileVariants}
-                initial="initial"
-                animate={
-                  isDesktop
-                    ? { ...desktopVariants.animate, x: 0 }
-                    : mobileVariants.animate
-                }
-                exit="exit"
-                transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-                drag={!isDesktop ? 'y' : false}
-                dragControls={dragControls}
-                dragListener={false} // Disable drag from anywhere
-                dragConstraints={{ top: 0, bottom: 0 }}
-                dragElastic={{ top: 0, bottom: 0.5 }}
-                dragMomentum={false}
-                dragSnapToOrigin
-                dragDirectionLock
-                onDragEnd={(e, { offset, velocity }) => {
-                  // Easier close threshold
-                  if (offset.y > 100 || velocity.y > 500) {
-                    onOpenChange(false);
-                  }
-                }}
-                style={{
-                  touchAction: 'none', // Prevent scrolling on the drag handle
-                  transform: 'translate3d(0,0,0)', // Fixes border-radius clipping on mobile
-                }}
-                // Added rounded-t-[32px] for sheet look on mobile
-                onClick={() => confirmingBuyId && setConfirmingBuyId(null)}
-                className={cn(
-                  'pointer-events-auto w-full sm:max-w-[95vw] lg:max-w-[1200px] h-[90vh] sm:h-[90vh] flex flex-col bg-background overflow-hidden relative select-none',
-                  isDesktop && 'shadow-2xl', // Only show shadow on desktop to reduce lag on mobile
-                  'rounded-t-[32px] sm:rounded-[40px] border-t sm:border border-border/40',
-                )}
-              >
-                {/* Drag Handle (Mobile Only) - Invisible Hit Area */}
-                {!isDesktop && (
-                  <div
-                    className="absolute top-0 left-0 right-0 h-8 z-50 touch-none"
-                    onPointerDown={(e) => dragControls.start(e)}
-                  />
-                )}
-
-                {/* --- HEADER --- */}
-                <div
-                  className={cn(
-                    'relative z-20 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-border/40',
-                    isDesktop
-                      ? 'bg-background/50 backdrop-blur-xl'
-                      : 'bg-transparent',
-                  )}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div>
-                        <h2 className="text-2xl md:text-5xl font-bold tracking-tight text-foreground">
-                          Inventory
-                        </h2>
-                        <p className="hidden md:block text-base font-medium text-muted-foreground mt-1">
-                          Customize Your Companion
-                        </p>
-                      </div>
-
-                      {/* Balance Badge - moved here */}
-                      <motion.div
-                        animate={shakeBalance ? { x: [-5, 5, -5, 5, 0] } : {}}
-                        transition={{ duration: 0.4 }}
-                        className={cn(
-                          'flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full transition-colors duration-300',
-                          shakeBalance
-                            ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-800'
-                            : 'bg-secondary border-border dark:bg-slate-800/50 dark:border-slate-700',
-                        )}
-                      >
-                        <div className="flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0 dark:bg-slate-900">
-                          <Fly
-                            size={24}
-                            className="text-muted-foreground"
-                            y={-2}
-                          />
-                        </div>
-                        <AnimatedNumber
-                          value={balance}
-                          className="text-sm font-black leading-none md:text-xl text-foreground tabular-nums"
-                        />
-                      </motion.div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                      {/* Mobile Close Button (X) */}
-                      <button
-                        onClick={() => onOpenChange(false)}
-                        className="flex items-center justify-center w-10 h-10 rounded-full md:hidden bg-secondary/80 text-foreground"
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-
-                      {/* Desktop Close Button */}
-                      <button
-                        onClick={() => onOpenChange(false)}
-                        className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-secondary hover:bg-secondary/80 border-border dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
-                      >
-                        <X className="w-5 h-5 text-muted-foreground" />
-                      </button>
-                    </div>
+      <BaseSheet
+        open={open}
+        onOpenChange={onOpenChange}
+        className="h-[90vh] sm:h-[90vh] sm:max-w-[95vw] lg:max-w-[1200px] select-none bg-background"
+        zIndex={999}
+      >
+        {({ isDesktop }) => (
+          <div
+            className="flex flex-col h-full"
+            onClick={() => confirmingBuyId && setConfirmingBuyId(null)}
+          >
+            {/* --- HEADER --- */}
+            <div
+              className={cn(
+                'relative z-20 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-border/40',
+                isDesktop
+                  ? 'bg-background/50 backdrop-blur-xl'
+                  : 'bg-transparent',
+              )}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div>
+                    <h2 className="text-2xl md:text-5xl font-bold tracking-tight text-foreground">
+                      Inventory
+                    </h2>
+                    <p className="hidden md:block text-base font-medium text-muted-foreground mt-1">
+                      Customize Your Companion
+                    </p>
                   </div>
+
+                  {/* Balance Badge */}
+                  <motion.div
+                    animate={shakeBalance ? { x: [-5, 5, -5, 5, 0] } : {}}
+                    transition={{ duration: 0.4 }}
+                    className={cn(
+                      'flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full transition-colors duration-300',
+                      shakeBalance
+                        ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-800'
+                        : 'bg-secondary border-border dark:bg-slate-800/50 dark:border-slate-700',
+                    )}
+                  >
+                    <div className="flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0 dark:bg-slate-900">
+                      <Fly
+                        size={24}
+                        className="text-muted-foreground"
+                        y={-2}
+                      />
+                    </div>
+                    <AnimatedNumber
+                      value={balance}
+                      className="text-sm font-black leading-none md:text-xl text-foreground tabular-nums"
+                    />
+                  </motion.div>
                 </div>
 
-                {/* --- MAIN CONTENT WRAPPER --- */}
-                <div
-                  className={cn(
-                    'flex flex-col flex-1 min-h-0',
-                    isDesktop
-                      ? 'bg-background/50 backdrop-blur-2xl'
-                      : 'bg-transparent',
-                  )}
-                >
-                  <Tabs
-                    value={activeTab}
-                    onValueChange={setActiveTab}
-                    className="flex flex-col h-full"
+                <div className="flex items-center gap-3">
+                  {/* Mobile Close Button (X) */}
+                  <button
+                    onClick={() => onOpenChange(false)}
+                    className="flex items-center justify-center w-10 h-10 rounded-full md:hidden bg-secondary/80 text-foreground"
                   >
-                    {/* Controls Area (Tabs + Filter) */}
-                    <div className="px-4 pt-4 space-y-4 shrink-0 md:px-6 md:pt-5">
-                      <div className="flex items-center justify-between gap-2 md:gap-4">
-                        {/* NEW TAB DESIGN */}
-                        <TabsList
-                          className={cn(
-                            'flex-1 h-12 md:h-14 p-1 rounded-[20px] border border-border/50 shadow-sm flex items-center gap-1',
-                            isDesktop
-                              ? 'bg-card/80 backdrop-blur-2xl'
-                              : 'bg-muted/30',
-                          )}
-                        >
-                          <TabsTrigger
-                            value="inventory"
-                            className="
-                              flex-1 h-full rounded-2xl relative
-                              flex items-center justify-center gap-2 
-                              text-xs md:text-sm font-bold tracking-wide uppercase 
-                              transition-all duration-300
-                              data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
-                              data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                            "
-                          >
-                            <Shirt className="w-4 h-4" />
-                            <span className="hidden xs:inline">Inventory</span>
-                            <span className="xs:hidden">Inv</span>
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="shop"
-                            className="
-                              flex-1 h-full rounded-2xl relative
-                              flex items-center justify-center gap-2 
-                              text-xs md:text-sm font-bold tracking-wide uppercase 
-                              transition-all duration-300
-                              data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
-                              data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                            "
-                          >
-                            <ShoppingBag className="w-4 h-4" />
-                            <span>Shop</span>
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="trade"
-                            className="
-                              flex-1 h-full rounded-2xl relative
-                              flex items-center justify-center gap-2 
-                              text-xs md:text-sm font-bold tracking-wide uppercase 
-                              transition-all duration-300
-                              data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
-                              data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                            "
-                          >
-                            <Repeat className="w-4 h-4" />
-                            <span>Trade</span>
-                          </TabsTrigger>
-                        </TabsList>
+                    <X className="w-5 h-5" />
+                  </button>
 
-                        <SortMenu value={sortBy} onChange={setSortBy} />
-                      </div>
+                  {/* Desktop Close Button */}
+                  <button
+                    onClick={() => onOpenChange(false)}
+                    className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-secondary hover:bg-secondary/80 border-border dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                  >
+                    <X className="w-5 h-5 text-muted-foreground" />
+                  </button>
+                </div>
+              </div>
+            </div>
 
-                      {/* UPDATED WRAPPER: Just a plain container, FilterBar handles the bleeding */}
-                      {activeTab !== 'trade' && (
-                        <div className="w-full min-w-0">
-                          <FilterBar
-                            active={activeFilter}
-                            onChange={handleFilterChange}
-                            badges={filterBadges}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Content Area (Grid) 
-                      Mobile: Expands to edges, no margin, no border radius
-                      Desktop: Has margins, rounded corners
-                  */}
-                    {/* Content Area (Grid) */}
-                    <div
+            {/* --- MAIN CONTENT WRAPPER --- */}
+            <div
+              className={cn(
+                'flex flex-col flex-1 min-h-0',
+                isDesktop
+                  ? 'bg-background/50 backdrop-blur-2xl'
+                  : 'bg-transparent',
+              )}
+            >
+              <Tabs
+                value={activeTab}
+                onValueChange={setActiveTab}
+                className="flex flex-col h-full"
+              >
+                {/* Controls Area (Tabs + Filter) */}
+                <div className="px-4 pt-4 space-y-4 shrink-0 md:px-6 md:pt-5">
+                  <div className="flex items-center justify-between gap-2 md:gap-4">
+                    <TabsList
                       className={cn(
-                        'flex-1 relative mt-4 overflow-hidden',
-                        /* Mobile Styles */
-                        'rounded-t-[32px] border-t border-border/40',
+                        'flex-1 h-12 md:h-14 p-1 rounded-[20px] border border-border/50 shadow-sm flex items-center gap-1',
                         isDesktop
-                          ? 'bg-card/40 backdrop-blur-md'
-                          : 'bg-card/20',
-                        /* Desktop Styles */
-                        'md:mx-8 md:mb-8 md:rounded-[32px] md:border md:border-border/40 md:shadow-inner',
+                          ? 'bg-card/80 backdrop-blur-2xl'
+                          : 'bg-muted/30',
                       )}
                     >
-                      <TabsContent
+                      <TabsTrigger
                         value="inventory"
-                        className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
+                        className="
+                          flex-1 h-full rounded-2xl relative
+                          flex items-center justify-center gap-2
+                          text-xs md:text-sm font-bold tracking-wide uppercase
+                          data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
+                          data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
+                        "
                       >
-                        {!isReady ? (
-                          // SKELETON LOADING STATE (during animation)
-                          <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                            {Array.from({ length: 12 }).map((_, i) => (
-                              <div
-                                key={i}
-                                className="w-full aspect-[1/1.2] rounded-2xl bg-muted/20 animate-pulse border border-border/10"
-                              />
-                            ))}
-                          </div>
-                        ) : inventoryItems.length === 0 ? (
-                          <div className="flex flex-col items-center justify-center h-full opacity-50 animate-in fade-in duration-300">
-                            <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
-                              <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
-                            </div>
-                            <p className="text-lg font-black text-muted-foreground">
-                              Empty
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4 animate-in fade-in zoom-in-95 duration-300">
-                            {inventoryItems.map((item) => (
-                              <ItemCard
-                                key={item.id}
-                                item={item}
-                                mode="inventory"
-                                ownedCount={
-                                  data?.wardrobe?.inventory?.[item.id] ?? 0
-                                }
-                                isEquipped={
-                                  data?.wardrobe?.equipped?.[item.slot] ===
-                                  item.id
-                                }
-                                canAfford={true}
-                                actionLoading={equippingId === item.id}
-                                onAction={() => handleItemAction(item)}
-                                onSell={() => {
-                                  setItemToSell(item);
-                                }}
-                                actionLabel={null}
-                                isNew={unseenInventorySet.has(item.id)}
-                              />
-                            ))}
-                          </div>
-                        )}
-                      </TabsContent>
-
-                      <TabsContent
+                        <Shirt className="w-4 h-4" />
+                        <span className="hidden xs:inline">Inventory</span>
+                        <span className="xs:hidden">Inv</span>
+                      </TabsTrigger>
+                      <TabsTrigger
                         value="shop"
-                        className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
+                        className="
+                          flex-1 h-full rounded-2xl relative
+                          flex items-center justify-center gap-2
+                          text-xs md:text-sm font-bold tracking-wide uppercase
+                          data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
+                          data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
+                        "
                       >
-                        <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                          {shopItems.map((item) => {
-                            const count =
-                              data?.wardrobe?.inventory?.[item.id] ?? 0;
-                            return (
-                              <ItemCard
-                                key={item.id}
-                                item={item}
-                                mode="shop"
-                                ownedCount={count}
-                                isEquipped={false}
-                                canAfford={
-                                  balance >= (item.priceFlies ?? 0) && !isGuest
-                                }
-                                actionLoading={buyingId === item.id}
-                                actionLabel={
-                                  confirmingBuyId === item.id
-                                    ? 'CONFIRM'
-                                    : undefined
-                                }
-                                onAction={(e) => handleBuyItem(item, e)}
-                              />
-                            );
-                          })}
-                        </div>
-                      </TabsContent>
-
-                      <TabsContent
+                        <ShoppingBag className="w-4 h-4" />
+                        <span>Shop</span>
+                      </TabsTrigger>
+                      <TabsTrigger
                         value="trade"
-                        className="absolute inset-0 overflow-hidden data-[state=inactive]:hidden"
+                        className="
+                          flex-1 h-full rounded-2xl relative
+                          flex items-center justify-center gap-2
+                          text-xs md:text-sm font-bold tracking-wide uppercase
+                          data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
+                          data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
+                        "
                       >
-                        {data?.wardrobe?.inventory && data.catalog && (
-                          <TradePanel
-                            inventory={data.wardrobe.inventory}
-                            catalog={data.catalog}
-                            unseenItems={unseenItems}
-                            onTradeSuccess={() => mutate()}
-                            activeFilter={
-                              activeFilter === 'container' ? 'all' : activeFilter
-                            }
-                            sortBy={sortBy}
-                          />
-                        )}
-                      </TabsContent>
+                        <Repeat className="w-4 h-4" />
+                        <span>Trade</span>
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <SortMenu value={sortBy} onChange={setSortBy} />
+                  </div>
+
+                  {activeTab !== 'trade' && (
+                    <div className="w-full min-w-0">
+                      <FilterBar
+                        active={activeFilter}
+                        onChange={handleFilterChange}
+                        badges={filterBadges}
+                      />
                     </div>
-                  </Tabs>
+                  )}
                 </div>
-              </motion.div>
+
+                {/* Content Area (Grid) */}
+                <div
+                  className={cn(
+                    'flex-1 relative mt-4 overflow-hidden',
+                    'rounded-t-[32px] border-t border-border/40',
+                    isDesktop
+                      ? 'bg-card/40 backdrop-blur-md'
+                      : 'bg-card/20',
+                    'md:mx-8 md:mb-8 md:rounded-[32px] md:border md:border-border/40 md:shadow-inner',
+                  )}
+                >
+                  <TabsContent
+                    value="inventory"
+                    forceMount
+                    className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
+                  >
+                    {inventoryItems.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full opacity-50">
+                        <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
+                          <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
+                        </div>
+                        <p className="text-lg font-black text-muted-foreground">
+                          Empty
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                        {inventoryItems.map((item) => (
+                          <ItemCard
+                            key={item.id}
+                            item={item}
+                            mode="inventory"
+                            ownedCount={
+                              data?.wardrobe?.inventory?.[item.id] ?? 0
+                            }
+                            isEquipped={
+                              data?.wardrobe?.equipped?.[item.slot] ===
+                              item.id
+                            }
+                            canAfford={true}
+                            actionLoading={equippingId === item.id}
+                            onAction={() => handleItemAction(item)}
+                            onSell={() => {
+                              setItemToSell(item);
+                            }}
+                            actionLabel={null}
+                            isNew={unseenInventorySet.has(item.id)}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent
+                    value="shop"
+                    forceMount
+                    className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden"
+                  >
+                    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                      {shopItems.map((item) => {
+                        const count =
+                          data?.wardrobe?.inventory?.[item.id] ?? 0;
+                        return (
+                          <ItemCard
+                            key={item.id}
+                            item={item}
+                            mode="shop"
+                            ownedCount={count}
+                            isEquipped={false}
+                            canAfford={
+                              balance >= (item.priceFlies ?? 0) && !isGuest
+                            }
+                            actionLoading={buyingId === item.id}
+                            actionLabel={
+                              confirmingBuyId === item.id
+                                ? 'CONFIRM'
+                                : undefined
+                            }
+                            onAction={(e) => handleBuyItem(item, e)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent
+                    value="trade"
+                    className="absolute inset-0 overflow-hidden data-[state=inactive]:hidden"
+                  >
+                    {data?.wardrobe?.inventory && data.catalog && (
+                      <TradePanel
+                        inventory={data.wardrobe.inventory}
+                        catalog={data.catalog}
+                        unseenItems={unseenItems}
+                        onTradeSuccess={() => mutate()}
+                        activeFilter={
+                          activeFilter === 'container' ? 'all' : activeFilter
+                        }
+                        sortBy={sortBy}
+                      />
+                    )}
+                  </TabsContent>
+                </div>
+              </Tabs>
             </div>
-          </>
+          </div>
         )}
-      </AnimatePresence>
+      </BaseSheet>
 
       <SellConfirmationDialog
         open={!!itemToSell}
@@ -742,7 +612,6 @@ export function WardrobePanel({
           onWin={() => mutate()}
         />
       )}
-    </>,
-    document.body,
+    </>
   );
 }
