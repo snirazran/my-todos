@@ -59,6 +59,9 @@ type QuestRewardRevealEntry = {
   key: string;
   item: ItemDef;
   fliesGranted?: number;
+  quantity?: number;
+  baseFlies?: number;
+  isQuestReward?: boolean;
 };
 
 const fetcher = async <T,>(url: string) => {
@@ -269,26 +272,40 @@ export function QuestsPopup({
     const catalog = data?.rewardCatalog ?? {};
     const nextEntries: QuestRewardRevealEntry[] = [];
     const fliesGranted = Math.max(0, Math.floor(summary?.fliesGranted ?? 0));
+    const isPremium = data?.isPremium ?? false;
 
     if (fliesGranted > 0) {
+      const baseFlies = isPremium ? Math.floor(fliesGranted / 2) : fliesGranted;
       nextEntries.push({
         key: `flies-${fliesGranted}-${rewardRevealIdRef.current}`,
         item: createFlyRewardItem(fliesGranted),
         fliesGranted,
+        baseFlies: isPremium ? baseFlies : undefined,
+        isQuestReward: true,
       });
       rewardRevealIdRef.current += 1;
     }
 
-    nextEntries.push(
-      ...grantedItemIds
-        .map((itemId) => catalog[itemId])
-        .filter((item): item is ItemDef => Boolean(item))
-        .map((item) => {
-          const key = `${item.id}-${rewardRevealIdRef.current}`;
-          rewardRevealIdRef.current += 1;
-          return { key, item };
-        }),
-    );
+    // Consolidate duplicate item IDs into single entries with quantity
+    const itemCounts: Record<string, number> = {};
+    for (const itemId of grantedItemIds) {
+      itemCounts[itemId] = (itemCounts[itemId] ?? 0) + 1;
+    }
+
+    const uniqueItemIds = Object.keys(itemCounts);
+    for (const itemId of uniqueItemIds) {
+      const item = catalog[itemId];
+      if (!item) continue;
+      const count = itemCounts[itemId];
+      const key = `${item.id}-${rewardRevealIdRef.current}`;
+      rewardRevealIdRef.current += 1;
+      nextEntries.push({
+        key,
+        item,
+        quantity: count > 1 ? count : undefined,
+        isQuestReward: true,
+      });
+    }
 
     if (!nextEntries.length) return 0;
     setRewardRevealQueue((current) => [...current, ...nextEntries]);
@@ -306,28 +323,35 @@ export function QuestsPopup({
     }
     if (openingGiftKey) return;
 
+    const totalToOpen = entry.quantity ?? 1;
+
     setOpeningGiftKey(entry.key);
     setClaimMessage(null);
     try {
-      const res = await fetch('/api/skins/open-gift', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ giftBoxId: entry.item.id }),
-      });
-      const payload = await res.json();
-      if (!res.ok || !payload.prize) {
-        throw new Error(payload.error || 'Could not open gift');
+      // Open all copies sequentially, collect prize entries
+      const prizeEntries: QuestRewardRevealEntry[] = [];
+      for (let i = 0; i < totalToOpen; i++) {
+        const res = await fetch('/api/skins/open-gift', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ giftBoxId: entry.item.id }),
+        });
+        const payload = await res.json();
+        if (!res.ok || !payload.prize) {
+          throw new Error(payload.error || 'Could not open gift');
+        }
+        const prize = payload.prize as ItemDef;
+        prizeEntries.push({
+          key: `${prize.id}-${rewardRevealIdRef.current}`,
+          item: prize,
+        });
+        rewardRevealIdRef.current += 1;
       }
 
-      const prize = payload.prize as ItemDef;
-      const prizeEntry = {
-        key: `${prize.id}-${rewardRevealIdRef.current}`,
-        item: prize,
-      };
-      rewardRevealIdRef.current += 1;
+      // Replace current entry with all prize entries (shown one after another)
       setRewardRevealQueue((current) =>
         current[0]?.key === entry.key
-          ? [prizeEntry, ...current.slice(1)]
+          ? [...prizeEntries, ...current.slice(1)]
           : current,
       );
       mutate('/api/skins/inventory');
@@ -492,18 +516,6 @@ export function QuestsPopup({
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  {data && (
-                    <div
-                      className={cn(
-                        'hidden rounded-full border px-3 py-2 text-[11px] font-black uppercase tracking-[0.18em] sm:flex',
-                        data.isPremium
-                          ? 'border-primary/20 bg-primary/10 text-primary'
-                          : 'border-border/50 bg-background/80 text-muted-foreground',
-                      )}
-                    >
-                      {data.isPremium ? 'Premium active' : 'Free tier'}
-                    </div>
-                  )}
                   <button
                     onClick={onClose}
                     className="flex items-center justify-center w-10 h-10 transition-colors border rounded-full border-border/50 bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -722,6 +734,7 @@ export function QuestsPopup({
       <QuestRewardRevealOverlay
         entry={rewardRevealQueue[0] ?? null}
         openingGiftKey={openingGiftKey}
+        isPremium={data?.isPremium ?? false}
         onClaim={handleRewardRevealClaim}
         onOpenGift={handleRewardRevealOpenGift}
       />
@@ -729,14 +742,55 @@ export function QuestsPopup({
   );
 }
 
+function PremiumFlyCounter({ baseAmount, finalAmount }: { baseAmount: number; finalAmount: number }) {
+  const [displayAmount, setDisplayAmount] = useState(baseAmount);
+  const [showDouble, setShowDouble] = useState(false);
+
+  useEffect(() => {
+    const doubleTimer = setTimeout(() => {
+      setShowDouble(true);
+      // Animate counting up from base to final
+      const duration = 600;
+      const steps = 20;
+      const increment = (finalAmount - baseAmount) / steps;
+      let current = baseAmount;
+      let step = 0;
+      const interval = setInterval(() => {
+        step++;
+        current = Math.min(baseAmount + Math.round(increment * step), finalAmount);
+        setDisplayAmount(current);
+        if (step >= steps) clearInterval(interval);
+      }, duration / steps);
+      return () => clearInterval(interval);
+    }, 800);
+    return () => clearTimeout(doubleTimer);
+  }, [baseAmount, finalAmount]);
+
+  return (
+    <div className="relative flex items-center justify-center w-full h-full">
+      <Fly size={132} />
+      <motion.span
+        key={displayAmount}
+        animate={showDouble ? { scale: [1.3, 1] } : {}}
+        transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+        className="absolute z-40 px-3 py-1 text-sm font-black text-white border shadow-sm right-3 top-3 rounded-xl border-white/20 bg-black/45 backdrop-blur-sm"
+      >
+        x{displayAmount}
+      </motion.span>
+    </div>
+  );
+}
+
 function QuestRewardRevealOverlay({
   entry,
   openingGiftKey,
+  isPremium,
   onClaim,
   onOpenGift,
 }: {
   entry: QuestRewardRevealEntry | null;
   openingGiftKey: string | null;
+  isPremium: boolean;
   onClaim: () => void;
   onOpenGift: (entry: QuestRewardRevealEntry) => void;
 }) {
@@ -780,14 +834,23 @@ function QuestRewardRevealOverlay({
               onOpenLater={
                 entry.item.slot === 'container' ? onClaim : undefined
               }
+              quantity={entry.quantity}
+              isPremium={isPremium && !!entry.isQuestReward}
               customPreview={
                 entry.fliesGranted ? (
-                  <div className="relative flex items-center justify-center w-full h-full">
-                    <Fly size={132} />
-                    <span className="absolute z-40 px-3 py-1 text-sm font-black text-white border shadow-sm right-3 top-3 rounded-xl border-white/20 bg-black/45 backdrop-blur-sm">
-                      x{entry.fliesGranted}
-                    </span>
-                  </div>
+                  entry.baseFlies ? (
+                    <PremiumFlyCounter
+                      baseAmount={entry.baseFlies}
+                      finalAmount={entry.fliesGranted}
+                    />
+                  ) : (
+                    <div className="relative flex items-center justify-center w-full h-full">
+                      <Fly size={132} />
+                      <span className="absolute z-40 px-3 py-1 text-sm font-black text-white border shadow-sm right-3 top-3 rounded-xl border-white/20 bg-black/45 backdrop-blur-sm">
+                        x{entry.fliesGranted}
+                      </span>
+                    </div>
+                  )
                 ) : undefined
               }
               slotLabel={entry.fliesGranted ? 'currency' : undefined}

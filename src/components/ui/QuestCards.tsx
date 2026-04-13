@@ -1106,30 +1106,29 @@ function rewardLabel(
   if (reward.type === 'FLIES')
     return `${getRewardQuantityLabel(reward, isPremium)} flies`;
   if (reward.itemId) {
-    return `${rewardCatalog[reward.itemId]?.name ?? reward.itemId}${isPremium ? ' x2' : ''}`;
+    return rewardCatalog[reward.itemId]?.name ?? reward.itemId;
   }
   return 'Reward';
 }
 
-function getRewardQuantityLabel(reward: QuestReward, isPremium: boolean) {
+function getRewardQuantityLabel(reward: QuestReward, _isPremium: boolean) {
   if (reward.type === 'FLIES') {
     if (reward.amountMode === 'random') {
-      const min = Math.max(1, reward.minAmount ?? 1) * (isPremium ? 2 : 1);
-      const max = Math.max(min, reward.maxAmount ?? min) * (isPremium ? 2 : 1);
+      const min = Math.max(1, reward.minAmount ?? 1);
+      const max = Math.max(min, reward.maxAmount ?? min);
       return min === max ? String(max) : `${min}-${max}`;
     }
 
-    return String(Math.max(0, (reward.amount ?? 0) * (isPremium ? 2 : 1)));
+    return String(Math.max(0, reward.amount ?? 0));
   }
 
   const base = reward.amount && reward.amount > 1 ? reward.amount : 1;
-  const multiplied = base * (isPremium ? 2 : 1);
-  return `x${multiplied}`;
+  return `x${base}`;
 }
 
-function getRewardOwnedCount(reward: QuestReward, isPremium: boolean) {
+function getRewardOwnedCount(reward: QuestReward, _isPremium: boolean) {
   const base = reward.amount && reward.amount > 1 ? reward.amount : 1;
-  return base * (isPremium ? 2 : 1);
+  return base;
 }
 
 function getQuestButtonLabel(
@@ -1139,7 +1138,6 @@ function getQuestButtonLabel(
 ) {
   if (quest.claimed) return 'Claimed';
   if (claiming) return 'Claiming...';
-  if (quest.claimable)
-    return isPremium ? 'Claim Double Reward' : 'Claim Reward';
+  if (quest.claimable) return 'Claim Reward';
   return 'In Progress';
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, Variants } from 'framer-motion';
-import { Loader2, Gift, Sparkles } from 'lucide-react';
+import { AnimatePresence } from 'framer-motion';
+import { Loader2, Gift, Sparkles, Crown } from 'lucide-react';
 import Frog from '@/components/ui/frog';
 import { ItemDef } from '@/lib/skins/catalog';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,8 @@ type RewardCardProps = {
   slotLabel?: string;
   onOpenLater?: () => void;
   openLaterLabel?: string;
+  quantity?: number;
+  isPremium?: boolean;
 };
 
 const GLOW_COLORS = {
@@ -33,6 +36,8 @@ export const RewardCard = ({
   slotLabel,
   onOpenLater,
   openLaterLabel = 'Open Later',
+  quantity,
+  isPremium,
 }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
   const [localClaiming, setLocalClaiming] = useState(false);
@@ -78,12 +83,35 @@ export const RewardCard = ({
   return (
     <motion.div
       key="card"
-      className="flex flex-col items-center w-full"
+      className="relative flex flex-col items-center w-full"
       variants={cardVariants}
       initial="hidden"
       animate="visible"
       onAnimationComplete={() => setShowContent(true)}
     >
+      {/* Premium Multiplier Banner — positioned above card without affecting layout */}
+      <AnimatePresence>
+        {isPremium && showContent && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 18, delay: 0.3 }}
+            className="absolute left-0 right-0 flex flex-col items-center gap-1 -top-[4.5rem] z-30"
+          >
+            <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.25em] text-white/50">
+              <Crown className="w-3.5 h-3.5 text-amber-400 drop-shadow-[0_0_6px_rgba(251,191,36,0.5)]" />
+              Premium
+            </span>
+            <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-[0.25em] text-white/50">
+              <span className="px-2 py-0.5 text-base font-black tracking-wide text-amber-300 rounded-lg bg-amber-500/15 border border-amber-400/25 shadow-[0_0_16px_rgba(251,191,36,0.25)]">
+                x2
+              </span>
+              Multiplier
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 3D Card Container */}
       <div
         className={cn(
@@ -121,6 +149,13 @@ export const RewardCard = ({
               )}
             >
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-white/40 to-transparent opacity-60" />
+
+              {/* Quantity Badge */}
+              {quantity && quantity > 1 && (
+                <div className="absolute top-2 right-2 z-40 bg-black/50 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded-lg shadow-sm border border-white/10">
+                  x{quantity}
+                </div>
+              )}
 
               {/* === LAYER 1: CINEMATIC EFFECTS (Centered) === */}
               <div className="absolute inset-0 z-10 flex items-center justify-center pointer-events-none">
@@ -244,7 +279,11 @@ export const RewardCard = ({
             <>
               <Loader2 className="relative z-20 w-5 h-5 animate-spin" />
               <span className="relative z-20">
-                {prize.slot === 'container' ? 'Opening...' : 'Claiming...'}
+                {prize.slot === 'container'
+                  ? quantity && quantity > 1
+                    ? `Opening ${quantity}...`
+                    : 'Opening...'
+                  : 'Claiming...'}
               </span>
             </>
           ) : (
@@ -253,7 +292,11 @@ export const RewardCard = ({
                 <Sparkles className="relative z-20 w-5 h-5" />
               )}
               <span className="relative z-20">
-                {prize.slot === 'container' ? 'Open Now' : 'Claim Reward'}
+                {prize.slot === 'container'
+                  ? quantity && quantity > 1
+                    ? `Open All (${quantity})`
+                    : 'Open Now'
+                  : 'Claim Reward'}
               </span>
             </>
           )}
