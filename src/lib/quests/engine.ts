@@ -5,6 +5,7 @@ import QuestTemplateModel, {
 import UserModel from '@/lib/models/User';
 import TaskModel, { type TaskDoc } from '@/lib/models/Task';
 import QuestCategoryModel, { type QuestCategoryDoc } from '@/lib/models/QuestCategory';
+import connectMongo from '@/lib/mongoose';
 import type { UserDoc } from '@/lib/types/UserDoc';
 import type { ItemDef } from '@/lib/skins/catalog';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
@@ -415,6 +416,7 @@ async function syncQuestForTemplate(args: {
   user: UserDoc;
   tasks: TaskDoc[];
   timezone: string;
+  existingDoc?: InstanceType<typeof QuestModel> | null;
 }) {
   const { template, userId, user, tasks, timezone } = args;
   const windowKey = placementWindowKey(template.placement, template.templateId, timezone);
@@ -424,7 +426,7 @@ async function syncQuestForTemplate(args: {
       : `${template.templateId}:category`;
 
   let doc =
-    (await QuestModel.findOne({ userId, templateId: template.templateId, windowKey })) ??
+    args.existingDoc ??
     new QuestModel({
       userId,
       questId,
@@ -598,12 +600,13 @@ export async function syncQuestState(args: {
   dailySelectionSeed?: string;
 }) {
   const { userId, timezone } = args;
-  const [user, tasks, catalog, templates, categories] = await Promise.all([
+  const [user, tasks, catalog, templates, categories, allExistingDocs] = await Promise.all([
     UserModel.findById(userId).lean<UserDoc | null>(),
     TaskModel.find({ userId, deletedAt: { $exists: false } }).lean<TaskDoc[]>(),
     args.catalog ? Promise.resolve(args.catalog) : getFullCatalog(),
     QuestTemplateModel.find({ isActive: true }).lean<QuestTemplateDoc[]>(),
     QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean<QuestCategoryDoc[]>(),
+    QuestModel.find({ userId }),
   ]);
 
   if (!user) throw new Error('User not found');
@@ -637,11 +640,9 @@ export async function syncQuestState(args: {
     return profile.selectedCategoryIds.includes(template.categoryId);
   });
 
-  const existingDailyDocs = await QuestModel.find({
-    userId,
-    placement: 'daily',
-    windowKey: todayKey,
-  }).lean<QuestDoc[]>();
+  const existingDailyDocs = allExistingDocs.filter(
+    (doc) => doc.placement === 'daily' && doc.windowKey === todayKey,
+  );
 
   let selectedDailyTemplates: QuestTemplateDoc[] = [];
   if (existingDailyDocs.length > 0) {
@@ -662,32 +663,51 @@ export async function syncQuestState(args: {
   }
 
   const eligibleTemplates = [...selectedDailyTemplates, ...categoryTemplates];
-  const eligibleDailyTemplateIds = selectedDailyTemplates.map(
-    (template) => template.templateId,
+  const eligibleDailyTemplateIds = new Set(
+    selectedDailyTemplates.map((t) => t.templateId),
   );
-  const eligibleCategoryTemplateIds = categoryTemplates.map(
-    (template) => template.templateId,
+  const eligibleCategoryTemplateIds = new Set(
+    categoryTemplates.map((t) => t.templateId),
   );
 
-  await Promise.all([
-    QuestModel.deleteMany({
-      userId,
-      placement: 'daily',
-      windowKey: todayKey,
-      templateId: { $nin: eligibleDailyTemplateIds },
-    }),
-    QuestModel.deleteMany({
-      userId,
-      placement: 'category',
-      templateId: { $nin: eligibleCategoryTemplateIds },
-    }),
-  ]);
+  // Find docs to delete in-memory and batch delete by IDs
+  const docsToDelete = allExistingDocs.filter((doc) => {
+    if (doc.placement === 'daily' && doc.windowKey === todayKey) {
+      return !eligibleDailyTemplateIds.has(doc.templateId);
+    }
+    if (doc.placement === 'category') {
+      return !eligibleCategoryTemplateIds.has(doc.templateId);
+    }
+    // Delete stale daily docs from other days
+    if (doc.placement === 'daily' && doc.windowKey !== todayKey) {
+      return true;
+    }
+    return false;
+  });
 
-  const docs = await Promise.all(
-    eligibleTemplates.map((template) =>
-      syncQuestForTemplate({ template, userId, user, tasks, timezone }),
+  const deleteIdSet = new Set(docsToDelete.map((doc) => doc._id.toString()));
+  const deletePromise =
+    deleteIdSet.size > 0
+      ? QuestModel.deleteMany({ _id: { $in: docsToDelete.map((d) => d._id) } })
+      : Promise.resolve();
+
+  // Build lookup of existing docs by templateId+windowKey for syncQuestForTemplate
+  const existingDocMap = new Map(
+    allExistingDocs
+      .filter((doc) => !deleteIdSet.has(doc._id.toString()))
+      .map((doc) => [`${doc.templateId}:${doc.windowKey}`, doc]),
+  );
+
+  const [docs] = await Promise.all([
+    Promise.all(
+      eligibleTemplates.map((template) => {
+        const windowKey = placementWindowKey(template.placement, template.templateId, timezone);
+        const existingDoc = existingDocMap.get(`${template.templateId}:${windowKey}`) ?? null;
+        return syncQuestForTemplate({ template, userId, user, tasks, timezone, existingDoc });
+      }),
     ),
-  );
+    deletePromise,
+  ]);
 
   const questViews = docs.map(questDocToView);
   const dailyQuests = questViews
@@ -779,48 +799,15 @@ export async function claimQuestReward(args: {
   targetId: string;
   timezone: string;
 }) {
-  const { userId, claimType, targetId, timezone } = args;
-  await syncQuestState({ userId, timezone });
-  const user = await UserModel.findById(userId);
+  const { userId, claimType, targetId } = args;
+  await connectMongo();
+
+  // Load user and quest in parallel
+  const [user, quest] = await Promise.all([
+    UserModel.findById(userId),
+    QuestModel.findOne({ userId, questId: targetId }),
+  ]);
   if (!user) throw new Error('User not found');
-  const isPremium = isPremiumUser(user.toObject());
-  const summary = {
-    fliesGranted: 0,
-    grantedItemIds: [] as string[],
-  };
-
-  const applyRewards = (rewards: QuestReward[], multiplier = 1) => {
-    if (!user.wardrobe) {
-      user.wardrobe = {
-        equipped: {},
-        inventory: {},
-        unseenItems: [],
-        flies: 0,
-      };
-    }
-    user.wardrobe.inventory = user.wardrobe.inventory ?? {};
-    user.wardrobe.unseenItems = user.wardrobe.unseenItems ?? [];
-    user.wardrobe.flies = user.wardrobe.flies ?? 0;
-
-    rewards.forEach((reward) => {
-      if (reward.type === 'FLIES') {
-        const amount = (reward.amount ?? 0) * multiplier;
-        user.wardrobe!.flies += amount;
-        summary.fliesGranted += amount;
-        return;
-      }
-      if (reward.itemId) {
-        for (let i = 0; i < multiplier; i += 1) {
-          user.wardrobe!.inventory[reward.itemId] =
-            (user.wardrobe!.inventory[reward.itemId] ?? 0) + 1;
-          user.wardrobe!.unseenItems!.push(reward.itemId);
-          summary.grantedItemIds.push(reward.itemId);
-        }
-      }
-    });
-  };
-
-  const quest = await QuestModel.findOne({ userId, questId: targetId });
   if (!quest) throw new Error('Quest not found');
   if (quest.placement !== claimType) {
     throw new Error('Quest type mismatch');
@@ -829,13 +816,45 @@ export async function claimQuestReward(args: {
     throw new Error('Quest is not claimable');
   }
 
-  applyRewards(quest.rewards, isPremium ? 2 : 1);
-  quest.claimedAt = new Date();
-  await quest.save();
+  const isPremium = isPremiumUser(user.toObject());
+  const summary = {
+    fliesGranted: 0,
+    grantedItemIds: [] as string[],
+  };
 
+  if (!user.wardrobe) {
+    user.wardrobe = {
+      equipped: {},
+      inventory: {},
+      unseenItems: [],
+      flies: 0,
+    };
+  }
+  user.wardrobe.inventory = user.wardrobe.inventory ?? {};
+  user.wardrobe.unseenItems = user.wardrobe.unseenItems ?? [];
+  user.wardrobe.flies = user.wardrobe.flies ?? 0;
+
+  const multiplier = isPremium ? 2 : 1;
+  for (const reward of quest.rewards) {
+    if (reward.type === 'FLIES') {
+      const amount = (reward.amount ?? 0) * multiplier;
+      user.wardrobe.flies += amount;
+      summary.fliesGranted += amount;
+    } else if (reward.itemId) {
+      for (let i = 0; i < multiplier; i += 1) {
+        user.wardrobe.inventory[reward.itemId] =
+          (user.wardrobe.inventory[reward.itemId] ?? 0) + 1;
+        user.wardrobe.unseenItems!.push(reward.itemId);
+        summary.grantedItemIds.push(reward.itemId);
+      }
+    }
+  }
+
+  quest.claimedAt = new Date();
   user.markModified('wardrobe');
-  user.markModified('focusProfile');
-  await user.save();
+
+  // Save quest and user in parallel
+  await Promise.all([quest.save(), user.save()]);
   return summary;
 }
 
@@ -845,13 +864,15 @@ export async function claimObjectiveReward(args: {
   objectiveId: string;
   timezone: string;
 }) {
-  const { userId, questId, objectiveId, timezone } = args;
-  await syncQuestState({ userId, timezone });
-  const user = await UserModel.findById(userId);
-  if (!user) throw new Error('User not found');
-  const isPremium = isPremiumUser(user.toObject());
+  const { userId, questId, objectiveId } = args;
+  await connectMongo();
 
-  const quest = await QuestModel.findOne({ userId, questId });
+  // Load user and quest in parallel
+  const [user, quest] = await Promise.all([
+    UserModel.findById(userId),
+    QuestModel.findOne({ userId, questId }),
+  ]);
+  if (!user) throw new Error('User not found');
   if (!quest) throw new Error('Quest not found');
 
   const alreadyClaimed = (quest.claimedObjectiveIds ?? []).includes(objectiveId);
@@ -862,6 +883,7 @@ export async function claimObjectiveReward(args: {
   if (!block.rewards?.length) throw new Error('Objective has no rewards');
   if (block.progress < block.target) throw new Error('Objective not completed');
 
+  const isPremium = isPremiumUser(user.toObject());
   const summary = { fliesGranted: 0, grantedItemIds: [] as string[] };
 
   if (!user.wardrobe) {
@@ -890,9 +912,9 @@ export async function claimObjectiveReward(args: {
 
   quest.claimedObjectiveIds = [...(quest.claimedObjectiveIds ?? []), objectiveId];
   quest.markModified('claimedObjectiveIds');
-  await quest.save();
-
   user.markModified('wardrobe');
-  await user.save();
+
+  // Save quest and user in parallel
+  await Promise.all([quest.save(), user.save()]);
   return summary;
 }

@@ -60,6 +60,7 @@ type QuestRewardRevealEntry = {
   item: ItemDef;
   fliesGranted?: number;
   quantity?: number;
+  baseQuantity?: number;
   baseFlies?: number;
   isQuestReward?: boolean;
 };
@@ -299,10 +300,12 @@ export function QuestsPopup({
       const count = itemCounts[itemId];
       const key = `${item.id}-${rewardRevealIdRef.current}`;
       rewardRevealIdRef.current += 1;
+      const baseCount = isPremium ? Math.floor(count / 2) || 1 : count;
       nextEntries.push({
         key,
         item,
         quantity: count > 1 ? count : undefined,
+        baseQuantity: isPremium && count > 1 ? baseCount : undefined,
         isQuestReward: true,
       });
     }
@@ -835,6 +838,7 @@ function QuestRewardRevealOverlay({
                 entry.item.slot === 'container' ? onClaim : undefined
               }
               quantity={entry.quantity}
+              baseQuantity={entry.baseQuantity}
               isPremium={isPremium && !!entry.isQuestReward}
               customPreview={
                 entry.fliesGranted ? (

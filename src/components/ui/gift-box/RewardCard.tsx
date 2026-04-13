@@ -17,6 +17,7 @@ type RewardCardProps = {
   onOpenLater?: () => void;
   openLaterLabel?: string;
   quantity?: number;
+  baseQuantity?: number;
   isPremium?: boolean;
 };
 
@@ -37,6 +38,7 @@ export const RewardCard = ({
   onOpenLater,
   openLaterLabel = 'Open Later',
   quantity,
+  baseQuantity,
   isPremium,
 }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
@@ -152,9 +154,11 @@ export const RewardCard = ({
 
               {/* Quantity Badge */}
               {quantity && quantity > 1 && (
-                <div className="absolute top-2 right-2 z-40 bg-black/50 backdrop-blur-sm text-white text-[10px] font-bold px-1.5 py-0.5 rounded-lg shadow-sm border border-white/10">
-                  x{quantity}
-                </div>
+                <QuantityBadge
+                  quantity={quantity}
+                  baseQuantity={baseQuantity}
+                  showContent={showContent}
+                />
               )}
 
               {/* === LAYER 1: CINEMATIC EFFECTS (Centered) === */}
@@ -315,3 +319,35 @@ export const RewardCard = ({
     </motion.div>
   );
 };
+
+function QuantityBadge({
+  quantity,
+  baseQuantity,
+  showContent,
+}: {
+  quantity: number;
+  baseQuantity?: number;
+  showContent: boolean;
+}) {
+  const [displayQty, setDisplayQty] = useState(baseQuantity ?? quantity);
+  const [bumped, setBumped] = useState(false);
+
+  useEffect(() => {
+    if (!baseQuantity || !showContent || baseQuantity >= quantity) return;
+    const timer = setTimeout(() => {
+      setDisplayQty(quantity);
+      setBumped(true);
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [baseQuantity, quantity, showContent]);
+
+  return (
+    <motion.span
+      animate={bumped ? { scale: [1.4, 1] } : {}}
+      transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+      className="absolute z-40 px-3 py-1 text-sm font-black text-white border shadow-sm right-3 top-3 rounded-xl border-white/20 bg-black/45 backdrop-blur-sm"
+    >
+      x{displayQty}
+    </motion.span>
+  );
+}
