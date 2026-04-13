@@ -835,20 +835,38 @@ export async function claimQuestReward(args: {
   user.wardrobe.flies = user.wardrobe.flies ?? 0;
 
   const multiplier = isPremium ? 2 : 1;
-  for (const reward of quest.rewards) {
-    if (reward.type === 'FLIES') {
-      const amount = (reward.amount ?? 0) * multiplier;
-      user.wardrobe.flies += amount;
-      summary.fliesGranted += amount;
-    } else if (reward.itemId) {
-      for (let i = 0; i < multiplier; i += 1) {
-        user.wardrobe.inventory[reward.itemId] =
-          (user.wardrobe.inventory[reward.itemId] ?? 0) + 1;
-        user.wardrobe.unseenItems!.push(reward.itemId);
-        summary.grantedItemIds.push(reward.itemId);
+  const alreadyClaimed = new Set(quest.claimedObjectiveIds ?? []);
+
+  const applyRewards = (rewards: QuestReward[]) => {
+    for (const reward of rewards) {
+      if (reward.type === 'FLIES') {
+        const amount = (reward.amount ?? 0) * multiplier;
+        user.wardrobe!.flies += amount;
+        summary.fliesGranted += amount;
+      } else if (reward.itemId) {
+        for (let i = 0; i < multiplier; i += 1) {
+          user.wardrobe!.inventory[reward.itemId] =
+            (user.wardrobe!.inventory[reward.itemId] ?? 0) + 1;
+          user.wardrobe!.unseenItems!.push(reward.itemId);
+          summary.grantedItemIds.push(reward.itemId);
+        }
       }
     }
+  };
+
+  // Claim any unclaimed objective rewards first
+  for (const block of quest.logic) {
+    if (!block.rewards?.length) continue;
+    if (alreadyClaimed.has(block.id)) continue;
+    if (block.progress < block.target) continue;
+    applyRewards(block.rewards);
+    alreadyClaimed.add(block.id);
   }
+  quest.claimedObjectiveIds = Array.from(alreadyClaimed);
+  quest.markModified('claimedObjectiveIds');
+
+  // Claim quest-level rewards
+  applyRewards(quest.rewards);
 
   quest.claimedAt = new Date();
   user.markModified('wardrobe');
