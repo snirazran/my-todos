@@ -298,7 +298,7 @@ export const RewardCard = ({
               {prize.slot !== 'container' && (
                 <Sparkles className="relative z-20 w-5 h-5" />
               )}
-              <span className="relative z-20">
+              <span className="relative z-20 uppercase tracking-[0.14em]">
                 {prize.slot === 'container'
                   ? quantity && quantity > 1
                     ? `Open All (${quantity})`
@@ -318,18 +318,17 @@ export const RewardCard = ({
             {openLaterLabel}
           </button>
         )}
-        {showDoubleUpsell && prize.slot !== 'container' && (
+        {showDoubleUpsell && (
           <button
             type="button"
             onClick={() => setShowUpsellPopup(true)}
             disabled={isProcessing || !showContent}
-            className="group relative flex w-full items-center justify-center gap-2.5 overflow-hidden rounded-2xl border border-amber-400/30 bg-gradient-to-r from-amber-950/80 to-amber-900/60 px-4 py-2.5 transition-all hover:border-amber-400/50 hover:from-amber-950/90 hover:to-amber-900/70 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full flex items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-orange-500 py-3 text-sm font-black uppercase tracking-[0.14em] text-white shadow-lg shadow-amber-500/25 transition hover:brightness-110 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_left,_rgba(251,191,36,0.12),transparent_60%)]" />
-            <span className="relative flex items-center justify-center w-8 h-8 text-sm font-black text-amber-300 rounded-lg bg-amber-500/20 border border-amber-400/20 shrink-0 shadow-[0_0_12px_rgba(251,191,36,0.15)]">
+            <span className="flex items-center justify-center w-6 h-6 text-[10px] font-black text-amber-900 rounded-md bg-white/25">
               x2
             </span>
-            <span className="relative text-base font-black text-white">Double this reward</span>
+            Double Reward
           </button>
         )}
       </div>
