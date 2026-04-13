@@ -78,6 +78,47 @@ type RewardPopupState = {
   rewards: QuestReward[];
 };
 
+const REWARD_TILE_TONE: Record<
+  ItemDef['rarity'] | 'flies' | 'default',
+  { border: string; bg: string; shadow: string }
+> = {
+  common: {
+    border: 'border-slate-300 dark:border-slate-600',
+    bg: 'bg-gradient-to-br from-slate-200 to-slate-100 dark:from-slate-800 dark:to-slate-900',
+    shadow: 'shadow-slate-900/10',
+  },
+  uncommon: {
+    border: 'border-emerald-400',
+    bg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-950/40',
+    shadow: 'shadow-emerald-900/10',
+  },
+  rare: {
+    border: 'border-sky-400',
+    bg: 'bg-gradient-to-br from-sky-100 to-sky-50 dark:from-sky-900/40 dark:to-sky-950/40',
+    shadow: 'shadow-sky-900/10',
+  },
+  epic: {
+    border: 'border-violet-400',
+    bg: 'bg-gradient-to-br from-violet-100 to-violet-50 dark:from-violet-900/40 dark:to-violet-950/40',
+    shadow: 'shadow-violet-900/20',
+  },
+  legendary: {
+    border: 'border-amber-400',
+    bg: 'bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/40 dark:to-amber-950/40',
+    shadow: 'shadow-amber-900/30',
+  },
+  flies: {
+    border: 'border-emerald-500',
+    bg: 'bg-gradient-to-br from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-950/40',
+    shadow: 'shadow-emerald-900/10',
+  },
+  default: {
+    border: 'border-border/40',
+    bg: 'bg-muted/30',
+    shadow: 'shadow-sm',
+  },
+};
+
 export function formatQuestObjective(block: QuestCardLogicBlock) {
   const targetLabel =
     block.targetLabel ?? String(Math.max(0, block.target ?? 0));
@@ -832,6 +873,8 @@ export function RewardTile({
   onClick?: () => void;
 }) {
   const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
+  const tone =
+    item ? REWARD_TILE_TONE[item.rarity] : reward.type === 'FLIES' ? REWARD_TILE_TONE.flies : REWARD_TILE_TONE.default;
   const quantityLabel = getRewardQuantityLabel(reward, isPremium);
   const previewIndices = item
     ? {
@@ -846,10 +889,11 @@ export function RewardTile({
   return (
     <div
       className={cn(
-        'group relative flex items-center justify-center overflow-visible',
-        compact
-          ? 'h-16 w-16 rounded-[20px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,245,0.96))] shadow-[0_14px_28px_rgba(15,23,42,0.24)] backdrop-blur-sm'
-          : 'h-12 w-12 rounded-xl border border-border/40 bg-muted/30',
+        'group relative flex items-center justify-center overflow-visible border-2 shadow-sm',
+        tone.border,
+        tone.bg,
+        tone.shadow,
+        compact ? 'h-16 w-16 rounded-[20px]' : 'h-12 w-12 rounded-xl',
         onClick && 'cursor-pointer transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
         className,
       )}
@@ -911,11 +955,11 @@ export function RewardTile({
 
       <div className={cn(
         'absolute z-20 flex justify-center',
-        compact ? '-right-1.5 -top-1.5' : '-right-1 -top-1',
+        compact ? '-right-1 -top-1' : '-right-0.5 -top-0.5',
       )}>
         <span className={cn(
-          'flex items-center justify-center rounded-full border border-white/20 bg-black font-black uppercase tracking-wide text-white',
-          compact ? 'min-w-5 px-1.5 py-1 text-[9px]' : 'min-w-4 px-1 py-0.5 text-[8px]',
+          'flex items-center justify-center rounded-md border border-white/10 bg-black/50 font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm',
+          compact ? 'min-w-5 px-1.5 py-0.5 text-[9px]' : 'min-w-4 px-1 py-0.5 text-[8px]',
         )}>
           {quantityLabel}
         </span>
