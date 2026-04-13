@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Clock, Gift, Plus, Trophy } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Clock, Gift, Plus, Trophy, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { ItemDef } from '@/lib/skins/catalog';
@@ -14,6 +15,7 @@ import type {
 import Fly from './fly';
 import Frog from './frog';
 import { GiftRive } from './gift-box/GiftBox';
+import { ItemCard } from './skins/ItemCard';
 
 export type QuestRewardCatalogItem = Pick<
   ItemDef,
@@ -69,6 +71,11 @@ type BaseCardProps = {
   buttonDisabled?: boolean;
   onClaim?: () => void;
   onClaimObjective?: (objectiveId: string) => void;
+};
+
+type RewardPopupState = {
+  title: string;
+  rewards: QuestReward[];
 };
 
 export function formatQuestObjective(block: QuestCardLogicBlock) {
@@ -188,6 +195,7 @@ export function DailyQuestPresentationCard({
   quest: QuestCardData & { placement: 'daily' };
 }) {
   const timeLeft = useTimeLeft();
+  const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
 
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
@@ -211,7 +219,7 @@ export function DailyQuestPresentationCard({
             </span>
           )}
         </div>
-        <div className="absolute z-10 flex flex-wrap justify-end gap-2 bottom-4 right-4">
+        <div className="absolute z-30 flex flex-wrap justify-end gap-1.5 bottom-3 right-3 sm:bottom-4 sm:right-4 sm:gap-2">
           {quest.rewards.map((reward, index) => (
             <RewardTile
               key={`${reward.type}-${reward.itemId ?? reward.amount ?? reward.minAmount ?? index}`}
@@ -219,10 +227,17 @@ export function DailyQuestPresentationCard({
               rewardCatalog={rewardCatalog}
               isPremium={isPremium}
               compact
+              className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
+              onClick={() =>
+                setRewardPopup({
+                  title: 'Rewards',
+                  rewards: quest.rewards,
+                })
+              }
             />
           ))}
         </div>
-        <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[116px]">
+        <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[108px] sm:pr-[116px]">
           <h3 className="text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]">
             {quest.title}
           </h3>
@@ -241,6 +256,12 @@ export function DailyQuestPresentationCard({
             claimingObjective={claimingObjectiveId === block.id}
             isPremium={isPremium}
             rewardCatalog={rewardCatalog}
+            onOpenRewards={(rewards) =>
+              setRewardPopup({
+                title: 'Rewards',
+                rewards,
+              })
+            }
             onClaimObjective={onClaimObjective ? () => onClaimObjective(block.id) : undefined}
             isLast={i === quest.logic.length - 1}
           />
@@ -256,6 +277,14 @@ export function DailyQuestPresentationCard({
           onClaim={onClaim}
         />
       </div>
+      <RewardDetailsPopup
+        open={!!rewardPopup}
+        title={rewardPopup?.title ?? ''}
+        rewards={rewardPopup?.rewards ?? []}
+        rewardCatalog={rewardCatalog}
+        isPremium={isPremium}
+        onClose={() => setRewardPopup(null)}
+      />
     </div>
   );
 }
@@ -284,6 +313,7 @@ export function CategoryQuestPresentationCard({
 }) {
   const heroImageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
   const timeLeft = useCountdownLabel(quest.expiresAt);
+  const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
 
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
@@ -312,7 +342,7 @@ export function CategoryQuestPresentationCard({
             </span>
           </div>
         )}
-        <div className="absolute z-10 flex flex-wrap justify-end gap-2 bottom-4 right-4 sm:bottom-5 sm:right-5">
+        <div className="absolute z-30 flex flex-wrap justify-end gap-1.5 bottom-3 right-3 sm:bottom-5 sm:right-5 sm:gap-2">
           {quest.rewards.map((reward, index) => (
             <RewardTile
               key={`${reward.type}-${reward.itemId ?? reward.amount ?? reward.minAmount ?? index}`}
@@ -320,10 +350,17 @@ export function CategoryQuestPresentationCard({
               rewardCatalog={rewardCatalog}
               isPremium={isPremium}
               compact
+              className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
+              onClick={() =>
+                setRewardPopup({
+                  title: 'Rewards',
+                  rewards: quest.rewards,
+                })
+              }
             />
           ))}
         </div>
-        <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[116px] sm:p-5 sm:pr-[132px]">
+        <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[108px] sm:p-5 sm:pr-[132px]">
           <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
             {category?.shortLabel || 'Focus'}
           </p>
@@ -359,6 +396,12 @@ export function CategoryQuestPresentationCard({
               claimingObjective={claimingObjectiveId === block.id}
               isPremium={isPremium}
               rewardCatalog={rewardCatalog}
+              onOpenRewards={(rewards) =>
+                setRewardPopup({
+                  title: 'Rewards',
+                  rewards,
+                })
+              }
               onClaimObjective={onClaimObjective ? () => onClaimObjective(block.id) : undefined}
               isLast={i === quest.logic.length - 1}
             />
@@ -452,6 +495,14 @@ export function CategoryQuestPresentationCard({
           onClaim={onClaim}
         />
       </div>
+      <RewardDetailsPopup
+        open={!!rewardPopup}
+        title={rewardPopup?.title ?? ''}
+        rewards={rewardPopup?.rewards ?? []}
+        rewardCatalog={rewardCatalog}
+        isPremium={isPremium}
+        onClose={() => setRewardPopup(null)}
+      />
     </div>
   );
 }
@@ -470,6 +521,7 @@ function ObjectiveRow({
   claimingObjective,
   isPremium,
   rewardCatalog,
+  onOpenRewards,
   onClaimObjective,
   isLast,
 }: {
@@ -478,6 +530,7 @@ function ObjectiveRow({
   claimingObjective?: boolean;
   isPremium?: boolean;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  onOpenRewards?: (rewards: QuestReward[]) => void;
   onClaimObjective?: () => void;
   isLast?: boolean;
 }) {
@@ -523,6 +576,7 @@ function ObjectiveRow({
                 reward={reward}
                 rewardCatalog={rewardCatalog}
                 isPremium={isPremium ?? false}
+                onClick={() => onOpenRewards?.(block.rewards ?? [])}
               />
             ))}
           </div>
@@ -626,18 +680,130 @@ function PreviewTagHint({ label, color }: { label: string; color: string }) {
   );
 }
 
+function RewardDetailsPopup({
+  open,
+  title,
+  rewards,
+  rewardCatalog,
+  isPremium,
+  onClose,
+}: {
+  open: boolean;
+  title: string;
+  rewards: QuestReward[];
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+  onClose: () => void;
+}) {
+  if (!open || typeof document === 'undefined') return null;
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/45 p-3 sm:p-6"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-[24px] border border-border bg-card p-4 text-card-foreground shadow-2xl sm:p-6"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-4 border-b border-border/40 pb-4">
+          <div>
+            <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+              Quest Hub
+            </p>
+            <h3 className="mt-1 text-2xl font-black leading-none text-foreground">
+              {title}
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            aria-label="Close reward details"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:gap-4">
+          {rewards.map((reward, index) => (
+            <QuestRewardDetailCard
+              key={`${reward.type}-${reward.itemId ?? reward.amount ?? reward.minAmount ?? index}`}
+              reward={reward}
+              rewardCatalog={rewardCatalog}
+              isPremium={isPremium}
+            />
+          ))}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+function QuestRewardDetailCard({
+  reward,
+  rewardCatalog,
+  isPremium,
+}: {
+  reward: QuestReward;
+  rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  isPremium: boolean;
+}) {
+  const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
+
+  if (!item) {
+    const quantityLabel = getRewardQuantityLabel(reward, isPremium);
+
+    return (
+      <div className="relative flex flex-col overflow-hidden rounded-2xl border-[3px] border-emerald-500 bg-emerald-50 p-2.5 text-center shadow-emerald-500/15 dark:bg-emerald-950/30">
+        <div className="relative mx-auto mt-4 mb-2 flex aspect-[1/0.75] w-full items-center justify-center rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50 shadow-inner dark:from-emerald-900/40 dark:to-emerald-950/40">
+          <div className="absolute right-1.5 top-1.5 z-20 rounded-lg border border-white/10 bg-black/50 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm">
+            {quantityLabel}
+          </div>
+          <Fly size={62} y={-1} />
+        </div>
+        <p className="pb-1 text-xs font-bold leading-tight text-foreground">
+          {rewardLabel(reward, rewardCatalog, isPremium)}
+        </p>
+      </div>
+    );
+  }
+
+  const itemDef: ItemDef = {
+    ...item,
+    icon: '',
+    priceFlies: 0,
+  };
+
+  return (
+    <ItemCard
+      item={itemDef}
+      ownedCount={getRewardOwnedCount(reward, isPremium)}
+      isEquipped={false}
+      canAfford
+      actionLoading={false}
+      mode="inventory"
+      hidePrice
+      customAction={<div className="h-0" />}
+    />
+  );
+}
+
 export function RewardTile({
   reward,
   rewardCatalog,
   isPremium,
   compact = false,
   className,
+  onClick,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   compact?: boolean;
   className?: string;
+  onClick?: () => void;
 }) {
   const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
   const quantityLabel = getRewardQuantityLabel(reward, isPremium);
@@ -658,9 +824,20 @@ export function RewardTile({
         compact
           ? 'h-16 w-16 rounded-[20px] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(236,253,245,0.96))] shadow-[0_14px_28px_rgba(15,23,42,0.24)] backdrop-blur-sm'
           : 'h-12 w-12 rounded-xl border border-border/40 bg-muted/30',
+        onClick && 'cursor-pointer transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
         className,
       )}
       title={rewardLabel(reward, rewardCatalog, isPremium)}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(event) => {
+        if (!onClick) return;
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onClick();
+        }
+      }}
     >
       {reward.type === 'FLIES' ? (
         <div className="relative flex items-center justify-center w-full h-full">
@@ -750,6 +927,11 @@ function getRewardQuantityLabel(reward: QuestReward, isPremium: boolean) {
   return `x${multiplied}`;
 }
 
+function getRewardOwnedCount(reward: QuestReward, isPremium: boolean) {
+  const base = reward.amount && reward.amount > 1 ? reward.amount : 1;
+  return base * (isPremium ? 2 : 1);
+}
+
 function getQuestButtonLabel(
   quest: Pick<QuestCardData, 'claimable' | 'claimed' | 'completed'>,
   isPremium: boolean,
@@ -759,5 +941,5 @@ function getQuestButtonLabel(
   if (claiming) return 'Claiming...';
   if (quest.claimable)
     return isPremium ? 'Claim Double Reward' : 'Claim Reward';
-  return 'Keep Going';
+  return 'In Progress';
 }
