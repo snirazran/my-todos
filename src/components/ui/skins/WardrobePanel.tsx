@@ -1,4 +1,4 @@
-import { useInventory } from '@/hooks/useInventory';
+import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
 import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
@@ -50,7 +50,7 @@ export function WardrobePanel({
     markItemSeen,
     markAllSeen,
   } =
-    useInventory(); // Always active
+    useInventory(open);
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
@@ -120,13 +120,13 @@ export function WardrobePanel({
 
       if (res.ok) {
         setNotif({ msg: `Sold ${qty}x ${item.name}!`, type: 'success' });
-        mutate();
+        refreshInventory();
       } else {
         throw new Error('Failed');
       }
     } catch (e) {
       setNotif({ msg: 'Sell failed.', type: 'error' });
-      mutate();
+      refreshInventory();
     } finally {
       // setActionId(null); // Removed
     }
@@ -142,6 +142,11 @@ export function WardrobePanel({
   }, [open, markAllSeen]);
 
   // Removed Handle Mark Seen on Tab Change to improve performance when switching away from inventory
+
+  const refreshInventory = () => {
+    mutate();
+    mutateInventoryCaches();
+  };
 
   // Filter change handler to mark category as visited
   const handleFilterChange = (cat: FilterCategory) => {
@@ -216,7 +221,7 @@ export function WardrobePanel({
       body: JSON.stringify({ slot, itemId: isEquipped ? null : itemId }),
     });
     setEquippingId(null);
-    mutate();
+    refreshInventory();
   };
 
   const handleItemAction = (item: ItemDef) => {
@@ -298,13 +303,13 @@ export function WardrobePanel({
 
       if (res.ok) {
         setNotif({ msg: `Purchased ${item.name}!`, type: 'success' });
-        mutate();
+        refreshInventory();
       } else {
         throw new Error('Failed');
       }
     } catch (e) {
       setNotif({ msg: 'Purchase failed.', type: 'error' });
-      mutate();
+      refreshInventory();
     } finally {
       setBuyingId(null);
     }
@@ -583,7 +588,7 @@ export function WardrobePanel({
                         inventory={data.wardrobe.inventory}
                         catalog={data.catalog}
                         unseenItems={unseenItems}
-                        onTradeSuccess={() => mutate()}
+                        onTradeSuccess={refreshInventory}
                         activeFilter={
                           activeFilter === 'container' ? 'all' : activeFilter
                         }
@@ -612,7 +617,7 @@ export function WardrobePanel({
         <GiftBoxOpening
           giftBoxId={openingGiftId}
           onClose={() => setOpeningGiftId(null)}
-          onWin={() => mutate()}
+          onWin={refreshInventory}
         />
       )}
     </>

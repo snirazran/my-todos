@@ -27,7 +27,7 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { openWardrobe } = useUIStore();
-  const { unseenCount, unseenContainerCount } = useInventory();
+  const { unseenCount, unseenContainerCount } = useInventory(!!user, true);
   const inventoryBadge = unseenCount + unseenContainerCount;
 
   const navItems = [

@@ -226,6 +226,8 @@ export default function Home() {
   const [dismissQuestOnboarding, setDismissQuestOnboarding] = useState(false);
   const { data: questsData, mutate: mutateQuests } = useSWR<{
     isPremium?: boolean;
+    claimableCount?: number;
+    activeCount?: number;
     onboarding?: {
       complete: boolean;
       selectedCategoryIds: MacroCategoryId[];
@@ -233,7 +235,7 @@ export default function Home() {
     };
     macroCategories?: MacroCategoryDefinition[];
   }>(
-    user ? `/api/quests?timezone=${encodeURIComponent(timezone)}` : null,
+    user ? `/api/quests?view=home&timezone=${encodeURIComponent(timezone)}` : null,
     (url: string) => fetch(url).then((res) => res.json()),
     { revalidateOnFocus: false },
   );
@@ -343,6 +345,11 @@ export default function Home() {
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
               isGuest={!user}
+              questClaimableCount={questsData?.claimableCount ?? 0}
+              questActiveCount={questsData?.activeCount ?? 0}
+              onQuestsChanged={async () => {
+                await mutateQuests();
+              }}
             />
           </div>
 

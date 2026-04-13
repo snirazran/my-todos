@@ -19,7 +19,7 @@ function getCachedIndices(): Indices | null {
 
 export function useWardrobeIndices(enabled: boolean) {
   const { data } = useSWR(
-    enabled ? '/api/skins/inventory' : null,
+    enabled ? '/api/skins/inventory?view=summary' : null,
     (u) => fetch(u!).then((r) => r.json()),
     { revalidateOnFocus: false }
   );

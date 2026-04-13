@@ -99,6 +99,9 @@ const TaskSchema = new Schema<TaskDoc>(
 );
 
 TaskSchema.index({ userId: 1, id: 1 });
+TaskSchema.index({ userId: 1, type: 1, date: 1, order: 1 });
+TaskSchema.index({ userId: 1, type: 1, dayOfWeek: 1, order: 1 });
+TaskSchema.index({ userId: 1, type: 1, weekStart: 1, order: 1 });
 
 if (process.env.NODE_ENV === 'development') {
   delete mongoose.models.Task;

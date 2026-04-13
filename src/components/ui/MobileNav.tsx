@@ -12,7 +12,7 @@ export default function MobileNav() {
   const router = useRouter();
   const { user } = useAuth();
   const { openWardrobe } = useUIStore();
-  const { unseenCount, unseenContainerCount } = useInventory(); // Always fetch
+  const { unseenCount, unseenContainerCount } = useInventory(!!user, true);
   const inventoryBadge = unseenCount + unseenContainerCount;
 
   if (pathname === '/login' || pathname === '/register') return null;

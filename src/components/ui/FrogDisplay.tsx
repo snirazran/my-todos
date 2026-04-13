@@ -12,7 +12,6 @@ import { cn } from '@/lib/utils';
 import { CurrencyShop } from '@/components/ui/shop/CurrencyShop';
 import { QuestsPopup } from './QuestsPopup';
 import { useUIStore } from '@/lib/uiStore';
-import useSWR from 'swr';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle>;
@@ -33,6 +32,9 @@ type Props = {
   hunger?: number;
   maxHunger?: number;
   isGuest?: boolean;
+  questClaimableCount?: number;
+  questActiveCount?: number;
+  onQuestsChanged?: () => void | Promise<void>;
 };
 
 export function FrogDisplay({
@@ -54,24 +56,15 @@ export function FrogDisplay({
   hunger,
   maxHunger,
   isGuest,
+  questClaimableCount = 0,
+  questActiveCount = 0,
+  onQuestsChanged,
 }: Props) {
-  const { unseenCount, unseenContainerCount } = useInventory();
+  const { unseenCount, unseenContainerCount } = useInventory(!isGuest, true);
   const [clickedAt, setClickedAt] = React.useState(0);
   const [shopOpen, setShopOpen] = React.useState(false);
 
   const { isQuestsOpen, setQuestsOpen } = useUIStore();
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const { data: questsData } = useSWR<{
-    claimableCount?: number;
-    activeCount?: number;
-  }>(
-    !isGuest ? `/api/quests?timezone=${encodeURIComponent(timezone)}` : null,
-    (url: string) => fetch(url).then((res) => res.json()),
-    { revalidateOnFocus: false },
-  );
-
-  const questClaimableCount = questsData?.claimableCount ?? 0;
-  const questActiveCount = questsData?.activeCount ?? 0;
   const wardrobeBadge = unseenCount + unseenContainerCount;
 
   // Local state for smooth hunger updates
@@ -318,6 +311,7 @@ export function FrogDisplay({
         show={isQuestsOpen}
         onClose={() => setQuestsOpen(false)}
         isGuest={isGuest}
+        onQuestsChanged={onQuestsChanged}
       />
 
       <WardrobePanel open={openWardrobe} onOpenChange={onOpenChange} />

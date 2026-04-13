@@ -596,16 +596,26 @@ export async function syncQuestState(args: {
   userId: string;
   timezone: string;
   catalog?: ItemDef[];
+  includeCatalog?: boolean;
+  includeCategories?: boolean;
   refreshDaily?: boolean;
   dailySelectionSeed?: string;
 }) {
   const { userId, timezone } = args;
+  const includeCatalog = args.includeCatalog ?? true;
+  const includeCategories = args.includeCategories ?? true;
   const [user, tasks, catalog, templates, categories, allExistingDocs] = await Promise.all([
     UserModel.findById(userId).lean<UserDoc | null>(),
     TaskModel.find({ userId, deletedAt: { $exists: false } }).lean<TaskDoc[]>(),
-    args.catalog ? Promise.resolve(args.catalog) : getFullCatalog(),
+    includeCatalog
+      ? args.catalog
+        ? Promise.resolve(args.catalog)
+        : getFullCatalog()
+      : Promise.resolve([] as ItemDef[]),
     QuestTemplateModel.find({ isActive: true }).lean<QuestTemplateDoc[]>(),
-    QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean<QuestCategoryDoc[]>(),
+    includeCategories
+      ? QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean<QuestCategoryDoc[]>()
+      : Promise.resolve([] as QuestCategoryDoc[]),
     QuestModel.find({ userId }),
   ]);
 
@@ -733,16 +743,18 @@ export async function syncQuestState(args: {
     macroCategories: categories.map(categoryDocToDefinition),
     dailyQuests,
     categoryQuests,
-    rewardCatalog: buildRewardCatalog(catalog, [
-      ...dailyQuests.map((quest) => quest.rewards),
-      ...categoryQuests.map((quest) => quest.rewards),
-      ...dailyQuests.flatMap((quest) =>
-        quest.logic.map((block) => block.rewards ?? []),
-      ),
-      ...categoryQuests.flatMap((quest) =>
-        quest.logic.map((block) => block.rewards ?? []),
-      ),
-    ]),
+    rewardCatalog: includeCatalog
+      ? buildRewardCatalog(catalog, [
+          ...dailyQuests.map((quest) => quest.rewards),
+          ...categoryQuests.map((quest) => quest.rewards),
+          ...dailyQuests.flatMap((quest) =>
+            quest.logic.map((block) => block.rewards ?? []),
+          ),
+          ...categoryQuests.flatMap((quest) =>
+            quest.logic.map((block) => block.rewards ?? []),
+          ),
+        ])
+      : {},
   };
 }
 

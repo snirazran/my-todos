@@ -9,6 +9,7 @@ import { useTheme } from 'next-themes';
 import { MonthProgress } from './MonthProgress';
 import { useAuth } from '@/components/auth/AuthContext';
 import { cn } from '@/lib/utils';
+import { mutateInventoryCaches } from '@/hooks/useInventory';
 
 interface DailyStatusResponse {
   dailyRewards: {
@@ -86,7 +87,7 @@ export function DailyRewardPopup({
       const data = await res.json();
       if (data.success) {
         await mutateStatus();
-        mutate('/api/skins/inventory');
+        mutateInventoryCaches();
         setTimeout(() => {
           onClose();
           mutate(

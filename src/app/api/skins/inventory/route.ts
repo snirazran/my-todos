@@ -47,9 +47,12 @@ async function ensureWardrobe(uid: string) {
   return next;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
     const userId = await requireUserId();
+    const isSummary =
+      new URL(req.url).searchParams.get('view') === 'summary' ||
+      new URL(req.url).searchParams.get('summary') === '1';
 
     // Auto-create user if missing (fallback for existing sessions)
     // We can reuse the logic from POST /api/user or just call ensureWardrobe which updates it
@@ -88,6 +91,32 @@ export async function GET() {
     const wardrobe = await ensureWardrobe(userId);
     if (!wardrobe) return json({ error: 'User not found' }, 404);
     const fullCatalog = await getFullCatalog();
+    if (isSummary) {
+      const unseenIds = wardrobe.unseenItems ?? [];
+      const containerIds = new Set(
+        fullCatalog
+          .filter((item) => item.slot === 'container')
+          .map((item) => item.id),
+      );
+      const equippedIds = new Set(
+        Object.values(wardrobe.equipped ?? {}).filter(
+          (id): id is string => typeof id === 'string' && id.length > 0,
+        ),
+      );
+
+      return json({
+        wardrobe: {
+          equipped: wardrobe.equipped ?? {},
+          inventory: {},
+          unseenItems: unseenIds,
+          flies: wardrobe.flies ?? 0,
+        },
+        catalog: fullCatalog.filter((item) => equippedIds.has(item.id)),
+        unseenCount: unseenIds.filter((id) => !containerIds.has(id)).length,
+        unseenContainerCount: unseenIds.filter((id) => containerIds.has(id))
+          .length,
+      });
+    }
     return json({ wardrobe, catalog: fullCatalog });
   } catch {
     // Guest Mode or Unauthorized

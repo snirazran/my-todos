@@ -766,7 +766,7 @@ export function useTaskData() {
 
   const { data: tagsData, mutate: mutateTags } = useSWR<{
     tags: { id: string; name: string; color: string }[];
-  }>('/api/tags', fetcher, {
+  }>(user ? '/api/tags' : null, fetcher, {
     revalidateOnFocus: false,
   });
 

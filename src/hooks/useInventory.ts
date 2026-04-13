@@ -1,6 +1,14 @@
 import { useMemo } from 'react';
-import useSWR from 'swr';
+import useSWR, { mutate as mutateGlobal } from 'swr';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
+
+export const INVENTORY_KEY = '/api/skins/inventory';
+export const INVENTORY_SUMMARY_KEY = '/api/skins/inventory?view=summary';
+
+export function mutateInventoryCaches() {
+  mutateGlobal(INVENTORY_KEY);
+  mutateGlobal(INVENTORY_SUMMARY_KEY);
+}
 
 type ApiData = {
   wardrobe: {
@@ -10,13 +18,15 @@ type ApiData = {
     flies: number;
   };
   catalog: ItemDef[];
+  unseenCount?: number;
+  unseenContainerCount?: number;
 };
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-export function useInventory(active: boolean = true) {
+export function useInventory(active: boolean = true, summary: boolean = false) {
   const { data, mutate, error, isLoading } = useSWR<ApiData>(
-    active ? '/api/skins/inventory' : null,
+    active ? (summary ? INVENTORY_SUMMARY_KEY : INVENTORY_KEY) : null,
     fetcher,
     {
       revalidateOnFocus: false,
@@ -45,7 +55,7 @@ export function useInventory(active: boolean = true) {
       body: JSON.stringify({ action: 'markSeen' }),
     });
 
-    mutate(); // Re-validate to be sure
+    mutateInventoryCaches();
   };
 
   const markContainersSeen = async () => {
@@ -76,7 +86,7 @@ export function useInventory(active: boolean = true) {
       body: JSON.stringify({ action: 'markContainersSeen' }),
     });
 
-    mutate();
+    mutateInventoryCaches();
   };
 
   const markItemSeen = async (itemId: string) => {
@@ -100,7 +110,7 @@ export function useInventory(active: boolean = true) {
       body: JSON.stringify({ action: 'markOneSeen', itemId }),
     });
 
-    mutate();
+    mutateInventoryCaches();
   };
 
   const containerIds = useMemo(
@@ -124,9 +134,9 @@ export function useInventory(active: boolean = true) {
     isLoading,
     error,
     unseenItems,
-    unseenCount: unseenItems.length,
+    unseenCount: data?.unseenCount ?? unseenItems.length,
     unseenContainers,
-    unseenContainerCount: unseenContainers.length,
+    unseenContainerCount: data?.unseenContainerCount ?? unseenContainers.length,
     markAllSeen,
     markContainersSeen,
     markItemSeen,

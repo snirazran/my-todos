@@ -21,9 +21,21 @@ export async function GET(req: Request) {
 
   try {
     await connectMongo();
-    const timezone = new URL(req.url).searchParams.get('timezone') || 'UTC';
+    const searchParams = new URL(req.url).searchParams;
+    const timezone = searchParams.get('timezone') || 'UTC';
+    const view = searchParams.get('view');
+    const isSummary = view === 'summary' || view === 'home' || searchParams.get('summary') === '1';
+    const includeCategories =
+      !isSummary ||
+      view === 'home' ||
+      searchParams.get('includeCategories') === '1';
 
-    const dashboard = await syncQuestState({ userId, timezone });
+    const dashboard = await syncQuestState({
+      userId,
+      timezone,
+      includeCatalog: !isSummary,
+      includeCategories,
+    });
     // Count prizes ready to collect (claimable quests + completed objectives with unclaimed rewards)
     const claimableCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
       (sum, quest) => {
@@ -44,6 +56,22 @@ export async function GET(req: Request) {
     const activeCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].filter(
       (quest) => !quest.claimed && !quest.claimable,
     ).length;
+
+    if (isSummary) {
+      return NextResponse.json({
+        isPremium: dashboard.isPremium,
+        claimableCount,
+        activeCount,
+        onboarding: {
+          complete: !!dashboard.focusProfile.completedAt,
+          selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
+          categoryTagMap: dashboard.focusProfile.categoryTagMap,
+        },
+        ...(includeCategories
+          ? { macroCategories: dashboard.macroCategories }
+          : {}),
+      });
+    }
 
     return NextResponse.json({
       isPremium: dashboard.isPremium,

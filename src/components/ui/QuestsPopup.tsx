@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import useSWR, { mutate } from 'swr';
+import useSWR from 'swr';
 import { ScrollText, X, Compass, CalendarDays, RefreshCw, Sparkles } from 'lucide-react';
 import { BaseSheet } from './BaseSheet';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,6 +28,7 @@ import { RewardCard } from './gift-box/RewardCard';
 import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
+import { mutateInventoryCaches } from '@/hooks/useInventory';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -86,10 +87,12 @@ export function QuestsPopup({
   show,
   onClose,
   isGuest,
+  onQuestsChanged,
 }: {
   show: boolean;
   onClose: () => void;
   isGuest?: boolean;
+  onQuestsChanged?: () => void | Promise<void>;
 }) {
   const [activeTab, setActiveTab] = useState<'daily' | 'category'>('category');
   const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -128,6 +131,11 @@ export function QuestsPopup({
     fetcher,
     { revalidateOnFocus: false },
   );
+
+  const refreshQuestData = async () => {
+    await mutateQuests();
+    await onQuestsChanged?.();
+  };
 
   useEffect(() => {
     if (!claimMessage) return;
@@ -381,7 +389,7 @@ export function QuestsPopup({
           ? [...prizeEntries, ...current.slice(1)]
           : current,
       );
-      mutate('/api/skins/inventory');
+      mutateInventoryCaches();
     } catch (err: any) {
       setClaimMessage(err.message || 'Could not open gift');
     } finally {
@@ -415,8 +423,8 @@ export function QuestsPopup({
           bits.length ? `Claimed ${bits.join(' + ')}` : 'Reward claimed',
         );
       }
-      await mutateQuests();
-      mutate('/api/skins/inventory');
+      await refreshQuestData();
+      mutateInventoryCaches();
     } catch (err: any) {
       setClaimMessage(err.message || 'Claim failed');
     } finally {
@@ -437,8 +445,8 @@ export function QuestsPopup({
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
       queueRewardReveal(payload.rewardSummary);
-      await mutateQuests();
-      mutate('/api/skins/inventory');
+      await refreshQuestData();
+      mutateInventoryCaches();
     } catch (err: any) {
       setClaimMessage(err.message || 'Claim failed');
     } finally {
@@ -459,7 +467,7 @@ export function QuestsPopup({
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Could not refresh quests');
       setClaimMessage('Daily quests refreshed');
-      await mutateQuests();
+      await refreshQuestData();
     } catch (err: any) {
       setClaimMessage(err.message || 'Could not refresh quests');
     } finally {
@@ -481,7 +489,7 @@ export function QuestsPopup({
       if (!res.ok)
         throw new Error(payload.error || 'Could not refresh focus quests');
       setClaimMessage('Focus quests refreshed');
-      await mutateQuests();
+      await refreshQuestData();
     } catch (err: any) {
       setClaimMessage(err.message || 'Could not refresh focus quests');
     } finally {
@@ -517,7 +525,7 @@ export function QuestsPopup({
     if (!res.ok) {
       throw new Error(payload.error || 'Could not save focus tags');
     }
-    await mutateQuests();
+    await refreshQuestData();
   };
 
   return (
