@@ -132,6 +132,13 @@ export function WardrobePanel({
     }
   };
 
+  // Handle Mark Seen on Open/Tab Change
+  useEffect(() => {
+    if (open && activeTab === 'inventory' && activeFilter === 'all') {
+      markAllSeen();
+    }
+  }, [open, activeTab, activeFilter, markAllSeen]);
+
   // Handle Mark Seen on Close
   const prevOpen = React.useRef(open);
   useEffect(() => {
@@ -140,8 +147,6 @@ export function WardrobePanel({
     }
     prevOpen.current = open;
   }, [open, markAllSeen]);
-
-  // Removed Handle Mark Seen on Tab Change to improve performance when switching away from inventory
 
   const refreshInventory = () => {
     mutate();
