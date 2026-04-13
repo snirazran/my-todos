@@ -353,7 +353,7 @@ export function WardrobePanel({
                 <div className="flex items-center gap-3">
                   <div>
                     <h2 className="text-2xl md:text-5xl font-bold tracking-tight text-foreground">
-                      Inventory
+                      Wardrobe
                     </h2>
                     <p className="hidden md:block text-base font-medium text-muted-foreground mt-1">
                       Customize Your Companion
@@ -371,12 +371,15 @@ export function WardrobePanel({
                         : 'bg-secondary border-border dark:bg-slate-800/50 dark:border-slate-700',
                     )}
                   >
-                    <div className="flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0 dark:bg-slate-900">
+                    <div className="relative flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0 dark:bg-slate-900">
                       <Fly
                         size={24}
                         className="text-muted-foreground"
                         y={-2}
                       />
+                      <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+                        +
+                      </span>
                     </div>
                     <AnimatedNumber
                       value={balance}
@@ -441,8 +444,8 @@ export function WardrobePanel({
                         "
                       >
                         <Shirt className="w-4 h-4" />
-                        <span className="hidden xs:inline">Inventory</span>
-                        <span className="xs:hidden">Inv</span>
+                        <span className="hidden xs:inline">Wardrobe</span>
+                        <span className="xs:hidden">WRD</span>
                       </TabsTrigger>
                       <TabsTrigger
                         value="shop"

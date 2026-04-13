@@ -106,6 +106,8 @@ export function QuestsPopup({
     QuestRewardRevealEntry[]
   >([]);
   const [openingGiftKey, setOpeningGiftKey] = useState<string | null>(null);
+  const [categoryPage, setCategoryPage] = useState(0);
+  const [dailyPage, setDailyPage] = useState(0);
   const rewardRevealIdRef = useRef(0);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -620,7 +622,7 @@ export function QuestsPopup({
                         {data.onboarding?.complete && (
                           <FilterBar
                             active={activeSubCategoryId}
-                            onChange={setActiveSubCategoryId}
+                            onChange={(id: string) => { setActiveSubCategoryId(id); setCategoryPage(0); }}
                             options={subCategoryOptions}
                             badges={categoryBadges}
                             badgeClassName="text-white bg-amber-500"
@@ -628,30 +630,57 @@ export function QuestsPopup({
                         )}
                         {filteredCategoryQuests.length === 0 ? (
                           <PanelCard>No active focus quests here.</PanelCard>
+                        ) : filteredCategoryQuests.length === 1 ? (
+                          <CategoryQuestPresentationCard
+                            quest={filteredCategoryQuests[0]}
+                            category={categoryMap[filteredCategoryQuests[0].categoryId]}
+                            rewardCatalog={data.rewardCatalog}
+                            isPremium={data.isPremium}
+                            claiming={claimingId === filteredCategoryQuests[0].id}
+                            claimingObjectiveId={claimingObjectiveId}
+                            linkedTags={
+                              (categoryTagMap.get(filteredCategoryQuests[0].categoryId) ?? [])
+                                .map((tagId) => tagCatalog.get(tagId))
+                                .filter(Boolean) as QuestTagChip[]
+                            }
+                            onEditTags={() =>
+                              setEditingFocusCategoryId(filteredCategoryQuests[0].categoryId)
+                            }
+                            onClaim={() => handleClaim('category', filteredCategoryQuests[0].id)}
+                            onClaimObjective={(objectiveId) =>
+                              handleClaimObjective(filteredCategoryQuests[0].id, objectiveId)
+                            }
+                          />
                         ) : (
-                          filteredCategoryQuests.map((quest) => (
-                            <CategoryQuestPresentationCard
-                              key={quest.id}
-                              quest={quest}
-                              category={categoryMap[quest.categoryId]}
-                              rewardCatalog={data.rewardCatalog}
-                              isPremium={data.isPremium}
-                              claiming={claimingId === quest.id}
-                              claimingObjectiveId={claimingObjectiveId}
-                              linkedTags={
-                                (categoryTagMap.get(quest.categoryId) ?? [])
-                                  .map((tagId) => tagCatalog.get(tagId))
-                                  .filter(Boolean) as QuestTagChip[]
-                              }
-                              onEditTags={() =>
-                                setEditingFocusCategoryId(quest.categoryId)
-                              }
-                              onClaim={() => handleClaim('category', quest.id)}
-                              onClaimObjective={(objectiveId) =>
-                                handleClaimObjective(quest.id, objectiveId)
-                              }
-                            />
-                          ))
+                          <QuestCarousel
+                            activePage={categoryPage}
+                            onPageChange={setCategoryPage}
+                            count={filteredCategoryQuests.length}
+                          >
+                            {filteredCategoryQuests.map((quest) => (
+                              <CategoryQuestPresentationCard
+                                key={quest.id}
+                                quest={quest}
+                                category={categoryMap[quest.categoryId]}
+                                rewardCatalog={data.rewardCatalog}
+                                isPremium={data.isPremium}
+                                claiming={claimingId === quest.id}
+                                claimingObjectiveId={claimingObjectiveId}
+                                linkedTags={
+                                  (categoryTagMap.get(quest.categoryId) ?? [])
+                                    .map((tagId) => tagCatalog.get(tagId))
+                                    .filter(Boolean) as QuestTagChip[]
+                                }
+                                onEditTags={() =>
+                                  setEditingFocusCategoryId(quest.categoryId)
+                                }
+                                onClaim={() => handleClaim('category', quest.id)}
+                                onClaimObjective={(objectiveId) =>
+                                  handleClaimObjective(quest.id, objectiveId)
+                                }
+                              />
+                            ))}
+                          </QuestCarousel>
                         )}
                         {data.onboarding?.complete &&
                           selectedCategories.length > 0 && (
@@ -678,22 +707,48 @@ export function QuestsPopup({
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        <div className="space-y-4">
-                          {(data.dailyQuests ?? []).map((quest) => (
-                            <DailyQuestPresentationCard
-                              key={quest.id}
-                              quest={quest}
-                              rewardCatalog={data.rewardCatalog}
-                              isPremium={data.isPremium}
-                              claiming={claimingId === quest.id}
-                              claimingObjectiveId={claimingObjectiveId}
-                              onClaim={() => handleClaim('daily', quest.id)}
-                              onClaimObjective={(objectiveId) =>
-                                handleClaimObjective(quest.id, objectiveId)
-                              }
-                            />
-                          ))}
-                        </div>
+                        {(() => {
+                          const dailyQuests = data.dailyQuests ?? [];
+                          if (dailyQuests.length === 0) return null;
+                          if (dailyQuests.length === 1) {
+                            const quest = dailyQuests[0];
+                            return (
+                              <DailyQuestPresentationCard
+                                quest={quest}
+                                rewardCatalog={data.rewardCatalog}
+                                isPremium={data.isPremium}
+                                claiming={claimingId === quest.id}
+                                claimingObjectiveId={claimingObjectiveId}
+                                onClaim={() => handleClaim('daily', quest.id)}
+                                onClaimObjective={(objectiveId) =>
+                                  handleClaimObjective(quest.id, objectiveId)
+                                }
+                              />
+                            );
+                          }
+                          return (
+                            <QuestCarousel
+                              activePage={dailyPage}
+                              onPageChange={setDailyPage}
+                              count={dailyQuests.length}
+                            >
+                              {dailyQuests.map((quest) => (
+                                <DailyQuestPresentationCard
+                                  key={quest.id}
+                                  quest={quest}
+                                  rewardCatalog={data.rewardCatalog}
+                                  isPremium={data.isPremium}
+                                  claiming={claimingId === quest.id}
+                                  claimingObjectiveId={claimingObjectiveId}
+                                  onClaim={() => handleClaim('daily', quest.id)}
+                                  onClaimObjective={(objectiveId) =>
+                                    handleClaimObjective(quest.id, objectiveId)
+                                  }
+                                />
+                              ))}
+                            </QuestCarousel>
+                          );
+                        })()}
                         <div className="flex justify-center pt-2">
                           <Button
                             type="button"
@@ -902,6 +957,84 @@ function EmptyState({
         <h3 className="text-xl font-black text-foreground">{title}</h3>
         <p className="mt-2 text-sm text-muted-foreground">{description}</p>
       </div>
+    </div>
+  );
+}
+
+function QuestCarousel({
+  children,
+  activePage,
+  onPageChange,
+  count,
+}: {
+  children: React.ReactNode;
+  activePage: number;
+  onPageChange: (page: number) => void;
+  count: number;
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Track which card is most visible via IntersectionObserver
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            const idx = itemRefs.current.indexOf(entry.target as HTMLDivElement);
+            if (idx !== -1) onPageChange(idx);
+          }
+        }
+      },
+      { root: container, threshold: 0.6 },
+    );
+    itemRefs.current.forEach((el) => el && observer.observe(el));
+    return () => observer.disconnect();
+  }, [count, onPageChange]);
+
+  return (
+    <div>
+      <div
+        ref={scrollRef}
+        className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
+        {React.Children.map(children, (child, i) => (
+          <div
+            key={i}
+            ref={(el) => { itemRefs.current[i] = el; }}
+            className="flex-none w-[88%] snap-center"
+          >
+            {child}
+          </div>
+        ))}
+      </div>
+      {count > 1 && (
+        <div className="flex items-center justify-center gap-1.5 pt-3">
+          {Array.from({ length: count }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => {
+                itemRefs.current[i]?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'nearest',
+                  inline: 'center',
+                });
+                onPageChange(i);
+              }}
+              className={cn(
+                'h-2 rounded-full transition-all duration-200',
+                i === activePage
+                  ? 'bg-primary w-5'
+                  : 'bg-muted-foreground/30 hover:bg-muted-foreground/50 w-2',
+              )}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
