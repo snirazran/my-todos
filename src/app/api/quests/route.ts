@@ -3,6 +3,48 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import { syncQuestState } from '@/lib/quests/engine';
 
+function normalizeQuestTag(tag: any, index: number, isPremium: boolean) {
+  if (typeof tag === 'string') {
+    const name = tag.trim();
+    if (!name) return null;
+    return {
+      id: name,
+      name,
+      color: '#22c55e',
+      key: `${name}-${index}`,
+      disabled: !isPremium && index >= 3,
+    };
+  }
+
+  if (!tag || typeof tag !== 'object') return null;
+
+  const name =
+    typeof tag.name === 'string' && tag.name.trim()
+      ? tag.name.trim()
+      : typeof tag.id === 'string' && tag.id.trim()
+        ? tag.id.trim()
+        : '';
+
+  if (!name) return null;
+
+  const id =
+    typeof tag.id === 'string' && tag.id.trim()
+      ? tag.id.trim()
+      : name;
+  const color =
+    typeof tag.color === 'string' && tag.color.trim()
+      ? tag.color.trim()
+      : '#22c55e';
+
+  return {
+    id,
+    name,
+    color,
+    key: typeof tag._key === 'string' ? tag._key : `${id}-${index}`,
+    disabled: !isPremium && index >= 3,
+  };
+}
+
 export async function GET(req: Request) {
   let userId: string;
   try {
@@ -56,7 +98,6 @@ export async function GET(req: Request) {
     const activeCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].filter(
       (quest) => !quest.claimed && !quest.claimable,
     ).length;
-
     if (isSummary) {
       return NextResponse.json({
         isPremium: dashboard.isPremium,
@@ -73,6 +114,12 @@ export async function GET(req: Request) {
       });
     }
 
+    const tags = (dashboard.user.tags ?? [])
+      .map((tag: any, index: number) =>
+        normalizeQuestTag(tag, index, dashboard.isPremium),
+      )
+      .filter(Boolean);
+
     return NextResponse.json({
       isPremium: dashboard.isPremium,
       claimableCount,
@@ -82,6 +129,7 @@ export async function GET(req: Request) {
         selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
         categoryTagMap: dashboard.focusProfile.categoryTagMap,
       },
+      tags,
       macroCategories: dashboard.macroCategories,
       dailyQuests: dashboard.dailyQuests,
       categoryQuests: dashboard.categoryQuests,

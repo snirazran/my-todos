@@ -279,8 +279,12 @@ export default function Home() {
       explicitCompleted !== undefined ? explicitCompleted : !task.completed;
 
     if (!completed) {
-      if (user) toggleTask(taskId, false);
-      else persistGuestTask(taskId, false);
+      if (user) {
+        await toggleTask(taskId, false);
+        await mutateQuests();
+      } else {
+        persistGuestTask(taskId, false);
+      }
       return;
     }
 
@@ -308,9 +312,13 @@ export default function Home() {
     await triggerTongue({
       key: taskId,
       completed,
-      onPersist: () => {
-        if (user) toggleTask(taskId, true);
-        else persistGuestTask(taskId, true);
+      onPersist: async () => {
+        if (user) {
+          await toggleTask(taskId, true);
+          await mutateQuests();
+        } else {
+          persistGuestTask(taskId, true);
+        }
       },
     });
   };

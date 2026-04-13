@@ -34,6 +34,7 @@ type QuestsResponse = {
   isPremium: boolean;
   claimableCount: number;
   todoCount?: number;
+  tags?: Array<{ id: string; name: string; color: string; key?: string }>;
   onboarding: {
     complete: boolean;
     selectedCategoryIds: MacroCategoryId[];
@@ -44,11 +45,6 @@ type QuestsResponse = {
   categoryQuests: CategoryQuestProgressView[];
   rewardCatalog: Record<string, ItemDef>;
   unlockedAnimationIds: string[];
-};
-
-type TagsResponse = {
-  tags: Array<{ id: string; name: string; color: string; key?: string }>;
-  isPremium: boolean;
 };
 
 type QuestRewardSummary = {
@@ -126,11 +122,6 @@ export function QuestsPopup({
     fetcher,
     { revalidateOnFocus: false },
   );
-  const { data: tagsData } = useSWR<TagsResponse>(
-    show && !isGuest ? '/api/tags' : null,
-    fetcher,
-    { revalidateOnFocus: false },
-  );
 
   const refreshQuestData = async () => {
     await mutateQuests();
@@ -176,7 +167,7 @@ export function QuestsPopup({
   const tagCatalog = useMemo(
     () =>
       new Map(
-        (tagsData?.tags ?? []).map((tag, index) => {
+        (data?.tags ?? []).map((tag, index) => {
           const id =
             typeof tag?.id === 'string' && tag.id.trim()
               ? tag.id.trim()
@@ -194,7 +185,7 @@ export function QuestsPopup({
           return [id, { id, name, color }] as const;
         }),
       ),
-    [tagsData?.tags],
+    [data?.tags],
   );
   // Count only claimable rewards (completed objectives with unclaimed rewards + claimable quests)
   const countDaily = useMemo(() => {

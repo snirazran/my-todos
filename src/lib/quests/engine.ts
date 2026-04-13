@@ -410,6 +410,40 @@ function placementWindowKey(
   return `category:${templateId}`;
 }
 
+function comparableQuestValue(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(comparableQuestValue);
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return Object.keys(record)
+      .sort()
+      .reduce<Record<string, unknown>>((next, key) => {
+        if (key === '_id') return next;
+        const entry = comparableQuestValue(record[key]);
+        if (typeof entry !== 'undefined') next[key] = entry;
+        return next;
+      }, {});
+  }
+  return value;
+}
+
+function questValuesEqual(left: unknown, right: unknown) {
+  return (
+    JSON.stringify(comparableQuestValue(left)) ===
+    JSON.stringify(comparableQuestValue(right))
+  );
+}
+
+function setQuestField(
+  doc: InstanceType<typeof QuestModel>,
+  field: keyof QuestDoc,
+  nextValue: unknown,
+) {
+  if (questValuesEqual((doc as any)[field], nextValue)) return false;
+  (doc as any)[field] = nextValue;
+  return true;
+}
+
 async function syncQuestForTemplate(args: {
   template: QuestTemplateDoc;
   userId: string;
@@ -456,20 +490,19 @@ async function syncQuestForTemplate(args: {
       ? Math.floor(template.durationMinutes)
       : undefined;
 
+  let nextDurationMinutes: number | undefined;
+  let nextStartedAt: Date | null;
+  let nextExpiresAt: Date | null;
   if (templateDurationMinutes) {
-    if (!doc.startedAt) {
-      doc.startedAt = new Date();
-    }
-    if (!doc.durationMinutes || !doc.expiresAt) {
-      doc.durationMinutes = templateDurationMinutes;
-      doc.expiresAt = new Date(
-        doc.startedAt.getTime() + templateDurationMinutes * 60_000,
-      );
-    }
+    nextStartedAt = doc.startedAt ?? new Date();
+    nextDurationMinutes = doc.durationMinutes ?? templateDurationMinutes;
+    nextExpiresAt =
+      doc.expiresAt ??
+      new Date(nextStartedAt.getTime() + templateDurationMinutes * 60_000);
   } else {
-    doc.durationMinutes = undefined;
-    doc.startedAt = null;
-    doc.expiresAt = null;
+    nextDurationMinutes = undefined;
+    nextStartedAt = null;
+    nextExpiresAt = null;
   }
 
   const startDate =
@@ -562,14 +595,7 @@ async function syncQuestForTemplate(args: {
   );
   const completed = progress >= target;
 
-  doc.questId = questId;
-  doc.placement = template.placement;
-  doc.categoryId = template.categoryId;
-  doc.title = template.name;
-  doc.description = template.description;
-  doc.coverImageUrl = template.coverImageUrl;
-  doc.logic = resolvedLogic;
-  doc.rewards = template.rewards
+  const resolvedQuestRewards = template.rewards
     .filter((reward): reward is QuestReward =>
       isSupportedReward(reward as { type?: string }),
     )
@@ -579,11 +605,26 @@ async function syncQuestForTemplate(args: {
         `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:reward:${index}`,
       ),
     );
-  doc.target = target;
-  doc.progress = progress;
-  doc.completedAt = completed ? doc.completedAt ?? new Date() : null;
+  const nextCompletedAt = completed ? doc.completedAt ?? new Date() : null;
 
-  if (doc.isModified()) {
+  let changed = !!(doc as any).isNew;
+  changed = setQuestField(doc, 'questId', questId) || changed;
+  changed = setQuestField(doc, 'placement', template.placement) || changed;
+  changed = setQuestField(doc, 'categoryId', template.categoryId) || changed;
+  changed = setQuestField(doc, 'windowKey', windowKey) || changed;
+  changed = setQuestField(doc, 'title', template.name) || changed;
+  changed = setQuestField(doc, 'description', template.description) || changed;
+  changed = setQuestField(doc, 'coverImageUrl', template.coverImageUrl) || changed;
+  changed = setQuestField(doc, 'durationMinutes', nextDurationMinutes) || changed;
+  changed = setQuestField(doc, 'startedAt', nextStartedAt) || changed;
+  changed = setQuestField(doc, 'expiresAt', nextExpiresAt) || changed;
+  changed = setQuestField(doc, 'logic', resolvedLogic) || changed;
+  changed = setQuestField(doc, 'rewards', resolvedQuestRewards) || changed;
+  changed = setQuestField(doc, 'target', target) || changed;
+  changed = setQuestField(doc, 'progress', progress) || changed;
+  changed = setQuestField(doc, 'completedAt', nextCompletedAt) || changed;
+
+  if (changed) {
     doc.markModified('logic');
     doc.markModified('rewards');
     await doc.save();
@@ -606,7 +647,18 @@ export async function syncQuestState(args: {
   const includeCategories = args.includeCategories ?? true;
   const [user, tasks, catalog, templates, categories, allExistingDocs] = await Promise.all([
     UserModel.findById(userId).lean<UserDoc | null>(),
-    TaskModel.find({ userId, deletedAt: { $exists: false } }).lean<TaskDoc[]>(),
+    TaskModel.find(
+      { userId, deletedAt: { $exists: false } },
+      {
+        type: 1,
+        completed: 1,
+        completedDates: 1,
+        date: 1,
+        createdAt: 1,
+        tags: 1,
+        frogodoroSessions: 1,
+      },
+    ).lean<TaskDoc[]>(),
     includeCatalog
       ? args.catalog
         ? Promise.resolve(args.catalog)

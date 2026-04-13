@@ -384,7 +384,9 @@ export function useFrogTongue({
           pathNode.style.strokeDasharray = `0 ${total}`;
         }
 
-        grab.onPersist();
+        Promise.resolve(grab.onPersist()).catch((error) => {
+          console.error('Failed to persist tongue action', error);
+        });
         setVisuallyDone((prev) => {
           const s = new Set(prev);
           s.delete(grab.key);
