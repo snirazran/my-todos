@@ -213,14 +213,6 @@ export function QuestsPopup({
       });
       const payload = await res.json();
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
-      const bits: string[] = [];
-      if (payload.rewardSummary?.fliesGranted)
-        bits.push(`${payload.rewardSummary.fliesGranted} flies`);
-      if (payload.rewardSummary?.grantedItemIds?.length)
-        bits.push(`${payload.rewardSummary.grantedItemIds.length} items`);
-      setClaimMessage(
-        bits.length ? `Claimed ${bits.join(' + ')}` : 'Objective reward claimed',
-      );
       await mutateQuests();
       mutate('/api/skins/inventory');
     } catch (err: any) {

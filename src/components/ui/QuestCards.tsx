@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Clock, Gift, Plus, Trophy, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -46,6 +46,7 @@ export type QuestCardLogicBlock = Pick<
 };
 
 type QuestCardData = {
+  id: string;
   placement: QuestPlacement;
   categoryId?: MacroCategoryDefinition['id'];
   title: string;
@@ -74,6 +75,7 @@ type BaseCardProps = {
 };
 
 type RewardPopupState = {
+  eyebrow: string;
   title: string;
   rewards: QuestReward[];
 };
@@ -228,6 +230,48 @@ function useCountdownLabel(expiresAt?: string) {
   return label;
 }
 
+function useHiddenClaimedObjectives(
+  questId: string,
+  claimedObjectiveIds: string[],
+) {
+  const claimedKey = claimedObjectiveIds.join('|');
+  const [hiddenIds, setHiddenIds] = useState<Set<string>>(
+    () => new Set(claimedObjectiveIds),
+  );
+  const previousClaimedRef = useRef<Set<string>>(new Set(claimedObjectiveIds));
+
+  useEffect(() => {
+    const next = new Set(claimedObjectiveIds);
+    previousClaimedRef.current = next;
+    setHiddenIds(next);
+  }, [questId]);
+
+  useEffect(() => {
+    const previous = previousClaimedRef.current;
+    const timers: number[] = [];
+
+    for (const id of claimedObjectiveIds) {
+      if (previous.has(id)) continue;
+      timers.push(
+        window.setTimeout(() => {
+          setHiddenIds((current) => {
+            const next = new Set(current);
+            next.add(id);
+            return next;
+          });
+        }, 1000),
+      );
+    }
+
+    previousClaimedRef.current = new Set(claimedObjectiveIds);
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [claimedKey]);
+
+  return hiddenIds;
+}
+
 export function DailyQuestPresentationCard({
   quest,
   rewardCatalog,
@@ -243,6 +287,14 @@ export function DailyQuestPresentationCard({
 }) {
   const timeLeft = useTimeLeft();
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
+  const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
+  const hiddenClaimedObjectiveIds = useHiddenClaimedObjectives(
+    quest.id,
+    claimedObjectiveIds,
+  );
+  const visibleLogic = quest.logic.filter(
+    (block) => !hiddenClaimedObjectiveIds.has(block.id),
+  );
 
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
@@ -277,6 +329,7 @@ export function DailyQuestPresentationCard({
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
               onClick={() =>
                 setRewardPopup({
+                  eyebrow: 'Quest',
                   title: 'Rewards',
                   rewards: quest.rewards,
                 })
@@ -295,22 +348,23 @@ export function DailyQuestPresentationCard({
       </div>
 
       <div className="px-4 pt-1 pb-4">
-        {quest.logic.map((block, i) => (
+        {visibleLogic.map((block, i) => (
           <ObjectiveRow
             key={block.id}
             block={block}
-            objectiveClaimed={(quest.claimedObjectiveIds ?? []).includes(block.id)}
+            objectiveClaimed={claimedObjectiveIds.includes(block.id)}
             claimingObjective={claimingObjectiveId === block.id}
             isPremium={isPremium}
             rewardCatalog={rewardCatalog}
             onOpenRewards={(rewards) =>
               setRewardPopup({
+                eyebrow: 'Objective',
                 title: 'Rewards',
                 rewards,
               })
             }
             onClaimObjective={onClaimObjective ? () => onClaimObjective(block.id) : undefined}
-            isLast={i === quest.logic.length - 1}
+            isLast={i === visibleLogic.length - 1}
           />
         ))}
 
@@ -326,6 +380,7 @@ export function DailyQuestPresentationCard({
       </div>
       <RewardDetailsPopup
         open={!!rewardPopup}
+        eyebrow={rewardPopup?.eyebrow ?? ''}
         title={rewardPopup?.title ?? ''}
         rewards={rewardPopup?.rewards ?? []}
         rewardCatalog={rewardCatalog}
@@ -361,6 +416,14 @@ export function CategoryQuestPresentationCard({
   const heroImageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
   const timeLeft = useCountdownLabel(quest.expiresAt);
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
+  const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
+  const hiddenClaimedObjectiveIds = useHiddenClaimedObjectives(
+    quest.id,
+    claimedObjectiveIds,
+  );
+  const visibleLogic = quest.logic.filter(
+    (block) => !hiddenClaimedObjectiveIds.has(block.id),
+  );
   const usesFocusTags = quest.logic.some(
     (block) => block.tagMode === 'focus_category_tags',
   );
@@ -404,6 +467,7 @@ export function CategoryQuestPresentationCard({
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
               onClick={() =>
                 setRewardPopup({
+                  eyebrow: 'Quest',
                   title: 'Rewards',
                   rewards: quest.rewards,
                 })
@@ -429,22 +493,23 @@ export function CategoryQuestPresentationCard({
             onEditTags={onEditTags}
           />
         )}
-        {quest.logic.map((block, i) => (
+        {visibleLogic.map((block, i) => (
           <div key={block.id}>
             <ObjectiveRow
               block={block}
-              objectiveClaimed={(quest.claimedObjectiveIds ?? []).includes(block.id)}
+              objectiveClaimed={claimedObjectiveIds.includes(block.id)}
               claimingObjective={claimingObjectiveId === block.id}
               isPremium={isPremium}
               rewardCatalog={rewardCatalog}
               onOpenRewards={(rewards) =>
                 setRewardPopup({
+                  eyebrow: 'Objective',
                   title: 'Rewards',
                   rewards,
                 })
               }
               onClaimObjective={onClaimObjective ? () => onClaimObjective(block.id) : undefined}
-              isLast={i === quest.logic.length - 1}
+              isLast={i === visibleLogic.length - 1}
             />
             {block.tagMode !== 'focus_category_tags' && getTagScopeMessage(block) ? (
               <p className="-mt-2 mb-2 px-1 text-xs font-medium text-muted-foreground">
@@ -502,6 +567,7 @@ export function CategoryQuestPresentationCard({
       </div>
       <RewardDetailsPopup
         open={!!rewardPopup}
+        eyebrow={rewardPopup?.eyebrow ?? ''}
         title={rewardPopup?.title ?? ''}
         rewards={rewardPopup?.rewards ?? []}
         rewardCatalog={rewardCatalog}
@@ -592,9 +658,10 @@ function ObjectiveRow({
                 type="button"
                 onClick={onClaimObjective}
                 disabled={claimingObjective}
-                className="rounded-xl bg-primary px-4 py-1.5 text-[11px] font-black uppercase tracking-[0.12em] text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-50"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-emerald-500 px-3 text-[11px] font-black uppercase tracking-[0.12em] text-white shadow-sm transition hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {claimingObjective ? 'Claiming...' : 'Claim'}
+                {!claimingObjective && <Gift className="h-3.5 w-3.5" />}
+                {claimingObjective ? 'Claiming...' : 'Claim Reward'}
               </button>
             ) : objectiveClaimed ? (
               <span className="text-[11px] font-black uppercase tracking-[0.12em] text-emerald-600 dark:text-emerald-400">
@@ -749,6 +816,7 @@ function PreviewTagHint({ label, color }: { label: string; color: string }) {
 
 function RewardDetailsPopup({
   open,
+  eyebrow,
   title,
   rewards,
   rewardCatalog,
@@ -756,6 +824,7 @@ function RewardDetailsPopup({
   onClose,
 }: {
   open: boolean;
+  eyebrow: string;
   title: string;
   rewards: QuestReward[];
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -776,7 +845,7 @@ function RewardDetailsPopup({
         <div className="flex items-center justify-between gap-4 border-b border-border/40 pb-4">
           <div>
             <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-              Quest Hub
+              {eyebrow}
             </p>
             <h3 className="mt-1 text-2xl font-black leading-none text-foreground">
               {title}
