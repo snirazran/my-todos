@@ -36,6 +36,7 @@ import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
+import { useSheetOverscrollDrag } from './useSheetOverscrollDrag';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -125,6 +126,7 @@ export function QuestsPopup({
   const [dailyPage, setDailyPage] = useState(0);
   const rewardRevealIdRef = useRef(0);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const overscrollDrag = useSheetOverscrollDrag();
 
   const {
     data,
@@ -563,18 +565,7 @@ export function QuestsPopup({
         zIndex={1050}
       >
         {({ isDesktop, dragControls }) => {
-          const handleSheetDrag = (
-            e: React.PointerEvent,
-            scrollEl: HTMLDivElement | null,
-          ) => {
-            if (isDesktop || !scrollEl) return;
-            if (
-              scrollEl.scrollTop <= 0 &&
-              e.nativeEvent instanceof PointerEvent
-            ) {
-              dragControls.start(e);
-            }
-          };
+          overscrollDrag.setContext(dragControls, !isDesktop);
 
           return (
             <>
@@ -681,8 +672,8 @@ export function QuestsPopup({
                       )}
                     </div>
                     <div
+                      ref={overscrollDrag.bind}
                       className="flex-1 min-h-0 px-4 pt-4 pb-4 overflow-y-auto md:px-6 md:pb-6 overscroll-none"
-                      onPointerDown={(e) => handleSheetDrag(e, e.currentTarget)}
                     >
                       {activeTab === 'category' ? (
                         <div className="space-y-4">

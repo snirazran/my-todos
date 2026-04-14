@@ -15,6 +15,7 @@ import confetti from 'canvas-confetti';
 import { motion } from 'framer-motion';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
@@ -70,6 +71,8 @@ export function WardrobePanel({
 
   // --- Sell Dialog Logic ---
   const [itemToSell, setItemToSell] = useState<ItemDef | null>(null);
+
+  const overscrollDrag = useSheetOverscrollDrag();
 
   const unseenInventorySet = useMemo(
     () => new Set(data?.wardrobe?.unseenItems ?? []),
@@ -346,12 +349,7 @@ export function WardrobePanel({
         zIndex={999}
       >
         {({ isDesktop, dragControls }) => {
-          const handleSheetDrag = (e: React.PointerEvent, scrollEl: HTMLDivElement | null) => {
-            if (isDesktop || !scrollEl) return;
-            if (scrollEl.scrollTop <= 0 && e.nativeEvent instanceof PointerEvent) {
-              dragControls.start(e);
-            }
-          };
+          overscrollDrag.setContext(dragControls, !isDesktop);
 
           return (
             <div
@@ -521,7 +519,7 @@ export function WardrobePanel({
                   >
                     <TabsContent
                       value="inventory"
-                      onPointerDown={(e) => handleSheetDrag(e, e.currentTarget)}
+                      ref={overscrollDrag.bind}
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
                     >
                       {inventoryItems.length === 0 ? (
@@ -563,7 +561,7 @@ export function WardrobePanel({
 
                     <TabsContent
                       value="shop"
-                      onPointerDown={(e) => handleSheetDrag(e, e.currentTarget)}
+                      ref={overscrollDrag.bind}
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
                     >
                       <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
