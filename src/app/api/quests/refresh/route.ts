@@ -18,11 +18,21 @@ export async function POST(req: NextRequest) {
       dailySelectionSeed: scope === 'daily' ? `${Date.now()}` : undefined,
     });
 
+    const withCover = <T extends { templateId?: string; coverImageUrl?: string }>(
+      quest: T,
+    ): T =>
+      quest.templateId && dashboard.templatesWithCover.has(quest.templateId)
+        ? {
+            ...quest,
+            coverImageUrl: `/api/quests/cover?type=template&id=${encodeURIComponent(quest.templateId)}`,
+          }
+        : quest;
+
     return NextResponse.json({
       ok: true,
       scope,
-      dailyQuests: dashboard.dailyQuests,
-      categoryQuests: dashboard.categoryQuests,
+      dailyQuests: dashboard.dailyQuests.map(withCover),
+      categoryQuests: dashboard.categoryQuests.map(withCover),
     });
   } catch (error) {
     return NextResponse.json(

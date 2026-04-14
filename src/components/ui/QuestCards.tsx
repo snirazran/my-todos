@@ -307,6 +307,8 @@ export function DailyQuestPresentationCard({
           <img
             src={quest.coverImageUrl}
             alt={quest.title}
+            loading="lazy"
+            decoding="async"
             className="h-[220px] w-full object-cover"
           />
         ) : (
@@ -442,6 +444,8 @@ export function CategoryQuestPresentationCard({
           <img
             src={heroImageUrl}
             alt={category?.name ?? quest.title}
+            loading="lazy"
+            decoding="async"
             className="h-[220px] w-full object-cover"
           />
         ) : (

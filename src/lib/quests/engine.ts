@@ -471,7 +471,6 @@ async function syncQuestForTemplate(args: {
       windowKey,
       title: template.name,
       description: template.description,
-      coverImageUrl: template.coverImageUrl,
       target: 0,
       progress: 0,
       logic: [],
@@ -614,7 +613,6 @@ async function syncQuestForTemplate(args: {
   changed = setQuestField(doc, 'windowKey', windowKey) || changed;
   changed = setQuestField(doc, 'title', template.name) || changed;
   changed = setQuestField(doc, 'description', template.description) || changed;
-  changed = setQuestField(doc, 'coverImageUrl', template.coverImageUrl) || changed;
   changed = setQuestField(doc, 'durationMinutes', nextDurationMinutes) || changed;
   changed = setQuestField(doc, 'startedAt', nextStartedAt) || changed;
   changed = setQuestField(doc, 'expiresAt', nextExpiresAt) || changed;
@@ -668,7 +666,7 @@ export async function syncQuestState(args: {
     includeCategories
       ? QuestCategoryModel.find({}).sort({ createdAt: 1 }).lean<QuestCategoryDoc[]>()
       : Promise.resolve([] as QuestCategoryDoc[]),
-    QuestModel.find({ userId }),
+    QuestModel.find({ userId }).select('-coverImageUrl'),
   ]);
 
   if (!user) throw new Error('User not found');
@@ -786,6 +784,12 @@ export async function syncQuestState(args: {
       return a.title.localeCompare(b.title);
     });
 
+  const templatesWithCover = new Set(
+    templates
+      .filter((t) => typeof t.coverImageUrl === 'string' && t.coverImageUrl.length > 0)
+      .map((t) => t.templateId),
+  );
+
   return {
     user,
     tasks,
@@ -793,6 +797,7 @@ export async function syncQuestState(args: {
     isPremium: isPremiumUser(user),
     focusProfile: profile,
     macroCategories: categories.map(categoryDocToDefinition),
+    templatesWithCover,
     dailyQuests,
     categoryQuests,
     rewardCatalog: includeCatalog

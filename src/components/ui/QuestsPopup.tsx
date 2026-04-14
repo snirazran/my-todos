@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import useSWR from 'swr';
+import useSWR, { preload } from 'swr';
 import {
   ScrollText,
   X,
@@ -75,6 +75,15 @@ const fetcher = async <T,>(url: string) => {
   return res.json() as Promise<T>;
 };
 
+export function getQuestsUrl(timezone: string) {
+  return `/api/quests?timezone=${encodeURIComponent(timezone)}`;
+}
+
+export function prefetchQuests() {
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  void preload(getQuestsUrl(timezone), fetcher);
+}
+
 function createFlyRewardItem(amount: number): ItemDef {
   return {
     id: `flies-${amount}`,
@@ -123,11 +132,13 @@ export function QuestsPopup({
     isLoading,
     mutate: mutateQuests,
   } = useSWR<QuestsResponse>(
-    show && !isGuest
-      ? `/api/quests?timezone=${encodeURIComponent(timezone)}`
-      : null,
+    !isGuest && show ? getQuestsUrl(timezone) : null,
     fetcher,
-    { revalidateOnFocus: false },
+    {
+      revalidateOnFocus: false,
+      revalidateIfStale: false,
+      keepPreviousData: true,
+    },
   );
 
   const refreshQuestData = async () => {

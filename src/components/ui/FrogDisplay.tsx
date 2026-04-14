@@ -10,7 +10,7 @@ import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { useInventory } from '@/hooks/useInventory';
 import { cn } from '@/lib/utils';
 import { CurrencyShop } from '@/components/ui/shop/CurrencyShop';
-import { QuestsPopup } from './QuestsPopup';
+import { QuestsPopup, prefetchQuests } from './QuestsPopup';
 import { useUIStore } from '@/lib/uiStore';
 
 type Props = {
@@ -268,6 +268,9 @@ export function FrogDisplay({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setQuestsOpen(true)}
+            onPointerEnter={isGuest ? undefined : prefetchQuests}
+            onFocus={isGuest ? undefined : prefetchQuests}
+            onTouchStart={isGuest ? undefined : prefetchQuests}
             className="group relative flex items-center justify-center w-[52px] h-[52px] rounded-[15px]
                     bg-card/80 backdrop-blur-2xl
                     text-muted-foreground hover:text-primary

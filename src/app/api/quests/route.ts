@@ -3,6 +3,30 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import { syncQuestState } from '@/lib/quests/engine';
 
+const isDataUrl = (value: unknown): value is string =>
+  typeof value === 'string' && value.startsWith('data:');
+
+const templateCoverRef = (templateId: string) =>
+  `/api/quests/cover?type=template&id=${encodeURIComponent(templateId)}`;
+
+const categoryCoverRef = (categoryId: string) =>
+  `/api/quests/cover?type=category&id=${encodeURIComponent(categoryId)}`;
+
+function withTemplateCover<T extends { templateId?: string; coverImageUrl?: string }>(
+  quest: T,
+  templatesWithCover: Set<string>,
+): T {
+  if (!quest.templateId || !templatesWithCover.has(quest.templateId)) return quest;
+  return { ...quest, coverImageUrl: templateCoverRef(quest.templateId) };
+}
+
+function lightenCategory<T extends { id?: string; coverImageUrl?: string }>(
+  category: T,
+): T {
+  if (!isDataUrl(category.coverImageUrl) || !category.id) return category;
+  return { ...category, coverImageUrl: categoryCoverRef(category.id) };
+}
+
 function normalizeQuestTag(tag: any, index: number, isPremium: boolean) {
   if (typeof tag === 'string') {
     const name = tag.trim();
@@ -98,20 +122,27 @@ export async function GET(req: Request) {
     const activeCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].filter(
       (quest) => !quest.claimed && !quest.claimable,
     ).length;
+    const lightMacroCategories = dashboard.macroCategories.map(lightenCategory);
+
     if (isSummary) {
-      return NextResponse.json({
-        isPremium: dashboard.isPremium,
-        claimableCount,
-        activeCount,
-        onboarding: {
-          complete: !!dashboard.focusProfile.completedAt,
-          selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
-          categoryTagMap: dashboard.focusProfile.categoryTagMap,
+      return NextResponse.json(
+        {
+          isPremium: dashboard.isPremium,
+          claimableCount,
+          activeCount,
+          onboarding: {
+            complete: !!dashboard.focusProfile.completedAt,
+            selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
+            categoryTagMap: dashboard.focusProfile.categoryTagMap,
+          },
+          ...(includeCategories ? { macroCategories: lightMacroCategories } : {}),
         },
-        ...(includeCategories
-          ? { macroCategories: dashboard.macroCategories }
-          : {}),
-      });
+        {
+          headers: {
+            'Cache-Control': 'private, max-age=0, stale-while-revalidate=60',
+          },
+        },
+      );
     }
 
     const tags = (dashboard.user.tags ?? [])
@@ -120,22 +151,33 @@ export async function GET(req: Request) {
       )
       .filter(Boolean);
 
-    return NextResponse.json({
-      isPremium: dashboard.isPremium,
-      claimableCount,
-      activeCount,
-      onboarding: {
-        complete: !!dashboard.focusProfile.completedAt,
-        selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
-        categoryTagMap: dashboard.focusProfile.categoryTagMap,
+    return NextResponse.json(
+      {
+        isPremium: dashboard.isPremium,
+        claimableCount,
+        activeCount,
+        onboarding: {
+          complete: !!dashboard.focusProfile.completedAt,
+          selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
+          categoryTagMap: dashboard.focusProfile.categoryTagMap,
+        },
+        tags,
+        macroCategories: lightMacroCategories,
+        dailyQuests: dashboard.dailyQuests.map((q) =>
+          withTemplateCover(q, dashboard.templatesWithCover),
+        ),
+        categoryQuests: dashboard.categoryQuests.map((q) =>
+          withTemplateCover(q, dashboard.templatesWithCover),
+        ),
+        unlockedAnimationIds: dashboard.focusProfile.unlockedAnimationIds ?? [],
+        rewardCatalog: dashboard.rewardCatalog,
       },
-      tags,
-      macroCategories: dashboard.macroCategories,
-      dailyQuests: dashboard.dailyQuests,
-      categoryQuests: dashboard.categoryQuests,
-      unlockedAnimationIds: dashboard.focusProfile.unlockedAnimationIds ?? [],
-      rewardCatalog: dashboard.rewardCatalog,
-    });
+      {
+        headers: {
+          'Cache-Control': 'private, max-age=0, stale-while-revalidate=60',
+        },
+      },
+    );
   } catch (error) {
     console.error('Error loading quests:', error);
     return NextResponse.json(
