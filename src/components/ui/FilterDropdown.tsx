@@ -90,7 +90,7 @@ export function FilterDropdown({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: -10 }}
               transition={{ duration: 0.15, ease: 'easeOut' }}
-              className="fixed overflow-hidden rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl ring-1 ring-black/5 backdrop-blur-xl min-w-[200px]"
+              className="fixed overflow-hidden rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl ring-1 ring-black/5 backdrop-blur-xl min-w-[200px] max-w-[280px]"
               style={{ 
                 top: coords.top, 
                 left: Math.max(10, Math.min(coords.left, typeof window !== 'undefined' ? window.innerWidth - 210 : coords.left)),

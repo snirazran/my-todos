@@ -317,9 +317,9 @@ export function TradePanel({
       {/* --- CONTRACT (Side/Bottom Dock - Order 2) --- */}
       <div className="fixed bottom-0 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto shrink-0 z-[60] order-2 lg:w-[320px] xl:w-[360px] bg-card border-t lg:border-t-0 lg:border-l border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30 shrink-0">
+        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30 shrink-0">
             <div>
-              <h3 className="flex items-center gap-2 text-base md:text-lg font-black uppercase text-foreground">
+              <h3 className="flex items-center gap-2 text-sm font-black uppercase text-foreground">
                 Contract
                 {targetRarity && (
                   <span
@@ -333,7 +333,7 @@ export function TradePanel({
               </h3>
             </div>
             <div className="text-right">
-              <div className="text-lg md:text-xl font-black text-primary">
+              <div className="text-base font-black text-primary">
                 {selectedIds.length}
                 <span className="text-muted-foreground/40">/10</span>
               </div>
@@ -341,9 +341,9 @@ export function TradePanel({
         </div>
 
         {/* Scrollable Content (Sidebar) or Fixed (Bottom Bar) */}
-        <div className="flex-1 p-4 flex flex-col pointer-events-auto w-full max-w-md mx-auto lg:max-w-none lg:mx-0 lg:overflow-y-auto">
+        <div className="flex-1 p-2 lg:p-4 flex flex-col pointer-events-auto w-full max-w-md mx-auto lg:max-w-none lg:mx-0 lg:overflow-y-auto">
            {/* Grid */}
-           <div className="grid grid-cols-5 gap-2 md:gap-3 mb-4">
+           <div className="grid grid-cols-5 gap-1.5 lg:gap-3 mb-2 lg:mb-4">
                 {Array.from({ length: 10 }).map((_, i) => {
                   const itemId = selectedIds[i];
                   const item = itemId
@@ -357,7 +357,7 @@ export function TradePanel({
                       layout
                       onClick={() => item && handleRemove(i)}
                       className={cn(
-                        'aspect-square rounded-lg border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200',
+                        'h-10 lg:h-auto lg:aspect-square rounded-lg border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200',
                         !item &&
                           'border-dashed border-border bg-muted/50',
                         item &&
@@ -366,7 +366,7 @@ export function TradePanel({
                       )}
                     >
                       {item ? (
-                        <div className="relative flex items-center justify-center w-full h-full p-0.5">
+                        <div className="relative flex items-center justify-center w-full h-full">
                           <Frog
                             className="object-contain w-full h-full"
                             indices={{
@@ -376,8 +376,8 @@ export function TradePanel({
                               hand_item: 0,
                               [item.slot]: item.riveIndex,
                             }}
-                            width={80}
-                            height={80}
+                            width={60}
+                            height={60}
                           />
                         </div>
                       ) : (
@@ -389,7 +389,7 @@ export function TradePanel({
                   );
                 })}
            </div>
-           
+
            <div className="mt-auto">
              {error && (
                 <div className="flex items-center gap-2 mb-2 text-xs font-bold text-destructive justify-center">
@@ -402,7 +402,7 @@ export function TradePanel({
                   <Button
                     variant="outline"
                     onClick={handleClear}
-                    className="h-12 shrink-0 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive px-3"
+                    className="h-9 lg:h-12 shrink-0 border-destructive/20 text-destructive hover:bg-destructive/10 hover:text-destructive px-3"
                   >
                     Clear
                   </Button>
@@ -411,7 +411,7 @@ export function TradePanel({
                   disabled={selectedIds.length !== 10 || isTrading}
                   onClick={handleConfirmTrade}
                   className={cn(
-                    'group relative flex-1 h-12 md:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm md:text-base',
+                    'group relative flex-1 h-9 lg:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm',
                     selectedIds.length === 10
                       ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
                       : 'bg-muted text-muted-foreground'
@@ -430,7 +430,7 @@ export function TradePanel({
                   )}
                 </Button>
              </div>
-             <p className="text-[10px] text-center text-muted-foreground mt-2">
+             <p className="text-[10px] text-center text-muted-foreground mt-1">
                 Combine 10 items to upgrade rarity.
               </p>
            </div>

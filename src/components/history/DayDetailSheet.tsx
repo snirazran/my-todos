@@ -182,24 +182,30 @@ export default function DayDetailSheet({
 
           return (
             <div ref={sheetRef} className="flex flex-col h-full relative">
-              {/* Header (Compact) */}
-              <div 
+              {/* Header */}
+              <div
                 onPointerDown={(e) => !isDesktop && !cinematic && dragControls.start(e)}
-                className="relative z-20 flex-shrink-0 px-5 py-3.5 flex items-center justify-between border-b border-border/40 bg-background/20"
+                className="px-4 py-4 md:px-6 border-b border-border/50 shrink-0 flex items-center justify-between gap-3"
               >
-                <div>
-                  <h2 className="text-xl font-black tracking-tighter flex items-center gap-2 text-foreground">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary/10 shrink-0">
                     <CalendarIcon className="w-5 h-5 text-primary" />
-                    {format(new Date(date), 'MMMM do')}
-                  </h2>
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-xl font-black tracking-tight text-foreground uppercase leading-none">
+                      {format(new Date(date), 'MMMM do')}
+                    </h2>
+                    <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5 opacity-70">
+                      {format(new Date(date), 'EEEE')}
+                    </p>
+                  </div>
                 </div>
-
                 <button
                   onClick={onClose}
                   onPointerDown={(e) => e.stopPropagation()}
-                  className="relative z-30 flex items-center justify-center w-10 h-10 transition-all border rounded-full border-border/50 bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground active:scale-90"
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95 shrink-0"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" strokeWidth={2.5} />
                 </button>
               </div>
 

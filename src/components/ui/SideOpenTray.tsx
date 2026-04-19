@@ -118,6 +118,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
               dragListener={false}
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={{ top: 0, bottom: 0.8 }}
+              dragMomentum={false}
               onDragEnd={(e, { offset, velocity }) => {
                 if (offset.y > 150 || velocity.y > 500) {
                   onClose();
@@ -140,40 +141,47 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
             >
               {/* Drag Handle (Mobile Only) */}
               {!isDesktop && (
-                <div 
+                <div
                   onPointerDown={(e) => dragControls.start(e)}
-                  className="absolute top-0 left-0 right-0 h-10 z-50 flex items-start justify-center pt-3 touch-none cursor-grab active:cursor-grabbing"
+                  className="absolute top-0 left-0 right-0 h-6 z-50 flex items-center justify-center pt-1.5 touch-none cursor-grab active:cursor-grabbing"
                 >
                   <div className="w-12 h-1.5 bg-muted-foreground/20 rounded-full" />
                 </div>
               )}
 
               {/* Header */}
-              <div className="flex items-center justify-between px-6 py-8 md:px-8 shrink-0">
-                <div className="flex items-center gap-4">
+              <div
+                onPointerDown={(e) => !isDesktop && dragControls.start(e)}
+                className="flex items-center justify-between px-4 py-4 md:px-6 border-b border-border/50 shrink-0 gap-3"
+              >
+                <div className="flex items-center gap-3 min-w-0">
                   <div className={cn(
-                    "flex items-center justify-center w-12 h-12 rounded-2xl shadow-sm",
+                    "flex items-center justify-center w-11 h-11 rounded-2xl shrink-0",
                     iconContainerClassName
                   )}>
                     {icon}
                   </div>
-                  <div>
-                    <h3 className="text-2xl font-black tracking-tight text-foreground uppercase">
+                  <div className="min-w-0">
+                    <h3 className="text-xl font-black tracking-tight text-foreground uppercase leading-none">
                       {title}
                     </h3>
                     {subtitle && (
-                      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5 opacity-70">
                         {subtitle}
                       </p>
                     )}
-                    {headerActions}
+                    {headerActions && (
+                      <div className="mt-0.5">
+                        {headerActions}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="flex items-center justify-center w-10 h-10 rounded-xl bg-muted/50 hover:bg-muted text-muted-foreground transition-all active:scale-95"
+                  className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95 shrink-0"
                 >
-                  <X size={20} strokeWidth={2.5} />
+                  <X size={16} strokeWidth={2.5} />
                 </button>
               </div>
 

@@ -101,7 +101,7 @@ export function BaseSheet({
               {/* Drag handle – mobile only */}
               {!isDesktop && (
                 <div
-                  className="absolute inset-x-0 top-0 z-[60] h-10 pointer-events-none flex items-center justify-center"
+                  className="absolute inset-x-0 top-0 z-[60] h-6 pointer-events-none flex items-center justify-center pt-1.5"
                 >
                    <div
                     className="w-12 h-1.5 rounded-full bg-border/60 pointer-events-auto touch-none cursor-grab active:cursor-grabbing"
