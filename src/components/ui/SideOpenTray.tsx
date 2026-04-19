@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSheetOverscrollDrag } from './useSheetOverscrollDrag';
 
 interface SideOpenTrayProps {
   isOpen: boolean;
@@ -38,14 +39,18 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
   ) => {
     const [isDesktop, setIsDesktop] = useState(false);
     const dragControls = useDragControls();
+    const overscrollDrag = useSheetOverscrollDrag();
 
     useEffect(() => {
-      const checkDesktop = () =>
-        setIsDesktop(window.matchMedia('(min-width: 768px)').matches);
+      const checkDesktop = () => {
+        const desktop = window.matchMedia('(min-width: 768px)').matches;
+        setIsDesktop(desktop);
+        overscrollDrag.setContext(dragControls, !desktop);
+      };
       checkDesktop();
       window.addEventListener('resize', checkDesktop);
       return () => window.removeEventListener('resize', checkDesktop);
-    }, []);
+    }, [dragControls, overscrollDrag]);
 
     // Lock body scroll when open
     useEffect(() => {
@@ -186,7 +191,10 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
               </div>
 
               {/* Vertical Scroll Content */}
-              <div className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4 md:px-6 pb-24 flex flex-col gap-3">
+              <div
+                ref={overscrollDrag.bind}
+                className="flex-1 overflow-y-auto overflow-x-hidden min-h-0 px-4 md:px-6 pb-24 flex flex-col gap-3 overscroll-none"
+              >
                 {children}
               </div>
 

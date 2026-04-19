@@ -389,7 +389,7 @@ export function WardrobePanel({
                       )}
                     >
                       <Fly size={24} y={-4} />
-                      <AnimatedNumber value={balance} className="tabular-nums" />
+                      <span className="tabular-nums">{balance.toLocaleString()}</span>
                       <span className="flex items-center justify-center w-4 h-4 rounded-full bg-primary/15 text-primary text-[10px] font-black leading-none ml-0.5">
                         +
                       </span>
