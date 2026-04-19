@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useTaskData } from '@/hooks/useTaskData';
 import {
@@ -31,6 +32,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useUIStore } from '@/lib/uiStore';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
+import { getQuestsUrl } from '@/components/ui/QuestsPopup';
 import { type FrogHandle } from '@/components/ui/frog';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import Fly from '@/components/ui/fly';
@@ -155,7 +157,16 @@ export default function FrogodoroPage() {
 
   // FrogDisplay state
   const { isWardrobeOpen, setWardrobeOpen } = useUIStore();
-  const { indices } = useWardrobeIndices(!!user && isWardrobeOpen);
+  const { indices } = useWardrobeIndices(!!user);
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const { data: questsData, mutate: mutateQuests } = useSWR<{
+    claimableCount?: number;
+    activeCount?: number;
+  }>(
+    user ? getQuestsUrl(timezone) : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
   const flyRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -402,6 +413,7 @@ export default function FrogodoroPage() {
       completed: true,
       onPersist: () => {
         toggleTask(taskId, true);
+        mutateQuests();
         // The 3-second disappearance is handled in the useEffect below
       },
     });
@@ -521,7 +533,11 @@ export default function FrogodoroPage() {
               maxHunger={user ? hungerStatus.maxHunger : 10000}
               animateHunger={!!user}
               isGuest={!user}
-              deferInventorySummary
+              questClaimableCount={questsData?.claimableCount ?? 0}
+              questActiveCount={questsData?.activeCount ?? 0}
+              onQuestsChanged={async () => {
+                await mutateQuests();
+              }}
             />
           </div>
 
