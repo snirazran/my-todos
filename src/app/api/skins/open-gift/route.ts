@@ -2,53 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
-import { ItemDef, Rarity } from '@/lib/skins/catalog';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
-import { DROP_RATES } from '@/lib/skins/dropRates';
+import { getGiftConfig, pickGiftDrop } from '@/lib/skins/gifts';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
 
 type LeanUser = UserDoc & { _id: string };
-
-const rollRarity = (containerRarity: Rarity = 'common'): Rarity => {
-  const weights = DROP_RATES[containerRarity] ?? DROP_RATES.common;
-  const rand = Math.random();
-  let cumulative = 0;
-  for (const [rarity, weight] of Object.entries(weights)) {
-    cumulative += weight;
-    if (rand < cumulative) return rarity as Rarity;
-  }
-  return 'common';
-};
-
-const getRandomItem = (catalog: ItemDef[], containerRarity: Rarity = 'common'): ItemDef => {
-  const catalogByRarity: Record<Rarity, ItemDef[]> = {
-    common: [],
-    uncommon: [],
-    rare: [],
-    epic: [],
-    legendary: [],
-  };
-
-  catalog.forEach((item) => {
-    if (item.slot !== 'container') {
-      if (catalogByRarity[item.rarity]) catalogByRarity[item.rarity].push(item);
-    }
-  });
-
-  let rarity = rollRarity(containerRarity);
-  while (catalogByRarity[rarity].length === 0) {
-    if (rarity === 'legendary') rarity = 'epic';
-    else if (rarity === 'epic') rarity = 'rare';
-    else if (rarity === 'rare') rarity = 'uncommon';
-    else if (rarity === 'uncommon') rarity = 'common';
-    else break;
-  }
-  const pool = catalogByRarity[rarity];
-  return pool[Math.floor(Math.random() * pool.length)];
-};
 
 export async function POST(req: NextRequest) {
   try {
@@ -69,9 +30,17 @@ export async function POST(req: NextRequest) {
     if (!giftBoxId || !byId[giftBoxId])
       return json({ error: 'Unknown giftBoxId' }, 400);
 
-    // 1. Pick a prize (use container rarity for better odds)
     const containerDef = byId[giftBoxId];
-    const prize = getRandomItem(fullCatalog, containerDef?.rarity ?? 'common');
+    if (containerDef.slot !== 'container') {
+      return json({ error: 'Item is not a gift box' }, 400);
+    }
+
+    // 1. Pick a prize from the DB-backed gift drop table.
+    const giftConfig = await getGiftConfig(giftBoxId);
+    if (!giftConfig) return json({ error: 'Gift is not configured' }, 400);
+
+    const prize = pickGiftDrop(giftConfig);
+    if (!prize) return json({ error: 'Gift has no available drops' }, 400);
 
     await connectMongo();
     const user = (await UserModel.findById(userId).lean()) as LeanUser | null;

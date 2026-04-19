@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
 import { AdminCosmeticsPopup } from './AdminCosmeticsPopup';
+import { AdminGiftManagerPopup } from './AdminGiftManagerPopup';
 
 interface Template {
   id: string;
@@ -54,6 +55,7 @@ export function AdminSettingsDialog({
 
   // Cosmetics popup state
   const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
+  const [giftManagerOpen, setGiftManagerOpen] = useState(false);
 
   // Load notification data when dialog opens
   useEffect(() => {
@@ -463,6 +465,23 @@ export function AdminSettingsDialog({
                 </Button>
 
                 <Button
+                  onClick={() => setGiftManagerOpen(true)}
+                  disabled={loading !== null}
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-auto py-4 px-4"
+                >
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <Gift className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-sm">Gift Manager</div>
+                    <div className="text-xs text-muted-foreground font-normal">
+                      Create gifts and configure item drop chances
+                    </div>
+                  </div>
+                </Button>
+
+                <Button
                   onClick={() => {
                     onOpenChange(false);
                     router.push('/admin/quests');
@@ -580,6 +599,7 @@ export function AdminSettingsDialog({
     <>
       {mainDialog}
       <AdminCosmeticsPopup open={cosmeticsOpen} onClose={() => setCosmeticsOpen(false)} />
+      <AdminGiftManagerPopup open={giftManagerOpen} onClose={() => setGiftManagerOpen(false)} />
     </>
   );
 }

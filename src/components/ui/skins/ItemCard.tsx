@@ -7,7 +7,6 @@ import { Check, Lock, Loader2, CircleDollarSign, X, Info } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
-import { DROP_RATES } from '@/lib/skins/dropRates';
 import Frog from '@/components/ui/frog';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GiftRive } from '@/components/ui/gift-box/GiftBox';
@@ -380,7 +379,7 @@ export function ItemCard({
 
         {/* Drop Rates Button (Containers only) */}
         {item.slot === 'container' && (
-          <DropRatesButton rarity={item.rarity} name={item.name} />
+          <DropRatesButton giftId={item.id} name={item.name} />
         )}
       </div>
     </motion.div>
@@ -405,10 +404,15 @@ const RARITY_TEXT: Record<Rarity, string> = {
   legendary: 'text-amber-600 dark:text-amber-400',
 };
 
-function DropRatesButton({ rarity, name }: { rarity: Rarity; name: string }) {
+type GiftDropRate = {
+  itemId: string;
+  chance: number;
+  item?: ItemDef;
+};
+
+function DropRatesButton({ giftId, name }: { giftId: string; name: string }) {
   const [open, setOpen] = useState(false);
   const closingRef = React.useRef(false);
-  const rates = DROP_RATES[rarity] ?? DROP_RATES.common;
 
   const handleClose = () => {
     setOpen(false);
@@ -433,27 +437,52 @@ function DropRatesButton({ rarity, name }: { rarity: Rarity; name: string }) {
       </button>
 
       <AnimatePresence>
-        {open && <DropRatesPopup rates={rates} name={name} onClose={handleClose} />}
+        {open && <DropRatesPopup giftId={giftId} name={name} onClose={handleClose} />}
       </AnimatePresence>
     </>
   );
 }
 
 function DropRatesPopup({
-  rates,
+  giftId,
   name,
   onClose,
 }: {
-  rates: Record<Rarity, number>;
+  giftId: string;
   name: string;
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
+  const [drops, setDrops] = useState<GiftDropRate[]>([]);
+  const [loading, setLoading] = useState(true);
   React.useEffect(() => setMounted(true), []);
+
+  React.useEffect(() => {
+    if (!mounted) return;
+    let cancelled = false;
+    setLoading(true);
+    fetch(`/api/skins/gift-drops?giftId=${encodeURIComponent(giftId)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setDrops(data.drops ?? []);
+      })
+      .catch(() => {
+        if (!cancelled) setDrops([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [giftId, mounted]);
 
   if (!mounted) return null;
 
-  const entries = Object.entries(rates) as [Rarity, number][];
+  const total = drops.reduce((sum, drop) => sum + Math.max(0, drop.chance), 0);
+  const entries = [...drops]
+    .filter((drop) => drop.chance > 0)
+    .sort((a, b) => b.chance - a.chance);
 
   return createPortal(
     <motion.div
@@ -495,16 +524,25 @@ function DropRatesPopup({
 
         {/* Rates */}
         <div className="px-5 pb-5 space-y-2.5">
-          {entries.map(([tier, weight]) => {
-            const raw = weight * 100;
+          {loading ? (
+            <div className="flex items-center justify-center py-8 text-muted-foreground">
+              <Loader2 className="w-5 h-5 animate-spin" />
+            </div>
+          ) : entries.length === 0 ? (
+            <div className="rounded-2xl border border-border/50 bg-muted/30 p-4 text-center text-xs font-bold text-muted-foreground">
+              No drops configured.
+            </div>
+          ) : entries.map((drop) => {
+            const raw = total > 0 ? (drop.chance / total) * 100 : 0;
             const label = raw >= 1 ? `${Math.round(raw)}%` : raw >= 0.01 ? `${raw.toFixed(2)}%` : raw > 0 ? `${raw.toFixed(4)}%` : '0%';
             const barWidth = raw > 0 ? Math.max(raw, 2) : 0;
+            const rarity = drop.item?.rarity ?? 'common';
             return (
-              <div key={tier} className="flex items-center gap-3">
-                <div className="flex items-center gap-2 w-24">
-                  <div className={cn('w-2 h-2 rounded-full shrink-0', RARITY_COLORS[tier])} />
-                  <span className={cn('text-xs font-bold capitalize', RARITY_TEXT[tier])}>
-                    {tier}
+              <div key={drop.itemId} className="flex items-center gap-3">
+                <div className="flex items-center gap-2 w-28 min-w-0">
+                  <div className={cn('w-2 h-2 rounded-full shrink-0', RARITY_COLORS[rarity])} />
+                  <span className={cn('truncate text-xs font-bold', RARITY_TEXT[rarity])}>
+                    {drop.item?.name ?? drop.itemId}
                   </span>
                 </div>
                 <div className="flex-1 h-2.5 bg-muted/60 rounded-full overflow-hidden">
@@ -512,7 +550,7 @@ function DropRatesPopup({
                     initial={{ width: 0 }}
                     animate={{ width: `${barWidth}%` }}
                     transition={{ duration: 0.5, ease: 'easeOut' }}
-                    className={cn('h-full rounded-full', RARITY_COLORS[tier])}
+                    className={cn('h-full rounded-full', RARITY_COLORS[rarity])}
                   />
                 </div>
                 <span className="text-xs font-black text-muted-foreground tabular-nums w-14 text-right">

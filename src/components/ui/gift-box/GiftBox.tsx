@@ -64,14 +64,6 @@ export const GiftRive = React.memo(
       };
     }, [rive]);
 
-    // Set color as soon as rive is ready via the stateMachineInputs API
-    useEffect(() => {
-      if (!rive) return;
-      const inputs = rive.stateMachineInputs('State Machine 1');
-      const ci = inputs?.find((i) => i.name === 'color');
-      if (ci) ci.value = color;
-    }, [rive, color]);
-
     const startOpenInput = useStateMachineInput(
       rive,
       'State Machine 1',
@@ -84,21 +76,26 @@ export const GiftRive = React.memo(
       'is_mile_stone'
     );
 
-    const colorInput = useStateMachineInput(
-      rive,
-      'State Machine 1',
-      'color'
-    );
-
-    // Apply color whenever the input becomes available or color changes
+    // Query a fresh input every time. Rive invalidates input objects during reset.
     const applyColor = React.useCallback(() => {
-      if (colorInput && typeof color === 'number') {
-        colorInput.value = color;
+      if (!rive || typeof color !== 'number') return;
+      try {
+        const inputs = rive.stateMachineInputs('State Machine 1');
+        const colorInput = inputs?.find((i) => i.name === 'color');
+        if (colorInput) colorInput.value = color;
+      } catch {
+        // Rive can briefly invalidate inputs while canvases mount/reset.
       }
-    }, [color, colorInput]);
+    }, [color, rive]);
 
     useEffect(() => {
       applyColor();
+      const raf = requestAnimationFrame(applyColor);
+      const timers = [50, 150, 300].map((ms) => setTimeout(applyColor, ms));
+      return () => {
+        cancelAnimationFrame(raf);
+        timers.forEach(clearTimeout);
+      };
     }, [applyColor]);
 
     useEffect(() => {
@@ -106,12 +103,21 @@ export const GiftRive = React.memo(
         if (paused) {
           rive.reset();
           rive.play();
-          // Re-apply color after reset since reset clears inputs
-          const timer = setTimeout(() => {
+          // Re-apply color after reset since reset clears inputs.
+          const raf = requestAnimationFrame(() => {
             applyColor();
             rive.pause();
-          }, 50);
-          return () => clearTimeout(timer);
+          });
+          const timers = [50, 150, 300].map((ms) =>
+            setTimeout(() => {
+              applyColor();
+              rive.pause();
+            }, ms),
+          );
+          return () => {
+            cancelAnimationFrame(raf);
+            timers.forEach(clearTimeout);
+          };
         } else if (!rive.isPlaying) {
           rive.play();
         }
