@@ -573,23 +573,26 @@ export function QuestsPopup({
                 onPointerDown={(e) => !isDesktop && dragControls.start(e)}
                 className="px-4 py-4 border-b border-border/50 md:px-6"
               >
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center justify-center h-11 w-11 rounded-2xl bg-primary/10 text-primary">
-                      <ScrollText className="w-6 h-6" />
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary/10 shrink-0">
+                      <ScrollText className="w-5 h-5 text-primary" />
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-black tracking-tight text-foreground md:text-3xl">
+                    <div className="min-w-0">
+                      <h2 className="text-xl font-black tracking-tight text-foreground uppercase leading-none">
                         Quests
                       </h2>
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5 opacity-70">
+                        Track your progress
+                      </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={onClose}
-                      className="flex items-center justify-center w-10 h-10 transition-colors border rounded-full border-border/50 bg-background/80 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95"
                     >
-                      <X className="w-5 h-5" />
+                      <X className="w-4 h-4" strokeWidth={2.5} />
                     </button>
                   </div>
                 </div>

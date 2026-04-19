@@ -17,7 +17,7 @@ export interface BaseSheetProps {
   zIndex?: number;
 }
 
-const transition = { type: 'spring' as const, damping: 26, stiffness: 260 };
+const transition = { type: 'spring' as const, damping: 30, stiffness: 300, mass: 0.8 };
 
 export function BaseSheet({
   open,
@@ -85,11 +85,11 @@ export function BaseSheet({
               dragControls={dragControls}
               dragListener={false}
               dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.45 }}
+              dragElastic={{ top: 0, bottom: 0.8 }}
               dragMomentum={false}
               dragSnapToOrigin
               onDragEnd={(_e, { offset, velocity }) => {
-                if (offset.y > 120 || velocity.y > 650) onOpenChange(false);
+                if (offset.y > 150 || velocity.y > 500) onOpenChange(false);
               }}
               className={cn(
                 'pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[32px] border border-border/50 bg-card/95 text-card-foreground shadow-2xl backdrop-blur-2xl sm:rounded-[34px]',
@@ -103,8 +103,8 @@ export function BaseSheet({
                 <div
                   className="absolute inset-x-0 top-0 z-[60] h-10 pointer-events-none flex items-center justify-center"
                 >
-                   <div 
-                    className="w-12 h-1.5 rounded-full bg-border/60 pointer-events-auto touch-none" 
+                   <div
+                    className="w-12 h-1.5 rounded-full bg-border/60 pointer-events-auto touch-none cursor-grab active:cursor-grabbing"
                     onPointerDown={(e) => dragControls.start(e)}
                    />
                 </div>

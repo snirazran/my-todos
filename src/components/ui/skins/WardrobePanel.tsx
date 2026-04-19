@@ -357,67 +357,49 @@ export function WardrobePanel({
               {/* --- HEADER --- */}
               <div
                 onPointerDown={(e) => !isDesktop && dragControls.start(e)}
-                className={cn(
-                  'relative z-20 px-4 py-4 md:px-8 md:py-6 shrink-0 border-b border-border/40',
-                  isDesktop
-                    ? 'bg-background/50 backdrop-blur-xl'
-                    : 'bg-transparent',
-                )}
+                className="px-4 py-4 border-b border-border/50 md:px-6 shrink-0"
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <h2 className="text-2xl md:text-5xl font-bold tracking-tight text-foreground">
+                <div className="flex items-center justify-between gap-3">
+                  {/* Left: icon + title */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary/10 shrink-0">
+                      <Shirt className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="text-xl font-black tracking-tight text-foreground uppercase leading-none">
                         Wardrobe
                       </h2>
-                      <p className="hidden md:block text-base font-medium text-muted-foreground mt-1">
-                        Customize Your Companion
+                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5 opacity-70">
+                        Customize your style
                       </p>
                     </div>
-
-                    {/* Balance Badge */}
-                    <motion.div
-                      animate={shakeBalance ? { x: [-5, 5, -5, 5, 0] } : {}}
-                      transition={{ duration: 0.4 }}
-                      className={cn(
-                        'flex items-center gap-2 py-1 pl-1 pr-3 border rounded-full transition-colors duration-300',
-                        shakeBalance
-                          ? 'bg-red-100 border-red-300 dark:bg-red-900/30 dark:border-red-800'
-                          : 'bg-secondary border-border dark:bg-slate-800/50 dark:border-slate-700',
-                      )}
-                    >
-                      <div className="relative flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0 dark:bg-slate-900">
-                        <Fly
-                          size={24}
-                          className="text-muted-foreground"
-                          y={-2}
-                        />
-                        <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
-                          +
-                        </span>
-                      </div>
-                      <AnimatedNumber
-                        value={balance}
-                        className="text-sm font-black leading-none md:text-xl text-foreground tabular-nums"
-                      />
-                    </motion.div>
                   </div>
 
-                  <div className="flex items-center gap-3">
-                    {/* Mobile Close Button (X) */}
-                    <button
-                      onClick={() => onOpenChange(false)}
-                      className="flex items-center justify-center w-10 h-10 rounded-full md:hidden bg-secondary/80 text-foreground"
+                  {/* Right: fly balance + close */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <motion.button
+                      onClick={() => {/* TODO: open add balance popup */}}
+                      animate={shakeBalance ? { x: [-4, 4, -4, 4, 0] } : {}}
+                      transition={{ duration: 0.4 }}
+                      className={cn(
+                        'flex items-center gap-1.5 h-9 pl-2.5 pr-2 rounded-full border font-black text-sm transition-all duration-300 tabular-nums active:scale-95',
+                        shakeBalance
+                          ? 'bg-red-100 border-red-300 text-red-700 dark:bg-red-900/30 dark:border-red-700 dark:text-red-400'
+                          : 'bg-secondary border-border text-foreground hover:bg-secondary/80 hover:border-primary/40',
+                      )}
                     >
-                      <X className="w-5 h-5" />
-                    </button>
+                      <Fly size={24} y={-4} />
+                      <AnimatedNumber value={balance} className="tabular-nums" />
+                      <span className="flex items-center justify-center w-4 h-4 rounded-full bg-primary/15 text-primary text-[10px] font-black leading-none ml-0.5">
+                        +
+                      </span>
+                    </motion.button>
 
-                    {/* Desktop Close Button */}
                     <button
                       onClick={() => onOpenChange(false)}
-                      className="items-center justify-center hidden w-10 h-10 transition-colors border rounded-full md:flex bg-secondary hover:bg-secondary/80 border-border dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700"
+                      className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95"
                     >
-                      <X className="w-5 h-5 text-muted-foreground" />
+                      <X className="w-4 h-4" strokeWidth={2.5} />
                     </button>
                   </div>
                 </div>
@@ -460,7 +442,7 @@ export function WardrobePanel({
                         >
                           <Shirt className="w-4 h-4" />
                           <span className="hidden xs:inline">Wardrobe</span>
-                          <span className="xs:hidden">WRD</span>
+                          <span className="xs:hidden">INV</span>
                         </TabsTrigger>
                         <TabsTrigger
                           value="shop"
