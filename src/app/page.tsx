@@ -30,12 +30,13 @@ import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { cn } from '@/lib/utils';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
+import { getQuestsUrl } from '@/components/ui/QuestsPopup';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { DailyRewardPopup } from '@/components/ui/daily-reward/DailyRewardPopup';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
-import useSWR from 'swr';
+import useSWR, { mutate as swrMutate } from 'swr';
 import {
   useTaskData,
   Task,
@@ -282,6 +283,7 @@ export default function Home() {
       if (user) {
         await toggleTask(taskId, false);
         await mutateQuests();
+        void swrMutate(getQuestsUrl(timezone));
       } else {
         persistGuestTask(taskId, false);
       }
@@ -316,6 +318,7 @@ export default function Home() {
         if (user) {
           await toggleTask(taskId, true);
           await mutateQuests();
+          void swrMutate(getQuestsUrl(timezone));
         } else {
           persistGuestTask(taskId, true);
         }

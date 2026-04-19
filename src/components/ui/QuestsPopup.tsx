@@ -138,7 +138,7 @@ export function QuestsPopup({
     fetcher,
     {
       revalidateOnFocus: false,
-      revalidateIfStale: false,
+      revalidateIfStale: true,
       keepPreviousData: true,
     },
   );

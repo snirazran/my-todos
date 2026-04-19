@@ -49,7 +49,6 @@ export function WardrobePanel({
     unseenItems,
     unseenContainers,
     markItemSeen,
-    markAllSeen,
   } =
     useInventory(open);
 
@@ -135,21 +134,20 @@ export function WardrobePanel({
     }
   };
 
-  // Handle Mark Seen on Open/Tab Change
-  useEffect(() => {
-    if (open && activeTab === 'inventory' && activeFilter === 'all') {
-      markAllSeen();
-    }
-  }, [open, activeTab, activeFilter, markAllSeen]);
-
-  // Handle Mark Seen on Close
+  // Handle Mark Seen on Close — call API directly since data is cleared when open→false
   const prevOpen = React.useRef(open);
   useEffect(() => {
     if (prevOpen.current && !open) {
-      markAllSeen();
+      fetch('/api/skins/inventory', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'markSeen' }),
+      })
+        .then(() => mutateInventoryCaches())
+        .catch(() => {});
     }
     prevOpen.current = open;
-  }, [open, markAllSeen]);
+  }, [open]);
 
   const refreshInventory = () => {
     mutate();
