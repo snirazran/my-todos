@@ -91,23 +91,21 @@ export function BaseSheet({
                 if (offset.y > 150 || velocity.y > 500) onOpenChange(false);
               }}
               className={cn(
-                'relative pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[32px] border border-border/50 bg-card text-card-foreground shadow-2xl sm:rounded-[34px]',
+                'pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[32px] border border-border/50 bg-card text-card-foreground shadow-2xl sm:rounded-[34px]',
                 className,
               )}
             >
-              {children({ isDesktop, dragControls })}
-
               {/* Drag handle – mobile only */}
               {!isDesktop && (
                 <div
-                  className="absolute inset-x-0 top-0 z-[60] h-6 pointer-events-none flex items-center justify-center pt-1.5"
+                  className="flex-none h-7 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing shrink-0"
+                  onPointerDown={(e) => dragControls.start(e)}
                 >
-                   <div
-                    className="w-12 h-1.5 rounded-full bg-border/60 pointer-events-auto touch-none cursor-grab active:cursor-grabbing"
-                    onPointerDown={(e) => dragControls.start(e)}
-                   />
+                  <div className="w-12 h-1.5 rounded-full bg-border/60" />
                 </div>
               )}
+
+              {children({ isDesktop, dragControls })}
             </motion.div>
           </div>
         </>

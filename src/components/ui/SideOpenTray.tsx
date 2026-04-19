@@ -148,7 +148,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
               {!isDesktop && (
                 <div
                   onPointerDown={(e) => dragControls.start(e)}
-                  className="absolute top-0 left-0 right-0 h-6 z-50 flex items-center justify-center pt-1.5 touch-none cursor-grab active:cursor-grabbing"
+                  className="flex-none h-7 flex items-center justify-center touch-none cursor-grab active:cursor-grabbing shrink-0"
                 >
                   <div className="w-12 h-1.5 bg-muted-foreground/20 rounded-full" />
                 </div>
