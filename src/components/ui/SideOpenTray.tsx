@@ -103,7 +103,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
               animate={{ opacity: isDraggingAny ? 0 : 1 - closeProgress }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[80] bg-background/60 backdrop-blur-sm"
+              className="fixed inset-0 z-[80] bg-background/60"
               onClick={onClose}
               style={{
                 pointerEvents:
@@ -136,7 +136,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
                 mass: 0.8,
               }}
               className={cn(
-                "fixed z-[90] flex flex-col bg-card/95 border-r border-border/50 shadow-2xl backdrop-blur-3xl overflow-hidden",
+                "fixed z-[90] flex flex-col bg-card border-r border-border/50 shadow-2xl overflow-hidden",
                 "inset-x-0 bottom-0 top-[15vh] rounded-t-[32px] border-t",
                 "md:inset-y-0 md:left-0 md:right-auto md:w-[420px] md:top-0 md:bottom-0 md:rounded-none md:border-t-0",
                 className

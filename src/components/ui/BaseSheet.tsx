@@ -87,12 +87,11 @@ export function BaseSheet({
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={{ top: 0, bottom: 0.8 }}
               dragMomentum={false}
-              dragSnapToOrigin
               onDragEnd={(_e, { offset, velocity }) => {
                 if (offset.y > 150 || velocity.y > 500) onOpenChange(false);
               }}
               className={cn(
-                'pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[32px] border border-border/50 bg-card/95 text-card-foreground shadow-2xl backdrop-blur-2xl sm:rounded-[34px]',
+                'relative pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[32px] border border-border/50 bg-card text-card-foreground shadow-2xl sm:rounded-[34px]',
                 className,
               )}
             >
