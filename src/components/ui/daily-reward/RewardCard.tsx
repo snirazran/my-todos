@@ -1,9 +1,7 @@
 import React from 'react';
-import { motion } from 'framer-motion';
-import { Check, Lock, X } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Fly from '../fly';
-import { GiftRive } from '../gift-box/GiftBox';
 import { byId, ItemDef } from '@/lib/skins/catalog';
 import { ItemCard } from '../skins/ItemCard';
 import { Button } from '@/components/ui/button';
@@ -83,11 +81,7 @@ export function SingleRewardCard({
       </div>
     ) : undefined;
 
-  // Custom Action Button
-  // ONLY show button if READY.
-  // If Missed -> Show "Missed" button (disabled/destructive style)
-  // If Locked Premium AND Today -> Show "Unlock" button
-  // If Claimed, Locked -> No button, but reserve space so card size is consistent
+  const muted = status === 'LOCKED' || isMissed || (isLockedPremium && !isToday);
   let customAction: React.ReactNode;
   if (isReady) {
     customAction = (
@@ -96,7 +90,7 @@ export function SingleRewardCard({
           e.stopPropagation();
           onClick?.();
         }}
-        className="w-full h-8 rounded-lg font-black uppercase tracking-wide bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/25 active:scale-95 transition-all"
+        className="w-full h-8 rounded-lg font-black uppercase tracking-wide bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm active:scale-95 transition-all"
       >
         Claim
       </Button>
@@ -108,7 +102,7 @@ export function SingleRewardCard({
           e.stopPropagation();
           onClick?.();
         }}
-        className="w-full h-8 rounded-lg font-black uppercase tracking-wide bg-amber-500 hover:bg-amber-600 text-white shadow-lg shadow-amber-500/25 active:scale-95 transition-all"
+        className="w-full h-8 rounded-lg font-black uppercase tracking-wide bg-amber-500 hover:bg-amber-600 text-white shadow-sm active:scale-95 transition-all"
       >
         Unlock
       </Button>
@@ -147,6 +141,7 @@ export function SingleRewardCard({
         className={cn(
           'relative transition-all duration-300 w-full max-w-[192px] mx-auto scale-100',
           onClick && 'cursor-pointer',
+          muted && 'opacity-70',
         )}
       >
         <ItemCard
@@ -161,6 +156,9 @@ export function SingleRewardCard({
           hidePrice={true}
           hideRarity={rewardType === 'FLIES'} // Hide rarity for flies
         />
+        {muted && (
+          <div className="pointer-events-none absolute inset-0 rounded-2xl bg-background/20" />
+        )}
       </div>
 
       {/* Day Label - Hidden when layout handles it */}
@@ -192,6 +190,3 @@ export function SingleRewardCard({
     </div>
   );
 }
-
-// Export the unused component just in case, or we can simply export SingleRewardCard as default or similar.
-// For now, I'll leave the named export as is, and remove the unused `RewardCard` function from this file to clean up.

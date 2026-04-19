@@ -1,10 +1,9 @@
 import React, { useRef, useEffect } from 'react';
-import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { REWARD_SCHEDULE } from '@/lib/dailyRewards';
 import { SingleRewardCard } from './RewardCard';
 import type { DailyRewardProgress } from '@/lib/types/UserDoc';
-import { Crown } from 'lucide-react';
+import { Check, Crown, Gift } from 'lucide-react';
 
 interface MonthProgressProps {
   progress: DailyRewardProgress;
@@ -21,8 +20,6 @@ export function MonthProgress({
   isPremium,
   onGoPremium,
 }: MonthProgressProps) {
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,243 +54,140 @@ export function MonthProgress({
   const progressPct = ((currentDay - 0.5) / REWARD_SCHEDULE.length) * 100;
 
   return (
-    <div
-      className="w-full relative h-full overflow-y-auto overflow-x-hidden no-scrollbar"
-      ref={containerRef}
-      style={{ background: 'transparent' }}
-    >
-      <div className="w-full relative min-h-full flex flex-col">
-        {/* ── Sticky Header Tabs ── */}
-        <div
-          className="sticky top-0 z-50 flex items-stretch h-12 overflow-hidden"
-          style={{
-            borderBottom: isDark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(0,0,0,0.08)',
-            boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.3)' : '0 4px 20px rgba(0,0,0,0.08)',
-          }}
-        >
-          {/* Basic */}
-          <div
-            className="w-[50%] flex items-center justify-center"
-            style={{
-              background: isDark
-                ? 'linear-gradient(135deg, #145d29 0%, #0e4120 50%, #145d29 100%)'
-                : 'linear-gradient(135deg, #22c55e 0%, #16a34a 50%, #22c55e 100%)',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '11px',
-                fontWeight: 900,
-                textTransform: 'uppercase',
-                letterSpacing: '0.12em',
-                color: isDark ? 'rgba(255,255,255,0.45)' : 'rgba(255,255,255,0.9)',
-              }}
-            >
-              Basic
-            </span>
-          </div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[24px] border border-border/50 bg-card/80 shadow-sm backdrop-blur-2xl">
+      <div className="sticky top-0 z-40 grid h-14 grid-cols-[1fr_auto_1fr] items-center border-b border-border/50 bg-card/95 px-2 backdrop-blur-2xl">
+        <TierHeader icon={<Gift className="w-4 h-4" />} label="Free" />
+        <div className="w-10" />
+        <TierHeader
+          icon={<Crown className="w-4 h-4" />}
+          label="Premium"
+          premium
+        />
+      </div>
 
-          {/* Premium — gold shimmer */}
+      <div
+        ref={containerRef}
+        className="relative flex-1 overflow-y-auto overflow-x-hidden px-2 pb-5 pt-4 no-scrollbar sm:px-3"
+      >
+        <div className="relative min-h-full">
+          <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-muted/50 shadow-inner" />
           <div
-            className="w-[50%] flex items-center justify-center relative overflow-hidden"
-            style={{
-              background:
-                'linear-gradient(135deg, #b45309 0%, #d97706 50%, #b45309 100%)',
-              borderLeft: '2px solid rgba(0,0,0,0.35)',
-            }}
-          >
-            {/* Shimmer sweep */}
-            <div
-              className="absolute inset-0 animate-shimmer pointer-events-none"
-              style={{
-                background:
-                  'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.28) 50%, transparent 70%)',
-                backgroundSize: '200% 100%',
-              }}
-            />
-            <span
-              className="relative z-10 flex items-center gap-1.5 pr-2"
-              style={{
-                fontSize: '11px',
-                fontWeight: 900,
-                textTransform: 'uppercase',
-                letterSpacing: '0.12em',
-                color: '#fde68a',
-                textShadow: '0 1px 4px rgba(0,0,0,0.5)',
-              }}
-            >
-              <Crown className="w-3.5 h-3.5 shrink-0" strokeWidth={3} />
-              Premium
-            </span>
-          </div>
-        </div>
-
-        {/* ── Vertical Timeline ── */}
-        <div className="relative flex-grow">
-          {/* Track */}
-          <div
-            className="absolute top-0 bottom-0 left-1/2 w-[2px] -translate-x-1/2 z-[1]"
-            style={{ background: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }}
+            className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary/70 shadow-[0_0_14px_rgba(34,197,94,0.28)]"
+            style={{ height: `calc(${progressPct}%)` }}
           />
 
-          {/* Progress fill — glowing green */}
-          <div
-            className="absolute top-0 left-1/2 w-[2px] -translate-x-1/2 z-[2]"
-            style={{
-              height: `calc(${progressPct}%)`,
-              background:
-                'linear-gradient(180deg, #22c55e 0%, #16a34a 70%, #15803d 100%)',
-              boxShadow: '0 0 10px 2px rgba(34,197,94,0.45)',
-            }}
-          />
+          <div className="relative z-10 flex flex-col gap-y-5 sm:gap-y-6">
+          {REWARD_SCHEDULE.map((dayDef) => {
+            const freeStatus = getStatus(dayDef.day, false);
+            const premiumStatus = getStatus(dayDef.day, true);
+            const isToday = dayDef.day === currentDay;
+            const isClaimed = progress.claimedDays.includes(dayDef.day);
 
-          {/* Travelling dot at progress tip — hidden, current-day circle is the indicator */}
-
-          <div className="flex flex-col gap-y-6 sm:gap-y-8 relative z-10 w-full px-2 sm:px-3 pt-3 pb-6">
-            {REWARD_SCHEDULE.map((dayDef) => {
-              const freeStatus = getStatus(dayDef.day, false);
-              const premiumStatus = getStatus(dayDef.day, true);
-              const isToday = dayDef.day === currentDay;
-
-              return (
-                <div
-                  key={`day-${dayDef.day}`}
-                  data-day={dayDef.day}
-                  className={cn(
-                    'grid grid-cols-[1fr_auto_1fr] items-center transition-all duration-300',
-                    isToday ? 'opacity-100 z-20' : 'hover:-translate-y-0.5',
-                  )}
-                >
-                  {/* Today row highlight strip */}
-                  {isToday && (
-                    <div
-                      className="absolute left-0 right-0 rounded-xl pointer-events-none"
-                      style={{
-                        top: '-6px',
-                        bottom: '-6px',
-                        background: isDark
-                          ? 'linear-gradient(90deg, rgba(34,197,94,0.07) 0%, rgba(34,197,94,0.12) 50%, rgba(251,191,36,0.07) 100%)'
-                          : 'linear-gradient(90deg, rgba(34,197,94,0.08) 0%, rgba(34,197,94,0.15) 50%, rgba(251,191,36,0.08) 100%)',
-                        border: isDark
-                          ? '1px solid rgba(34,197,94,0.15)'
-                          : '1px solid rgba(34,197,94,0.25)',
-                      }}
+            return (
+              <div
+                key={`day-${dayDef.day}`}
+                data-day={dayDef.day}
+                className={cn(
+                  'relative grid grid-cols-[minmax(0,1fr)_2.5rem_minmax(0,1fr)] items-center rounded-2xl px-1 py-2 transition-all duration-300 sm:px-2',
+                  isToday
+                    ? 'bg-primary/10 ring-1 ring-primary/20 shadow-sm'
+                    : '',
+                )}
+              >
+                <div className="flex w-full justify-center pr-2 sm:pr-3">
+                  <div className="w-full max-w-[132px] sm:max-w-[160px]">
+                    <SingleRewardCard
+                      day={dayDef.day}
+                      rewardType={dayDef.free.type}
+                      amount={dayDef.free.amount}
+                      itemId={dayDef.free.itemId}
+                      status={freeStatus}
+                      isToday={isToday}
+                      hideDayLabel
+                      onClick={
+                        isToday && freeStatus === 'READY'
+                          ? () => onClaim(dayDef.day)
+                          : undefined
+                      }
                     />
-                  )}
-
-                  {/* Left — Free */}
-                  <div className="pr-2 sm:pr-3 flex justify-center w-full">
-                    <div className="w-full max-w-[140px] sm:max-w-[160px]">
-                      <SingleRewardCard
-                        day={dayDef.day}
-                        rewardType={dayDef.free.type}
-                        amount={dayDef.free.amount}
-                        itemId={dayDef.free.itemId}
-                        status={freeStatus}
-                        isToday={isToday}
-                        hideDayLabel={true}
-                        onClick={
-                          isToday && freeStatus === 'READY'
-                            ? () => onClaim(dayDef.day)
-                            : undefined
-                        }
-                      />
-                    </div>
                   </div>
+                </div>
 
-                  {/* Center — Day Marker */}
-                  <div className="w-10 flex justify-center relative my-auto">
-                    {/* Pulsing ring for today */}
-                    {isToday && (
-                      <span
-                        className="absolute rounded-full animate-ping-ring"
-                        style={{
-                          width: '2.4rem',
-                          height: '2.4rem',
-                          background: isDark ? 'rgba(34,197,94,0.22)' : 'rgba(34,197,94,0.3)',
-                          top: '50%',
-                          left: '50%',
-                          transform: 'translate(-50%, -50%)',
-                        }}
-                      />
-                    )}
+                <div className="relative z-20 flex justify-center">
+                  {isToday && (
+                    <span className="absolute left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/20 animate-ping-ring" />
+                  )}
+                  <div className="relative z-10 rounded-full bg-card p-1 shadow-sm ring-1 ring-border/70">
                     <div
                       className={cn(
-                        'flex items-center justify-center rounded-full z-10 relative transition-all duration-300',
+                        'flex items-center justify-center rounded-full border font-black tabular-nums',
                         isToday
-                          ? 'w-8 h-8'
-                          : 'w-6 h-6 border-2',
+                          ? 'h-8 w-8 border-primary bg-primary text-primary-foreground text-sm shadow-sm shadow-primary/25'
+                          : isClaimed
+                            ? 'h-6 w-6 border-primary/30 bg-primary/10 text-primary text-[11px]'
+                            : 'h-6 w-6 border-border bg-background text-muted-foreground text-[11px]',
                       )}
-                      style={{
-                        background: isToday
-                          ? '#19a34a'
-                          : progress.claimedDays.includes(dayDef.day)
-                            ? (isDark ? '#1a3a28' : '#d1fae5')
-                            : (isDark ? '#0f1f17' : '#f0fdf4'),
-                        borderColor: isToday
-                          ? undefined
-                          : progress.claimedDays.includes(dayDef.day)
-                            ? (isDark ? '#2a5a3a' : '#86efac')
-                            : (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)'),
-                        boxShadow: isToday
-                          ? `0 4px 18px rgba(34,197,94,0.65), 0 0 0 2.5px ${isDark ? '#0a2f17' : '#dcfce7'}`
-                          : undefined,
-                      }}
                     >
-                      <span
-                        className={cn(
-                          'font-black tracking-tight',
-                          isToday
-                            ? 'text-[13px] sm:text-sm text-white'
-                            : 'text-[11px] sm:text-[12px]',
-                        )}
-                        style={{
-                          color: isToday
-                            ? 'white'
-                            : progress.claimedDays.includes(dayDef.day)
-                              ? (isDark ? 'rgba(255,255,255,0.75)' : '#166534')
-                              : (isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)'),
-                        }}
-                      >
-                        {dayDef.day}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Right — Premium */}
-                  <div className="pl-2 sm:pl-3 flex justify-center w-full relative">
-                    {isToday && (
-                      <div
-                        className="absolute inset-0 rounded-2xl -z-10 scale-110 blur-xl"
-                        style={{ background: 'rgba(251,191,36,0.12)' }}
-                      />
-                    )}
-                    <div className="w-full max-w-[140px] sm:max-w-[160px]">
-                      <SingleRewardCard
-                        day={dayDef.day}
-                        rewardType={dayDef.premium.type}
-                        amount={dayDef.premium.amount}
-                        itemId={dayDef.premium.itemId}
-                        status={premiumStatus}
-                        isPremiumTier={true}
-                        isToday={isToday}
-                        hideDayLabel={true}
-                        onClick={
-                          !isPremium
-                            ? onGoPremium
-                            : isToday && premiumStatus === 'READY'
-                              ? () => onClaim(dayDef.day)
-                              : undefined
-                        }
-                      />
+                      {isClaimed && !isToday ? (
+                        <Check className="w-3.5 h-3.5 stroke-[4]" />
+                      ) : (
+                        dayDef.day
+                      )}
                     </div>
                   </div>
                 </div>
-              );
-            })}
+
+                <div className="flex w-full justify-center pl-2 sm:pl-3">
+                  <div className="w-full max-w-[132px] sm:max-w-[160px]">
+                    <SingleRewardCard
+                      day={dayDef.day}
+                      rewardType={dayDef.premium.type}
+                      amount={dayDef.premium.amount}
+                      itemId={dayDef.premium.itemId}
+                      status={premiumStatus}
+                      isPremiumTier
+                      isToday={isToday}
+                      hideDayLabel
+                      onClick={
+                        !isPremium
+                          ? onGoPremium
+                          : isToday && premiumStatus === 'READY'
+                            ? () => onClaim(dayDef.day)
+                            : undefined
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TierHeader({
+  icon,
+  label,
+  premium = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  premium?: boolean;
+}) {
+  return (
+    <div
+      className={cn(
+        'flex h-10 items-center justify-center gap-2 rounded-2xl border text-[11px] font-black uppercase tracking-widest',
+        premium
+          ? 'border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400'
+          : 'border-primary/20 bg-primary/10 text-primary',
+      )}
+    >
+      {icon}
+      <span>{label}</span>
     </div>
   );
 }
