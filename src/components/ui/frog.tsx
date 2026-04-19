@@ -13,6 +13,10 @@ import {
   Alignment,
   useRive,
   useStateMachineInput,
+  useViewModel,
+  useViewModelInstance,
+  useViewModelInstanceBoolean,
+  useViewModelInstanceNumber,
 } from '@rive-app/react-canvas';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
@@ -21,8 +25,9 @@ import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 const ARTBOARD_NAME = 'main';
 const STATE_MACHINE = 'State Machine 1';
 const MOUTH_TRIGGER = 'open_mouth';
+const OPEN_MOUTH_BINDING = 'openMouth';
 
-// Rive numeric inputs (all are integers in your state machine)
+// Legacy Rive numeric inputs (all are integers in the older state machine)
 const INPUTS = {
   skin: 'skin',
   mood: 'mood',
@@ -32,6 +37,14 @@ const INPUTS = {
 } as const;
 
 export type WardrobeSlot = keyof typeof INPUTS;
+
+const DATA_BINDINGS: Record<WardrobeSlot, string> = {
+  skin: 'skin',
+  mood: 'mood',
+  hat: 'hat',
+  body: 'body',
+  hand_item: 'handItem',
+};
 
 /** Artboard pixel dimensions + anchor (artboard coords) */
 const ARTBOARD_WIDTH = 149;
@@ -78,12 +91,44 @@ const Frog = memo(
       artboard: ARTBOARD_NAME,
       stateMachines: STATE_MACHINE,
       autoplay: true,
+      autoBind: true,
       layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
     });
 
     useRiveVisibility(rive, wrapperRef);
 
-    // inputs
+    const viewModel = useViewModel(rive, { useDefault: true });
+    const viewModelInstance = useViewModelInstance(viewModel, {
+      useDefault: true,
+      rive,
+    });
+
+    const skinBinding = useViewModelInstanceNumber(
+      DATA_BINDINGS.skin,
+      viewModelInstance,
+    );
+    const moodBinding = useViewModelInstanceNumber(
+      DATA_BINDINGS.mood,
+      viewModelInstance,
+    );
+    const hatBinding = useViewModelInstanceNumber(
+      DATA_BINDINGS.hat,
+      viewModelInstance,
+    );
+    const bodyBinding = useViewModelInstanceNumber(
+      DATA_BINDINGS.body,
+      viewModelInstance,
+    );
+    const handItemBinding = useViewModelInstanceNumber(
+      DATA_BINDINGS.hand_item,
+      viewModelInstance,
+    );
+    const openMouthBinding = useViewModelInstanceBoolean(
+      OPEN_MOUTH_BINDING,
+      viewModelInstance,
+    );
+
+    // Legacy state machine inputs, kept so older .riv backups still work.
     const mouthTrigger = useStateMachineInput(
       rive,
       STATE_MACHINE,
@@ -101,23 +146,68 @@ const Frog = memo(
 
     /* ---- mouth trigger ---- */
     useEffect(() => {
-      if (mouthOpen) mouthTrigger?.fire();
-    }, [mouthOpen, mouthTrigger]);
+      if (!mouthOpen) return;
 
-    /* ---- controlled per-slot indices -> rive inputs ---- */
+      if (openMouthBinding.value !== null) {
+        openMouthBinding.setValue(true);
+        const timer = setTimeout(() => openMouthBinding.setValue(false), 120);
+        return () => clearTimeout(timer);
+      }
+
+      mouthTrigger?.fire();
+    }, [mouthOpen, mouthTrigger, openMouthBinding]);
+
+    const setBoundSlotIndex = React.useCallback(
+      (slot: WardrobeSlot, index: number) => {
+        if (slot === 'skin') {
+          if (skinBinding.value !== null) skinBinding.setValue(index);
+          if (skinInput) skinInput.value = index;
+        }
+        if (slot === 'mood') {
+          if (moodBinding.value !== null) moodBinding.setValue(index);
+          if (moodInput) moodInput.value = index;
+        }
+        if (slot === 'hat') {
+          if (hatBinding.value !== null) hatBinding.setValue(index);
+          if (hatInput) hatInput.value = index;
+        }
+        if (slot === 'body') {
+          if (bodyBinding.value !== null) bodyBinding.setValue(index);
+          if (bodyInput) bodyInput.value = index;
+        }
+        if (slot === 'hand_item') {
+          if (handItemBinding.value !== null) handItemBinding.setValue(index);
+          if (handItemInput) handItemInput.value = index;
+        }
+      },
+      [
+        bodyBinding,
+        bodyInput,
+        handItemBinding,
+        handItemInput,
+        hatBinding,
+        hatInput,
+        moodBinding,
+        moodInput,
+        skinBinding,
+        skinInput,
+      ],
+    );
+
+    /* ---- controlled per-slot indices -> data bindings + legacy inputs ---- */
     useEffect(() => {
       if (!indices) return;
-      if (typeof indices.skin === 'number' && skinInput)
-        skinInput.value = indices.skin;
-      if (typeof indices.mood === 'number' && moodInput)
-        moodInput.value = indices.mood;
-      if (typeof indices.hat === 'number' && hatInput)
-        hatInput.value = indices.hat;
-      if (typeof indices.body === 'number' && bodyInput)
-        bodyInput.value = indices.body;
-      if (typeof indices.hand_item === 'number' && handItemInput)
-        handItemInput.value = indices.hand_item;
-    }, [indices, skinInput, moodInput, hatInput, bodyInput, handItemInput]);
+      if (typeof indices.skin === 'number')
+        setBoundSlotIndex('skin', indices.skin);
+      if (typeof indices.mood === 'number')
+        setBoundSlotIndex('mood', indices.mood);
+      if (typeof indices.hat === 'number')
+        setBoundSlotIndex('hat', indices.hat);
+      if (typeof indices.body === 'number')
+        setBoundSlotIndex('body', indices.body);
+      if (typeof indices.hand_item === 'number')
+        setBoundSlotIndex('hand_item', indices.hand_item);
+    }, [indices, setBoundSlotIndex]);
 
     /* ---- expose helpers to parent ---- */
     useImperativeHandle(ref, () => ({
@@ -145,11 +235,7 @@ const Frog = memo(
         );
       },
       setSlotIndex(slot, index) {
-        if (slot === 'skin' && skinInput) skinInput.value = index;
-        if (slot === 'mood' && moodInput) moodInput.value = index;
-        if (slot === 'hat' && hatInput) hatInput.value = index;
-        if (slot === 'body' && bodyInput) bodyInput.value = index;
-        if (slot === 'hand_item' && handItemInput) handItemInput.value = index;
+        setBoundSlotIndex(slot, index);
       },
     }));
 

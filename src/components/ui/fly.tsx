@@ -8,7 +8,16 @@ import React, {
   useRef,
   useImperativeHandle,
 } from 'react';
-import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas';
+import {
+  useRive,
+  Layout,
+  Fit,
+  Alignment,
+  useViewModel,
+  useViewModelInstance,
+  useViewModelInstanceBoolean,
+  useViewModelInstanceTrigger,
+} from '@rive-app/react-canvas';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 
@@ -35,6 +44,7 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
         artboard: 'fly',
         animations: ['Wings', 'Body'],
         autoplay: true,
+        autoBind: true,
         layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
         onLoad: () => {
           onLoad?.();
@@ -46,6 +56,21 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
     const { RiveComponent, rive } = useRive(riveOptions);
 
     useRiveVisibility(rive, innerRef);
+
+    const viewModel = useViewModel(rive, { useDefault: true });
+    const viewModelInstance = useViewModelInstance(viewModel, {
+      useDefault: true,
+      rive,
+    });
+    const pausedBinding = useViewModelInstanceBoolean(
+      'paused',
+      viewModelInstance,
+    );
+    const isPausedBinding = useViewModelInstanceBoolean(
+      'isPaused',
+      viewModelInstance,
+    );
+    const playBinding = useViewModelInstanceTrigger('play', viewModelInstance);
 
     useEffect(() => {
       if (!rive) return;
@@ -61,19 +86,22 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
 
     useEffect(() => {
       if (!rive) return;
+      if (pausedBinding.value !== null) pausedBinding.setValue(paused);
+      if (isPausedBinding.value !== null) isPausedBinding.setValue(paused);
       if (paused) {
         rive.pause();
       } else if (rive.isPaused) {
         rive.play();
       }
-    }, [rive, paused]);
+    }, [isPausedBinding, paused, pausedBinding, rive]);
 
     const handleClick = useCallback(
       (e: React.MouseEvent) => {
         onClick?.(e);
+        playBinding.trigger();
         rive?.play();
       },
-      [onClick, rive]
+      [onClick, playBinding, rive]
     );
 
     return (

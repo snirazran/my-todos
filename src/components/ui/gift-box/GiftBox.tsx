@@ -6,6 +6,11 @@ import {
   Layout,
   Fit,
   Alignment,
+  useViewModel,
+  useViewModelInstance,
+  useViewModelInstanceBoolean,
+  useViewModelInstanceNumber,
+  useViewModelInstanceTrigger,
 } from '@rive-app/react-canvas';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
@@ -47,10 +52,34 @@ export const GiftRive = React.memo(
       src: riveUrl || undefined,
       stateMachines: 'State Machine 1',
       autoplay: true,
+      autoBind: true,
       layout: RIVE_LAYOUT,
     });
 
     useRiveVisibility(rive, containerRef);
+
+    const viewModel = useViewModel(rive, { useDefault: true });
+    const viewModelInstance = useViewModelInstance(viewModel, {
+      useDefault: true,
+      rive,
+    });
+    const colorBinding = useViewModelInstanceNumber('color', viewModelInstance);
+    const isMilestoneBinding = useViewModelInstanceBoolean(
+      'isMilestone',
+      viewModelInstance,
+    );
+    const legacyIsMilestoneBinding = useViewModelInstanceBoolean(
+      'is_mile_stone',
+      viewModelInstance,
+    );
+    const startOpenBinding = useViewModelInstanceTrigger(
+      'startBoxOpen',
+      viewModelInstance,
+    );
+    const legacyStartOpenBinding = useViewModelInstanceTrigger(
+      'start_box_open',
+      viewModelInstance,
+    );
 
     useEffect(() => {
       if (!rive) return;
@@ -79,6 +108,9 @@ export const GiftRive = React.memo(
     // Query a fresh input every time. Rive invalidates input objects during reset.
     const applyColor = React.useCallback(() => {
       if (!rive || typeof color !== 'number') return;
+      if (colorBinding.value !== null) {
+        colorBinding.setValue(color);
+      }
       try {
         const inputs = rive.stateMachineInputs('State Machine 1');
         const colorInput = inputs?.find((i) => i.name === 'color');
@@ -86,7 +118,7 @@ export const GiftRive = React.memo(
       } catch {
         // Rive can briefly invalidate inputs while canvases mount/reset.
       }
-    }, [color, rive]);
+    }, [color, colorBinding, rive]);
 
     useEffect(() => {
       applyColor();
@@ -125,20 +157,36 @@ export const GiftRive = React.memo(
     }, [rive, paused, applyColor]);
 
     useEffect(() => {
-      if (isMilestone && isMileStoneInput) {
-        const timer = setTimeout(() => {
+      if (!isMilestone) return;
+
+      const timer = setTimeout(() => {
+        if (isMilestoneBinding.value !== null) {
+          isMilestoneBinding.setValue(true);
+        }
+        if (legacyIsMilestoneBinding.value !== null) {
+          legacyIsMilestoneBinding.setValue(true);
+        }
+        if (isMileStoneInput) {
           isMileStoneInput.fire();
-          applyColor();
-        }, 100);
-        return () => clearTimeout(timer);
-      }
-    }, [isMilestone, isMileStoneInput, applyColor]);
+        }
+        applyColor();
+      }, 100);
+      return () => clearTimeout(timer);
+    }, [
+      applyColor,
+      isMileStoneInput,
+      isMilestone,
+      isMilestoneBinding,
+      legacyIsMilestoneBinding,
+    ]);
 
     useEffect(() => {
-      if (triggerOpen && startOpenInput) {
-        startOpenInput.fire();
-      }
-    }, [triggerOpen, startOpenInput]);
+      if (!triggerOpen) return;
+
+      startOpenBinding.trigger();
+      legacyStartOpenBinding.trigger();
+      startOpenInput?.fire();
+    }, [legacyStartOpenBinding, startOpenBinding, startOpenInput, triggerOpen]);
 
     return (
       <div
