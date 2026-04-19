@@ -625,7 +625,17 @@ async function syncQuestForTemplate(args: {
   if (changed) {
     doc.markModified('logic');
     doc.markModified('rewards');
-    await doc.save();
+    try {
+      await doc.save();
+    } catch (err: any) {
+      // Duplicate key: a concurrent request already inserted this quest doc.
+      // Re-fetch and return the winner instead of surfacing a 500.
+      if (err.code === 11000 && (doc as any).isNew) {
+        const existing = await QuestModel.findOne({ userId, questId });
+        if (existing) return existing;
+      }
+      throw err;
+    }
   }
 
   return doc;
