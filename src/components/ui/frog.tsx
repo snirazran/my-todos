@@ -15,8 +15,8 @@ import {
   useStateMachineInput,
   useViewModel,
   useViewModelInstance,
-  useViewModelInstanceBoolean,
   useViewModelInstanceNumber,
+  useViewModelInstanceTrigger,
 } from '@rive-app/react-canvas-lite';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
@@ -81,7 +81,7 @@ const Frog = memo(
       height = 180,
       indices,
     },
-    ref
+    ref,
   ) {
     const wrapperRef = useRef<HTMLDivElement | null>(null);
     const riveUrl = useRiveAsset('/frog_idle.riv');
@@ -123,7 +123,7 @@ const Frog = memo(
       DATA_BINDINGS.hand_item,
       viewModelInstance,
     );
-    const openMouthBinding = useViewModelInstanceBoolean(
+    const { trigger: triggerOpenMouth } = useViewModelInstanceTrigger(
       OPEN_MOUTH_BINDING,
       viewModelInstance,
     );
@@ -132,7 +132,7 @@ const Frog = memo(
     const mouthTrigger = useStateMachineInput(
       rive,
       STATE_MACHINE,
-      MOUTH_TRIGGER
+      MOUTH_TRIGGER,
     );
     const skinInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.skin);
     const moodInput = useStateMachineInput(rive, STATE_MACHINE, INPUTS.mood);
@@ -141,21 +141,16 @@ const Frog = memo(
     const handItemInput = useStateMachineInput(
       rive,
       STATE_MACHINE,
-      INPUTS.hand_item
+      INPUTS.hand_item,
     );
 
     /* ---- mouth trigger ---- */
     useEffect(() => {
       if (!mouthOpen) return;
 
-      if (openMouthBinding.value !== null) {
-        openMouthBinding.setValue(true);
-        const timer = setTimeout(() => openMouthBinding.setValue(false), 120);
-        return () => clearTimeout(timer);
-      }
-
+      triggerOpenMouth();
       mouthTrigger?.fire();
-    }, [mouthOpen, mouthTrigger, openMouthBinding]);
+    }, [mouthOpen, mouthTrigger, triggerOpenMouth]);
 
     const setBoundSlotIndex = React.useCallback(
       (slot: WardrobeSlot, index: number) => {
@@ -252,7 +247,7 @@ const Frog = memo(
         )}
       </div>
     );
-  })
+  }),
 );
 
 export default Frog;
