@@ -1,5 +1,5 @@
 import { useEffect, type RefObject } from 'react';
-import { type Rive } from '@rive-app/react-canvas';
+import { type Rive } from '@rive-app/react-canvas-lite';
 
 /**
  * Automatically plays/pauses a Rive animation based on visibility in the viewport.
@@ -11,7 +11,7 @@ export function useRiveVisibility(rive: Rive | null, ref: RefObject<HTMLElement 
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.1) {
             rive.play();
           } else {
             rive.pause();
@@ -19,7 +19,8 @@ export function useRiveVisibility(rive: Rive | null, ref: RefObject<HTMLElement 
         });
       },
       {
-        threshold: 0, // Stop as soon as it's completely out of view
+        rootMargin: '0px',
+        threshold: [0, 0.1],
       }
     );
 

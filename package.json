@@ -33,6 +33,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@rive-app/canvas": "^2.30.4",
     "@rive-app/react-canvas": "^4.22.1",
+    "@rive-app/react-canvas-lite": "^4.28.1",
     "@types/canvas-confetti": "^1.9.0",
     "array-move": "^4.0.0",
     "bcryptjs": "^3.0.2",

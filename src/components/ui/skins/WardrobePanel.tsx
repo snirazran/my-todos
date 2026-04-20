@@ -16,6 +16,7 @@ import { motion } from 'framer-motion';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
@@ -335,6 +336,17 @@ export function WardrobePanel({
     return getFilteredItems(data.catalog);
   }, [data, activeFilter, sortBy]);
 
+  const inventoryGrid = useInfiniteScroll(inventoryItems, {
+    initial: 18,
+    batch: 18,
+    resetKey: `inv|${activeFilter}|${sortBy}`,
+  });
+  const shopGrid = useInfiniteScroll(shopItems, {
+    initial: 18,
+    batch: 18,
+    resetKey: `shop|${activeFilter}|${sortBy}`,
+  });
+
   const balance = data?.wardrobe?.flies ?? 0;
   const isGuest = !user;
 
@@ -512,30 +524,35 @@ export function WardrobePanel({
                           </p>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                          {inventoryItems.map((item) => (
-                            <ItemCard
-                              key={item.id}
-                              item={item}
-                              mode="inventory"
-                              ownedCount={
-                                data?.wardrobe?.inventory?.[item.id] ?? 0
-                              }
-                              isEquipped={
-                                data?.wardrobe?.equipped?.[item.slot] ===
-                                item.id
-                              }
-                              canAfford={true}
-                              actionLoading={equippingId === item.id}
-                              onAction={() => handleItemAction(item)}
-                              onSell={() => {
-                                setItemToSell(item);
-                              }}
-                              actionLabel={null}
-                              isNew={unseenInventorySet.has(item.id)}
-                            />
-                          ))}
-                        </div>
+                        <>
+                          <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                            {inventoryGrid.visibleItems.map((item) => (
+                              <ItemCard
+                                key={item.id}
+                                item={item}
+                                mode="inventory"
+                                ownedCount={
+                                  data?.wardrobe?.inventory?.[item.id] ?? 0
+                                }
+                                isEquipped={
+                                  data?.wardrobe?.equipped?.[item.slot] ===
+                                  item.id
+                                }
+                                canAfford={true}
+                                actionLoading={equippingId === item.id}
+                                onAction={() => handleItemAction(item)}
+                                onSell={() => {
+                                  setItemToSell(item);
+                                }}
+                                actionLabel={null}
+                                isNew={unseenInventorySet.has(item.id)}
+                              />
+                            ))}
+                          </div>
+                          {inventoryGrid.hasMore && (
+                            <div ref={inventoryGrid.sentinelRef} className="h-8" />
+                          )}
+                        </>
                       )}
                     </TabsContent>
 
@@ -545,7 +562,7 @@ export function WardrobePanel({
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
                     >
                       <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                        {shopItems.map((item) => {
+                        {shopGrid.visibleItems.map((item) => {
                           const count =
                             data?.wardrobe?.inventory?.[item.id] ?? 0;
                           return (
@@ -569,6 +586,9 @@ export function WardrobePanel({
                           );
                         })}
                       </div>
+                      {shopGrid.hasMore && (
+                        <div ref={shopGrid.sentinelRef} className="h-8" />
+                      )}
                     </TabsContent>
 
                     <TabsContent

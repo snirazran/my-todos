@@ -11,7 +11,7 @@ import {
   useViewModelInstanceBoolean,
   useViewModelInstanceNumber,
   useViewModelInstanceTrigger,
-} from '@rive-app/react-canvas';
+} from '@rive-app/react-canvas-lite';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 
@@ -83,13 +83,16 @@ export const GiftRive = React.memo(
 
     useEffect(() => {
       if (!rive) return;
+      const el = containerRef.current;
+      if (!el) return;
       const resize = () => rive.resizeDrawingSurfaceToCanvas();
       resize();
       const raf = requestAnimationFrame(resize);
-      const delays = [100, 300, 600, 1000].map((ms) => setTimeout(resize, ms));
+      const observer = new ResizeObserver(() => resize());
+      observer.observe(el);
       return () => {
         cancelAnimationFrame(raf);
-        delays.forEach(clearTimeout);
+        observer.disconnect();
       };
     }, [rive]);
 

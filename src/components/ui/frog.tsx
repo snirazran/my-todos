@@ -17,7 +17,7 @@ import {
   useViewModelInstance,
   useViewModelInstanceBoolean,
   useViewModelInstanceNumber,
-} from '@rive-app/react-canvas';
+} from '@rive-app/react-canvas-lite';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 

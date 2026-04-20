@@ -87,6 +87,7 @@ const RARITY_CONFIG: Record<
 
 import { FilterCategory } from './FilterBar';
 import { SortOrder } from './SortMenu';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
 type TradePanelProps = {
   inventory: Record<string, number>;
@@ -162,6 +163,12 @@ export function TradePanel({
       }
     });
   }, [inventory, catalog, targetRarity, activeFilter, sortBy]);
+
+  const availableGrid = useInfiniteScroll(availableItems, {
+    initial: 18,
+    batch: 18,
+    resetKey: `${activeFilter}|${sortBy}|${targetRarity ?? ''}`,
+  });
 
   const selectedCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -285,31 +292,36 @@ export function TradePanel({
               <p>Your wardrobe is empty (or filtered out).</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-3 gap-3 md:gap-4 pb-4">
-              {availableItems.map((item) => {
-                const owned = inventory[item.id] || 0;
-                const selected = selectedCounts[item.id] || 0;
-                const remaining = owned - selected;
-                const isDimmed = remaining === 0;
+            <>
+              <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-3 gap-3 md:gap-4 pb-4">
+                {availableGrid.visibleItems.map((item) => {
+                  const owned = inventory[item.id] || 0;
+                  const selected = selectedCounts[item.id] || 0;
+                  const remaining = owned - selected;
+                  const isDimmed = remaining === 0;
 
-                return (
-                  <div key={item.id} className={isDimmed ? 'opacity-50 grayscale pointer-events-none' : ''}>
-                    <ItemCard
-                      item={item}
-                      mode="trade"
-                      ownedCount={owned}
-                      isEquipped={false}
-                      canAfford={true}
-                      actionLoading={false}
-                      selectedCount={selected}
-                      onAction={() => handleSelect(item)}
-                      actionLabel={null}
-                      isNew={unseenItems.includes(item.id)}
-                    />
-                  </div>
-                );
-              })}
-            </div>
+                  return (
+                    <div key={item.id} className={isDimmed ? 'opacity-50 grayscale pointer-events-none' : ''}>
+                      <ItemCard
+                        item={item}
+                        mode="trade"
+                        ownedCount={owned}
+                        isEquipped={false}
+                        canAfford={true}
+                        actionLoading={false}
+                        selectedCount={selected}
+                        onAction={() => handleSelect(item)}
+                        actionLabel={null}
+                        isNew={unseenItems.includes(item.id)}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+              {availableGrid.hasMore && (
+                <div ref={availableGrid.sentinelRef} className="h-8" />
+              )}
+            </>
           )}
         </div>
       </div>
