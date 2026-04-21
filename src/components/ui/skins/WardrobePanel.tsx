@@ -349,6 +349,7 @@ export function WardrobePanel({
 
   const balance = data?.wardrobe?.flies ?? 0;
   const isGuest = !user;
+  const canRenderItems = open && !!data;
 
   return (
     <>
@@ -514,7 +515,9 @@ export function WardrobePanel({
                       ref={overscrollDrag.bind}
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
                     >
-                      {inventoryItems.length === 0 ? (
+                      {!canRenderItems ? (
+                        <WardrobeGridSkeleton />
+                      ) : activeTab === 'inventory' && inventoryItems.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full opacity-50">
                           <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
                             <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
@@ -523,7 +526,7 @@ export function WardrobePanel({
                             Empty
                           </p>
                         </div>
-                      ) : (
+                      ) : activeTab === 'inventory' ? (
                         <>
                           <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
                             {inventoryGrid.visibleItems.map((item) => (
@@ -553,7 +556,7 @@ export function WardrobePanel({
                             <div ref={inventoryGrid.sentinelRef} className="h-8" />
                           )}
                         </>
-                      )}
+                      ) : null}
                     </TabsContent>
 
                     <TabsContent
@@ -561,41 +564,50 @@ export function WardrobePanel({
                       ref={overscrollDrag.bind}
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
                     >
-                      <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                        {shopGrid.visibleItems.map((item) => {
-                          const count =
-                            data?.wardrobe?.inventory?.[item.id] ?? 0;
-                          return (
-                            <ItemCard
-                              key={item.id}
-                              item={item}
-                              mode="shop"
-                              ownedCount={count}
-                              isEquipped={false}
-                              canAfford={
-                                balance >= (item.priceFlies ?? 0) && !isGuest
-                              }
-                              actionLoading={buyingId === item.id}
-                              actionLabel={
-                                confirmingBuyId === item.id
-                                  ? 'CONFIRM'
-                                  : undefined
-                              }
-                              onAction={(e) => handleBuyItem(item, e)}
-                            />
-                          );
-                        })}
-                      </div>
-                      {shopGrid.hasMore && (
-                        <div ref={shopGrid.sentinelRef} className="h-8" />
-                      )}
+                      {!canRenderItems ? (
+                        <WardrobeGridSkeleton />
+                      ) : activeTab === 'shop' ? (
+                        <>
+                          <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                            {shopGrid.visibleItems.map((item) => {
+                              const count =
+                                data?.wardrobe?.inventory?.[item.id] ?? 0;
+                              return (
+                                <ItemCard
+                                  key={item.id}
+                                  item={item}
+                                  mode="shop"
+                                  ownedCount={count}
+                                  isEquipped={false}
+                                  canAfford={
+                                    balance >= (item.priceFlies ?? 0) &&
+                                    !isGuest
+                                  }
+                                  actionLoading={buyingId === item.id}
+                                  actionLabel={
+                                    confirmingBuyId === item.id
+                                      ? 'CONFIRM'
+                                      : undefined
+                                  }
+                                  onAction={(e) => handleBuyItem(item, e)}
+                                />
+                              );
+                            })}
+                          </div>
+                          {shopGrid.hasMore && (
+                            <div ref={shopGrid.sentinelRef} className="h-8" />
+                          )}
+                        </>
+                      ) : null}
                     </TabsContent>
 
                     <TabsContent
                       value="trade"
                       className="absolute inset-0 overflow-hidden data-[state=inactive]:hidden"
                     >
-                      {data?.wardrobe?.inventory && data.catalog && (
+                      {!canRenderItems ? (
+                        <WardrobeGridSkeleton />
+                      ) : activeTab === 'trade' && data?.wardrobe?.inventory && data.catalog ? (
                         <TradePanel
                           inventory={data.wardrobe.inventory}
                           catalog={data.catalog}
@@ -606,7 +618,7 @@ export function WardrobePanel({
                           }
                           sortBy={sortBy}
                         />
-                      )}
+                      ) : null}
                     </TabsContent>
                   </div>
                 </Tabs>
@@ -634,5 +646,22 @@ export function WardrobePanel({
         />
       )}
     </>
+  );
+}
+
+function WardrobeGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <div
+          key={index}
+          className="mx-auto flex w-full max-w-[240px] flex-col rounded-2xl border-[3px] border-border bg-card p-2.5 md:p-3.5"
+        >
+          <div className="mt-4 mb-2 md:mt-5 md:mb-3 aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl bg-muted/50" />
+          <div className="mx-auto h-3 w-2/3 rounded-full bg-muted/60" />
+          <div className="mx-auto mt-3 h-7 w-3/4 rounded-lg bg-muted/50 md:h-8" />
+        </div>
+      ))}
+    </div>
   );
 }

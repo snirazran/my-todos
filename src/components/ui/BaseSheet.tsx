@@ -17,7 +17,7 @@ export interface BaseSheetProps {
   zIndex?: number;
 }
 
-const transition = { type: 'spring' as const, damping: 30, stiffness: 300, mass: 0.8 };
+const transition = { type: 'tween' as const, duration: 0.22, ease: 'easeOut' as const };
 
 export function BaseSheet({
   open,
