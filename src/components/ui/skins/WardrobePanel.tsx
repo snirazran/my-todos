@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Lock, Shirt, X, ArrowLeft, ShoppingBag, Repeat } from 'lucide-react';
+import { Lock, Shirt, X, ArrowLeft, ShoppingBag, Repeat, ChevronDown } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
@@ -68,25 +68,34 @@ export function WardrobePanel({
   } | null>(null);
   const [shakeBalance, setShakeBalance] = useState(false);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
-  const [isWideGrid, setIsWideGrid] = useState(false);
+  const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
+  const [shopHasScrolled, setShopHasScrolled] = useState(false);
+  const [gridBatchSize, setGridBatchSize] = useState(6);
 
   // --- Sell Dialog Logic ---
   const [itemToSell, setItemToSell] = useState<ItemDef | null>(null);
 
   const overscrollDrag = useSheetOverscrollDrag();
-
-  useEffect(() => {
-    const query = window.matchMedia('(min-width: 768px)');
-    const update = () => setIsWideGrid(query.matches);
-    update();
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, []);
+  const inventoryScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const shopScrollRef = React.useRef<HTMLDivElement | null>(null);
 
   const unseenInventorySet = useMemo(
     () => new Set(data?.wardrobe?.unseenItems ?? []),
     [data?.wardrobe?.unseenItems],
   );
+
+  useEffect(() => {
+    setInventoryHasScrolled(false);
+    setShopHasScrolled(false);
+  }, [activeFilter, sortBy, activeTab, open]);
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 768px)');
+    const update = () => setGridBatchSize(query.matches ? 10 : 6);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
 
   const confirmSell = (amount: number) => {
     if (itemToSell) {
@@ -345,18 +354,25 @@ export function WardrobePanel({
     return getFilteredItems(data.catalog);
   }, [data, activeFilter, sortBy]);
 
-  const gridBatchSize = isWideGrid ? 15 : 6;
-
   const inventoryGrid = useInfiniteScroll(inventoryItems, {
     initial: gridBatchSize,
     batch: gridBatchSize,
-    resetKey: `inv|${activeFilter}|${sortBy}`,
+    resetKey: `inv|${activeFilter}|${sortBy}|${gridBatchSize}|${open ? 'open' : 'closed'}`,
+    rootRef: inventoryScrollRef,
+    enabled: inventoryHasScrolled,
   });
   const shopGrid = useInfiniteScroll(shopItems, {
     initial: gridBatchSize,
     batch: gridBatchSize,
-    resetKey: `shop|${activeFilter}|${sortBy}`,
+    resetKey: `shop|${activeFilter}|${sortBy}|${gridBatchSize}|${open ? 'open' : 'closed'}`,
+    rootRef: shopScrollRef,
+    enabled: shopHasScrolled,
   });
+
+  const isNearScrollEnd = (node: HTMLElement) =>
+    node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
+  const shouldLoadMoreFromWheel = (node: HTMLElement, deltaY: number) =>
+    deltaY > 0 && node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
 
   const balance = data?.wardrobe?.flies ?? 0;
   const isGuest = !user;
@@ -523,7 +539,31 @@ export function WardrobePanel({
                   >
                     <TabsContent
                       value="inventory"
-                      ref={overscrollDrag.bind}
+                      ref={(node) => {
+                        inventoryScrollRef.current = node;
+                        overscrollDrag.bind(node);
+                      }}
+                      onScroll={(event) => {
+                        setInventoryHasScrolled(true);
+                        if (
+                          inventoryGrid.hasMore &&
+                          isNearScrollEnd(event.currentTarget)
+                        ) {
+                          inventoryGrid.loadMore();
+                        }
+                      }}
+                      onWheel={(event) => {
+                        setInventoryHasScrolled(true);
+                        if (
+                          inventoryGrid.hasMore &&
+                          shouldLoadMoreFromWheel(
+                            event.currentTarget,
+                            event.deltaY,
+                          )
+                        ) {
+                          inventoryGrid.loadMore();
+                        }
+                      }}
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
                     >
                       {!canRenderItems ? (
@@ -564,7 +604,11 @@ export function WardrobePanel({
                             ))}
                           </div>
                           {inventoryGrid.hasMore && (
-                            <div ref={inventoryGrid.sentinelRef} className="h-8" />
+                            <div
+                              ref={inventoryGrid.sentinelRef}
+                              className="h-8"
+                              aria-hidden="true"
+                            />
                           )}
                         </>
                       ) : null}
@@ -572,7 +616,31 @@ export function WardrobePanel({
 
                     <TabsContent
                       value="shop"
-                      ref={overscrollDrag.bind}
+                      ref={(node) => {
+                        shopScrollRef.current = node;
+                        overscrollDrag.bind(node);
+                      }}
+                      onScroll={(event) => {
+                        setShopHasScrolled(true);
+                        if (
+                          shopGrid.hasMore &&
+                          isNearScrollEnd(event.currentTarget)
+                        ) {
+                          shopGrid.loadMore();
+                        }
+                      }}
+                      onWheel={(event) => {
+                        setShopHasScrolled(true);
+                        if (
+                          shopGrid.hasMore &&
+                          shouldLoadMoreFromWheel(
+                            event.currentTarget,
+                            event.deltaY,
+                          )
+                        ) {
+                          shopGrid.loadMore();
+                        }
+                      }}
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
                     >
                       {!canRenderItems ? (
@@ -606,7 +674,11 @@ export function WardrobePanel({
                             })}
                           </div>
                           {shopGrid.hasMore && (
-                            <div ref={shopGrid.sentinelRef} className="h-8" />
+                            <div
+                              ref={shopGrid.sentinelRef}
+                              className="h-8"
+                              aria-hidden="true"
+                            />
                           )}
                         </>
                       ) : null}
@@ -631,6 +703,13 @@ export function WardrobePanel({
                         />
                       ) : null}
                     </TabsContent>
+
+                    {activeTab === 'inventory' && inventoryGrid.hasMore && (
+                      <ScrollMoreCue />
+                    )}
+                    {activeTab === 'shop' && shopGrid.hasMore && (
+                      <ScrollMoreCue />
+                    )}
                   </div>
                 </Tabs>
               </div>
@@ -673,6 +752,17 @@ function WardrobeGridSkeleton() {
           <div className="mx-auto mt-3 h-7 w-3/4 rounded-lg bg-muted/50 md:h-8" />
         </div>
       ))}
+    </div>
+  );
+}
+
+function ScrollMoreCue() {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center bg-gradient-to-t from-background/95 via-background/60 to-transparent pb-4 pt-10">
+      <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground shadow-sm backdrop-blur">
+        <ChevronDown className="h-3.5 w-3.5 animate-bounce text-primary" />
+        <span>Scroll for more</span>
+      </div>
     </div>
   );
 }

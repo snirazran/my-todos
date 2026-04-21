@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Sparkles, AlertCircle, Plus, ArrowUp } from 'lucide-react';
+import { ArrowRight, Sparkles, AlertCircle, Plus, ArrowUp, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ItemDef, Rarity, rarityRank } from '@/lib/skins/catalog';
 import { Button } from '@/components/ui/button';
@@ -112,6 +112,9 @@ export function TradePanel({
   const [tradeResult, setTradeResult] = useState<ItemDef | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
+  const [gridBatchSize, setGridBatchSize] = useState(6);
+  const inventoryScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -123,6 +126,18 @@ export function TradePanel({
     const firstItem = catalog.find((i) => i.id === selectedIds[0]);
     return firstItem?.rarity || null;
   }, [selectedIds, catalog]);
+
+  useEffect(() => {
+    setInventoryHasScrolled(false);
+  }, [activeFilter, sortBy, targetRarity]);
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 768px)');
+    const update = () => setGridBatchSize(query.matches ? 10 : 6);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
 
   const availableItems = useMemo(() => {
     const ownedIds = Object.keys(inventory);
@@ -165,10 +180,17 @@ export function TradePanel({
   }, [inventory, catalog, targetRarity, activeFilter, sortBy]);
 
   const availableGrid = useInfiniteScroll(availableItems, {
-    initial: 18,
-    batch: 18,
-    resetKey: `${activeFilter}|${sortBy}|${targetRarity ?? ''}`,
+    initial: gridBatchSize,
+    batch: gridBatchSize,
+    resetKey: `${activeFilter}|${sortBy}|${targetRarity ?? ''}|${gridBatchSize}`,
+    rootRef: inventoryScrollRef,
+    enabled: inventoryHasScrolled,
   });
+
+  const isNearScrollEnd = (node: HTMLElement) =>
+    node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
+  const shouldLoadMoreFromWheel = (node: HTMLElement, deltaY: number) =>
+    deltaY > 0 && node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
 
   const selectedCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -274,7 +296,28 @@ export function TradePanel({
       }
 
       {/* --- INVENTORY (Main View - Order 1) --- */}
-      <div className="flex-1 flex flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto order-1 bg-background lg:bg-transparent">
+      <div
+        ref={inventoryScrollRef}
+        onScroll={(event) => {
+          setInventoryHasScrolled(true);
+          if (
+            availableGrid.hasMore &&
+            isNearScrollEnd(event.currentTarget)
+          ) {
+            availableGrid.loadMore();
+          }
+        }}
+        onWheel={(event) => {
+          setInventoryHasScrolled(true);
+          if (
+            availableGrid.hasMore &&
+            shouldLoadMoreFromWheel(event.currentTarget, event.deltaY)
+          ) {
+            availableGrid.loadMore();
+          }
+        }}
+        className="flex-1 flex flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto order-1 bg-background lg:bg-transparent"
+      >
         <div className="flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4 shrink-0">
           <h3 className="text-sm font-bold tracking-wider uppercase text-muted-foreground">
             Your Inventory
@@ -319,8 +362,13 @@ export function TradePanel({
                 })}
               </div>
               {availableGrid.hasMore && (
-                <div ref={availableGrid.sentinelRef} className="h-8" />
+                <div
+                  ref={availableGrid.sentinelRef}
+                  className="h-8"
+                  aria-hidden="true"
+                />
               )}
+              {availableGrid.hasMore && <ScrollMoreCue />}
             </>
           )}
         </div>
@@ -447,6 +495,17 @@ export function TradePanel({
               </p>
            </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ScrollMoreCue() {
+  return (
+    <div className="pointer-events-none sticky bottom-3 z-30 flex justify-center">
+      <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/85 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground shadow-sm backdrop-blur">
+        <ChevronDown className="h-3.5 w-3.5 animate-bounce text-primary" />
+        <span>Scroll for more</span>
       </div>
     </div>
   );
