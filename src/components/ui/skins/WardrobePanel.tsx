@@ -648,6 +648,10 @@ export function WardrobePanel({
                                 actionLabel={null}
                                 isNew={unseenInventorySet.has(item.id)}
                                 deferPreview
+                                pausePreview={
+                                  item.slot !== 'container' &&
+                                  data?.wardrobe?.equipped?.[item.slot] !== item.id
+                                }
                                 previewDelayMs={150 + index * 55}
                               />
                             ))}
@@ -719,6 +723,7 @@ export function WardrobePanel({
                                   }
                                   onAction={(e) => handleBuyItem(item, e)}
                                   deferPreview
+                                  pausePreview={item.slot !== 'container' && confirmingBuyId !== item.id}
                                   previewDelayMs={150 + index * 55}
                                 />
                               );

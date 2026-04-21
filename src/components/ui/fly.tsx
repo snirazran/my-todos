@@ -21,6 +21,8 @@ import {
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 
+const FLY_LAYOUT = new Layout({ fit: Fit.Contain, alignment: Alignment.Center });
+
 type FlyProps = {
   onClick?: (e: React.MouseEvent) => void;
   size?: number;
@@ -45,7 +47,7 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
         animations: ['Wings', 'Body'],
         autoplay: true,
         autoBind: true,
-        layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
+        layout: FLY_LAYOUT,
         onLoad: () => {
           onLoad?.();
         },

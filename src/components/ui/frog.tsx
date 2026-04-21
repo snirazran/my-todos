@@ -21,6 +21,10 @@ import {
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 
+// Stable layout constant — defined once at module level to prevent useRive from seeing
+// a new object reference on every render, which can cause unnecessary reinitialization.
+const FROG_LAYOUT = new Layout({ fit: Fit.Contain, alignment: Alignment.Center });
+
 /* === Artboard & geometry (adjust to your .riv) =========================== */
 const ARTBOARD_NAME = 'main';
 const STATE_MACHINE = 'State Machine 1';
@@ -66,6 +70,7 @@ interface FrogProps {
   mouthOffset?: { x?: number; y?: number };
   width?: number;
   height?: number;
+  paused?: boolean;
 
   /** Controlled numeric indices per slot (optional) */
   indices?: Partial<Record<WardrobeSlot, number>>;
@@ -79,6 +84,7 @@ const Frog = memo(
       mouthOffset,
       width = 240,
       height = 180,
+      paused = false,
       indices,
     },
     ref,
@@ -92,10 +98,25 @@ const Frog = memo(
       stateMachines: STATE_MACHINE,
       autoplay: true,
       autoBind: true,
-      layout: new Layout({ fit: Fit.Contain, alignment: Alignment.Center }),
+      layout: FROG_LAYOUT,
     });
 
-    useRiveVisibility(rive, wrapperRef);
+    useRiveVisibility(rive, wrapperRef, !paused);
+
+    useEffect(() => {
+      if (!rive) return;
+      const el = wrapperRef.current;
+      if (!el) return;
+      const resize = () => rive.resizeDrawingSurfaceToCanvas();
+      resize();
+      const raf = requestAnimationFrame(resize);
+      const observer = new ResizeObserver(() => resize());
+      observer.observe(el);
+      return () => {
+        cancelAnimationFrame(raf);
+        observer.disconnect();
+      };
+    }, [rive]);
 
     const viewModel = useViewModel(rive, { useDefault: true });
     const viewModelInstance = useViewModelInstance(viewModel, {
@@ -203,6 +224,17 @@ const Frog = memo(
       if (typeof indices.hand_item === 'number')
         setBoundSlotIndex('hand_item', indices.hand_item);
     }, [indices, setBoundSlotIndex]);
+
+    /* ---- pause: play one RAF tick so the state machine applies indices, then freeze ---- */
+    useEffect(() => {
+      if (!rive || !paused) return;
+      rive.play();
+      const raf = requestAnimationFrame(() => rive.pause());
+      return () => cancelAnimationFrame(raf);
+    // setBoundSlotIndex is recreated when bindings become ready, so including it
+    // here ensures we re-run after indices are actually applied, not before.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rive, paused, setBoundSlotIndex]);
 
     /* ---- expose helpers to parent ---- */
     useImperativeHandle(ref, () => ({

@@ -4,9 +4,17 @@ import { type Rive } from '@rive-app/react-canvas-lite';
 /**
  * Automatically plays/pauses a Rive animation based on visibility in the viewport.
  */
-export function useRiveVisibility(rive: Rive | null, ref: RefObject<HTMLElement | null>) {
+export function useRiveVisibility(
+  rive: Rive | null,
+  ref: RefObject<HTMLElement | null>,
+  enabled = true,
+) {
   useEffect(() => {
-    if (!rive || !ref.current) return;
+    if (!rive) return;
+
+    if (!enabled) return;
+
+    if (!ref.current) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -29,5 +37,5 @@ export function useRiveVisibility(rive: Rive | null, ref: RefObject<HTMLElement 
     return () => {
       observer.disconnect();
     };
-  }, [rive, ref]);
+  }, [rive, ref, enabled]);
 }

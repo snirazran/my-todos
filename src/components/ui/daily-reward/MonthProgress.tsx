@@ -101,9 +101,10 @@ export function MonthProgress({
                       isToday={isToday}
                       hideDayLabel
                       deferPreview
+                      pausePreview={!isToday}
                       previewDelayMs={150 + (dayDef.day % 4) * 55}
                       previewRootMargin="120px"
-                      previewUnmountDelayMs={700}
+                      previewUnmountDelayMs={2000}
                       onClick={
                         isToday && freeStatus === 'READY'
                           ? () => onClaim(dayDef.day)
@@ -149,9 +150,10 @@ export function MonthProgress({
                       isToday={isToday}
                       hideDayLabel
                       deferPreview
+                      pausePreview={!isToday}
                       previewDelayMs={170 + (dayDef.day % 4) * 55}
                       previewRootMargin="120px"
-                      previewUnmountDelayMs={700}
+                      previewUnmountDelayMs={2000}
                       onClick={
                         !isPremium
                           ? onGoPremium

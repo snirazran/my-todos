@@ -101,6 +101,7 @@ function ItemCardComponent({
   hideRarity,
   staticPreview = false,
   deferPreview = false,
+  pausePreview = false,
   previewDelayMs = 0,
   previewRootMargin = '520px',
   previewUnmountDelayMs = 2400,
@@ -123,6 +124,7 @@ function ItemCardComponent({
   hideRarity?: boolean;
   staticPreview?: boolean;
   deferPreview?: boolean;
+  pausePreview?: boolean;
   previewDelayMs?: number;
   previewRootMargin?: string;
   previewUnmountDelayMs?: number;
@@ -290,7 +292,7 @@ function ItemCardComponent({
                 previewClassName,
               )}
             >
-              <GiftRive color={item.riveIndex} />
+              <GiftRive color={item.riveIndex} paused={pausePreview} />
             </div>
           ) : (
             <Frog
@@ -301,6 +303,7 @@ function ItemCardComponent({
               indices={previewIndices}
               width={180}
               height={180}
+              paused={pausePreview}
             />
           )}
         </div>

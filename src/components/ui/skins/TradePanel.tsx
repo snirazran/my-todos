@@ -395,6 +395,7 @@ export function TradePanel({
                         actionLabel={null}
                         isNew={unseenItems.includes(item.id)}
                         deferPreview
+                        pausePreview
                         previewDelayMs={150 + index * 55}
                       />
                     </div>
