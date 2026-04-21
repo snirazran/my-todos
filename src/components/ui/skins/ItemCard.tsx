@@ -102,6 +102,8 @@ function ItemCardComponent({
   staticPreview = false,
   deferPreview = false,
   previewDelayMs = 0,
+  previewRootMargin = '520px',
+  previewUnmountDelayMs = 2400,
   previewClassName,
 }: {
   item: ItemDef;
@@ -122,6 +124,8 @@ function ItemCardComponent({
   staticPreview?: boolean;
   deferPreview?: boolean;
   previewDelayMs?: number;
+  previewRootMargin?: string;
+  previewUnmountDelayMs?: number;
   previewClassName?: string;
 }) {
   const config = RARITY_CONFIG[item.rarity];
@@ -139,11 +143,11 @@ function ItemCardComponent({
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => setNearViewport(entry.isIntersecting),
-      { rootMargin: '520px', threshold: [0, 0.01] },
+      { rootMargin: previewRootMargin, threshold: [0, 0.01] },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [previewRootMargin]);
 
   useEffect(() => {
     if (!deferPreview) {
@@ -167,10 +171,10 @@ function ItemCardComponent({
     const timer = window.setTimeout(() => {
       setPreviewMounted(false);
       setPreviewReady(false);
-    }, 2400);
+    }, previewUnmountDelayMs);
 
     return () => window.clearTimeout(timer);
-  }, [deferPreview, nearViewport, previewReady]);
+  }, [deferPreview, nearViewport, previewReady, previewUnmountDelayMs]);
 
   const previewIndices = useMemo(
     () => ({
