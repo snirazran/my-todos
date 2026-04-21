@@ -1098,7 +1098,7 @@ export const RewardTile = memo(function RewardTile({
                 : 'h-[120%] w-[120%]',
             )}
           >
-            <GiftRive className="w-full h-full" color={item.riveIndex} paused={paused} />
+            <GiftRive className="w-full h-full" color={item.riveIndex} />
           </div>
         </div>
       ) : previewIndices && hasHydrated ? (
