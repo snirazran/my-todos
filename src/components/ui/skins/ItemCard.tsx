@@ -112,6 +112,7 @@ function ItemCardComponent({
   staticPreview = false,
   deferPreview = false,
   previewDelayMs = 0,
+  previewClassName,
 }: {
   item: ItemDef;
   ownedCount: number;
@@ -131,6 +132,7 @@ function ItemCardComponent({
   staticPreview?: boolean;
   deferPreview?: boolean;
   previewDelayMs?: number;
+  previewClassName?: string;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
@@ -284,12 +286,20 @@ function ItemCardComponent({
           ) : staticPreview || (deferPreview && !previewReady) ? (
             <LightweightItemPreview item={item} toneClassName={config.text} />
           ) : item.slot === 'container' ? (
-            <div className="w-[110%] h-[110%] -translate-y-1 drop-shadow-xl">
+            <div
+              className={cn(
+                'w-[110%] h-[110%] -translate-y-1 drop-shadow-xl',
+                previewClassName,
+              )}
+            >
               <GiftRive color={item.riveIndex} />
             </div>
           ) : (
             <Frog
-              className="w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[10%]"
+              className={cn(
+                'w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[10%]',
+                previewClassName,
+              )}
               indices={previewIndices}
               width={180}
               height={180}

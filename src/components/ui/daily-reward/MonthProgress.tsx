@@ -104,6 +104,8 @@ export function MonthProgress({
                       status={freeStatus}
                       isToday={isToday}
                       hideDayLabel
+                      deferPreview
+                      previewDelayMs={180 + (dayDef.day % 4) * 90}
                       onClick={
                         isToday && freeStatus === 'READY'
                           ? () => onClaim(dayDef.day)
@@ -148,6 +150,8 @@ export function MonthProgress({
                       isPremiumTier
                       isToday={isToday}
                       hideDayLabel
+                      deferPreview
+                      previewDelayMs={240 + (dayDef.day % 4) * 90}
                       onClick={
                         !isPremium
                           ? onGoPremium

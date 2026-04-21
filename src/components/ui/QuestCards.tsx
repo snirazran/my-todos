@@ -198,23 +198,28 @@ function useTimeLeft() {
   return label;
 }
 
-function useElementInView<T extends HTMLElement>() {
+function useElementNearViewport<T extends HTMLElement>(rootMargin = '360px') {
   const ref = useRef<T | null>(null);
-  const [visible, setVisible] = useState(false);
+  const [nearViewport, setNearViewport] = useState(false);
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
 
     const observer = new IntersectionObserver(
-      ([entry]) => setVisible(entry.isIntersecting),
-      { rootMargin: '80px', threshold: [0, 0.01] },
+      ([entry]) => {
+        const isNear = entry.isIntersecting;
+        setNearViewport(isNear);
+        if (isNear) setHasHydrated(true);
+      },
+      { rootMargin, threshold: [0, 0.01] },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [rootMargin]);
 
-  return { ref, visible };
+  return { ref, nearViewport, hasHydrated };
 }
 
 function formatCountdown(diffMs: number) {
@@ -1013,7 +1018,7 @@ export const RewardTile = memo(function RewardTile({
   className?: string;
   onClick?: () => void;
 }) {
-  const { ref, visible } = useElementInView<HTMLDivElement>();
+  const { ref, hasHydrated } = useElementNearViewport<HTMLDivElement>();
   const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
   const tone = item
     ? REWARD_TILE_TONE[item.rarity]
@@ -1060,7 +1065,7 @@ export const RewardTile = memo(function RewardTile({
         <div className="relative flex items-center justify-center w-full h-full">
           <Fly size={compact ? 30 : 22} y={-1} />
         </div>
-      ) : item?.slot === 'container' && visible ? (
+      ) : item?.slot === 'container' && hasHydrated ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           <div
             className={cn(
@@ -1072,7 +1077,7 @@ export const RewardTile = memo(function RewardTile({
             <GiftRive className="w-full h-full" color={item.riveIndex} />
           </div>
         </div>
-      ) : previewIndices && visible ? (
+      ) : previewIndices && hasHydrated ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           <Frog
             className={cn(
