@@ -367,7 +367,7 @@ export function TradePanel({
           )}
         </div>
 
-        <div className="px-4 pb-96 lg:pb-6 lg:px-6">
+        <div className="px-4 pb-52 lg:pb-6 lg:px-6">
           {availableItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 md:h-64 text-sm border-2 border-dashed text-muted-foreground border-border rounded-xl bg-muted/30">
               <p>Your wardrobe is empty (or filtered out).</p>

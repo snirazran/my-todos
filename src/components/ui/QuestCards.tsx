@@ -710,6 +710,7 @@ function ObjectiveRow({
                 rewardCatalog={rewardCatalog}
                 isPremium={isPremium ?? false}
                 compact
+                paused
                 className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
                 hydrateDelayMs={150 + index * 55}
                 onClick={() => onOpenRewards?.(block.rewards ?? [])}
@@ -1028,6 +1029,7 @@ export const RewardTile = memo(function RewardTile({
   className,
   onClick,
   hydrateDelayMs = 0,
+  paused = false,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -1036,6 +1038,7 @@ export const RewardTile = memo(function RewardTile({
   className?: string;
   onClick?: () => void;
   hydrateDelayMs?: number;
+  paused?: boolean;
 }) {
   const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
     hydrateDelayMs,
@@ -1084,7 +1087,7 @@ export const RewardTile = memo(function RewardTile({
     >
       {reward.type === 'FLIES' ? (
         <div className="relative flex items-center justify-center w-full h-full">
-          <Fly size={compact ? 30 : 22} y={-1} />
+          <Fly size={compact ? 30 : 22} y={-1} paused={paused} />
         </div>
       ) : item?.slot === 'container' && hasHydrated ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
@@ -1095,7 +1098,7 @@ export const RewardTile = memo(function RewardTile({
                 : 'h-[120%] w-[120%]',
             )}
           >
-            <GiftRive className="w-full h-full" color={item.riveIndex} />
+            <GiftRive className="w-full h-full" color={item.riveIndex} paused={paused} />
           </div>
         </div>
       ) : previewIndices && hasHydrated ? (
@@ -1110,6 +1113,7 @@ export const RewardTile = memo(function RewardTile({
             indices={previewIndices}
             width={compact ? 96 : 64}
             height={compact ? 96 : 64}
+            paused={paused}
           />
         </div>
       ) : item || reward.type === 'BOX' ? (
