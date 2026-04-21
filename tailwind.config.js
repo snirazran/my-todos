@@ -29,11 +29,16 @@ module.exports = {
           '0%': { backgroundPosition: '200% 0' },
           '100%': { backgroundPosition: '-200% 0' },
         },
+        shine: {
+          '0%': { transform: 'translateX(-140%) skewX(-18deg)' },
+          '100%': { transform: 'translateX(260%) skewX(-18deg)' },
+        },
       },
       animation: {
         float: 'float 3s ease-in-out infinite',
         'logo-line': 'logo-line 3s ease-in-out infinite',
         shimmer: 'shimmer 2s linear infinite',
+        shine: 'shine 1.35s ease-in-out infinite',
       },
       colors: {
         // every key here becomes a colour-utility name

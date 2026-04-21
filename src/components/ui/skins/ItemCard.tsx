@@ -3,17 +3,7 @@
 import React, { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import {
-  Check,
-  Crown,
-  Gift,
-  Hand,
-  Info,
-  Loader2,
-  Shirt,
-  Sparkles,
-  X,
-} from 'lucide-react';
+import { Check, Info, Loader2, X } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
@@ -140,6 +130,9 @@ function ItemCardComponent({
   const cardRef = useRef<HTMLDivElement>(null);
   const [nearViewport, setNearViewport] = useState(false);
   const [previewReady, setPreviewReady] = useState(!deferPreview);
+  const [previewMounted, setPreviewMounted] = useState(!deferPreview);
+  const shouldShowPlaceholder =
+    staticPreview || (deferPreview && (!previewMounted || !previewReady));
 
   useEffect(() => {
     const el = cardRef.current;
@@ -164,12 +157,16 @@ function ItemCardComponent({
     const timer = window.setTimeout(() => {
       if ('requestIdleCallback' in window) {
         const idleId = window.requestIdleCallback(
-          () => setPreviewReady(true),
+          () => {
+            setPreviewMounted(true);
+            setPreviewReady(true);
+          },
           { timeout: 500 },
         );
         cancelIdleLoad = () => window.cancelIdleCallback(idleId);
         return;
       }
+      setPreviewMounted(true);
       setPreviewReady(true);
     }, previewDelayMs);
 
@@ -178,6 +175,17 @@ function ItemCardComponent({
       cancelIdleLoad?.();
     };
   }, [deferPreview, nearViewport, previewDelayMs, previewReady]);
+
+  useEffect(() => {
+    if (!deferPreview || !previewReady || nearViewport) return;
+
+    const timer = window.setTimeout(() => {
+      setPreviewMounted(false);
+      setPreviewReady(false);
+    }, 2400);
+
+    return () => window.clearTimeout(timer);
+  }, [deferPreview, nearViewport, previewReady]);
 
   const previewIndices = useMemo(
     () => ({
@@ -283,8 +291,11 @@ function ItemCardComponent({
         <div className="absolute inset-0 z-10 flex items-end justify-center">
           {customPreview ? (
             customPreview
-          ) : staticPreview || (deferPreview && !previewReady) ? (
-            <LightweightItemPreview item={item} toneClassName={config.text} />
+          ) : shouldShowPlaceholder ? (
+            <LightweightItemPreview
+              item={item}
+              toneClassName={config.text}
+            />
           ) : item.slot === 'container' ? (
             <div
               className={cn(
@@ -448,22 +459,26 @@ function LightweightItemPreview({
   item: ItemDef;
   toneClassName: string;
 }) {
-  const Icon =
-    item.slot === 'container'
-      ? Gift
-      : item.slot === 'hat'
-        ? Crown
-        : item.slot === 'body'
-          ? Shirt
-          : item.slot === 'hand_item'
-            ? Hand
-            : Sparkles;
-
   return (
-    <div className="flex h-full w-full items-center justify-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/30 bg-white/35 shadow-inner dark:bg-black/15 md:h-20 md:w-20">
-        <Icon className={cn('h-9 w-9 md:h-11 md:w-11', toneClassName)} />
-      </div>
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
+      <PreviewSkeleton toneClassName={toneClassName} />
+    </div>
+  );
+}
+
+function PreviewSkeleton({
+  toneClassName,
+}: {
+  toneClassName: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'absolute inset-0 overflow-hidden rounded-xl',
+        toneClassName,
+      )}
+    >
+      <div className="absolute inset-y-[-24%] left-0 w-1/3 bg-gradient-to-r from-transparent via-white/65 to-transparent opacity-90 animate-shine dark:via-white/18 dark:opacity-100" />
     </div>
   );
 }
