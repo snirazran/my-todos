@@ -68,11 +68,20 @@ export function WardrobePanel({
   } | null>(null);
   const [shakeBalance, setShakeBalance] = useState(false);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
+  const [isWideGrid, setIsWideGrid] = useState(false);
 
   // --- Sell Dialog Logic ---
   const [itemToSell, setItemToSell] = useState<ItemDef | null>(null);
 
   const overscrollDrag = useSheetOverscrollDrag();
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 768px)');
+    const update = () => setIsWideGrid(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
 
   const unseenInventorySet = useMemo(
     () => new Set(data?.wardrobe?.unseenItems ?? []),
@@ -336,14 +345,16 @@ export function WardrobePanel({
     return getFilteredItems(data.catalog);
   }, [data, activeFilter, sortBy]);
 
+  const gridBatchSize = isWideGrid ? 15 : 6;
+
   const inventoryGrid = useInfiniteScroll(inventoryItems, {
-    initial: 18,
-    batch: 18,
+    initial: gridBatchSize,
+    batch: gridBatchSize,
     resetKey: `inv|${activeFilter}|${sortBy}`,
   });
   const shopGrid = useInfiniteScroll(shopItems, {
-    initial: 18,
-    batch: 18,
+    initial: gridBatchSize,
+    batch: gridBatchSize,
     resetKey: `shop|${activeFilter}|${sortBy}`,
   });
 
