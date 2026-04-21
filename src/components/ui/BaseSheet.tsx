@@ -17,7 +17,16 @@ export interface BaseSheetProps {
   zIndex?: number;
 }
 
-const transition = { type: 'tween' as const, duration: 0.22, ease: 'easeOut' as const };
+const desktopTransition = {
+  type: 'tween' as const,
+  duration: 0.2,
+  ease: 'easeOut' as const,
+};
+const mobileTransition = {
+  type: 'tween' as const,
+  duration: 0.16,
+  ease: 'easeOut' as const,
+};
 
 export function BaseSheet({
   open,
@@ -61,7 +70,7 @@ export function BaseSheet({
             exit={{ opacity: 0 }}
             onClick={() => onOpenChange(false)}
             className={cn(
-              'fixed inset-0 bg-background/70 backdrop-blur-md',
+              'fixed inset-0 bg-background/55 sm:bg-background/70 sm:backdrop-blur-md',
               backdropClassName,
             )}
             style={{ zIndex }}
@@ -80,7 +89,7 @@ export function BaseSheet({
               exit={
                 isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%' }
               }
-              transition={transition}
+              transition={isDesktop ? desktopTransition : mobileTransition}
               drag={!isDesktop ? 'y' : false}
               dragControls={dragControls}
               dragListener={false}
@@ -91,7 +100,7 @@ export function BaseSheet({
                 if (offset.y > 150 || velocity.y > 500) onOpenChange(false);
               }}
               className={cn(
-                'pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[32px] border border-border/50 bg-card text-card-foreground shadow-2xl sm:rounded-[34px]',
+                'pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[24px] border border-border/50 bg-card text-card-foreground shadow-lg will-change-transform sm:rounded-[34px] sm:shadow-2xl',
                 className,
               )}
             >

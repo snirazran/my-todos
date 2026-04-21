@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Clock, Gift, Plus, Trophy, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -196,6 +196,25 @@ function useTimeLeft() {
     return () => clearInterval(id);
   }, []);
   return label;
+}
+
+function useElementInView<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(entry.isIntersecting),
+      { rootMargin: '80px', threshold: [0, 0.01] },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return { ref, visible };
 }
 
 function formatCountdown(diffMs: number) {
@@ -979,7 +998,7 @@ function QuestRewardDetailCard({
   );
 }
 
-export function RewardTile({
+export const RewardTile = memo(function RewardTile({
   reward,
   rewardCatalog,
   isPremium,
@@ -994,6 +1013,7 @@ export function RewardTile({
   className?: string;
   onClick?: () => void;
 }) {
+  const { ref, visible } = useElementInView<HTMLDivElement>();
   const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
   const tone = item
     ? REWARD_TILE_TONE[item.rarity]
@@ -1013,6 +1033,7 @@ export function RewardTile({
 
   return (
     <div
+      ref={ref}
       className={cn(
         'group relative flex items-center justify-center overflow-visible border-2 shadow-sm',
         tone.border,
@@ -1039,7 +1060,7 @@ export function RewardTile({
         <div className="relative flex items-center justify-center w-full h-full">
           <Fly size={compact ? 30 : 22} y={-1} />
         </div>
-      ) : item?.slot === 'container' ? (
+      ) : item?.slot === 'container' && visible ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           <div
             className={cn(
@@ -1051,7 +1072,7 @@ export function RewardTile({
             <GiftRive className="w-full h-full" color={item.riveIndex} />
           </div>
         </div>
-      ) : previewIndices ? (
+      ) : previewIndices && visible ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           <Frog
             className={cn(
@@ -1100,7 +1121,7 @@ export function RewardTile({
       </div>
     </div>
   );
-}
+});
 
 function rewardLabel(
   reward: QuestReward,

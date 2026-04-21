@@ -113,6 +113,7 @@ export function TradePanel({
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
+  const [gridInitialSize, setGridInitialSize] = useState(4);
   const [gridBatchSize, setGridBatchSize] = useState(6);
   const inventoryScrollRef = useRef<HTMLDivElement | null>(null);
 
@@ -133,7 +134,10 @@ export function TradePanel({
 
   useEffect(() => {
     const query = window.matchMedia('(min-width: 768px)');
-    const update = () => setGridBatchSize(query.matches ? 10 : 6);
+    const update = () => {
+      setGridInitialSize(query.matches ? 10 : 4);
+      setGridBatchSize(query.matches ? 10 : 6);
+    };
     update();
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
@@ -180,12 +184,46 @@ export function TradePanel({
   }, [inventory, catalog, targetRarity, activeFilter, sortBy]);
 
   const availableGrid = useInfiniteScroll(availableItems, {
-    initial: gridBatchSize,
+    initial: gridInitialSize,
     batch: gridBatchSize,
-    resetKey: `${activeFilter}|${sortBy}|${targetRarity ?? ''}|${gridBatchSize}`,
+    resetKey: `${activeFilter}|${sortBy}|${targetRarity ?? ''}|${gridInitialSize}|${gridBatchSize}`,
     rootRef: inventoryScrollRef,
     enabled: inventoryHasScrolled,
   });
+
+  useEffect(() => {
+    if (gridInitialSize >= gridBatchSize || !availableGrid.hasMore) return;
+
+    let cancelIdleLoad: (() => void) | undefined;
+    const loadTimer = window.setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        const idleId = window.requestIdleCallback(
+          () => availableGrid.loadMore(),
+          { timeout: 700 },
+        );
+        cancelIdleLoad = () => window.cancelIdleCallback(idleId);
+      } else {
+        const fallbackTimer = globalThis.setTimeout(
+          availableGrid.loadMore,
+          0,
+        );
+        cancelIdleLoad = () => globalThis.clearTimeout(fallbackTimer);
+      }
+    }, 900);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+      cancelIdleLoad?.();
+    };
+  }, [
+    activeFilter,
+    availableGrid.hasMore,
+    availableGrid.loadMore,
+    gridBatchSize,
+    gridInitialSize,
+    sortBy,
+    targetRarity,
+  ]);
 
   const isNearScrollEnd = (node: HTMLElement) =>
     node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
@@ -337,7 +375,7 @@ export function TradePanel({
           ) : (
             <>
               <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-3 gap-3 md:gap-4 pb-4">
-                {availableGrid.visibleItems.map((item) => {
+                {availableGrid.visibleItems.map((item, index) => {
                   const owned = inventory[item.id] || 0;
                   const selected = selectedCounts[item.id] || 0;
                   const remaining = owned - selected;
@@ -356,6 +394,8 @@ export function TradePanel({
                         onAction={() => handleSelect(item)}
                         actionLabel={null}
                         isNew={unseenItems.includes(item.id)}
+                        deferPreview
+                        previewDelayMs={220 + index * 80}
                       />
                     </div>
                   );

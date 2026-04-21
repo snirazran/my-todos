@@ -1,9 +1,19 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Check, Lock, Loader2, CircleDollarSign, X, Info } from 'lucide-react';
+import {
+  Check,
+  Crown,
+  Gift,
+  Hand,
+  Info,
+  Loader2,
+  Shirt,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
@@ -83,7 +93,7 @@ const RARITY_CONFIG: Record<
 
 const MotionButton = motion(Button);
 
-export function ItemCard({
+function ItemCardComponent({
   item,
   ownedCount,
   isEquipped,
@@ -99,6 +109,9 @@ export function ItemCard({
   customPreview,
   hidePrice,
   hideRarity,
+  staticPreview = false,
+  deferPreview = false,
+  previewDelayMs = 0,
 }: {
   item: ItemDef;
   ownedCount: number;
@@ -115,37 +128,65 @@ export function ItemCard({
   customPreview?: React.ReactNode;
   hidePrice?: boolean;
   hideRarity?: boolean;
+  staticPreview?: boolean;
+  deferPreview?: boolean;
+  previewDelayMs?: number;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
   const [shake, setShake] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [nearViewport, setNearViewport] = useState(false);
+  const [previewReady, setPreviewReady] = useState(!deferPreview);
 
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '50px' },
+      ([entry]) => setNearViewport(entry.isIntersecting),
+      { rootMargin: '520px', threshold: [0, 0.01] },
     );
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
-  const previewIndices = {
-    skin: 0,
-    mood: 0,
-    hat: 0,
-    body: 0,
-    hand_item: 0,
-    [item.slot]: item.riveIndex,
-  };
+  useEffect(() => {
+    if (!deferPreview) {
+      setPreviewReady(true);
+      return;
+    }
+
+    if (!nearViewport || previewReady) return;
+
+    let cancelIdleLoad: (() => void) | undefined;
+    const timer = window.setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        const idleId = window.requestIdleCallback(
+          () => setPreviewReady(true),
+          { timeout: 500 },
+        );
+        cancelIdleLoad = () => window.cancelIdleCallback(idleId);
+        return;
+      }
+      setPreviewReady(true);
+    }, previewDelayMs);
+
+    return () => {
+      window.clearTimeout(timer);
+      cancelIdleLoad?.();
+    };
+  }, [deferPreview, nearViewport, previewDelayMs, previewReady]);
+
+  const previewIndices = useMemo(
+    () => ({
+      skin: item.slot === 'skin' ? item.riveIndex : 0,
+      mood: 0,
+      hat: item.slot === 'hat' ? item.riveIndex : 0,
+      body: item.slot === 'body' ? item.riveIndex : 0,
+      hand_item: item.slot === 'hand_item' ? item.riveIndex : 0,
+    }),
+    [item.riveIndex, item.slot],
+  );
 
   const handleAction = (e?: React.MouseEvent) => {
     if (mode === 'shop' && !canAfford) {
@@ -240,7 +281,9 @@ export function ItemCard({
         <div className="absolute inset-0 z-10 flex items-end justify-center">
           {customPreview ? (
             customPreview
-          ) : !visible ? null : item.slot === 'container' ? (
+          ) : staticPreview || (deferPreview && !previewReady) ? (
+            <LightweightItemPreview item={item} toneClassName={config.text} />
+          ) : item.slot === 'container' ? (
             <div className="w-[110%] h-[110%] -translate-y-1 drop-shadow-xl">
               <GiftRive color={item.riveIndex} />
             </div>
@@ -383,6 +426,35 @@ export function ItemCard({
         )}
       </div>
     </motion.div>
+  );
+}
+
+export const ItemCard = memo(ItemCardComponent);
+
+function LightweightItemPreview({
+  item,
+  toneClassName,
+}: {
+  item: ItemDef;
+  toneClassName: string;
+}) {
+  const Icon =
+    item.slot === 'container'
+      ? Gift
+      : item.slot === 'hat'
+        ? Crown
+        : item.slot === 'body'
+          ? Shirt
+          : item.slot === 'hand_item'
+            ? Hand
+            : Sparkles;
+
+  return (
+    <div className="flex h-full w-full items-center justify-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-white/30 bg-white/35 shadow-inner dark:bg-black/15 md:h-20 md:w-20">
+        <Icon className={cn('h-9 w-9 md:h-11 md:w-11', toneClassName)} />
+      </div>
+    </div>
   );
 }
 

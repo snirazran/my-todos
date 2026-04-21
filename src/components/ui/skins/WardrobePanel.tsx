@@ -70,6 +70,7 @@ export function WardrobePanel({
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
   const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
   const [shopHasScrolled, setShopHasScrolled] = useState(false);
+  const [gridInitialSize, setGridInitialSize] = useState(4);
   const [gridBatchSize, setGridBatchSize] = useState(6);
 
   // --- Sell Dialog Logic ---
@@ -91,7 +92,10 @@ export function WardrobePanel({
 
   useEffect(() => {
     const query = window.matchMedia('(min-width: 768px)');
-    const update = () => setGridBatchSize(query.matches ? 10 : 6);
+    const update = () => {
+      setGridInitialSize(query.matches ? 10 : 4);
+      setGridBatchSize(query.matches ? 10 : 6);
+    };
     update();
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
@@ -355,19 +359,62 @@ export function WardrobePanel({
   }, [data, activeFilter, sortBy]);
 
   const inventoryGrid = useInfiniteScroll(inventoryItems, {
-    initial: gridBatchSize,
+    initial: gridInitialSize,
     batch: gridBatchSize,
-    resetKey: `inv|${activeFilter}|${sortBy}|${gridBatchSize}|${open ? 'open' : 'closed'}`,
+    resetKey: `inv|${activeFilter}|${sortBy}|${gridInitialSize}|${gridBatchSize}|${open ? 'open' : 'closed'}`,
     rootRef: inventoryScrollRef,
     enabled: inventoryHasScrolled,
   });
   const shopGrid = useInfiniteScroll(shopItems, {
-    initial: gridBatchSize,
+    initial: gridInitialSize,
     batch: gridBatchSize,
-    resetKey: `shop|${activeFilter}|${sortBy}|${gridBatchSize}|${open ? 'open' : 'closed'}`,
+    resetKey: `shop|${activeFilter}|${sortBy}|${gridInitialSize}|${gridBatchSize}|${open ? 'open' : 'closed'}`,
     rootRef: shopScrollRef,
     enabled: shopHasScrolled,
   });
+
+  useEffect(() => {
+    if (!open || gridInitialSize >= gridBatchSize) return;
+
+    let cancelIdleLoad: (() => void) | undefined;
+    const loadTimer = window.setTimeout(() => {
+      const loadMore =
+        activeTab === 'inventory'
+          ? inventoryGrid.hasMore
+            ? inventoryGrid.loadMore
+            : null
+          : activeTab === 'shop' && shopGrid.hasMore
+            ? shopGrid.loadMore
+            : null;
+      if (!loadMore) return;
+
+      if ('requestIdleCallback' in window) {
+        const idleId = window.requestIdleCallback(() => loadMore(), {
+          timeout: 700,
+        });
+        cancelIdleLoad = () => window.cancelIdleCallback(idleId);
+      } else {
+        const fallbackTimer = globalThis.setTimeout(loadMore, 0);
+        cancelIdleLoad = () => globalThis.clearTimeout(fallbackTimer);
+      }
+    }, 900);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+      cancelIdleLoad?.();
+    };
+  }, [
+    activeFilter,
+    activeTab,
+    gridBatchSize,
+    gridInitialSize,
+    inventoryGrid.hasMore,
+    inventoryGrid.loadMore,
+    open,
+    shopGrid.hasMore,
+    shopGrid.loadMore,
+    sortBy,
+  ]);
 
   const isNearScrollEnd = (node: HTMLElement) =>
     node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
@@ -580,7 +627,7 @@ export function WardrobePanel({
                       ) : activeTab === 'inventory' ? (
                         <>
                           <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                            {inventoryGrid.visibleItems.map((item) => (
+                            {inventoryGrid.visibleItems.map((item, index) => (
                               <ItemCard
                                 key={item.id}
                                 item={item}
@@ -600,6 +647,8 @@ export function WardrobePanel({
                                 }}
                                 actionLabel={null}
                                 isNew={unseenInventorySet.has(item.id)}
+                                deferPreview
+                                previewDelayMs={220 + index * 80}
                               />
                             ))}
                           </div>
@@ -648,7 +697,7 @@ export function WardrobePanel({
                       ) : activeTab === 'shop' ? (
                         <>
                           <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                            {shopGrid.visibleItems.map((item) => {
+                            {shopGrid.visibleItems.map((item, index) => {
                               const count =
                                 data?.wardrobe?.inventory?.[item.id] ?? 0;
                               return (
@@ -669,6 +718,8 @@ export function WardrobePanel({
                                       : undefined
                                   }
                                   onAction={(e) => handleBuyItem(item, e)}
+                                  deferPreview
+                                  previewDelayMs={220 + index * 80}
                                 />
                               );
                             })}
