@@ -371,7 +371,7 @@ export function DailyQuestPresentationCard({
               isPremium={isPremium}
               compact
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
-              hydrateDelayMs={70 + index * 35}
+              hydrateDelayMs={150 + index * 55}
               onClick={() =>
                 setRewardPopup({
                   eyebrow: 'Quest',
@@ -514,7 +514,7 @@ export function CategoryQuestPresentationCard({
               isPremium={isPremium}
               compact
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
-              hydrateDelayMs={70 + index * 35}
+              hydrateDelayMs={150 + index * 55}
               onClick={() =>
                 setRewardPopup({
                   eyebrow: 'Quest',
@@ -711,7 +711,7 @@ function ObjectiveRow({
                 isPremium={isPremium ?? false}
                 compact
                 className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
-                hydrateDelayMs={70 + index * 35}
+                hydrateDelayMs={150 + index * 55}
                 onClick={() => onOpenRewards?.(block.rewards ?? [])}
               />
             ))}
@@ -1147,7 +1147,7 @@ export const RewardTile = memo(function RewardTile({
 function RewardTileGloss() {
   return (
     <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
-      <div className="absolute inset-y-[-24%] left-0 w-1/3 bg-gradient-to-r from-transparent via-white/65 to-transparent opacity-90 animate-shine dark:via-white/18 dark:opacity-100" />
+      <div className="absolute inset-y-[-24%] left-0 w-1/3 bg-gradient-to-r from-transparent via-white/65 to-transparent opacity-90 animate-shine dark:via-current dark:opacity-20" />
     </div>
   );
 }

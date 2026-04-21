@@ -648,7 +648,7 @@ export function WardrobePanel({
                                 actionLabel={null}
                                 isNew={unseenInventorySet.has(item.id)}
                                 deferPreview
-                                previewDelayMs={70 + index * 35}
+                                previewDelayMs={150 + index * 55}
                               />
                             ))}
                           </div>
@@ -719,7 +719,7 @@ export function WardrobePanel({
                                   }
                                   onAction={(e) => handleBuyItem(item, e)}
                                   deferPreview
-                                  previewDelayMs={70 + index * 35}
+                                  previewDelayMs={150 + index * 55}
                                 />
                               );
                             })}

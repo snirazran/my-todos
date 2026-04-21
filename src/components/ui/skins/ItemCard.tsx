@@ -264,8 +264,6 @@ function ItemCardComponent({
           config.gradient,
         )}
       >
-        <div className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine" />
-
         {/* NEW Badge (Moved) */}
         {isNew && (
           <div className="absolute top-0 left-0 z-50 px-2 py-1 text-[9px] font-black text-white bg-red-500 rounded-br-xl shadow-sm animate-pulse">
@@ -463,7 +461,7 @@ function PreviewSkeleton({
         toneClassName,
       )}
     >
-      <div className="absolute inset-y-[-24%] left-0 w-1/3 bg-gradient-to-r from-transparent via-white/65 to-transparent opacity-90 animate-shine dark:via-white/18 dark:opacity-100" />
+      <div className="absolute inset-y-[-24%] left-0 w-1/3 bg-gradient-to-r from-transparent via-white/65 to-transparent opacity-90 animate-shine dark:via-current dark:opacity-20" />
     </div>
   );
 }
