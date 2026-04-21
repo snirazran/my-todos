@@ -198,7 +198,10 @@ function useTimeLeft() {
   return label;
 }
 
-function useElementNearViewport<T extends HTMLElement>(rootMargin = '360px') {
+function useDelayedHydration<T extends HTMLElement>(
+  delayMs = 0,
+  rootMargin = '360px',
+) {
   const ref = useRef<T | null>(null);
   const [nearViewport, setNearViewport] = useState(false);
   const [hasHydrated, setHasHydrated] = useState(false);
@@ -211,7 +214,6 @@ function useElementNearViewport<T extends HTMLElement>(rootMargin = '360px') {
       ([entry]) => {
         const isNear = entry.isIntersecting;
         setNearViewport(isNear);
-        if (isNear) setHasHydrated(true);
       },
       { rootMargin, threshold: [0, 0.01] },
     );
@@ -219,7 +221,19 @@ function useElementNearViewport<T extends HTMLElement>(rootMargin = '360px') {
     return () => observer.disconnect();
   }, [rootMargin]);
 
-  return { ref, nearViewport, hasHydrated };
+  useEffect(() => {
+    if (!nearViewport || hasHydrated) return;
+    const timer = window.setTimeout(() => setHasHydrated(true), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [delayMs, hasHydrated, nearViewport]);
+
+  useEffect(() => {
+    if (!hasHydrated || nearViewport) return;
+    const timer = window.setTimeout(() => setHasHydrated(false), 2400);
+    return () => window.clearTimeout(timer);
+  }, [hasHydrated, nearViewport]);
+
+  return { ref, hasHydrated };
 }
 
 function formatCountdown(diffMs: number) {
@@ -357,6 +371,7 @@ export function DailyQuestPresentationCard({
               isPremium={isPremium}
               compact
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
+              hydrateDelayMs={70 + index * 35}
               onClick={() =>
                 setRewardPopup({
                   eyebrow: 'Quest',
@@ -499,6 +514,7 @@ export function CategoryQuestPresentationCard({
               isPremium={isPremium}
               compact
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
+              hydrateDelayMs={70 + index * 35}
               onClick={() =>
                 setRewardPopup({
                   eyebrow: 'Quest',
@@ -695,6 +711,7 @@ function ObjectiveRow({
                 isPremium={isPremium ?? false}
                 compact
                 className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
+                hydrateDelayMs={70 + index * 35}
                 onClick={() => onOpenRewards?.(block.rewards ?? [])}
               />
             ))}
@@ -1010,6 +1027,7 @@ export const RewardTile = memo(function RewardTile({
   compact = false,
   className,
   onClick,
+  hydrateDelayMs = 0,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -1017,8 +1035,11 @@ export const RewardTile = memo(function RewardTile({
   compact?: boolean;
   className?: string;
   onClick?: () => void;
+  hydrateDelayMs?: number;
 }) {
-  const { ref, hasHydrated } = useElementNearViewport<HTMLDivElement>();
+  const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
+    hydrateDelayMs,
+  );
   const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
   const tone = item
     ? REWARD_TILE_TONE[item.rarity]
@@ -1091,13 +1112,8 @@ export const RewardTile = memo(function RewardTile({
             height={compact ? 96 : 64}
           />
         </div>
-      ) : reward.type === 'BOX' ? (
-        <Gift
-          className={cn(
-            'relative text-primary',
-            compact ? 'h-5 w-5' : 'h-4 w-4',
-          )}
-        />
+      ) : item || reward.type === 'BOX' ? (
+        <RewardTileGloss />
       ) : (
         <Trophy
           className={cn(
@@ -1127,6 +1143,14 @@ export const RewardTile = memo(function RewardTile({
     </div>
   );
 });
+
+function RewardTileGloss() {
+  return (
+    <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
+      <div className="absolute inset-y-[-24%] left-0 w-1/3 bg-gradient-to-r from-transparent via-white/65 to-transparent opacity-90 animate-shine dark:via-white/18 dark:opacity-100" />
+    </div>
+  );
+}
 
 function rewardLabel(
   reward: QuestReward,

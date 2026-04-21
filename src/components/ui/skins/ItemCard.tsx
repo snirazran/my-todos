@@ -153,27 +153,12 @@ function ItemCardComponent({
 
     if (!nearViewport || previewReady) return;
 
-    let cancelIdleLoad: (() => void) | undefined;
     const timer = window.setTimeout(() => {
-      if ('requestIdleCallback' in window) {
-        const idleId = window.requestIdleCallback(
-          () => {
-            setPreviewMounted(true);
-            setPreviewReady(true);
-          },
-          { timeout: 500 },
-        );
-        cancelIdleLoad = () => window.cancelIdleCallback(idleId);
-        return;
-      }
       setPreviewMounted(true);
       setPreviewReady(true);
     }, previewDelayMs);
 
-    return () => {
-      window.clearTimeout(timer);
-      cancelIdleLoad?.();
-    };
+    return () => window.clearTimeout(timer);
   }, [deferPreview, nearViewport, previewDelayMs, previewReady]);
 
   useEffect(() => {
