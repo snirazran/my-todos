@@ -52,7 +52,7 @@ export default function DayDetailSheet({
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
 
   // Split tasks by type
@@ -255,7 +255,7 @@ export default function DayDetailSheet({
       >
         {({ isDesktop, dragControls, isDragging }) => {
           overscrollDrag.setContext(dragControls, !isDesktop);
-          const isAnyPanelOpen = wardrobeOpen || cinematic || isDragging || isQuestsOpen;
+          const isAnyPanelOpen = wardrobeOpen || isDragging || isQuestsOpen;
 
           return (
             <div ref={sheetRef} className="flex flex-col h-full relative">
