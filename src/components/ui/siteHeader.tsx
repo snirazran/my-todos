@@ -12,7 +12,6 @@ import {
   Sparkles,
   LogIn,
   LogOut,
-  Timer,
   Compass,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -46,12 +45,6 @@ export default function SiteHeader() {
       href: '/analytics',
       label: 'Analytics',
       icon: History,
-      protected: true,
-    },
-    {
-      href: '/timer',
-      label: 'Timer',
-      icon: Timer,
       protected: true,
     },
     {

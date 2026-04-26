@@ -22,6 +22,8 @@ import { type FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
+import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
+import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -71,6 +73,7 @@ export default function Home() {
     closeQuestOnboarding,
     isWardrobeOpen,
     setWardrobeOpen,
+    setIsCinematicActive,
   } = useUIStore();
 
   // -- NEW STATE HOOK --
@@ -106,6 +109,8 @@ export default function Home() {
   const [quickText, setQuickText] = useState('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>('pick');
+  const [timerTask, setTimerTask] = useState<Task | null>(null);
+  const [showTimer, setShowTimer] = useState(false);
 
   /* State */
   const [activeTab, setActiveTab] = useState<HomeTab>('all');
@@ -136,6 +141,11 @@ export default function Home() {
     visuallyDone,
     speedUpTongue,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs, scrollContainerRef: mainScrollRef });
+
+  // Sync cinematic state with UI store
+  useEffect(() => {
+    setIsCinematicActive(cinematic);
+  }, [cinematic, setIsCinematicActive]);
 
   const { showNotification } = useNotification();
   const [showDailyReward, setShowDailyReward] = useState(false);
@@ -650,6 +660,11 @@ export default function Home() {
                           }
                           return scheduleTask(id, data);
                         }}
+                        onStartTimer={(t) => {
+                          if (!user) { router.push('/login'); return; }
+                          setTimerTask(t as Task);
+                          setShowTimer(true);
+                        }}
                         isGuest={!user}
                         tags={tags}
                         showCompleted={showCompleted}
@@ -771,6 +786,11 @@ export default function Home() {
                           return;
                         }
                         return scheduleTask(id, data);
+                      }}
+                      onStartTimer={(t) => {
+                        if (!user) { router.push('/login'); return; }
+                        setTimerTask(t as Task);
+                        setShowTimer(true);
                       }}
                       isGuest={!user}
                       tags={tags}
@@ -958,6 +978,24 @@ export default function Home() {
           }
         }}
       />
+
+      <FrogodoroSheet
+        open={showTimer}
+        onOpenChange={setShowTimer}
+        task={timerTask}
+        tags={tags}
+        onMutateToday={() => mutateToday()}
+      />
+
+      {!showTimer && (
+        <FrogodoroPill
+          onClick={() => {
+            const t = tasks.find((t) => t.id === frogTaskId);
+            if (t) setTimerTask(t);
+            setShowTimer(true);
+          }}
+        />
+      )}
 
       <HungerWarningModal
         open={!!user && hungerStatus.stolenFlies > 0 && !showDailyReward}

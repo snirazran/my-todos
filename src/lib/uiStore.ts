@@ -16,6 +16,9 @@ interface UIState {
   openQuestOnboarding: () => void;
   closeQuestOnboarding: () => void;
   setQuestOnboardingOpen: (open: boolean) => void;
+
+  isCinematicActive: boolean;
+  setIsCinematicActive: (active: boolean) => void;
 }
 
 export const useUIStore = create<UIState>((set) => ({
@@ -34,4 +37,7 @@ export const useUIStore = create<UIState>((set) => ({
   openQuestOnboarding: () => set({ isQuestOnboardingOpen: true }),
   closeQuestOnboarding: () => set({ isQuestOnboardingOpen: false }),
   setQuestOnboardingOpen: (open: boolean) => set({ isQuestOnboardingOpen: open }),
+
+  isCinematicActive: false,
+  setIsCinematicActive: (active: boolean) => set({ isCinematicActive: active }),
 }));

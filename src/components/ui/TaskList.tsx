@@ -14,6 +14,7 @@ import {
   CalendarDays,
   Clock,
   Bell,
+  Timer,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import {
@@ -104,6 +105,7 @@ interface SortableTaskItemProps {
   isGuest?: boolean;
   isGlowActive?: boolean;
   isSortDragging?: boolean;
+  onStartTimer?: (task: Task) => void;
 }
 
 const SortableTaskItem = React.forwardRef<
@@ -126,6 +128,7 @@ const SortableTaskItem = React.forwardRef<
       onDoLater,
       isGlowActive,
       isSortDragging,
+      onStartTimer,
     },
     ref,
   ) => {
@@ -279,7 +282,7 @@ const SortableTaskItem = React.forwardRef<
           );
         } else {
           // Snap back to open (Negative X)
-          animate(x, -100, { type: 'spring', stiffness: 600, damping: 28 });
+          animate(x, -148, { type: 'spring', stiffness: 600, damping: 28 });
         }
       } else {
         // Closed state
@@ -304,7 +307,7 @@ const SortableTaskItem = React.forwardRef<
           window.dispatchEvent(
             new CustomEvent('task-swipe-open', { detail: { id: task.id } }),
           );
-          animate(x, -100, { type: 'spring', stiffness: 600, damping: 28 });
+          animate(x, -148, { type: 'spring', stiffness: 600, damping: 28 });
         } else {
           // Snap back
           animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
@@ -395,9 +398,24 @@ const SortableTaskItem = React.forwardRef<
 
           {/* Swipe (Menu) Actions Layer */}
           <div
-            className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-2 transition-opacity ${!(isExitingLater || hasTriggeredExit) && (isOpen || isSwiping) ? 'opacity-100 duration-200' : isExitingLater || hasTriggeredExit ? 'opacity-0 duration-0' : 'opacity-0 duration-200 delay-200'}`}
+            className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-1.5 transition-opacity ${!(isExitingLater || hasTriggeredExit) && (isOpen || isSwiping) ? 'opacity-100 duration-200' : isExitingLater || hasTriggeredExit ? 'opacity-0 duration-0' : 'opacity-0 duration-200 delay-200'}`}
             aria-hidden={!isOpen || isExitingLater || hasTriggeredExit}
           >
+            {onStartTimer && !isDone && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  e.nativeEvent.stopImmediatePropagation();
+                  setIsOpen(false);
+                  onStartTimer(task);
+                }}
+                className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary hover:bg-primary/20 shadow-sm transition-colors"
+                title="Start Timer"
+                tabIndex={isOpen ? 0 : -1}
+              >
+                <Timer className="w-4 h-4" />
+              </button>
+            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -432,7 +450,7 @@ const SortableTaskItem = React.forwardRef<
             drag={isDesktop || isDragging || swipeBlocked ? false : 'x'} // Disable swipe if sorting/dragging
             dragListener={!isDragging && !isDragDisabled} // Also ensure disabled listener logic matches
             dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
-            dragConstraints={{ left: -100, right: 70 }}
+            dragConstraints={{ left: -148, right: 70 }}
             dragElastic={0}
             dragMomentum={false}
             onDragStart={handleDragStart}
@@ -442,7 +460,7 @@ const SortableTaskItem = React.forwardRef<
             onMouseLeave={() => isDesktop && setIsHovered(false)}
             initial={false}
             animate={{
-              x: isExitingLater ? (isDesktop ? 800 : 450) : isOpen ? -100 : 0,
+              x: isExitingLater ? (isDesktop ? 800 : 450) : isOpen ? -148 : 0,
             }}
             style={{
               x: x,
@@ -698,6 +716,7 @@ export default function TaskList({
   onToggleRepeat,
   onEditTask,
   onScheduleTask,
+  onStartTimer,
   pendingToToday,
   tags,
   showCompleted,
@@ -726,6 +745,7 @@ export default function TaskList({
   onToggleRepeat?: (taskId: string) => Promise<void> | void;
   onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
   onScheduleTask?: (taskId: string, data: { startTime: string; endTime: string; reminder: string }) => Promise<void> | void;
+  onStartTimer?: (task: { id: string; text: string; completed: boolean; tags?: string[]; frogodoroSession?: Task['frogodoroSession']; frogodoroSettings?: Record<string, unknown> }) => void;
   pendingToToday?: number;
   tags?: { id: string; name: string; color: string }[];
   showCompleted: boolean;
@@ -1259,6 +1279,7 @@ export default function TaskList({
                                   }
                                 : undefined
                             }
+                            onStartTimer={onStartTimer ? (t) => onStartTimer(t) : undefined}
                           />
                         );
                       })}

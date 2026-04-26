@@ -17,6 +17,7 @@ interface NotificationContextType {
     undoAction?: () => void | Promise<void>,
   ) => void;
   hideNotification: () => void;
+  isVisible: boolean;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
@@ -132,7 +133,7 @@ export function NotificationProvider({
 
   return (
     <NotificationContext.Provider
-      value={{ showNotification, hideNotification }}
+      value={{ showNotification, hideNotification, isVisible: !!notification }}
     >
       {children}
       <AnimatePresence>
