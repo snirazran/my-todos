@@ -1,5 +1,5 @@
 import { useEffect, type RefObject, useId } from 'react';
-import { type Rive } from '@rive-app/react-canvas-lite';
+import { type Rive, EventType } from '@rive-app/react-canvas-lite';
 import { useRiveStatsStore } from '@/lib/riveStatsStore';
 import { useUIStore } from '@/lib/uiStore';
 
@@ -50,9 +50,9 @@ export function useRiveVisibility(
 
     if (isDebugMode) {
       updateStatus();
-      rive.on('play', updateStatus);
-      rive.on('pause', updateStatus);
-      rive.on('stop', updateStatus);
+      rive.on(EventType.Play, updateStatus);
+      rive.on(EventType.Pause, updateStatus);
+      rive.on(EventType.Stop, updateStatus);
     }
 
     let observer: IntersectionObserver | null = null;
@@ -82,9 +82,9 @@ export function useRiveVisibility(
       if (observer) observer.disconnect();
       if (rafId) cancelAnimationFrame(rafId);
       if (isDebugMode) {
-        rive.off('play', updateStatus);
-        rive.off('pause', updateStatus);
-        rive.off('stop', updateStatus);
+        rive.off(EventType.Play, updateStatus);
+        rive.off(EventType.Pause, updateStatus);
+        rive.off(EventType.Stop, updateStatus);
       }
     };
   }, [rive, ref, enabled, fullId, updateInstance, isDebugMode]);
