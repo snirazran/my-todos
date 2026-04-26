@@ -12,6 +12,7 @@
     "sync": "npx cap sync"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.91.1",
     "@capacitor/android": "^8.0.2",
     "@capacitor/cli": "^8.0.2",
     "@capacitor/core": "^8.0.2",

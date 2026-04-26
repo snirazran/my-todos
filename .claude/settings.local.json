@@ -28,7 +28,8 @@
       "Bash(perl -i -pe 's/\\\\x{e2}\\\\x{80}\\\\x{98}/'\"'\"'/g; s/\\\\x{e2}\\\\x{80}\\\\x{99}/'\"'\"'/g' /Users/snirazran/Fullstack/my-todos/src/components/ui/AdminQuestManagerPage.tsx)",
       "Bash(curl:*)",
       "Bash(NODE_OPTIONS='' npx tsc --noEmit)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(pnpm add *)"
     ]
   }
 }

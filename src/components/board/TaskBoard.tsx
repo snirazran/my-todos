@@ -42,6 +42,7 @@ export default function TaskBoard({
   onScheduleTask,
   onEditTask,
   onDoLater,
+  onAcceptSuggestion,
 }: {
   titles: string[];
   week: Task[][];
@@ -79,6 +80,7 @@ export default function TaskBoard({
     newText: string,
   ) => Promise<void>;
   onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
+  onAcceptSuggestion?: (text: string) => Promise<void> | void;
 }) {
   const pathname = usePathname();
   const [habitTrayOpen, setHabitTrayOpen] = useState(false);
@@ -545,6 +547,8 @@ export default function TaskBoard({
                   onDoLater={handleDoLater}
                   onScheduleTask={onScheduleTask}
                   isAnyDragging={!!drag?.active}
+                  isToday={day === todayDisplayIndex}
+                  onAcceptSuggestion={onAcceptSuggestion}
                   filter={getFilter(day)}
                   selectedTags={getSelectedTags(day)}
                   showCompleted={getShowCompleted(day)}

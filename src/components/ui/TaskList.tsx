@@ -58,6 +58,7 @@ import TaskMenu from '../board/TaskMenu';
 import TagPopup from '@/components/ui/TagPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
+import AiSuggestions from '@/components/ui/AiSuggestions';
 
 interface Task {
   id: string;
@@ -728,6 +729,7 @@ export default function TaskList({
   isGlowActive,
   isFrozen = false,
   paused = false,
+  onAcceptSuggestion,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -759,6 +761,7 @@ export default function TaskList({
   /** When true the current sort order is frozen (prevents layout shifts during tongue animation) */
   isFrozen?: boolean;
   paused?: boolean;
+  onAcceptSuggestion?: (text: string) => Promise<void> | void;
 }) {
   const router = useRouter(); // Import might be needed if not present
   const userTags = tags || [];
@@ -1291,6 +1294,12 @@ export default function TaskList({
                     </AnimatePresence>
                   </SortableContext>
                 </div>
+
+                {onAcceptSuggestion && (
+                  <div className="mt-1.5 mb-1">
+                    <AiSuggestions onAccept={onAcceptSuggestion} />
+                  </div>
+                )}
 
                 {/* Completed Tasks Section */}
                 {showCompleted && completedTasks.length > 0 && (

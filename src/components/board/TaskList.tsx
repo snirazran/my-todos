@@ -19,6 +19,7 @@ import TagPopup from '@/components/ui/TagPopup';
 import Fly from '@/components/ui/fly';
 import { Plus, LayoutList, ListTodo, Repeat } from 'lucide-react';
 import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
+import AiSuggestions from '@/components/ui/AiSuggestions';
 
 export default React.memo(function TaskList({
   day,
@@ -38,6 +39,8 @@ export default React.memo(function TaskList({
   onEditTask,
   onDoLater,
   onScheduleTask,
+  onAcceptSuggestion,
+  isToday = false,
   filter = 'all',
   selectedTags = [],
   showCompleted = true,
@@ -91,6 +94,8 @@ export default React.memo(function TaskList({
     taskId: string,
     data: { startTime: string; endTime: string; reminder: string },
   ) => Promise<void> | void;
+  onAcceptSuggestion?: (text: string) => Promise<void> | void;
+  isToday?: boolean;
   filter?: 'all' | 'tasks' | 'habits';
   selectedTags?: string[];
   showCompleted?: boolean;
@@ -367,6 +372,11 @@ export default React.memo(function TaskList({
   return (
     <>
       {rows}
+      {isToday && onAcceptSuggestion && (
+        <div className="mt-1.5">
+          <AiSuggestions onAccept={onAcceptSuggestion} />
+        </div>
+      )}
       <TaskMenu
         menu={menu}
         onClose={() => setMenu(null)}

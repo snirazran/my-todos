@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^0.91.1
+        version: 0.91.1(zod@4.0.10)
       '@capacitor/android':
         specifier: ^8.0.2
         version: 8.0.2(@capacitor/core@8.0.2)
@@ -189,6 +192,15 @@ packages:
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
     engines: {node: '>=10'}
+
+  '@anthropic-ai/sdk@0.91.1':
+    resolution: {integrity: sha512-LAmu761tSN9r66ixvmciswUj/ZC+1Q4iAfpedTfSVLeswRwnY3n2Nb6Tsk+cLPP28aLOPWeMgIuTuCcMC6W/iw==}
+    hasBin: true
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      zod:
+        optional: true
 
   '@babel/runtime@7.28.2':
     resolution: {integrity: sha512-KHp2IflsnGywDjBWDkR9iEqiWSpc8GIi0lgTT3mOElT0PP1tG26P4tmFI2YvAdzgq9RGyoHZQEIEdZy6Ec5xCA==}
@@ -1163,19 +1175,19 @@ packages:
   '@radix-ui/rect@1.1.1':
     resolution: {integrity: sha512-HPwpGIzkl28mWyZqG52jiqDJ12waP11Pa1lGoiyUkIEuMLBP0oeK/C89esbXrxsky5we7dfd8U58nm0SgAWpVw==}
 
-  '@rive-app/canvas@2.30.4':
-    resolution: {integrity: sha512-kq8pUw6aexyEqnDG2hpw8NJiHfhaTycN6d+6Q1ogKG492NKWbcWHcVzXlcl77x0uWSEAKyKrOxzwOb+ebwUvZw==}
-
   '@rive-app/canvas-lite@2.37.2':
     resolution: {integrity: sha512-Pp8R/ZpZliwkPm684HFIKZ4N6UurcfbfFQXV74+HV2bxAutpQYsDCr0sOjEgJC/brG5aeSCVyJY3Iq7nNAkmeQ==}
 
-  '@rive-app/react-canvas@4.22.1':
-    resolution: {integrity: sha512-RJVoP60mi152u7Joh/x/DutKC4aSaMrxwR5LRrvOUZiJbJO9ZKWofyttZmHEYRw+sAhDGnvQ0eIdc2e/udkvSg==}
-    peerDependencies:
-      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0
+  '@rive-app/canvas@2.30.4':
+    resolution: {integrity: sha512-kq8pUw6aexyEqnDG2hpw8NJiHfhaTycN6d+6Q1ogKG492NKWbcWHcVzXlcl77x0uWSEAKyKrOxzwOb+ebwUvZw==}
 
   '@rive-app/react-canvas-lite@4.28.1':
     resolution: {integrity: sha512-lhaD8eIATdjXGQxUK1iKMND8jg2SNBGOF7w962sEJaLPBP9pQEu+X8dLXXJlbZbp0p8pumAfUkruub4roadIKQ==}
+    peerDependencies:
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0
+
+  '@rive-app/react-canvas@4.22.1':
+    resolution: {integrity: sha512-RJVoP60mi152u7Joh/x/DutKC4aSaMrxwR5LRrvOUZiJbJO9ZKWofyttZmHEYRw+sAhDGnvQ0eIdc2e/udkvSg==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0
 
@@ -2431,6 +2443,10 @@ packages:
   json-buffer@3.0.1:
     resolution: {integrity: sha512-4bV5BfR2mqfQTJm+V5tPPdf+ZpuhiIvTuAB5g8kcrXOZpTT/QwwVRWBywX1ozr6lEuPdbHxwaJlm9G6mI2sfSQ==}
 
+  json-schema-to-ts@3.1.1:
+    resolution: {integrity: sha512-+DWg8jCJG2TEnpy7kOm/7/AxaYoaRbjVB4LFZLySZlWn8exGs3A4OLJR966cVvU26N7X9TWxl+Jsw7dzAqKT6g==}
+    engines: {node: '>=16'}
+
   json-schema-traverse@0.4.1:
     resolution: {integrity: sha512-xbbCH5dCYU5T8LcEhhuh7HJ88HXuW3qsI3Y0zOZFKfZEHcpWiHU/Jxzk629Brsab/mMiHQti9wMP+845RPe3Vg==}
 
@@ -3393,6 +3409,9 @@ packages:
     resolution: {integrity: sha512-L0Orpi8qGpRG//Nd+H90vFB+3iHnue1zSSGmNOOCh1GLJ7rUKVwV2HvijphGQS2UmhUZewS9VgvxYIdgr+fG1A==}
     hasBin: true
 
+  ts-algebra@2.0.0:
+    resolution: {integrity: sha512-FPAhNPFMrkwz76P7cdjdmiShwMynZYN6SgOujD1urY4oNm80Ou9oMdmbR45LotcKOXoy7wSmHkRFE6Mxbrhefw==}
+
   ts-api-utils@1.4.3:
     resolution: {integrity: sha512-i3eMG77UTMD0hZhgRS562pv83RC6ukSAC2GMNWc+9dieh/+jDM5u5YG+NHX6VNDRHQcHwmsTHctP9LhbC3WxVw==}
     engines: {node: '>=16'}
@@ -3641,6 +3660,12 @@ packages:
 snapshots:
 
   '@alloc/quick-lru@5.2.0': {}
+
+  '@anthropic-ai/sdk@0.91.1(zod@4.0.10)':
+    dependencies:
+      json-schema-to-ts: 3.1.1
+    optionalDependencies:
+      zod: 4.0.10
 
   '@babel/runtime@7.28.2': {}
 
@@ -4773,18 +4798,18 @@ snapshots:
 
   '@radix-ui/rect@1.1.1': {}
 
-  '@rive-app/canvas@2.30.4': {}
-
   '@rive-app/canvas-lite@2.37.2': {}
 
-  '@rive-app/react-canvas@4.22.1(react@18.3.1)':
-    dependencies:
-      '@rive-app/canvas': 2.30.4
-      react: 18.3.1
+  '@rive-app/canvas@2.30.4': {}
 
   '@rive-app/react-canvas-lite@4.28.1(react@18.3.1)':
     dependencies:
       '@rive-app/canvas-lite': 2.37.2
+      react: 18.3.1
+
+  '@rive-app/react-canvas@4.22.1(react@18.3.1)':
+    dependencies:
+      '@rive-app/canvas': 2.30.4
       react: 18.3.1
 
   '@rtsao/scc@1.1.0': {}
@@ -6282,6 +6307,11 @@ snapshots:
 
   json-buffer@3.0.1: {}
 
+  json-schema-to-ts@3.1.1:
+    dependencies:
+      '@babel/runtime': 7.28.2
+      ts-algebra: 2.0.0
+
   json-schema-traverse@0.4.1: {}
 
   json-stable-stringify-without-jsonify@1.0.1: {}
@@ -7290,6 +7320,8 @@ snapshots:
       punycode: 2.3.1
 
   tree-kill@1.2.2: {}
+
+  ts-algebra@2.0.0: {}
 
   ts-api-utils@1.4.3(typescript@5.8.3):
     dependencies:
