@@ -22,7 +22,32 @@ type SuggestionCache = {
   suggestions: AiSuggestion[];
   generatedAt: string;
   weekStart: string;
+  focusSignature?: string;
 };
+
+function getFocusSignature(focusProfile: any) {
+  const selectedCategoryIds = (Array.isArray(focusProfile?.selectedCategoryIds)
+    ? focusProfile.selectedCategoryIds
+    : []
+  )
+    .map(String)
+    .sort();
+  const categoryTagMap = (Array.isArray(focusProfile?.categoryTagMap)
+    ? focusProfile.categoryTagMap
+    : []
+  )
+    .map((entry: any) => ({
+      categoryId: String(entry.categoryId ?? ''),
+      tagIds: (Array.isArray(entry.tagIds) ? entry.tagIds : [])
+        .map(String)
+        .sort(),
+    }))
+    .sort((a: { categoryId: string }, b: { categoryId: string }) =>
+      a.categoryId.localeCompare(b.categoryId),
+    );
+
+  return JSON.stringify({ selectedCategoryIds, categoryTagMap });
+}
 
 function getWeekStartDate(tz: string): string {
   const now = new Date();
@@ -69,11 +94,14 @@ export async function GET(req: Request) {
       return NextResponse.json({ suggestions: [], cached: false, isPremium, refreshesLeft });
     }
 
+    const focusSignature = getFocusSignature(focusProfile);
+
     // Check cache
     const cached: SuggestionCache | undefined = (user as any).aiSuggestionCache;
     if (
       cached &&
       cached.weekStart === weekStart &&
+      cached.focusSignature === focusSignature &&
       cached.generatedAt &&
       Date.now() - new Date(cached.generatedAt).getTime() < CACHE_TTL_MS
     ) {
@@ -164,6 +192,7 @@ export async function GET(req: Request) {
       suggestions,
       generatedAt: new Date().toISOString(),
       weekStart,
+      focusSignature,
     };
     await UserModel.updateOne(
       { _id: uid },

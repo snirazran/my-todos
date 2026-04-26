@@ -40,6 +40,7 @@ export default React.memo(function TaskList({
   onDoLater,
   onScheduleTask,
   onAcceptSuggestion,
+  aiSuggestionFocusCategoryIds,
   isToday = false,
   filter = 'all',
   selectedTags = [],
@@ -95,6 +96,7 @@ export default React.memo(function TaskList({
     data: { startTime: string; endTime: string; reminder: string },
   ) => Promise<void> | void;
   onAcceptSuggestion?: (text: string, tagIds?: string[]) => Promise<void> | void;
+  aiSuggestionFocusCategoryIds?: string[];
   isToday?: boolean;
   filter?: 'all' | 'tasks' | 'habits';
   selectedTags?: string[];
@@ -234,6 +236,14 @@ export default React.memo(function TaskList({
     }
     return true;
   });
+  const aiSuggestionsBlock = isToday && onAcceptSuggestion ? (
+    <div className="mt-1.5">
+      <AiSuggestions
+        onAccept={onAcceptSuggestion}
+        focusCategoryIds={aiSuggestionFocusCategoryIds}
+      />
+    </div>
+  ) : null;
 
   // ---- Empty list: render a single placeholder (if targeting index 0) OR themed empty state
   if (filteredItems.length === 0) {
@@ -256,7 +266,12 @@ export default React.memo(function TaskList({
         </button>,
       );
     }
-    return <>{rows}</>;
+    return (
+      <>
+        {rows}
+        {aiSuggestionsBlock}
+      </>
+    );
   }
 
   // ---- Non-empty list
@@ -372,11 +387,7 @@ export default React.memo(function TaskList({
   return (
     <>
       {rows}
-      {isToday && onAcceptSuggestion && (
-        <div className="mt-1.5">
-          <AiSuggestions onAccept={onAcceptSuggestion} />
-        </div>
-      )}
+      {aiSuggestionsBlock}
       <TaskMenu
         menu={menu}
         onClose={() => setMenu(null)}

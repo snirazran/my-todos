@@ -702,6 +702,9 @@ export default function Home() {
                           });
                           mutateToday();
                         } : undefined}
+                        aiSuggestionFocusCategoryIds={
+                          questOnboarding?.selectedCategoryIds ?? []
+                        }
                       />
                     )}
                   </motion.div>
@@ -847,6 +850,9 @@ export default function Home() {
                         });
                         mutateToday();
                       } : undefined}
+                      aiSuggestionFocusCategoryIds={
+                        questOnboarding?.selectedCategoryIds ?? []
+                      }
                     />
                   </motion.div>
                 ) : (

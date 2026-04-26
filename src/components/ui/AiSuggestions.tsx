@@ -28,13 +28,18 @@ const REFRESH_COOLDOWN_MS = 3000;
 export default function AiSuggestions({
   onAccept,
   getTagDetails,
+  focusCategoryIds,
 }: {
   onAccept: (text: string, tagIds?: string[]) => Promise<void> | void;
   getTagDetails?: (tagId: string) => { id: string; name: string; color?: string } | undefined;
+  focusCategoryIds?: string[];
 }) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const focusKey = (focusCategoryIds ?? []).slice().sort().join(',');
   const { data, mutate, isLoading } = useSWR<SuggestResponse>(
-    `/api/tasks/suggest?timezone=${encodeURIComponent(tz)}`,
+    focusKey
+      ? `/api/tasks/suggest?timezone=${encodeURIComponent(tz)}&focus=${encodeURIComponent(focusKey)}`
+      : null,
     fetcher,
     {
       revalidateOnFocus: false,

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import { format } from 'date-fns';
+import useSWR from 'swr';
 import TaskBoard from '@/components/board/TaskBoard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
@@ -19,6 +20,13 @@ import {
 
 const EXTRA = 'Maybe Today';
 type BoardResponse = Task[][] | { week: Task[][]; habits?: Task[] };
+type QuestSummaryResponse = {
+  onboarding?: {
+    selectedCategoryIds: string[];
+  };
+};
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export default function ManageTasksPage() {
   const [week, setWeek] = useState<Task[][]>(
@@ -40,6 +48,12 @@ export default function ManageTasksPage() {
   const todayIdx = useMemo(
     () => todayDisplayIndex(processingWeekOrder),
     [processingWeekOrder],
+  );
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const { data: questsData } = useSWR<QuestSummaryResponse>(
+    `/api/quests?view=home&timezone=${encodeURIComponent(timezone)}`,
+    fetcher,
+    { revalidateOnFocus: false },
   );
 
   /** Map API order (Sun..Sat, Later at index 7) -> Display order */
@@ -427,6 +441,9 @@ export default function ManageTasksPage() {
             });
             fetchWeek();
           }}
+          aiSuggestionFocusCategoryIds={
+            questsData?.onboarding?.selectedCategoryIds ?? []
+          }
         />
       </div>
 

@@ -730,6 +730,7 @@ export default function TaskList({
   isFrozen = false,
   paused = false,
   onAcceptSuggestion,
+  aiSuggestionFocusCategoryIds,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -762,6 +763,7 @@ export default function TaskList({
   isFrozen?: boolean;
   paused?: boolean;
   onAcceptSuggestion?: (text: string, tagIds?: string[]) => Promise<void> | void;
+  aiSuggestionFocusCategoryIds?: string[];
 }) {
   const router = useRouter(); // Import might be needed if not present
   const userTags = tags || [];
@@ -1169,6 +1171,15 @@ export default function TaskList({
     }
     return verticalRestricted;
   };
+  const aiSuggestionsBlock = onAcceptSuggestion ? (
+    <div className="mt-1.5 mb-1">
+      <AiSuggestions
+        onAccept={onAcceptSuggestion}
+        getTagDetails={getTagDetails}
+        focusCategoryIds={aiSuggestionFocusCategoryIds}
+      />
+    </div>
+  ) : null;
 
   return (
     <>
@@ -1184,58 +1195,64 @@ export default function TaskList({
         >
           {tasks.length === 0 && !exitAction ? (
             /* Empty State: No Tasks at all */
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="mb-2"
-            >
-              <button
-                onClick={() =>
-                  onAddRequested('', null, { preselectToday: true })
-                }
-                className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+                className="mb-2"
               >
-                <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 md:grayscale md:opacity-70 opacity-100 grayscale-0 group-hover:grayscale-0 group-hover:opacity-100">
-                  <Fly size={32} y={-4} />
-                </div>
-                <p className="text-sm font-bold md:text-muted-foreground text-primary group-hover:text-primary transition-colors">
-                  Start your day
-                </p>
-                <p className="mt-1 text-xs md:text-muted-foreground/60 text-muted-foreground group-hover:text-muted-foreground transition-colors">
-                  Tap to add your first task
-                </p>
-              </button>
-            </motion.div>
+                <button
+                  onClick={() =>
+                    onAddRequested('', null, { preselectToday: true })
+                  }
+                  className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 md:grayscale md:opacity-70 opacity-100 grayscale-0 group-hover:grayscale-0 group-hover:opacity-100">
+                    <Fly size={32} y={-4} />
+                  </div>
+                  <p className="text-sm font-bold md:text-muted-foreground text-primary group-hover:text-primary transition-colors">
+                    Start your day
+                  </p>
+                  <p className="mt-1 text-xs md:text-muted-foreground/60 text-muted-foreground group-hover:text-muted-foreground transition-colors">
+                    Tap to add your first task
+                  </p>
+                </button>
+              </motion.div>
+              {aiSuggestionsBlock}
+            </>
           ) : tasks.length > 0 &&
             sortedVisibleTasks.length === 0 &&
             !exitAction ? (
             /* Empty State: Tasks exist but all filtered/completed */
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="mb-2"
-            >
-              <button
-                onClick={() =>
-                  onAddRequested('', null, { preselectToday: true })
-                }
-                className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+                className="mb-2"
               >
-                <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
-                  <CalendarCheck className="w-8 h-8 text-primary" />
-                </div>
-                <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
-                  You're all caught up!
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
-                  {selectedTags.length > 0
-                    ? 'No tasks match your filters'
-                    : 'Great job! Tap to add more'}
-                </p>
-              </button>
-            </motion.div>
+                <button
+                  onClick={() =>
+                    onAddRequested('', null, { preselectToday: true })
+                  }
+                  className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+                    <CalendarCheck className="w-8 h-8 text-primary" />
+                  </div>
+                  <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
+                    You're all caught up!
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+                    {selectedTags.length > 0
+                      ? 'No tasks match your filters'
+                      : 'Great job! Tap to add more'}
+                  </p>
+                </button>
+              </motion.div>
+              {aiSuggestionsBlock}
+            </>
           ) : (
             /* List Content */
             <DndContext
@@ -1295,11 +1312,7 @@ export default function TaskList({
                   </SortableContext>
                 </div>
 
-                {onAcceptSuggestion && (
-                  <div className="mt-1.5 mb-1">
-                    <AiSuggestions onAccept={onAcceptSuggestion} getTagDetails={getTagDetails} />
-                  </div>
-                )}
+                {aiSuggestionsBlock}
 
                 {/* Completed Tasks Section */}
                 {showCompleted && completedTasks.length > 0 && (
