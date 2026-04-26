@@ -23,13 +23,13 @@ export interface BaseSheetProps {
 
 const desktopTransition = {
   type: 'tween' as const,
-  duration: 0.2,
-  ease: 'easeOut' as const,
+  duration: 0.18,
+  ease: [0.25, 0.1, 0.25, 1] as const,
 };
 const mobileTransition = {
   type: 'tween' as const,
-  duration: 0.16,
-  ease: 'easeOut' as const,
+  duration: 0.14,
+  ease: [0.25, 0.1, 0.25, 1] as const,
 };
 
 export function BaseSheet({
@@ -75,7 +75,7 @@ export function BaseSheet({
             exit={{ opacity: 0 }}
             onClick={() => onOpenChange(false)}
             className={cn(
-              'fixed inset-0 bg-background/55 sm:bg-background/70 sm:backdrop-blur-md',
+              'fixed inset-0 bg-background/55 sm:bg-background/70 sm:backdrop-blur-md will-change-[opacity]',
               backdropClassName,
             )}
             style={{ zIndex }}
@@ -99,13 +99,14 @@ export function BaseSheet({
               dragControls={dragControls}
               dragListener={false}
               dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.8 }}
+              dragElastic={{ top: 0, bottom: 0.6 }}
               dragMomentum={false}
               onDragStart={() => setIsDragging(true)}
               onDragEnd={(_e, { offset, velocity }) => {
                 setIsDragging(false);
-                if (offset.y > 150 || velocity.y > 500) onOpenChange(false);
+                if (offset.y > 120 || velocity.y > 400) onOpenChange(false);
               }}
+              style={{ willChange: 'transform' }}
               className={cn(
                 'pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[24px] border border-border/50 bg-card text-card-foreground shadow-lg will-change-transform sm:rounded-[34px] sm:shadow-2xl',
                 className,

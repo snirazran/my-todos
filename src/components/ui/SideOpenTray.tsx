@@ -74,13 +74,12 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
     }, [isOpen, onClose]);
 
     const mobileVariants = {
-      initial: { y: '100%', opacity: 0 },
+      initial: { y: '100%' },
       animate: {
         y: `${closeProgress * 100}%`,
         opacity: isDraggingAny ? 0 : 1,
-        scale: isDraggingAny ? 0.95 : 1,
       },
-      exit: { y: '100%', opacity: 0 },
+      exit: { y: '100%' },
     };
 
     const desktopVariants = {
@@ -88,7 +87,6 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
       animate: {
         x: '0%',
         opacity: isDraggingAny ? 0 : 1,
-        scale: isDraggingAny ? 0.95 : 1,
       },
       exit: { x: '-100%', opacity: 0 },
     };
@@ -102,8 +100,8 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
               initial={{ opacity: 0 }}
               animate={{ opacity: isDraggingAny ? 0 : 1 - closeProgress }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 z-[80] bg-background/60"
+              transition={{ type: 'tween', duration: 0.15, ease: 'easeOut' }}
+              className="fixed inset-0 z-[80] bg-background/60 will-change-[opacity]"
               onClick={onClose}
               style={{
                 pointerEvents:
@@ -122,19 +120,17 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
               dragControls={dragControls}
               dragListener={false}
               dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.8 }}
+              dragElastic={{ top: 0, bottom: 0.6 }}
               dragMomentum={false}
               onDragEnd={(e, { offset, velocity }) => {
-                if (offset.y > 150 || velocity.y > 500) {
+                if (offset.y > 120 || velocity.y > 400) {
                   onClose();
                 }
               }}
-              transition={{
-                type: 'spring',
-                damping: 30,
-                stiffness: 300,
-                mass: 0.8,
-              }}
+              transition={isDesktop
+                ? { type: 'tween', duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }
+                : { type: 'tween', duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }
+              }
               className={cn(
                 "fixed z-[90] flex flex-col bg-card border-r border-border/50 shadow-2xl overflow-hidden",
                 "inset-x-0 bottom-0 top-[15vh] rounded-t-[32px] border-t",
@@ -142,7 +138,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
                 className
               )}
               onClick={(e) => e.stopPropagation()}
-              style={{ pointerEvents: isDraggingAny ? 'none' : 'auto' }}
+              style={{ pointerEvents: isDraggingAny ? 'none' : 'auto', willChange: 'transform, opacity' }}
             >
               {/* Drag Handle (Mobile Only) */}
               {!isDesktop && (

@@ -248,8 +248,8 @@ body {
   @apply bg-slate-400 dark:bg-slate-500;
 }
 
-/* Smooth transitions */
-* {
+/* Smooth color transitions — scoped to interactive elements only (global * rule kills drag/animation perf on mobile) */
+button, a, input, select, textarea, [role="button"], [role="tab"], [data-theme-transition] {
   @apply transition-colors duration-200;
 }
 .progress-rtl {
