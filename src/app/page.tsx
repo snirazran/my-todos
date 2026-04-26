@@ -50,6 +50,7 @@ import type { FocusCategoryTagMap, MacroCategoryDefinition, MacroCategoryId } fr
 // Force re-compilation of this file to pick up useTaskData.tsx change
 
 const FLY_PX = 24;
+type HomeTab = 'all' | 'today' | 'habits';
 
 const demoTasks: Task[] = [
   {
@@ -111,7 +112,7 @@ export default function Home() {
   const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>('pick');
 
   /* State */
-  const [activeTab, setActiveTab] = useState<'today' | 'habits'>('today');
+  const [activeTab, setActiveTab] = useState<HomeTab>('all');
   const [isBacklogOpen, setIsBacklogOpen] = useState(false);
   const [showCompleted, setShowCompleted] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -214,6 +215,13 @@ export default function Home() {
 
   // Include completed habits in gift milestone progress
   const todayDateStr = format(new Date(), 'yyyy-MM-dd');
+  const openTaskCount = data.filter((t) => !t.completed).length;
+  const openHabitCount = habits.filter(
+    (h) => !h.completedDates?.includes(todayDateStr) && !h.completed,
+  ).length;
+  const visibleTaskCount = showCompleted ? data.length : openTaskCount;
+  const visibleHabitCount = showCompleted ? habits.length : openHabitCount;
+  const visibleTodayCount = visibleTaskCount + visibleHabitCount;
   const habitsDone = user
     ? habits.filter(
         (h) => h.completedDates?.includes(todayDateStr) || h.completed,
@@ -328,6 +336,166 @@ export default function Home() {
 
   const { indices } = useWardrobeIndices(!!user);
 
+  const renderGuestPrompt = () =>
+    !user ? (
+      <div className="relative mx-4 mb-3 overflow-hidden rounded-xl bg-primary/5 border border-primary/10 shadow-sm">
+        <div className="relative flex items-center gap-4 p-4">
+          <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-background text-primary shadow-sm ring-1 ring-primary/20">
+            <Fly size={28} y={-4} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-black text-foreground tracking-tight mb-0.5">
+              The Frog is Hungry!
+            </h3>
+            <p className="text-xs font-medium text-muted-foreground leading-relaxed">
+              Catch a fly to make her happy and unlock a special{' '}
+              <span className="text-primary font-bold">Gift</span>!
+            </p>
+          </div>
+        </div>
+      </div>
+    ) : null;
+
+  const renderTaskList = (isOverview = false) => {
+    if (isOverview && data.length === 0 && habits.length > 0) return null;
+
+    return (
+      <TaskList
+        tasks={data}
+        toggle={handleToggle}
+        showConfetti={rate === 100}
+        visuallyCompleted={visuallyDone}
+        renderBullet={(task, isVisuallyDone) =>
+          task.completed || isVisuallyDone ? null : (
+            <Fly
+              ref={(el) => {
+                flyRefs.current[task.id] = el;
+              }}
+              onClick={() => null}
+              size={28}
+              y={-4}
+              x={-2}
+            />
+          )
+        }
+        onAddRequested={(prefill) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          setQuickText(prefill || '');
+          setQuickAddMode('pick');
+          setShowQuickAdd(true);
+        }}
+        weeklyIds={weeklyIds}
+        onDeleteToday={(id) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          deleteTask(id);
+        }}
+        onDeleteFromWeek={async (taskId) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          const dow = new Date().getDay();
+          await fetch('/api/tasks?view=board', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ day: dow, taskId }),
+          });
+          deleteTask(taskId);
+        }}
+        onDoLater={(id) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          moveTaskToBacklog(id);
+        }}
+        onReorder={reorderTasks}
+        pendingToToday={pendingToToday}
+        onToggleRepeat={(id) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          toggleRepeat(id);
+        }}
+        onEditTask={(id, text) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          editTask(id, text, false);
+        }}
+        onScheduleTask={(id, data) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          return scheduleTask(id, data);
+        }}
+        isGuest={!user}
+        tags={tags}
+        showCompleted={showCompleted}
+        selectedTags={selectedTags}
+        onSetSelectedTags={setSelectedTags}
+        isGlowActive={isTaskGlow}
+        isFrozen={cinematic}
+      />
+    );
+  };
+
+  const renderHabitPanel = (isOverview = false) => {
+    if (isOverview && habits.length === 0) return null;
+
+    return (
+      <HabitPanel
+        habits={habits}
+        onToggle={handleToggle}
+        onEdit={(id, text) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          editTask(id, text, false);
+        }}
+        onDelete={(id) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          deleteTask(id, true);
+        }}
+        onSchedule={(id, data) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          scheduleTask(id, data);
+        }}
+        onAddRequested={(prefill, isHabit) => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          setQuickText(prefill || '');
+          setQuickAddMode(isHabit ? 'habit' : 'pick');
+          setShowQuickAdd(true);
+        }}
+        tags={tags}
+        flyRefs={flyRefs}
+        showCompleted={showCompleted}
+        visuallyCompleted={visuallyDone}
+        onReorder={reorderTasks}
+        date={todayDateStr}
+      />
+    );
+  };
+
   if (sessionLoading || (user && isLoading && tasks.length === 0)) {
     return <LoadingScreen message="Loading your day..." />;
   }
@@ -371,9 +539,32 @@ export default function Home() {
             <div className="flex items-center justify-center w-full px-4 md:px-0 md:w-auto md:justify-start">
               <div className="flex items-center w-full max-w-[calc(100vw-2rem)] md:max-w-none md:w-auto p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative group z-20">
                 <button
+                  onClick={() => setActiveTab('all')}
+                  className={`
+        flex-1 md:flex-none justify-center relative px-3 sm:px-5 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all flex items-center whitespace-nowrap
+        ${
+          activeTab === 'all'
+            ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
+            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
+        }
+      `}
+                >
+                  <div className="flex items-center justify-center gap-2 mr-[-0.15em]">
+                    <LayoutDashboard
+                      className={`w-3.5 h-3.5 ${activeTab === 'all' ? 'text-primary' : 'text-muted-foreground'}`}
+                    />
+                    <span>All</span>
+                    <TaskCounter
+                      count={visibleTodayCount}
+                      pendingCount={pendingToToday}
+                      isActive={activeTab === 'all'}
+                    />
+                  </div>
+                </button>
+                <button
                   onClick={() => setActiveTab('today')}
                   className={`
-        flex-1 md:flex-none justify-center relative px-5 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all flex items-center whitespace-nowrap
+        flex-1 md:flex-none justify-center relative px-3 sm:px-5 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all flex items-center whitespace-nowrap
         ${
           activeTab === 'today'
             ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
@@ -387,11 +578,7 @@ export default function Home() {
                     />
                     <span>Tasks</span>
                     <TaskCounter
-                      count={
-                        showCompleted
-                          ? data.length
-                          : data.filter((t) => !t.completed).length
-                      }
+                      count={visibleTaskCount}
                       pendingCount={pendingToToday}
                       isActive={activeTab === 'today'}
                     />
@@ -400,7 +587,7 @@ export default function Home() {
                 <button
                   onClick={() => setActiveTab('habits')}
                   className={`
-        flex-1 md:flex-none justify-center relative px-5 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all flex items-center whitespace-nowrap
+        flex-1 md:flex-none justify-center relative px-3 sm:px-5 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all flex items-center whitespace-nowrap
         ${
           activeTab === 'habits'
             ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
@@ -414,11 +601,7 @@ export default function Home() {
                     />
                     <span>Habits</span>
                     <TaskCounter 
-                      count={
-                        showCompleted
-                          ? habits.length
-                          : habits.filter((h) => !h.completedDates?.includes(todayDateStr) && !h.completed).length
-                      } 
+                      count={visibleHabitCount}
                       isActive={activeTab === 'habits'}
                     />
                   </div>
@@ -460,7 +643,36 @@ export default function Home() {
 
             <div className="min-h-[400px] pb-20" ref={taskListRef}>
               <AnimatePresence mode="wait" initial={false}>
-                {activeTab === 'today' ? (
+                {activeTab === 'all' ? (
+                  <motion.div
+                    key="all"
+                    className="w-full"
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -8 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {renderGuestPrompt()}
+                    {habits.length > 0 && (
+                      <OverviewSectionHeader
+                        icon={<CalendarClock className="w-3.5 h-3.5" />}
+                        title="Habits"
+                        count={visibleHabitCount}
+                        detail={showCompleted ? 'visible' : 'left today'}
+                      />
+                    )}
+                    {renderHabitPanel(true)}
+                    {data.length > 0 && habits.length > 0 && (
+                      <OverviewSectionHeader
+                        icon={<CalendarCheck className="w-3.5 h-3.5" />}
+                        title="Tasks"
+                        count={visibleTaskCount}
+                        detail={showCompleted ? 'visible' : 'left today'}
+                      />
+                    )}
+                    {renderTaskList(true)}
+                  </motion.div>
+                ) : activeTab === 'today' ? (
                   <motion.div
                     key="today"
                     className="w-full"
@@ -800,7 +1012,7 @@ export default function Home() {
       {/* Floating Add Task Button - Home Page Version */}
       <div className="fixed bottom-0 left-0 right-0 z-[40] px-4 pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
         <div className="pointer-events-auto mx-auto w-full max-w-[320px] md:max-w-[400px] relative min-h-[56px] flex items-center justify-center gap-2">
-          {(activeTab === 'today' || activeTab === 'habits') && (
+          {(activeTab === 'all' || activeTab === 'today' || activeTab === 'habits') && (
             <BacklogBox
               count={laterThisWeek.length}
               isDragOver={false}
@@ -946,6 +1158,34 @@ function Header({ router }: { router: any }) {
           {format(new Date(), 'MMMM d, yyyy')}
         </p>
       </div>
+    </div>
+  );
+}
+
+function OverviewSectionHeader({
+  icon,
+  title,
+  count,
+  detail,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  count: number;
+  detail: string;
+}) {
+  return (
+    <div className="flex items-center justify-between px-5 pt-2 pb-1">
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-card border border-border/60 shadow-sm text-primary">
+          {icon}
+        </span>
+        <span className="text-[11px] font-black uppercase tracking-[0.18em]">
+          {title}
+        </span>
+      </div>
+      <span className="text-[11px] font-bold text-muted-foreground/70">
+        {count} {detail}
+      </span>
     </div>
   );
 }
