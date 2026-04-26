@@ -17,27 +17,27 @@ export default function HabitBox({
 }: Props) {
   return (
     <motion.div 
-      className="relative flex pointer-events-auto shrink-0"
+      className="relative flex pointer-events-auto origin-left shrink-0"
       initial={false}
       animate={{
         opacity: isDragging ? 0 : 1,
         scale: isDragging ? 0.9 : 1,
-        width: isDragging ? 0 : '56px',
       }}
       transition={{
         type: 'spring',
         stiffness: 300,
         damping: 28,
       }}
+      style={{ width: isDragging ? 0 : '48px' }}
     >
       <motion.button
         onClick={onClick}
         aria-label="Habits"
         initial={false}
         animate={{
-          width: '56px',
-          height: '56px',
-          borderRadius: 16, 
+          width: '100%',
+          height: '48px',
+          borderRadius: 14,
         }}
         className={`
            relative flex items-center justify-center overflow-hidden w-full
@@ -48,9 +48,9 @@ export default function HabitBox({
       >
         <div className="absolute inset-0 flex items-center justify-center">
           <CalendarClock 
-            size={22} 
+            size={22}
+            className="text-muted-foreground group-hover:text-emerald-500 transition-colors"
             strokeWidth={2} 
-            className="text-muted-foreground group-hover:text-emerald-500 transition-colors" 
           />
         </div>
       </motion.button>
