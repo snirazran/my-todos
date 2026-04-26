@@ -16,6 +16,7 @@ interface TagPopupProps {
   title?: string;
   description?: string;
   saveLabel?: string;
+  maxSelectedTags?: number;
 }
 
 export default function TagPopup({
@@ -28,21 +29,22 @@ export default function TagPopup({
   title = 'Manage Tags',
   description = 'Select or create tags to organize your items',
   saveLabel = 'Save tags',
+  maxSelectedTags,
 }: TagPopupProps) {
   const [tags, setTags] = useState<string[]>(initialTags);
   const [isSaving, setIsSaving] = useState(false);
 
   React.useEffect(() => {
     if (open) {
-        setTags(initialTags);
+        setTags(initialTags.slice(0, maxSelectedTags));
     }
-  }, [open, taskId]);
+  }, [open, taskId, maxSelectedTags]);
 
   const handleSave = async () => {
     if (!taskId) return;
     setIsSaving(true);
     try {
-        await onSave(taskId, tags);
+        await onSave(taskId, tags.slice(0, maxSelectedTags));
         onClose();
     } finally {
         setIsSaving(false);
@@ -102,6 +104,7 @@ export default function TagPopup({
               selectedTags={tags}
               onTagsChange={setTags}
               autoFocus={false}
+              maxSelectedTags={maxSelectedTags}
             />
           </div>
         </div>

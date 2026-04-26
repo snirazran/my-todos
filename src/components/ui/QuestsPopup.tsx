@@ -179,7 +179,7 @@ export function QuestsPopup({
       new Map(
         (data?.onboarding?.categoryTagMap ?? []).map((entry) => [
           entry.categoryId,
-          entry.tagIds,
+          entry.tagIds.slice(0, 1),
         ]),
       ),
     [data?.onboarding?.categoryTagMap],
@@ -525,15 +525,16 @@ export function QuestsPopup({
 
   const handleSaveFocusTags = async (categoryId: string, newTags: string[]) => {
     if (!data) return;
+    const nextTags = newTags.slice(0, 1);
 
     const nextCategoryTagMap = (data.onboarding.categoryTagMap ?? []).filter(
       (entry) => entry.categoryId !== categoryId,
     );
 
-    if (newTags.length > 0) {
+    if (nextTags.length > 0) {
       nextCategoryTagMap.push({
         categoryId: categoryId as MacroCategoryId,
-        tagIds: newTags,
+        tagIds: nextTags,
       });
     }
 
@@ -895,9 +896,10 @@ export function QuestsPopup({
         open={editingFocusCategoryId !== null}
         taskId={editingFocusCategoryId}
         onClose={() => setEditingFocusCategoryId(null)}
-        title={editingFocusCategory ? `Focus Tags: ${editingFocusCategory.name}` : "Manage Focus Tags"}
-        description="Select tags to track for this focus area."
+        title={editingFocusCategory ? `Connect a tag to ${editingFocusCategory.name}` : "Connect a focus tag"}
+        description="Choose one tag to decide which tasks count toward this focus area."
         initialTags={editingFocusCategoryId ? (categoryTagMap.get(editingFocusCategoryId) || []) : []}
+        maxSelectedTags={1}
         onSave={handleSaveFocusTags}
       />
     </>

@@ -27,12 +27,17 @@ export async function POST(req: NextRequest) {
     const categoryTagMap = (Array.isArray(body.categoryTagMap)
       ? body.categoryTagMap
       : []
-    ).filter(
-      (entry: FocusCategoryTagMap) =>
-        isValidCategoryId(entry.categoryId) &&
-        Array.isArray(entry.tagIds) &&
-        entry.tagIds.length > 0,
-    );
+    )
+      .filter(
+        (entry: FocusCategoryTagMap) =>
+          isValidCategoryId(entry.categoryId) &&
+          Array.isArray(entry.tagIds) &&
+          entry.tagIds.length > 0,
+      )
+      .map((entry: FocusCategoryTagMap) => ({
+        categoryId: entry.categoryId,
+        tagIds: entry.tagIds.slice(0, 1),
+      }));
 
     if (!selectedCategoryIds.length) {
       return NextResponse.json(

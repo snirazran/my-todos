@@ -41,6 +41,7 @@ interface TagManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   autoFocus?: boolean;
+  maxSelectedTags?: number;
 }
 
 import { PremiumLimitDialog } from './PremiumLimitDialog';
@@ -51,6 +52,7 @@ export default function TagManager({
   open,
   onOpenChange,
   autoFocus = true,
+  maxSelectedTags,
 }: TagManagerProps) {
   const { data: tagsData } = useSWR('/api/tags', fetcher);
   const savedTags: SavedTag[] = useMemo(
@@ -126,7 +128,14 @@ export default function TagManager({
     if (existing) {
         // Select existing if not already selected
         if (!selectedTags.includes(existing.id)) {
-             onTagsChange([...selectedTags, existing.id]);
+             onTagsChange(
+               maxSelectedTags === 1
+                 ? [existing.id]
+                 : Array.from(new Set([...selectedTags, existing.id])).slice(
+                     0,
+                     maxSelectedTags,
+                   ),
+             );
         }
         setTagInput('');
         setShowColorPicker(false);
@@ -173,7 +182,14 @@ export default function TagManager({
       mutate('/api/tags');
       
       if (data.tag && !selectedTags.includes(data.tag.id)) {
-        onTagsChange([...selectedTags, data.tag.id]);
+        onTagsChange(
+          maxSelectedTags === 1
+            ? [data.tag.id]
+            : Array.from(new Set([...selectedTags, data.tag.id])).slice(
+                0,
+                maxSelectedTags,
+              ),
+        );
       }
       setShowColorPicker(false);
       setTagInput('');
@@ -379,7 +395,13 @@ export default function TagManager({
                                             }
 
                                             if (isSelected) removeTag(st.id);
-                                            else onTagsChange(Array.from(new Set([...selectedTags, st.id])));
+                                            else {
+                                                onTagsChange(
+                                                    maxSelectedTags === 1
+                                                        ? [st.id]
+                                                        : Array.from(new Set([...selectedTags, st.id])).slice(0, maxSelectedTags),
+                                                );
+                                            }
                                         }}
                                         className={`
                                             relative flex items-center gap-2 px-4 py-2.5 rounded-xl text-[13px] font-bold uppercase tracking-wider transition-all
