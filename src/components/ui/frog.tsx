@@ -101,7 +101,7 @@ const Frog = memo(
       layout: FROG_LAYOUT,
     });
 
-    useRiveVisibility(rive, wrapperRef, !paused);
+    useRiveVisibility(rive, wrapperRef, !paused, 'frog');
 
     useEffect(() => {
       if (!rive) return;

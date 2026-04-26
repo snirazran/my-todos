@@ -10,6 +10,7 @@ interface Props {
   label?: React.ReactNode;
   className?: string;
   showFly?: boolean;
+  paused?: boolean;
 }
 
 export function AddTaskButton({
@@ -18,6 +19,7 @@ export function AddTaskButton({
   label = 'Add a task',
   className = '',
   showFly = true,
+  paused = false,
 }: Props) {
   return (
     <button
@@ -51,7 +53,7 @@ export function AddTaskButton({
 
         {showFly && (
           <span className="opacity-100 transition-all duration-300">
-            <Fly size={24} y={-3} x={-5} />
+            <Fly size={24} y={-3} x={-5} paused={paused} />
           </span>
         )}
       </span>

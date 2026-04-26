@@ -73,6 +73,7 @@ export default function Home() {
     closeQuestOnboarding,
     isWardrobeOpen,
     setWardrobeOpen,
+    isQuestsOpen,
     setIsCinematicActive,
   } = useUIStore();
 
@@ -141,6 +142,14 @@ export default function Home() {
     visuallyDone,
     speedUpTongue,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs, scrollContainerRef: mainScrollRef });
+
+  const isAnyPanelOpen =
+    isWardrobeOpen ||
+    isQuestsOpen ||
+    isQuestOnboardingOpen ||
+    showQuickAdd ||
+    showTimer ||
+    isBacklogOpen;
 
   // Sync cinematic state with UI store
   useEffect(() => {
@@ -347,7 +356,7 @@ export default function Home() {
       <div className="relative mx-3 mb-2 overflow-hidden rounded-xl bg-primary/5 border border-primary/10 shadow-sm">
         <div className="relative flex items-center gap-3 p-3">
           <div className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-background text-primary shadow-sm ring-1 ring-primary/20">
-            <Fly size={24} y={-4} />
+            <Fly size={24} y={-4} paused={isAnyPanelOpen} />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-black text-foreground tracking-tight mb-0.5">
@@ -395,6 +404,7 @@ export default function Home() {
               onQuestsChanged={async () => {
                 await mutateQuests();
               }}
+              paused={isAnyPanelOpen}
             />
           </div>
 
@@ -519,7 +529,7 @@ export default function Home() {
                     transition={{ duration: 0.2 }}
                   >
                     {renderGuestPrompt()}
-                    {habits.length > 0 && (showCompleted || visibleHabitCount > 0) && (
+                    {habits.length > 0 && (
                       <OverviewSectionHeader
                         icon={<CalendarClock className="w-3.5 h-3.5" />}
                         title="Habits"
@@ -567,9 +577,10 @@ export default function Home() {
                         visuallyCompleted={visuallyDone}
                         onReorder={reorderTasks}
                         date={todayDateStr}
+                        paused={isAnyPanelOpen}
                       />
                     )}
-                    {data.length > 0 && (habits.length > 0 || visibleHabitCount > 0) && (
+                    {data.length > 0 && (
                       <OverviewSectionHeader
                         icon={<CalendarCheck className="w-3.5 h-3.5" />}
                         title="Tasks"
@@ -583,7 +594,7 @@ export default function Home() {
                         toggle={handleToggle}
                         showConfetti={rate === 100}
                         visuallyCompleted={visuallyDone}
-                        renderBullet={(task, isVisuallyDone) =>
+                        renderBullet={(task, isVisuallyDone, isPaused) =>
                           task.completed || isVisuallyDone ? null : (
                             <div
                               ref={(el) => {
@@ -596,6 +607,7 @@ export default function Home() {
                                 size={24}
                                 y={-3}
                                 x={0}
+                                paused={isPaused}
                               />
                             </div>
                           )
@@ -672,6 +684,7 @@ export default function Home() {
                         onSetSelectedTags={setSelectedTags}
                         isGlowActive={isTaskGlow}
                         isFrozen={cinematic}
+                        paused={isAnyPanelOpen}
                       />
                     )}
                   </motion.div>
@@ -710,7 +723,7 @@ export default function Home() {
                       toggle={handleToggle}
                       showConfetti={rate === 100}
                       visuallyCompleted={visuallyDone}
-                      renderBullet={(task, isVisuallyDone) =>
+                      renderBullet={(task, isVisuallyDone, isPaused) =>
                         task.completed || isVisuallyDone ? null : (
                           <div
                             ref={(el) => {
@@ -723,6 +736,7 @@ export default function Home() {
                               size={24}
                               y={-3}
                               x={0}
+                              paused={isPaused}
                             />
                           </div>
                         )
@@ -799,6 +813,7 @@ export default function Home() {
                       onSetSelectedTags={setSelectedTags}
                       isGlowActive={isTaskGlow}
                       isFrozen={cinematic}
+                      paused={isAnyPanelOpen}
                     />
                   </motion.div>
                 ) : (
@@ -849,6 +864,7 @@ export default function Home() {
                       visuallyCompleted={visuallyDone}
                       onReorder={reorderTasks}
                       date={format(new Date(), 'yyyy-MM-dd')}
+                      paused={isAnyPanelOpen}
                     />
                   </motion.div>
                 )}
@@ -1069,10 +1085,11 @@ export default function Home() {
               }}
               label={
                 <span className="flex items-center">
-                  Add a <Fly size={24} y={-3} x={4} />
+                  Add a <Fly size={24} y={-3} x={4} paused={isAnyPanelOpen} />
                 </span>
               }
               showFly={false}
+              paused={isAnyPanelOpen}
             />
           </div>
         </div>

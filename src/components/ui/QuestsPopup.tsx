@@ -890,6 +890,16 @@ export function QuestsPopup({
           );
         }}
       </BaseSheet>
+
+      <TagPopup
+        open={editingFocusCategoryId !== null}
+        taskId={editingFocusCategoryId}
+        onClose={() => setEditingFocusCategoryId(null)}
+        title={editingFocusCategory ? `Focus Tags: ${editingFocusCategory.name}` : "Manage Focus Tags"}
+        description="Select tags to track for this focus area."
+        initialTags={editingFocusCategoryId ? (categoryTagMap.get(editingFocusCategoryId) || []) : []}
+        onSave={handleSaveFocusTags}
+      />
     </>
   );
 }

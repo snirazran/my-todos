@@ -88,7 +88,7 @@ interface SortableTaskItemProps {
   isDone: boolean;
   isMenuOpen: boolean;
   isExitingLater: boolean;
-  renderBullet?: (task: Task, isVisuallyDone: boolean) => React.ReactNode;
+  renderBullet?: (task: Task, isVisuallyDone: boolean, paused: boolean) => React.ReactNode;
   handleTaskToggle: (
     task: Task,
     forceState?: boolean,
@@ -106,6 +106,7 @@ interface SortableTaskItemProps {
   isGlowActive?: boolean;
   isSortDragging?: boolean;
   onStartTimer?: (task: Task) => void;
+  paused?: boolean;
 }
 
 const SortableTaskItem = React.forwardRef<
@@ -129,6 +130,7 @@ const SortableTaskItem = React.forwardRef<
       isGlowActive,
       isSortDragging,
       onStartTimer,
+      paused = false,
     },
     ref,
   ) => {
@@ -522,7 +524,7 @@ const SortableTaskItem = React.forwardRef<
                       transition={{ duration: 0.18 }}
                     >
                       {renderBullet ? (
-                        renderBullet(task, false)
+                        renderBullet(task, false, paused)
                       ) : (
                         <button
                           onClick={(e) => {
@@ -725,11 +727,12 @@ export default function TaskList({
   isGuest,
   isGlowActive,
   isFrozen = false,
+  paused = false,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
   showConfetti: boolean;
-  renderBullet?: (task: Task, isVisuallyDone: boolean) => React.ReactNode;
+  renderBullet?: (task: Task, isVisuallyDone: boolean, paused: boolean) => React.ReactNode;
   visuallyCompleted?: Set<string>;
   onAddRequested: (
     prefill: string,
@@ -755,6 +758,7 @@ export default function TaskList({
   isGlowActive?: boolean;
   /** When true the current sort order is frozen (prevents layout shifts during tongue animation) */
   isFrozen?: boolean;
+  paused?: boolean;
 }) {
   const router = useRouter(); // Import might be needed if not present
   const userTags = tags || [];
@@ -1280,6 +1284,7 @@ export default function TaskList({
                                 : undefined
                             }
                             onStartTimer={onStartTimer ? (t) => onStartTimer(t) : undefined}
+                            paused={paused}
                           />
                         );
                       })}

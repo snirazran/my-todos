@@ -404,7 +404,7 @@ export function DailyQuestPresentationCard({
             claimingObjective={claimingObjectiveId === block.id}
             isPremium={isPremium}
             rewardCatalog={rewardCatalog}
-            paused={paused}
+            paused={true}
             onOpenRewards={(rewards) =>
               setRewardPopup({
                 eyebrow: 'Objective',
@@ -519,7 +519,7 @@ export function CategoryQuestPresentationCard({
               rewardCatalog={rewardCatalog}
               isPremium={isPremium}
               compact
-              paused={paused}
+              paused={false}
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
               hydrateDelayMs={150 + index * 55}
               onClick={() =>
@@ -558,7 +558,7 @@ export function CategoryQuestPresentationCard({
               claimingObjective={claimingObjectiveId === block.id}
               isPremium={isPremium}
               rewardCatalog={rewardCatalog}
-              paused={paused}
+              paused={true}
               onOpenRewards={(rewards) =>
                 setRewardPopup({
                   eyebrow: 'Objective',

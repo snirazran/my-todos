@@ -68,6 +68,7 @@ interface HabitPanelProps {
   onAddRequested: (prefill: string, isHabit?: boolean) => void;
   onReorder?: (habits: Task[]) => void;
   date: string;
+  paused?: boolean;
 }
 
 const DAYS_SHORT = ['U', 'M', 'T', 'W', 'R', 'F', 'S'];
@@ -85,6 +86,7 @@ export function HabitPanel({
   onAddRequested,
   onReorder,
   date,
+  paused = false,
 }: HabitPanelProps) {
   const [editingHabit, setEditingHabit] = React.useState<Task | null>(null);
   const [deletingHabit, setDeletingHabit] = React.useState<Task | null>(null);
@@ -311,7 +313,7 @@ export function HabitPanel({
             className="flex flex-col items-center justify-center w-full py-8 pt-8 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl group"
           >
             <div className="flex items-center justify-center mb-3 transition-all border rounded-full opacity-100 w-14 h-14 bg-muted border-muted-foreground/10 md:grayscale md:opacity-70 grayscale-0 group-hover:grayscale-0 group-hover:opacity-100">
-              <Fly size={32} y={-4} />
+              <Fly size={32} y={-4} paused={paused} />
             </div>
             <p className="text-sm font-bold transition-colors md:text-muted-foreground text-primary group-hover:text-primary">
               No Habits Yet
@@ -382,6 +384,7 @@ export function HabitPanel({
                         tags={tags}
                         date={date}
                         isSortDragging={isAnyDragging}
+                        paused={paused}
                       />
                     ))}
                   </AnimatePresence>
@@ -567,6 +570,7 @@ function HabitItem({
   tags,
   date,
   isSortDragging,
+  paused = false,
 }: {
   habit: Task;
   isDone: boolean;
@@ -578,6 +582,7 @@ function HabitItem({
   tags: SavedTag[];
   date: string;
   isSortDragging?: boolean;
+  paused?: boolean;
 }) {
   const menuBtnRef = React.useRef<HTMLButtonElement>(null);
   const containerRef = React.useRef<HTMLDivElement>(null);
@@ -822,9 +827,8 @@ function HabitItem({
                       }}
                       data-fly-ref="true"
                     >
-                      <Fly size={24} y={-3} />
-                    </div>
-                  </button>
+                      <Fly size={24} y={-3} paused={paused} />
+                    </div>                  </button>
                 </motion.div>
               ) : (
                 <motion.div

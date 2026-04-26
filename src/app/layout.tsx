@@ -5,6 +5,7 @@ import './globals.css';
 import Providers from '@/app/providers';
 import SiteHeader from '@/components/ui/siteHeader';
 import MobileNav from '@/components/ui/MobileNav';
+import { RiveCounter } from '@/components/ui/RiveCounter';
 import { AuthContext } from '@/components/auth/AuthContext';
 
 const poppins = Poppins({
@@ -65,6 +66,7 @@ export default function RootLayout({
                 {children}
               </main>
               <MobileNav />
+              <RiveCounter />
             </div>
           </Providers>
         </AuthContext>

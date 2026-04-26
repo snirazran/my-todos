@@ -36,6 +36,7 @@ type Props = {
   questActiveCount?: number;
   onQuestsChanged?: () => void | Promise<void>;
   deferInventorySummary?: boolean;
+  paused?: boolean;
 };
 
 export function FrogDisplay({
@@ -61,6 +62,7 @@ export function FrogDisplay({
   questActiveCount = 0,
   onQuestsChanged,
   deferInventorySummary = false,
+  paused = false,
 }: Props) {
   const { unseenCount, unseenContainerCount } = useInventory(
     !isGuest && (!deferInventorySummary || openWardrobe),
@@ -151,6 +153,7 @@ export function FrogDisplay({
             mouthOpen={!!mouthOpen}
             mouthOffset={mouthOffset}
             indices={indices}
+            paused={paused}
           />
         </div>
 
@@ -234,6 +237,7 @@ export function FrogDisplay({
                     'transition-transform duration-300 text-muted-foreground',
                     animateBalance && 'group-hover:rotate-12',
                   )}
+                  paused={paused}
                 />
               </div>
 

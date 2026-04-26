@@ -18,8 +18,12 @@ import {
   Paintbrush,
   ScrollText,
   Upload,
+  Bug,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { useUIStore } from '@/lib/uiStore';
 import { createPortal } from 'react-dom';
 import { AdminCosmeticsPopup } from './AdminCosmeticsPopup';
 import { AdminGiftManagerPopup } from './AdminGiftManagerPopup';
@@ -59,6 +63,8 @@ export function AdminSettingsDialog({
   const [cosmeticsOpen, setCosmeticsOpen] = useState(false);
   const [giftManagerOpen, setGiftManagerOpen] = useState(false);
   const [riveManagerOpen, setRiveManagerOpen] = useState(false);
+
+  const { isDebugMode, setIsDebugMode } = useUIStore();
 
   // Load notification data when dialog opens
   useEffect(() => {
@@ -285,6 +291,28 @@ export function AdminSettingsDialog({
 
               {/* Content */}
               <div className="p-6 space-y-4 overflow-y-auto">
+                {/* Debug Mode */}
+                <div className="flex items-center justify-between p-4 bg-muted/30 border border-border/50 rounded-2xl">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-violet-500/10 text-violet-600 dark:text-violet-400">
+                      <Bug className="w-5 h-5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <Label htmlFor="debug-mode" className="font-bold cursor-pointer">
+                        Debug Mode
+                      </Label>
+                      <span className="text-[11px] text-muted-foreground">
+                        Show Rive stats and dev tools
+                      </span>
+                    </div>
+                  </div>
+                  <Checkbox
+                    id="debug-mode"
+                    checked={isDebugMode}
+                    onCheckedChange={(checked) => setIsDebugMode(!!checked)}
+                  />
+                </div>
+
                 {/* Reset Tasks & Statistics */}
                 <div className="space-y-2">
                   <Button

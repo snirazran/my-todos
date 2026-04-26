@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface UIState {
   isWardrobeOpen: boolean;
@@ -19,25 +20,39 @@ interface UIState {
 
   isCinematicActive: boolean;
   setIsCinematicActive: (active: boolean) => void;
+
+  isDebugMode: boolean;
+  setIsDebugMode: (debug: boolean) => void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
-  isWardrobeOpen: false,
-  openWardrobe: () => set({ isWardrobeOpen: true }),
-  closeWardrobe: () => set({ isWardrobeOpen: false }),
-  toggleWardrobe: () => set((state) => ({ isWardrobeOpen: !state.isWardrobeOpen })),
-  setWardrobeOpen: (open: boolean) => set({ isWardrobeOpen: open }),
+export const useUIStore = create<UIState>()(
+  persist(
+    (set) => ({
+      isWardrobeOpen: false,
+      openWardrobe: () => set({ isWardrobeOpen: true }),
+      closeWardrobe: () => set({ isWardrobeOpen: false }),
+      toggleWardrobe: () => set((state) => ({ isWardrobeOpen: !state.isWardrobeOpen })),
+      setWardrobeOpen: (open: boolean) => set({ isWardrobeOpen: open }),
 
-  isQuestsOpen: false,
-  openQuests: () => set({ isQuestsOpen: true }),
-  closeQuests: () => set({ isQuestsOpen: false }),
-  setQuestsOpen: (open: boolean) => set({ isQuestsOpen: open }),
+      isQuestsOpen: false,
+      openQuests: () => set({ isQuestsOpen: true }),
+      closeQuests: () => set({ isQuestsOpen: false }),
+      setQuestsOpen: (open: boolean) => set({ isQuestsOpen: open }),
 
-  isQuestOnboardingOpen: false,
-  openQuestOnboarding: () => set({ isQuestOnboardingOpen: true }),
-  closeQuestOnboarding: () => set({ isQuestOnboardingOpen: false }),
-  setQuestOnboardingOpen: (open: boolean) => set({ isQuestOnboardingOpen: open }),
+      isQuestOnboardingOpen: false,
+      openQuestOnboarding: () => set({ isQuestOnboardingOpen: true }),
+      closeQuestOnboarding: () => set({ isQuestOnboardingOpen: false }),
+      setQuestOnboardingOpen: (open: boolean) => set({ isQuestOnboardingOpen: open }),
 
-  isCinematicActive: false,
-  setIsCinematicActive: (active: boolean) => set({ isCinematicActive: active }),
-}));
+      isCinematicActive: false,
+      setIsCinematicActive: (active: boolean) => set({ isCinematicActive: active }),
+
+      isDebugMode: false,
+      setIsDebugMode: (debug: boolean) => set({ isDebugMode: debug }),
+    }),
+    {
+      name: 'frog-task-ui-storage',
+      partialize: (state) => ({ isDebugMode: state.isDebugMode }), // Only persist debug mode
+    }
+  )
+);
