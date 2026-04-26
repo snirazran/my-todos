@@ -411,7 +411,7 @@ export default function ManageTasksPage() {
           daysOrder={processingWeekOrder} // Pass the rolling order
           onToggleRepeat={onToggleRepeat}
           onScheduleTask={onScheduleTask}
-          onAcceptSuggestion={async (text: string) => {
+          onAcceptSuggestion={async (text: string, tagIds?: string[]) => {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const todayApiDay = new Date().getDay() as ApiDay;
             await fetch('/api/tasks?view=board', {
@@ -421,7 +421,7 @@ export default function ManageTasksPage() {
                 text,
                 days: [todayApiDay],
                 repeat: 'this-week',
-                tags: [],
+                tags: tagIds ?? [],
                 timezone: tz,
               }),
             });

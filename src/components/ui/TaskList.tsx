@@ -761,7 +761,7 @@ export default function TaskList({
   /** When true the current sort order is frozen (prevents layout shifts during tongue animation) */
   isFrozen?: boolean;
   paused?: boolean;
-  onAcceptSuggestion?: (text: string) => Promise<void> | void;
+  onAcceptSuggestion?: (text: string, tagIds?: string[]) => Promise<void> | void;
 }) {
   const router = useRouter(); // Import might be needed if not present
   const userTags = tags || [];
@@ -1297,7 +1297,7 @@ export default function TaskList({
 
                 {onAcceptSuggestion && (
                   <div className="mt-1.5 mb-1">
-                    <AiSuggestions onAccept={onAcceptSuggestion} />
+                    <AiSuggestions onAccept={onAcceptSuggestion} getTagDetails={getTagDetails} />
                   </div>
                 )}
 

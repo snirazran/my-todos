@@ -94,7 +94,7 @@ export default React.memo(function TaskList({
     taskId: string,
     data: { startTime: string; endTime: string; reminder: string },
   ) => Promise<void> | void;
-  onAcceptSuggestion?: (text: string) => Promise<void> | void;
+  onAcceptSuggestion?: (text: string, tagIds?: string[]) => Promise<void> | void;
   isToday?: boolean;
   filter?: 'all' | 'tasks' | 'habits';
   selectedTags?: string[];

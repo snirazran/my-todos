@@ -80,7 +80,7 @@ export default function TaskBoard({
     newText: string,
   ) => Promise<void>;
   onDoLater?: (day: DisplayDay, taskId: string) => Promise<void>;
-  onAcceptSuggestion?: (text: string) => Promise<void> | void;
+  onAcceptSuggestion?: (text: string, tagIds?: string[]) => Promise<void> | void;
 }) {
   const pathname = usePathname();
   const [habitTrayOpen, setHabitTrayOpen] = useState(false);

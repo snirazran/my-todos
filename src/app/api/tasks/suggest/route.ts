@@ -15,6 +15,7 @@ const FREE_DAILY_REFRESHES = 2;
 type AiSuggestion = {
   text: string;
   categoryId: string;
+  tagIds?: string[];
 };
 
 type SuggestionCache = {
@@ -107,17 +108,11 @@ export async function GET(req: Request) {
       .map((id: string) => QUEST_MACRO_CATEGORIES.find((c) => c.id === id))
       .filter(Boolean);
 
-    const categoryTagMap: Record<string, string[]> = {};
+    const categoryTagIdMap: Record<string, string[]> = {};
     for (const entry of focusProfile?.categoryTagMap ?? []) {
-      const tagNames = (entry.tagIds ?? [])
-        .map((tagId: string) => {
-          const tag = ((user as any).tags ?? []).find(
-            (t: any) => t.id === tagId,
-          );
-          return tag?.name;
-        })
-        .filter(Boolean);
-      categoryTagMap[entry.categoryId] = tagNames;
+      if (entry.tagIds?.length) {
+        categoryTagIdMap[entry.categoryId] = entry.tagIds;
+      }
     }
 
     const now = new Date();
@@ -134,7 +129,7 @@ export async function GET(req: Request) {
     const currentTime = timeFormatter.format(now);
     const currentDay = dayFormatter.format(now);
 
-    const prompt = buildPrompt(taskTexts, habitTexts, categories, categoryTagMap, currentTime, currentDay);
+    const prompt = buildPrompt(taskTexts, habitTexts, categories, currentTime, currentDay);
 
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
@@ -158,6 +153,7 @@ export async function GET(req: Request) {
       suggestions = suggestions.slice(0, MAX_SUGGESTIONS).map((s) => ({
         text: String(s.text || '').slice(0, 45),
         categoryId: String(s.categoryId || ''),
+        tagIds: categoryTagIdMap[String(s.categoryId || '')] ?? [],
       }));
     } catch {
       suggestions = [];
@@ -241,16 +237,11 @@ function buildPrompt(
   existingTasks: string[],
   habits: string[],
   categories: any[],
-  categoryTagMap: Record<string, string[]>,
   currentTime: string,
   currentDay: string,
 ): string {
   const categoryInfo = categories
-    .map((c: any) => {
-      const tags = categoryTagMap[c.id];
-      const tagLine = tags?.length ? ` (linked tags: ${tags.join(', ')})` : '';
-      return `- ${c.name} [id: ${c.id}]: ${c.description}${tagLine}`;
-    })
+    .map((c: any) => `- ${c.name} [id: ${c.id}]`)
     .join('\n');
 
   const taskList =

@@ -686,7 +686,7 @@ export default function Home() {
                         isGlowActive={isTaskGlow}
                         isFrozen={cinematic}
                         paused={isAnyPanelOpen}
-                        onAcceptSuggestion={user ? async (text: string) => {
+                        onAcceptSuggestion={user ? async (text: string, tagIds?: string[]) => {
                           const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
                           const todayApiDay = new Date().getDay();
                           await fetch('/api/tasks?view=board', {
@@ -696,7 +696,7 @@ export default function Home() {
                               text,
                               days: [todayApiDay],
                               repeat: 'this-week',
-                              tags: [],
+                              tags: tagIds ?? [],
                               timezone: tz,
                             }),
                           });
@@ -831,7 +831,7 @@ export default function Home() {
                       isGlowActive={isTaskGlow}
                       isFrozen={cinematic}
                       paused={isAnyPanelOpen}
-                      onAcceptSuggestion={user ? async (text: string) => {
+                      onAcceptSuggestion={user ? async (text: string, tagIds?: string[]) => {
                         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
                         const todayApiDay = new Date().getDay();
                         await fetch('/api/tasks?view=board', {
@@ -841,7 +841,7 @@ export default function Home() {
                             text,
                             days: [todayApiDay],
                             repeat: 'this-week',
-                            tags: [],
+                            tags: tagIds ?? [],
                             timezone: tz,
                           }),
                         });
