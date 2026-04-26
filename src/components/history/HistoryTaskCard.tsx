@@ -29,6 +29,7 @@ export type HistoryTaskCardProps = {
   onMenuOpen?: (e: React.MouseEvent, id: string) => void;
   setFlyRef?: (el: HTMLDivElement | null) => void;
   isEaten?: boolean;
+  paused?: boolean;
 };
 
 export default function HistoryTaskCard({
@@ -46,6 +47,7 @@ export default function HistoryTaskCard({
   onMenuOpen,
   setFlyRef,
   isEaten = false,
+  paused = false,
 }: HistoryTaskCardProps) {
   const isWeekly = type === 'weekly';
   const displayedCompleted = completed || isEaten;
@@ -95,7 +97,7 @@ export default function HistoryTaskCard({
                 >
                   <Fly
                     size={24}
-                    paused={displayedCompleted}
+                    paused={paused}
                     y={-3}
                   />
                 </div>

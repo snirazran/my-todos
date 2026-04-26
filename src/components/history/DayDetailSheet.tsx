@@ -1,20 +1,20 @@
 'use client';
 
 import React, { useRef, useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Calendar as CalendarIcon, CalendarCheck, CalendarClock, EllipsisVertical, LayoutDashboard } from 'lucide-react';
 import { format } from 'date-fns';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { type FrogHandle } from '@/components/ui/frog';
 import HistoryTaskCard from './HistoryTaskCard';
-import TaskMenu from '../board/TaskMenu';
 import { FilterDropdown } from '../ui/FilterDropdown';
 import useSWR from 'swr';
 import { cn } from '@/lib/utils';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
+import { useUIStore } from '@/lib/uiStore';
 
 type DayDetailSheetProps = {
   open: boolean;
@@ -37,8 +37,6 @@ export default function DayDetailSheet({
   date,
   tasks,
   onToggleTask,
-  onDeleteTask,
-  onEditTask,
   frogProps,
   selectedTags,
   onTagsChange,
@@ -46,28 +44,16 @@ export default function DayDetailSheet({
   onShowCompletedChange,
 }: DayDetailSheetProps) {
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
-  const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'tasks' | 'habits'>('all');
+
+  const { isQuestsOpen } = useUIStore();
+
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const sheetRef = useRef<HTMLDivElement>(null);
-
-  const handleToggleMenu = (taskId: string, anchor: DOMRect) => {
-    if (menu?.id === taskId) {
-      setMenu(null);
-    } else {
-      setMenu({ id: taskId, top: anchor.bottom + window.scrollY, left: anchor.left + window.scrollX });
-    }
-  };
-
-  // Close menu when sheet scrolls
-  const handleScroll = () => {
-    if (menu) setMenu(null);
-    if (showFilterMenu) setShowFilterMenu(false);
-  };
 
   // Split tasks by type
   const regularTasks = React.useMemo(() => tasks.filter((t) => t.type !== 'habit'), [tasks]);
@@ -99,6 +85,7 @@ export default function DayDetailSheet({
   const completedRegular = React.useMemo(() => filteredRegular.filter((t) => t.completed), [filteredRegular]);
   const activeHabits = React.useMemo(() => filteredHabits.filter((t) => !t.completed), [filteredHabits]);
   const completedHabitsFiltered = React.useMemo(() => filteredHabits.filter((t) => t.completed), [filteredHabits]);
+  
   const visibleRegularCount = showCompleted ? regularTasks.length : regularTasks.filter((t) => !t.completed).length;
   const visibleHabitCount = showCompleted ? habitTasks.length : habitTasks.filter((t) => !t.completed).length;
   const visibleAllCount = visibleRegularCount + visibleHabitCount;
@@ -123,14 +110,18 @@ export default function DayDetailSheet({
   );
   const userTags = tagsData?.tags || [];
 
-  // Manage wardrobe locally if needed in popup, or passed down
   const { indices } = useWardrobeIndices(true);
+  const overscrollDrag = useSheetOverscrollDrag();
 
   useEffect(() => {
     if (open) {
       setActiveTab('all');
     }
   }, [open]);
+
+  const handleScroll = () => {
+    if (showFilterMenu) setShowFilterMenu(false);
+  };
 
   // Block scrolling inside the popup during cinematic tongue animation
   useEffect(() => {
@@ -148,8 +139,7 @@ export default function DayDetailSheet({
 
   const completedCount = tasks.filter((t) => t.completed).length;
   const totalCount = tasks.length;
-  const completionRate =
-    totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
+  const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
 
   const handleToggleProxy = async (
     id: string,
@@ -167,7 +157,7 @@ export default function DayDetailSheet({
     }
   };
 
-  const renderHistoryCard = (task: any) => {
+  const renderHistoryCard = (task: any, paused = false) => {
     const uniqueKey = `${date}::${task.id}`;
     return (
       <HistoryTaskCard
@@ -188,6 +178,7 @@ export default function DayDetailSheet({
         }}
         isEaten={visuallyDone?.has(uniqueKey)}
         userTags={userTags}
+        paused={paused}
       />
     );
   };
@@ -210,6 +201,7 @@ export default function DayDetailSheet({
     filteredItems,
     emptyText,
     showHeader = false,
+    paused = false,
   }: {
     title: string;
     icon: React.ReactNode;
@@ -218,6 +210,7 @@ export default function DayDetailSheet({
     filteredItems: any[];
     emptyText: string;
     showHeader?: boolean;
+    paused?: boolean;
   }) => (
     <div className={showHeader && filteredItems.length > 0 ? 'space-y-2' : ''}>
       {showHeader && filteredItems.length > 0 && (
@@ -238,11 +231,11 @@ export default function DayDetailSheet({
             </div>
           ) : (
             <>
-              {activeItems.map(renderHistoryCard)}
+              {activeItems.map((t) => renderHistoryCard(t, paused))}
               {showCompleted && completedItems.length > 0 && (
                 <>
                   {activeItems.length > 0 && renderCompletedDivider()}
-                  {completedItems.map(renderHistoryCard)}
+                  {completedItems.map((t) => renderHistoryCard(t, paused))}
                 </>
               )}
             </>
@@ -260,13 +253,9 @@ export default function DayDetailSheet({
         className="h-[90vh] sm:h-auto sm:max-h-[85vh] sm:max-w-lg bg-background"
         zIndex={1000}
       >
-        {({ isDesktop, dragControls }) => {
-          const handleSheetDrag = (e: React.PointerEvent, scrollEl: HTMLDivElement | null) => {
-            if (isDesktop || !scrollEl || cinematic) return;
-            if (scrollEl.scrollTop <= 0 && e.nativeEvent instanceof PointerEvent) {
-              dragControls.start(e);
-            }
-          };
+        {({ isDesktop, dragControls, isDragging }) => {
+          overscrollDrag.setContext(dragControls, !isDesktop);
+          const isAnyPanelOpen = wardrobeOpen || cinematic || isDragging || isQuestsOpen;
 
           return (
             <div ref={sheetRef} className="flex flex-col h-full relative">
@@ -299,10 +288,12 @@ export default function DayDetailSheet({
 
               {/* Content Scrollable */}
               <div
-                ref={scrollContainerRef}
+                ref={(node) => {
+                  scrollContainerRef.current = node;
+                  overscrollDrag.bind(node);
+                }}
                 className="flex-1 overflow-y-auto p-3 pb-14 space-y-4 scrollbar-hide overscroll-none"
                 onScroll={handleScroll}
-                onPointerDown={(e) => handleSheetDrag(e, e.currentTarget)}
                 style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
               >
                 {/* 1. Frog Display Section */}
@@ -318,13 +309,14 @@ export default function DayDetailSheet({
                       total={totalCount}
                       openWardrobe={wardrobeOpen}
                       onOpenChange={setWardrobeOpen}
-                      mouthOpen={!!grab} // Open mouth when grabbing
+                      mouthOpen={!!grab} 
                       mouthOffset={{ y: -4 }}
+                      paused={isAnyPanelOpen}
                     />
                   </div>
                 </div>
 
-                {/* 2. Tab Bar (matches home page design) */}
+                {/* 2. Tab Bar */}
                 <div className="flex items-center w-full p-0.5 rounded-[16px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative">
                   <button
                     onClick={() => setActiveTab('all')}
@@ -338,7 +330,10 @@ export default function DayDetailSheet({
                     <LayoutDashboard className={cn('w-3.5 h-3.5', activeTab === 'all' ? 'text-primary' : 'text-muted-foreground')} />
                     All
                     {visibleAllCount > 0 && (
-                      <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-black leading-none text-white shadow-sm">
+                      <span className={cn(
+                        'flex h-[17px] min-w-[17px] px-1 items-center justify-center rounded-full text-[9px] font-black leading-none tracking-normal pt-px transition-colors',
+                        activeTab === 'all' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground/70',
+                      )}>
                         {visibleAllCount}
                       </span>
                     )}
@@ -355,7 +350,10 @@ export default function DayDetailSheet({
                     <CalendarCheck className={cn('w-3.5 h-3.5', activeTab === 'tasks' ? 'text-primary' : 'text-muted-foreground')} />
                     Tasks
                     {visibleRegularCount > 0 && (
-                      <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-black leading-none text-white shadow-sm">
+                      <span className={cn(
+                        'flex h-[17px] min-w-[17px] px-1 items-center justify-center rounded-full text-[9px] font-black leading-none tracking-normal pt-px transition-colors',
+                        activeTab === 'tasks' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground/70',
+                      )}>
                         {visibleRegularCount}
                       </span>
                     )}
@@ -372,7 +370,10 @@ export default function DayDetailSheet({
                     <CalendarClock className={cn('w-3.5 h-3.5', activeTab === 'habits' ? 'text-primary' : 'text-muted-foreground')} />
                     Habits
                     {visibleHabitCount > 0 && (
-                      <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-black leading-none text-white shadow-sm">
+                      <span className={cn(
+                        'flex h-[17px] min-w-[17px] px-1 items-center justify-center rounded-full text-[9px] font-black leading-none tracking-normal pt-px transition-colors',
+                        activeTab === 'habits' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground/70',
+                      )}>
                         {visibleHabitCount}
                       </span>
                     )}
@@ -413,49 +414,61 @@ export default function DayDetailSheet({
                   </div>
                 </div>
 
-                <div className={activeTab === 'all' ? 'space-y-2' : 'hidden'}>
-                  {habitTasks.length > 0 &&
-                    renderHistorySection({
-                      title: 'Habits',
-                      icon: <CalendarClock className="w-3.5 h-3.5" />,
-                      activeItems: activeHabits,
-                      completedItems: completedHabitsFiltered,
-                      filteredItems: filteredHabits,
-                      emptyText: 'No habits for this day.',
-                      showHeader: filteredHabits.length > 0,
-                    })}
-                  {(regularTasks.length > 0 || habitTasks.length === 0) &&
-                    renderHistorySection({
-                      title: 'Tasks',
-                      icon: <CalendarCheck className="w-3.5 h-3.5" />,
-                      activeItems: activeRegular,
-                      completedItems: completedRegular,
-                      filteredItems: filteredRegular,
-                      emptyText: 'No tasks for this day.',
-                      showHeader: filteredHabits.length > 0 && filteredRegular.length > 0,
-                    })}
-                </div>
+                <div className="space-y-4">
+                  {activeTab === 'all' && (
+                    <div className="space-y-2 animate-in fade-in slide-in-from-left-1 duration-200">
+                      {habitTasks.length > 0 &&
+                        renderHistorySection({
+                          title: 'Habits',
+                          icon: <CalendarClock className="w-3.5 h-3.5" />,
+                          activeItems: activeHabits,
+                          completedItems: completedHabitsFiltered,
+                          filteredItems: filteredHabits,
+                          emptyText: 'No habits for this day.',
+                          showHeader: filteredHabits.length > 0,
+                          paused: isAnyPanelOpen,
+                        })}
+                      {(regularTasks.length > 0 || habitTasks.length === 0) &&
+                        renderHistorySection({
+                          title: 'Tasks',
+                          icon: <CalendarCheck className="w-3.5 h-3.5" />,
+                          activeItems: activeRegular,
+                          completedItems: completedRegular,
+                          filteredItems: filteredRegular,
+                          emptyText: 'No tasks for this day.',
+                          showHeader: filteredHabits.length > 0 && filteredRegular.length > 0,
+                          paused: isAnyPanelOpen,
+                        })}
+                    </div>
+                  )}
 
-                <div className={activeTab === 'tasks' ? '' : 'hidden'}>
-                  {renderHistorySection({
-                    title: 'Tasks',
-                    icon: <CalendarCheck className="w-3.5 h-3.5" />,
-                    activeItems: activeRegular,
-                    completedItems: completedRegular,
-                    filteredItems: filteredRegular,
-                    emptyText: 'No tasks for this day.',
-                  })}
-                </div>
+                  {activeTab === 'tasks' && (
+                    <div className="animate-in fade-in slide-in-from-right-1 duration-200">
+                      {renderHistorySection({
+                        title: 'Tasks',
+                        icon: <CalendarCheck className="w-3.5 h-3.5" />,
+                        activeItems: activeRegular,
+                        completedItems: completedRegular,
+                        filteredItems: filteredRegular,
+                        emptyText: 'No tasks for this day.',
+                        paused: isAnyPanelOpen,
+                      })}
+                    </div>
+                  )}
 
-                <div className={activeTab === 'habits' ? '' : 'hidden'}>
-                  {renderHistorySection({
-                    title: 'Habits',
-                    icon: <CalendarClock className="w-3.5 h-3.5" />,
-                    activeItems: activeHabits,
-                    completedItems: completedHabitsFiltered,
-                    filteredItems: filteredHabits,
-                    emptyText: 'No habits for this day.',
-                  })}
+                  {activeTab === 'habits' && (
+                    <div className="animate-in fade-in slide-in-from-right-1 duration-200">
+                      {renderHistorySection({
+                        title: 'Habits',
+                        icon: <CalendarClock className="w-3.5 h-3.5" />,
+                        activeItems: activeHabits,
+                        completedItems: completedHabitsFiltered,
+                        filteredItems: filteredHabits,
+                        emptyText: 'No habits for this day.',
+                        paused: isAnyPanelOpen,
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -463,7 +476,7 @@ export default function DayDetailSheet({
         }}
       </BaseSheet>
 
-      {/* SVG Tongue Overlay (Z-index high to overlap sheet) */}
+      {/* SVG Tongue Overlay */}
       {grab && (() => {
         const sr = sheetRef.current?.getBoundingClientRect();
         const cr = scrollContainerRef.current?.getBoundingClientRect();
@@ -482,13 +495,7 @@ export default function DayDetailSheet({
           style={{ width: vp.w, height: vp.h, clipPath: clip }}
         >
           <defs>
-            <linearGradient
-              id="tongue-grad-history"
-              x1="0"
-              y1="0"
-              x2="0"
-              y2="1"
-            >
+            <linearGradient id="tongue-grad-history" x1="0" y1="0" x2="0" y2="1">
               <stop stopColor="#ff6b6b" />
               <stop offset="1" stopColor="#f43f5e" />
             </linearGradient>
@@ -504,13 +511,7 @@ export default function DayDetailSheet({
           />
           <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
             <circle r={10} fill="transparent" />
-            <image
-              href="/fly.svg"
-              x={-24 / 2}
-              y={-24 / 2}
-              width={24}
-              height={24}
-            />
+            <image href="/fly.svg" x={-24 / 2} y={-24 / 2} width={24} height={24} />
           </g>
         </svg>
         );

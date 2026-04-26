@@ -35,6 +35,7 @@ import { DailyRewardPopup } from '@/components/ui/daily-reward/DailyRewardPopup'
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import useSWR, { mutate as swrMutate } from 'swr';
+import { cn } from '@/lib/utils';
 import {
   useTaskData,
   Task,
@@ -1277,7 +1278,12 @@ function TaskCounter({
       {count > 0 && (
         <motion.span
           animate={controls}
-          className="flex h-[18px] min-w-[18px] px-0.5 items-center justify-center rounded-full text-[9px] font-black shadow-sm !text-white bg-primary leading-none tracking-normal pt-px"
+          className={cn(
+            'flex h-[17px] min-w-[17px] px-1 items-center justify-center rounded-full text-[9px] font-black leading-none tracking-normal pt-px transition-colors',
+            isActive
+              ? 'bg-primary/10 text-primary'
+              : 'bg-muted text-muted-foreground/70',
+          )}
         >
           {count}
         </motion.span>

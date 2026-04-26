@@ -431,7 +431,7 @@ export function WardrobePanel({
         open={open}
         onOpenChange={onOpenChange}
         className="h-[90vh] sm:h-[90vh] sm:max-w-[95vw] lg:max-w-[1200px] select-none bg-background"
-        zIndex={999}
+        zIndex={1100}
       >
         {({ isDesktop, dragControls, isDragging }) => {
           overscrollDrag.setContext(dragControls, !isDesktop);

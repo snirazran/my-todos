@@ -1,10 +1,5 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
-import { X, Plus, LayoutGrid } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { BaseSheet } from '@/components/ui/BaseSheet';
+import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 
 // Widget icons/labels mapping (reusing from parent if possible, but defining here for now)
 const WIDGET_LABELS: Record<string, string> = {
@@ -38,58 +33,54 @@ interface AddWidgetDrawerProps {
 }
 
 export function AddWidgetDrawer({ open, onOpenChange, availableWidgets, onAdd }: AddWidgetDrawerProps) {
-    const [mounted, setMounted] = useState(false);
+    const overscrollDrag = useSheetOverscrollDrag();
 
-    useEffect(() => {
-        setMounted(true);
-    }, []);
+    return (
+        <BaseSheet
+            open={open}
+            onOpenChange={onOpenChange}
+            className="sm:max-w-xl bg-background"
+            zIndex={1000}
+        >
+            {({ isDesktop, dragControls }) => {
+                overscrollDrag.setContext(dragControls, !isDesktop);
 
-    if (!mounted) return null;
-
-    return createPortal(
-        <AnimatePresence>
-            {open && (
-                <>
-                    {/* Backdrop */}
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={() => onOpenChange(false)}
-                        className="fixed inset-0 z-[1001] bg-background/80 backdrop-blur-sm"
-                    />
-
-                    {/* Drawer */}
-                    <motion.div
-                        initial={{ y: '100%', opacity: 0.5 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: '100%', opacity: 0 }}
-                        transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                        className="fixed bottom-0 left-0 right-0 z-[1002] mx-auto w-full max-w-xl p-4 sm:p-6"
-                    >
-                        <div className="flex flex-col gap-4 rounded-3xl bg-popover border border-border/50 shadow-2xl p-6 ring-1 ring-border/10">
-                            <div className="flex items-center justify-between pl-1">
-                                <h2 className="text-xl font-bold flex items-center gap-2">
-                                    <span className="p-2 bg-primary/10 rounded-xl text-primary">
-                                        <Plus className="w-5 h-5" strokeWidth={3} />
-                                    </span>
+                return (
+                    <div className="flex flex-col h-full relative">
+                        {/* Header */}
+                        <div
+                            onPointerDown={(e) => !isDesktop && dragControls.start(e)}
+                            className="px-6 py-5 border-b border-border/50 shrink-0 flex items-center justify-between gap-3"
+                        >
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary/10 shrink-0">
+                                    <Plus className="w-5 h-5 text-primary" strokeWidth={3} />
+                                </div>
+                                <h2 className="text-xl font-black tracking-tight text-foreground uppercase leading-none">
                                     Add Widget
                                 </h2>
-                                <button 
-                                    onClick={() => onOpenChange(false)}
-                                    className="p-2 bg-muted rounded-full hover:bg-muted/80 transition-colors"
-                                >
-                                    <X className="w-5 h-5" />
-                                </button>
                             </div>
+                            <button
+                                onClick={() => onOpenChange(false)}
+                                onPointerDown={(e) => e.stopPropagation()}
+                                className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95 shrink-0"
+                            >
+                                <X className="w-4 h-4" strokeWidth={2.5} />
+                            </button>
+                        </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1 -mr-2">
+                        {/* Content Scrollable */}
+                        <div
+                            ref={overscrollDrag.bind}
+                            className="flex-1 overflow-y-auto p-6 space-y-4 scrollbar-hide overscroll-none"
+                        >
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-10">
                                 {availableWidgets.length === 0 ? (
                                     <div className="col-span-full py-12 text-center text-muted-foreground flex flex-col items-center gap-3">
                                         <div className="p-4 rounded-full bg-muted/50">
                                             <LayoutGrid className="w-8 h-8 opacity-20" />
                                         </div>
-                                        <p>You've added all available widgets!</p>
+                                        <p className="font-bold">You've added all available widgets!</p>
                                     </div>
                                 ) : (
                                     availableWidgets.map((id) => (
@@ -109,10 +100,10 @@ export function AddWidgetDrawer({ open, onOpenChange, availableWidgets, onAdd }:
                                 )}
                             </div>
                         </div>
-                    </motion.div>
-                </>
-            )}
-        </AnimatePresence>,
-        document.body
+                    </div>
+                );
+            }}
+        </BaseSheet>
     );
 }
+
