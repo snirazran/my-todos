@@ -1097,7 +1097,8 @@ function QuestCarousel({
   const pages = React.Children.toArray(children);
 
   const onPointerDown = (e: React.PointerEvent) => {
-    if (e.pointerType !== 'mouse') return; // let touch use native scroll
+    if (e.pointerType !== 'mouse') return;
+    if ((e.target as HTMLElement).closest('button, a, [role="button"]')) return;
     const el = scrollRef.current;
     if (!el) return;
     isDragging.current = true;
