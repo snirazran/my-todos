@@ -76,6 +76,7 @@ interface SellConfirmationDialogProps {
   onConfirm: (amount: number) => void;
   item: ItemDef | null;
   ownedCount: number;
+  paused?: boolean;
 }
 
 export function SellConfirmationDialog({
@@ -84,6 +85,7 @@ export function SellConfirmationDialog({
   onConfirm,
   item,
   ownedCount,
+  paused = false,
 }: SellConfirmationDialogProps) {
   const [quantity, setQuantity] = useState(1);
 
@@ -146,7 +148,7 @@ export function SellConfirmationDialog({
              <div className="absolute inset-0 z-10 flex items-end justify-center">
               {item.slot === 'container' ? (
                 <div className="w-[80%] h-[80%] mb-4 drop-shadow-xl">
-                   <GiftRive color={item.riveIndex} />
+                   <GiftRive color={item.riveIndex} paused={false} />
                 </div>
               ) : (
                 <Frog
@@ -154,6 +156,7 @@ export function SellConfirmationDialog({
                   indices={previewIndices}
                   width={140}
                   height={140}
+                  paused={paused}
                 />
               )}
             </div>
@@ -207,7 +210,7 @@ export function SellConfirmationDialog({
           <span className="text-sm font-medium text-muted-foreground">Total Refund</span>
           <div className="flex items-center gap-2 px-4 py-2 bg-green-500/10 text-green-600 dark:text-green-400 border border-green-500/20 rounded-2xl">
              <span className="text-xl font-black">+</span>
-             <Fly size={32} paused={false} y={-5} />  {/* Bigger Fly */}
+             <Fly size={32} paused={paused} y={-5} />  {/* Bigger Fly */}
              <span className="text-3xl font-black tracking-tight tabular-nums">{totalRefund}</span>
           </div>
         </div>

@@ -56,7 +56,7 @@ export const GiftRive = React.memo(
       layout: RIVE_LAYOUT,
     });
 
-    useRiveVisibility(rive, containerRef);
+    useRiveVisibility(rive, containerRef, !paused);
 
     const viewModel = useViewModel(rive, { useDefault: true });
     const viewModelInstance = useViewModelInstance(viewModel, {

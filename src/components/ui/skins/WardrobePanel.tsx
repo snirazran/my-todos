@@ -433,7 +433,7 @@ export function WardrobePanel({
         className="h-[90vh] sm:h-[90vh] sm:max-w-[95vw] lg:max-w-[1200px] select-none bg-background"
         zIndex={999}
       >
-        {({ isDesktop, dragControls }) => {
+        {({ isDesktop, dragControls, isDragging }) => {
           overscrollDrag.setContext(dragControls, !isDesktop);
 
           return (
@@ -475,7 +475,7 @@ export function WardrobePanel({
                           : 'bg-secondary border-border text-foreground hover:bg-secondary/80 hover:border-primary/40',
                       )}
                     >
-                      <Fly size={24} y={-4} />
+                      <Fly size={24} y={-4} paused={isDragging} />
                       <span className="tabular-nums">{balance.toLocaleString()}</span>
                       <span className="flex items-center justify-center w-4 h-4 rounded-full bg-primary/15 text-primary text-[10px] font-black leading-none ml-0.5">
                         +
@@ -649,8 +649,9 @@ export function WardrobePanel({
                                 isNew={unseenInventorySet.has(item.id)}
                                 deferPreview
                                 pausePreview={
-                                  item.slot !== 'container' &&
-                                  data?.wardrobe?.equipped?.[item.slot] !== item.id
+                                  (item.slot !== 'container' && isDragging) ||
+                                  (item.slot !== 'container' &&
+                                   data?.wardrobe?.equipped?.[item.slot] !== item.id)
                                 }
                                 previewDelayMs={150 + index * 55}
                               />
@@ -723,7 +724,7 @@ export function WardrobePanel({
                                   }
                                   onAction={(e) => handleBuyItem(item, e)}
                                   deferPreview
-                                  pausePreview={item.slot !== 'container' && confirmingBuyId !== item.id}
+                                  pausePreview={(item.slot !== 'container' && isDragging) || (item.slot !== 'container' && confirmingBuyId !== item.id)}
                                   previewDelayMs={150 + index * 55}
                                 />
                               );
@@ -756,6 +757,7 @@ export function WardrobePanel({
                             activeFilter === 'container' ? 'all' : activeFilter
                           }
                           sortBy={sortBy}
+                          paused={isDragging}
                         />
                       ) : null}
                     </TabsContent>
@@ -769,28 +771,30 @@ export function WardrobePanel({
                   </div>
                 </Tabs>
               </div>
+
+              <SellConfirmationDialog
+                open={!!itemToSell}
+                onClose={() => setItemToSell(null)}
+                onConfirm={confirmSell}
+                item={itemToSell}
+                ownedCount={
+                  itemToSell ? (data?.wardrobe?.inventory?.[itemToSell.id] ?? 0) : 0
+                }
+                paused={isDragging}
+              />
+
+              {openingGiftId && (
+                <GiftBoxOpening
+                  giftBoxId={openingGiftId}
+                  onClose={() => setOpeningGiftId(null)}
+                  onWin={refreshInventory}
+                  paused={isDragging}
+                />
+              )}
             </div>
           );
         }}
       </BaseSheet>
-
-      <SellConfirmationDialog
-        open={!!itemToSell}
-        onClose={() => setItemToSell(null)}
-        onConfirm={confirmSell}
-        item={itemToSell}
-        ownedCount={
-          itemToSell ? (data?.wardrobe?.inventory?.[itemToSell.id] ?? 0) : 0
-        }
-      />
-
-      {openingGiftId && (
-        <GiftBoxOpening
-          giftBoxId={openingGiftId}
-          onClose={() => setOpeningGiftId(null)}
-          onWin={refreshInventory}
-        />
-      )}
     </>
   );
 }

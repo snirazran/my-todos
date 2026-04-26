@@ -564,7 +564,7 @@ export function QuestsPopup({
         className="h-[92vh] sm:h-[88vh] sm:max-w-[1080px]"
         zIndex={1050}
       >
-        {({ isDesktop, dragControls }) => {
+        {({ isDesktop, dragControls, isDragging }) => {
           overscrollDrag.setContext(dragControls, !isDesktop);
 
           return (
@@ -749,6 +749,7 @@ export function QuestsPopup({
                                   objectiveId,
                                 )
                               }
+                              paused={isDragging}
                             />
                           ) : (
                             <QuestCarousel
@@ -779,6 +780,7 @@ export function QuestsPopup({
                                   onClaimObjective={(objectiveId) =>
                                     handleClaimObjective(quest.id, objectiveId)
                                   }
+                                  paused={isDragging}
                                 />
                               ))}
                             </QuestCarousel>
@@ -824,6 +826,7 @@ export function QuestsPopup({
                                   onClaimObjective={(objectiveId) =>
                                     handleClaimObjective(quest.id, objectiveId)
                                   }
+                                  paused={isDragging}
                                 />
                               );
                             }
@@ -850,6 +853,7 @@ export function QuestsPopup({
                                         objectiveId,
                                       )
                                     }
+                                    paused={isDragging}
                                   />
                                 ))}
                               </QuestCarousel>
@@ -874,40 +878,18 @@ export function QuestsPopup({
                   </div>
                 )}
               </div>
+              <QuestRewardRevealOverlay
+                queue={rewardRevealQueue}
+                openingGiftKey={openingGiftKey}
+                isPremium={data?.isPremium ?? false}
+                onClaim={handleRewardRevealClaim}
+                onOpenGift={handleRewardRevealOpenGift}
+                paused={isDragging}
+              />
             </>
           );
         }}
       </BaseSheet>
-      <TagPopup
-        open={!!editingFocusCategoryId}
-        onClose={() => setEditingFocusCategoryId(null)}
-        taskId={editingFocusCategoryId}
-        initialTags={
-          editingFocusCategoryId
-            ? (categoryTagMap.get(editingFocusCategoryId) ?? [])
-            : []
-        }
-        onSave={handleSaveFocusTags}
-        eyebrow="My Focus"
-        title={
-          editingFocusCategory
-            ? `${editingFocusCategory.name} Tags`
-            : 'Focus Tags'
-        }
-        description={
-          editingFocusCategory
-            ? `Choose which tags should count toward your ${editingFocusCategory.name.toLowerCase()} quests.`
-            : 'Choose the tags that should guide quests for this focus area.'
-        }
-        saveLabel="Save focus tags"
-      />
-      <QuestRewardRevealOverlay
-        queue={rewardRevealQueue}
-        openingGiftKey={openingGiftKey}
-        isPremium={data?.isPremium ?? false}
-        onClaim={handleRewardRevealClaim}
-        onOpenGift={handleRewardRevealOpenGift}
-      />
     </>
   );
 }
@@ -915,9 +897,11 @@ export function QuestsPopup({
 function PremiumFlyCounter({
   baseAmount,
   finalAmount,
+  paused = false,
 }: {
   baseAmount: number;
   finalAmount: number;
+  paused?: boolean;
 }) {
   const [displayAmount, setDisplayAmount] = useState(baseAmount);
   const [showDouble, setShowDouble] = useState(false);
@@ -947,7 +931,7 @@ function PremiumFlyCounter({
 
   return (
     <div className="relative flex items-center justify-center w-full h-full">
-      <Fly size={132} />
+      <Fly size={132} paused={paused} />
       <motion.span
         key={displayAmount}
         animate={showDouble ? { scale: [1.3, 1] } : {}}
@@ -966,12 +950,14 @@ function QuestRewardRevealOverlay({
   isPremium,
   onClaim,
   onOpenGift,
+  paused = false,
 }: {
   queue: QuestRewardRevealEntry[];
   openingGiftKey: string | null;
   isPremium: boolean;
   onClaim: () => void;
   onOpenGift: (entry: QuestRewardRevealEntry) => void;
+  paused?: boolean;
 }) {
   const entry = queue[0] ?? null;
   return createPortal(
@@ -1018,6 +1004,7 @@ function QuestRewardRevealOverlay({
               baseQuantity={entry.baseQuantity}
               isPremium={isPremium && !!entry.isQuestReward}
               showDoubleUpsell={!isPremium && !!entry.isQuestReward}
+              paused={paused}
               customPreview={
                 entry.fliesGranted ? (
                   entry.baseFlies ? (
@@ -1027,7 +1014,7 @@ function QuestRewardRevealOverlay({
                     />
                   ) : (
                     <div className="relative flex items-center justify-center w-full h-full">
-                      <Fly size={132} />
+                      <Fly size={132} paused={paused} />
                       <span className="absolute z-40 px-3 py-1 text-sm font-black text-white border shadow-sm right-3 top-3 rounded-xl border-white/20 bg-black/45 backdrop-blur-sm">
                         x{entry.fliesGranted}
                       </span>

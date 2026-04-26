@@ -84,7 +84,7 @@ export function DailyRewardPopup({
         className="h-[92vh] sm:h-[88vh] sm:max-w-[980px] bg-background"
         zIndex={1060}
       >
-        {({ isDesktop, dragControls }) => (
+        {({ isDesktop, dragControls, isDragging }) => (
           <div className="relative flex h-full flex-col">
             <div
               onPointerDown={(e) => !isDesktop && dragControls.start(e)}
@@ -137,6 +137,7 @@ export function DailyRewardPopup({
                 isPremium={statusData.isPremium}
                 onClaim={handleClaim}
                 onGoPremium={() => setShowPremiumPopup(true)}
+                pausePreview={isDragging}
               />
             </div>
 

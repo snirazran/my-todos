@@ -18,10 +18,12 @@ export default function GiftBoxOpening({
   onClose,
   onWin,
   giftBoxId = 'gift_box_1',
+  paused = false,
 }: {
   onClose: () => void;
   onWin?: (item: ItemDef) => void;
   giftBoxId?: string;
+  paused?: boolean;
 }) {
   const { user } = useAuth();
   const router = useRouter();
@@ -176,6 +178,7 @@ export default function GiftBoxOpening({
               prize={prize}
               claiming={claiming}
               onClaim={handleClaim}
+              paused={paused}
             />
           )}
         </AnimatePresence>

@@ -11,6 +11,7 @@ interface MonthProgressProps {
   currentDay: number;
   isPremium: boolean;
   onGoPremium?: () => void;
+  pausePreview?: boolean;
 }
 
 export function MonthProgress({
@@ -19,6 +20,7 @@ export function MonthProgress({
   currentDay,
   isPremium,
   onGoPremium,
+  pausePreview = false,
 }: MonthProgressProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -101,7 +103,7 @@ export function MonthProgress({
                       isToday={isToday}
                       hideDayLabel
                       deferPreview
-                      pausePreview={!isToday}
+                      pausePreview={pausePreview || !isToday}
                       previewDelayMs={150 + (dayDef.day % 4) * 55}
                       previewRootMargin="120px"
                       previewUnmountDelayMs={2000}
@@ -150,7 +152,7 @@ export function MonthProgress({
                       isToday={isToday}
                       hideDayLabel
                       deferPreview
-                      pausePreview={!isToday}
+                      pausePreview={pausePreview || !isToday}
                       previewDelayMs={170 + (dayDef.day % 4) * 55}
                       previewRootMargin="120px"
                       previewUnmountDelayMs={2000}

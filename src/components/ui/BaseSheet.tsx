@@ -8,7 +8,11 @@ import { cn } from '@/lib/utils';
 export interface BaseSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  children: (props: { isDesktop: boolean; dragControls: any }) => React.ReactNode;
+  children: (props: {
+    isDesktop: boolean;
+    dragControls: any;
+    isDragging: boolean;
+  }) => React.ReactNode;
   /** Extra classes on the sheet panel itself */
   className?: string;
   /** Extra classes on the backdrop */
@@ -38,6 +42,7 @@ export function BaseSheet({
 }: BaseSheetProps) {
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const dragControls = useDragControls();
 
   useEffect(() => {
@@ -96,7 +101,9 @@ export function BaseSheet({
               dragConstraints={{ top: 0, bottom: 0 }}
               dragElastic={{ top: 0, bottom: 0.8 }}
               dragMomentum={false}
+              onDragStart={() => setIsDragging(true)}
               onDragEnd={(_e, { offset, velocity }) => {
+                setIsDragging(false);
                 if (offset.y > 150 || velocity.y > 500) onOpenChange(false);
               }}
               className={cn(
@@ -114,7 +121,7 @@ export function BaseSheet({
                 </div>
               )}
 
-              {children({ isDesktop, dragControls })}
+              {children({ isDesktop, dragControls, isDragging })}
             </motion.div>
           </div>
         </>

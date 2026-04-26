@@ -57,7 +57,7 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
 
     const { RiveComponent, rive } = useRive(riveOptions);
 
-    useRiveVisibility(rive, innerRef);
+    useRiveVisibility(rive, innerRef, !paused);
 
     const viewModel = useViewModel(rive, { useDefault: true });
     const viewModelInstance = useViewModelInstance(viewModel, {

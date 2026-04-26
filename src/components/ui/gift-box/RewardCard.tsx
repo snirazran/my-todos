@@ -20,6 +20,7 @@ type RewardCardProps = {
   baseQuantity?: number;
   isPremium?: boolean;
   showDoubleUpsell?: boolean;
+  paused?: boolean;
 };
 
 const GLOW_COLORS = {
@@ -42,6 +43,7 @@ export const RewardCard = ({
   baseQuantity,
   isPremium,
   showDoubleUpsell,
+  paused = false,
 }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
   const [localClaiming, setLocalClaiming] = useState(false);
@@ -222,7 +224,7 @@ export const RewardCard = ({
                       customPreview
                     ) : prize.slot === 'container' ? (
                       <div className="h-[120%] w-auto aspect-[282/381] mb-2">
-                        <GiftRive className="w-full h-full" color={prize.riveIndex} />
+                        <GiftRive className="w-full h-full" color={prize.riveIndex} paused={false} />
                       </div>
                     ) : (
                       <Frog
@@ -236,6 +238,7 @@ export const RewardCard = ({
                         }}
                         width={300}
                         height={300}
+                        paused={paused}
                       />
                     )}
                   </motion.div>

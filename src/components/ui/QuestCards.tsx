@@ -72,6 +72,7 @@ type BaseCardProps = {
   buttonDisabled?: boolean;
   onClaim?: () => void;
   onClaimObjective?: (objectiveId: string) => void;
+  paused?: boolean;
 };
 
 type RewardPopupState = {
@@ -324,6 +325,7 @@ export function DailyQuestPresentationCard({
   buttonDisabled,
   onClaim,
   onClaimObjective,
+  paused = false,
 }: BaseCardProps & {
   quest: QuestCardData & { placement: 'daily' };
 }) {
@@ -370,6 +372,7 @@ export function DailyQuestPresentationCard({
               rewardCatalog={rewardCatalog}
               isPremium={isPremium}
               compact
+              paused={paused}
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
               hydrateDelayMs={150 + index * 55}
               onClick={() =>
@@ -401,6 +404,7 @@ export function DailyQuestPresentationCard({
             claimingObjective={claimingObjectiveId === block.id}
             isPremium={isPremium}
             rewardCatalog={rewardCatalog}
+            paused={paused}
             onOpenRewards={(rewards) =>
               setRewardPopup({
                 eyebrow: 'Objective',
@@ -433,6 +437,7 @@ export function DailyQuestPresentationCard({
         rewardCatalog={rewardCatalog}
         isPremium={isPremium}
         onClose={() => setRewardPopup(null)}
+        paused={paused}
       />
     </div>
   );
@@ -451,6 +456,7 @@ export function CategoryQuestPresentationCard({
   buttonDisabled,
   onClaim,
   onClaimObjective,
+  paused = false,
 }: BaseCardProps & {
   quest: QuestCardData & {
     placement: 'category';
@@ -513,6 +519,7 @@ export function CategoryQuestPresentationCard({
               rewardCatalog={rewardCatalog}
               isPremium={isPremium}
               compact
+              paused={paused}
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
               hydrateDelayMs={150 + index * 55}
               onClick={() =>
@@ -551,6 +558,7 @@ export function CategoryQuestPresentationCard({
               claimingObjective={claimingObjectiveId === block.id}
               isPremium={isPremium}
               rewardCatalog={rewardCatalog}
+              paused={paused}
               onOpenRewards={(rewards) =>
                 setRewardPopup({
                   eyebrow: 'Objective',
@@ -651,6 +659,7 @@ function ObjectiveRow({
   onOpenRewards,
   onClaimObjective,
   isLast,
+  paused = false,
 }: {
   block: QuestCardLogicBlock;
   objectiveClaimed?: boolean;
@@ -660,6 +669,7 @@ function ObjectiveRow({
   onOpenRewards?: (rewards: QuestReward[]) => void;
   onClaimObjective?: () => void;
   isLast?: boolean;
+  paused?: boolean;
 }) {
   const safeTarget = Math.max(1, block.target);
   const objectiveComplete = block.progress >= safeTarget;
@@ -710,7 +720,7 @@ function ObjectiveRow({
                 rewardCatalog={rewardCatalog}
                 isPremium={isPremium ?? false}
                 compact
-                paused
+                paused={paused}
                 className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
                 hydrateDelayMs={150 + index * 55}
                 onClick={() => onOpenRewards?.(block.rewards ?? [])}
@@ -917,6 +927,7 @@ function RewardDetailsPopup({
   rewardCatalog,
   isPremium,
   onClose,
+  paused = false,
 }: {
   open: boolean;
   eyebrow: string;
@@ -925,6 +936,7 @@ function RewardDetailsPopup({
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
   onClose: () => void;
+  paused?: boolean;
 }) {
   if (!open || typeof document === 'undefined') return null;
 
@@ -963,6 +975,7 @@ function RewardDetailsPopup({
               reward={reward}
               rewardCatalog={rewardCatalog}
               isPremium={isPremium}
+              paused={paused}
             />
           ))}
         </div>
@@ -976,10 +989,12 @@ function QuestRewardDetailCard({
   reward,
   rewardCatalog,
   isPremium,
+  paused = false,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
   isPremium: boolean;
+  paused?: boolean;
 }) {
   const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
 
@@ -992,7 +1007,7 @@ function QuestRewardDetailCard({
           <div className="absolute right-1.5 top-1.5 z-20 rounded-lg border border-white/10 bg-black/50 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm">
             {quantityLabel}
           </div>
-          <Fly size={62} y={-1} />
+          <Fly size={62} y={-1} paused={paused} />
         </div>
         <p className="pb-1 text-xs font-bold leading-tight text-foreground">
           {rewardLabel(reward, rewardCatalog, isPremium)}
@@ -1017,6 +1032,7 @@ function QuestRewardDetailCard({
       mode="inventory"
       hidePrice
       customAction={<div className="h-0" />}
+      pausePreview={paused}
     />
   );
 }
@@ -1098,7 +1114,7 @@ export const RewardTile = memo(function RewardTile({
                 : 'h-[120%] w-[120%]',
             )}
           >
-            <GiftRive className="w-full h-full" color={item.riveIndex} />
+            <GiftRive className="w-full h-full" color={item.riveIndex} paused={false} />
           </div>
         </div>
       ) : previewIndices && hasHydrated ? (

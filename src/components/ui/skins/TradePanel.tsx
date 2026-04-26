@@ -96,6 +96,7 @@ type TradePanelProps = {
   onTradeSuccess?: () => void;
   activeFilter?: FilterCategory;
   sortBy?: SortOrder;
+  paused?: boolean;
 };
 
 export function TradePanel({
@@ -105,6 +106,7 @@ export function TradePanel({
   onTradeSuccess,
   activeFilter = 'all',
   sortBy = 'rarity_desc',
+  paused = false,
 }: TradePanelProps) {
   // --- State ---
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -326,6 +328,7 @@ export function TradePanel({
                 prize={tradeResult}
                 claiming={false}
                 onClaim={handleClaimReward}
+                paused={paused}
               />
             </div>
           </div>,
@@ -395,7 +398,7 @@ export function TradePanel({
                         actionLabel={null}
                         isNew={unseenItems.includes(item.id)}
                         deferPreview
-                        pausePreview
+                        pausePreview={paused}
                         previewDelayMs={150 + index * 55}
                       />
                     </div>
@@ -479,6 +482,7 @@ export function TradePanel({
                             }}
                             width={60}
                             height={60}
+                            paused={paused}
                           />
                         </div>
                       ) : (

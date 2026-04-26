@@ -278,13 +278,13 @@ function ItemCardComponent({
         )}
 
         <div className="absolute inset-0 z-10 flex items-end justify-center">
-          {customPreview ? (
-            customPreview
-          ) : shouldShowPlaceholder ? (
+          {shouldShowPlaceholder ? (
             <LightweightItemPreview
               item={item}
               toneClassName={config.text}
             />
+          ) : customPreview ? (
+            customPreview
           ) : item.slot === 'container' ? (
             <div
               className={cn(
@@ -395,6 +395,7 @@ function ItemCardComponent({
                       size={18}
                       className={cn(canAfford ? 'opacity-80' : 'opacity-100')}
                       y={-2}
+                      paused={true}
                     />
                     <span className={cn(canAfford ? '' : 'font-black')}>
                       {item.priceFlies}
@@ -424,7 +425,7 @@ function ItemCardComponent({
                 <span className="flex items-center gap-1">
                   Sell
                   <span className="mx-1 opacity-40">|</span>
-                  <Fly size={18} className="opacity-80" y={-3} />+
+                  <Fly size={18} className="opacity-80" y={-3} paused={true} />+
                   {Math.floor((item.priceFlies || 0) / 2)}
                 </span>
               </Button>

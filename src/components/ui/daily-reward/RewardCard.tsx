@@ -166,7 +166,7 @@ export function SingleRewardCard({
           hidePrice={true}
           hideRarity={rewardType === 'FLIES'} // Hide rarity for flies
           deferPreview={deferPreview && rewardType !== 'FLIES'}
-          pausePreview={pausePreview}
+          pausePreview={pausePreview && itemDef.slot !== 'container'}
           previewDelayMs={previewDelayMs}
           previewRootMargin={previewRootMargin}
           previewUnmountDelayMs={previewUnmountDelayMs}
