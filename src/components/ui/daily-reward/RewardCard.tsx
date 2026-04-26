@@ -53,6 +53,11 @@ export function SingleRewardCard({
   isPremiumTier,
   isToday,
   hideDayLabel,
+  deferPreview = false,
+  pausePreview = false,
+  previewDelayMs = 0,
+  previewRootMargin,
+  previewUnmountDelayMs,
 }: {
   day: number;
   rewardType: 'FLIES' | 'ITEM' | 'BOX';
@@ -63,6 +68,11 @@ export function SingleRewardCard({
   isPremiumTier?: boolean;
   isToday?: boolean;
   hideDayLabel?: boolean;
+  deferPreview?: boolean;
+  pausePreview?: boolean;
+  previewDelayMs?: number;
+  previewRootMargin?: string;
+  previewUnmountDelayMs?: number;
 }) {
   const isReady = status === 'READY';
   const isLockedPremium = status === 'LOCKED_PREMIUM';
@@ -76,7 +86,7 @@ export function SingleRewardCard({
     rewardType === 'FLIES' ? (
       <div className="flex flex-col items-center justify-center gap-1 h-full w-full pb-0">
         <div className="relative">
-          <Fly size={60} />
+          <Fly size={60} paused={pausePreview} />
         </div>
       </div>
     ) : undefined;
@@ -155,6 +165,12 @@ export function SingleRewardCard({
           customPreview={customPreview}
           hidePrice={true}
           hideRarity={rewardType === 'FLIES'} // Hide rarity for flies
+          deferPreview={deferPreview && rewardType !== 'FLIES'}
+          pausePreview={pausePreview}
+          previewDelayMs={previewDelayMs}
+          previewRootMargin={previewRootMargin}
+          previewUnmountDelayMs={previewUnmountDelayMs}
+          previewClassName="translate-y-[18%] scale-110"
         />
         {muted && (
           <div className="pointer-events-none absolute inset-0 rounded-2xl bg-background/20" />

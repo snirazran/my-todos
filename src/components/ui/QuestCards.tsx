@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Check, Clock, Gift, Plus, Trophy, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -198,6 +198,44 @@ function useTimeLeft() {
   return label;
 }
 
+function useDelayedHydration<T extends HTMLElement>(
+  delayMs = 0,
+  rootMargin = '360px',
+) {
+  const ref = useRef<T | null>(null);
+  const [nearViewport, setNearViewport] = useState(false);
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const isNear = entry.isIntersecting;
+        setNearViewport(isNear);
+      },
+      { rootMargin, threshold: [0, 0.01] },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [rootMargin]);
+
+  useEffect(() => {
+    if (!nearViewport || hasHydrated) return;
+    const timer = window.setTimeout(() => setHasHydrated(true), delayMs);
+    return () => window.clearTimeout(timer);
+  }, [delayMs, hasHydrated, nearViewport]);
+
+  useEffect(() => {
+    if (!hasHydrated || nearViewport) return;
+    const timer = window.setTimeout(() => setHasHydrated(false), 2400);
+    return () => window.clearTimeout(timer);
+  }, [hasHydrated, nearViewport]);
+
+  return { ref, hasHydrated };
+}
+
 function formatCountdown(diffMs: number) {
   if (diffMs <= 0) return 'Expired';
   const totalMinutes = Math.max(1, Math.ceil(diffMs / 60_000));
@@ -333,6 +371,7 @@ export function DailyQuestPresentationCard({
               isPremium={isPremium}
               compact
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
+              hydrateDelayMs={150 + index * 55}
               onClick={() =>
                 setRewardPopup({
                   eyebrow: 'Quest',
@@ -475,6 +514,7 @@ export function CategoryQuestPresentationCard({
               isPremium={isPremium}
               compact
               className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
+              hydrateDelayMs={150 + index * 55}
               onClick={() =>
                 setRewardPopup({
                   eyebrow: 'Quest',
@@ -670,7 +710,9 @@ function ObjectiveRow({
                 rewardCatalog={rewardCatalog}
                 isPremium={isPremium ?? false}
                 compact
+                paused
                 className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
+                hydrateDelayMs={150 + index * 55}
                 onClick={() => onOpenRewards?.(block.rewards ?? [])}
               />
             ))}
@@ -979,13 +1021,15 @@ function QuestRewardDetailCard({
   );
 }
 
-export function RewardTile({
+export const RewardTile = memo(function RewardTile({
   reward,
   rewardCatalog,
   isPremium,
   compact = false,
   className,
   onClick,
+  hydrateDelayMs = 0,
+  paused = false,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -993,7 +1037,12 @@ export function RewardTile({
   compact?: boolean;
   className?: string;
   onClick?: () => void;
+  hydrateDelayMs?: number;
+  paused?: boolean;
 }) {
+  const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
+    hydrateDelayMs,
+  );
   const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
   const tone = item
     ? REWARD_TILE_TONE[item.rarity]
@@ -1013,6 +1062,7 @@ export function RewardTile({
 
   return (
     <div
+      ref={ref}
       className={cn(
         'group relative flex items-center justify-center overflow-visible border-2 shadow-sm',
         tone.border,
@@ -1037,9 +1087,9 @@ export function RewardTile({
     >
       {reward.type === 'FLIES' ? (
         <div className="relative flex items-center justify-center w-full h-full">
-          <Fly size={compact ? 30 : 22} y={-1} />
+          <Fly size={compact ? 30 : 22} y={-1} paused={paused} />
         </div>
-      ) : item?.slot === 'container' ? (
+      ) : item?.slot === 'container' && hasHydrated ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           <div
             className={cn(
@@ -1051,7 +1101,7 @@ export function RewardTile({
             <GiftRive className="w-full h-full" color={item.riveIndex} />
           </div>
         </div>
-      ) : previewIndices ? (
+      ) : previewIndices && hasHydrated ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
           <Frog
             className={cn(
@@ -1063,15 +1113,11 @@ export function RewardTile({
             indices={previewIndices}
             width={compact ? 96 : 64}
             height={compact ? 96 : 64}
+            paused={paused}
           />
         </div>
-      ) : reward.type === 'BOX' ? (
-        <Gift
-          className={cn(
-            'relative text-primary',
-            compact ? 'h-5 w-5' : 'h-4 w-4',
-          )}
-        />
+      ) : item || reward.type === 'BOX' ? (
+        <RewardTileGloss />
       ) : (
         <Trophy
           className={cn(
@@ -1098,6 +1144,14 @@ export function RewardTile({
           {quantityLabel}
         </span>
       </div>
+    </div>
+  );
+});
+
+function RewardTileGloss() {
+  return (
+    <div className="absolute inset-0 overflow-hidden rounded-[inherit]">
+      <div className="absolute inset-y-[-24%] left-0 w-1/3 bg-gradient-to-r from-transparent via-white/65 to-transparent opacity-90 animate-shine dark:via-current dark:opacity-20" />
     </div>
   );
 }

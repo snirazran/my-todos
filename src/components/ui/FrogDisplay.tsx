@@ -84,14 +84,17 @@ export function FrogDisplay({
 
   // Constant visual decay
   React.useEffect(() => {
-    if (!animateHunger || displayedHunger <= 0) return;
+    if (!animateHunger) return;
 
     const interval = setInterval(() => {
-      setDisplayedHunger((prev) => Math.max(0, prev - 1000));
+      setDisplayedHunger((prev) => {
+        if (prev <= 0) return 0;
+        return prev - 1000;
+      });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [displayedHunger]);
+  }, [animateHunger]);
 
   const hungerPercent =
     typeof displayedHunger === 'number' && typeof maxHunger === 'number'
@@ -210,11 +213,11 @@ export function FrogDisplay({
 
               <div
                 className={cn(
-                  'absolute bottom-0 left-0 right-0 z-0',
-                  animateHunger && 'transition-all duration-1000 ease-in-out',
+                  'absolute bottom-0 left-0 right-0 z-0 h-full origin-bottom',
+                  animateHunger && 'transition-transform duration-1000 ease-in-out',
                   hungerColor,
                 )}
-                style={{ height: `${hungerPercent}%`, opacity: 0.2 }}
+                style={{ transform: `scaleY(${hungerPercent / 100})`, opacity: 0.2 }}
               />
 
               {/* Icon Container */}

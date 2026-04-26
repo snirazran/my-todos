@@ -1,5 +1,3 @@
-import type { ItemDef } from './skins/catalog';
-
 export type RewardType = 'FLIES' | 'ITEM' | 'BOX';
 
 export type DailyRewardDef = {
@@ -16,54 +14,21 @@ export type DailyRewardDef = {
   };
 };
 
+const TEST_FROG_REWARD_IDS = ['skin_pink', 'skin_blue', 'skin_rainbow'];
+
 // 30-day schedule
 export const REWARD_SCHEDULE: DailyRewardDef[] = Array.from(
   { length: 31 },
   (_, i) => {
     const day = i + 1;
-    const isMilestone = day % 5 === 0;
-    const isBigMilestone = day % 30 === 0;
-
-    // Base rewards
-    let freeReward: DailyRewardDef['free'] = { type: 'FLIES', amount: 100 };
-    let premiumReward: DailyRewardDef['premium'] = {
-      type: 'FLIES',
-      amount: 300,
-    };
-
-    if (isBigMilestone) {
-      // day 30
-      freeReward = { type: 'BOX', itemId: 'box_gold' };
-      premiumReward = { type: 'BOX', itemId: 'box_diamond' };
-    } else if (isMilestone) {
-      // day 5, 10, 15, 20, 25
-      freeReward = { type: 'BOX', itemId: 'box_silver' };
-      premiumReward = { type: 'BOX', itemId: 'box_gold' };
-    } else {
-      // Regular days
-      // Small variance for fun could be added here
-      freeReward = { type: 'FLIES', amount: 50 + day * 5 };
-      premiumReward = { type: 'FLIES', amount: 150 + day * 10 };
-
-      // Inject specific items
-      if (day === 3) {
-        freeReward = { type: 'ITEM', itemId: 'body_red_scarf' };
-      }
-      if (day === 7) {
-        premiumReward = { type: 'ITEM', itemId: 'hat_girl_hair' };
-      }
-      if (day === 14) {
-        premiumReward = { type: 'ITEM', itemId: 'hat_pirate' };
-      }
-      if (day === 21) {
-        premiumReward = { type: 'ITEM', itemId: 'skin_blue' };
-      }
-    }
+    const freeItemId = TEST_FROG_REWARD_IDS[i % TEST_FROG_REWARD_IDS.length];
+    const premiumItemId =
+      TEST_FROG_REWARD_IDS[(i + 1) % TEST_FROG_REWARD_IDS.length];
 
     return {
       day,
-      free: freeReward,
-      premium: premiumReward,
+      free: { type: 'ITEM', itemId: freeItemId },
+      premium: { type: 'ITEM', itemId: premiumItemId },
     };
   },
 );

@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useLayoutEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { REWARD_SCHEDULE } from '@/lib/dailyRewards';
 import { SingleRewardCard } from './RewardCard';
@@ -22,20 +22,16 @@ export function MonthProgress({
 }: MonthProgressProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const el = containerRef.current;
-      if (!el) return;
-      const target = el.querySelector(
-        `[data-day="${currentDay}"]`,
-      ) as HTMLElement;
-      if (target) {
-        const scrollPos =
-          target.offsetTop - el.clientHeight / 2 + target.offsetHeight / 2;
-        el.scrollTo({ top: Math.max(0, scrollPos), behavior: 'smooth' });
-      }
-    }, 500);
-    return () => clearTimeout(timer);
+  useLayoutEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const target = el.querySelector(`[data-day="${currentDay}"]`) as HTMLElement;
+    if (!target) return;
+
+    const scrollPos =
+      target.offsetTop - el.clientHeight / 2 + target.offsetHeight / 2;
+    el.scrollTop = Math.max(0, scrollPos);
   }, [currentDay]);
 
   const getStatus = (day: number, isPremiumRow: boolean) => {
@@ -104,6 +100,11 @@ export function MonthProgress({
                       status={freeStatus}
                       isToday={isToday}
                       hideDayLabel
+                      deferPreview
+                      pausePreview={!isToday}
+                      previewDelayMs={150 + (dayDef.day % 4) * 55}
+                      previewRootMargin="120px"
+                      previewUnmountDelayMs={2000}
                       onClick={
                         isToday && freeStatus === 'READY'
                           ? () => onClaim(dayDef.day)
@@ -148,6 +149,11 @@ export function MonthProgress({
                       isPremiumTier
                       isToday={isToday}
                       hideDayLabel
+                      deferPreview
+                      pausePreview={!isToday}
+                      previewDelayMs={170 + (dayDef.day % 4) * 55}
+                      previewRootMargin="120px"
+                      previewUnmountDelayMs={2000}
                       onClick={
                         !isPremium
                           ? onGoPremium

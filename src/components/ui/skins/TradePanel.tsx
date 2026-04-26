@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Sparkles, AlertCircle, Plus, ArrowUp } from 'lucide-react';
+import { ArrowRight, Sparkles, AlertCircle, Plus, ArrowUp, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ItemDef, Rarity, rarityRank } from '@/lib/skins/catalog';
 import { Button } from '@/components/ui/button';
@@ -112,6 +112,10 @@ export function TradePanel({
   const [tradeResult, setTradeResult] = useState<ItemDef | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
+  const [gridInitialSize, setGridInitialSize] = useState(4);
+  const [gridBatchSize, setGridBatchSize] = useState(6);
+  const inventoryScrollRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     setMounted(true);
@@ -123,6 +127,21 @@ export function TradePanel({
     const firstItem = catalog.find((i) => i.id === selectedIds[0]);
     return firstItem?.rarity || null;
   }, [selectedIds, catalog]);
+
+  useEffect(() => {
+    setInventoryHasScrolled(false);
+  }, [activeFilter, sortBy, targetRarity]);
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 768px)');
+    const update = () => {
+      setGridInitialSize(query.matches ? 10 : 4);
+      setGridBatchSize(query.matches ? 10 : 6);
+    };
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
 
   const availableItems = useMemo(() => {
     const ownedIds = Object.keys(inventory);
@@ -165,10 +184,51 @@ export function TradePanel({
   }, [inventory, catalog, targetRarity, activeFilter, sortBy]);
 
   const availableGrid = useInfiniteScroll(availableItems, {
-    initial: 18,
-    batch: 18,
-    resetKey: `${activeFilter}|${sortBy}|${targetRarity ?? ''}`,
+    initial: gridInitialSize,
+    batch: gridBatchSize,
+    resetKey: `${activeFilter}|${sortBy}|${targetRarity ?? ''}|${gridInitialSize}|${gridBatchSize}`,
+    rootRef: inventoryScrollRef,
+    enabled: inventoryHasScrolled,
   });
+
+  useEffect(() => {
+    if (gridInitialSize >= gridBatchSize || !availableGrid.hasMore) return;
+
+    let cancelIdleLoad: (() => void) | undefined;
+    const loadTimer = window.setTimeout(() => {
+      if ('requestIdleCallback' in window) {
+        const idleId = window.requestIdleCallback(
+          () => availableGrid.loadMore(),
+          { timeout: 700 },
+        );
+        cancelIdleLoad = () => window.cancelIdleCallback(idleId);
+      } else {
+        const fallbackTimer = globalThis.setTimeout(
+          availableGrid.loadMore,
+          0,
+        );
+        cancelIdleLoad = () => globalThis.clearTimeout(fallbackTimer);
+      }
+    }, 900);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+      cancelIdleLoad?.();
+    };
+  }, [
+    activeFilter,
+    availableGrid.hasMore,
+    availableGrid.loadMore,
+    gridBatchSize,
+    gridInitialSize,
+    sortBy,
+    targetRarity,
+  ]);
+
+  const isNearScrollEnd = (node: HTMLElement) =>
+    node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
+  const shouldLoadMoreFromWheel = (node: HTMLElement, deltaY: number) =>
+    deltaY > 0 && node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
 
   const selectedCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -274,7 +334,28 @@ export function TradePanel({
       }
 
       {/* --- INVENTORY (Main View - Order 1) --- */}
-      <div className="flex-1 flex flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto order-1 bg-background lg:bg-transparent">
+      <div
+        ref={inventoryScrollRef}
+        onScroll={(event) => {
+          setInventoryHasScrolled(true);
+          if (
+            availableGrid.hasMore &&
+            isNearScrollEnd(event.currentTarget)
+          ) {
+            availableGrid.loadMore();
+          }
+        }}
+        onWheel={(event) => {
+          setInventoryHasScrolled(true);
+          if (
+            availableGrid.hasMore &&
+            shouldLoadMoreFromWheel(event.currentTarget, event.deltaY)
+          ) {
+            availableGrid.loadMore();
+          }
+        }}
+        className="flex-1 flex flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto order-1 bg-background lg:bg-transparent"
+      >
         <div className="flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4 shrink-0">
           <h3 className="text-sm font-bold tracking-wider uppercase text-muted-foreground">
             Your Inventory
@@ -286,7 +367,7 @@ export function TradePanel({
           )}
         </div>
 
-        <div className="px-4 pb-96 lg:pb-6 lg:px-6">
+        <div className="px-4 pb-52 lg:pb-6 lg:px-6">
           {availableItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 md:h-64 text-sm border-2 border-dashed text-muted-foreground border-border rounded-xl bg-muted/30">
               <p>Your wardrobe is empty (or filtered out).</p>
@@ -294,7 +375,7 @@ export function TradePanel({
           ) : (
             <>
               <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-3 gap-3 md:gap-4 pb-4">
-                {availableGrid.visibleItems.map((item) => {
+                {availableGrid.visibleItems.map((item, index) => {
                   const owned = inventory[item.id] || 0;
                   const selected = selectedCounts[item.id] || 0;
                   const remaining = owned - selected;
@@ -313,14 +394,22 @@ export function TradePanel({
                         onAction={() => handleSelect(item)}
                         actionLabel={null}
                         isNew={unseenItems.includes(item.id)}
+                        deferPreview
+                        pausePreview
+                        previewDelayMs={150 + index * 55}
                       />
                     </div>
                   );
                 })}
               </div>
               {availableGrid.hasMore && (
-                <div ref={availableGrid.sentinelRef} className="h-8" />
+                <div
+                  ref={availableGrid.sentinelRef}
+                  className="h-8"
+                  aria-hidden="true"
+                />
               )}
+              {availableGrid.hasMore && <ScrollMoreCue />}
             </>
           )}
         </div>
@@ -447,6 +536,17 @@ export function TradePanel({
               </p>
            </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ScrollMoreCue() {
+  return (
+    <div className="pointer-events-none sticky bottom-3 z-30 flex justify-center">
+      <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/85 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground shadow-sm backdrop-blur">
+        <ChevronDown className="h-3.5 w-3.5 animate-bounce text-primary" />
+        <span>Scroll for more</span>
       </div>
     </div>
   );

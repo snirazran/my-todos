@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Lock, Shirt, X, ArrowLeft, ShoppingBag, Repeat } from 'lucide-react';
+import { Lock, Shirt, X, ArrowLeft, ShoppingBag, Repeat, ChevronDown } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
@@ -68,16 +68,38 @@ export function WardrobePanel({
   } | null>(null);
   const [shakeBalance, setShakeBalance] = useState(false);
   const [openingGiftId, setOpeningGiftId] = useState<string | null>(null);
+  const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
+  const [shopHasScrolled, setShopHasScrolled] = useState(false);
+  const [gridInitialSize, setGridInitialSize] = useState(4);
+  const [gridBatchSize, setGridBatchSize] = useState(6);
 
   // --- Sell Dialog Logic ---
   const [itemToSell, setItemToSell] = useState<ItemDef | null>(null);
 
   const overscrollDrag = useSheetOverscrollDrag();
+  const inventoryScrollRef = React.useRef<HTMLDivElement | null>(null);
+  const shopScrollRef = React.useRef<HTMLDivElement | null>(null);
 
   const unseenInventorySet = useMemo(
     () => new Set(data?.wardrobe?.unseenItems ?? []),
     [data?.wardrobe?.unseenItems],
   );
+
+  useEffect(() => {
+    setInventoryHasScrolled(false);
+    setShopHasScrolled(false);
+  }, [activeFilter, sortBy, activeTab, open]);
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 768px)');
+    const update = () => {
+      setGridInitialSize(query.matches ? 10 : 4);
+      setGridBatchSize(query.matches ? 10 : 6);
+    };
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
 
   const confirmSell = (amount: number) => {
     if (itemToSell) {
@@ -337,18 +359,71 @@ export function WardrobePanel({
   }, [data, activeFilter, sortBy]);
 
   const inventoryGrid = useInfiniteScroll(inventoryItems, {
-    initial: 18,
-    batch: 18,
-    resetKey: `inv|${activeFilter}|${sortBy}`,
+    initial: gridInitialSize,
+    batch: gridBatchSize,
+    resetKey: `inv|${activeFilter}|${sortBy}|${gridInitialSize}|${gridBatchSize}|${open ? 'open' : 'closed'}`,
+    rootRef: inventoryScrollRef,
+    enabled: inventoryHasScrolled,
   });
   const shopGrid = useInfiniteScroll(shopItems, {
-    initial: 18,
-    batch: 18,
-    resetKey: `shop|${activeFilter}|${sortBy}`,
+    initial: gridInitialSize,
+    batch: gridBatchSize,
+    resetKey: `shop|${activeFilter}|${sortBy}|${gridInitialSize}|${gridBatchSize}|${open ? 'open' : 'closed'}`,
+    rootRef: shopScrollRef,
+    enabled: shopHasScrolled,
   });
+
+  useEffect(() => {
+    if (!open || gridInitialSize >= gridBatchSize) return;
+
+    let cancelIdleLoad: (() => void) | undefined;
+    const loadTimer = window.setTimeout(() => {
+      const loadMore =
+        activeTab === 'inventory'
+          ? inventoryGrid.hasMore
+            ? inventoryGrid.loadMore
+            : null
+          : activeTab === 'shop' && shopGrid.hasMore
+            ? shopGrid.loadMore
+            : null;
+      if (!loadMore) return;
+
+      if ('requestIdleCallback' in window) {
+        const idleId = window.requestIdleCallback(() => loadMore(), {
+          timeout: 700,
+        });
+        cancelIdleLoad = () => window.cancelIdleCallback(idleId);
+      } else {
+        const fallbackTimer = globalThis.setTimeout(loadMore, 0);
+        cancelIdleLoad = () => globalThis.clearTimeout(fallbackTimer);
+      }
+    }, 900);
+
+    return () => {
+      window.clearTimeout(loadTimer);
+      cancelIdleLoad?.();
+    };
+  }, [
+    activeFilter,
+    activeTab,
+    gridBatchSize,
+    gridInitialSize,
+    inventoryGrid.hasMore,
+    inventoryGrid.loadMore,
+    open,
+    shopGrid.hasMore,
+    shopGrid.loadMore,
+    sortBy,
+  ]);
+
+  const isNearScrollEnd = (node: HTMLElement) =>
+    node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
+  const shouldLoadMoreFromWheel = (node: HTMLElement, deltaY: number) =>
+    deltaY > 0 && node.scrollTop + node.clientHeight >= node.scrollHeight - 160;
 
   const balance = data?.wardrobe?.flies ?? 0;
   const isGuest = !user;
+  const canRenderItems = open && !!data;
 
   return (
     <>
@@ -511,10 +586,36 @@ export function WardrobePanel({
                   >
                     <TabsContent
                       value="inventory"
-                      ref={overscrollDrag.bind}
+                      ref={(node) => {
+                        inventoryScrollRef.current = node;
+                        overscrollDrag.bind(node);
+                      }}
+                      onScroll={(event) => {
+                        setInventoryHasScrolled(true);
+                        if (
+                          inventoryGrid.hasMore &&
+                          isNearScrollEnd(event.currentTarget)
+                        ) {
+                          inventoryGrid.loadMore();
+                        }
+                      }}
+                      onWheel={(event) => {
+                        setInventoryHasScrolled(true);
+                        if (
+                          inventoryGrid.hasMore &&
+                          shouldLoadMoreFromWheel(
+                            event.currentTarget,
+                            event.deltaY,
+                          )
+                        ) {
+                          inventoryGrid.loadMore();
+                        }
+                      }}
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
                     >
-                      {inventoryItems.length === 0 ? (
+                      {!canRenderItems ? (
+                        <WardrobeGridSkeleton />
+                      ) : activeTab === 'inventory' && inventoryItems.length === 0 ? (
                         <div className="flex flex-col items-center justify-center h-full opacity-50">
                           <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
                             <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
@@ -523,10 +624,10 @@ export function WardrobePanel({
                             Empty
                           </p>
                         </div>
-                      ) : (
+                      ) : activeTab === 'inventory' ? (
                         <>
                           <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                            {inventoryGrid.visibleItems.map((item) => (
+                            {inventoryGrid.visibleItems.map((item, index) => (
                               <ItemCard
                                 key={item.id}
                                 item={item}
@@ -546,56 +647,106 @@ export function WardrobePanel({
                                 }}
                                 actionLabel={null}
                                 isNew={unseenInventorySet.has(item.id)}
+                                deferPreview
+                                pausePreview={
+                                  item.slot !== 'container' &&
+                                  data?.wardrobe?.equipped?.[item.slot] !== item.id
+                                }
+                                previewDelayMs={150 + index * 55}
                               />
                             ))}
                           </div>
                           {inventoryGrid.hasMore && (
-                            <div ref={inventoryGrid.sentinelRef} className="h-8" />
+                            <div
+                              ref={inventoryGrid.sentinelRef}
+                              className="h-8"
+                              aria-hidden="true"
+                            />
                           )}
                         </>
-                      )}
+                      ) : null}
                     </TabsContent>
 
                     <TabsContent
                       value="shop"
-                      ref={overscrollDrag.bind}
+                      ref={(node) => {
+                        shopScrollRef.current = node;
+                        overscrollDrag.bind(node);
+                      }}
+                      onScroll={(event) => {
+                        setShopHasScrolled(true);
+                        if (
+                          shopGrid.hasMore &&
+                          isNearScrollEnd(event.currentTarget)
+                        ) {
+                          shopGrid.loadMore();
+                        }
+                      }}
+                      onWheel={(event) => {
+                        setShopHasScrolled(true);
+                        if (
+                          shopGrid.hasMore &&
+                          shouldLoadMoreFromWheel(
+                            event.currentTarget,
+                            event.deltaY,
+                          )
+                        ) {
+                          shopGrid.loadMore();
+                        }
+                      }}
                       className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
                     >
-                      <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
-                        {shopGrid.visibleItems.map((item) => {
-                          const count =
-                            data?.wardrobe?.inventory?.[item.id] ?? 0;
-                          return (
-                            <ItemCard
-                              key={item.id}
-                              item={item}
-                              mode="shop"
-                              ownedCount={count}
-                              isEquipped={false}
-                              canAfford={
-                                balance >= (item.priceFlies ?? 0) && !isGuest
-                              }
-                              actionLoading={buyingId === item.id}
-                              actionLabel={
-                                confirmingBuyId === item.id
-                                  ? 'CONFIRM'
-                                  : undefined
-                              }
-                              onAction={(e) => handleBuyItem(item, e)}
+                      {!canRenderItems ? (
+                        <WardrobeGridSkeleton />
+                      ) : activeTab === 'shop' ? (
+                        <>
+                          <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                            {shopGrid.visibleItems.map((item, index) => {
+                              const count =
+                                data?.wardrobe?.inventory?.[item.id] ?? 0;
+                              return (
+                                <ItemCard
+                                  key={item.id}
+                                  item={item}
+                                  mode="shop"
+                                  ownedCount={count}
+                                  isEquipped={false}
+                                  canAfford={
+                                    balance >= (item.priceFlies ?? 0) &&
+                                    !isGuest
+                                  }
+                                  actionLoading={buyingId === item.id}
+                                  actionLabel={
+                                    confirmingBuyId === item.id
+                                      ? 'CONFIRM'
+                                      : undefined
+                                  }
+                                  onAction={(e) => handleBuyItem(item, e)}
+                                  deferPreview
+                                  pausePreview={item.slot !== 'container' && confirmingBuyId !== item.id}
+                                  previewDelayMs={150 + index * 55}
+                                />
+                              );
+                            })}
+                          </div>
+                          {shopGrid.hasMore && (
+                            <div
+                              ref={shopGrid.sentinelRef}
+                              className="h-8"
+                              aria-hidden="true"
                             />
-                          );
-                        })}
-                      </div>
-                      {shopGrid.hasMore && (
-                        <div ref={shopGrid.sentinelRef} className="h-8" />
-                      )}
+                          )}
+                        </>
+                      ) : null}
                     </TabsContent>
 
                     <TabsContent
                       value="trade"
                       className="absolute inset-0 overflow-hidden data-[state=inactive]:hidden"
                     >
-                      {data?.wardrobe?.inventory && data.catalog && (
+                      {!canRenderItems ? (
+                        <WardrobeGridSkeleton />
+                      ) : activeTab === 'trade' && data?.wardrobe?.inventory && data.catalog ? (
                         <TradePanel
                           inventory={data.wardrobe.inventory}
                           catalog={data.catalog}
@@ -606,8 +757,15 @@ export function WardrobePanel({
                           }
                           sortBy={sortBy}
                         />
-                      )}
+                      ) : null}
                     </TabsContent>
+
+                    {activeTab === 'inventory' && inventoryGrid.hasMore && (
+                      <ScrollMoreCue />
+                    )}
+                    {activeTab === 'shop' && shopGrid.hasMore && (
+                      <ScrollMoreCue />
+                    )}
                   </div>
                 </Tabs>
               </div>
@@ -634,5 +792,33 @@ export function WardrobePanel({
         />
       )}
     </>
+  );
+}
+
+function WardrobeGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+      {Array.from({ length: 8 }).map((_, index) => (
+        <div
+          key={index}
+          className="mx-auto flex w-full max-w-[240px] flex-col rounded-2xl border-[3px] border-border bg-card p-2.5 md:p-3.5"
+        >
+          <div className="mt-4 mb-2 md:mt-5 md:mb-3 aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl bg-muted/50" />
+          <div className="mx-auto h-3 w-2/3 rounded-full bg-muted/60" />
+          <div className="mx-auto mt-3 h-7 w-3/4 rounded-lg bg-muted/50 md:h-8" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ScrollMoreCue() {
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center bg-gradient-to-t from-background/95 via-background/60 to-transparent pb-4 pt-10">
+      <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground shadow-sm backdrop-blur">
+        <ChevronDown className="h-3.5 w-3.5 animate-bounce text-primary" />
+        <span>Scroll for more</span>
+      </div>
+    </div>
   );
 }

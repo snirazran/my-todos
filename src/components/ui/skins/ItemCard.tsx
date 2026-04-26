@@ -1,9 +1,9 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { memo, useMemo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
-import { Check, Lock, Loader2, CircleDollarSign, X, Info } from 'lucide-react';
+import { Check, Info, Loader2, X } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import type { ItemDef, Rarity } from '@/lib/skins/catalog';
@@ -83,7 +83,7 @@ const RARITY_CONFIG: Record<
 
 const MotionButton = motion(Button);
 
-export function ItemCard({
+function ItemCardComponent({
   item,
   ownedCount,
   isEquipped,
@@ -99,6 +99,13 @@ export function ItemCard({
   customPreview,
   hidePrice,
   hideRarity,
+  staticPreview = false,
+  deferPreview = false,
+  pausePreview = false,
+  previewDelayMs = 0,
+  previewRootMargin = '520px',
+  previewUnmountDelayMs = 2400,
+  previewClassName,
 }: {
   item: ItemDef;
   ownedCount: number;
@@ -115,37 +122,72 @@ export function ItemCard({
   customPreview?: React.ReactNode;
   hidePrice?: boolean;
   hideRarity?: boolean;
+  staticPreview?: boolean;
+  deferPreview?: boolean;
+  pausePreview?: boolean;
+  previewDelayMs?: number;
+  previewRootMargin?: string;
+  previewUnmountDelayMs?: number;
+  previewClassName?: string;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
   const [shake, setShake] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
+  const [nearViewport, setNearViewport] = useState(false);
+  const [previewReady, setPreviewReady] = useState(!deferPreview);
+  const [previewMounted, setPreviewMounted] = useState(!deferPreview);
+  const shouldShowPlaceholder =
+    staticPreview || (deferPreview && (!previewMounted || !previewReady));
 
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '50px' },
+      ([entry]) => setNearViewport(entry.isIntersecting),
+      { rootMargin: previewRootMargin, threshold: [0, 0.01] },
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+  }, [previewRootMargin]);
 
-  const previewIndices = {
-    skin: 0,
-    mood: 0,
-    hat: 0,
-    body: 0,
-    hand_item: 0,
-    [item.slot]: item.riveIndex,
-  };
+  useEffect(() => {
+    if (!deferPreview) {
+      setPreviewReady(true);
+      return;
+    }
+
+    if (!nearViewport || previewReady) return;
+
+    const timer = window.setTimeout(() => {
+      setPreviewMounted(true);
+      setPreviewReady(true);
+    }, previewDelayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [deferPreview, nearViewport, previewDelayMs, previewReady]);
+
+  useEffect(() => {
+    if (!deferPreview || !previewReady || nearViewport) return;
+
+    const timer = window.setTimeout(() => {
+      setPreviewMounted(false);
+      setPreviewReady(false);
+    }, previewUnmountDelayMs);
+
+    return () => window.clearTimeout(timer);
+  }, [deferPreview, nearViewport, previewReady, previewUnmountDelayMs]);
+
+  const previewIndices = useMemo(
+    () => ({
+      skin: item.slot === 'skin' ? item.riveIndex : 0,
+      mood: 0,
+      hat: item.slot === 'hat' ? item.riveIndex : 0,
+      body: item.slot === 'body' ? item.riveIndex : 0,
+      hand_item: item.slot === 'hand_item' ? item.riveIndex : 0,
+    }),
+    [item.riveIndex, item.slot],
+  );
 
   const handleAction = (e?: React.MouseEvent) => {
     if (mode === 'shop' && !canAfford) {
@@ -228,8 +270,6 @@ export function ItemCard({
           config.gradient,
         )}
       >
-        <div className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-40 group-hover:animate-shine" />
-
         {/* NEW Badge (Moved) */}
         {isNew && (
           <div className="absolute top-0 left-0 z-50 px-2 py-1 text-[9px] font-black text-white bg-red-500 rounded-br-xl shadow-sm animate-pulse">
@@ -240,16 +280,30 @@ export function ItemCard({
         <div className="absolute inset-0 z-10 flex items-end justify-center">
           {customPreview ? (
             customPreview
-          ) : !visible ? null : item.slot === 'container' ? (
-            <div className="w-[110%] h-[110%] -translate-y-1 drop-shadow-xl">
-              <GiftRive color={item.riveIndex} />
+          ) : shouldShowPlaceholder ? (
+            <LightweightItemPreview
+              item={item}
+              toneClassName={config.text}
+            />
+          ) : item.slot === 'container' ? (
+            <div
+              className={cn(
+                'w-[110%] h-[110%] -translate-y-1 drop-shadow-xl',
+                previewClassName,
+              )}
+            >
+              <GiftRive color={item.riveIndex} paused={pausePreview} />
             </div>
           ) : (
             <Frog
-              className="w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[10%]"
+              className={cn(
+                'w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[10%]',
+                previewClassName,
+              )}
               indices={previewIndices}
               width={180}
               height={180}
+              paused={pausePreview}
             />
           )}
         </div>
@@ -383,6 +437,39 @@ export function ItemCard({
         )}
       </div>
     </motion.div>
+  );
+}
+
+export const ItemCard = memo(ItemCardComponent);
+
+function LightweightItemPreview({
+  item,
+  toneClassName,
+}: {
+  item: ItemDef;
+  toneClassName: string;
+}) {
+  return (
+    <div className="relative flex h-full w-full items-center justify-center overflow-hidden">
+      <PreviewSkeleton toneClassName={toneClassName} />
+    </div>
+  );
+}
+
+function PreviewSkeleton({
+  toneClassName,
+}: {
+  toneClassName: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'absolute inset-0 overflow-hidden rounded-xl',
+        toneClassName,
+      )}
+    >
+      <div className="absolute inset-y-[-24%] left-0 w-1/3 bg-gradient-to-r from-transparent via-white/65 to-transparent opacity-90 animate-shine dark:via-current dark:opacity-20" />
+    </div>
   );
 }
 

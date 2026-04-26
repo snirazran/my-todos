@@ -1097,6 +1097,7 @@ function QuestCarousel({
   const lastX = useRef(0);
   const lastTime = useRef(0);
   const velocity = useRef(0);
+  const pages = React.Children.toArray(children);
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType !== 'mouse') return; // let touch use native scroll
@@ -1172,6 +1173,7 @@ function QuestCarousel({
   useEffect(() => {
     const container = scrollRef.current;
     if (!container) return;
+    itemRefs.current = itemRefs.current.slice(0, count);
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
@@ -1200,17 +1202,20 @@ function QuestCarousel({
         className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 cursor-grab select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        {React.Children.map(children, (child, i) => (
-          <div
-            key={i}
-            ref={(el) => {
-              itemRefs.current[i] = el;
-            }}
-            className="flex-none w-[88%] snap-center"
-          >
-            {child}
-          </div>
-        ))}
+        {pages.map((child, i) => {
+          const shouldRender = Math.abs(i - activePage) <= 1;
+          return (
+            <div
+              key={i}
+              ref={(el) => {
+                itemRefs.current[i] = el;
+              }}
+              className="flex-none w-[88%] snap-center"
+            >
+              {shouldRender ? child : <div className="min-h-[420px]" />}
+            </div>
+          );
+        })}
       </div>
       {count > 1 && (
         <div className="flex items-center justify-center gap-1.5 pt-3">
