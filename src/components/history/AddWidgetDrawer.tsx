@@ -1,5 +1,6 @@
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
+import { Plus, X, LayoutGrid } from 'lucide-react';
 
 // Widget icons/labels mapping (reusing from parent if possible, but defining here for now)
 const WIDGET_LABELS: Record<string, string> = {
