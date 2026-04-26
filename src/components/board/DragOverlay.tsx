@@ -40,8 +40,8 @@ export default function DragOverlay({
     >
       <div
         className={[
-          'flex items-start gap-3 p-3 select-none rounded-2xl',
-          'bg-card border-2 border-primary/20 shadow-2xl backdrop-blur-sm', 
+          'flex items-center gap-2 px-2 py-2 select-none rounded-[14px]',
+          'bg-card border-2 border-primary/20 shadow-2xl backdrop-blur-sm',
         ].join(' ')}
         style={{
           minHeight: height,
@@ -49,14 +49,14 @@ export default function DragOverlay({
           opacity: 0.95,
         }}
       >
-        <span className="shrink-0 h-7 w-7 mt-0.5 relative">
-          <Fly size={28} x={-2} y={-2} />
+        <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60">
+          <Fly size={24} y={-3} />
         </span>
         <div className="flex-1 min-w-0 flex flex-col">
           {(tags && tags.length > 0 || startTime || reminder) && (
-            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+            <div className="mb-1 flex flex-wrap items-center gap-1">
               {startTime && (
-                <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase bg-amber-500 text-white shadow-sm border border-amber-400">
+                <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-normal uppercase bg-amber-500 text-white shadow-sm border border-amber-400">
                   <Clock className="w-2.5 h-2.5" />
                   <span>
                     {startTime}
@@ -68,7 +68,7 @@ export default function DragOverlay({
               {tags?.map((tag) => (
                 <span
                   key={tag.id}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors border shadow-sm"
+                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-normal uppercase transition-colors border shadow-sm"
                   style={
                     tag.color
                       ? {
@@ -84,9 +84,11 @@ export default function DragOverlay({
               ))}
             </div>
           )}
-          <div className="text-[15px] font-medium leading-[1.4] text-foreground whitespace-pre-wrap break-words">
+          <div className="text-sm font-semibold leading-snug text-foreground whitespace-pre-wrap break-words">
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              <span>{text}</span>
+              <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+                {text}
+              </span>
               <div className="inline-flex items-center gap-1.5 shrink-0">
                 {taskType === 'weekly' && (
                   <RotateCcw className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />

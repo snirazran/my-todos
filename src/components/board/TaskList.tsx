@@ -215,7 +215,7 @@ export default React.memo(function TaskList({
   const renderPlaceholder = (k: string) => (
     <div
       key={k}
-      className="h-12 my-2 border-2 border-dashed rounded-xl border-primary/50 bg-primary/10"
+      className="h-10 my-1.5 border-2 border-dashed rounded-[14px] border-primary/50 bg-primary/10"
     />
   );
 
@@ -240,10 +240,10 @@ export default React.memo(function TaskList({
         <button
           key={`empty-state-${day}`}
           onClick={() => onAddRequested('')}
-          className="flex flex-col items-center justify-center w-full py-4 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl group"
+          className="flex flex-col items-center justify-center w-full py-3 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-[14px] group"
         >
-          <div className="flex items-center justify-center w-10 h-10 mb-2 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
-            <Fly size={20} y={-2} />
+          <div className="flex items-center justify-center w-8 h-8 mb-1.5 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+            <Fly size={18} y={-2} />
           </div>
           <p className="text-xs font-bold transition-colors text-muted-foreground group-hover:text-primary">
             Add a task
@@ -351,6 +351,7 @@ export default React.memo(function TaskList({
             isRepeating={t.type === 'weekly'}
             userTags={userTags}
             isAnyDragging={isAnyDragging}
+            compact
           />
         </div>,
       );

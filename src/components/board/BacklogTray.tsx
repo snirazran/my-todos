@@ -194,6 +194,7 @@ export default React.memo(function BacklogTray({
           </div>
         }
       >
+        <div className="h-3 shrink-0" aria-hidden />
         <AnimatePresence mode="popLayout" initial={false}>
           {filteredTasks.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
@@ -299,6 +300,7 @@ export default React.memo(function BacklogTray({
                         onDoToday ? () => onDoToday(t.id) : undefined
                       }
                       hideDoTodayButton={hideDoTodayButton}
+                      compact
                     />
                   </div>
                 </motion.div>

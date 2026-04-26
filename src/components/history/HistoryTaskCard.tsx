@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CheckCircle2, Circle, RotateCcw, CalendarClock, EllipsisVertical } from 'lucide-react';
+import { CheckCircle2, RotateCcw } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 
@@ -65,14 +65,14 @@ export default function HistoryTaskCard({
   return (
     <div
       className={cn(
-        'group relative flex items-stretch gap-3 p-3.5 transition-all duration-200 rounded-xl border select-none cursor-pointer',
+        'group relative flex items-center gap-2 px-2 py-2 transition-all duration-200 rounded-xl border select-none cursor-pointer',
         'bg-card border-border/80 shadow-sm md:hover:border-primary/40 active:border-primary/40',
       )}
       onClick={handleToggle}
     >
       <div
         className={cn(
-          'flex items-stretch flex-1 min-w-0 gap-3 transition-opacity duration-200',
+          'flex items-center flex-1 min-w-0 gap-2 transition-opacity duration-200',
           displayedCompleted ? 'opacity-60' : 'opacity-100',
         )}
       >
@@ -91,12 +91,12 @@ export default function HistoryTaskCard({
                 {/* Fly or Empty Circle */}
                 <div
                   ref={setFlyRef}
-                  className="w-full h-full flex items-center justify-center"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60"
                 >
                   <Fly
-                    size={28}
+                    size={24}
                     paused={displayedCompleted}
-                    y={-4}
+                    y={-3}
                   />
                 </div>
               </motion.div>
@@ -109,7 +109,7 @@ export default function HistoryTaskCard({
                 exit={{ opacity: 0, scale: 0.6 }}
                 transition={{ type: 'spring', stiffness: 400, damping: 25 }}
               >
-                <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
+                <CheckCircle2 className="text-green-500 w-6 h-6 drop-shadow-sm" />
               </motion.div>
             )}
           </AnimatePresence>
@@ -118,7 +118,7 @@ export default function HistoryTaskCard({
         {/* Text & Meta */}
         <div className="flex-1 min-w-0 flex flex-col justify-center">
           {tags && tags.length > 0 && (
-            <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <div className="mb-1 flex flex-wrap items-center gap-1">
               {tags.map((tagId) => {
                 const tagDetails = getTagDetails(tagId);
                 if (!tagDetails) return null;
@@ -130,7 +130,7 @@ export default function HistoryTaskCard({
                   <span
                     key={tagId}
                     className={cn(
-                      'inline-flex items-center px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors border shadow-sm',
+                      'inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal shadow-sm transition-colors',
                       !color &&
                         'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50',
                     )}
@@ -153,13 +153,15 @@ export default function HistoryTaskCard({
 
           <div
             className={cn(
-              'whitespace-pre-wrap break-words text-base font-medium md:text-lg transition-colors flex items-center gap-1.5',
+              'flex min-w-0 items-start gap-1.5 text-sm font-semibold leading-snug transition-colors',
               displayedCompleted
                 ? 'text-muted-foreground line-through decoration-2 opacity-80'
                 : 'text-foreground',
             )}
           >
-            <span>{text}</span>
+            <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+              {text}
+            </span>
             {isWeekly && (
               <RotateCcw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
             )}
@@ -211,7 +213,7 @@ export default function HistoryTaskCard({
 
           {/* Weekly Goal Progress Dots */}
           {type === 'habit' && (
-            <div className="flex items-center gap-1.5 mt-2">
+            <div className="flex items-center gap-1 mt-1.5">
               {(() => {
                 const goal = timesPerWeek || 7;
 
@@ -262,7 +264,7 @@ export default function HistoryTaskCard({
                       <div
                         key={i}
                         className={cn(
-                          'w-3 h-3 rounded-full border transition-all duration-300 flex-shrink-0',
+                          'w-2.5 h-2.5 rounded-full border transition-all duration-300 flex-shrink-0',
                           i < completedThisWeek
                             ? 'bg-green-500 border-green-600 shadow-sm shadow-green-500/20'
                             : 'bg-muted border-border/50'

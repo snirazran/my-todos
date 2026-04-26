@@ -83,6 +83,7 @@ export default React.memo(function HabitTray({
         iconContainerClassName="bg-emerald-500/10 text-emerald-500"
         lockScroll={true}
       >
+        <div className="h-3 shrink-0" aria-hidden />
         <AnimatePresence mode="popLayout" initial={false}>
           {habits.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
@@ -119,6 +120,7 @@ export default React.memo(function HabitTray({
             Add New Habit
           </span>
         </button>
+        <div className="h-10 shrink-0" aria-hidden />
       </SideOpenTray>
 
       <TaskMenu
@@ -293,7 +295,7 @@ function HabitTrayItem({
         dragElastic={0.1}
         onDragEnd={handleDragEnd}
         style={{ x }}
-        className="flex items-center gap-4 p-4 cursor-default select-none"
+        className="flex items-center gap-3 p-3 cursor-default select-none"
       >
         {/* Bullet - non-interactive */}
         <div className="relative w-7 h-7 shrink-0 pointer-events-none">
@@ -306,7 +308,9 @@ function HabitTrayItem({
                 exit={{ opacity: 0, scale: 0.8 }}
                 className="absolute inset-0 flex items-center justify-center text-muted-foreground/40"
               >
-                <Fly size={28} y={-4} />
+                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60">
+                  <Fly size={24} y={-3} />
+                </div>
               </motion.div>
             ) : (
               <motion.div
@@ -356,7 +360,7 @@ function HabitTrayItem({
             </div>
           )}
           <span className={cn(
-            "block text-base font-bold transition-all",
+            "block min-w-0 whitespace-pre-wrap break-words text-sm font-semibold leading-snug transition-all",
             isDone ? "text-muted-foreground line-through" : "text-foreground"
           )}>
             {habit.text}

@@ -3,7 +3,7 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Calendar as CalendarIcon, CalendarCheck, CalendarClock, EllipsisVertical } from 'lucide-react';
+import { X, Calendar as CalendarIcon, CalendarCheck, CalendarClock, EllipsisVertical, LayoutDashboard } from 'lucide-react';
 import { format } from 'date-fns';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { type FrogHandle } from '@/components/ui/frog';
@@ -48,7 +48,7 @@ export default function DayDetailSheet({
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [menu, setMenu] = useState<{ id: string; top: number; left: number } | null>(null);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'habits'>('tasks');
+  const [activeTab, setActiveTab] = useState<'all' | 'tasks' | 'habits'>('all');
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
@@ -99,6 +99,9 @@ export default function DayDetailSheet({
   const completedRegular = React.useMemo(() => filteredRegular.filter((t) => t.completed), [filteredRegular]);
   const activeHabits = React.useMemo(() => filteredHabits.filter((t) => !t.completed), [filteredHabits]);
   const completedHabitsFiltered = React.useMemo(() => filteredHabits.filter((t) => t.completed), [filteredHabits]);
+  const visibleRegularCount = showCompleted ? regularTasks.length : regularTasks.filter((t) => !t.completed).length;
+  const visibleHabitCount = showCompleted ? habitTasks.length : habitTasks.filter((t) => !t.completed).length;
+  const visibleAllCount = visibleRegularCount + visibleHabitCount;
 
   const isFiltered = selectedTags.length > 0 || !showCompleted;
 
@@ -125,7 +128,7 @@ export default function DayDetailSheet({
 
   useEffect(() => {
     if (open) {
-      setActiveTab('tasks');
+      setActiveTab('all');
     }
   }, [open]);
 
@@ -163,6 +166,91 @@ export default function DayDetailSheet({
       onToggleTask(id, date, currentStatus);
     }
   };
+
+  const renderHistoryCard = (task: any) => {
+    const uniqueKey = `${date}::${task.id}`;
+    return (
+      <HistoryTaskCard
+        key={uniqueKey}
+        id={task.id}
+        text={task.text}
+        completed={task.completed}
+        type={task.type}
+        tags={task.tags}
+        date={date}
+        completedDates={task.completedDates}
+        timesPerWeek={task.timesPerWeek}
+        frogodoroSession={task.frogodoroSession}
+        onToggle={handleToggleProxy}
+        setFlyRef={(el) => {
+          if (el) flyRefs.current[uniqueKey] = el;
+          else delete flyRefs.current[uniqueKey];
+        }}
+        isEaten={visuallyDone?.has(uniqueKey)}
+        userTags={userTags}
+      />
+    );
+  };
+
+  const renderCompletedDivider = () => (
+    <div className="flex items-center gap-3 px-3 py-1.5 mt-1">
+      <div className="flex-1 h-px bg-border/50" />
+      <span className="text-[10px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
+        Completed
+      </span>
+      <div className="flex-1 h-px bg-border/50" />
+    </div>
+  );
+
+  const renderHistorySection = ({
+    title,
+    icon,
+    activeItems,
+    completedItems,
+    filteredItems,
+    emptyText,
+    showHeader = false,
+  }: {
+    title: string;
+    icon: React.ReactNode;
+    activeItems: any[];
+    completedItems: any[];
+    filteredItems: any[];
+    emptyText: string;
+    showHeader?: boolean;
+  }) => (
+    <div className={showHeader && filteredItems.length > 0 ? 'space-y-2' : ''}>
+      {showHeader && filteredItems.length > 0 && (
+        <HistorySectionHeader
+          icon={icon}
+          title={title}
+          count={filteredItems.length}
+          detail={showCompleted ? 'visible' : 'left'}
+        />
+      )}
+      <div className="flex flex-col rounded-[22px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
+        <div className="p-1.5 space-y-1 pb-2 min-h-[80px]">
+          {filteredItems.length === 0 ? (
+            <div className="text-center py-6 px-4 text-muted-foreground bg-muted/5 rounded-2xl border border-dashed border-border/40">
+              <p className="font-bold text-sm">
+                {isFiltered ? 'No matches found.' : emptyText}
+              </p>
+            </div>
+          ) : (
+            <>
+              {activeItems.map(renderHistoryCard)}
+              {showCompleted && completedItems.length > 0 && (
+                <>
+                  {activeItems.length > 0 && renderCompletedDivider()}
+                  {completedItems.map(renderHistoryCard)}
+                </>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <>
@@ -212,7 +300,7 @@ export default function DayDetailSheet({
               {/* Content Scrollable */}
               <div
                 ref={scrollContainerRef}
-                className="flex-1 overflow-y-auto p-3 space-y-4 scrollbar-hide overscroll-none"
+                className="flex-1 overflow-y-auto p-3 pb-14 space-y-4 scrollbar-hide overscroll-none"
                 onScroll={handleScroll}
                 onPointerDown={(e) => handleSheetDrag(e, e.currentTarget)}
                 style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
@@ -237,43 +325,60 @@ export default function DayDetailSheet({
                 </div>
 
                 {/* 2. Tab Bar (matches home page design) */}
-                <div className="flex items-center w-full p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative">
+                <div className="flex items-center w-full p-0.5 rounded-[16px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative">
+                  <button
+                    onClick={() => setActiveTab('all')}
+                    className={cn(
+                      'flex-1 justify-center relative px-2.5 py-2 text-[10px] font-black uppercase rounded-[11px] transition-all flex items-center gap-2 whitespace-nowrap',
+                      activeTab === 'all'
+                        ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
+                    )}
+                  >
+                    <LayoutDashboard className={cn('w-3.5 h-3.5', activeTab === 'all' ? 'text-primary' : 'text-muted-foreground')} />
+                    All
+                    {visibleAllCount > 0 && (
+                      <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-black leading-none text-white shadow-sm">
+                        {visibleAllCount}
+                      </span>
+                    )}
+                  </button>
                   <button
                     onClick={() => setActiveTab('tasks')}
                     className={cn(
-                      'flex-1 justify-center relative px-4 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap',
+                      'flex-1 justify-center relative px-2.5 py-2 text-[10px] font-black uppercase rounded-[11px] transition-all flex items-center gap-2 whitespace-nowrap',
                       activeTab === 'tasks'
                         ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
                     )}
                   >
-                    <CalendarCheck className={cn('w-4 h-4', activeTab === 'tasks' ? 'text-primary' : 'text-muted-foreground')} />
+                    <CalendarCheck className={cn('w-3.5 h-3.5', activeTab === 'tasks' ? 'text-primary' : 'text-muted-foreground')} />
                     Tasks
-                    {regularTasks.length > 0 && (
-                      <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm">
-                        {showCompleted ? regularTasks.length : regularTasks.filter((t) => !t.completed).length}
+                    {visibleRegularCount > 0 && (
+                      <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-black leading-none text-white shadow-sm">
+                        {visibleRegularCount}
                       </span>
                     )}
                   </button>
                   <button
                     onClick={() => setActiveTab('habits')}
                     className={cn(
-                      'flex-1 justify-center relative px-4 py-2 text-sm font-bold rounded-xl transition-all flex items-center gap-2 whitespace-nowrap',
+                      'flex-1 justify-center relative px-2.5 py-2 text-[10px] font-black uppercase rounded-[11px] transition-all flex items-center gap-2 whitespace-nowrap',
                       activeTab === 'habits'
                         ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted/30',
                     )}
                   >
-                    <CalendarClock className={cn('w-4 h-4', activeTab === 'habits' ? 'text-primary' : 'text-muted-foreground')} />
+                    <CalendarClock className={cn('w-3.5 h-3.5', activeTab === 'habits' ? 'text-primary' : 'text-muted-foreground')} />
                     Habits
-                    {habitTasks.length > 0 && (
-                      <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-secondary px-1.5 text-[11px] font-black text-muted-foreground shadow-sm">
-                        {showCompleted ? habitTasks.length : habitTasks.filter((t) => !t.completed).length}
+                    {visibleHabitCount > 0 && (
+                      <span className="flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[9px] font-black leading-none text-white shadow-sm">
+                        {visibleHabitCount}
                       </span>
                     )}
                   </button>
 
-                  <div className="w-[1px] h-6 bg-border/50 mx-1" />
+                  <div className="w-[1px] h-5 bg-border/50 mx-0.5" />
 
                   <div className="relative" ref={filterMenuRef}>
                     <button
@@ -282,13 +387,13 @@ export default function DayDetailSheet({
                         setShowFilterMenu(!showFilterMenu);
                       }}
                       className={cn(
-                        'relative p-2 rounded-full transition-colors',
+                        'relative p-1.5 rounded-full transition-colors',
                         showFilterMenu || isFiltered
                           ? 'bg-primary/10 text-primary'
                           : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
                       )}
                     >
-                      <EllipsisVertical className="w-5 h-5" />
+                      <EllipsisVertical className="w-[18px] h-[18px]" />
                       {isFiltered && (
                         <div className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
                       )}
@@ -308,159 +413,50 @@ export default function DayDetailSheet({
                   </div>
                 </div>
 
-                {/* 3. Tasks List */}
-                <div className={activeTab === 'tasks' ? '' : 'hidden'}>
-                      <div className="flex flex-col rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
-                        <div className="p-2 space-y-1 pb-4 min-h-[120px]">
-                          {filteredRegular.length === 0 ? (
-                            <div className="text-center py-8 px-4 text-muted-foreground bg-muted/5 rounded-2xl border border-dashed border-border/40">
-                              <p className="font-bold text-sm">
-                                {isFiltered ? 'No matches found.' : 'No tasks for this day.'}
-                              </p>
-                            </div>
-                          ) : (
-                            <>
-                              {activeRegular.map((task) => {
-                                const uniqueKey = `${date}::${task.id}`;
-                                return (
-                                  <HistoryTaskCard
-                                    key={uniqueKey}
-                                    id={task.id}
-                                    text={task.text}
-                                    completed={task.completed}
-                                    type={task.type}
-                                    tags={task.tags}
-                                    date={date}
-                                    completedDates={task.completedDates}
-                                    timesPerWeek={task.timesPerWeek}
-                                    frogodoroSession={task.frogodoroSession}
-                                    onToggle={handleToggleProxy}
-                                    setFlyRef={(el) => {
-                                      if (el) flyRefs.current[uniqueKey] = el;
-                                      else delete flyRefs.current[uniqueKey];
-                                    }}
-                                    isEaten={visuallyDone?.has(uniqueKey)}
-                                    userTags={userTags}
-                                  />
-                                );
-                              })}
-                              {showCompleted && completedRegular.length > 0 && (
-                                <>
-                                  <div className="flex items-center gap-3 px-3 py-2 mt-1 mb-1">
-                                    <div className="flex-1 h-px bg-border/50" />
-                                    <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
-                                      Completed
-                                    </span>
-                                    <div className="flex-1 h-px bg-border/50" />
-                                  </div>
-                                  {completedRegular.map((task) => {
-                                    const uniqueKey = `${date}::${task.id}`;
-                                    return (
-                                      <HistoryTaskCard
-                                        key={uniqueKey}
-                                        id={task.id}
-                                        text={task.text}
-                                        completed={task.completed}
-                                        type={task.type}
-                                        tags={task.tags}
-                                        date={date}
-                                        completedDates={task.completedDates}
-                                        timesPerWeek={task.timesPerWeek}
-                                        frogodoroSession={task.frogodoroSession}
-                                        onToggle={handleToggleProxy}
-                                        setFlyRef={(el) => {
-                                          if (el) flyRefs.current[uniqueKey] = el;
-                                          else delete flyRefs.current[uniqueKey];
-                                        }}
-                                        isEaten={visuallyDone?.has(uniqueKey)}
-                                        userTags={userTags}
-                                      />
-                                    );
-                                  })}
-                                </>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                <div className={activeTab === 'all' ? 'space-y-2' : 'hidden'}>
+                  {habitTasks.length > 0 &&
+                    renderHistorySection({
+                      title: 'Habits',
+                      icon: <CalendarClock className="w-3.5 h-3.5" />,
+                      activeItems: activeHabits,
+                      completedItems: completedHabitsFiltered,
+                      filteredItems: filteredHabits,
+                      emptyText: 'No habits for this day.',
+                      showHeader: filteredHabits.length > 0,
+                    })}
+                  {(regularTasks.length > 0 || habitTasks.length === 0) &&
+                    renderHistorySection({
+                      title: 'Tasks',
+                      icon: <CalendarCheck className="w-3.5 h-3.5" />,
+                      activeItems: activeRegular,
+                      completedItems: completedRegular,
+                      filteredItems: filteredRegular,
+                      emptyText: 'No tasks for this day.',
+                      showHeader: filteredHabits.length > 0 && filteredRegular.length > 0,
+                    })}
+                </div>
 
-                    {/* 4. Habits List */}
-                    <div className={activeTab === 'habits' ? '' : 'hidden'}>
-                      <div className="flex flex-col rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
-                        <div className="p-2 space-y-1 pb-4 min-h-[120px]">
-                          {filteredHabits.length === 0 ? (
-                            <div className="text-center py-8 px-4 text-muted-foreground bg-muted/5 rounded-2xl border border-dashed border-border/40">
-                              <p className="font-bold text-sm">
-                                {isFiltered ? 'No matches found.' : 'No habits for this day.'}
-                              </p>
-                            </div>
-                          ) : (
-                            <>
-                              {activeHabits.map((task) => {
-                                const uniqueKey = `${date}::${task.id}`;
-                                return (
-                                  <HistoryTaskCard
-                                    key={uniqueKey}
-                                    id={task.id}
-                                    text={task.text}
-                                    completed={task.completed}
-                                    type={task.type}
-                                    tags={task.tags}
-                                    date={date}
-                                    completedDates={task.completedDates}
-                                    timesPerWeek={task.timesPerWeek}
-                                    frogodoroSession={task.frogodoroSession}
-                                    onToggle={handleToggleProxy}
-                                    setFlyRef={(el) => {
-                                      if (el) flyRefs.current[uniqueKey] = el;
-                                      else delete flyRefs.current[uniqueKey];
-                                    }}
-                                    isEaten={visuallyDone?.has(uniqueKey)}
-                                    userTags={userTags}
-                                  />
-                                );
-                              })}
-                              {showCompleted && completedHabitsFiltered.length > 0 && (
-                                <>
-                                  <div className="flex items-center gap-3 px-3 py-2 mt-1 mb-1">
-                                    <div className="flex-1 h-px bg-border/50" />
-                                    <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
-                                      Completed
-                                    </span>
-                                    <div className="flex-1 h-px bg-border/50" />
-                                  </div>
-                                  {completedHabitsFiltered.map((task) => {
-                                    const uniqueKey = `${date}::${task.id}`;
-                                    return (
-                                      <HistoryTaskCard
-                                        key={uniqueKey}
-                                        id={task.id}
-                                        text={task.text}
-                                        completed={task.completed}
-                                        type={task.type}
-                                        tags={task.tags}
-                                        date={date}
-                                        completedDates={task.completedDates}
-                                        timesPerWeek={task.timesPerWeek}
-                                        frogodoroSession={task.frogodoroSession}
-                                        onToggle={handleToggleProxy}
-                                        setFlyRef={(el) => {
-                                          if (el) flyRefs.current[uniqueKey] = el;
-                                          else delete flyRefs.current[uniqueKey];
-                                        }}
-                                        isEaten={visuallyDone?.has(uniqueKey)}
-                                        userTags={userTags}
-                                      />
-                                    );
-                                  })}
-                                </>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
+                <div className={activeTab === 'tasks' ? '' : 'hidden'}>
+                  {renderHistorySection({
+                    title: 'Tasks',
+                    icon: <CalendarCheck className="w-3.5 h-3.5" />,
+                    activeItems: activeRegular,
+                    completedItems: completedRegular,
+                    filteredItems: filteredRegular,
+                    emptyText: 'No tasks for this day.',
+                  })}
+                </div>
+
+                <div className={activeTab === 'habits' ? '' : 'hidden'}>
+                  {renderHistorySection({
+                    title: 'Habits',
+                    icon: <CalendarClock className="w-3.5 h-3.5" />,
+                    activeItems: activeHabits,
+                    completedItems: completedHabitsFiltered,
+                    filteredItems: filteredHabits,
+                    emptyText: 'No habits for this day.',
+                  })}
+                </div>
               </div>
             </div>
           );
@@ -520,5 +516,33 @@ export default function DayDetailSheet({
         );
       })()}
     </>
+  );
+}
+
+function HistorySectionHeader({
+  icon,
+  title,
+  count,
+  detail,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  count: number;
+  detail: string;
+}) {
+  return (
+    <div className="flex items-center justify-between px-4 pt-1 pb-0">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-card border border-border/60 shadow-sm text-primary">
+          {icon}
+        </span>
+        <span className="text-[10px] font-black uppercase tracking-[0.16em]">
+          {title}
+        </span>
+      </div>
+      <span className="text-[10px] font-bold text-muted-foreground/70">
+        {count} {detail}
+      </span>
+    </div>
   );
 }

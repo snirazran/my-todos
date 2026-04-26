@@ -36,6 +36,7 @@ export default function TaskCard({
   isAnyDragging,
   onDoToday,
   hideDoTodayButton,
+  compact = false,
 }: {
   dragId: string;
   task: Task;
@@ -51,6 +52,7 @@ export default function TaskCard({
   isAnyDragging?: boolean;
   onDoToday?: () => void;
   hideDoTodayButton?: boolean;
+  compact?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -187,6 +189,12 @@ export default function TaskCard({
     [innerRef],
   );
 
+  const hasMeta =
+    (task.tags && task.tags.length > 0) || task.startTime || task.reminder;
+  const chipClass = compact
+    ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-normal uppercase transition-colors border shadow-sm'
+    : 'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors border shadow-sm';
+
   return (
     <div
       ref={setRefs}
@@ -198,29 +206,46 @@ export default function TaskCard({
         WebkitTapHighlightColor: 'transparent',
       }}
       className={[
-        'group relative overflow-visible flex items-start gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
+        compact
+          ? 'group relative overflow-visible flex items-center gap-2 px-2 py-2 select-none rounded-[14px] transition-all duration-200'
+          : 'group relative overflow-visible flex items-start gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
         task.completed ? 'cursor-default' : 'cursor-grab',
         'bg-card border border-border/80',
         task.completed
           ? 'shadow-sm'
           : 'shadow-sm md:hover:border-primary/40 active:border-primary/40',
-        'mb-2.5',
+        compact ? 'mb-1.5' : 'mb-2.5',
         menuOpen ? 'z-50 shadow-sm border-primary/30' : '',
         hiddenWhileDragging ? 'opacity-0' : '',
       ].join(' ')}
       role="listitem"
       aria-grabbed={false}
     >
-      <motion.div className="flex items-start gap-3 w-full">
+      <motion.div
+        className={[
+          'flex w-full',
+          compact ? 'items-center gap-2' : 'items-start gap-3',
+        ].join(' ')}
+      >
         <div
-          className={`shrink-0 place-items-center text-muted-foreground group-hover:text-primary transition-colors relative h-7 w-7 mt-0.5 ${task.completed ? 'opacity-60' : ''}`}
+          className={[
+            'shrink-0 text-muted-foreground group-hover:text-primary transition-colors relative h-7 w-7',
+            compact
+              ? 'flex items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60'
+              : 'place-items-center mt-0.5',
+            task.completed ? 'opacity-60' : '',
+          ].join(' ')}
         >
           <div
             className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
               task.completed ? 'opacity-0 pointer-events-none' : 'opacity-100'
             }`}
           >
-            <Fly size={28} paused={task.completed} y={-4} />
+            <Fly
+              size={compact ? 24 : 28}
+              paused={task.completed}
+              y={compact ? -3 : -4}
+            />
           </div>
 
           <div
@@ -228,22 +253,30 @@ export default function TaskCard({
               task.completed ? 'opacity-100' : 'opacity-0 pointer-events-none'
             }`}
           >
-            <CheckCircle2 className="w-7 h-7 text-green-500" />
+            <CheckCircle2
+              className={`${compact ? 'w-6 h-6' : 'w-7 h-7'} text-green-500`}
+            />
           </div>
         </div>
 
         <div
           className={`flex-1 min-w-0 flex flex-col ${task.completed ? 'opacity-60' : ''}`}
         >
-          {( (task.tags && task.tags.length > 0) || task.startTime || task.reminder ) && (
-            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          {hasMeta && (
+            <div
+              className={
+                compact
+                  ? 'mb-1 flex flex-wrap items-center gap-1'
+                  : 'mb-2 flex flex-wrap items-center gap-1.5'
+              }
+            >
               <AnimatePresence mode="popLayout">
                 {task.startTime && (
                   <motion.span
                     initial={{ opacity: 0, scale: 0.8 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0 }}
-                    className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-500/20 shadow-sm"
+                    className={`${chipClass} bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-500/20`}
                     key="task-time-tag"
                   >
                     <Clock className="w-2.5 h-2.5" />
@@ -268,7 +301,7 @@ export default function TaskCard({
                       exit={{ opacity: 0, scale: 0 }}
                       transition={{ duration: 0.2 }}
                       key={tagId}
-                      className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors border shadow-sm"
+                      className={chipClass}
                       style={
                         color
                           ? {
@@ -298,14 +331,20 @@ export default function TaskCard({
             </div>
           )}
           <div
-            className={`whitespace-pre-wrap break-words text-[15px] font-medium leading-[1.4] transition-colors ${
+            className={`whitespace-pre-wrap break-words transition-colors ${
+              compact
+                ? 'text-sm font-semibold leading-snug'
+                : 'text-[15px] font-medium leading-[1.4]'
+            } ${
               task.completed
                 ? 'text-muted-foreground line-through'
                 : 'text-foreground'
             }`}
           >
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              <span>{task.text}</span>
+              <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+                {task.text}
+              </span>
               <div className="inline-flex items-center gap-1.5 shrink-0">
                 {isRepeating && (
                   <RotateCcw
