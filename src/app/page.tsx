@@ -6,13 +6,10 @@ import Link from 'next/link';
 import { format } from 'date-fns';
 import {
   Calendar,
-  History,
   LayoutDashboard,
   CalendarCheck,
   CalendarClock,
   EllipsisVertical,
-  Check,
-  FolderOpen,
 } from 'lucide-react';
 import { HabitPanel } from '@/components/ui/HabitPanel';
 import BacklogTray from '@/components/board/BacklogTray';
@@ -27,7 +24,6 @@ import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
-import { cn } from '@/lib/utils';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { getQuestsUrl } from '@/components/ui/QuestsPopup';
@@ -338,10 +334,10 @@ export default function Home() {
 
   const renderGuestPrompt = () =>
     !user ? (
-      <div className="relative mx-4 mb-3 overflow-hidden rounded-xl bg-primary/5 border border-primary/10 shadow-sm">
-        <div className="relative flex items-center gap-4 p-4">
-          <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-background text-primary shadow-sm ring-1 ring-primary/20">
-            <Fly size={28} y={-4} />
+      <div className="relative mx-3 mb-2 overflow-hidden rounded-xl bg-primary/5 border border-primary/10 shadow-sm">
+        <div className="relative flex items-center gap-3 p-3">
+          <div className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-background text-primary shadow-sm ring-1 ring-primary/20">
+            <Fly size={24} y={-4} />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-black text-foreground tracking-tight mb-0.5">
@@ -356,157 +352,17 @@ export default function Home() {
       </div>
     ) : null;
 
-  const renderTaskList = (isOverview = false) => {
-    if (isOverview && data.length === 0 && habits.length > 0) return null;
-
-    return (
-      <TaskList
-        tasks={data}
-        toggle={handleToggle}
-        showConfetti={rate === 100}
-        visuallyCompleted={visuallyDone}
-        renderBullet={(task, isVisuallyDone) =>
-          task.completed || isVisuallyDone ? null : (
-            <Fly
-              ref={(el) => {
-                flyRefs.current[task.id] = el;
-              }}
-              onClick={() => null}
-              size={28}
-              y={-4}
-              x={-2}
-            />
-          )
-        }
-        onAddRequested={(prefill) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          setQuickText(prefill || '');
-          setQuickAddMode('pick');
-          setShowQuickAdd(true);
-        }}
-        weeklyIds={weeklyIds}
-        onDeleteToday={(id) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          deleteTask(id);
-        }}
-        onDeleteFromWeek={async (taskId) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          const dow = new Date().getDay();
-          await fetch('/api/tasks?view=board', {
-            method: 'DELETE',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ day: dow, taskId }),
-          });
-          deleteTask(taskId);
-        }}
-        onDoLater={(id) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          moveTaskToBacklog(id);
-        }}
-        onReorder={reorderTasks}
-        pendingToToday={pendingToToday}
-        onToggleRepeat={(id) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          toggleRepeat(id);
-        }}
-        onEditTask={(id, text) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          editTask(id, text, false);
-        }}
-        onScheduleTask={(id, data) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          return scheduleTask(id, data);
-        }}
-        isGuest={!user}
-        tags={tags}
-        showCompleted={showCompleted}
-        selectedTags={selectedTags}
-        onSetSelectedTags={setSelectedTags}
-        isGlowActive={isTaskGlow}
-        isFrozen={cinematic}
-      />
-    );
-  };
-
-  const renderHabitPanel = (isOverview = false) => {
-    if (isOverview && habits.length === 0) return null;
-
-    return (
-      <HabitPanel
-        habits={habits}
-        onToggle={handleToggle}
-        onEdit={(id, text) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          editTask(id, text, false);
-        }}
-        onDelete={(id) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          deleteTask(id, true);
-        }}
-        onSchedule={(id, data) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          scheduleTask(id, data);
-        }}
-        onAddRequested={(prefill, isHabit) => {
-          if (!user) {
-            router.push('/login');
-            return;
-          }
-          setQuickText(prefill || '');
-          setQuickAddMode(isHabit ? 'habit' : 'pick');
-          setShowQuickAdd(true);
-        }}
-        tags={tags}
-        flyRefs={flyRefs}
-        showCompleted={showCompleted}
-        visuallyCompleted={visuallyDone}
-        onReorder={reorderTasks}
-        date={todayDateStr}
-      />
-    );
-  };
-
   if (sessionLoading || (user && isLoading && tasks.length === 0)) {
     return <LoadingScreen message="Loading your day..." />;
   }
 
   return (
-    <main className="min-h-screen pb-24 md:pb-12 bg-background">
-      <div className="px-4 pt-2 pb-6 mx-auto max-w-7xl md:px-8">
+    <main className="min-h-screen pb-20 md:pb-8 bg-background">
+      <div className="px-3 pt-1 pb-4 mx-auto max-w-7xl md:px-6">
         <Header router={router} />
 
-        <div className="relative grid items-start grid-cols-1 gap-4 lg:grid-cols-12 lg:gap-8">
-          <div className="z-10 flex flex-col gap-4 lg:col-span-4 lg:sticky lg:top-8 lg:gap-6">
+        <div className="relative grid items-start grid-cols-1 gap-2 lg:grid-cols-12 lg:gap-5">
+          <div className="z-10 flex flex-col gap-2 lg:col-span-4 lg:sticky lg:top-4 lg:gap-4">
             <FrogDisplay
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
@@ -533,15 +389,15 @@ export default function Home() {
           </div>
 
           <div
-            className="flex flex-col gap-4 lg:col-span-8 lg:gap-6"
+            className="flex flex-col gap-2 lg:col-span-8 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
-            <div className="flex items-center justify-center w-full px-4 md:px-0 md:w-auto md:justify-start">
-              <div className="flex items-center w-full max-w-[calc(100vw-2rem)] md:max-w-none md:w-auto p-1 rounded-[20px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative group z-20">
+            <div className="flex items-center justify-center w-full px-2 md:px-0 md:w-auto md:justify-start">
+              <div className="flex items-center w-full max-w-[calc(100vw-1rem)] md:max-w-none md:w-auto p-0.5 rounded-[16px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative group z-20">
                 <button
                   onClick={() => setActiveTab('all')}
                   className={`
-        flex-1 md:flex-none justify-center relative px-3 sm:px-5 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all flex items-center whitespace-nowrap
+        flex-1 md:flex-none justify-center relative px-2.5 sm:px-4 py-2 text-[10px] font-black uppercase rounded-[11px] transition-all flex items-center whitespace-nowrap
         ${
           activeTab === 'all'
             ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
@@ -564,7 +420,7 @@ export default function Home() {
                 <button
                   onClick={() => setActiveTab('today')}
                   className={`
-        flex-1 md:flex-none justify-center relative px-3 sm:px-5 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all flex items-center whitespace-nowrap
+        flex-1 md:flex-none justify-center relative px-2.5 sm:px-4 py-2 text-[10px] font-black uppercase rounded-[11px] transition-all flex items-center whitespace-nowrap
         ${
           activeTab === 'today'
             ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
@@ -587,7 +443,7 @@ export default function Home() {
                 <button
                   onClick={() => setActiveTab('habits')}
                   className={`
-        flex-1 md:flex-none justify-center relative px-3 sm:px-5 py-2.5 text-[11px] font-black uppercase rounded-xl transition-all flex items-center whitespace-nowrap
+        flex-1 md:flex-none justify-center relative px-2.5 sm:px-4 py-2 text-[10px] font-black uppercase rounded-[11px] transition-all flex items-center whitespace-nowrap
         ${
           activeTab === 'habits'
             ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
@@ -600,7 +456,7 @@ export default function Home() {
                       className={`w-3.5 h-3.5 ${activeTab === 'habits' ? 'text-primary' : 'text-muted-foreground'}`}
                     />
                     <span>Habits</span>
-                    <TaskCounter 
+                    <TaskCounter
                       count={visibleHabitCount}
                       isActive={activeTab === 'habits'}
                     />
@@ -608,20 +464,20 @@ export default function Home() {
                 </button>
 
                 {/* 3-DOTS MENU ADDED HERE */}
-                <div className="w-[1px] h-6 bg-border/50 mx-1" />
+                <div className="w-[1px] h-5 bg-border/50 mx-0.5" />
                 <button
                   ref={headerMenuBtnRef}
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsHeaderMenuOpen(!isHeaderMenuOpen);
                   }}
-                  className={`relative p-2 rounded-full transition-colors ${
+                  className={`relative p-1.5 rounded-full transition-colors ${
                     isHeaderMenuOpen || selectedTags.length > 0 || showCompleted
                       ? 'bg-primary/10 text-primary'
                       : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
                   }`}
                 >
-                  <EllipsisVertical className="w-5 h-5" />
+                  <EllipsisVertical className="w-[18px] h-[18px]" />
                   {(selectedTags.length > 0 || showCompleted) && (
                     <div className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
                   )}
@@ -641,7 +497,7 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="min-h-[400px] pb-20" ref={taskListRef}>
+            <div className="min-h-[360px] pb-16" ref={taskListRef}>
               <AnimatePresence mode="wait" initial={false}>
                 {activeTab === 'all' ? (
                   <motion.div
@@ -653,7 +509,7 @@ export default function Home() {
                     transition={{ duration: 0.2 }}
                   >
                     {renderGuestPrompt()}
-                    {habits.length > 0 && (
+                    {habits.length > 0 && (showCompleted || visibleHabitCount > 0) && (
                       <OverviewSectionHeader
                         icon={<CalendarClock className="w-3.5 h-3.5" />}
                         title="Habits"
@@ -661,8 +517,49 @@ export default function Home() {
                         detail={showCompleted ? 'visible' : 'left today'}
                       />
                     )}
-                    {renderHabitPanel(true)}
-                    {data.length > 0 && habits.length > 0 && (
+                    {habits.length > 0 && (
+                      <HabitPanel
+                        habits={habits}
+                        onToggle={handleToggle}
+                        onEdit={(id, text) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          editTask(id, text, false);
+                        }}
+                        onDelete={(id) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          deleteTask(id, true);
+                        }}
+                        onSchedule={(id, data) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          scheduleTask(id, data);
+                        }}
+                        onAddRequested={(prefill, isHabit) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          setQuickText(prefill || '');
+                          setQuickAddMode(isHabit ? 'habit' : 'pick');
+                          setShowQuickAdd(true);
+                        }}
+                        tags={tags}
+                        flyRefs={flyRefs}
+                        showCompleted={showCompleted}
+                        visuallyCompleted={visuallyDone}
+                        onReorder={reorderTasks}
+                        date={todayDateStr}
+                      />
+                    )}
+                    {data.length > 0 && (habits.length > 0 || visibleHabitCount > 0) && (
                       <OverviewSectionHeader
                         icon={<CalendarCheck className="w-3.5 h-3.5" />}
                         title="Tasks"
@@ -670,7 +567,98 @@ export default function Home() {
                         detail={showCompleted ? 'visible' : 'left today'}
                       />
                     )}
-                    {renderTaskList(true)}
+                    {(data.length > 0 || habits.length === 0) && (
+                      <TaskList
+                        tasks={data}
+                        toggle={handleToggle}
+                        showConfetti={rate === 100}
+                        visuallyCompleted={visuallyDone}
+                        renderBullet={(task, isVisuallyDone) =>
+                          task.completed || isVisuallyDone ? null : (
+                            <div
+                              ref={(el) => {
+                                flyRefs.current[task.id] = el;
+                              }}
+                              className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60"
+                            >
+                              <Fly
+                                onClick={() => null}
+                                size={24}
+                                y={-3}
+                                x={0}
+                              />
+                            </div>
+                          )
+                        }
+                        onAddRequested={(prefill) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          setQuickText(prefill || '');
+                          setQuickAddMode('pick');
+                          setShowQuickAdd(true);
+                        }}
+                        weeklyIds={weeklyIds}
+                        onDeleteToday={(id) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          deleteTask(id);
+                        }}
+                        onDeleteFromWeek={async (taskId) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          const dow = new Date().getDay();
+                          await fetch('/api/tasks?view=board', {
+                            method: 'DELETE',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ day: dow, taskId }),
+                          });
+                          deleteTask(taskId);
+                        }}
+                        onDoLater={(id) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          moveTaskToBacklog(id);
+                        }}
+                        onReorder={reorderTasks}
+                        pendingToToday={pendingToToday}
+                        onToggleRepeat={(id) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          toggleRepeat(id);
+                        }}
+                        onEditTask={(id, text) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          editTask(id, text, false);
+                        }}
+                        onScheduleTask={(id, data) => {
+                          if (!user) {
+                            router.push('/login');
+                            return;
+                          }
+                          return scheduleTask(id, data);
+                        }}
+                        isGuest={!user}
+                        tags={tags}
+                        showCompleted={showCompleted}
+                        selectedTags={selectedTags}
+                        onSetSelectedTags={setSelectedTags}
+                        isGlowActive={isTaskGlow}
+                        isFrozen={cinematic}
+                      />
+                    )}
                   </motion.div>
                 ) : activeTab === 'today' ? (
                   <motion.div
@@ -709,15 +697,19 @@ export default function Home() {
                       visuallyCompleted={visuallyDone}
                       renderBullet={(task, isVisuallyDone) =>
                         task.completed || isVisuallyDone ? null : (
-                          <Fly
+                          <div
                             ref={(el) => {
                               flyRefs.current[task.id] = el;
                             }}
-                            onClick={() => null}
-                            size={28}
-                            y={-4}
-                            x={-2}
-                          />
+                            className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60"
+                          >
+                            <Fly
+                              onClick={() => null}
+                              size={24}
+                              y={-3}
+                              x={0}
+                            />
+                          </div>
                         )
                       }
                       onAddRequested={(prefill) => {
@@ -1010,8 +1002,8 @@ export default function Home() {
       />
 
       {/* Floating Add Task Button - Home Page Version */}
-      <div className="fixed bottom-0 left-0 right-0 z-[40] px-4 pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[320px] md:max-w-[400px] relative min-h-[56px] flex items-center justify-center gap-2">
+      <div className="fixed bottom-0 left-0 right-0 z-[40] px-3 pb-[calc(env(safe-area-inset-bottom)+84px)] pointer-events-none">
+        <div className="pointer-events-auto mx-auto w-full max-w-[300px] md:max-w-[360px] relative min-h-[48px] flex items-center justify-center gap-1.5">
           {(activeTab === 'all' || activeTab === 'today' || activeTab === 'habits') && (
             <BacklogBox
               count={laterThisWeek.length}
@@ -1107,7 +1099,7 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
       />
 
       {/* Visual skip hint (non-interactive): aligned with bottom notification zone */}
-      <div className="fixed bottom-0 left-0 right-0 z-[56] flex justify-center pointer-events-none px-4 pb-[calc(env(safe-area-inset-bottom)+176px)]">
+      <div className="fixed bottom-0 left-0 right-0 z-[56] flex justify-center pointer-events-none px-3 pb-[calc(env(safe-area-inset-bottom)+152px)]">
         <div
           className={`
             flex items-center gap-2 rounded-full border px-3 py-2
@@ -1148,13 +1140,13 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
 // Compact Header
 function Header({ router }: { router: any }) {
   return (
-    <div className="flex flex-col gap-4 mb-2 md:mb-4 md:flex-row md:items-center md:justify-between">
+    <div className="flex flex-col gap-1 mb-1 md:mb-2 md:flex-row md:items-center md:justify-between">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground md:text-5xl">
+        <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-4xl">
           {format(new Date(), 'EEEE')}
         </h1>
-        <p className="flex items-center gap-2 font-medium text-md md:text-lg text-muted-foreground">
-          <Calendar className="w-4 h-4 md:w-5 md:h-5" />
+        <p className="flex items-center gap-1.5 text-sm font-medium md:text-base text-muted-foreground">
+          <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />
           {format(new Date(), 'MMMM d, yyyy')}
         </p>
       </div>
@@ -1174,16 +1166,16 @@ function OverviewSectionHeader({
   detail: string;
 }) {
   return (
-    <div className="flex items-center justify-between px-5 pt-2 pb-1">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <span className="flex h-7 w-7 items-center justify-center rounded-full bg-card border border-border/60 shadow-sm text-primary">
+    <div className="flex items-center justify-between px-4 pt-1 pb-0">
+      <div className="flex items-center gap-1.5 text-muted-foreground">
+        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-card border border-border/60 shadow-sm text-primary">
           {icon}
         </span>
-        <span className="text-[11px] font-black uppercase tracking-[0.18em]">
+        <span className="text-[10px] font-black uppercase tracking-[0.16em]">
           {title}
         </span>
       </div>
-      <span className="text-[11px] font-bold text-muted-foreground/70">
+      <span className="text-[10px] font-bold text-muted-foreground/70">
         {count} {detail}
       </span>
     </div>

@@ -305,7 +305,7 @@ export function HabitPanel({
   if (habits.length === 0) {
     return (
       <div className="px-4 pt-2 pb-4">
-        <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-2">
+        <div className="rounded-[22px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-1.5">
           <button
             onClick={() => onAddRequested('', true)}
             className="flex flex-col items-center justify-center w-full py-8 pt-8 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl group"
@@ -326,8 +326,8 @@ export function HabitPanel({
   }
 
   return (
-    <div className="px-4 pt-2 pb-4">
-      <div className="rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-2 pb-0 flex flex-col">
+    <div className="px-4 pt-2 pb-3">
+      <div className="rounded-[22px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-1.5 pb-0 flex flex-col">
         {visibleHabits.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
@@ -789,12 +789,12 @@ function HabitItem({
         transition={{ type: 'spring', stiffness: 600, damping: 28, mass: 1 }}
         onClick={handleCardClick}
         className={`
-          group relative flex flex-col gap-2 px-2 py-3.5 rounded-xl border border-border/50 transition-colors duration-200 cursor-pointer select-none
+          group relative flex flex-col gap-1.5 px-2 py-2 rounded-xl border border-border/50 transition-colors duration-200 cursor-pointer select-none
           ${isDone ? 'bg-card opacity-60' : 'bg-card md:hover:border-primary/40 active:border-primary/40'}
           ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
         `}
       >
-        <div className="relative z-10 flex items-center justify-between gap-3 pl-2 pr-1">
+        <div className="relative z-10 flex items-center justify-between gap-2 pl-1.5 pr-1">
           {/* Bullet — exact match to TaskList */}
           <div className="relative flex-shrink-0 w-7 h-7">
             <AnimatePresence initial={false}>
@@ -816,13 +816,14 @@ function HabitItem({
                     className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 md:hover:text-primary"
                   >
                     <div
-                      className="absolute inset-0 outline-none"
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60"
                       ref={(el) => {
                         flyRefs.current[habit.id] = el;
                       }}
                       data-fly-ref="true"
-                    />
-                    <Fly size={30} />
+                    >
+                      <Fly size={24} y={-3} />
+                    </div>
                   </button>
                 </motion.div>
               ) : (
@@ -845,7 +846,7 @@ function HabitItem({
                       onToggle(habit.id);
                     }}
                   >
-                    <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
+                    <CheckCircle2 className="text-green-500 w-6 h-6 drop-shadow-sm" />
                   </button>
                 </motion.div>
               )}
@@ -863,15 +864,15 @@ function HabitItem({
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0 }}
-                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-500/20 shadow-sm"
+                      className="inline-flex items-center gap-0.5 rounded-md border border-amber-100 bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal text-amber-600 shadow-sm transition-colors dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400"
                       key="task-time-tag"
                     >
-                      <Clock className="w-2.5 h-2.5" />
+                      <Clock className="w-2 h-2" />
                       <span>
                         {habit.startTime}
                         {habit.endTime && habit.endTime !== habit.startTime ? ` - ${habit.endTime}` : ''}
                       </span>
-                      {habit.reminder && <Bell className="w-2.5 h-2.5" />}
+                      {habit.reminder && <Bell className="w-2 h-2" />}
                     </motion.span>
                   )}
                   {habit.tags?.map((tagId) => {
@@ -884,7 +885,7 @@ function HabitItem({
                         exit={{ opacity: 0, scale: 0 }}
                         transition={{ duration: 0.2 }}
                         key={tagId}
-                        className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider border shadow-sm"
+                        className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal shadow-sm"
                         style={{
                           backgroundColor: `${tag.color}20`,
                           color: tag.color,
@@ -899,7 +900,7 @@ function HabitItem({
               </div>
             )}
             <span
-              className={`block text-base font-medium md:text-lg transition-colors duration-200 ${
+              className={`block text-sm font-semibold leading-snug break-words transition-colors duration-200 ${
                 isDone
                   ? 'text-muted-foreground line-through decoration-2 opacity-80'
                   : 'text-foreground'
@@ -909,7 +910,7 @@ function HabitItem({
             </span>
 
             {/* Weekly Goal Progress Dots */}
-            <div className="flex items-center gap-1.5 mt-2 pl-px">
+            <div className="flex items-center gap-1 mt-1.5 pl-px">
               {(() => {
                 const goal = habit.timesPerWeek || 7;
 
@@ -984,7 +985,7 @@ function HabitItem({
                       return (
                         <div
                           key={i}
-                          className={`w-3 h-3 rounded-full border transition-all duration-300 flex-shrink-0 ${
+                          className={`w-2.5 h-2.5 rounded-full border transition-all duration-300 flex-shrink-0 ${
                             isFilled
                               ? 'bg-green-500 border-green-600 shadow-sm shadow-green-500/20'
                               : 'bg-muted border-border/50'

@@ -24,7 +24,7 @@ export function AddTaskButton({
       onClick={onClick}
       disabled={disabled}
       className={[
-        'relative h-14 rounded-2xl px-6 w-auto md:w-full group overflow-hidden',
+        'relative h-12 rounded-xl px-4 w-auto md:w-full group overflow-hidden',
         'bg-card/80 backdrop-blur-2xl',
         'border border-border/80',
         'text-foreground font-bold tracking-tight',
@@ -40,12 +40,12 @@ export function AddTaskButton({
       {/* Subtle Gradient Hover Effect */}
       <div className="absolute inset-0 bg-gradient-to-tr from-primary/5 via-transparent to-emerald-400/5 opacity-0 md:group-hover:opacity-100 transition-opacity duration-500" />
 
-      <span className="relative z-10 flex items-center justify-center h-full gap-3">
-        <div className="flex items-center justify-center w-6 h-6 rounded-lg bg-primary/10 text-primary md:group-hover:scale-110 transition-transform duration-300">
-          <Plus size={18} strokeWidth={3} />
+      <span className="relative z-10 flex items-center justify-center h-full gap-2">
+        <div className="flex items-center justify-center w-5 h-5 rounded-md bg-primary/10 text-primary md:group-hover:scale-110 transition-transform duration-300">
+          <Plus size={15} strokeWidth={3} />
         </div>
 
-        <span className="text-[15px] text-foreground transition-colors duration-300 whitespace-nowrap">
+        <span className="text-sm text-foreground transition-colors duration-300 whitespace-nowrap">
           {label}
         </span>
 

@@ -37,7 +37,7 @@ export default function BacklogBox({
       className="relative flex pointer-events-auto origin-left shrink-0"
       initial={false}
       animate={{
-        width: isDragging ? '100%' : '56px',
+        width: isDragging ? '100%' : '48px',
       }}
       transition={{
         type: 'spring',
@@ -52,8 +52,8 @@ export default function BacklogBox({
         initial={false}
         animate={{
           width: '100%', // Button always fills wrapper
-          height: isDragging ? '80px' : '56px',
-          borderRadius: isDragging ? 24 : 16, 
+          height: isDragging ? '72px' : '48px',
+          borderRadius: isDragging ? 22 : 14,
         }}
         transition={{
           type: 'spring',
@@ -84,8 +84,8 @@ export default function BacklogBox({
           className="absolute inset-0 flex flex-col items-center justify-center gap-1"
           style={{ pointerEvents: 'none' }}
         >
-          <ArrowDownToLine size={24} className={isDragOver ? 'animate-bounce' : ''} />
-          <span className="text-sm font-bold whitespace-nowrap">
+          <ArrowDownToLine size={22} className={isDragOver ? 'animate-bounce' : ''} />
+          <span className="text-xs font-bold whitespace-nowrap">
             {isDragOver ? 'Drop to save' : 'Save for later'}
           </span>
         </motion.div>
@@ -101,7 +101,7 @@ export default function BacklogBox({
            className="absolute inset-0 flex items-center justify-center"
            style={{ pointerEvents: 'none' }}
         >
-          <FolderOpen size={22} strokeWidth={2} className="text-muted-foreground group-hover:text-primary transition-colors" />
+          <FolderOpen size={19} strokeWidth={2} className="text-muted-foreground group-hover:text-primary transition-colors" />
         </motion.div>
 
         {/* Drag Over Glow Effect */}
@@ -131,4 +131,3 @@ export default function BacklogBox({
     </motion.div>
   );
 }
-

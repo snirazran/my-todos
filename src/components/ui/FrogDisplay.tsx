@@ -128,7 +128,7 @@ export function FrogDisplay({
     // Added mb-12 to create the requested space from the tabs below
 
     <div
-      className={`${className} flex flex-col items-center mb-6 md:mb-12 relative`}
+      className={`${className} flex flex-col items-center mb-2 md:mb-2 relative`}
     >
       <CurrencyShop
         open={shopOpen}
@@ -140,10 +140,10 @@ export function FrogDisplay({
 
       <div
         ref={frogBoxRef}
-        className="relative z-50 transition-transform duration-500 -translate-y-3.5 pointer-events-none "
+        className="relative z-50 -mb-8 origin-top scale-[0.82] transition-transform duration-500 -translate-y-3.5 pointer-events-none md:mb-0 md:scale-100 md:-translate-y-3.5"
       >
         <div
-          className="pointer-events-auto cursor-pointer"
+          className="cursor-pointer pointer-events-auto"
           onClick={() => setClickedAt(Date.now())}
         >
           <Frog
@@ -181,13 +181,13 @@ export function FrogDisplay({
       <div
         className="relative z-10 -mt-6 flex items-center justify-between 
 
-              w-[370px] max-w-[min(95vw,100%)] h-[76px] px-3
+              w-[340px] max-w-[min(94vw,100%)] h-[64px] px-2
 
               bg-card/80
 
               backdrop-blur-2xl
 
-              rounded-[20px]
+              rounded-[18px]
 
               border border-border/50
 
@@ -203,7 +203,7 @@ export function FrogDisplay({
                 if (!isGuest) setShopOpen(true);
               }}
               className={cn(
-                'group relative overflow-hidden flex items-center gap-3 pl-2.5 pr-5 py-2 h-[60px] rounded-[18px] bg-muted/50 shadow-inner border border-border/30 transition-all cursor-pointer active:scale-95 duration-200',
+                'group relative overflow-hidden flex items-center gap-2 pl-2 pr-4 py-1.5 h-[50px] rounded-[15px] bg-muted/50 shadow-inner border border-border/30 transition-all cursor-pointer active:scale-95 duration-200',
                 !isGuest && 'hover:bg-muted/80',
                 hungerPercent <= 20 && 'ring-2 ring-rose-500/20',
                 isGuest && 'cursor-default active:scale-100 hover:bg-muted/50',
@@ -214,17 +214,21 @@ export function FrogDisplay({
               <div
                 className={cn(
                   'absolute bottom-0 left-0 right-0 z-0 h-full origin-bottom',
-                  animateHunger && 'transition-transform duration-1000 ease-in-out',
+                  animateHunger &&
+                    'transition-transform duration-1000 ease-in-out',
                   hungerColor,
                 )}
-                style={{ transform: `scaleY(${hungerPercent / 100})`, opacity: 0.2 }}
+                style={{
+                  transform: `scaleY(${hungerPercent / 100})`,
+                  opacity: 0.2,
+                }}
               />
 
               {/* Icon Container */}
 
-              <div className="relative z-10 flex items-center justify-center bg-background rounded-full shadow-sm w-9 h-9 ring-1 ring-black/5 shrink-0">
+              <div className="relative z-10 flex items-center justify-center w-8 h-8 rounded-full shadow-sm bg-background ring-1 ring-black/5 shrink-0">
                 <Fly
-                  size={24}
+                  size={21}
                   y={-2}
                   className={cn(
                     'transition-transform duration-300 text-muted-foreground',
@@ -236,7 +240,7 @@ export function FrogDisplay({
               <div className="relative z-10 flex flex-col justify-center">
                 {/* Hunger Status - Integrated Line at the top */}
 
-                <div className="flex items-center gap-1.5 mb-1">
+                <div className="flex items-center gap-1.5 mb-0.5">
                   <div
                     className={cn(
                       'w-1.5 h-1.5 rounded-full ring-1 ring-white/10 shadow-sm',
@@ -255,7 +259,7 @@ export function FrogDisplay({
                   </span>
                 </div>
 
-                <span className="text-2xl font-black leading-none text-foreground tabular-nums tracking-tight">
+                <span className="text-xl font-black leading-none tracking-tight text-foreground tabular-nums">
                   {flyBalance}
                 </span>
               </div>
@@ -268,13 +272,13 @@ export function FrogDisplay({
         <div className="flex-1" />
 
         {/* Right: Gift & Wardrobe Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => setQuestsOpen(true)}
             onPointerEnter={isGuest ? undefined : prefetchQuests}
             onFocus={isGuest ? undefined : prefetchQuests}
             onTouchStart={isGuest ? undefined : prefetchQuests}
-            className="group relative flex items-center justify-center w-[52px] h-[52px] rounded-[15px]
+            className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
                     bg-card/80 backdrop-blur-2xl
                     text-muted-foreground hover:text-primary
                     shadow-sm hover:shadow-md
@@ -283,8 +287,8 @@ export function FrogDisplay({
                     active:scale-95 active:translate-y-0.5"
             title="Quests"
           >
-            <div className="absolute inset-0 bg-primary/10 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <ScrollText className="relative w-5 h-5 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
+            <div className="absolute inset-0 bg-primary/10 rounded-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <ScrollText className="relative w-[18px] h-[18px] stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
             {questClaimableCount > 0 ? (
               <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background shadow-sm z-20 animate-in zoom-in">
                 {questClaimableCount > 99 ? '99+' : questClaimableCount}
@@ -298,7 +302,7 @@ export function FrogDisplay({
 
           <button
             onClick={() => onOpenChange(true)}
-            className="group relative flex items-center justify-center w-[52px] h-[52px] rounded-[15px]
+            className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
                     bg-card/80 backdrop-blur-2xl
                     text-muted-foreground hover:text-primary
                     shadow-sm hover:shadow-md
@@ -307,8 +311,8 @@ export function FrogDisplay({
                     active:scale-95 active:translate-y-0.5"
             title="Open Wardrobe"
           >
-            <div className="absolute inset-0 bg-primary/10 rounded-[15px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <Shirt className="relative w-5 h-5 stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
+            <div className="absolute inset-0 bg-primary/10 rounded-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <Shirt className="relative w-[18px] h-[18px] stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
             {wardrobeBadge > 0 && (
               <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background shadow-sm z-20">
                 {wardrobeBadge > 9 ? '9+' : wardrobeBadge}

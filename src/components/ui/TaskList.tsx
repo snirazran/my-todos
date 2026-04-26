@@ -459,7 +459,7 @@ const SortableTaskItem = React.forwardRef<
                 : { type: 'spring', stiffness: 600, damping: 28, mass: 1 }
             }
             className={`
-              relative flex w-full items-center gap-1.5 px-2 py-3.5
+              relative flex w-full items-start gap-1.5 px-2 py-2
               transition-colors duration-200 rounded-xl 
               bg-card
               border border-border/50 shadow-none
@@ -489,7 +489,7 @@ const SortableTaskItem = React.forwardRef<
             )}
 
             <div
-              className={`relative z-10 flex items-center flex-1 min-w-0 gap-3 pl-2 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
+              className={`relative z-10 flex items-center flex-1 min-w-0 gap-2 pl-1.5 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
             >
               {/* Bullet */}
               <div className="relative flex-shrink-0 w-7 h-7">
@@ -543,7 +543,7 @@ const SortableTaskItem = React.forwardRef<
                           handleTaskToggle(task, false);
                         }}
                       >
-                        <CheckCircle2 className="text-green-500 w-7 h-7 drop-shadow-sm" />
+                        <CheckCircle2 className="text-green-500 w-6 h-6 drop-shadow-sm" />
                       </button>
                     </motion.div>
                   )}
@@ -559,15 +559,15 @@ const SortableTaskItem = React.forwardRef<
                           initial={{ opacity: 0, scale: 0.8 }}
                           animate={{ opacity: 1, scale: 1 }}
                           exit={{ opacity: 0, scale: 0 }}
-                          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-100 dark:border-amber-500/20 shadow-sm"
+                          className="inline-flex items-center gap-0.5 rounded-md border border-amber-100 bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal text-amber-600 shadow-sm transition-colors dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400"
                           key="task-time-tag"
                         >
-                          <Clock className="w-2.5 h-2.5" />
+                          <Clock className="w-2 h-2" />
                           <span>
                             {task.startTime}
                             {task.endTime && task.endTime !== task.startTime ? ` - ${task.endTime}` : ''}
                           </span>
-                          {task.reminder && <Bell className="w-2.5 h-2.5" />}
+                          {task.reminder && <Bell className="w-2 h-2" />}
                         </motion.span>
                       )}
                       {task.tags?.map((tagId) => {
@@ -584,7 +584,7 @@ const SortableTaskItem = React.forwardRef<
                             exit={{ opacity: 0, scale: 0 }}
                             transition={{ duration: 0.2 }}
                             key={tagId}
-                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider transition-colors border shadow-sm ${
+                            className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal shadow-sm transition-colors ${
                               !color
                                 ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
                                 : ''
@@ -606,9 +606,9 @@ const SortableTaskItem = React.forwardRef<
                     </AnimatePresence>
                   </div>
                 )}
-                <span className="flex items-center gap-1.5">
+                <span className="flex flex-wrap items-center gap-1.5">
                   <motion.span
-                    className={`text-base font-medium md:text-lg transition-colors duration-200 ${
+                    className={`text-sm font-semibold leading-snug break-words transition-colors duration-200 ${
                       isDone
                         ? 'text-muted-foreground line-through'
                         : 'text-foreground'
@@ -1145,14 +1145,14 @@ export default function TaskList({
 
   return (
     <>
-      <div dir="ltr" className="w-full px-4 pt-0 pb-4 overflow-visible">
+      <div dir="ltr" className="w-full px-4 pt-0 pb-3 overflow-visible">
         <div className="flex flex-row items-center justify-end mb-2 gap-3 relative">
           {/* Header Menu Removed - Moved to Page */}
         </div>
 
-        <div className="w-full rounded-[24px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
+        <div className="w-full rounded-[22px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
         <div
-          className={`p-2 pb-0 space-y-0 md:overflow-y-auto overflow-y-visible md:max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
+          className={`p-1.5 pb-0 space-y-0 md:overflow-y-auto overflow-y-visible md:max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
         >
           {tasks.length === 0 && !exitAction ? (
