@@ -51,12 +51,13 @@ function AnimatedNumber({ value, suffix = '', className }: { value: number, suff
   return <motion.span className={className}>{display}</motion.span>;
 }
 
-const StaggeredText = ({ text, className, delay = 0, stagger = 0.1 }: { text: string, className?: string, delay?: number, stagger?: number }) => {
+const StaggeredText = ({ text, className, delay = 0, stagger = 0.1, style }: { text: string, className?: string, delay?: number, stagger?: number, style?: React.CSSProperties }) => {
   const words = text.split(" ");
   return (
     <motion.div 
       initial="hidden"
       animate="visible"
+      style={style}
       variants={{
         visible: { transition: { staggerChildren: stagger, delayChildren: delay } },
       }}
