@@ -1,25 +1,20 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useSpring, useTransform } from 'framer-motion';
 import {
   X,
   Flame,
-  Calendar,
   CalendarCheck,
   Target,
-  Clock,
-  Trophy,
-  Sparkles,
   Zap,
-  ChevronRight,
   Crown,
   Share2,
-  PartyPopper,
   Shirt,
   Star,
   Compass,
-  Waves,
+  Sparkles,
+  Trophy
 } from 'lucide-react';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
@@ -31,95 +26,89 @@ import type { RecapInsightsResponse } from '@/app/api/weekly-recap/insights/rout
 /*  Constants & Helpers                                                */
 /* ------------------------------------------------------------------ */
 
-const SLIDE_DURATION = 7500; // 7.5 seconds for a premium feel
+const SLIDE_DURATION = 8000; // 8 seconds for pacing
 
 function getWeekRating(rate: number) {
-  if (rate >= 90) return { label: 'Legendary', sub: 'You mastered the week!', color: '#10b981', bg: 'from-emerald-950 to-black', icon: Crown };
-  if (rate >= 75) return { label: 'Great', sub: 'Solid consistency!', color: '#22c55e', bg: 'from-green-950 to-black', icon: Trophy };
-  if (rate >= 60) return { label: 'Good', sub: 'Keep that momentum!', color: '#84cc16', bg: 'from-lime-950 to-black', icon: Zap };
-  if (rate >= 40) return { label: 'Fair', sub: 'Room to grow next week.', color: '#f59e0b', bg: 'from-amber-950 to-black', icon: Target };
-  return { label: 'Reset', sub: 'New week, new start.', color: '#ef4444', bg: 'from-red-950 to-black', icon: Flame };
+  if (rate >= 90) return { label: 'LEGENDARY', sub: 'Absolutely unstoppable.', color: '#10b981', bg: 'bg-emerald-950', icon: Crown };
+  if (rate >= 75) return { label: 'GREAT', sub: 'Solid consistency.', color: '#22c55e', bg: 'bg-green-950', icon: Trophy };
+  if (rate >= 60) return { label: 'GOOD', sub: 'Kept the momentum.', color: '#84cc16', bg: 'bg-lime-950', icon: Zap };
+  if (rate >= 40) return { label: 'FAIR', sub: 'Room to grow.', color: '#f59e0b', bg: 'bg-amber-950', icon: Target };
+  return { label: 'RESET', sub: 'A fresh start awaits.', color: '#ef4444', bg: 'bg-red-950', icon: Flame };
 }
 
 /* ------------------------------------------------------------------ */
-/*  Themed Background Elements                                         */
+/*  Micro-Interactions & Components                                    */
 /* ------------------------------------------------------------------ */
 
-function ParticleBackground({ color, count = 20 }: { color: string, count?: number }) {
+function AnimatedNumber({ value, suffix = '', className }: { value: number, suffix?: string, className?: string }) {
+  const spring = useSpring(0, { bounce: 0, duration: 2500 });
+  const display = useTransform(spring, (current) => Math.round(current).toString() + suffix);
+  
+  useEffect(() => {
+    spring.set(value);
+  }, [value, spring]);
+
+  return <motion.span className={className}>{display}</motion.span>;
+}
+
+const StaggeredText = ({ text, className, delay = 0, stagger = 0.1 }: { text: string, className?: string, delay?: number, stagger?: number }) => {
+  const words = text.split(" ");
   return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {Array.from({ length: count }).map((_, i) => (
-        <motion.div
-          key={i}
-          initial={{ 
-            x: Math.random() * 100 + '%', 
-            y: Math.random() * 100 + '%', 
-            opacity: 0,
-            scale: Math.random() * 0.5 + 0.5 
+    <motion.div 
+      initial="hidden"
+      animate="visible"
+      variants={{
+        visible: { transition: { staggerChildren: stagger, delayChildren: delay } },
+      }}
+      className={cn("flex flex-wrap justify-center gap-[0.25em]", className)}
+    >
+      {words.map((word, i) => (
+        <motion.span 
+          key={i} 
+          variants={{
+            hidden: { y: 40, opacity: 0, rotate: 5 },
+            visible: { y: 0, opacity: 1, rotate: 0, transition: { type: "spring", damping: 15, stiffness: 100 } }
           }}
-          animate={{ 
-            y: [null, '-20%', '120%'],
-            opacity: [0, 0.4, 0],
-          }}
-          transition={{ 
-            duration: Math.random() * 5 + 5, 
-            repeat: Infinity, 
-            delay: Math.random() * 5,
-            ease: "linear"
-          }}
-          className="absolute w-1 h-1 rounded-full"
-          style={{ backgroundColor: color }}
-        />
+          className="inline-block origin-bottom-left"
+        >
+          {word}
+        </motion.span>
       ))}
-    </div>
+    </motion.div>
   );
 }
 
-function PondBackground() {
+function NoiseOverlay() {
   return (
-    <div className="absolute inset-0 bg-[#020617] pointer-events-none">
-      <motion.div
-        animate={{ 
-          scale: [1, 1.1, 1],
-          rotate: [0, 5, 0],
-        }}
-        transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-        className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-500/20 via-transparent to-transparent"
-      />
-      {Array.from({ length: 3 }).map((_, i) => (
-        <motion.div
-          key={i}
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: [0, 4], opacity: [0.3, 0] }}
-          transition={{ duration: 6, repeat: Infinity, delay: i * 2, ease: "easeOut" }}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 border border-blue-400/20 rounded-full"
-        />
-      ))}
-    </div>
+    <div 
+      className="absolute inset-0 opacity-[0.03] pointer-events-none mix-blend-overlay"
+      style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=\'0 0 200 200\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cfilter id=\'noiseFilter\'%3E%3CfeTurbulence type=\'fractalNoise\' baseFrequency=\'0.85\' numOctaves=\'3\' stitchTiles=\'stitch\'/%3E%3C/filter%3E%3Crect width=\'100%25\' height=\'100%25\' filter=\'url(%23noiseFilter)\'/%3E%3C/svg%3E")' }}
+    />
   );
 }
 
-function SpecialistBackground({ accent }: { accent: string }) {
+function FloatingBlobs({ color1, color2 }: { color1: string, color2: string }) {
   return (
-    <div className="absolute inset-0 pointer-events-none">
-      <div className="absolute inset-0 opacity-10 bg-[grid-white/5] [mask-image:radial-gradient(white,transparent_70%)]" />
+    <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 mix-blend-screen">
       <motion.div
         animate={{ 
-          rotate: 360,
-          scale: [1, 1.2, 1],
+          scale: [1, 1.5, 1],
+          x: ['0%', '30%', '0%'],
+          y: ['0%', '20%', '0%'],
         }}
-        transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
-        className="absolute -right-20 -top-20 w-96 h-96 rounded-full blur-[100px]"
-        style={{ backgroundColor: accent + '20' }}
+        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute top-0 left-0 w-[150vw] h-[150vw] md:w-[80vw] md:h-[80vw] rounded-full blur-[100px] opacity-40 -translate-x-1/2 -translate-y-1/2"
+        style={{ backgroundColor: color1 }}
       />
       <motion.div
         animate={{ 
-          rotate: -360,
           scale: [1, 1.3, 1],
+          x: ['0%', '-40%', '0%'],
+          y: ['0%', '40%', '0%'],
         }}
-        transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
-        className="absolute -left-20 -bottom-20 w-96 h-96 rounded-full blur-[100px]"
-        style={{ backgroundColor: accent + '10' }}
+        transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute bottom-0 right-0 w-[120vw] h-[120vw] md:w-[70vw] md:h-[70vw] rounded-full blur-[100px] opacity-30 translate-x-1/4 translate-y-1/4"
+        style={{ backgroundColor: color2 }}
       />
     </div>
   );
@@ -182,7 +171,7 @@ export default function WeeklyWrapped({
   }, [currentSlide]);
 
   useEffect(() => {
-    const step = 100;
+    const step = 50; // Smoother 50ms updates
     const increment = (step / SLIDE_DURATION) * 100;
     if (timerRef.current) clearInterval(timerRef.current);
     timerRef.current = setInterval(() => {
@@ -201,171 +190,187 @@ export default function WeeklyWrapped({
   }, [currentSlide, handleNext]);
 
   const slides = useMemo(() => [
-    // 0: Intro (Pond Theme)
+    // 0: Intro (The Hook)
     {
       id: 'intro',
-      background: <PondBackground />,
+      bg: 'bg-indigo-950',
+      blobs: ['#4f46e5', '#ec4899'],
       content: (
         <div className="relative flex flex-col items-center justify-center h-full text-center px-6 z-10">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="mb-12"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
+            className="mb-8 relative"
           >
-            <div className="relative h-64 w-80 flex items-center justify-center">
+            <div className="relative h-64 w-80 flex items-center justify-center drop-shadow-[0_20px_50px_rgba(79,70,229,0.5)]">
               <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
-                className="absolute inset-0 rounded-full border border-primary/10 p-6"
+                animate={{ rotate: 360, scale: [1, 1.05, 1] }}
+                transition={{ rotate: { duration: 30, repeat: Infinity, ease: 'linear' }, scale: { duration: 4, repeat: Infinity, ease: 'easeInOut' } }}
+                className="absolute inset-0 rounded-full border border-indigo-400/20 p-6"
               >
-                <div className="w-full h-full rounded-full border-2 border-dotted border-primary/20" />
+                <div className="w-full h-full rounded-full border-2 border-dashed border-pink-400/30" />
               </motion.div>
               <Frog width={280} height={210} indices={indices} />
             </div>
           </motion.div>
-          <div className="space-y-6">
-            <motion.h1
-              initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.3 }}
-              className="text-6xl font-black tracking-tighter leading-[0.85] italic"
+          <div className="space-y-4">
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="text-indigo-200 font-bold tracking-[0.3em] uppercase text-xs"
             >
-              YOUR WEEK,<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-indigo-400 to-emerald-400">WRAPPED.</span>
-            </motion.h1>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10"
-            >
-              <Waves className="w-3 h-3 text-primary animate-pulse" />
-              <span className="text-white/40 font-black tracking-[0.2em] uppercase text-[10px]">
-                {new Date(data.weekStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} — {new Date(data.weekEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-              </span>
-            </motion.div>
+              Are you ready?
+            </motion.p>
+            <StaggeredText 
+              text="YOUR WEEK UNWRAPPED" 
+              delay={1.5}
+              className="text-6xl md:text-7xl font-black tracking-tighter leading-[0.85] italic text-transparent bg-clip-text bg-gradient-to-br from-white via-indigo-100 to-pink-200"
+            />
           </div>
         </div>
       ),
     },
-    // 1: Overall Score
+    // 1: The Vibe (Score)
     {
       id: 'score',
-      background: (
-        <div className="absolute inset-0 bg-[#020617]">
-          <ParticleBackground color={rating.color} />
-          <div className={cn("absolute inset-0 opacity-40 bg-gradient-to-b", rating.bg)} />
-        </div>
-      ),
+      bg: 'bg-[#0f172a]', // Slate 950 base
+      blobs: [rating.color, '#0ea5e9'],
       content: (
-        <div className="flex flex-col items-center justify-center h-full text-center px-6 relative z-10">
-          <div className="relative mb-12">
-             <motion.div
-               initial={{ scale: 0.5, opacity: 0 }}
-               animate={{ scale: 1, opacity: 1 }}
-               transition={{ type: 'spring', damping: 12, delay: 0.2 }}
-               className="text-[140px] leading-none font-black tracking-tighter italic"
-               style={{ color: rating.color }}
-             >
-               {data.completionRate}%
-             </motion.div>
-             <motion.div
-               initial={{ rotate: -40, opacity: 0, scale: 0 }}
-               animate={{ rotate: -15, opacity: 1, scale: 1 }}
-               transition={{ delay: 0.6, type: 'spring' }}
-               className="absolute -top-16 -right-12"
-             >
-               <rating.icon className="w-24 h-24 text-white drop-shadow-[0_0_20px_rgba(255,255,255,0.4)]" />
-             </motion.div>
-          </div>
-          <motion.div 
-            initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.5 }}
-            className="space-y-2"
+        <div className="flex flex-col h-full justify-center px-8 relative z-10">
+          <motion.p 
+            initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }}
+            className="text-2xl md:text-3xl font-bold italic text-white/60 mb-2"
           >
-            <h2 className="text-5xl font-black uppercase italic tracking-tighter" style={{ color: rating.color }}>{rating.label}</h2>
-            <p className="text-xl text-white/60 font-black uppercase tracking-widest">{rating.sub}</p>
+            This week, your vibe was...
+          </motion.p>
+          <StaggeredText 
+            text={rating.label} 
+            delay={1.2}
+            className="text-[6rem] md:text-[8rem] font-black uppercase italic tracking-tighter leading-none mb-12 justify-start"
+            style={{ color: rating.color }}
+          />
+
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2, type: "spring" }}
+            className="bg-white/5 backdrop-blur-2xl p-8 rounded-[40px] border border-white/10 shadow-2xl relative overflow-hidden"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50" />
+            <div className="relative z-10 grid grid-cols-2 gap-6">
+              <div>
+                <div className="text-sm font-bold uppercase tracking-widest text-white/40 mb-1">Completion</div>
+                <div className="text-5xl font-black italic"><AnimatedNumber value={data.completionRate} suffix="%" /></div>
+              </div>
+              <div>
+                <div className="text-sm font-bold uppercase tracking-widest text-white/40 mb-1">Tasks Crushed</div>
+                <div className="text-5xl font-black italic"><AnimatedNumber value={data.tasksCompleted} /></div>
+              </div>
+            </div>
+            <motion.p 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 3.5 }}
+              className="mt-6 text-lg font-medium text-white/70"
+            >
+              {rating.sub} You showed up for <span className="text-white font-bold">{data.activeDays}</span> days.
+            </motion.p>
           </motion.div>
-          
-          <div className="mt-16 grid grid-cols-2 gap-4 w-full max-w-xs">
-            {[
-              { label: 'Tasks', val: data.tasksCompleted, icon: CalendarCheck, color: 'text-primary' },
-              { label: 'Days', val: data.activeDays, icon: Zap, color: 'text-amber-400' }
-            ].map((st, i) => (
-              <motion.div
-                key={st.label}
-                initial={{ y: 20, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.8 + i * 0.1 }}
-                className="bg-white/5 backdrop-blur-3xl p-6 rounded-[32px] border border-white/10 text-left relative overflow-hidden"
-              >
-                <st.icon className={cn("w-5 h-5 mb-4", st.color)} />
-                <div className="text-4xl font-black italic">{st.val}</div>
-                <div className="text-[10px] font-black uppercase text-white/30 tracking-widest">{st.label}</div>
-              </motion.div>
-            ))}
-          </div>
         </div>
       ),
     },
-    // 2: Flies & Skins (The Collector)
+    // 2: The Focus (Focus Areas & Time)
     {
-      id: 'collection',
-      background: (
-        <div className="absolute inset-0 bg-[#09090b]">
-           <ParticleBackground color="#f59e0b" count={15} />
-           <div className="absolute inset-0 opacity-30 bg-gradient-to-br from-amber-900/50 via-purple-950/40 to-black" />
-           {/* Background Fly Swarm */}
-           {Array.from({ length: 5 }).map((_, i) => (
-             <motion.div
-               key={i}
-               initial={{ x: Math.random() * 100 + '%', y: '110%' }}
-               animate={{ y: '-10%', x: (Math.random() * 100) + '%' }}
-               transition={{ duration: Math.random() * 10 + 10, repeat: Infinity, delay: i * 2 }}
-               className="absolute opacity-5 pointer-events-none"
-             >
-               <Fly size={40} />
-             </motion.div>
-           ))}
-        </div>
-      ),
+      id: 'focus',
+      bg: 'bg-blue-950',
+      blobs: ['#3b82f6', '#8b5cf6'],
       content: (
-        <div className="flex flex-col items-center justify-center h-full px-6 relative z-10">
+        <div className="flex flex-col h-full justify-center px-8 relative z-10">
           <motion.div 
-             initial={{ y: -20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-             className="text-center mb-12"
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
+            className="mb-8"
           >
-            <h2 className="text-4xl font-black italic tracking-tighter uppercase text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-purple-400">The Collector</h2>
+            <p className="text-xl font-bold italic text-blue-200 mb-2">You locked in for...</p>
+            <div className="text-7xl md:text-8xl font-black italic tracking-tighter leading-none text-white">
+              <AnimatedNumber value={data.totalFocusMinutes} />
+              <span className="text-4xl ml-2 text-blue-400">minutes.</span>
+            </div>
           </motion.div>
 
-          <div className="grid grid-cols-1 gap-5 w-full max-w-xs">
+          {data.focusAreas && data.focusAreas.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 1.5 }}
+              className="space-y-4"
+            >
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-white/40 mb-6">Where your energy went</p>
+              {data.focusAreas.slice(0, 3).map((area, i) => (
+                <motion.div
+                  key={area.categoryId}
+                  initial={{ x: -40, opacity: 0 }}
+                  animate={{ x: 0, opacity: 1 }}
+                  transition={{ delay: 2 + i * 0.2, type: "spring" }}
+                  className="bg-white/5 backdrop-blur-xl p-5 rounded-[32px] border border-white/5 relative overflow-hidden"
+                >
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(100, (area.tasksCompleted / Math.max(1, data.tasksCompleted)) * 100)}%` }}
+                    transition={{ delay: 2.5 + i * 0.2, duration: 1, ease: "easeOut" }}
+                    className="absolute inset-y-0 left-0 opacity-20"
+                    style={{ backgroundColor: area.accent }} 
+                  />
+                  <div className="relative z-10 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-xl font-black italic uppercase tracking-wider" style={{ color: area.accent }}>{area.categoryName}</h3>
+                      <p className="text-xs font-bold text-white/50">{area.tasksCompleted} tasks • {area.focusMinutes}m focus</p>
+                    </div>
+                    {i === 0 && <Crown className="w-6 h-6 text-amber-400" />}
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </div>
+      ),
+    },
+    // 3: The Collector (Flies & Skins)
+    {
+      id: 'collection',
+      bg: 'bg-amber-950',
+      blobs: ['#f59e0b', '#d946ef'],
+      content: (
+        <div className="flex flex-col items-center justify-center h-full text-center px-6 relative z-10">
+          <StaggeredText 
+            text="HARD WORK PAYS OFF." 
+            delay={0.3}
+            className="text-4xl md:text-5xl font-black italic tracking-tighter uppercase text-amber-400 mb-12"
+          />
+
+          <div className="grid grid-cols-1 gap-6 w-full max-w-sm">
             {/* Flies Card */}
             <motion.div
-              initial={{ x: -30, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white/5 p-8 rounded-[40px] border border-white/10 text-left relative overflow-hidden group shadow-2xl"
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 1.2, type: "spring" }}
+              className="bg-gradient-to-br from-amber-500/20 to-orange-600/20 backdrop-blur-2xl p-8 rounded-[40px] border border-amber-500/30 text-left relative overflow-hidden shadow-2xl"
             >
-              <div className="absolute -right-4 -top-4 w-44 h-44 z-0 pointer-events-none drop-shadow-[0_0_15px_rgba(251,191,36,0.4)]">
-                <Fly size={160} className="w-full h-full opacity-60 rotate-12 group-hover:rotate-[25deg] transition-transform duration-700" />
+              <div className="absolute -right-8 -top-8 w-48 h-48 z-20 pointer-events-none drop-shadow-[0_0_25px_rgba(251,191,36,0.6)]">
+                <Fly size={200} className="w-full h-full opacity-100 rotate-12 transition-transform duration-700" />
               </div>
               <div className="relative z-10">
-                <div className="text-[10px] font-black uppercase text-amber-400 tracking-[0.3em] mb-2">Flies Caught</div>
-                <div className="text-7xl font-black tracking-tighter italic">{data.fliesEarned}</div>
-                <p className="text-xs text-white/40 mt-3 font-bold uppercase tracking-wider">A feast for the queen</p>
+                <div className="text-[10px] font-black uppercase text-amber-200 tracking-[0.3em] mb-2">The Bounty</div>
+                <div className="text-7xl font-black tracking-tighter italic text-white"><AnimatedNumber value={data.fliesEarned} /></div>
+                <p className="text-sm text-amber-200/60 mt-2 font-bold uppercase tracking-widest">Flies caught</p>
               </div>
             </motion.div>
 
             {/* Skins Card */}
             <motion.div
-              initial={{ x: 30, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className="bg-white/5 p-8 rounded-[40px] border border-white/10 text-left relative overflow-hidden shadow-2xl group"
+              initial={{ y: 40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 1.6, type: "spring" }}
+              className="bg-gradient-to-br from-fuchsia-500/20 to-purple-600/20 backdrop-blur-2xl p-8 rounded-[40px] border border-fuchsia-500/30 text-left relative overflow-hidden shadow-2xl"
             >
-              <div className="absolute -right-6 -top-6 w-44 h-44 z-0 pointer-events-none drop-shadow-[0_0_15px_rgba(168,85,247,0.4)]">
+              <div className="absolute -right-4 -top-4 w-40 h-40 z-0 pointer-events-none drop-shadow-[0_0_20px_rgba(217,70,239,0.5)]">
                 {data.skinsRarestDetail ? (
-                   <div className="scale-125 rotate-[-10deg] group-hover:rotate-0 transition-transform duration-1000">
+                   <div className="scale-125 -rotate-12 origin-center">
                      <Frog 
                        width={180} 
                        height={140} 
@@ -376,16 +381,16 @@ export default function WeeklyWrapped({
                      />
                    </div>
                 ) : (
-                  <Shirt className="w-full h-full -rotate-12 opacity-10 text-purple-400" />
+                  <Shirt className="w-full h-full -rotate-12 opacity-20 text-fuchsia-300" />
                 )}
               </div>
               <div className="relative z-10">
-                <div className="text-[10px] font-black uppercase text-purple-400 tracking-[0.3em] mb-2">New Wardrobe</div>
-                <div className="text-7xl font-black tracking-tighter italic">+{data.skinsNew || 0}</div>
+                <div className="text-[10px] font-black uppercase text-fuchsia-200 tracking-[0.3em] mb-2">New Style</div>
+                <div className="text-7xl font-black tracking-tighter italic text-white">+<AnimatedNumber value={data.skinsNew || 0} /></div>
                 {data.skinsRarest && (
-                  <div className="mt-4 inline-flex items-center gap-2 bg-purple-500/20 px-3 py-1.5 rounded-full border border-purple-500/30">
-                    <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                    <span className="text-[10px] font-black uppercase text-white tracking-widest">{data.skinsRarest}</span>
+                  <div className="mt-4 inline-flex items-center gap-2 bg-fuchsia-500/30 px-4 py-2 rounded-full border border-fuchsia-400/40">
+                    <Star className="w-4 h-4 text-amber-300 fill-amber-300" />
+                    <span className="text-xs font-black uppercase text-white tracking-widest truncate max-w-[120px]">{data.skinsRarest}</span>
                   </div>
                 )}
               </div>
@@ -394,149 +399,94 @@ export default function WeeklyWrapped({
         </div>
       ),
     },
-    // 3: Focus Areas (The Specialist)
-    ...(data.focusAreas && data.focusAreas.length > 0 ? [{
-      id: 'focus-areas',
-      background: <SpecialistBackground accent={data.focusAreas[0]?.accent || '#3b82f6'} />,
-      content: (
-        <div className="flex flex-col items-center justify-center h-full px-6 relative z-10">
-          <motion.div 
-            initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-            className="text-center mb-10"
-          >
-            <div className="w-16 h-16 rounded-3xl bg-blue-500/10 flex items-center justify-center mx-auto mb-6 border border-blue-500/20">
-              <Compass className="w-8 h-8 text-blue-400" />
-            </div>
-            <h2 className="text-4xl font-black italic tracking-tighter uppercase leading-[0.9]">Your Life,<br/><span className="text-blue-400">In Focus</span></h2>
-          </motion.div>
-
-          <div className="space-y-4 w-full max-w-xs">
-            {data.focusAreas.slice(0, 3).map((area, i) => (
-              <motion.div
-                key={area.categoryId}
-                initial={{ x: -20, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ delay: i * 0.15 + 0.3 }}
-                className="group bg-white/5 p-6 rounded-[32px] border border-white/10 relative overflow-hidden"
-              >
-                <div className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: area.accent }} />
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm font-black uppercase tracking-[0.2em]" style={{ color: area.accent }}>{area.categoryName}</span>
-                  <div className="flex gap-2">
-                    {area.topTags.slice(0, 2).map(tag => (
-                      <div key={tag.tagId} className="w-2.5 h-2.5 rounded-full shadow-[0_0_8px_rgba(255,255,255,0.2)]" style={{ backgroundColor: tag.tagColor }} />
-                    ))}
-                  </div>
-                </div>
-                <div className="grid grid-cols-3 gap-6">
-                  <div>
-                    <div className="text-2xl font-black italic">{area.tasksCompleted}</div>
-                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest">Tasks</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black italic">{area.habitsCompleted}</div>
-                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest">Habits</div>
-                  </div>
-                  <div>
-                    <div className="text-2xl font-black italic">{area.focusMinutes}m</div>
-                    <div className="text-[8px] font-black text-white/20 uppercase tracking-widest">Focus</div>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      ),
-    }] : []),
     // 4: AI Fortune (The Oracle)
     ...(aiInsights?.summary && aiInsights?.insights ? [{
       id: 'ai',
-      background: (
-        <div className="absolute inset-0 bg-[#0c0a09]">
-          <ParticleBackground color="#d946ef" count={30} />
-          <motion.div
-            animate={{ opacity: [0.1, 0.2, 0.1] }}
-            transition={{ duration: 4, repeat: Infinity }}
-            className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,_#701a75_0%,_transparent_60%)]"
-          />
-        </div>
-      ),
+      bg: 'bg-zinc-950',
+      blobs: ['#9333ea', '#4f46e5'],
       content: (
         <div className="flex flex-col items-center justify-center h-full text-center px-8 relative z-10">
           <motion.div 
-            initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-            className="mb-10"
+            initial={{ scale: 0, opacity: 0, rotate: -180 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} transition={{ duration: 1, type: "spring" }}
+            className="mb-12"
           >
-            <div className="w-20 h-20 rounded-full bg-fuchsia-500/10 border border-fuchsia-500/30 flex items-center justify-center shadow-[0_0_30px_rgba(217,70,239,0.2)]">
-              <Sparkles className="w-10 h-10 text-fuchsia-400" />
+            <div className="w-24 h-24 rounded-[32px] bg-fuchsia-500/20 border border-fuchsia-500/40 flex items-center justify-center shadow-[0_0_50px_rgba(217,70,239,0.3)] backdrop-blur-xl rotate-12">
+              <Sparkles className="w-12 h-12 text-fuchsia-300 -rotate-12" />
             </div>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.4 }}
-            className="bg-white/5 backdrop-blur-3xl p-10 rounded-[60px] border border-white/10 relative shadow-2xl"
-          >
-            <div className="text-3xl font-black leading-tight italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-white via-white to-fuchsia-200">
-              "{aiInsights.summary}"
-            </div>
-          </motion.div>
+          <StaggeredText 
+            text={aiInsights.summary}
+            delay={0.5}
+            stagger={0.05}
+            className="text-3xl md:text-4xl font-black leading-tight italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-br from-white to-white/60 mb-12"
+          />
           
-          <div className="mt-12 flex flex-wrap justify-center gap-3">
+          <div className="flex flex-col gap-3 w-full max-w-sm">
             {aiInsights.insights?.map((ins, i) => (
               <motion.div 
                 key={i}
-                initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.7 + i * 0.1 }}
-                className="bg-white/10 px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-white/60 border border-white/5"
+                initial={{ x: 40, opacity: 0 }} animate={{ x: 0, opacity: 1 }} transition={{ delay: 2 + i * 0.2, type: "spring" }}
+                className="bg-white/5 backdrop-blur-xl p-4 rounded-3xl text-left border border-white/10 flex items-center gap-4"
               >
-                {ins.emoji} {ins.title}
+                <div className="text-3xl">{ins.emoji}</div>
+                <div className="text-sm font-bold uppercase tracking-widest text-white/80">{ins.title}</div>
               </motion.div>
             ))}
           </div>
         </div>
       ),
     }] : []),
-    // 5: Outro (The Legend)
+    // 5: Outro
     {
       id: 'outro',
-      background: (
-        <div className="absolute inset-0 bg-black">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_120%,_#1e1b4b_0%,_transparent_50%)]" />
-        </div>
-      ),
+      bg: 'bg-black',
+      blobs: ['#1e1b4b', '#000000'],
       content: (
         <div className="flex flex-col items-center justify-center h-full text-center px-6 relative z-10">
-          <h2 className="text-5xl font-black mb-12 italic tracking-tighter uppercase leading-[0.85] text-transparent bg-clip-text bg-gradient-to-b from-white to-white/40">
-            Another Week,<br/>Another Legend.
-          </h2>
+          <motion.div
+             initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 1, ease: "easeOut" }}
+             className="mb-8"
+          >
+             <h2 className="text-6xl md:text-7xl font-black italic tracking-tighter uppercase leading-[0.85] text-white">
+              ONE WEEK.<br/>
+              <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary via-emerald-400 to-blue-500">ONE LEGEND.</span>
+            </h2>
+          </motion.div>
 
-          <div className="grid grid-cols-2 gap-4 w-full max-w-xs mb-12">
-            <div className="text-left p-6 rounded-[40px] bg-white/5 border border-white/10">
-              <div className="text-white/20 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Success</div>
-              <div className="text-5xl font-black italic tracking-tighter text-primary">{data.completionRate}%</div>
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.8 }}
+            className="grid grid-cols-2 gap-4 w-full max-w-sm mb-16"
+          >
+            <div className="p-8 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl flex flex-col items-center justify-center">
+              <div className="text-6xl font-black italic tracking-tighter text-primary"><AnimatedNumber value={data.completionRate} suffix="%" /></div>
+              <div className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Success</div>
             </div>
-            <div className="text-left p-6 rounded-[40px] bg-white/5 border border-white/10">
-              <div className="text-white/20 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Focus</div>
-              <div className="text-5xl font-black italic tracking-tighter text-blue-400">{data.totalFocusMinutes}m</div>
+            <div className="p-8 rounded-[40px] bg-white/5 border border-white/10 backdrop-blur-xl flex flex-col items-center justify-center">
+              <div className="text-6xl font-black italic tracking-tighter text-blue-400"><AnimatedNumber value={data.totalFocusMinutes} /></div>
+              <div className="text-white/40 text-[10px] font-black uppercase tracking-[0.3em] mt-2">Minutes</div>
             </div>
-          </div>
+          </motion.div>
 
           <motion.button
+            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.5 }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={(e) => {
               e.stopPropagation();
               handleFinish();
             }}
-            className="w-full max-w-xs py-6 rounded-[35px] bg-primary text-primary-foreground font-black text-2xl shadow-[0_20px_50px_rgba(34,197,94,0.3)] uppercase tracking-tighter italic"
+            className="w-full max-w-sm py-6 rounded-[40px] bg-primary text-primary-foreground font-black text-2xl shadow-[0_20px_50px_rgba(34,197,94,0.3)] uppercase tracking-tighter italic"
           >
-            START NEW WEEK
+            DOMINATE NEXT WEEK
           </motion.button>
           
-          <button className="mt-8 flex items-center gap-2 text-white/20 font-black text-xs uppercase tracking-[0.3em] hover:text-white transition-colors">
+          <motion.button 
+             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2 }}
+             className="mt-8 flex items-center gap-2 text-white/30 font-black text-xs uppercase tracking-[0.3em] hover:text-white transition-colors"
+          >
             <Share2 className="w-4 h-4" /> Share Story
-          </button>
+          </motion.button>
         </div>
       ),
     },
@@ -544,6 +494,8 @@ export default function WeeklyWrapped({
 
   return (
     <div className="fixed inset-0 z-[1000] bg-black text-white select-none overflow-hidden flex flex-col font-sans">
+      <NoiseOverlay />
+      
       {/* Dynamic Background Wrapper */}
       <AnimatePresence mode="wait">
         <motion.div
@@ -551,22 +503,22 @@ export default function WeeklyWrapped({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 1 }}
-          className="absolute inset-0 z-0"
+          transition={{ duration: 1.2 }}
+          className={cn("absolute inset-0 z-0", slides[currentSlide].bg)}
         >
-          {slides[currentSlide].background}
+          <FloatingBlobs color1={slides[currentSlide].blobs[0]} color2={slides[currentSlide].blobs[1]} />
         </motion.div>
       </AnimatePresence>
 
       {/* Progress Bars Container */}
       <div className="absolute top-4 left-4 right-4 z-[1050] flex gap-2 px-1">
         {slides.map((_, i) => (
-          <div key={i} className="h-1 flex-1 bg-white/10 rounded-full overflow-hidden">
+          <div key={i} className="h-1.5 flex-1 bg-white/20 rounded-full overflow-hidden backdrop-blur-md">
             <div 
               className="h-full bg-white transition-all ease-linear"
               style={{ 
                 width: i < currentSlide ? '100%' : i === currentSlide ? `${progress}%` : '0%',
-                transitionDuration: i === currentSlide ? '100ms' : '0ms'
+                transitionDuration: i === currentSlide ? '50ms' : '0ms'
               }}
             />
           </div>
@@ -576,10 +528,10 @@ export default function WeeklyWrapped({
       {/* Persistent Header */}
       <div className="absolute top-10 left-6 right-6 z-[1050] flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-primary flex items-center justify-center font-black text-sm shadow-lg shadow-primary/20 rotate-3">FT</div>
+          <div className="w-10 h-10 rounded-xl bg-white text-black flex items-center justify-center font-black text-sm shadow-xl">FT</div>
           <div className="flex flex-col">
-            <span className="font-black text-[10px] tracking-[0.3em] uppercase opacity-50">Weekly</span>
-            <span className="font-black text-xs tracking-tight uppercase">Wrapped</span>
+            <span className="font-black text-[9px] tracking-[0.4em] uppercase text-white/60">Weekly</span>
+            <span className="font-black text-sm tracking-tighter uppercase leading-none">Wrapped</span>
           </div>
         </div>
         <button 
@@ -587,7 +539,7 @@ export default function WeeklyWrapped({
             e.stopPropagation();
             onClose();
           }} 
-          className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center hover:bg-white/20 transition-colors pointer-events-auto"
+          className="w-10 h-10 rounded-full bg-white/10 backdrop-blur-xl flex items-center justify-center hover:bg-white/20 transition-colors pointer-events-auto border border-white/10"
         >
           <X className="w-5 h-5" />
         </button>
@@ -598,9 +550,9 @@ export default function WeeklyWrapped({
         <AnimatePresence mode="wait">
           <motion.div
             key={slides[currentSlide].id}
-            initial={{ opacity: 0, y: 40 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -40 }}
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 1.05, y: -20 }}
             transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
             className="absolute inset-0"
           >
@@ -615,14 +567,14 @@ export default function WeeklyWrapped({
 
       {/* Dynamic Interaction Hint */}
       {currentSlide < slides.length - 1 && (
-        <div className="absolute bottom-10 left-0 right-0 text-center z-[1050] pointer-events-none">
+        <div className="absolute bottom-8 left-0 right-0 text-center z-[1050] pointer-events-none">
           <motion.div
             initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 0.4, 0], y: [0, 10, 0] }}
-            transition={{ duration: 3, repeat: Infinity }}
-            className="text-[9px] font-black uppercase tracking-[0.5em] text-white/50"
+            animate={{ opacity: [0, 0.6, 0], y: [0, -5, 0] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+            className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40 drop-shadow-md"
           >
-            Tap to Advance
+            Tap to advance
           </motion.div>
         </div>
       )}
