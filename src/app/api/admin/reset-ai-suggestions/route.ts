@@ -15,7 +15,7 @@ export async function POST() {
     }
 
     await mongoose.connection.db!.collection('users').updateOne(
-      { _id: user._id },
+      { _id: user._id as any },
       { $unset: { aiSuggestionCache: 1, aiSuggestionRefreshes: 1 } },
     );
 

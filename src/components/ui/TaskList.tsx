@@ -1237,7 +1237,7 @@ export default function TaskList({
                   className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
                 >
                   <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
-                    <CalendarCheck className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                    <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
                   <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
                     {selectedTags.length > 0

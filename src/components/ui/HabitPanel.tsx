@@ -308,17 +308,19 @@ export function HabitPanel({
   if (habits.length === 0) {
     return (
       <div className="px-4 pt-2 pb-4">
-        <button
-          onClick={() => onAddRequested('', true)}
-          className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
-        >
-          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
-            <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-          </div>
-          <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
-            Add your first habit
-          </p>
-        </button>
+        <div className="rounded-[22px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-1.5">
+          <button
+            onClick={() => onAddRequested('', true)}
+            className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+          >
+            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
+              <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+            </div>
+            <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+              Add your first habit
+            </p>
+          </button>
+        </div>
       </div>
     );
   }

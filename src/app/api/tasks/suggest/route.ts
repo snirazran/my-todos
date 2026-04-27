@@ -225,7 +225,7 @@ export async function GET(req: Request) {
       };
       const user2 = await UserModel.findById(uid).select('_id').lean();
       await usersCol().updateOne(
-        { _id: user2!._id },
+        { _id: user2!._id as any },
         { $set: { aiSuggestionCache: cache } },
       );
     }
@@ -299,7 +299,7 @@ export async function POST(req: Request) {
 
     const user2 = await UserModel.findById(uid).select('_id').lean();
     await usersCol().updateOne(
-      { _id: user2!._id },
+      { _id: user2!._id as any },
       {
         $unset: { aiSuggestionCache: 1 },
         $set: { aiSuggestionRefreshes: { date: todayStr, count: newCount } },
@@ -328,7 +328,7 @@ export async function PATCH(req: Request) {
 
     const user = await UserModel.findById(uid).select('_id').lean();
     await usersCol().updateOne(
-      { _id: user!._id },
+      { _id: user!._id as any },
       { $addToSet: { 'aiSuggestionCache.usedTexts': text } },
     );
 
