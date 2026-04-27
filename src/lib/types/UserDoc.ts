@@ -62,12 +62,17 @@ export type UserDoc = {
   focusProfile?: FocusProfile;
   quests?: unknown;
   dailyRewards?: DailyRewardProgress;
+  missedReview?: MissedReviewProgress;
   notificationPrefs?: NotificationPrefs;
   calendarSyncEnabled?: boolean;
   calendarAccessToken?: string;
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   aiSuggestionCache?: unknown;
   aiSuggestionRefreshes?: unknown;
+};
+
+export type MissedReviewProgress = {
+  lastShownDate?: string;
 };
 
 export type NotificationPrefs = {

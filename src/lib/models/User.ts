@@ -64,6 +64,9 @@ const UserSchema = new Schema<UserDoc>(
       month: { type: String }, // Format YYYY-MM
       streak: { type: Number, default: 0 },
     },
+    missedReview: {
+      lastShownDate: { type: String, default: '' },
+    },
     notificationPrefs: {
       type: Schema.Types.Mixed,
       default: undefined,

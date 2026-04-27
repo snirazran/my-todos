@@ -33,6 +33,7 @@ import { getQuestsUrl } from '@/components/ui/QuestsPopup';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { DailyRewardPopup } from '@/components/ui/daily-reward/DailyRewardPopup';
+import { MissedTasksPopup, type MissedTasksStatus } from '@/components/ui/MissedTasksPopup';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import useSWR, { mutate as swrMutate } from 'swr';
@@ -103,6 +104,21 @@ export default function Home() {
     tags,
   } = useTaskData();
 
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [dismissMissedReview, setDismissMissedReview] = useState(false);
+  const { data: missedTasksData, mutate: mutateMissedTasks } =
+    useSWR<MissedTasksStatus>(
+      user ? `/api/missed-tasks?timezone=${encodeURIComponent(timezone)}` : null,
+      (url: string) => fetch(url).then((res) => res.json()),
+      { revalidateOnFocus: false },
+    );
+  const shouldShowMissedReview =
+    !!user &&
+    !!missedTasksData &&
+    !dismissMissedReview &&
+    !missedTasksData.reviewedToday &&
+    missedTasksData.items.length > 0;
+
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const isInitialLoad = useRef(true);
@@ -149,6 +165,7 @@ export default function Home() {
     isWardrobeOpen ||
     isQuestsOpen ||
     isQuestOnboardingOpen ||
+    shouldShowMissedReview ||
     showQuickAdd ||
     showTimer ||
     isBacklogOpen;
@@ -248,7 +265,6 @@ export default function Home() {
   const giftTotal = data.length + (user ? habits.length : 0);
   const flyBalance = user ? flyStatus.balance : 5;
   const laterThisWeek = user ? backlogTasks : [];
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [dismissQuestOnboarding, setDismissQuestOnboarding] = useState(false);
   const { data: questsData, mutate: mutateQuests } = useSWR<{
     isPremium?: boolean;
@@ -266,6 +282,21 @@ export default function Home() {
     { revalidateOnFocus: false },
   );
   const questOnboarding = questsData?.onboarding;
+  const wasMissedReviewOpen = useRef(false);
+
+  useEffect(() => {
+    if (wasMissedReviewOpen.current && !shouldShowMissedReview) {
+      void mutateToday();
+      void mutateBacklog();
+      void mutateQuests();
+    }
+    wasMissedReviewOpen.current = shouldShowMissedReview;
+  }, [
+    shouldShowMissedReview,
+    mutateToday,
+    mutateBacklog,
+    mutateQuests,
+  ]);
 
   useEffect(() => {
     if (questOnboarding?.complete) {
@@ -1076,7 +1107,12 @@ export default function Home() {
       )}
 
       <HungerWarningModal
-        open={!!user && hungerStatus.stolenFlies > 0 && !showDailyReward}
+        open={
+          !!user &&
+          hungerStatus.stolenFlies > 0 &&
+          !showDailyReward &&
+          !shouldShowMissedReview
+        }
         stolenFlies={hungerStatus.stolenFlies}
         indices={indices}
         onAcknowledge={async () => {
@@ -1089,9 +1125,34 @@ export default function Home() {
       />
 
       <DailyRewardPopup
-        show={showDailyReward}
+        show={showDailyReward && !shouldShowMissedReview}
         onClose={() => setShowDailyReward(false)}
       />
+
+      {missedTasksData && (
+        <MissedTasksPopup
+          show={shouldShowMissedReview}
+          status={missedTasksData}
+          tags={tags}
+          onClose={() => setDismissMissedReview(true)}
+          onItemResolved={async (id, nextFlyBalance) => {
+            await mutateMissedTasks(
+              (current) =>
+                current
+                  ? {
+                      ...current,
+                      flyBalance: nextFlyBalance ?? current.flyBalance,
+                      items: current.items.filter((item) => item.id !== id),
+                    }
+                  : current,
+              { revalidate: false },
+            );
+          }}
+          onStatusChanged={async () => {
+            await mutateMissedTasks();
+          }}
+        />
+      )}
 
       <QuestOnboardingPopup
         show={
