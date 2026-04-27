@@ -261,12 +261,15 @@ Rules:
   - insights[0] = one small experiment that does not repeat the task-count advice
 - Use the app's actual tools in suggestions when relevant:
   - schedule a task or habit for a specific time
+  - start a focus session on a task
   - set how many times per week a habit should be done
   - add or adjust tags to separate areas like work, family, health, chores, or focus
   - reduce the number of tasks planned for heavy days
 - Prefer simple commands like "Schedule", "Tag", "Lower", "Set", "Move".
+- Do not say "schedule a focus block". Focus is tracked by starting a focus session on a task.
 - The single insight card should be a "Try" suggestion, not another diagnosis.
 - Do not use the Try card for capping task count if the plan already mentions task count.
+- Never say "one day to one day". If suggesting a move, say where in practical terms, like "Move one low-priority task to later this week."
 - Good Try examples:
   - title: "Schedule soft tasks"
   - body: "Open-ended reminders are easier to skip."
@@ -323,6 +326,7 @@ function parseCoachResponse(content: string): AnalyticsCoachResponse {
       .filter((insight: AnalyticsCoachInsight) =>
         !isDuplicateTaskCountSuggestion(insight, nextWeekPlan),
       )
+      .filter((insight: AnalyticsCoachInsight) => hasCoherentAction(insight))
       .slice(0, 1);
 
     return {
@@ -341,6 +345,11 @@ function parseCoachResponse(content: string): AnalyticsCoachResponse {
       insights: [],
     };
   }
+}
+
+function hasCoherentAction(insight: AnalyticsCoachInsight) {
+  const text = `${insight.title} ${insight.body} ${insight.action}`.toLowerCase();
+  return !text.includes('one day to one day');
 }
 
 function isDuplicateTaskCountSuggestion(
@@ -376,6 +385,7 @@ function cleanCoachText(value: unknown) {
       /\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\.?\s+\d{1,2}\b/gi,
       'a lighter day',
     )
+    .replace(/\bmove one task from one day to one day\b/gi, 'Move one low-priority task to later this week')
     .replace(/\bday\s+\d+(?:'s)?\b/gi, 'one day')
     .replace(/\b(\d+)\/\1\b/g, 'all $1')
     .replace(/\b(\d+)\/(\d+)\b/g, '$1 of $2')
@@ -387,6 +397,8 @@ function cleanCoachText(value: unknown) {
     .replace(/\bbroken\b/gi, 'harder to manage')
     .replace(/\bsharply\b/gi, '')
     .replace(/\bheavy days?\b/gi, 'busy days')
+    .replace(/\bschedule (?:one )?(?:\d+\s*-?\s*min(?:ute)?\s*)?focus block\b/gi, 'start a focus session on one task')
+    .replace(/\bschedule a focus block\b/gi, 'start a focus session on one task')
     .replace(/\s+/g, ' ')
     .trim();
 }

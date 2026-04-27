@@ -377,7 +377,7 @@ export default function Home() {
   const coachHistoryFrom = format(subDays(new Date(), 6), 'yyyy-MM-dd');
   const coachHistoryTo = format(new Date(), 'yyyy-MM-dd');
   const { data: coachHistoryData } = useSWR<any[]>(
-    user
+    user && showProgressCoach
       ? `/api/history?from=${coachHistoryFrom}&to=${coachHistoryTo}&timezone=${encodeURIComponent(timezone)}`
       : null,
     (url: string) => fetch(url).then((res) => res.json()),
