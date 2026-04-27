@@ -49,7 +49,7 @@ export default function AiSuggestions({
 
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [adding, setAdding] = useState<string | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showPremiumLimit, setShowPremiumLimit] = useState(false);
   const lastRefreshRef = useRef(0);

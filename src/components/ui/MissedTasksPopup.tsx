@@ -10,6 +10,7 @@ import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { cn } from '@/lib/utils';
+import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import type { Task } from '@/hooks/useTaskData';
 
 const FLY_PX = 24;
@@ -84,6 +85,7 @@ export function MissedTasksPopup({
     visuallyDone,
     speedUpTongue,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs, scrollContainerRef });
+  const overscrollDrag = useSheetOverscrollDrag();
 
   useEffect(() => {
     if (!show) return;
@@ -239,7 +241,9 @@ export function MissedTasksPopup({
         className="h-[92vh] sm:h-[88vh] sm:max-w-[620px] bg-background"
         zIndex={1070}
       >
-        {({ isDesktop, dragControls, isDragging }) => (
+        {({ isDesktop, dragControls, isDragging }) => {
+          overscrollDrag.setContext(dragControls, !isDesktop);
+          return (
           <div ref={sheetRef} className="relative flex h-full flex-col">
             <div
               onPointerDown={(event) => !isDesktop && !cinematic && dragControls.start(event)}
@@ -271,8 +275,11 @@ export function MissedTasksPopup({
             </div>
 
             <div
-              ref={scrollContainerRef}
-              className="flex-1 min-h-0 overflow-y-auto p-3 pb-8 space-y-3 overscroll-none"
+              ref={(el) => {
+                scrollContainerRef.current = el;
+                overscrollDrag.bind(el);
+              }}
+              className="flex-1 min-h-0 overflow-y-auto p-3 pb-24 space-y-3 overscroll-none"
               style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
             >
               <div className="pt-1">
@@ -349,29 +356,6 @@ export function MissedTasksPopup({
 
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex flex-wrap items-center gap-1">
-                              <span
-                                className={cn(
-                                  'inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal',
-                                  item.type === 'habit'
-                                    ? 'border-sky-500/25 bg-sky-500/10 text-sky-600 dark:text-sky-300'
-                                    : item.type === 'weekly'
-                                      ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
-                                      : 'border-primary/20 bg-primary/10 text-primary',
-                                )}
-                              >
-                                {item.type === 'habit' ? (
-                                  <CalendarClock className="h-3 w-3" />
-                                ) : item.type === 'weekly' ? (
-                                  <RotateCcw className="h-3 w-3" />
-                                ) : (
-                                  <CalendarCheck className="h-3 w-3" />
-                                )}
-                                {item.type === 'habit'
-                                  ? 'Habit'
-                                  : item.type === 'weekly'
-                                    ? 'Repeating'
-                                    : 'Task'}
-                              </span>
                               {item.tags?.map((tagId) => {
                                 const tag = getTagDetails(tagId);
                                 if (!tag) return null;
@@ -392,6 +376,9 @@ export function MissedTasksPopup({
                             </div>
                             <p className="break-words text-sm font-bold leading-snug text-foreground">
                               {item.text}
+                              {item.type === 'weekly' && (
+                                <RotateCcw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 inline ml-1.5 relative -top-px" />
+                              )}
                             </p>
 
                             <div className="mt-2 flex flex-wrap items-center gap-1.5">
@@ -498,10 +485,6 @@ export function MissedTasksPopup({
 
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex flex-wrap items-center gap-1">
-                              <span className="inline-flex items-center gap-1 rounded-md border border-sky-500/25 bg-sky-500/10 px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal text-sky-600 dark:text-sky-300">
-                                <CalendarClock className="h-3 w-3" />
-                                Habit
-                              </span>
                               {item.tags?.map((tagId) => {
                                 const tag = getTagDetails(tagId);
                                 if (!tag) return null;
@@ -550,7 +533,7 @@ export function MissedTasksPopup({
               )}
             </div>
           </div>
-        )}
+        );}}
       </BaseSheet>
 
       {grab && (() => {
@@ -600,13 +583,7 @@ export function MissedTasksPopup({
       })()}
 
       {cinematic && (
-        <button
-          type="button"
-          aria-label="Tap anywhere to fast-forward tongue animation"
-          className="fixed inset-0 z-[1090] cursor-default bg-transparent"
-          onClick={speedUpTongue}
-          onTouchStart={speedUpTongue}
-        />
+        <MissedCinematicOverlay onSkip={speedUpTongue} />
       )}
     </>
   );
@@ -670,5 +647,58 @@ function HabitProgressDots({
         {completedThisWeek}/{safeGoal}
       </span>
     </div>
+  );
+}
+
+function MissedCinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
+  const [active, setActive] = React.useState(false);
+
+  const handleSkip = React.useCallback(() => {
+    if (active) return;
+    setActive(true);
+    onSkip();
+  }, [active, onSkip]);
+
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="Tap anywhere to fast-forward tongue animation"
+        className="fixed inset-0 z-[1090] cursor-default bg-transparent"
+        onClick={handleSkip}
+        onTouchStart={handleSkip}
+      />
+
+      <div className="fixed bottom-0 left-0 right-0 z-[1091] flex justify-center pointer-events-none px-3 pb-[calc(env(safe-area-inset-bottom)+24px)]">
+        <div
+          className={`
+            flex items-center gap-2 rounded-full border px-3 py-2
+            shadow-sm backdrop-blur-2xl transition-all duration-200
+            ${active ? 'bg-card/90 border-primary/40' : 'bg-card/80 border-border/50'}
+          `}
+        >
+          <span
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors duration-200"
+            aria-hidden
+          >
+            {active ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
+                <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
+              </svg>
+            )}
+          </span>
+          <span
+            className={`text-[11px] font-semibold select-none whitespace-nowrap transition-colors duration-200 ${active ? 'text-primary' : 'text-muted-foreground'}`}
+          >
+            {active ? 'x2 speed' : 'Tap to speed'}
+          </span>
+        </div>
+      </div>
+    </>
   );
 }

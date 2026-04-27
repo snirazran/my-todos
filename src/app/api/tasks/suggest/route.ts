@@ -237,14 +237,7 @@ export async function GET(req: Request) {
     const todayTaskCount = await getTodayTaskCount(uid, tz);
     const suggestCount = getSuggestCount(todayTaskCount);
 
-    // Pick random indices, then sort them to preserve pool order
-    const indices = available.map((_, i) => i);
-    for (let i = indices.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [indices[i], indices[j]] = [indices[j], indices[i]];
-    }
-    const picked = indices.slice(0, suggestCount).sort((a, b) => a - b);
-    const suggestions = picked.map((i) => available[i]);
+    const suggestions = available.slice(0, suggestCount);
 
     return NextResponse.json({
       suggestions,

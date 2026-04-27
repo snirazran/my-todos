@@ -78,6 +78,7 @@ export default function Home() {
     setWardrobeOpen,
     isQuestsOpen,
     setIsCinematicActive,
+    isDebugMode,
   } = useUIStore();
 
   // -- NEW STATE HOOK --
@@ -112,13 +113,37 @@ export default function Home() {
       (url: string) => fetch(url).then((res) => res.json()),
       { revalidateOnFocus: false },
     );
-  const activeMissedTasksData = missedTasksData;
-  const shouldShowMissedReview =
-    !!user &&
-    !!activeMissedTasksData &&
-    !dismissMissedReview &&
-    !activeMissedTasksData.reviewedToday &&
-    activeMissedTasksData.items.length > 0;
+  const debugMockTags = [
+    { id: 'debug-tag-work', name: 'Work', color: '#3b82f6' },
+    { id: 'debug-tag-health', name: 'Health', color: '#22c55e' },
+    { id: 'debug-tag-personal', name: 'Personal', color: '#f59e0b' },
+  ];
+  const debugYesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0]; })();
+  const debugMissedTasksData: MissedTasksStatus | undefined = isDebugMode
+    ? {
+        today: new Date().toISOString().split('T')[0],
+        yesterday: debugYesterday,
+        reviewedToday: false,
+        isPremium: false,
+        flyBalance: 12,
+        completionCost: 1,
+        items: [
+          { id: 'debug-1', text: 'Finish project report', completed: false, date: debugYesterday, type: 'regular' as const, tags: ['debug-tag-work'] },
+          { id: 'debug-2', text: 'Review pull requests', completed: false, date: debugYesterday, type: 'weekly' as const, tags: ['debug-tag-work', 'debug-tag-personal'] },
+          { id: 'debug-3', text: 'Morning meditation', completed: false, date: debugYesterday, type: 'habit' as const, timesPerWeek: 7, completedDates: [(() => { const d = new Date(); d.setDate(d.getDate() - 3); return d.toISOString().split('T')[0]; })(), (() => { const d = new Date(); d.setDate(d.getDate() - 5); return d.toISOString().split('T')[0]; })()], tags: ['debug-tag-health'] },
+          { id: 'debug-4', text: 'Read 20 pages', completed: false, date: debugYesterday, type: 'habit' as const, timesPerWeek: 5, completedDates: [], tags: ['debug-tag-personal'] },
+          { id: 'debug-5', text: 'Go grocery shopping', completed: false, date: debugYesterday, type: 'regular' as const },
+        ],
+      }
+    : undefined;
+  const activeMissedTasksData = isDebugMode ? debugMissedTasksData : missedTasksData;
+  const shouldShowMissedReview = isDebugMode
+    ? !dismissMissedReview
+    : !!user &&
+      !!activeMissedTasksData &&
+      !dismissMissedReview &&
+      !activeMissedTasksData.reviewedToday &&
+      activeMissedTasksData.items.length > 0;
 
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -1134,7 +1159,7 @@ export default function Home() {
         <MissedTasksPopup
           show={shouldShowMissedReview}
           status={activeMissedTasksData}
-          tags={tags}
+          tags={isDebugMode ? [...tags, ...debugMockTags] : tags}
           onClose={() => setDismissMissedReview(true)}
           onItemResolved={async (id, nextFlyBalance) => {
             await mutateMissedTasks(
