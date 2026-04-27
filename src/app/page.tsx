@@ -739,20 +739,17 @@ export default function Home() {
                         </div>
                       </div>
                     )}
-                    {data.length > 0 && (
-                      <OverviewSectionHeader
-                        icon={<CalendarCheck className="w-3.5 h-3.5" />}
-                        title="Tasks"
-                        count={visibleTaskCount}
-                        detail={showCompleted ? 'visible' : 'left today'}
-                      />
-                    )}
-                    {(data.length > 0 || habits.length === 0) && (
-                      <TaskList
-                        tasks={data}
-                        toggle={handleToggle}
-                        showConfetti={rate === 100}
-                        visuallyCompleted={visuallyDone}
+                    <OverviewSectionHeader
+                      icon={<CalendarCheck className="w-3.5 h-3.5" />}
+                      title="Tasks"
+                      count={visibleTaskCount}
+                      detail={showCompleted ? 'visible' : 'left today'}
+                    />
+                    <TaskList
+                      tasks={data}
+                      toggle={handleToggle}
+                      showConfetti={rate === 100}
+                      visuallyCompleted={visuallyDone}
                         renderBullet={(task, isVisuallyDone, isPaused) =>
                           task.completed || isVisuallyDone ? null : (
                             <div
@@ -864,8 +861,7 @@ export default function Home() {
                           questOnboarding?.selectedCategoryIds ?? []
                         }
                       />
-                    )}
-                  </motion.div>
+                    </motion.div>
                 ) : activeTab === 'today' ? (
                   <motion.div
                     key="today"
@@ -896,6 +892,12 @@ export default function Home() {
                         </div>
                       </div>
                     )}
+                    <OverviewSectionHeader
+                      icon={<CalendarCheck className="w-3.5 h-3.5" />}
+                      title="Tasks"
+                      count={visibleTaskCount}
+                      detail={showCompleted ? 'visible' : 'left today'}
+                    />
                     <TaskList
                       tasks={data}
                       toggle={handleToggle}

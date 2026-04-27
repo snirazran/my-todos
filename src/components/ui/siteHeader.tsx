@@ -68,12 +68,6 @@ export default function SiteHeader() {
       isActive: isQuestsOpen,
     },
     {
-      href: '/history',
-      label: 'History',
-      icon: History,
-      protected: true,
-    },
-    {
       label: 'Inventory',
       icon: Shirt,
       onClick: () => {
@@ -424,6 +418,19 @@ function RightActions({
 
                 <button
                   onClick={() => {
+                    router.push('/history');
+                    setIsOpen(false);
+                  }}
+                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                >
+                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
+                    History
+                  </span>
+                  <History className="h-[1.2rem] w-[1.2rem] text-blue-500" />
+                </button>
+
+                <button
+                  onClick={() => {
                     setAdminDialogOpen(true);
                     setIsOpen(false);
                   }}
@@ -510,6 +517,7 @@ function MobileSheet({
   pathname,
 }: any) {
   const [mounted, setMounted] = useState(false);
+  const router = useRouter();
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
 
@@ -600,18 +608,33 @@ function MobileSheet({
                 </button>
 
                 {showAuth && (
-                  <button
-                    onClick={() => {
-                      onOpenQuestOnboarding();
-                      onClose();
-                    }}
-                    className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
-                  >
-                    <span className="font-bold text-sm group-hover:text-foreground transition-colors">
-                      Quest Focus
-                    </span>
-                    <Compass className="h-5 w-5 text-emerald-500" />
-                  </button>
+                  <>
+                    <button
+                      onClick={() => {
+                        onOpenQuestOnboarding();
+                        onClose();
+                      }}
+                      className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
+                    >
+                      <span className="font-bold text-sm group-hover:text-foreground transition-colors">
+                        Quest Focus
+                      </span>
+                      <Compass className="h-5 w-5 text-emerald-500" />
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        router.push('/history');
+                        onClose();
+                      }}
+                      className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
+                    >
+                      <span className="font-bold text-sm group-hover:text-foreground transition-colors">
+                        History
+                      </span>
+                      <History className="h-5 w-5 text-blue-500" />
+                    </button>
+                  </>
                 )}
 
                 {setAdminDialogOpen && (
