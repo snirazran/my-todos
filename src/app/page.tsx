@@ -10,6 +10,7 @@ import {
   CalendarCheck,
   CalendarClock,
   EllipsisVertical,
+  Plus,
 } from 'lucide-react';
 import { HabitPanel } from '@/components/ui/HabitPanel';
 import BacklogTray from '@/components/board/BacklogTray';
@@ -530,15 +531,13 @@ export default function Home() {
                     transition={{ duration: 0.2 }}
                   >
                     {renderGuestPrompt()}
-                    {habits.length > 0 && (
-                      <OverviewSectionHeader
-                        icon={<CalendarClock className="w-3.5 h-3.5" />}
-                        title="Habits"
-                        count={visibleHabitCount}
-                        detail={showCompleted ? 'visible' : 'left today'}
-                      />
-                    )}
-                    {habits.length > 0 && (
+                    <OverviewSectionHeader
+                      icon={<CalendarClock className="w-3.5 h-3.5" />}
+                      title="Habits"
+                      count={visibleHabitCount}
+                      detail={showCompleted ? 'visible' : 'left today'}
+                    />
+                    {habits.length > 0 ? (
                       <HabitPanel
                         habits={habits}
                         onToggle={handleToggle}
@@ -580,6 +579,30 @@ export default function Home() {
                         date={todayDateStr}
                         paused={isAnyPanelOpen}
                       />
+                    ) : (
+                      <div className="px-4 pt-2 pb-3">
+                        <div className="rounded-[22px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-1.5">
+                          <button
+                            onClick={() => {
+                              if (!user) {
+                                router.push('/login');
+                                return;
+                              }
+                              setQuickText('');
+                              setQuickAddMode('habit');
+                              setShowQuickAdd(true);
+                            }}
+                            className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+                          >
+                            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
+                              <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                            </div>
+                            <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+                              Add your first habit
+                            </p>
+                          </button>
+                        </div>
+                      </div>
                     )}
                     {data.length > 0 && (
                       <OverviewSectionHeader

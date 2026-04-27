@@ -39,6 +39,7 @@ import {
   Flame,
   Clock,
   Bell,
+  Plus,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { Task } from '@/hooks/useTaskData';
@@ -307,22 +308,17 @@ export function HabitPanel({
   if (habits.length === 0) {
     return (
       <div className="px-4 pt-2 pb-4">
-        <div className="rounded-[22px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-1.5">
-          <button
-            onClick={() => onAddRequested('', true)}
-            className="flex flex-col items-center justify-center w-full py-8 pt-8 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl group"
-          >
-            <div className="flex items-center justify-center mb-3 transition-all border rounded-full opacity-100 w-14 h-14 bg-muted border-muted-foreground/10 md:grayscale md:opacity-70 grayscale-0 group-hover:grayscale-0 group-hover:opacity-100">
-              <Fly size={32} y={-4} paused={paused} />
-            </div>
-            <p className="text-sm font-bold transition-colors md:text-muted-foreground text-primary group-hover:text-primary">
-              No Habits Yet
-            </p>
-            <p className="mt-1 text-xs md:text-muted-foreground/60 text-muted-foreground group-hover:text-muted-foreground transition-colors max-w-[250px]">
-              Tap here to create your first habit and build your daily routine!
-            </p>
-          </button>
-        </div>
+        <button
+          onClick={() => onAddRequested('', true)}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+        >
+          <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
+            <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+          </div>
+          <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+            Add your first habit
+          </p>
+        </button>
       </div>
     );
   }
@@ -339,16 +335,13 @@ export function HabitPanel({
           >
             <button
               onClick={() => onAddRequested('', true)}
-              className="flex flex-col items-center justify-center w-full py-8 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl group"
+              className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
             >
-              <div className="flex items-center justify-center mb-3 transition-all border rounded-full w-14 h-14 bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
-                <CalendarCheck className="w-8 h-8 text-primary" />
+              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
+                <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
               </div>
-              <p className="text-sm font-bold transition-colors text-muted-foreground group-hover:text-primary">
-                You're all caught up!
-              </p>
-              <p className="mt-1 text-xs transition-colors text-muted-foreground/60 group-hover:text-muted-foreground">
-                Great job! All habits completed
+              <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+                Add another habit
               </p>
             </button>
           </motion.div>

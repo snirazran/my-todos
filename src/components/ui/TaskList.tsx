@@ -15,6 +15,7 @@ import {
   Clock,
   Bell,
   Timer,
+  Plus,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import {
@@ -1206,16 +1207,13 @@ export default function TaskList({
                   onClick={() =>
                     onAddRequested('', null, { preselectToday: true })
                   }
-                  className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 md:grayscale md:opacity-70 opacity-100 grayscale-0 group-hover:grayscale-0 group-hover:opacity-100">
-                    <Fly size={32} y={-4} />
+                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
+                    <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
-                  <p className="text-sm font-bold md:text-muted-foreground text-primary group-hover:text-primary transition-colors">
-                    Start your day
-                  </p>
-                  <p className="mt-1 text-xs md:text-muted-foreground/60 text-muted-foreground group-hover:text-muted-foreground transition-colors">
-                    Tap to add your first task
+                  <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+                    Add your first task
                   </p>
                 </button>
               </motion.div>
@@ -1236,18 +1234,15 @@ export default function TaskList({
                   onClick={() =>
                     onAddRequested('', null, { preselectToday: true })
                   }
-                  className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
-                    <CalendarCheck className="w-8 h-8 text-primary" />
+                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
+                    <CalendarCheck className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
-                  <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
-                    You're all caught up!
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground/60 group-hover:text-muted-foreground transition-colors">
+                  <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
                     {selectedTags.length > 0
                       ? 'No tasks match your filters'
-                      : 'Great job! Tap to add more'}
+                      : 'Add another task'}
                   </p>
                 </button>
               </motion.div>
