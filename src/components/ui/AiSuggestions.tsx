@@ -181,7 +181,7 @@ export default function AiSuggestions({
             transition={{ type: 'tween', duration: 0.15, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="flex flex-col gap-3 pb-1.5">
+            <div className="flex flex-col gap-1.5 pb-1.5">
               {suggestions.map((suggestion) => {
                 const tags = (suggestion.tagIds ?? [])
                   .map((id) => getTagDetails?.(id))

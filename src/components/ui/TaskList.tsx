@@ -362,7 +362,7 @@ const SortableTaskItem = React.forwardRef<
         className={`relative w-full rounded-xl ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
         initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-        animate={{ height: 'auto', opacity: 1, marginBottom: 12 }}
+        animate={{ height: 'auto', opacity: 1, marginBottom: 6 }}
         exit={isExitingLater
           ? { opacity: 1 }
           : { height: 0, marginBottom: 0, opacity: 0, transition: { height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }, marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }, opacity: { duration: 0.2, ease: 'easeOut' } } }

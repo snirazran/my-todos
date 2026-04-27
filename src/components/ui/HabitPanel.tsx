@@ -710,7 +710,7 @@ function HabitItem({
       {...listeners}
       layout={!isSortDragging}
       initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-      animate={{ height: 'auto', opacity: 1, marginBottom: 12 }}
+      animate={{ height: 'auto', opacity: 1, marginBottom: 6 }}
       exit={{
         height: 0,
         opacity: 0,
@@ -731,7 +731,7 @@ function HabitItem({
         transition: sortableTransition ?? undefined,
         zIndex: isDragging ? 30 : menuOpen ? 50 : 1,
       }}
-      className={`relative group ${isDragging ? 'opacity-50' : ''} ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-sm shadow-black/5 dark:shadow-black/20'} ${menuOpen ? 'shadow-sm border border-primary/30' : ''}`}
+      className={`relative group ${isDragging ? 'opacity-50' : ''} ${isOpen || isSwiping ? 'overflow-hidden bg-muted/70 rounded-xl shadow-none' : 'overflow-hidden bg-transparent rounded-xl shadow-none'} ${menuOpen ? 'shadow-none border border-primary/30' : ''}`}
       data-habit-active={!isDone}
     >
       {/* Swipe Actions Layer (behind the card) */}
