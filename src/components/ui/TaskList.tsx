@@ -181,16 +181,16 @@ const SortableTaskItem = React.forwardRef<
     }, [isDragging, isSortDragging]);
 
     // Transform values based on drag position x
-    // Right Swipe (Positive X) -> Do Later (Indigo) - SWAPPED
-    const doLaterOpacity = useTransform(x, [0, 25], [0, 1]);
-    const doLaterScale = useTransform(x, [0, swipeThreshold], [0.8, 1.2]);
+    // Right Swipe (Positive X) -> Start Timer (Emerald)
+    const timerActionOpacity = useTransform(x, [0, 25], [0, 1]);
+    const timerActionScale = useTransform(x, [0, swipeThreshold], [0.8, 1.2]);
     // Instant color snap at threshold
-    const doLaterColor = useTransform(
+    const timerActionColor = useTransform(
       x,
       [swipeThreshold - 1, swipeThreshold],
-      ['#9ca3af', '#6366f1'],
-    ); // Slate to Indigo
-    const doLaterTextColor = useTransform(
+      ['#9ca3af', '#10b981'],
+    ); // Slate to Emerald
+    const timerActionTextColor = useTransform(
       x,
       [swipeThreshold - 1, swipeThreshold],
       ['#ffffff', '#ffffff'],
@@ -286,32 +286,29 @@ const SortableTaskItem = React.forwardRef<
           );
         } else {
           // Snap back to open (Negative X)
-          animate(x, -148, { type: 'spring', stiffness: 600, damping: 28 });
+          animate(x, -100, { type: 'spring', stiffness: 600, damping: 28 });
         }
       } else {
         // Closed state
 
-        // Action: Swipe Right (Positive) -> Do Later - SWAPPED
-        if (offset > swipeThreshold && onDoLater) {
+        // Action: Swipe Right (Positive) -> Start Timer
+        if (offset > swipeThreshold && onStartTimer && !isDone) {
           hasActionTriggeredRef.current = true;
-          setHasTriggeredExit(true); // Immediately hide menu
-          setIsOpen(false); // Close menu immediately for clean exit
+          setIsOpen(false);
           window.dispatchEvent(
             new CustomEvent('task-swipe-open', { detail: { id: null } }),
           );
-          onDoLater(task);
-          // Continue the movement outwards with smooth timing
-          // Use larger distance for desktop (wider container) vs mobile
-          const exitDistance = isDesktop ? 800 : 450;
-          animate(x, exitDistance, { duration: 0.8, ease: [0.22, 1, 0.36, 1] });
+          onStartTimer(task);
+          // Snap back after triggering
+          animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
         }
-        // Opening: Swipe Left (Negative) -> Edit/Trash - SWAPPED
+        // Opening: Swipe Left (Negative) -> Edit/Trash - Reveal Menu
         else if (offset < -60 || velocity < -200) {
           setIsOpen(true);
           window.dispatchEvent(
             new CustomEvent('task-swipe-open', { detail: { id: task.id } }),
           );
-          animate(x, -148, { type: 'spring', stiffness: 600, damping: 28 });
+          animate(x, -100, { type: 'spring', stiffness: 600, damping: 28 });
         } else {
           // Snap back
           animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
@@ -390,13 +387,13 @@ const SortableTaskItem = React.forwardRef<
             <motion.div
               className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
               style={{
-                opacity: doLaterOpacity,
-                scale: doLaterScale,
-                color: doLaterTextColor,
-                backgroundColor: doLaterColor,
+                opacity: timerActionOpacity,
+                scale: timerActionScale,
+                color: timerActionTextColor,
+                backgroundColor: timerActionColor,
               }}
             >
-              <CalendarClock className="w-5 h-5" />
+              <Timer className="w-5 h-5" />
             </motion.div>
           </div>
 
@@ -405,21 +402,6 @@ const SortableTaskItem = React.forwardRef<
             className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-1.5 transition-opacity ${!(isExitingLater || hasTriggeredExit) && (isOpen || isSwiping) ? 'opacity-100 duration-200' : isExitingLater || hasTriggeredExit ? 'opacity-0 duration-0' : 'opacity-0 duration-200 delay-200'}`}
             aria-hidden={!isOpen || isExitingLater || hasTriggeredExit}
           >
-            {onStartTimer && !isDone && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
-                  setIsOpen(false);
-                  onStartTimer(task);
-                }}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary hover:bg-primary/20 shadow-sm transition-colors"
-                title="Start Timer"
-                tabIndex={isOpen ? 0 : -1}
-              >
-                <Timer className="w-4 h-4" />
-              </button>
-            )}
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -454,7 +436,7 @@ const SortableTaskItem = React.forwardRef<
             drag={isDesktop || isDragging || swipeBlocked ? false : 'x'} // Disable swipe if sorting/dragging
             dragListener={!isDragging && !isDragDisabled} // Also ensure disabled listener logic matches
             dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
-            dragConstraints={{ left: -148, right: 70 }}
+            dragConstraints={{ left: -100, right: 70 }}
             dragElastic={0}
             dragMomentum={false}
             onDragStart={handleDragStart}
@@ -464,7 +446,7 @@ const SortableTaskItem = React.forwardRef<
             onMouseLeave={() => isDesktop && setIsHovered(false)}
             initial={false}
             animate={{
-              x: isExitingLater ? (isDesktop ? 800 : 450) : isOpen ? -148 : 0,
+              x: isExitingLater ? (isDesktop ? 800 : 450) : isOpen ? -100 : 0,
             }}
             style={{
               x: x,
@@ -1455,6 +1437,19 @@ export default function TaskList({
                   const t = tasks.find((it) => it.id === menu.id);
                   if (t) {
                     setScheduleDialog({ task: t });
+                  }
+                }
+                setMenu(null);
+              }
+            : undefined
+        }
+        onStartTimer={
+          onStartTimer
+            ? () => {
+                if (menu) {
+                  const t = tasks.find((it) => it.id === menu.id);
+                  if (t) {
+                    onStartTimer(t);
                   }
                 }
                 setMenu(null);
