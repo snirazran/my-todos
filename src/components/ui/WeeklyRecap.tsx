@@ -477,7 +477,7 @@ function AiInsightsCard({ insights, loading }: { insights: RecapInsightsResponse
         <p className="max-w-[280px] text-center text-xs font-semibold text-muted-foreground italic">"{insights.summary}"</p>
       )}
       <div className="w-full max-w-[300px] space-y-2.5 max-h-[45vh] overflow-y-auto">
-        {insights.insights.map((insight, i) => (
+        {(insights.insights ?? []).map((insight, i) => (
           <motion.div
             key={i}
             initial={{ y: 15, opacity: 0 }}
