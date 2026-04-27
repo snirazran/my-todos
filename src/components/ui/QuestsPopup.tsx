@@ -124,6 +124,7 @@ export function QuestsPopup({
   const [openingGiftKey, setOpeningGiftKey] = useState<string | null>(null);
   const [categoryPage, setCategoryPage] = useState(0);
   const [dailyPage, setDailyPage] = useState(0);
+  const [carouselDragging, setCarouselDragging] = useState(false);
   const rewardRevealIdRef = useRef(0);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const overscrollDrag = useSheetOverscrollDrag();
@@ -750,13 +751,14 @@ export function QuestsPopup({
                                   objectiveId,
                                 )
                               }
-                              paused={isDragging}
+                              paused={isDragging || carouselDragging}
                             />
                           ) : (
                             <QuestCarousel
                               activePage={categoryPage}
                               onPageChange={setCategoryPage}
                               count={filteredCategoryQuests.length}
+                              onDragChange={setCarouselDragging}
                             >
                               {filteredCategoryQuests.map((quest) => (
                                 <CategoryQuestPresentationCard
@@ -781,7 +783,7 @@ export function QuestsPopup({
                                   onClaimObjective={(objectiveId) =>
                                     handleClaimObjective(quest.id, objectiveId)
                                   }
-                                  paused={isDragging}
+                                  paused={isDragging || carouselDragging}
                                 />
                               ))}
                             </QuestCarousel>
@@ -827,7 +829,7 @@ export function QuestsPopup({
                                   onClaimObjective={(objectiveId) =>
                                     handleClaimObjective(quest.id, objectiveId)
                                   }
-                                  paused={isDragging}
+                                  paused={isDragging || carouselDragging}
                                 />
                               );
                             }
@@ -836,6 +838,7 @@ export function QuestsPopup({
                                 activePage={dailyPage}
                                 onPageChange={setDailyPage}
                                 count={dailyQuests.length}
+                                onDragChange={setCarouselDragging}
                               >
                                 {dailyQuests.map((quest) => (
                                   <DailyQuestPresentationCard
@@ -854,7 +857,7 @@ export function QuestsPopup({
                                         objectiveId,
                                       )
                                     }
-                                    paused={isDragging}
+                                    paused={isDragging || carouselDragging}
                                   />
                                 ))}
                               </QuestCarousel>
@@ -1082,11 +1085,13 @@ function QuestCarousel({
   activePage,
   onPageChange,
   count,
+  onDragChange,
 }: {
   children: React.ReactNode;
   activePage: number;
   onPageChange: (page: number) => void;
   count: number;
+  onDragChange?: (dragging: boolean) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -1104,6 +1109,7 @@ function QuestCarousel({
     const el = scrollRef.current;
     if (!el) return;
     isDragging.current = true;
+    onDragChange?.(true);
     startX.current = e.clientX;
     lastX.current = e.clientX;
     lastTime.current = Date.now();
@@ -1131,6 +1137,7 @@ function QuestCarousel({
   const onPointerUp = (e: React.PointerEvent) => {
     if (!isDragging.current || !scrollRef.current) return;
     isDragging.current = false;
+    onDragChange?.(false);
     const el = scrollRef.current;
     el.releasePointerCapture(e.pointerId);
     el.style.cursor = 'grab';
