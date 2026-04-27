@@ -3,7 +3,7 @@
 import React from 'react';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
-import { Shirt, ScrollText } from 'lucide-react';
+import { Brain, Shirt, ScrollText } from 'lucide-react';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
@@ -35,6 +35,8 @@ type Props = {
   questClaimableCount?: number;
   questActiveCount?: number;
   onQuestsChanged?: () => void | Promise<void>;
+  onOpenProgressCoach?: () => void;
+  progressCoachIsPremium?: boolean;
   deferInventorySummary?: boolean;
   paused?: boolean;
   showActionButtons?: boolean;
@@ -62,6 +64,8 @@ export function FrogDisplay({
   questClaimableCount = 0,
   questActiveCount = 0,
   onQuestsChanged,
+  onOpenProgressCoach,
+  progressCoachIsPremium = false,
   deferInventorySummary = false,
   paused = false,
   showActionButtons = true,
@@ -280,6 +284,28 @@ export function FrogDisplay({
         {/* Right: Gift & Wardrobe Buttons */}
         {showActionButtons && (
           <div className="flex items-center gap-1.5">
+            {onOpenProgressCoach && !isGuest && (
+              <button
+                onClick={onOpenProgressCoach}
+                className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
+                    bg-card/80 backdrop-blur-2xl
+                    text-muted-foreground hover:text-primary
+                    shadow-sm hover:shadow-md
+                    border border-border/50
+                    transition-all duration-300 ease-out
+                    active:scale-95 active:translate-y-0.5"
+                title="Progress Coach"
+              >
+                <div className="absolute inset-0 bg-primary/10 rounded-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <Brain className="relative w-[18px] h-[18px] stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
+                {!progressCoachIsPremium && (
+                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-background bg-primary px-1 text-[8px] font-black text-primary-foreground shadow-sm">
+                    PRO
+                  </span>
+                )}
+              </button>
+            )}
+
             <button
               onClick={() => setQuestsOpen(true)}
               onPointerEnter={isGuest ? undefined : prefetchQuests}

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import {
   Calendar,
   LayoutDashboard,
@@ -47,6 +47,7 @@ import {
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
 import WeeklyRecap from '@/components/ui/WeeklyRecap';
+import ProgressCoachPopup from '@/components/ui/ProgressCoachPopup';
 import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
 import type { FocusCategoryTagMap, MacroCategoryDefinition, MacroCategoryId } from '@/lib/quests/types';
 
@@ -219,6 +220,7 @@ export default function Home() {
   const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>('pick');
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const [showTimer, setShowTimer] = useState(false);
+  const [showProgressCoach, setShowProgressCoach] = useState(false);
 
   /* State */
   const [activeTab, setActiveTab] = useState<HomeTab>('all');
@@ -257,6 +259,7 @@ export default function Home() {
     shouldShowMissedReview ||
     showQuickAdd ||
     showTimer ||
+    showProgressCoach ||
     isBacklogOpen;
 
   // Sync cinematic state with UI store
@@ -367,6 +370,16 @@ export default function Home() {
     macroCategories?: MacroCategoryDefinition[];
   }>(
     user ? `/api/quests?view=home&timezone=${encodeURIComponent(timezone)}` : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
+  const isPremium = !!questsData?.isPremium;
+  const coachHistoryFrom = format(subDays(new Date(), 6), 'yyyy-MM-dd');
+  const coachHistoryTo = format(new Date(), 'yyyy-MM-dd');
+  const { data: coachHistoryData } = useSWR<any[]>(
+    user
+      ? `/api/history?from=${coachHistoryFrom}&to=${coachHistoryTo}&timezone=${encodeURIComponent(timezone)}`
+      : null,
     (url: string) => fetch(url).then((res) => res.json()),
     { revalidateOnFocus: false },
   );
@@ -526,6 +539,8 @@ export default function Home() {
               onQuestsChanged={async () => {
                 await mutateQuests();
               }}
+              onOpenProgressCoach={() => setShowProgressCoach(true)}
+              progressCoachIsPremium={isPremium}
               paused={isAnyPanelOpen}
             />
           </div>
@@ -1249,6 +1264,14 @@ export default function Home() {
           onClose={() => setDismissRecap(true)}
         />
       )}
+
+      <ProgressCoachPopup
+        open={showProgressCoach}
+        onClose={() => setShowProgressCoach(false)}
+        isPremium={isPremium}
+        historyData={coachHistoryData ?? []}
+        availableTags={tags}
+      />
 
       <QuestOnboardingPopup
         show={

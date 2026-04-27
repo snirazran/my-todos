@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { BarChart3, Lock, Sparkles, TrendingUp, Clock, Zap, PieChart, LayoutGrid } from 'lucide-react';
+import { BarChart3, Clock, LayoutGrid, Lock, PieChart, Sparkles, TrendingUp, Zap } from 'lucide-react';
 import InsightsGrid from './InsightsGrid';
 import HistoryTimeSelector, { DateRangeOption } from './HistoryTimeSelector';
 
@@ -74,13 +74,13 @@ export default function HistoryInsights({
             className="cursor-pointer group/cta bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 p-6 rounded-[32px] text-center relative overflow-hidden transition-all hover:bg-primary/[0.08] active:scale-[0.98]"
           >
             <div className="relative z-10 space-y-2">
-              <h3 className="text-xl font-black text-foreground tracking-tight">Visualize Your Success</h3>
+              <h3 className="text-xl font-black text-foreground tracking-tight">Visualize Your Progress</h3>
               <p className="text-sm font-medium text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                Get deep analytics, productivity trends, and custom dashboard layouts to master your time.
+                Get deeper productivity trends, tag breakdowns, and a customizable analytics dashboard.
               </p>
               <div className="inline-flex items-center gap-2 pt-2 text-primary font-black text-xs uppercase tracking-[0.2em] group-hover/cta:scale-105 transition-transform">
                 <Sparkles className="w-4 h-4 fill-primary/10" />
-                Unlock Pro Insights
+                Unlock Pro Analytics
               </div>
             </div>
             <div className="absolute -right-4 -bottom-4 opacity-5 group-hover/cta:opacity-10 transition-opacity">
@@ -175,17 +175,17 @@ export default function HistoryInsights({
 
             <div className="p-10 text-center">
               <h3 className="text-2xl font-black tracking-tight mb-4 text-foreground">
-                Level Up Your History
+                Unlock Pro Analytics
               </h3>
               <p className="text-muted-foreground text-sm font-medium leading-relaxed mb-8">
-                Join our pro community to access advanced analytics, custom themes, and exclusive productivity tools.
+                Explore trends, customize your dashboard, and understand your productivity history.
               </p>
 
               <div className="space-y-3 mb-8">
                 {[
-                  { icon: TrendingUp, title: 'Growth Trends', sub: 'Weekly productivity scores' },
-                  { icon: LayoutGrid, title: 'Custom Dashboards', sub: 'Organize your metrics' },
-                  { icon: Clock, title: 'Time Analysis', sub: 'Find your golden hours' }
+                  { icon: TrendingUp, title: 'Growth Trends', sub: 'Track progress over time' },
+                  { icon: LayoutGrid, title: 'Custom Dashboard', sub: 'Arrange your key widgets' },
+                  { icon: Clock, title: 'Time Analysis', sub: 'Find your strongest days' }
                 ].map((f, i) => (
                   <div key={i} className="flex items-center gap-4 p-4 rounded-2xl bg-muted/40 border border-border/50 text-left">
                     <div className="bg-primary/10 p-2 rounded-xl text-primary">
