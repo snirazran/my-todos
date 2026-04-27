@@ -8,6 +8,7 @@ import {
   Home,
   History,
   LayoutDashboard,
+  ScrollText,
   Shirt,
   Sparkles,
   LogIn,
@@ -20,14 +21,26 @@ import { useUIStore } from '@/lib/uiStore';
 import { clearAuthTokenCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
 import GoogleCalendarSync from '@/components/ui/GoogleCalendarSync';
+import useSWR from 'swr';
 
 export default function SiteHeader() {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const { openWardrobe } = useUIStore();
+  const { isQuestsOpen, openQuests, openWardrobe } = useUIStore();
   const { unseenCount, unseenContainerCount } = useInventory(!!user, true);
   const inventoryBadge = unseenCount + unseenContainerCount;
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const { data: questsData } = useSWR<{
+    claimableCount?: number;
+    activeCount?: number;
+  }>(
+    user ? `/api/quests?view=home&timezone=${encodeURIComponent(timezone)}` : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
+  const questClaimableCount = questsData?.claimableCount ?? 0;
+  const questActiveCount = questsData?.activeCount ?? 0;
 
   const navItems = [
     {
@@ -40,6 +53,19 @@ export default function SiteHeader() {
       label: 'Planner',
       icon: LayoutDashboard,
       protected: true,
+    },
+    {
+      label: 'Quests',
+      icon: ScrollText,
+      onClick: () => {
+        if (!user) {
+          router.push('/login');
+          return;
+        }
+        if (pathname !== '/') router.push('/');
+        openQuests();
+      },
+      isActive: isQuestsOpen,
     },
     {
       href: '/history',
@@ -106,6 +132,15 @@ export default function SiteHeader() {
                       {inventoryBadge > 9 ? '9+' : inventoryBadge}
                     </span>
                   )}
+                  {item.label === 'Quests' && questClaimableCount > 0 ? (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
+                      {questClaimableCount > 99 ? '99+' : questClaimableCount}
+                    </span>
+                  ) : item.label === 'Quests' && questActiveCount > 0 ? (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-muted-foreground px-1 text-[10px] font-bold text-white shadow-sm ml-1">
+                      {questActiveCount > 9 ? '9+' : questActiveCount}
+                    </span>
+                  ) : null}
                 </button>
               );
             }
