@@ -1,12 +1,8 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
-  X,
-  ChevronRight,
-  ChevronLeft,
   Flame,
   Calendar,
   Target,
@@ -15,105 +11,53 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
-  Lock,
   Sparkles,
   Crown,
+  Lock,
+  Zap,
 } from 'lucide-react';
+import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
+import { BaseSheet } from '@/components/ui/BaseSheet';
+import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import { cn } from '@/lib/utils';
 import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
-import type { RecapInsight, RecapInsightsResponse } from '@/app/api/weekly-recap/insights/route';
+import type { RecapInsightsResponse } from '@/app/api/weekly-recap/insights/route';
 
-type CardType =
-  | 'intro'
-  | 'overview'
-  | 'best-day'
-  | 'focus-time'
-  | 'habits'
-  | 'top-tags'
-  | 'flies'
-  | 'focus-area'
-  | 'comparison'
-  | 'ai-insights'
-  | 'outro';
-
-type Card = {
-  type: CardType;
-  focusAreaIndex?: number;
-  premiumLocked?: boolean;
-};
-
-function buildCardList(data: WeeklyRecapData): Card[] {
-  const cards: Card[] = [{ type: 'intro' }, { type: 'overview' }];
-
-  if (data.bestDay && (data.bestDay.tasksCompleted > 0 || data.bestDay.habitsCompleted > 0)) {
-    cards.push({ type: 'best-day' });
-  }
-
-  if (data.totalFocusMinutes > 0) {
-    cards.push({ type: 'focus-time' });
-  }
-
-  if (data.habits.length > 0) {
-    cards.push({ type: 'habits' });
-  }
-
-  if (data.topTags.length > 0) {
-    cards.push({ type: 'top-tags' });
-  }
-
-  cards.push({ type: 'flies' });
-
-  if (data.isPremium) {
-    data.focusAreas.forEach((_, i) => {
-      cards.push({ type: 'focus-area', focusAreaIndex: i });
-    });
-  } else if (data.focusAreas.length > 0) {
-    cards.push({ type: 'focus-area', focusAreaIndex: 0 });
-    if (data.focusAreas.length > 1) {
-      cards.push({ type: 'focus-area', focusAreaIndex: 1, premiumLocked: true });
-    }
-  }
-
-  cards.push({
-    type: 'comparison',
-    premiumLocked: !data.isPremium,
-  });
-
-  cards.push({
-    type: 'ai-insights',
-    premiumLocked: !data.isPremium,
-  });
-
-  cards.push({ type: 'outro' });
-
-  return cards;
-}
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
 
 function formatDateRange(start: string, end: string) {
   const s = new Date(start + 'T12:00:00Z');
   const e = new Date(end + 'T12:00:00Z');
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  if (s.getUTCMonth() === e.getUTCMonth()) {
-    return `${months[s.getUTCMonth()]} ${s.getUTCDate()} – ${e.getUTCDate()}`;
-  }
-  return `${months[s.getUTCMonth()]} ${s.getUTCDate()} – ${months[e.getUTCMonth()]} ${e.getUTCDate()}`;
+  const m = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return s.getUTCMonth() === e.getUTCMonth()
+    ? `${m[s.getUTCMonth()]} ${s.getUTCDate()} – ${e.getUTCDate()}`
+    : `${m[s.getUTCMonth()]} ${s.getUTCDate()} – ${m[e.getUTCMonth()]} ${e.getUTCDate()}`;
 }
 
-// --- Progress ring for habits ---
-function Ring({ percent, size = 48, stroke = 4, color = 'currentColor' }: { percent: number; size?: number; stroke?: number; color?: string }) {
-  const r = (size - stroke) / 2;
-  const circ = 2 * Math.PI * r;
-  const offset = circ * (1 - Math.min(1, percent / 100));
-  return (
-    <svg width={size} height={size} className="shrink-0 -rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-muted/30" />
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-700" />
-    </svg>
-  );
+function getWeekRating(rate: number): { label: string; color: string; bg: string } {
+  if (rate >= 90) return { label: 'Outstanding', color: 'text-emerald-400', bg: 'bg-emerald-500' };
+  if (rate >= 75) return { label: 'Great', color: 'text-green-400', bg: 'bg-green-500' };
+  if (rate >= 60) return { label: 'Good', color: 'text-lime-400', bg: 'bg-lime-500' };
+  if (rate >= 40) return { label: 'Fair', color: 'text-amber-400', bg: 'bg-amber-500' };
+  if (rate >= 20) return { label: 'Needs Work', color: 'text-orange-400', bg: 'bg-orange-500' };
+  return { label: 'Rough Week', color: 'text-red-400', bg: 'bg-red-500' };
 }
 
-// --- Animated number ---
+function getDayRating(tasksCompleted: number, tasksTotal: number, habitsCompleted: number, habitsTotal: number) {
+  const total = tasksTotal + habitsTotal;
+  const done = tasksCompleted + habitsCompleted;
+  if (total === 0) return { color: 'bg-muted/30', label: 'No tasks' };
+  const pct = (done / total) * 100;
+  if (pct >= 90) return { color: 'bg-emerald-500', label: 'Perfect' };
+  if (pct >= 70) return { color: 'bg-green-500', label: 'Great' };
+  if (pct >= 50) return { color: 'bg-lime-500', label: 'Good' };
+  if (pct >= 30) return { color: 'bg-amber-500', label: 'Fair' };
+  return { color: 'bg-red-500', label: 'Missed' };
+}
+
 function AnimNum({ value, suffix = '' }: { value: number; suffix?: string }) {
   const [display, setDisplay] = useState(0);
   useEffect(() => {
@@ -132,404 +76,68 @@ function AnimNum({ value, suffix = '' }: { value: number; suffix?: string }) {
   return <>{display}{suffix}</>;
 }
 
-// --- Trend arrow ---
-function TrendBadge({ current, previous, suffix = '' }: { current: number; previous: number; suffix?: string }) {
+/* ------------------------------------------------------------------ */
+/*  Section wrapper                                                    */
+/* ------------------------------------------------------------------ */
+
+function Section({ title, icon, delay = 0, children, premium, locked }: {
+  title: string;
+  icon: React.ReactNode;
+  delay?: number;
+  children: React.ReactNode;
+  premium?: boolean;
+  locked?: boolean;
+}) {
+  return (
+    <motion.div
+      initial={{ y: 20, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ delay, duration: 0.4, ease: 'easeOut' }}
+      className="relative"
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/50">{icon}</div>
+        <h3 className="text-sm font-bold text-foreground/80 uppercase tracking-wider">{title}</h3>
+        {premium && (
+          <span className="ml-auto flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-bold text-amber-500">
+            <Crown className="h-3 w-3" /> PRO
+          </span>
+        )}
+      </div>
+      {locked ? (
+        <div className="relative rounded-2xl border border-border/50 bg-muted/20 p-6 overflow-hidden">
+          <div className="absolute inset-0 backdrop-blur-sm bg-background/60 z-10 flex flex-col items-center justify-center gap-2">
+            <Lock className="h-5 w-5 text-muted-foreground/60" />
+            <p className="text-xs font-semibold text-muted-foreground/60">Upgrade to unlock</p>
+          </div>
+          <div className="opacity-30 pointer-events-none">{children}</div>
+        </div>
+      ) : (
+        children
+      )}
+    </motion.div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Trend indicator                                                    */
+/* ------------------------------------------------------------------ */
+
+function Trend({ current, previous, suffix = '' }: { current: number; previous: number; suffix?: string }) {
   const diff = current - previous;
-  if (diff === 0) return <span className="inline-flex items-center gap-1 text-xs font-bold text-muted-foreground"><Minus className="h-3 w-3" /> Same</span>;
+  if (diff === 0) return <span className="inline-flex items-center gap-0.5 text-[11px] font-bold text-muted-foreground"><Minus className="h-3 w-3" /></span>;
   const up = diff > 0;
   return (
-    <span className={cn('inline-flex items-center gap-1 text-xs font-bold', up ? 'text-green-500' : 'text-red-400')}>
+    <span className={cn('inline-flex items-center gap-0.5 text-[11px] font-bold', up ? 'text-emerald-500' : 'text-red-500')}>
       {up ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
       {up ? '+' : ''}{diff}{suffix}
     </span>
   );
 }
 
-// --- Premium lock overlay ---
-function PremiumOverlay() {
-  return (
-    <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-3xl bg-background/80 backdrop-blur-md">
-      <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/15 ring-1 ring-amber-500/30">
-        <Crown className="h-7 w-7 text-amber-500" />
-      </div>
-      <p className="text-sm font-black text-foreground">Premium Feature</p>
-      <p className="max-w-[220px] text-center text-xs font-semibold text-muted-foreground leading-relaxed">
-        Upgrade to unlock full weekly insights, week-over-week trends, and AI-powered suggestions.
-      </p>
-    </div>
-  );
-}
-
-// --- Individual card components ---
-
-function IntroCard({ data }: { data: WeeklyRecapData }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 px-6 text-center">
-      <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 200, damping: 15 }}
-        className="flex h-24 w-24 items-center justify-center rounded-full bg-primary/10 ring-2 ring-primary/20"
-      >
-        <Fly size={56} y={-6} />
-      </motion.div>
-      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-        <h1 className="text-2xl font-black tracking-tight text-foreground">Your Week in Review</h1>
-        <p className="mt-2 text-sm font-semibold text-muted-foreground">{formatDateRange(data.weekStart, data.weekEnd)}</p>
-      </motion.div>
-      <motion.p
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        className="text-xs font-semibold text-muted-foreground"
-      >
-        Swipe to explore →
-      </motion.p>
-    </div>
-  );
-}
-
-function OverviewCard({ data }: { data: WeeklyRecapData }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 px-6">
-      <motion.h2 initial={{ y: -10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="text-lg font-black uppercase tracking-widest text-primary">
-        Overview
-      </motion.h2>
-      <div className="grid w-full max-w-[280px] grid-cols-2 gap-4">
-        {[
-          { icon: <Target className="h-5 w-5" />, label: 'Completed', value: data.tasksCompleted, color: 'text-green-500' },
-          { icon: <Calendar className="h-5 w-5" />, label: 'Active Days', value: data.activeDays, suffix: '/7', color: 'text-blue-500' },
-          { icon: <Flame className="h-5 w-5" />, label: 'Completion', value: data.completionRate, suffix: '%', color: 'text-amber-500' },
-          { icon: <Trophy className="h-5 w-5" />, label: 'Tasks Added', value: data.tasksAdded, color: 'text-purple-500' },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1 * i }}
-            className="flex flex-col items-center gap-2 rounded-2xl border border-border/50 bg-card/80 p-4"
-          >
-            <div className={cn('flex h-10 w-10 items-center justify-center rounded-full bg-muted/50', stat.color)}>{stat.icon}</div>
-            <span className="text-2xl font-black text-foreground"><AnimNum value={stat.value} suffix={stat.suffix} /></span>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{stat.label}</span>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function BestDayCard({ data }: { data: WeeklyRecapData }) {
-  if (!data.bestDay) return null;
-  const total = data.bestDay.tasksCompleted + data.bestDay.habitsCompleted;
-  const fullDayName = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const d = new Date(data.bestDay.date + 'T12:00:00Z');
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-5 px-6 text-center">
-      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300 }}>
-        <Trophy className="h-14 w-14 text-amber-500" />
-      </motion.div>
-      <h2 className="text-lg font-black uppercase tracking-widest text-primary">Best Day</h2>
-      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-        <p className="text-3xl font-black text-foreground">{fullDayName[d.getUTCDay()]}</p>
-        <p className="mt-1 text-sm font-semibold text-muted-foreground">{data.bestDay.date}</p>
-      </motion.div>
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-6 py-3"
-      >
-        <span className="text-4xl font-black text-amber-500"><AnimNum value={total} /></span>
-        <p className="text-xs font-bold text-amber-600 dark:text-amber-400">items completed</p>
-      </motion.div>
-
-      <div className="flex gap-6 text-center">
-        <div>
-          <p className="text-xl font-black text-foreground">{data.bestDay.tasksCompleted}</p>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground">Tasks</p>
-        </div>
-        <div>
-          <p className="text-xl font-black text-foreground">{data.bestDay.habitsCompleted}</p>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground">Habits</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FocusTimeCard({ data }: { data: WeeklyRecapData }) {
-  const avgPerDay = data.activeDays > 0 ? Math.round(data.totalFocusMinutes / data.activeDays) : 0;
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-5 px-6 text-center">
-      <motion.div initial={{ rotate: -180, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }}>
-        <Clock className="h-14 w-14 text-blue-500" />
-      </motion.div>
-      <h2 className="text-lg font-black uppercase tracking-widest text-primary">Focus Time</h2>
-      <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2 }}>
-        <p className="text-5xl font-black text-foreground"><AnimNum value={data.totalFocusMinutes} /></p>
-        <p className="text-sm font-bold text-muted-foreground">minutes focused</p>
-      </motion.div>
-      <div className="flex gap-6">
-        <div className="rounded-2xl border border-border/50 bg-card/80 px-4 py-3 text-center">
-          <p className="text-xl font-black text-foreground">{data.totalFocusCycles}</p>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground">Cycles</p>
-        </div>
-        <div className="rounded-2xl border border-border/50 bg-card/80 px-4 py-3 text-center">
-          <p className="text-xl font-black text-foreground">{avgPerDay}</p>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground">Min/day</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function HabitsCard({ data }: { data: WeeklyRecapData }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
-      <h2 className="text-lg font-black uppercase tracking-widest text-primary">Habits</h2>
-      <div className="w-full max-w-[300px] space-y-3 max-h-[50vh] overflow-y-auto">
-        {data.habits.map((h, i) => {
-          const pct = h.goal > 0 ? Math.round((h.completed / h.goal) * 100) : 0;
-          return (
-            <motion.div
-              key={h.id}
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.08 * i }}
-              className="flex items-center gap-3 rounded-2xl border border-border/50 bg-card/80 p-3"
-            >
-              <div className="relative">
-                <Ring percent={pct} size={44} stroke={3.5} color={pct >= 80 ? '#22c55e' : pct >= 50 ? '#eab308' : '#ef4444'} />
-                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-foreground">{pct}%</span>
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-bold text-foreground">{h.text}</p>
-                <p className="text-[10px] font-semibold text-muted-foreground">{h.completed}/{h.goal} days</p>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function TopTagsCard({ data }: { data: WeeklyRecapData }) {
-  const maxCount = Math.max(1, ...data.topTags.map((t) => t.completedCount));
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-5 px-6">
-      <h2 className="text-lg font-black uppercase tracking-widest text-primary">Top Tags</h2>
-      <div className="w-full max-w-[280px] space-y-3">
-        {data.topTags.map((tag, i) => (
-          <motion.div
-            key={tag.tagId}
-            initial={{ x: -30, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 0.1 * i }}
-            className="flex items-center gap-3"
-          >
-            <span className="text-lg font-black text-muted-foreground w-6 text-right">{i + 1}</span>
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-bold" style={{ color: tag.tagColor }}>{tag.tagName}</span>
-                <span className="text-xs font-bold text-muted-foreground">{tag.completedCount} done</span>
-              </div>
-              <div className="h-2 w-full rounded-full bg-muted/40 overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(tag.completedCount / maxCount) * 100}%` }}
-                  transition={{ delay: 0.1 * i + 0.3, duration: 0.5 }}
-                  className="h-full rounded-full"
-                  style={{ backgroundColor: tag.tagColor }}
-                />
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FliesCard({ data }: { data: WeeklyRecapData }) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-5 px-6 text-center">
-      <motion.div initial={{ y: -30, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ type: 'spring', bounce: 0.5 }}>
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/10 ring-2 ring-primary/20">
-          <Fly size={48} y={-5} />
-        </div>
-      </motion.div>
-      <h2 className="text-lg font-black uppercase tracking-widest text-primary">Flies Collected</h2>
-      <motion.p initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.2, type: 'spring' }} className="text-5xl font-black text-foreground">
-        <AnimNum value={data.fliesEarned} />
-      </motion.p>
-      <p className="text-xs font-semibold text-muted-foreground">flies earned this week</p>
-      {data.currentStreak > 0 && (
-        <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.4 }} className="flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-2">
-          <Flame className="h-4 w-4 text-amber-500" />
-          <span className="text-sm font-black text-amber-500">{data.currentStreak} day streak</span>
-        </motion.div>
-      )}
-    </div>
-  );
-}
-
-function FocusAreaCard({ data, areaIndex }: { data: WeeklyRecapData; areaIndex: number }) {
-  const area = data.focusAreas[areaIndex];
-  if (!area) return null;
-  const completionRate = area.tasksTotal > 0 ? Math.round((area.tasksCompleted / area.tasksTotal) * 100) : 0;
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
-      <motion.div
-        initial={{ scale: 0.5, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="flex h-16 w-16 items-center justify-center rounded-full"
-        style={{ backgroundColor: area.accent + '20', border: `2px solid ${area.accent}40` }}
-      >
-        <Target className="h-7 w-7" style={{ color: area.accent }} />
-      </motion.div>
-      <h2 className="text-lg font-black uppercase tracking-widest" style={{ color: area.accent }}>{area.categoryName}</h2>
-
-      <div className="grid w-full max-w-[260px] grid-cols-2 gap-3">
-        <div className="rounded-2xl border border-border/50 bg-card/80 p-3">
-          <p className="text-2xl font-black text-foreground">{area.tasksCompleted}<span className="text-sm text-muted-foreground">/{area.tasksTotal}</span></p>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground">Tasks</p>
-        </div>
-        <div className="rounded-2xl border border-border/50 bg-card/80 p-3">
-          <p className="text-2xl font-black text-foreground">{completionRate}%</p>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground">Rate</p>
-        </div>
-        <div className="rounded-2xl border border-border/50 bg-card/80 p-3">
-          <p className="text-2xl font-black text-foreground">{area.habitsCompleted}<span className="text-sm text-muted-foreground">/{area.habitsTotal}</span></p>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground">Habits</p>
-        </div>
-        <div className="rounded-2xl border border-border/50 bg-card/80 p-3">
-          <p className="text-2xl font-black text-foreground">{area.focusMinutes}</p>
-          <p className="text-[10px] font-bold uppercase text-muted-foreground">Focus min</p>
-        </div>
-      </div>
-
-      {area.topTags.length > 0 && (
-        <div className="flex flex-wrap justify-center gap-1.5 mt-1">
-          {area.topTags.slice(0, 4).map((tag) => (
-            <span
-              key={tag.tagId}
-              className="rounded-md border px-2 py-0.5 text-[9px] font-black uppercase"
-              style={{ backgroundColor: tag.tagColor + '20', borderColor: tag.tagColor + '40', color: tag.tagColor }}
-            >
-              {tag.tagName} ({tag.completedCount})
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ComparisonCard({ data }: { data: WeeklyRecapData }) {
-  const prev = data.prevWeek;
-  if (!prev) return null;
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-5 px-6">
-      <h2 className="text-lg font-black uppercase tracking-widest text-primary">Week vs Week</h2>
-      <div className="w-full max-w-[280px] space-y-3">
-        {[
-          { label: 'Tasks Done', current: data.tasksCompleted, previous: prev.tasksCompleted },
-          { label: 'Completion Rate', current: data.completionRate, previous: prev.completionRate, suffix: '%' },
-          { label: 'Focus Minutes', current: data.totalFocusMinutes, previous: prev.totalFocusMinutes },
-          { label: 'Active Days', current: data.activeDays, previous: prev.activeDays },
-        ].map((row, i) => (
-          <motion.div
-            key={row.label}
-            initial={{ x: -20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 0.1 * i }}
-            className="flex items-center justify-between rounded-2xl border border-border/50 bg-card/80 px-4 py-3"
-          >
-            <div>
-              <p className="text-sm font-bold text-foreground">{row.label}</p>
-              <p className="text-xs text-muted-foreground">{row.previous}{row.suffix} → {row.current}{row.suffix}</p>
-            </div>
-            <TrendBadge current={row.current} previous={row.previous} suffix={row.suffix} />
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function AiInsightsCard({ insights, loading }: { insights: RecapInsightsResponse | null; loading: boolean }) {
-  if (loading) {
-    return (
-      <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
-        <Sparkles className="h-10 w-10 text-primary animate-pulse" />
-        <p className="text-sm font-bold text-muted-foreground">Analyzing your week...</p>
-      </div>
-    );
-  }
-  if (!insights) return null;
-  const typeColors = { strength: 'border-green-500/30 bg-green-500/10', improvement: 'border-amber-500/30 bg-amber-500/10', suggestion: 'border-blue-500/30 bg-blue-500/10' };
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 px-6">
-      <h2 className="text-lg font-black uppercase tracking-widest text-primary">AI Insights</h2>
-      {insights.summary && (
-        <p className="max-w-[280px] text-center text-xs font-semibold text-muted-foreground italic">"{insights.summary}"</p>
-      )}
-      <div className="w-full max-w-[300px] space-y-2.5 max-h-[45vh] overflow-y-auto">
-        {(insights.insights ?? []).map((insight, i) => (
-          <motion.div
-            key={i}
-            initial={{ y: 15, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ delay: 0.12 * i }}
-            className={cn('rounded-2xl border p-3', typeColors[insight.type])}
-          >
-            <div className="flex items-start gap-2">
-              <span className="text-lg shrink-0">{insight.emoji}</span>
-              <div className="min-w-0">
-                <p className="text-sm font-black text-foreground">{insight.title}</p>
-                <p className="text-xs font-semibold text-muted-foreground mt-0.5">{insight.body}</p>
-              </div>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function OutroCard({ data, onClose }: { data: WeeklyRecapData; onClose: () => void }) {
-  const msgs = [
-    'Keep the momentum going!',
-    'Every small step counts.',
-    'You showed up — that matters.',
-    'Consistency beats perfection.',
-  ];
-  const msg = msgs[Math.floor(data.tasksCompleted % msgs.length)];
-  return (
-    <div className="flex h-full flex-col items-center justify-center gap-6 px-6 text-center">
-      <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200, damping: 12 }}>
-        <Fly size={64} y={-6} />
-      </motion.div>
-      <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-        <h2 className="text-xl font-black text-foreground">{msg}</h2>
-        <p className="mt-2 text-sm font-semibold text-muted-foreground">See you next week for another recap.</p>
-      </motion.div>
-      <motion.button
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.4 }}
-        onClick={onClose}
-        className="rounded-2xl bg-primary px-8 py-3 text-sm font-black uppercase tracking-wider text-primary-foreground shadow-lg active:scale-95 transition-transform"
-      >
-        Start Your Week
-      </motion.button>
-    </div>
-  );
-}
-
-// --- Main component ---
+/* ================================================================== */
+/*  MAIN COMPONENT                                                     */
+/* ================================================================== */
 
 export default function WeeklyRecap({
   data,
@@ -538,182 +146,399 @@ export default function WeeklyRecap({
   data: WeeklyRecapData;
   onClose: () => void;
 }) {
-  const cards = buildCardList(data);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [direction, setDirection] = useState(0);
-  const [mounted, setMounted] = useState(false);
   const [aiInsights, setAiInsights] = useState<RecapInsightsResponse | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const touchStartX = useRef(0);
+  const [open, setOpen] = useState(true);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const overscrollDrag = useSheetOverscrollDrag();
+  const hasFetched = useRef(false);
 
-  useEffect(() => setMounted(true), []);
+  const rating = getWeekRating(data.completionRate);
+  const prev = data.prevWeek;
 
-  // Fetch AI insights for premium users when they reach that card
   useEffect(() => {
-    if (!data.isPremium || aiInsights || aiLoading) return;
-    const card = cards[currentIndex];
-    if (card?.type === 'ai-insights' && !card.premiumLocked) {
-      setAiLoading(true);
-      fetch('/api/weekly-recap/insights', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      })
-        .then((r) => r.json())
-        .then((d) => setAiInsights(d))
-        .catch(() => {})
-        .finally(() => setAiLoading(false));
-    }
-  }, [currentIndex, data.isPremium]);
-
-  const goNext = useCallback(() => {
-    if (currentIndex < cards.length - 1) {
-      setDirection(1);
-      setCurrentIndex((i) => i + 1);
-    }
-  }, [currentIndex, cards.length]);
-
-  const goPrev = useCallback(() => {
-    if (currentIndex > 0) {
-      setDirection(-1);
-      setCurrentIndex((i) => i - 1);
-    }
-  }, [currentIndex]);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX.current = e.touches[0].clientX;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    const diff = touchStartX.current - e.changedTouches[0].clientX;
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) goNext();
-      else goPrev();
-    }
-  };
-
-  // Mark as seen on close
-  const handleClose = useCallback(() => {
-    fetch('/api/weekly-recap', {
+    if (!data.isPremium || hasFetched.current) return;
+    hasFetched.current = true;
+    setAiLoading(true);
+    fetch('/api/weekly-recap/insights', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ weekStart: data.weekStart }),
-    }).catch(() => {});
-    onClose();
+      body: JSON.stringify(data),
+    })
+      .then((r) => r.json())
+      .then((d) => setAiInsights(d))
+      .catch(() => {})
+      .finally(() => setAiLoading(false));
+  }, [data]);
+
+  const handleClose = useCallback((v: boolean) => {
+    if (!v) {
+      fetch('/api/weekly-recap', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weekStart: data.weekStart }),
+      }).catch(() => {});
+      setOpen(false);
+      onClose();
+    }
   }, [data.weekStart, onClose]);
 
-  // Keyboard navigation
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight' || e.key === ' ') goNext();
-      else if (e.key === 'ArrowLeft') goPrev();
-      else if (e.key === 'Escape') handleClose();
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [goNext, goPrev, handleClose]);
-
-  const card = cards[currentIndex];
-
-  const renderCard = () => {
-    const inner = (() => {
-      switch (card.type) {
-        case 'intro': return <IntroCard data={data} />;
-        case 'overview': return <OverviewCard data={data} />;
-        case 'best-day': return <BestDayCard data={data} />;
-        case 'focus-time': return <FocusTimeCard data={data} />;
-        case 'habits': return <HabitsCard data={data} />;
-        case 'top-tags': return <TopTagsCard data={data} />;
-        case 'flies': return <FliesCard data={data} />;
-        case 'focus-area': return <FocusAreaCard data={data} areaIndex={card.focusAreaIndex ?? 0} />;
-        case 'comparison': return <ComparisonCard data={data} />;
-        case 'ai-insights': return <AiInsightsCard insights={aiInsights} loading={aiLoading} />;
-        case 'outro': return <OutroCard data={data} onClose={handleClose} />;
-        default: return null;
-      }
-    })();
-
-    return (
-      <div className="relative h-full w-full">
-        {inner}
-        {card.premiumLocked && <PremiumOverlay />}
-      </div>
-    );
+  const typeStyles: Record<string, string> = {
+    strength: 'border-emerald-500/20 bg-emerald-500/10',
+    improvement: 'border-amber-500/20 bg-amber-500/10',
+    suggestion: 'border-blue-500/20 bg-blue-500/10',
   };
 
-  if (!mounted) return null;
-
-  const variants = {
-    enter: (dir: number) => ({ x: dir > 0 ? '100%' : '-100%', opacity: 0 }),
-    center: { x: 0, opacity: 1 },
-    exit: (dir: number) => ({ x: dir > 0 ? '-100%' : '100%', opacity: 0 }),
-  };
-
-  return createPortal(
-    <div className="fixed inset-0 z-[2000] flex flex-col bg-background">
-      {/* Top bar */}
-      <div className="relative z-10 flex items-center justify-between px-4 pt-[calc(env(safe-area-inset-top)+12px)] pb-2">
-        {/* Progress bar */}
-        <div className="flex flex-1 gap-1 mr-3">
-          {cards.map((_, i) => (
-            <div key={i} className="relative h-1 flex-1 rounded-full bg-muted/40 overflow-hidden">
-              <div
-                className="absolute inset-y-0 left-0 rounded-full bg-primary transition-all duration-300"
-                style={{ width: i < currentIndex ? '100%' : i === currentIndex ? '100%' : '0%', opacity: i === currentIndex ? 1 : i < currentIndex ? 0.5 : 0 }}
-              />
-            </div>
-          ))}
-        </div>
-        <button onClick={handleClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/60 text-muted-foreground hover:bg-muted transition-colors shrink-0">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-
-      {/* Card area */}
-      <div
-        className="relative flex-1 overflow-hidden"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        <AnimatePresence initial={false} custom={direction} mode="wait">
-          <motion.div
-            key={currentIndex}
-            custom={direction}
-            variants={variants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={{ type: 'tween', duration: 0.25, ease: 'easeInOut' }}
-            className="absolute inset-0"
+  return (
+    <BaseSheet open={open} onOpenChange={handleClose} className="max-h-[92vh] sm:max-w-lg" zIndex={1080}>
+      {({ isDesktop, dragControls, isDragging }) => {
+        overscrollDrag.setContext(dragControls, !isDesktop);
+        return (
+          <div
+            ref={(el) => { scrollRef.current = el; overscrollDrag.bind(el); }}
+            className="overflow-y-auto overscroll-contain px-5 pb-10"
           >
-            {renderCard()}
-          </motion.div>
-        </AnimatePresence>
+            {/* ── Header with frog + score ── */}
+            <motion.div
+              initial={{ y: -10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="flex flex-col items-center pt-4 pb-5"
+            >
+              <div className="relative h-32 w-32 mb-3 overflow-hidden rounded-full bg-muted/30">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Frog width={150} height={112} className="-translate-y-1.5" />
+                </div>
+              </div>
 
-        {/* Left/right tap zones */}
-        <button onClick={goPrev} className="absolute inset-y-0 left-0 w-1/4 z-10" aria-label="Previous" />
-        <button onClick={goNext} className="absolute inset-y-0 right-0 w-1/4 z-10" aria-label="Next" />
-      </div>
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                Week Review
+              </p>
+              <p className="text-[11px] text-muted-foreground/60 mt-0.5">
+                {formatDateRange(data.weekStart, data.weekEnd)}
+              </p>
 
-      {/* Bottom nav */}
-      <div className="flex items-center justify-between px-6 py-4 pb-[calc(env(safe-area-inset-bottom)+16px)]">
-        <button
-          onClick={goPrev}
-          disabled={currentIndex === 0}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-muted/60 text-muted-foreground disabled:opacity-30 transition-all"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
-        <span className="text-xs font-bold text-muted-foreground">{currentIndex + 1} / {cards.length}</span>
-        <button
-          onClick={goNext}
-          disabled={currentIndex === cards.length - 1}
-          className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-30 transition-all"
-        >
-          <ChevronRight className="h-5 w-5" />
-        </button>
-      </div>
-    </div>,
-    document.body,
+              {/* Score circle */}
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.15, type: 'spring', stiffness: 200 }}
+                className="mt-4 flex flex-col items-center"
+              >
+                <div className="relative flex h-28 w-28 items-center justify-center">
+                  <svg className="absolute inset-0 -rotate-90" viewBox="0 0 120 120">
+                    <circle cx="60" cy="60" r="52" fill="none" strokeWidth="8" className="stroke-muted/30" />
+                    <motion.circle
+                      cx="60" cy="60" r="52" fill="none" strokeWidth="8"
+                      strokeLinecap="round"
+                      className={cn('transition-colors', rating.color.replace('text-', 'stroke-'))}
+                      strokeDasharray={2 * Math.PI * 52}
+                      initial={{ strokeDashoffset: 2 * Math.PI * 52 }}
+                      animate={{ strokeDashoffset: 2 * Math.PI * 52 * (1 - data.completionRate / 100) }}
+                      transition={{ delay: 0.3, duration: 1, ease: 'easeOut' }}
+                    />
+                  </svg>
+                  <div className="text-center">
+                    <span className="text-3xl font-black text-foreground"><AnimNum value={data.completionRate} suffix="%" /></span>
+                  </div>
+                </div>
+                <p className={cn('mt-2 text-sm font-black', rating.color)}>{rating.label}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {data.tasksCompleted}/{data.tasksAdded} tasks · {data.activeDays}/7 days active
+                </p>
+              </motion.div>
+            </motion.div>
+
+            <div className="space-y-6">
+              {/* ── Day-by-Day Breakdown ── */}
+              <Section title="Day by Day" icon={<Calendar className="h-4 w-4 text-muted-foreground" />} delay={0.2}>
+                <div className="space-y-1.5">
+                  {data.days.map((day, i) => {
+                    const total = day.tasksTotal + day.habitsTotal;
+                    const done = day.tasksCompleted + day.habitsCompleted;
+                    const pct = total > 0 ? (done / total) * 100 : 0;
+                    const dayRating = getDayRating(day.tasksCompleted, day.tasksTotal, day.habitsCompleted, day.habitsTotal);
+                    return (
+                      <motion.div
+                        key={day.date}
+                        initial={{ x: -15, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        transition={{ delay: 0.25 + i * 0.04 }}
+                        className="flex items-center gap-3"
+                      >
+                        <span className="w-8 text-xs font-bold text-muted-foreground shrink-0">{day.dayName}</span>
+                        <div className="flex-1 h-6 rounded-lg bg-muted/20 overflow-hidden relative">
+                          <motion.div
+                            className={cn('h-full rounded-lg', dayRating.color)}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.max(pct, 2)}%` }}
+                            transition={{ delay: 0.3 + i * 0.04, duration: 0.5, ease: 'easeOut' }}
+                          />
+                          {total > 0 && (
+                            <span className="absolute inset-y-0 right-2 flex items-center text-[10px] font-bold text-foreground/50">
+                              {done}/{total}
+                            </span>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </div>
+                {/* Legend */}
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {[
+                    { color: 'bg-emerald-500', label: 'Perfect' },
+                    { color: 'bg-green-500', label: 'Great' },
+                    { color: 'bg-lime-500', label: 'Good' },
+                    { color: 'bg-amber-500', label: 'Fair' },
+                    { color: 'bg-red-500', label: 'Missed' },
+                  ].map((l) => (
+                    <div key={l.label} className="flex items-center gap-1">
+                      <div className={cn('h-2.5 w-2.5 rounded-sm', l.color)} />
+                      <span className="text-[10px] font-semibold text-muted-foreground/60">{l.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </Section>
+
+              {/* ── Best Day (right under day-by-day) ── */}
+              {data.bestDay && (data.bestDay.tasksCompleted > 0 || data.bestDay.habitsCompleted > 0) && (
+                <motion.div
+                  initial={{ scale: 0.95, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: 0.35 }}
+                  className="flex items-center gap-4 rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 -mt-3"
+                >
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/15">
+                    <Trophy className="h-6 w-6 text-amber-500" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider">Best Day</p>
+                    <p className="text-lg font-black text-foreground leading-tight">
+                      {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(data.bestDay.date + 'T12:00:00Z').getUTCDay()]}
+                    </p>
+                    <p className="text-xs font-semibold text-muted-foreground">
+                      {data.bestDay.tasksCompleted} tasks · {data.bestDay.habitsCompleted} habits
+                      {data.bestDay.focusMinutes > 0 && ` · ${data.bestDay.focusMinutes}m focused`}
+                    </p>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* ── Key Stats (with week-over-week comparison inline) ── */}
+              <Section title="Key Stats" icon={<Zap className="h-4 w-4 text-muted-foreground" />} delay={0.4}>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {([
+                    { label: 'Completed', value: data.tasksCompleted, prevValue: prev?.tasksCompleted, icon: <Target className="h-4 w-4" />, color: 'text-emerald-500', suffix: '' },
+                    { label: 'Completion Rate', value: data.completionRate, prevValue: prev?.completionRate, suffix: '%', icon: <Flame className="h-4 w-4" />, color: rating.color },
+                    { label: 'Focus Time', value: data.totalFocusMinutes, prevValue: prev?.totalFocusMinutes, suffix: 'm', icon: <Clock className="h-4 w-4" />, color: 'text-blue-500' },
+                    { label: 'Streak', value: data.currentStreak, prevValue: undefined as number | undefined, icon: <Flame className="h-4 w-4" />, suffix: 'd', color: 'text-amber-500' },
+                  ]).map((stat, i) => (
+                    <motion.div
+                      key={stat.label}
+                      initial={{ scale: 0.9, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ delay: 0.45 + i * 0.05 }}
+                      className="rounded-xl border border-border/50 bg-muted/20 p-3 flex flex-col items-center text-center"
+                    >
+                      <div className={cn('mb-1', stat.color)}>{stat.icon}</div>
+                      <span className="text-2xl font-black text-foreground leading-none">
+                        <AnimNum value={stat.value} suffix={stat.suffix} />
+                      </span>
+                      <span className="text-[10px] font-bold text-muted-foreground mt-1">{stat.label}</span>
+                      {stat.prevValue != null && (
+                        <div className="mt-1">
+                          <Trend current={stat.value} previous={stat.prevValue} suffix={stat.suffix} />
+                        </div>
+                      )}
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Flies earned */}
+                <motion.div
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  transition={{ delay: 0.65 }}
+                  className="flex items-center justify-between rounded-xl border border-border/50 bg-muted/20 p-3 mt-2.5"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Fly size={28} y={-3} />
+                    <div>
+                      <span className="text-lg font-black text-foreground"><AnimNum value={data.fliesEarned} /></span>
+                      <p className="text-[10px] font-bold text-muted-foreground">Flies earned</p>
+                    </div>
+                  </div>
+                  {data.currentStreak > 0 && (
+                    <div className="flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-1">
+                      <Flame className="h-3.5 w-3.5 text-amber-500" />
+                      <span className="text-xs font-bold text-amber-500">{data.currentStreak}d streak</span>
+                    </div>
+                  )}
+                </motion.div>
+              </Section>
+
+              {/* ── Habits ── */}
+              {data.habits.length > 0 && (
+                <Section title="Habits" icon={<Target className="h-4 w-4 text-muted-foreground" />} delay={0.5}>
+                  <div className="space-y-2">
+                    {data.habits.map((h, i) => {
+                      const pct = h.goal > 0 ? Math.round((h.completed / h.goal) * 100) : 0;
+                      const barColor = pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500';
+                      return (
+                        <motion.div
+                          key={h.id}
+                          initial={{ x: -10, opacity: 0 }}
+                          animate={{ x: 0, opacity: 1 }}
+                          transition={{ delay: 0.55 + i * 0.04 }}
+                          className="rounded-xl border border-border/50 bg-muted/20 p-3"
+                        >
+                          <div className="flex items-center justify-between mb-1.5">
+                            <span className="text-sm font-bold text-foreground truncate">{h.text}</span>
+                            <span className="text-xs font-bold text-muted-foreground shrink-0 ml-2">{h.completed}/{h.goal}d</span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-muted/30 overflow-hidden">
+                            <motion.div
+                              className={cn('h-full rounded-full', barColor)}
+                              initial={{ width: 0 }}
+                              animate={{ width: `${pct}%` }}
+                              transition={{ delay: 0.6 + i * 0.04, duration: 0.5 }}
+                            />
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+
+              {/* ── Top Tags ── */}
+              {data.topTags.length > 0 && (
+                <Section title="Top Tags" icon={<Target className="h-4 w-4 text-muted-foreground" />} delay={0.6}>
+                  <div className="flex flex-wrap gap-2">
+                    {data.topTags.map((tag, i) => (
+                      <motion.div
+                        key={tag.tagId}
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ delay: 0.65 + i * 0.04 }}
+                        className="flex items-center gap-2 rounded-full border border-border/50 bg-muted/20 pl-1.5 pr-3 py-1.5"
+                      >
+                        <div className="h-4 w-4 rounded-full" style={{ backgroundColor: tag.tagColor }} />
+                        <span className="text-xs font-bold text-foreground">{tag.tagName}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground">{tag.completedCount}</span>
+                      </motion.div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {/* ── AI Insights (premium) ── */}
+              <Section
+                title="AI Analysis"
+                icon={<Sparkles className="h-4 w-4 text-muted-foreground" />}
+                delay={0.8}
+                premium
+                locked={!data.isPremium}
+              >
+                {aiLoading ? (
+                  <div className="flex items-center justify-center gap-2 py-6">
+                    <motion.div animate={{ rotate: 360 }} transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}>
+                      <Sparkles className="h-5 w-5 text-muted-foreground" />
+                    </motion.div>
+                    <span className="text-xs font-bold text-muted-foreground">Analyzing your week...</span>
+                  </div>
+                ) : aiInsights ? (
+                  <div className="space-y-2">
+                    {aiInsights.summary && (
+                      <p className="text-sm font-semibold text-foreground/70 italic mb-3 text-center">
+                        &ldquo;{aiInsights.summary}&rdquo;
+                      </p>
+                    )}
+                    {(aiInsights.insights ?? []).map((insight, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ y: 10, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.85 + i * 0.06 }}
+                        className={cn('rounded-xl border p-3', typeStyles[insight.type] ?? typeStyles.suggestion)}
+                      >
+                        <div className="flex items-start gap-2">
+                          <span className="text-base shrink-0">{insight.emoji}</span>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-foreground">{insight.title}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">{insight.body}</p>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-center py-4">Insights will appear here.</p>
+                )}
+              </Section>
+
+              {/* ── Focus Areas (premium) ── */}
+              {data.focusAreas.length > 0 && (
+                <Section
+                  title="Focus Areas"
+                  icon={<Target className="h-4 w-4 text-muted-foreground" />}
+                  delay={0.9}
+                  premium
+                  locked={!data.isPremium}
+                >
+                  <div className="space-y-2">
+                    {data.focusAreas.map((area, i) => {
+                      const rate = area.tasksTotal > 0 ? Math.round((area.tasksCompleted / area.tasksTotal) * 100) : 0;
+                      return (
+                        <motion.div
+                          key={area.categoryName}
+                          initial={{ x: -10, opacity: 0 }}
+                          animate={{ x: 0, opacity: 1 }}
+                          transition={{ delay: 0.95 + i * 0.04 }}
+                          className="rounded-xl border border-border/50 bg-muted/20 p-3"
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-bold text-foreground">{area.categoryName}</span>
+                            <span className="text-xs font-bold text-muted-foreground">{rate}%</span>
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-muted/30 overflow-hidden">
+                            <motion.div
+                              className="h-full rounded-full bg-primary"
+                              initial={{ width: 0 }}
+                              animate={{ width: `${rate}%` }}
+                              transition={{ delay: 1.0 + i * 0.04, duration: 0.5 }}
+                            />
+                          </div>
+                          <div className="flex gap-3 mt-2 text-[10px] font-semibold text-muted-foreground">
+                            <span>{area.tasksCompleted}/{area.tasksTotal} tasks</span>
+                            <span>{area.habitsCompleted}/{area.habitsTotal} habits</span>
+                            {area.focusMinutes > 0 && <span>{area.focusMinutes}m focus</span>}
+                          </div>
+                        </motion.div>
+                      );
+                    })}
+                  </div>
+                </Section>
+              )}
+            </div>
+
+            {/* ── Close button ── */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 1.0 }}
+              className="mt-8 flex justify-center"
+            >
+              <button
+                onClick={() => handleClose(false)}
+                className="rounded-full bg-primary px-8 py-3 text-sm font-bold text-primary-foreground shadow-sm active:scale-95 transition-transform"
+              >
+                Start Your Week
+              </button>
+            </motion.div>
+          </div>
+        );
+      }}
+    </BaseSheet>
   );
 }
