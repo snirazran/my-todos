@@ -4,12 +4,18 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import TaskModel from '@/lib/models/Task';
 import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
+import { getZonedToday } from '@/lib/utils';
 import Anthropic from '@anthropic-ai/sdk';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const MAX_SUGGESTIONS = 5;
+function usersCol() {
+  return mongoose.connection.db!.collection('users');
+}
+
+
+const POOL_SIZE = 10;
 const FREE_DAILY_REFRESHES = 2;
 
 type AiSuggestion = {
@@ -19,9 +25,9 @@ type AiSuggestion = {
 };
 
 type SuggestionCache = {
-  suggestions: AiSuggestion[];
-  generatedAt: string;
-  weekStart: string;
+  pool: AiSuggestion[];
+  usedTexts: string[];
+  generatedDate: string;
   focusSignature?: string;
 };
 
@@ -49,6 +55,105 @@ function getFocusSignature(focusProfile: any) {
   return JSON.stringify({ selectedCategoryIds, categoryTagMap });
 }
 
+async function getTodayTaskCount(uid: string, tz: string): Promise<number> {
+  const todayDate = getZonedToday(tz);
+  const todayDow = new Date(`${todayDate}T12:00:00Z`).getUTCDay();
+  return TaskModel.countDocuments({
+    userId: uid,
+    deletedAt: { $exists: false },
+    type: { $ne: 'habit' },
+    $or: [
+      { type: 'weekly', dayOfWeek: todayDow },
+      { type: 'regular', date: todayDate },
+    ],
+  });
+}
+
+function getSuggestCount(todayTaskCount: number): number {
+  return todayTaskCount === 0 ? 5 : todayTaskCount === 1 ? 4 : 3;
+}
+
+async function generatePool(
+  uid: string,
+  tz: string,
+  focusProfile: any,
+  selectedCategoryIds: string[],
+): Promise<AiSuggestion[]> {
+  const todayDate = getZonedToday(tz);
+  const todayDow = new Date(`${todayDate}T12:00:00Z`).getUTCDay();
+  const weekStart = getWeekStartDate(tz);
+
+  const tasks = await TaskModel.find({
+    userId: uid,
+    deletedAt: { $exists: false },
+    $or: [
+      { type: 'weekly' },
+      { type: 'habit' },
+      { type: 'regular', weekStart },
+      { type: 'backlog' },
+    ],
+  })
+    .select('text type tags dayOfWeek completed')
+    .lean();
+
+  const habitTasks = tasks.filter((t: any) => t.type === 'habit');
+  const regularTasks = tasks.filter((t: any) => t.type !== 'habit');
+  const habitTexts = habitTasks.map((t: any) => t.text);
+  const taskTexts = regularTasks.map((t: any) => t.text);
+
+  const categories = selectedCategoryIds
+    .map((id: string) => QUEST_MACRO_CATEGORIES.find((c) => c.id === id))
+    .filter(Boolean);
+
+  const categoryTagIdMap: Record<string, string[]> = {};
+  for (const entry of focusProfile?.categoryTagMap ?? []) {
+    if (entry.tagIds?.length) {
+      categoryTagIdMap[entry.categoryId] = entry.tagIds;
+    }
+  }
+
+  const now = new Date();
+  const timeFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const dayFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: tz,
+    weekday: 'long',
+  });
+  const currentTime = timeFormatter.format(now);
+  const currentDay = dayFormatter.format(now);
+
+  const prompt = buildPrompt(taskTexts, habitTexts, categories, currentTime, currentDay);
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) return [];
+
+  const client = new Anthropic({ apiKey });
+  const message = await client.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 2048,
+    messages: [{ role: 'user', content: prompt }],
+  });
+
+  const content =
+    message.content[0].type === 'text' ? message.content[0].text : '';
+
+  try {
+    const jsonMatch = content.match(/\[[\s\S]*\]/);
+    const raw: AiSuggestion[] = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
+    return raw.slice(0, POOL_SIZE).map((s) => ({
+      text: String(s.text || '').slice(0, 45),
+      categoryId: String(s.categoryId || ''),
+      tagIds: categoryTagIdMap[String(s.categoryId || '')] ?? [],
+    }));
+  } catch {
+    return [];
+  }
+}
+
 function getWeekStartDate(tz: string): string {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -72,7 +177,7 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url);
     const tz = searchParams.get('timezone') || 'UTC';
-    const weekStart = getWeekStartDate(tz);
+    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
 
     const user = await UserModel.findById(uid).lean();
     if (!user) {
@@ -86,7 +191,6 @@ export async function GET(req: Request) {
       new Date((user as any).premiumUntil) > new Date();
 
     const refreshTracker = (user as any).aiSuggestionRefreshes ?? { date: '', count: 0 };
-    const todayStr = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
     const refreshesToday = refreshTracker.date === todayStr ? refreshTracker.count : 0;
     const refreshesLeft = isPremium ? Infinity : Math.max(0, FREE_DAILY_REFRESHES - refreshesToday);
 
@@ -96,110 +200,47 @@ export async function GET(req: Request) {
 
     const focusSignature = getFocusSignature(focusProfile);
 
-    // Check cache
-    const cached: SuggestionCache | undefined = (user as any).aiSuggestionCache;
-    if (
-      cached &&
-      cached.weekStart === weekStart &&
-      cached.focusSignature === focusSignature &&
-      cached.generatedAt &&
-      Date.now() - new Date(cached.generatedAt).getTime() < CACHE_TTL_MS
-    ) {
-      return NextResponse.json({
-        suggestions: cached.suggestions,
-        cached: true,
-        isPremium,
-        refreshesLeft,
-      });
+    let cache: SuggestionCache | undefined = (user as any).aiSuggestionCache;
+    let cached = true;
+
+    const needsNewPool =
+      !cache ||
+      cache.generatedDate !== todayStr ||
+      cache.focusSignature !== focusSignature;
+
+    if (needsNewPool) {
+      cached = false;
+      const pool = await generatePool(uid, tz, focusProfile, selectedCategoryIds);
+      cache = {
+        pool,
+        usedTexts: [],
+        generatedDate: todayStr,
+        focusSignature,
+      };
+      const user2 = await UserModel.findById(uid).select('_id').lean();
+      await usersCol().updateOne(
+        { _id: user2!._id },
+        { $set: { aiSuggestionCache: cache } },
+      );
     }
 
-    // Fetch current week tasks
-    const tasks = await TaskModel.find({
-      userId: uid,
-      deletedAt: { $exists: false },
-      $or: [
-        { type: 'weekly' },
-        { type: 'habit' },
-        { type: 'regular', weekStart },
-        { type: 'backlog' },
-      ],
-    })
-      .select('text type tags dayOfWeek completed')
-      .lean();
-
-    const habitTasks = tasks.filter((t: any) => t.type === 'habit');
-    const regularTasks = tasks.filter((t: any) => t.type !== 'habit');
-    const habitTexts = habitTasks.map((t: any) => t.text);
-    const taskTexts = regularTasks.map((t: any) => t.text);
-
-    const categories = selectedCategoryIds
-      .map((id: string) => QUEST_MACRO_CATEGORIES.find((c) => c.id === id))
-      .filter(Boolean);
-
-    const categoryTagIdMap: Record<string, string[]> = {};
-    for (const entry of focusProfile?.categoryTagMap ?? []) {
-      if (entry.tagIds?.length) {
-        categoryTagIdMap[entry.categoryId] = entry.tagIds;
-      }
-    }
-
-    const now = new Date();
-    const timeFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-    const dayFormatter = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz,
-      weekday: 'long',
-    });
-    const currentTime = timeFormatter.format(now);
-    const currentDay = dayFormatter.format(now);
-
-    const prompt = buildPrompt(taskTexts, habitTexts, categories, currentTime, currentDay);
-
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json({ error: 'AI not configured' }, { status: 503 });
-    }
-
-    const client = new Anthropic({ apiKey });
-    const message = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
-      messages: [{ role: 'user', content: prompt }],
-    });
-
-    const content =
-      message.content[0].type === 'text' ? message.content[0].text : '';
-
-    let suggestions: AiSuggestion[];
-    try {
-      const jsonMatch = content.match(/\[[\s\S]*\]/);
-      suggestions = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-      suggestions = suggestions.slice(0, MAX_SUGGESTIONS).map((s) => ({
-        text: String(s.text || '').slice(0, 45),
-        categoryId: String(s.categoryId || ''),
-        tagIds: categoryTagIdMap[String(s.categoryId || '')] ?? [],
-      }));
-    } catch {
-      suggestions = [];
-    }
-
-    // Cache in user doc
-    const cachePayload: SuggestionCache = {
-      suggestions,
-      generatedAt: new Date().toISOString(),
-      weekStart,
-      focusSignature,
-    };
-    await UserModel.updateOne(
-      { _id: uid },
-      { $set: { aiSuggestionCache: cachePayload } },
+    const available = cache!.pool.filter(
+      (s) => !cache!.usedTexts.includes(s.text),
     );
 
-    return NextResponse.json({ suggestions, cached: false, isPremium, refreshesLeft });
+    const todayTaskCount = await getTodayTaskCount(uid, tz);
+    const suggestCount = getSuggestCount(todayTaskCount);
+
+    // Shuffle available pool so each page load shows different suggestions
+    const shuffled = [...available].sort(() => Math.random() - 0.5);
+    const suggestions = shuffled.slice(0, suggestCount);
+
+    return NextResponse.json({
+      suggestions,
+      cached,
+      isPremium,
+      refreshesLeft,
+    });
   } catch (err: any) {
     if (err?.message === 'Unauthorized') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -212,7 +253,7 @@ export async function GET(req: Request) {
   }
 }
 
-// Force refresh (clears cache)
+// Force refresh (regenerates the pool)
 export async function POST(req: Request) {
   try {
     const uid = await requireUserId();
@@ -245,8 +286,9 @@ export async function POST(req: Request) {
     const isNewDay = refreshTracker.date !== todayStr;
     const newCount = isNewDay ? 1 : refreshTracker.count + 1;
 
-    await UserModel.updateOne(
-      { _id: uid },
+    const user2 = await UserModel.findById(uid).select('_id').lean();
+    await usersCol().updateOne(
+      { _id: user2!._id },
       {
         $unset: { aiSuggestionCache: 1 },
         $set: { aiSuggestionRefreshes: { date: todayStr, count: newCount } },
@@ -259,6 +301,32 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     return NextResponse.json({ error: 'Failed to refresh' }, { status: 500 });
+  }
+}
+
+// Mark a suggestion as used (accepted or dismissed)
+export async function PATCH(req: Request) {
+  try {
+    const uid = await requireUserId();
+    await connectMongo();
+
+    const { text } = await req.json();
+    if (!text) {
+      return NextResponse.json({ error: 'Missing text' }, { status: 400 });
+    }
+
+    const user = await UserModel.findById(uid).select('_id').lean();
+    await usersCol().updateOne(
+      { _id: user!._id },
+      { $addToSet: { 'aiSuggestionCache.usedTexts': text } },
+    );
+
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    if (err?.message === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return NextResponse.json({ error: 'Failed to update' }, { status: 500 });
   }
 }
 
@@ -294,13 +362,14 @@ ${habitList}
 Their tasks this week:
 ${taskList}
 
-Suggest ${MAX_SUGGESTIONS} new tasks that:
+Suggest EXACTLY ${POOL_SIZE} new tasks (you MUST return all ${POOL_SIZE}) that:
 - Help them make progress on their focus areas
+- Spread suggestions across ALL of the user's focus areas, not just one
 - Are time-appropriate (morning tasks if morning, evening tasks if evening, etc.)
 - Do NOT duplicate or closely resemble any existing task or habit above
 - Are specific and actionable, not generic advice
 - Each task text MUST be 45 characters or fewer
 
-Return ONLY a raw JSON array. No markdown, no backticks, no explanation:
+Return ONLY a raw JSON array with exactly ${POOL_SIZE} items. No markdown, no backticks, no explanation:
 [{"text":"short task","categoryId":"focus_area_id"}]`;
 }

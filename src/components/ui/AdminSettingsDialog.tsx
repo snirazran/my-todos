@@ -242,6 +242,24 @@ export function AdminSettingsDialog({
     }
   };
 
+  const handleResetAiSuggestions = async () => {
+    setLoading('reset-ai');
+    try {
+      const res = await fetch('/api/admin/reset-ai-suggestions', {
+        method: 'POST',
+      });
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        alert('Failed to reset AI suggestions');
+      }
+    } catch {
+      alert('Error resetting AI suggestions');
+    } finally {
+      setLoading(null);
+    }
+  };
+
   /* cosmetics popup is now a separate component */
 
   const mainDialog = createPortal(
@@ -452,6 +470,27 @@ export function AdminSettingsDialog({
                     </div>
                   </div>
                   {loading === 'reset-flies' && (
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  )}
+                </Button>
+
+                {/* Reset AI Suggestions */}
+                <Button
+                  onClick={handleResetAiSuggestions}
+                  disabled={loading !== null}
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-auto py-4 px-4"
+                >
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-primary/10 text-primary">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-sm">Reset AI Suggestions</div>
+                    <div className="text-xs text-muted-foreground font-normal">
+                      Clear cached pool and regenerate on next load
+                    </div>
+                  </div>
+                  {loading === 'reset-ai' && (
                     <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   )}
                 </Button>

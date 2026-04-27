@@ -74,6 +74,14 @@ const UserSchema = new Schema<UserDoc>(
       type: Schema.Types.Mixed,
       default: undefined,
     },
+    aiSuggestionCache: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
+    aiSuggestionRefreshes: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
   },
   { collection: 'users' },
 );

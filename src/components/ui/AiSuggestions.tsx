@@ -43,7 +43,7 @@ export default function AiSuggestions({
     fetcher,
     {
       revalidateOnFocus: false,
-      dedupingInterval: 60_000,
+      revalidateOnReconnect: false,
     },
   );
 
@@ -58,22 +58,32 @@ export default function AiSuggestions({
     (s) => !dismissed.has(s.text),
   );
 
+  const markUsed = useCallback((text: string) => {
+    fetch('/api/tasks/suggest', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+  }, []);
+
   const handleAccept = useCallback(
     async (suggestion: AiSuggestion) => {
       setAdding(suggestion.text);
       try {
         await onAccept(suggestion.text, suggestion.tagIds);
         setDismissed((prev) => new Set(prev).add(suggestion.text));
+        markUsed(suggestion.text);
       } finally {
         setAdding(null);
       }
     },
-    [onAccept],
+    [onAccept, markUsed],
   );
 
   const handleDismiss = useCallback((text: string) => {
     setDismissed((prev) => new Set(prev).add(text));
-  }, []);
+    markUsed(text);
+  }, [markUsed]);
 
   const handleRefresh = useCallback(async () => {
     const now = Date.now();
@@ -171,9 +181,11 @@ export default function AiSuggestions({
             transition={{ type: 'tween', duration: 0.15, ease: 'easeOut' }}
             className="overflow-hidden"
           >
-            <div className="space-y-1 pb-1.5">
+            <div className="flex flex-col gap-3 pb-1.5">
               {suggestions.map((suggestion) => {
-                const color = getCategoryColor(suggestion.categoryId);
+                const tags = (suggestion.tagIds ?? [])
+                  .map((id) => getTagDetails?.(id))
+                  .filter(Boolean) as { id: string; name: string; color?: string }[];
                 return (
                   <motion.div
                     key={suggestion.text}
@@ -182,20 +194,17 @@ export default function AiSuggestions({
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0, height: 0 }}
                     transition={{ duration: 0.15 }}
-                    className="relative flex w-full items-center gap-2 px-2 py-2 rounded-xl bg-card border border-border/50"
+                    className="group relative flex w-full items-start gap-1.5 px-2 py-2 rounded-xl border border-dashed border-border/60 cursor-pointer hover:bg-accent/40 transition-colors"
+                    onClick={() => !adding && handleAccept(suggestion)}
                   >
-                    <div className="relative flex-shrink-0 w-7 h-7 flex items-center justify-center">
-                      <Fly size={24} y={-3} />
-                    </div>
+                    <div className="flex items-center flex-1 min-w-0 gap-2 pl-1.5">
+                      <div className="relative flex-shrink-0 w-7 h-7 flex items-center justify-center">
+                        <Fly size={24} y={-3} />
+                      </div>
 
-                    <div className="flex-1 min-w-0">
-                      {(() => {
-                        const tags = (suggestion.tagIds ?? [])
-                          .map((id) => getTagDetails?.(id))
-                          .filter(Boolean) as { id: string; name: string; color?: string }[];
-                        const showCategory = tags.length === 0;
-                        return (tags.length > 0 || showCategory) ? (
-                          <div className="flex flex-wrap gap-1 mb-0.5">
+                      <div className="flex-1 min-w-0">
+                        {tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-1">
                             {tags.map((tag) => (
                               <span
                                 key={tag.id}
@@ -213,42 +222,28 @@ export default function AiSuggestions({
                                 {tag.name}
                               </span>
                             ))}
-                            {showCategory && (
-                              <span
-                                className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal shadow-sm"
-                                style={{
-                                  backgroundColor: `${color}20`,
-                                  color: color,
-                                  borderColor: `${color}40`,
-                                }}
-                              >
-                                {getCategoryName(suggestion.categoryId)}
-                              </span>
-                            )}
                           </div>
-                        ) : null;
-                      })()}
-                      <span className="text-sm font-semibold leading-snug text-foreground">
-                        {suggestion.text}
-                      </span>
+                        )}
+                        <span className="text-sm font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
+                          {suggestion.text}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => handleAccept(suggestion)}
-                        disabled={adding === suggestion.text}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary hover:bg-primary/20 transition-colors active:scale-95 disabled:opacity-50"
-                        aria-label="Add task"
-                      >
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg text-primary">
                         {adding === suggestion.text ? (
                           <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
                         ) : (
                           <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
                         )}
-                      </button>
+                      </div>
                       <button
-                        onClick={() => handleDismiss(suggestion.text)}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground/40 hover:bg-muted hover:text-muted-foreground transition-colors active:scale-95"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDismiss(suggestion.text);
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground transition-colors active:scale-95"
                         aria-label="Dismiss"
                       >
                         <X className="h-3 w-3" />
