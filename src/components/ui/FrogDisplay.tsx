@@ -37,6 +37,7 @@ type Props = {
   onQuestsChanged?: () => void | Promise<void>;
   deferInventorySummary?: boolean;
   paused?: boolean;
+  showActionButtons?: boolean;
 };
 
 export function FrogDisplay({
@@ -63,6 +64,7 @@ export function FrogDisplay({
   onQuestsChanged,
   deferInventorySummary = false,
   paused = false,
+  showActionButtons = true,
 }: Props) {
   const { unseenCount, unseenContainerCount } = useInventory(
     !isGuest && (!deferInventorySummary || openWardrobe),
@@ -276,54 +278,56 @@ export function FrogDisplay({
         <div className="flex-1" />
 
         {/* Right: Gift & Wardrobe Buttons */}
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => setQuestsOpen(true)}
-            onPointerEnter={isGuest ? undefined : prefetchQuests}
-            onFocus={isGuest ? undefined : prefetchQuests}
-            onTouchStart={isGuest ? undefined : prefetchQuests}
-            className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
+        {showActionButtons && (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setQuestsOpen(true)}
+              onPointerEnter={isGuest ? undefined : prefetchQuests}
+              onFocus={isGuest ? undefined : prefetchQuests}
+              onTouchStart={isGuest ? undefined : prefetchQuests}
+              className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
                     bg-card/80 backdrop-blur-2xl
                     text-muted-foreground hover:text-primary
                     shadow-sm hover:shadow-md
                     border border-border/50
                     transition-all duration-300 ease-out
                     active:scale-95 active:translate-y-0.5"
-            title="Quests"
-          >
-            <div className="absolute inset-0 bg-primary/10 rounded-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <ScrollText className="relative w-[18px] h-[18px] stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
-            {questClaimableCount > 0 ? (
-              <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background shadow-sm z-20 animate-in zoom-in">
-                {questClaimableCount > 99 ? '99+' : questClaimableCount}
-              </span>
-            ) : questActiveCount > 0 ? (
-              <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-muted-foreground/60 rounded-full border-2 border-background shadow-sm z-20">
-                {questActiveCount > 9 ? '9+' : questActiveCount}
-              </span>
-            ) : null}
-          </button>
+              title="Quests"
+            >
+              <div className="absolute inset-0 bg-primary/10 rounded-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <ScrollText className="relative w-[18px] h-[18px] stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
+              {questClaimableCount > 0 ? (
+                <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background shadow-sm z-20 animate-in zoom-in">
+                  {questClaimableCount > 99 ? '99+' : questClaimableCount}
+                </span>
+              ) : questActiveCount > 0 ? (
+                <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-muted-foreground/60 rounded-full border-2 border-background shadow-sm z-20">
+                  {questActiveCount > 9 ? '9+' : questActiveCount}
+                </span>
+              ) : null}
+            </button>
 
-          <button
-            onClick={() => onOpenChange(true)}
-            className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
+            <button
+              onClick={() => onOpenChange(true)}
+              className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
                     bg-card/80 backdrop-blur-2xl
                     text-muted-foreground hover:text-primary
                     shadow-sm hover:shadow-md
                     border border-border/50
                     transition-all duration-300 ease-out
                     active:scale-95 active:translate-y-0.5"
-            title="Open Wardrobe"
-          >
-            <div className="absolute inset-0 bg-primary/10 rounded-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-            <Shirt className="relative w-[18px] h-[18px] stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
-            {wardrobeBadge > 0 && (
-              <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background shadow-sm z-20">
-                {wardrobeBadge > 9 ? '9+' : wardrobeBadge}
-              </span>
-            )}
-          </button>
-        </div>
+              title="Open Wardrobe"
+            >
+              <div className="absolute inset-0 bg-primary/10 rounded-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <Shirt className="relative w-[18px] h-[18px] stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
+              {wardrobeBadge > 0 && (
+                <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background shadow-sm z-20">
+                  {wardrobeBadge > 9 ? '9+' : wardrobeBadge}
+                </span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       <QuestsPopup

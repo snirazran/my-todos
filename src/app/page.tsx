@@ -112,12 +112,13 @@ export default function Home() {
       (url: string) => fetch(url).then((res) => res.json()),
       { revalidateOnFocus: false },
     );
+  const activeMissedTasksData = missedTasksData;
   const shouldShowMissedReview =
     !!user &&
-    !!missedTasksData &&
+    !!activeMissedTasksData &&
     !dismissMissedReview &&
-    !missedTasksData.reviewedToday &&
-    missedTasksData.items.length > 0;
+    !activeMissedTasksData.reviewedToday &&
+    activeMissedTasksData.items.length > 0;
 
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -1129,10 +1130,10 @@ export default function Home() {
         onClose={() => setShowDailyReward(false)}
       />
 
-      {missedTasksData && (
+      {activeMissedTasksData && (
         <MissedTasksPopup
           show={shouldShowMissedReview}
-          status={missedTasksData}
+          status={activeMissedTasksData}
           tags={tags}
           onClose={() => setDismissMissedReview(true)}
           onItemResolved={async (id, nextFlyBalance) => {
