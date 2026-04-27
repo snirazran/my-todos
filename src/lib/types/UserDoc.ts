@@ -66,6 +66,8 @@ export type UserDoc = {
   calendarSyncEnabled?: boolean;
   calendarAccessToken?: string;
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
+  aiSuggestionCache?: unknown;
+  aiSuggestionRefreshes?: unknown;
 };
 
 export type NotificationPrefs = {
