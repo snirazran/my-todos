@@ -145,6 +145,13 @@ export default function ManageTasksPage() {
 
   /** Delete from one display column (maps -> API day) */
   const removeTask = async (displayDay: DisplayDay, id: string) => {
+    // Optimistic Update
+    setWeek((w) => {
+      const clone = [...w];
+      clone[displayDay] = clone[displayDay].filter((t) => t.id !== id);
+      return clone;
+    });
+
     try {
       const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
       await fetch('/api/tasks?view=board', {
@@ -156,12 +163,10 @@ export default function ManageTasksPage() {
           timezone: tz,
         }),
       });
-    } finally {
-      setWeek((w) => {
-        const clone = [...w];
-        clone[displayDay] = clone[displayDay].filter((t) => t.id !== id);
-        return clone;
-      });
+    } catch (err) {
+      console.error('Delete failed', err);
+      // Re-fetch on error to ensure sync
+      fetchWeek();
     }
   };
 

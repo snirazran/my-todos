@@ -97,6 +97,7 @@ export default function Home() {
     moveTaskToBacklog,
     moveTaskToToday,
     deleteTask,
+    deleteBacklogTask,
     reorderTasks,
     editTask,
     scheduleTask,
@@ -1366,7 +1367,7 @@ export default function Home() {
             router.push('/login');
             return;
           }
-          deleteTask(id);
+          deleteBacklogTask(id);
         }}
         userTags={tags}
       />

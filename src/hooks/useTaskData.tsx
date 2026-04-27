@@ -597,6 +597,42 @@ export function useTaskData({
   );
 
   /**
+   * Delete Task (Backlog)
+   */
+  const deleteBacklogTask = useCallback(
+    async (taskId: string) => {
+      setPendingExclusions((prev) => new Map(prev).set(taskId, 'backlog'));
+      const prevBacklog = backlogData;
+
+      // Optimistic
+      if (backlogData) {
+        mutateBacklog(
+          backlogData.filter((t) => t.id !== taskId),
+          { revalidate: false },
+        );
+      }
+
+      try {
+        await fetch('/api/tasks?view=board', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ day: -1, taskId }),
+        });
+      } catch (e) {
+        console.error('Backlog delete failed', e);
+        // Rollback
+        if (prevBacklog) mutateBacklog(prevBacklog, { revalidate: false });
+        setPendingExclusions((prev) => {
+          const next = new Map(prev);
+          next.delete(taskId);
+          return next;
+        });
+      }
+    },
+    [backlogData, mutateBacklog],
+  );
+
+  /**
    * Reorder Tasks (Today)
    */
   const reorderTasks = useCallback(
@@ -802,6 +838,7 @@ export function useTaskData({
     moveTaskToBacklog,
     moveTaskToToday,
     deleteTask,
+    deleteBacklogTask,
     reorderTasks,
     editTask,
     scheduleTask,

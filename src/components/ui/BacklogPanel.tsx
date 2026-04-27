@@ -467,6 +467,7 @@ export default function BacklogPanel({
   onMoveToToday,
   onAddRequested,
   onEditTask,
+  onDeleteTask,
   pendingToBacklog,
   tags,
   isGuest,
@@ -477,6 +478,7 @@ export default function BacklogPanel({
   onMoveToToday?: (item: BacklogItem) => Promise<void> | void;
   onAddRequested: () => void;
   onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
+  onDeleteTask?: (taskId: string) => Promise<void> | void;
   pendingToBacklog?: number;
   tags?: { id: string; name: string; color: string }[];
   isGuest?: boolean;
@@ -788,7 +790,15 @@ export default function BacklogPanel({
         }}
         onDeleteAll={() => {
           if (!confirmId) return;
-          removeLater(confirmId.id).then(() => setConfirmId(null));
+          if (onDeleteTask) {
+            setBusy(true);
+            Promise.resolve(onDeleteTask(confirmId.id)).then(() => {
+              setBusy(false);
+              setConfirmId(null);
+            });
+          } else {
+            removeLater(confirmId.id).then(() => setConfirmId(null));
+          }
         }}
       />
 
