@@ -200,6 +200,9 @@ export default function Home() {
           selectedCategoryIds: ['sport', 'mindfulness'],
           prevWeek: { tasksCompleted: 10, completionRate: 62, totalFocusMinutes: 120, activeDays: 4, habitAvgRate: 55 },
           alreadySeen: false,
+          skinsNew: 2,
+          skinsRarest: 'Wizard Hat',
+          skinsRarestDetail: { slot: 'hat', riveIndex: 5, name: 'Wizard Hat' },
         };
       })()
     : undefined;
