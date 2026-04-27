@@ -39,8 +39,8 @@ export default function MobileNav() {
       protected: true,
     },
     {
-      href: '/analytics',
-      label: 'Analytics',
+      href: '/history',
+      label: 'History',
       icon: History,
       protected: true,
     },

@@ -376,7 +376,7 @@ const PREMIUM_PERKS = [
   { icon: Zap, label: '2x all rewards & flies' },
   { icon: CalendarCheck, label: 'Bonus daily rewards' },
   { icon: InfinityIcon, label: 'Unlimited tags' },
-  { icon: BarChart3, label: 'Analytics access' },
+  { icon: BarChart3, label: 'History access' },
 ];
 
 function DoubleRewardUpsell({ onClose }: { onClose: () => void }) {

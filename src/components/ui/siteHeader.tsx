@@ -42,8 +42,8 @@ export default function SiteHeader() {
       protected: true,
     },
     {
-      href: '/analytics',
-      label: 'Analytics',
+      href: '/history',
+      label: 'History',
       icon: History,
       protected: true,
     },
