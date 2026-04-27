@@ -46,6 +46,8 @@ import {
 } from '@/hooks/useTaskData';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
+import WeeklyRecap from '@/components/ui/WeeklyRecap';
+import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
 import type { FocusCategoryTagMap, MacroCategoryDefinition, MacroCategoryId } from '@/lib/quests/types';
 
 // Force re-compilation of this file to pick up useTaskData.tsx change
@@ -144,6 +146,67 @@ export default function Home() {
       !dismissMissedReview &&
       !activeMissedTasksData.reviewedToday &&
       activeMissedTasksData.items.length > 0;
+
+  // Weekly Recap
+  const [dismissRecap, setDismissRecap] = useState(false);
+  const { data: recapData } = useSWR<WeeklyRecapData>(
+    user ? `/api/weekly-recap?timezone=${encodeURIComponent(timezone)}` : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
+  const debugRecapData: WeeklyRecapData | undefined = isDebugMode
+    ? (() => {
+        const d = (offset: number) => { const dt = new Date(); dt.setDate(dt.getDate() + offset); return dt.toISOString().split('T')[0]; };
+        return {
+          weekStart: d(-7),
+          weekEnd: d(-1),
+          isPremium: true,
+          tasksAdded: 18,
+          tasksCompleted: 14,
+          completionRate: 78,
+          activeDays: 6,
+          bestDay: { date: d(-4), dayName: 'Wed', tasksTotal: 5, tasksCompleted: 5, habitsTotal: 3, habitsCompleted: 3, focusMinutes: 45, focusCycles: 3 },
+          totalFocusMinutes: 185,
+          totalFocusCycles: 12,
+          fliesEarned: 14,
+          currentStreak: 4,
+          days: [
+            { date: d(-7), dayName: 'Mon', tasksTotal: 3, tasksCompleted: 2, habitsTotal: 3, habitsCompleted: 2, focusMinutes: 25, focusCycles: 1 },
+            { date: d(-6), dayName: 'Tue', tasksTotal: 4, tasksCompleted: 3, habitsTotal: 3, habitsCompleted: 3, focusMinutes: 30, focusCycles: 2 },
+            { date: d(-5), dayName: 'Wed', tasksTotal: 5, tasksCompleted: 5, habitsTotal: 3, habitsCompleted: 3, focusMinutes: 45, focusCycles: 3 },
+            { date: d(-4), dayName: 'Thu', tasksTotal: 2, tasksCompleted: 1, habitsTotal: 3, habitsCompleted: 2, focusMinutes: 25, focusCycles: 2 },
+            { date: d(-3), dayName: 'Fri', tasksTotal: 3, tasksCompleted: 2, habitsTotal: 3, habitsCompleted: 1, focusMinutes: 35, focusCycles: 2 },
+            { date: d(-2), dayName: 'Sat', tasksTotal: 1, tasksCompleted: 1, habitsTotal: 3, habitsCompleted: 2, focusMinutes: 15, focusCycles: 1 },
+            { date: d(-1), dayName: 'Sun', tasksTotal: 0, tasksCompleted: 0, habitsTotal: 3, habitsCompleted: 0, focusMinutes: 10, focusCycles: 1 },
+          ],
+          topTags: [
+            { tagId: 'debug-tag-work', tagName: 'Work', tagColor: '#3b82f6', completedCount: 8, totalCount: 10 },
+            { tagId: 'debug-tag-health', tagName: 'Health', tagColor: '#22c55e', completedCount: 5, totalCount: 7 },
+            { tagId: 'debug-tag-personal', tagName: 'Personal', tagColor: '#f59e0b', completedCount: 3, totalCount: 5 },
+          ],
+          habits: [
+            { id: 'h1', text: 'Morning meditation', goal: 7, completed: 5, tags: ['debug-tag-health'] },
+            { id: 'h2', text: 'Read 20 pages', goal: 5, completed: 3, tags: ['debug-tag-personal'] },
+            { id: 'h3', text: 'Stretch for 10 minutes', goal: 6, completed: 6, tags: ['debug-tag-health'] },
+          ],
+          focusAreas: [
+            { categoryId: 'sport', categoryName: 'Sport', accent: '#22c55e', tagIds: ['debug-tag-health'], tasksTotal: 7, tasksCompleted: 5, habitsTotal: 12, habitsCompleted: 9, focusMinutes: 60, topTags: [{ tagId: 'debug-tag-health', tagName: 'Health', tagColor: '#22c55e', completedCount: 5, totalCount: 7 }] },
+            { categoryId: 'mindfulness', categoryName: 'Mindfulness', accent: '#8b5cf6', tagIds: ['debug-tag-personal'], tasksTotal: 5, tasksCompleted: 3, habitsTotal: 7, habitsCompleted: 4, focusMinutes: 45, topTags: [{ tagId: 'debug-tag-personal', tagName: 'Personal', tagColor: '#f59e0b', completedCount: 3, totalCount: 5 }] },
+          ],
+          selectedCategoryIds: ['sport', 'mindfulness'],
+          prevWeek: { tasksCompleted: 10, completionRate: 62, totalFocusMinutes: 120, activeDays: 4, habitAvgRate: 55 },
+          alreadySeen: false,
+        };
+      })()
+    : undefined;
+  const showWeeklyRecap = isDebugMode
+    ? !dismissRecap
+    : !!user &&
+      !!recapData &&
+      !dismissRecap &&
+      !recapData.alreadySeen &&
+      recapData.tasksCompleted + recapData.habits.length > 0 &&
+      !shouldShowMissedReview;
 
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -1177,6 +1240,13 @@ export default function Home() {
           onStatusChanged={async () => {
             await mutateMissedTasks();
           }}
+        />
+      )}
+
+      {showWeeklyRecap && (isDebugMode ? debugRecapData : recapData) && (
+        <WeeklyRecap
+          data={(isDebugMode ? debugRecapData : recapData)!}
+          onClose={() => setDismissRecap(true)}
         />
       )}
 

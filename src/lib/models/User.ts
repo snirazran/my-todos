@@ -85,6 +85,7 @@ const UserSchema = new Schema<UserDoc>(
       type: Schema.Types.Mixed,
       default: undefined,
     },
+    lastRecapWeek: { type: String, default: '' },
   },
   { collection: 'users' },
 );

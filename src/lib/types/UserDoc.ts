@@ -69,6 +69,7 @@ export type UserDoc = {
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   aiSuggestionCache?: unknown;
   aiSuggestionRefreshes?: unknown;
+  lastRecapWeek?: string;
 };
 
 export type MissedReviewProgress = {
