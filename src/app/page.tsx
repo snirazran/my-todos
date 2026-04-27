@@ -11,6 +11,8 @@ import {
   CalendarClock,
   EllipsisVertical,
   Plus,
+  Sparkles,
+  ChevronRight,
 } from 'lucide-react';
 import { HabitPanel } from '@/components/ui/HabitPanel';
 import BacklogTray from '@/components/board/BacklogTray';
@@ -46,7 +48,7 @@ import {
 } from '@/hooks/useTaskData';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
-import WeeklyRecap from '@/components/ui/WeeklyRecap';
+import WeeklyWrapped from '@/components/ui/WeeklyWrapped';
 import ProgressCoachPopup from '@/components/ui/ProgressCoachPopup';
 import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
 import type { FocusCategoryTagMap, MacroCategoryDefinition, MacroCategoryId } from '@/lib/quests/types';
@@ -201,14 +203,6 @@ export default function Home() {
         };
       })()
     : undefined;
-  const showWeeklyRecap = isDebugMode
-    ? !dismissRecap
-    : !!user &&
-      !!recapData &&
-      !dismissRecap &&
-      !recapData.alreadySeen &&
-      recapData.tasksCompleted + recapData.habits.length > 0 &&
-      !shouldShowMissedReview;
 
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -386,6 +380,14 @@ export default function Home() {
   );
   const questOnboarding = questsData?.onboarding;
   const wasMissedReviewOpen = useRef(false);
+
+  const [showWeeklyWrapped, setShowWeeklyWrapped] = useState(false);
+  const isFirstDayOfWeek = [0, 1].includes(new Date().getDay()); // Sunday or Monday
+
+  // Allow manual force show via ?wrapped=1
+  const forceShowWrapped = typeof window !== 'undefined' && window.location.search.includes('wrapped=1');
+
+  const showRecapIndicator = !!user && !!recapData && !showWeeklyWrapped;
 
   useEffect(() => {
     if (wasMissedReviewOpen.current && !shouldShowMissedReview) {
@@ -1258,13 +1260,6 @@ export default function Home() {
           onStatusChanged={async () => {
             await mutateMissedTasks();
           }}
-        />
-      )}
-
-      {showWeeklyRecap && (isDebugMode ? debugRecapData : recapData) && (
-        <WeeklyRecap
-          data={(isDebugMode ? debugRecapData : recapData)!}
-          onClose={() => setDismissRecap(true)}
         />
       )}
 

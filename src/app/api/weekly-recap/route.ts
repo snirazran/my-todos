@@ -6,6 +6,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import TaskModel, { type TaskDoc, type Weekday } from '@/lib/models/Task';
 import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
+import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
 import type { FocusCategoryTagMap } from '@/lib/quests/types';
 
 function getWeekRange(tz: string, weeksAgo: number) {
@@ -114,6 +115,11 @@ export type WeeklyRecapData = {
 
   // Has user seen this recap already
   alreadySeen: boolean;
+
+  // Skins (New)
+  skinsNew: number;
+  skinsRarest: string | null;
+  skinsRarestDetail?: { slot: string; riveIndex: number; name: string } | null;
 };
 
 function getDayName(dateStr: string): string {
@@ -433,6 +439,48 @@ export async function GET(req: NextRequest) {
       };
     }
 
+    // Skins logic
+    const wardrobe = (user as any).wardrobe || {};
+    const inventoryHistory = wardrobe.inventoryHistory || {};
+    const fullCatalog = await getFullCatalog();
+    const catalogMap = buildById(fullCatalog);
+
+    const newSkinIds = Object.entries(inventoryHistory)
+      .filter(([id, timestamp]) => {
+        const created = new Date(timestamp as string);
+        // Include everything from start of last week until NOW
+        return created >= new Date(lastWeek.weekStart);
+      })
+      .map(([id]) => id);
+
+    // Fallback for skins that might have createdAt but not in history yet
+    const inventory = (user as any).inventory || [];
+    if (Array.isArray(inventory)) {
+      inventory.forEach((item: any) => {
+        if (item.id && item.createdAt && !inventoryHistory[item.id]) {
+          const created = new Date(item.createdAt);
+          if (created >= new Date(lastWeek.weekStart)) {
+            if (!newSkinIds.includes(item.id)) newSkinIds.push(item.id);
+          }
+        }
+      });
+    }
+
+    const rarityOrder: Record<string, number> = {
+      'common': 1,
+      'uncommon': 2,
+      'rare': 3,
+      'epic': 4,
+      'legendary': 5
+    };
+
+    const rarestSkinItem = newSkinIds.length > 0 
+      ? newSkinIds
+          .map(id => catalogMap[id])
+          .filter(Boolean)
+          .sort((a, b) => (rarityOrder[b.rarity] || 0) - (rarityOrder[a.rarity] || 0))[0]
+      : null;
+
     const result: WeeklyRecapData = {
       weekStart: lastWeek.weekStart,
       weekEnd: lastWeek.weekEnd,
@@ -453,6 +501,9 @@ export async function GET(req: NextRequest) {
       selectedCategoryIds,
       prevWeek,
       alreadySeen,
+      skinsNew: newSkinIds.length,
+      skinsRarest: rarestSkinItem?.name ?? null,
+      skinsRarestDetail: rarestSkinItem ? { slot: rarestSkinItem.slot, riveIndex: rarestSkinItem.riveIndex, name: rarestSkinItem.name } : null,
     };
 
     return NextResponse.json(result);

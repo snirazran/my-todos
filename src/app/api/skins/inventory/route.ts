@@ -259,6 +259,7 @@ export async function POST(req: NextRequest) {
       const init: UserWardrobe = {
         equipped: {},
         inventory: { [itemId]: 1 },
+        inventoryHistory: { [itemId]: new Date().toISOString() },
         unseenItems: [itemId],
         flies: 0,
       };
@@ -271,6 +272,11 @@ export async function POST(req: NextRequest) {
         $inc: { [`wardrobe.inventory.${itemId}`]: 1 },
         $addToSet: { 'wardrobe.unseenItems': itemId },
       };
+
+      // Only set history if not already present
+      if (!user.wardrobe.inventoryHistory?.[itemId]) {
+        update.$set = { [`wardrobe.inventoryHistory.${itemId}`]: new Date().toISOString() };
+      }
 
       await UserModel.updateOne({ _id: user._id }, update);
     }

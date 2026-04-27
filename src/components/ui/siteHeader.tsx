@@ -21,16 +21,41 @@ import { useUIStore } from '@/lib/uiStore';
 import { clearAuthTokenCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
 import GoogleCalendarSync from '@/components/ui/GoogleCalendarSync';
-import useSWR from 'swr';
+import useSWR, { mutate as swrMutate } from 'swr';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import WeeklyWrapped from '@/components/ui/WeeklyWrapped';
+import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronRight } from 'lucide-react';
 
 export default function SiteHeader() {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const { isQuestsOpen, openQuests, openWardrobe } = useUIStore();
+  const { 
+    isQuestsOpen, 
+    openQuests, 
+    openWardrobe, 
+    isWeeklyWrappedOpen, 
+    openWeeklyWrapped, 
+    closeWeeklyWrapped,
+    isDebugMode
+  } = useUIStore();
+  const { indices } = useWardrobeIndices(!!user);
   const { unseenCount, unseenContainerCount } = useInventory(!!user, true);
   const inventoryBadge = unseenCount + unseenContainerCount;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  // Weekly Recap Fetching
+  const { data: recapData } = useSWR<WeeklyRecapData>(
+    user ? `/api/weekly-recap?timezone=${encodeURIComponent(timezone)}` : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
+
+  const forceShowWrapped = typeof window !== 'undefined' && window.location.search.includes('wrapped=1');
+  const showRecapIndicator = !!user && !!recapData && !isWeeklyWrappedOpen;
+
   const { data: questsData } = useSWR<{
     claimableCount?: number;
     activeCount?: number;
@@ -97,6 +122,19 @@ export default function SiteHeader() {
           />
         </Link>
 
+        {/* Global Modal rendering */}
+        {isWeeklyWrappedOpen && (isDebugMode ? true : recapData) && createPortal(
+          <WeeklyWrapped
+            data={(isDebugMode ? true : recapData) === true ? (undefined as any) : recapData!}
+            indices={indices}
+            onClose={() => {
+              closeWeeklyWrapped();
+              void swrMutate((key) => typeof key === 'string' && key.startsWith('/api/weekly-recap'));
+            }}
+          />,
+          document.body
+        )}
+
         {/* ───────── Desktop Navigation (Centered) ───────── */}
         <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
           {navItems.map((item) => {
@@ -162,7 +200,24 @@ export default function SiteHeader() {
         </div>
 
         {/* ───────── Right Side (Desktop: User Menu, Mobile: Hamburger) ───────── */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-3 shrink-0">
+          {showRecapIndicator && (
+            <motion.button
+              initial={{ x: 10, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => openWeeklyWrapped()}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-md shadow-purple-500/10 border border-white/10 whitespace-nowrap"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-200 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-wider">
+                Wrapped
+              </span>
+              <ChevronRight className="w-3 h-3 opacity-70" />
+            </motion.button>
+          )}
+
           <RightActions
             user={user}
             loading={loading}
@@ -200,7 +255,6 @@ import {
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { createPortal } from 'react-dom';
 import { AdminSettingsDialog } from '@/components/ui/AdminSettingsDialog';
 

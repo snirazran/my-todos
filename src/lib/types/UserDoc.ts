@@ -32,6 +32,7 @@ export type UserTag = {
 export type UserWardrobe = {
   equipped: Partial<Record<WardrobeSlot, string | null>>;
   inventory: Record<string, number>;
+  inventoryHistory?: Record<string, string>; // itemId -> ISO date of acquisition
   unseenItems?: string[];
   flies: number;
   flyDaily?: DailyFlyProgress;

@@ -70,6 +70,11 @@ export async function POST(req: NextRequest) {
       $set: { 'wardrobe.unseenItems': nextUnseen },
     };
 
+    // Only set history if not already present
+    if (!user.wardrobe?.inventoryHistory?.[prize.id]) {
+      update.$set[`wardrobe.inventoryHistory.${prize.id}`] = new Date().toISOString();
+    }
+
     await UserModel.updateOne({ _id: user._id }, update);
 
     return json({ ok: true, prize });

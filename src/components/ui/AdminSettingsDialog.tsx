@@ -26,6 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { useUIStore } from '@/lib/uiStore';
 import { createPortal } from 'react-dom';
+import { mutate } from 'swr';
 import { AdminCosmeticsPopup } from './AdminCosmeticsPopup';
 import { AdminGiftManagerPopup } from './AdminGiftManagerPopup';
 import { AdminRiveManagerPopup } from './AdminRiveManagerPopup';
@@ -202,6 +203,26 @@ export function AdminSettingsDialog({
     } finally {
       setLoading(null);
       setConfirmAction(null);
+    }
+  };
+
+  const handleResetWeeklyRecap = async () => {
+    setLoading('reset-weekly-wrapped');
+    try {
+      const res = await fetch('/api/admin/reset-weekly-recap', {
+        method: 'POST',
+      });
+      if (res.ok) {
+        // Clear SWR cache for recap data
+        mutate((key) => typeof key === 'string' && key.startsWith('/api/weekly-recap'));
+        window.location.reload();
+      } else {
+        alert('Failed to reset weekly wrapped');
+      }
+    } catch {
+      alert('Error resetting weekly wrapped');
+    } finally {
+      setLoading(null);
     }
   };
 
@@ -492,6 +513,29 @@ export function AdminSettingsDialog({
                     </div>
                   </div>
                   {loading === 'reset-missed-review' && (
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  )}
+                </Button>
+
+                {/* Reset Weekly Wrapped */}
+                <Button
+                  onClick={handleResetWeeklyRecap}
+                  disabled={loading !== null}
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-auto py-4 px-4"
+                >
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-pink-500/10 text-pink-600 dark:text-pink-400">
+                    <Sparkles className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-sm">
+                      Reset Weekly Wrapped
+                    </div>
+                    <div className="text-xs text-muted-foreground font-normal">
+                      Allow viewing the Spotify-style recap again
+                    </div>
+                  </div>
+                  {loading === 'reset-weekly-wrapped' && (
                     <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   )}
                 </Button>

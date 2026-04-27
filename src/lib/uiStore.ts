@@ -23,6 +23,10 @@ interface UIState {
 
   isDebugMode: boolean;
   setIsDebugMode: (debug: boolean) => void;
+
+  isWeeklyWrappedOpen: boolean;
+  openWeeklyWrapped: () => void;
+  closeWeeklyWrapped: () => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -49,6 +53,10 @@ export const useUIStore = create<UIState>()(
 
       isDebugMode: false,
       setIsDebugMode: (debug: boolean) => set({ isDebugMode: debug }),
+
+      isWeeklyWrappedOpen: false,
+      openWeeklyWrapped: () => set({ isWeeklyWrappedOpen: true }),
+      closeWeeklyWrapped: () => set({ isWeeklyWrappedOpen: false }),
     }),
     {
       name: 'frog-task-ui-storage',

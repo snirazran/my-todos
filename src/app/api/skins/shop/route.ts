@@ -34,6 +34,8 @@ export async function POST(req: NextRequest) {
       const init: UserWardrobe = {
         equipped: {},
         inventory: { [itemId]: 1 },
+        inventoryHistory: { [itemId]: new Date().toISOString() },
+        unseenItems: [itemId],
         flies: 0,
       };
       await UserModel.updateOne(
@@ -47,14 +49,20 @@ export async function POST(req: NextRequest) {
     const price = byId[itemId].priceFlies ?? 0;
 
     // Transaction: Atomic check-and-update to prevent race conditions
-    // We match the user AND ensure they have enough flies in the same query.
     const update: any = {
       $inc: {
         [`wardrobe.inventory.${itemId}`]: 1,
         'wardrobe.flies': -price,
       },
       $addToSet: { 'wardrobe.unseenItems': itemId },
+      $set: {},
     };
+
+    // Only set history if not already present
+    if (!user.wardrobe.inventoryHistory?.[itemId]) {
+      update.$set[`wardrobe.inventoryHistory.${itemId}`] = new Date().toISOString();
+    }
+    if (Object.keys(update.$set).length === 0) delete update.$set;
 
     const result = await UserModel.updateOne(
       {

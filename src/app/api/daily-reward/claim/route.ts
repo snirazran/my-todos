@@ -117,7 +117,20 @@ export async function POST(request: Request) {
           user.wardrobe.inventory[itemId] =
             (user.wardrobe.inventory[itemId] || 0) + 1;
           itemsAdded.push(itemId);
-          // track unseen?
+
+          // Record history if not already present
+          if (!user.wardrobe.inventoryHistory) {
+            user.wardrobe.inventoryHistory = {};
+          }
+          if (!user.wardrobe.inventoryHistory[itemId]) {
+            user.wardrobe.inventoryHistory[itemId] = new Date().toISOString();
+          }
+
+          // Add to unseen
+          if (!user.wardrobe.unseenItems) user.wardrobe.unseenItems = [];
+          if (!user.wardrobe.unseenItems.includes(itemId)) {
+            user.wardrobe.unseenItems.push(itemId);
+          }
         }
       }
     }
