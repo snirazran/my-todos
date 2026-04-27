@@ -144,11 +144,17 @@ async function generatePool(
   try {
     const jsonMatch = content.match(/\[[\s\S]*\]/);
     const raw: AiSuggestion[] = jsonMatch ? JSON.parse(jsonMatch[0]) : [];
-    return raw.slice(0, POOL_SIZE).map((s) => ({
+    const pool = raw.slice(0, POOL_SIZE).map((s) => ({
       text: String(s.text || '').slice(0, 45),
       categoryId: String(s.categoryId || ''),
       tagIds: categoryTagIdMap[String(s.categoryId || '')] ?? [],
     }));
+    // Shuffle once so the stored order is randomized
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool;
   } catch {
     return [];
   }
@@ -231,9 +237,14 @@ export async function GET(req: Request) {
     const todayTaskCount = await getTodayTaskCount(uid, tz);
     const suggestCount = getSuggestCount(todayTaskCount);
 
-    // Shuffle available pool so each page load shows different suggestions
-    const shuffled = [...available].sort(() => Math.random() - 0.5);
-    const suggestions = shuffled.slice(0, suggestCount);
+    // Pick random indices, then sort them to preserve pool order
+    const indices = available.map((_, i) => i);
+    for (let i = indices.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [indices[i], indices[j]] = [indices[j], indices[i]];
+    }
+    const picked = indices.slice(0, suggestCount).sort((a, b) => a - b);
+    const suggestions = picked.map((i) => available[i]);
 
     return NextResponse.json({
       suggestions,
