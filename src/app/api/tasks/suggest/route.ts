@@ -57,7 +57,7 @@ function getFocusSignature(focusProfile: any) {
 
 async function getTodayTaskCount(uid: string, tz: string): Promise<number> {
   const todayDate = getZonedToday(tz);
-  const todayDow = new Date(`${todayDate}T12:00:00Z`).getUTCDay();
+  const todayDow = new Date(`${todayDate}T12:00:00Z`).getUTCDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
   return TaskModel.countDocuments({
     userId: uid,
     deletedAt: { $exists: false },
