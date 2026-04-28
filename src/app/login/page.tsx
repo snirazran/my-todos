@@ -7,7 +7,7 @@ import {
   signInWithCredential,
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+import { SocialLogin } from '@capgo/capacitor-social-login';
 import { auth } from '@/lib/firebase';
 import { setAuthTokenCookie } from '@/lib/authCookie';
 import { useRouter } from 'next/navigation';
@@ -41,14 +41,19 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  // Initialize Google Auth Plugin for the web (if needed) and ensure it's ready
+  // Initialize native Google auth for Capacitor builds.
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
-      GoogleAuth.initialize({
-        clientId:
-          '324868480648-qv2h2spg5jl3mmhek4u6vvefm7k7m0f4.apps.googleusercontent.com',
-        scopes: ['profile', 'email'],
-        grantOfflineAccess: true,
+      void SocialLogin.initialize({
+        google: {
+          webClientId:
+            '324868480648-mcnp29sgs2r9ip4nsbfs82phhiuv4tos.apps.googleusercontent.com',
+          iOSClientId:
+            '324868480648-qv2h2spg5jl3mmhek4u6vvefm7k7m0f4.apps.googleusercontent.com',
+          iOSServerClientId:
+            '324868480648-mcnp29sgs2r9ip4nsbfs82phhiuv4tos.apps.googleusercontent.com',
+          mode: 'online',
+        },
       });
     }
   }, []);
@@ -58,14 +63,22 @@ export default function LoginPage() {
     setError(null);
     try {
       if (Capacitor.isNativePlatform()) {
-        // Native apps use the Google Auth Plugin
-        const googleUser = await GoogleAuth.signIn();
+        // Native apps use the Capacitor social login plugin.
+        const googleUser = await SocialLogin.login({
+          provider: 'google',
+          options: {
+            scopes: ['email', 'profile'],
+          },
+        });
 
-        if (googleUser?.authentication?.idToken) {
+        const idToken =
+          googleUser.result.responseType === 'online'
+            ? googleUser.result.idToken
+            : null;
+
+        if (idToken) {
           // Sign in to Firebase using the acquired token
-          const credential = GoogleAuthProvider.credential(
-            googleUser.authentication.idToken,
-          );
+          const credential = GoogleAuthProvider.credential(idToken);
           const result = await signInWithCredential(auth, credential);
 
           const token = await result.user.getIdToken();
@@ -205,7 +218,7 @@ export default function LoginPage() {
                 <div className="space-y-1">
                   <Label
                     htmlFor="email"
-                    className="text-xs font-bold uppercase text-muted-foreground ml-1"
+                    className="ml-1 text-xs font-bold uppercase text-muted-foreground"
                   >
                     Email
                   </Label>
@@ -222,7 +235,7 @@ export default function LoginPage() {
                 <div className="space-y-1">
                   <Label
                     htmlFor="password"
-                    className="text-xs font-bold uppercase text-muted-foreground ml-1"
+                    className="ml-1 text-xs font-bold uppercase text-muted-foreground"
                   >
                     Password
                   </Label>
@@ -255,7 +268,7 @@ export default function LoginPage() {
                   <span className="w-full border-t border-border/60" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground font-bold tracking-widest">
+                  <span className="px-2 font-bold tracking-widest bg-background text-muted-foreground">
                     Or
                   </span>
                 </div>
@@ -266,14 +279,14 @@ export default function LoginPage() {
                 type="button"
                 onClick={handleGoogleSignIn}
                 disabled={loading}
-                className="w-full h-12 rounded-2xl border-border bg-background hover:bg-muted/50 font-bold tracking-wide transition-all"
+                className="w-full h-12 font-bold tracking-wide transition-all rounded-2xl border-border bg-background hover:bg-muted/50"
               >
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   <>
                     <svg
-                      className="mr-2 h-4 w-4"
+                      className="w-4 h-4 mr-2"
                       aria-hidden="true"
                       focusable="false"
                       data-prefix="fab"
