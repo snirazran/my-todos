@@ -21,6 +21,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { createId } from '@/lib/createId';
 import {
   Dialog,
   DialogContent,
@@ -114,7 +115,7 @@ const createReward = (): QuestReward => ({
   amount: 50,
 });
 const createLogic = (placement: QuestPlacement = 'daily'): QuestLogicBlock => ({
-  id: crypto.randomUUID(),
+  id: createId(),
   type: 'count',
   subject: 'task',
   action: 'complete',
@@ -125,7 +126,7 @@ const createLogic = (placement: QuestPlacement = 'daily'): QuestLogicBlock => ({
   tagMode: placement === 'category' ? 'focus_category_tags' : 'ignore',
 });
 const createVisibilityCondition = (): QuestVisibilityCondition => ({
-  id: crypto.randomUUID(),
+  id: createId(),
   metric: 'daily_tasks_count',
   operator: 'gt',
   value: 0,
