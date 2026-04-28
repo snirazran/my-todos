@@ -6,6 +6,7 @@ function getFirebaseApp() {
       NEXT_PUBLIC_FIREBASE_PROJECT_ID,
       FIREBASE_CLIENT_EMAIL,
       FIREBASE_PRIVATE_KEY,
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
     } = process.env;
 
     if (
@@ -25,6 +26,7 @@ function getFirebaseApp() {
           clientEmail: FIREBASE_CLIENT_EMAIL,
           privateKey: FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
         }),
+        storageBucket: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
       });
     } catch (error) {
       console.error('Firebase admin initialization error', error);
@@ -42,4 +44,9 @@ export function getAdminAuth() {
 export function getAdminMessaging() {
   getFirebaseApp();
   return admin.messaging();
+}
+
+export function getAdminStorage() {
+  getFirebaseApp();
+  return admin.storage().bucket();
 }

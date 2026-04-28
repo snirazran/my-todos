@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
-import { mkdir, readdir, copyFile, stat, writeFile } from 'fs/promises';
+import { readFile, stat } from 'fs/promises';
 import { existsSync } from 'fs';
 import { requireUserId } from '@/lib/auth';
 import {
@@ -8,81 +8,116 @@ import {
   MANAGED_RIVE_ASSETS,
   type ManagedRiveAsset,
 } from '@/lib/riveAssets';
+import { getAdminStorage } from '@/lib/firebaseAdmin';
+import connectMongo from '@/lib/mongoose';
+import RiveAssetModel from '@/lib/models/RiveAsset';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
 
 const PUBLIC_DIR = path.join(process.cwd(), 'public');
-const BACKUP_ROOT = path.join(PUBLIC_DIR, 'rive-backups');
 
-function assetPath(asset: ManagedRiveAsset) {
-  return path.join(PUBLIC_DIR, asset.fileName);
+function currentStoragePath(asset: ManagedRiveAsset) {
+  return `rive-assets/${asset.id}/${asset.fileName}`;
 }
 
-function assetBackupDir(asset: ManagedRiveAsset) {
-  return path.join(BACKUP_ROOT, asset.id);
-}
-
-function backupName(asset: ManagedRiveAsset) {
+function makeBackupName(asset: ManagedRiveAsset) {
   const stamp = new Date().toISOString().replace(/[:.]/g, '-');
   return `${stamp}-${asset.fileName}`;
 }
 
-async function fileInfo(filePath: string) {
-  const info = await stat(filePath);
-  return {
-    size: info.size,
-    updatedAt: info.mtime.toISOString(),
-  };
+function backupStoragePath(asset: ManagedRiveAsset, name: string) {
+  return `rive-backups/${asset.id}/${name}`;
 }
 
-async function createBackup(asset: ManagedRiveAsset) {
-  const source = assetPath(asset);
-  if (!existsSync(source)) {
-    throw new Error('Current Rive file does not exist');
+// Ensures the current file exists in Firebase Storage, bootstrapping from the
+// static public file on first use. Returns the storage path.
+async function ensureCurrentInStorage(asset: ManagedRiveAsset): Promise<string> {
+  await connectMongo();
+  const existing = await RiveAssetModel.findOne({ assetId: asset.id });
+  if (existing) return existing.storagePath;
+
+  const staticPath = path.join(PUBLIC_DIR, asset.fileName);
+  let buffer: Buffer;
+  try {
+    buffer = await readFile(staticPath);
+  } catch {
+    throw new Error(`Static Rive file not found: ${asset.fileName}`);
   }
 
-  const dir = assetBackupDir(asset);
-  await mkdir(dir, { recursive: true });
-  const name = backupName(asset);
-  const target = path.join(dir, name);
-  await copyFile(source, target);
+  const storagePath = currentStoragePath(asset);
+  const bucket = getAdminStorage();
+  await bucket.file(storagePath).save(buffer, {
+    metadata: { contentType: 'application/octet-stream' },
+  });
+
+  await RiveAssetModel.create({
+    assetId: asset.id,
+    storagePath,
+    size: buffer.byteLength,
+    updatedAt: new Date(),
+    backups: [],
+  });
+
+  return storagePath;
+}
+
+async function createBackup(asset: ManagedRiveAsset): Promise<string> {
+  const currentPath = await ensureCurrentInStorage(asset);
+  const bucket = getAdminStorage();
+  const name = makeBackupName(asset);
+  const destPath = backupStoragePath(asset, name);
+
+  await bucket.file(currentPath).copy(bucket.file(destPath));
+
+  const [meta] = await bucket.file(destPath).getMetadata();
+  const size = parseInt(String(meta.size ?? 0), 10);
+
+  await RiveAssetModel.updateOne(
+    { assetId: asset.id },
+    {
+      $push: {
+        backups: { name, storagePath: destPath, size, updatedAt: new Date() },
+      },
+    },
+  );
+
   return name;
 }
 
-async function listBackups(asset: ManagedRiveAsset) {
-  const dir = assetBackupDir(asset);
-  if (!existsSync(dir)) return [];
-
-  const names = await readdir(dir);
-  const backups = await Promise.all(
-    names
-      .filter((name) => name.endsWith('.riv'))
-      .map(async (name) => {
-        const info = await fileInfo(path.join(dir, name));
-        return {
-          name,
-          size: info.size,
-          updatedAt: info.updatedAt,
-          url: `/rive-backups/${asset.id}/${name}`,
-        };
-      }),
-  );
-
-  return backups.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-}
-
 async function assetView(asset: ManagedRiveAsset) {
-  const info = existsSync(assetPath(asset))
-    ? await fileInfo(assetPath(asset))
-    : { size: 0, updatedAt: null };
+  await connectMongo();
+  const record = await RiveAssetModel.findOne({ assetId: asset.id });
 
-  return {
-    ...asset,
-    size: info.size,
-    updatedAt: info.updatedAt,
-    backups: await listBackups(asset),
-  };
+  let size = 0;
+  let updatedAt: string | null = null;
+
+  if (record) {
+    size = record.size;
+    updatedAt = record.updatedAt.toISOString();
+  } else {
+    const staticPath = path.join(PUBLIC_DIR, asset.fileName);
+    if (existsSync(staticPath)) {
+      try {
+        const info = await stat(staticPath);
+        size = info.size;
+        updatedAt = info.mtime.toISOString();
+      } catch { /* ignore */ }
+    }
+  }
+
+  const backups = record?.backups
+    ? [...record.backups]
+        .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+        .map((b) => ({
+          name: b.name,
+          size: b.size,
+          updatedAt: b.updatedAt.toISOString(),
+          url: `/api/rive-files/${asset.id}?backup=${encodeURIComponent(b.name)}`,
+        }))
+    : [];
+
+  return { ...asset, size, updatedAt, backups };
 }
 
 export async function GET() {
@@ -111,15 +146,30 @@ export async function POST(req: NextRequest) {
     }
 
     if (action === 'restore') {
-      const backup = String(formData.get('backup') ?? '');
-      if (!backup || backup.includes('/') || backup.includes('\\')) {
+      const backupName = String(formData.get('backup') ?? '');
+      if (!backupName || backupName.includes('/') || backupName.includes('\\')) {
         return json({ error: 'Invalid backup name' }, 400);
       }
-      const source = path.join(assetBackupDir(asset), backup);
-      if (!existsSync(source)) return json({ error: 'Backup not found' }, 404);
+
+      await connectMongo();
+      const record = await RiveAssetModel.findOne({ assetId: asset.id });
+      const backup = record?.backups.find((b) => b.name === backupName);
+      if (!backup) return json({ error: 'Backup not found' }, 404);
 
       await createBackup(asset);
-      await copyFile(source, assetPath(asset));
+
+      const bucket = getAdminStorage();
+      const destPath = currentStoragePath(asset);
+      await bucket.file(backup.storagePath).copy(bucket.file(destPath));
+
+      const [meta] = await bucket.file(destPath).getMetadata();
+      const size = parseInt(String(meta.size ?? 0), 10);
+
+      await RiveAssetModel.updateOne(
+        { assetId: asset.id },
+        { storagePath: destPath, size, updatedAt: new Date() },
+      );
+
       return json({ ok: true, asset: await assetView(asset) });
     }
 
@@ -131,8 +181,20 @@ export async function POST(req: NextRequest) {
       }
 
       await createBackup(asset);
+
       const bytes = Buffer.from(await file.arrayBuffer());
-      await writeFile(assetPath(asset), bytes);
+      const destPath = currentStoragePath(asset);
+      const bucket = getAdminStorage();
+      await bucket.file(destPath).save(bytes, {
+        metadata: { contentType: 'application/octet-stream' },
+      });
+
+      await RiveAssetModel.findOneAndUpdate(
+        { assetId: asset.id },
+        { storagePath: destPath, size: bytes.byteLength, updatedAt: new Date() },
+        { upsert: true },
+      );
+
       return json({ ok: true, asset: await assetView(asset) });
     }
 

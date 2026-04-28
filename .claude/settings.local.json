@@ -29,7 +29,8 @@
       "Bash(curl:*)",
       "Bash(NODE_OPTIONS='' npx tsc --noEmit)",
       "Bash(git stash *)",
-      "Bash(pnpm add *)"
+      "Bash(pnpm add *)",
+      "Bash(node_modules/.bin/tsc --noEmit)"
     ]
   }
 }
