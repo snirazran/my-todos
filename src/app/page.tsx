@@ -218,6 +218,7 @@ export default function Home() {
   const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>('pick');
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const [showTimer, setShowTimer] = useState(false);
+  const lastHandledTimerCompletionRef = useRef<number | null>(null);
   const [showProgressCoach, setShowProgressCoach] = useState(false);
 
   /* State */
@@ -304,7 +305,17 @@ export default function Home() {
   }, [user]);
 
   // Live frogodoro session stats for the active task
-  const { selectedTaskId: frogTaskId, sessionStats, settings: frogSettings, phase: frogPhase, timeLeft: frogTimeLeft, isRunning: frogRunning, pauseTimer: frogPauseTimer } = useFrogodoroStore();
+  const {
+    selectedTaskId: frogTaskId,
+    sessionStats,
+    settings: frogSettings,
+    phase: frogPhase,
+    timeLeft: frogTimeLeft,
+    isRunning: frogRunning,
+    pauseTimer: frogPauseTimer,
+    lastCompletionId,
+    lastCompletedTaskId,
+  } = useFrogodoroStore();
   const frogPhaseDuration = frogPhase === 'focus'
     ? frogSettings.cycleDuration * 60
     : frogPhase === 'shortBreak'
@@ -334,6 +345,25 @@ export default function Home() {
       )
     : rawData;
   const doneCount = data.filter((t) => t.completed).length;
+
+  useEffect(() => {
+    if (lastHandledTimerCompletionRef.current === null) {
+      lastHandledTimerCompletionRef.current = lastCompletionId;
+      return;
+    }
+
+    if (lastCompletionId === lastHandledTimerCompletionRef.current) return;
+
+    lastHandledTimerCompletionRef.current = lastCompletionId;
+
+    const completedTask =
+      data.find((t) => t.id === lastCompletedTaskId) ??
+      data.find((t) => t.id === frogTaskId);
+
+    if (completedTask) setTimerTask(completedTask);
+    setShowTimer(true);
+  }, [data, frogTaskId, lastCompletedTaskId, lastCompletionId]);
+
   // Note: We don't rely purely on 'rate' anymore for triggering, but we keep it for the progress bar
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
 

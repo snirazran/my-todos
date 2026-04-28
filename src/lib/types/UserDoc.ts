@@ -1,5 +1,6 @@
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import type { FocusProfile } from '@/lib/quests/types';
+import type { FrogodoroSettings, PomodoroPhase, SessionStats } from '@/lib/frogodoroStore';
 
 export type DailyFlyProgress = {
   date: string;
@@ -70,7 +71,21 @@ export type UserDoc = {
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   aiSuggestionCache?: unknown;
   aiSuggestionRefreshes?: unknown;
+  activeFrogodoroTimer?: ActiveFrogodoroTimer | null;
   lastRecapWeek?: string;
+};
+
+export type ActiveFrogodoroTimer = {
+  taskId: string;
+  clientId?: string;
+  phase: PomodoroPhase;
+  status: 'running' | 'paused';
+  timeLeft: number;
+  endsAt?: string | null;
+  settings: FrogodoroSettings;
+  completedCycles: number;
+  sessionStats: SessionStats;
+  updatedAt: string;
 };
 
 export type MissedReviewProgress = {

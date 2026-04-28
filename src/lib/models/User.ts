@@ -85,6 +85,10 @@ const UserSchema = new Schema<UserDoc>(
       type: Schema.Types.Mixed,
       default: undefined,
     },
+    activeFrogodoroTimer: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
     lastRecapWeek: { type: String, default: '' },
   },
   { collection: 'users' },

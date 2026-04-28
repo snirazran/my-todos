@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { type TimerSound } from './timerSounds';
+import type { ActiveFrogodoroTimer } from './types/UserDoc';
 
 export type PomodoroPhase = 'focus' | 'shortBreak' | 'longBreak';
 
@@ -51,6 +52,9 @@ interface FrogodoroState {
   currentSessionSpend: number; // accumulated focus time to sync
   sessionStats: SessionStats;
   phaseElapsed: number; // seconds spent in the current phase
+  lastCompletionId: number;
+  lastCompletedTaskId: string;
+  lastCompletedPhase: PomodoroPhase | null;
 
   // Actions
   setSettings: (settings: FrogodoroSettings) => void;
@@ -65,6 +69,7 @@ interface FrogodoroState {
   updateSessionStats: (stats: SessionStats) => void;
   setPhaseElapsed: (elapsed: number) => void;
   resetSessionStats: () => void;
+  hydrateActiveTimer: (timer: ActiveFrogodoroTimer) => void;
 }
 
 export const useFrogodoroStore = create<FrogodoroState>()(
@@ -80,6 +85,9 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       currentSessionSpend: 0,
       sessionStats: DEFAULT_SESSION_STATS,
       phaseElapsed: 0,
+      lastCompletionId: 0,
+      lastCompletedTaskId: '',
+      lastCompletedPhase: null,
 
       setSettings: (settings) =>
         set((state) => {
@@ -148,6 +156,12 @@ export const useFrogodoroStore = create<FrogodoroState>()(
 
       completePhase: (autoStart = false, elapsedOverride?: number) => {
         set((state) => {
+          const completionFields = {
+            lastCompletionId: state.lastCompletionId + 1,
+            lastCompletedTaskId: state.selectedTaskId,
+            lastCompletedPhase: state.phase,
+          };
+
           if (state.phase === 'focus') {
             const newCycles = state.completedCycles + 1;
             const nextPhase =
@@ -167,6 +181,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
               isRunning: autoStart,
               endTime: autoStart ? Date.now() + time * 1000 : null,
               timeLeft: time,
+              ...completionFields,
               sessionStats: {
                 ...state.sessionStats,
                 focusSessions: state.sessionStats.focusSessions + 1,
@@ -187,6 +202,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
               isRunning: false,
               endTime: null,
               timeLeft: time,
+              ...completionFields,
               sessionStats: {
                 ...state.sessionStats,
                 ...(state.phase === 'shortBreak'
@@ -206,6 +222,27 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       updateSessionStats: (stats) => set({ sessionStats: stats }),
       setPhaseElapsed: (elapsed) => set({ phaseElapsed: elapsed }),
       resetSessionStats: () => set({ sessionStats: DEFAULT_SESSION_STATS, phaseElapsed: 0 }),
+      hydrateActiveTimer: (timer) => {
+        const endsAtMs = timer.endsAt ? new Date(timer.endsAt).getTime() : null;
+        const runningTimeLeft =
+          timer.status === 'running' && endsAtMs
+            ? Math.max(0, Math.round((endsAtMs - Date.now()) / 1000))
+            : timer.timeLeft;
+
+        set({
+          selectedTaskId: timer.taskId,
+          settings: timer.settings,
+          phase: timer.phase,
+          isRunning: timer.status === 'running' && runningTimeLeft > 0,
+          endTime:
+            timer.status === 'running' && runningTimeLeft > 0
+              ? Date.now() + runningTimeLeft * 1000
+              : null,
+          timeLeft: runningTimeLeft,
+          completedCycles: timer.completedCycles,
+          sessionStats: timer.sessionStats,
+        });
+      },
     }),
     {
       name: 'frogodoro-storage',

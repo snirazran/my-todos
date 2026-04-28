@@ -290,10 +290,7 @@ export default function FrogodoroSheet({
     switchPhase(newPhase);
   };
 
-  const saveSettings = async () => {
-    setSettings(localSettings);
-    setShowSettings(false);
-
+  const persistTaskSettings = async (settingsToSave: typeof DEFAULT_SETTINGS) => {
     if (selectedTaskId) {
       onMutateToday?.();
       try {
@@ -302,7 +299,7 @@ export default function FrogodoroSheet({
           shortBreakDuration,
           longBreakDuration,
           longBreakInterval,
-        } = localSettings;
+        } = settingsToSave;
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         await fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
           method: 'PUT',
@@ -321,6 +318,43 @@ export default function FrogodoroSheet({
         // silent
       }
     }
+  };
+
+  const saveSettings = async () => {
+    setSettings(localSettings);
+    setShowSettings(false);
+    await persistTaskSettings(localSettings);
+  };
+
+  const getDurationControl = () => {
+    if (phase === 'focus') {
+      return { key: 'cycleDuration' as const, min: 1, max: 120, step: 5 };
+    }
+    if (phase === 'shortBreak') {
+      return { key: 'shortBreakDuration' as const, min: 1, max: 30, step: 1 };
+    }
+    return { key: 'longBreakDuration' as const, min: 5, max: 60, step: 5 };
+  };
+
+  const adjustCurrentDuration = (direction: -1 | 1) => {
+    if (isRunning) return;
+
+    const control = getDurationControl();
+    const currentValue = settings[control.key];
+    const rawNextValue = currentValue + control.step * direction;
+    const nextValue =
+      phase === 'focus' && direction === -1 && currentValue === 5
+        ? 1
+        : phase === 'focus' && direction === 1 && currentValue === 1
+          ? 5
+          : Math.min(control.max, Math.max(control.min, rawNextValue));
+
+    if (nextValue === currentValue) return;
+
+    const nextSettings = { ...settings, [control.key]: nextValue };
+    setLocalSettings(nextSettings);
+    setSettings(nextSettings);
+    void persistTaskSettings(nextSettings);
   };
 
   const getPhaseColor = () => {
@@ -437,23 +471,23 @@ export default function FrogodoroSheet({
                       transition={{ duration: 0.2 }}
                       className="p-5 max-h-[70vh] overflow-y-auto no-scrollbar"
                     >
-                      <div className="flex items-center justify-between mb-5">
+                      <div className="mb-5 flex items-center justify-between">
                         <h3 className="text-lg font-black text-foreground">Timer Settings</h3>
                         <button
                           onClick={() => setShowSettings(false)}
-                          className="flex items-center justify-center w-8 h-8 rounded-full bg-muted/60 text-muted-foreground hover:bg-muted transition-colors"
+                          className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/15"
                         >
                           <X className="w-4 h-4" />
                         </button>
                       </div>
 
-                      <div className="space-y-5">
-                        {/* Work Cycle */}
+                      <div className="space-y-4">
+                        {/* Cycle Behavior */}
                         <div className="space-y-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/50 px-1">Work Cycle</p>
-                          <div className="overflow-hidden border rounded-2xl border-border/50 bg-muted/10">
+                          <p className="px-1 text-[11px] font-black uppercase tracking-widest text-primary/60">Cycle Behavior</p>
+                          <div className="overflow-hidden rounded-2xl border border-primary/10 bg-primary/5 p-2.5">
                             {/* Focus */}
-                            <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border-b border-border/40">
+                            <div className="hidden">
                               <div className="w-3 h-3 rounded-full bg-primary shrink-0" />
                               <div className="flex-1">
                                 <p className="text-sm font-semibold text-foreground">Focus</p>
@@ -465,7 +499,7 @@ export default function FrogodoroSheet({
                               </div>
                             </div>
                             {/* Short Break */}
-                            <div className="flex items-center gap-3 px-4 py-3 bg-sky-500/5 border-b border-border/40">
+                            <div className="hidden">
                               <div className="w-3 h-3 rounded-full bg-sky-400 shrink-0" />
                               <div className="flex-1">
                                 <p className="text-sm font-semibold text-foreground">Short Break</p>
@@ -477,21 +511,22 @@ export default function FrogodoroSheet({
                               </div>
                             </div>
                             {/* Rounds */}
-                            <div className="flex items-center gap-3 px-4 py-3 bg-muted/20 border-b border-border/40">
-                              <svg className="w-4 h-4 text-muted-foreground/40 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <div className="flex items-center gap-3 rounded-xl bg-background px-3 py-3 shadow-sm">
+                              <svg className="w-4 h-4 text-primary/70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                               </svg>
                               <div className="flex-1">
-                                <p className="text-xs font-medium text-muted-foreground/70">Rounds before long break</p>
+                                <p className="text-sm font-black text-foreground">Rounds before long break</p>
+                                <p className="text-[11px] font-semibold text-muted-foreground">Long break after {localSettings.longBreakInterval} focus rounds</p>
                               </div>
                               <div className="flex items-center gap-2">
                                 <button type="button" onClick={() => setLocalSettings({ ...localSettings, longBreakInterval: Math.max(1, localSettings.longBreakInterval - 1) })} className="flex items-center justify-center w-6 h-6 text-sm transition-all border rounded-full bg-background border-border/70 text-muted-foreground active:scale-90">−</button>
-                                <span className="w-5 text-sm font-black text-center tabular-nums text-foreground">{localSettings.longBreakInterval}</span>
+                                <span className="w-8 text-center text-base font-black tabular-nums text-foreground">{localSettings.longBreakInterval}</span>
                                 <button type="button" onClick={() => setLocalSettings({ ...localSettings, longBreakInterval: Math.min(10, localSettings.longBreakInterval + 1) })} className="flex items-center justify-center w-6 h-6 text-sm transition-all rounded-full bg-primary/10 text-primary active:scale-90">+</button>
                               </div>
                             </div>
                             {/* Long Break */}
-                            <div className="flex items-center gap-3 px-4 py-3 bg-indigo-500/5">
+                            <div className="hidden">
                               <div className="w-3 h-3 bg-indigo-500 rounded-full shrink-0" />
                               <div className="flex-1">
                                 <p className="text-sm font-semibold text-foreground">Long Break</p>
@@ -509,27 +544,27 @@ export default function FrogodoroSheet({
                         <button
                           type="button"
                           onClick={() => setLocalSettings({ ...localSettings, autoStartBreaks: !localSettings.autoStartBreaks })}
-                          className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl border transition-all active:scale-[0.98] ${
+                          className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 transition-all active:scale-[0.98] ${
                             localSettings.autoStartBreaks
-                              ? 'bg-primary/8 border-primary/25 text-primary'
-                              : 'bg-muted/20 border-border/50 text-muted-foreground'
+                              ? 'bg-primary/10 text-primary'
+                              : 'bg-muted/15 text-muted-foreground'
                           }`}
                         >
                           <div className="text-left">
-                            <p className="text-sm font-semibold">Auto-start breaks</p>
-                            <p className={`text-[11px] font-medium ${localSettings.autoStartBreaks ? 'text-primary/60' : 'text-muted-foreground/50'}`}>
+                            <p className="text-sm font-black">Auto-start breaks</p>
+                            <p className={`text-[11px] font-semibold ${localSettings.autoStartBreaks ? 'text-primary/60' : 'text-muted-foreground/50'}`}>
                               Breaks begin automatically
                             </p>
                           </div>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${localSettings.autoStartBreaks ? 'bg-primary/15' : 'bg-muted-foreground/10'}`}>
-                            {localSettings.autoStartBreaks ? 'On' : 'Off'}
+                          <span className={`relative h-7 w-12 rounded-full transition-colors ${localSettings.autoStartBreaks ? 'bg-primary' : 'bg-muted-foreground/25'}`}>
+                            <span className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${localSettings.autoStartBreaks ? 'translate-x-5' : 'translate-x-0'}`} />
                           </span>
                         </button>
 
                         {/* Sound */}
                         <div className="space-y-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground/50 px-1">Finish Sound</p>
-                          <div className="flex gap-2">
+                          <p className="px-1 text-[11px] font-black uppercase tracking-widest text-primary/60">Finish Sound</p>
+                          <div className="grid grid-cols-2 gap-2">
                             {([
                               { id: 'bell', label: 'Bell' },
                               { id: 'chime', label: 'Chime' },
@@ -543,10 +578,10 @@ export default function FrogodoroSheet({
                                   setLocalSettings({ ...localSettings, timerSound: id });
                                   playTimerSound(id);
                                 }}
-                                className={`flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all active:scale-95 ${
+                                className={`h-11 rounded-xl text-sm font-black transition-all active:scale-95 ${
                                   localSettings.timerSound === id
-                                    ? 'bg-primary text-primary-foreground shadow-sm'
-                                    : 'bg-muted/40 text-muted-foreground hover:bg-muted/70 border border-border/50'
+                                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
+                                    : 'border border-border/70 bg-background text-muted-foreground hover:bg-muted/40'
                                 }`}
                               >
                                 {label}
@@ -558,7 +593,7 @@ export default function FrogodoroSheet({
 
                       <button
                         onClick={saveSettings}
-                        className="mt-6 w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-base py-3 rounded-2xl transition-all active:scale-[0.98]"
+                        className="mt-6 w-full rounded-2xl bg-primary py-3.5 text-base font-black text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.98]"
                       >
                         Save
                       </button>
@@ -609,9 +644,9 @@ export default function FrogodoroSheet({
                         {/* Phase Tabs */}
                         <div className="flex items-center justify-center gap-1 mb-4">
                           {[
-                            { id: 'focus', label: 'Focus' },
-                            { id: 'shortBreak', label: 'Short' },
-                            { id: 'longBreak', label: 'Long' },
+                            { id: 'focus', label: 'Focus Time' },
+                            { id: 'shortBreak', label: 'Short Break' },
+                            { id: 'longBreak', label: 'Long Break' },
                           ].map((p) => (
                             <button
                               key={p.id}
@@ -630,8 +665,42 @@ export default function FrogodoroSheet({
                         </div>
 
                         {/* Time Display */}
-                        <div className="text-[72px] font-black tabular-nums tracking-tighter text-center leading-none mb-4 drop-shadow-lg text-white">
-                          {formatTime(timeLeft)}
+                        <div className="mb-4 flex items-center justify-center gap-3">
+                          {(() => {
+                            const control = getDurationControl();
+                            const duration = settings[control.key];
+                            return (
+                              <>
+                                {!isRunning && (
+                                  <button
+                                    type="button"
+                                    onClick={() => adjustCurrentDuration(-1)}
+                                    disabled={duration <= control.min}
+                                    aria-label="Decrease duration"
+                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                                  >
+                                    <Minus className="h-5 w-5" />
+                                  </button>
+                                )}
+
+                                <div className="min-w-[210px] text-center text-[72px] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">
+                                  {formatTime(timeLeft)}
+                                </div>
+
+                                {!isRunning && (
+                                  <button
+                                    type="button"
+                                    onClick={() => adjustCurrentDuration(1)}
+                                    disabled={duration >= control.max}
+                                    aria-label="Increase duration"
+                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                                  >
+                                    <Plus className="h-5 w-5" />
+                                  </button>
+                                )}
+                              </>
+                            );
+                          })()}
                         </div>
 
                         {/* Controls */}

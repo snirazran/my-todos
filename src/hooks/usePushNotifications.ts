@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 /**
  * dd
@@ -72,9 +73,40 @@ export function usePushNotifications(userId: string | null | undefined) {
         // Handle received notifications while app is in foreground
         PushNotifications.addListener(
           'pushNotificationReceived',
-          (notification) => {
+          async (notification) => {
             console.log('Push notification received:', notification);
-            // You could show an in-app toast here if desired
+            const type = notification.data?.type;
+            const shouldDisplayForegroundTimerNotification =
+              type === 'timer_complete' ||
+              type === 'break_started' ||
+              type === 'break_complete';
+
+            if (!shouldDisplayForegroundTimerNotification) return;
+
+            try {
+              const perms = await LocalNotifications.checkPermissions();
+              if (perms.display !== 'granted') {
+                const requested = await LocalNotifications.requestPermissions();
+                if (requested.display !== 'granted') return;
+              }
+
+              await LocalNotifications.schedule({
+                notifications: [
+                  {
+                    id: Date.now() % 2147483647,
+                    title: notification.title ?? 'Frogodoro timer',
+                    body: notification.body ?? 'Your timer status changed.',
+                    schedule: { at: new Date(Date.now() + 100) },
+                    sound: 'default',
+                    smallIcon: 'ic_notification',
+                    iconColor: '#4CAF50',
+                    extra: notification.data,
+                  },
+                ],
+              });
+            } catch (err) {
+              console.error('Failed to show foreground timer notification:', err);
+            }
           },
         );
 
