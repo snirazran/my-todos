@@ -33,7 +33,6 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { getQuestsUrl } from '@/components/ui/QuestsPopup';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
-import { createId } from '@/lib/createId';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { DailyRewardPopup } from '@/components/ui/daily-reward/DailyRewardPopup';
 import { MissedTasksPopup, type MissedTasksStatus } from '@/components/ui/MissedTasksPopup';
@@ -1222,7 +1221,7 @@ export default function Home() {
             } else {
               setGuestTasks((prev) => [
                 ...prev,
-                { id: createId(), text, completed: false, tags },
+                { id: crypto.randomUUID(), text, completed: false, tags },
               ]);
             }
           } catch (e) {

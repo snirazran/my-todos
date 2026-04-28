@@ -5,7 +5,6 @@ import { useFrogodoroStore, PomodoroPhase, FrogodoroSettings } from '@/lib/frogo
 import { playTimerSoundLooped, unlockAudio } from '@/lib/timerSounds';
 import { format } from 'date-fns';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
-import { createId } from '@/lib/createId';
 
 async function sendTimerNotification(phase: PomodoroPhase, autoStartBreak: boolean) {
   try {
@@ -31,7 +30,7 @@ function getClientId() {
   const existing = window.localStorage.getItem(key);
   if (existing) return existing;
 
-  const id = createId();
+  const id = crypto.randomUUID();
   window.localStorage.setItem(key, id);
   return id;
 }
