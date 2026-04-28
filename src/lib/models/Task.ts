@@ -40,6 +40,7 @@ export interface TaskDoc {
   startTime?: string; // e.g. "10:30"
   endTime?: string; // e.g. "11:30"
   reminder?: string; // e.g. "at_time", "5m", "10m", "15m", "30m", "1h"
+  reminderSentKeys?: string[];
 }
 
 const TaskSchema = new Schema<TaskDoc>(
@@ -91,6 +92,7 @@ const TaskSchema = new Schema<TaskDoc>(
     startTime: { type: String },
     endTime: { type: String },
     reminder: { type: String },
+    reminderSentKeys: { type: [String], default: [] },
   },
   {
     collection: 'tasks',

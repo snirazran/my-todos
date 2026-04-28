@@ -85,7 +85,7 @@ export function useTaskData({
 }: UseTaskDataOptions = {}) {
   const { user } = useAuth();
   const { showNotification, hideNotification } = useNotification();
-  const { scheduleNotification, cancelNotification } = useReminderScheduler();
+  const { cancelNotification } = useReminderScheduler();
 
   const today = new Date();
   const dateStr = format(today, 'yyyy-MM-dd');
@@ -776,17 +776,15 @@ export function useTaskData({
       const prevToday = todayData;
 
       // Optimistic update
-      let updatedTask: Task | null = null;
       if (todayData) {
         const updated = todayData.tasks.map((t) => {
           if (t.id === taskId) {
-            updatedTask = {
+            return {
               ...t,
               startTime: data.startTime || undefined,
               endTime: data.endTime || undefined,
               reminder: data.reminder || undefined,
             };
-            return updatedTask;
           }
           return t;
         });
@@ -800,15 +798,15 @@ export function useTaskData({
           body: JSON.stringify({ taskId, schedule: data, timezone: tz }),
         });
 
-        if (updatedTask) {
-          scheduleNotification(updatedTask);
-        }
+        // Scheduled task reminders are sent by the server cron so they work
+        // even when every client app is closed.
+        cancelNotification(taskId);
       } catch (e) {
         console.error('Schedule failed', e);
         if (prevToday) mutateToday(prevToday, { revalidate: false });
       }
     },
-    [todayData, mutateToday, tz, scheduleNotification],
+    [todayData, mutateToday, tz, cancelNotification],
   );
 
   const { data: tagsData, mutate: mutateTags } = useSWR<{
