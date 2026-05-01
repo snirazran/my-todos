@@ -90,6 +90,7 @@ const UserSchema = new Schema<UserDoc>(
       default: null,
     },
     lastRecapWeek: { type: String, default: '' },
+    onboardingCompleted: { type: Boolean, default: false },
   },
   { collection: 'users' },
 );

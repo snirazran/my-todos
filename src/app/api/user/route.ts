@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
 
     const existingUser = await UserModel.findById(uid).lean();
     if (existingUser) {
-      return NextResponse.json({ ok: true, user: existingUser });
+      return NextResponse.json({ ok: true, isNewUser: false, user: existingUser });
     }
 
     const now = new Date();
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ ok: true, user: newUser });
+    return NextResponse.json({ ok: true, isNewUser: true, user: newUser });
   } catch (error) {
     console.error('Error syncing user:', error);
     return NextResponse.json(

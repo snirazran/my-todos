@@ -27,7 +27,7 @@ export default function MobileNav() {
   const questClaimableCount = questsData?.claimableCount ?? 0;
   const questActiveCount = questsData?.activeCount ?? 0;
 
-  if (pathname === '/login' || pathname === '/register') return null;
+  if (pathname === '/login' || pathname === '/register' || pathname === '/onboarding') return null;
 
   const handleNavigation = (path: string) => {
     if (!user) {

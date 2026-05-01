@@ -175,25 +175,29 @@ const Frog = memo(
 
     const setBoundSlotIndex = React.useCallback(
       (slot: WardrobeSlot, index: number) => {
-        if (slot === 'skin') {
-          if (skinBinding.value !== null) skinBinding.setValue(index);
-          if (skinInput) skinInput.value = index;
-        }
-        if (slot === 'mood') {
-          if (moodBinding.value !== null) moodBinding.setValue(index);
-          if (moodInput) moodInput.value = index;
-        }
-        if (slot === 'hat') {
-          if (hatBinding.value !== null) hatBinding.setValue(index);
-          if (hatInput) hatInput.value = index;
-        }
-        if (slot === 'body') {
-          if (bodyBinding.value !== null) bodyBinding.setValue(index);
-          if (bodyInput) bodyInput.value = index;
-        }
-        if (slot === 'hand_item') {
-          if (handItemBinding.value !== null) handItemBinding.setValue(index);
-          if (handItemInput) handItemInput.value = index;
+        try {
+          if (slot === 'skin') {
+            if (skinBinding.value !== null) skinBinding.setValue(index);
+            if (skinInput) skinInput.value = index;
+          }
+          if (slot === 'mood') {
+            if (moodBinding.value !== null) moodBinding.setValue(index);
+            if (moodInput) moodInput.value = index;
+          }
+          if (slot === 'hat') {
+            if (hatBinding.value !== null) hatBinding.setValue(index);
+            if (hatInput) hatInput.value = index;
+          }
+          if (slot === 'body') {
+            if (bodyBinding.value !== null) bodyBinding.setValue(index);
+            if (bodyInput) bodyInput.value = index;
+          }
+          if (slot === 'hand_item') {
+            if (handItemBinding.value !== null) handItemBinding.setValue(index);
+            if (handItemInput) handItemInput.value = index;
+          }
+        } catch {
+          // Rive WASM not ready yet — indices will be applied once it initialises
         }
       },
       [

@@ -105,6 +105,8 @@ export default function SiteHeader() {
 
   // Fixed height so pages can reserve space (mobile/desktop)
   // mobile: h-14 (=3.5rem), md: h-16 (=4rem)
+  if (pathname === '/onboarding') return null;
+
   return (
     <header className="sticky md:relative top-0 z-[90] w-full h-14 md:h-16 backdrop-blur-xl border-b border-border/40 bg-background/95">
       <div className="flex items-center justify-between h-full gap-4 px-6 py-3 mx-auto max-w-7xl md:px-10">

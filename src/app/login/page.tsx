@@ -4,6 +4,7 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signInWithCredential,
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
@@ -11,37 +12,80 @@ import { SocialLogin } from '@capgo/capacitor-social-login';
 import { auth } from '@/lib/firebase';
 import { setAuthTokenCookie } from '@/lib/authCookie';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Mail, Lock, Loader2, Sparkles } from 'lucide-react';
-import { motion } from 'framer-motion';
-
-import { Button } from '@/components/ui/button';
+import { useEffect, useRef, useState } from 'react';
+import {
+  Loader2,
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  Check,
+  X,
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import dynamic from 'next/dynamic';
+import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
-/* tiny helper */
+type Mode = 'login' | 'register' | null;
+type Step = 0 | 1 | 2;
 
-export default function LoginPage() {
+const GOOGLE_ICON = (
+  <svg
+    className="w-4 h-4 shrink-0"
+    viewBox="0 0 488 512"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <path
+      fill="currentColor"
+      d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
+    />
+  </svg>
+);
+
+function getPasswordStrength(pw: string) {
+  if (!pw.length) return { score: 0, label: '', color: '' };
+  let score = 0;
+  if (pw.length >= 8) score++;
+  if (/[A-Z]/.test(pw)) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[^A-Za-z0-9]/.test(pw)) score++;
+  return [
+    { score: 1, label: 'Weak', color: 'bg-red-400' },
+    { score: 2, label: 'Fair', color: 'bg-orange-400' },
+    { score: 3, label: 'Good', color: 'bg-yellow-400' },
+    { score: 4, label: 'Strong', color: 'bg-primary' },
+  ][Math.max(0, score - 1)];
+}
+
+const slide = {
+  enter: (dir: number) => ({ x: dir * 50, opacity: 0 }),
+  center: { x: 0, opacity: 1 },
+  exit: (dir: number) => ({ x: dir * -50, opacity: 0 }),
+};
+
+export default function AuthPage() {
   const router = useRouter();
+  const [mode, setMode] = useState<Mode>(null);
+  const [step, setStep] = useState<Step>(0);
+  const [dir, setDir] = useState(1);
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Form State
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
 
-  // Initialize native Google auth for Capacitor builds.
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
       void SocialLogin.initialize({
@@ -58,277 +102,486 @@ export default function LoginPage() {
     }
   }, []);
 
-  const handleGoogleSignIn = async () => {
+  const advance = (next: Step) => {
+    setDir(1);
+    setStep(next);
+  };
+  const back = () => {
+    setError(null);
+    setDir(-1);
+    if (step === 1) {
+      setMode(null);
+      setStep(0);
+    } else if (step === 2) setStep(1);
+  };
+
+  const pickMode = (m: Mode) => {
+    setError(null);
+    setMode(m);
+    advance(1);
+    setTimeout(() => emailRef.current?.focus(), 300);
+  };
+
+  const goToPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setError(null);
+    advance(2);
+    setTimeout(() => passwordRef.current?.focus(), 300);
+  };
+
+  const handleGoogle = async () => {
     setLoading(true);
     setError(null);
     try {
       if (Capacitor.isNativePlatform()) {
-        // Native apps use the Capacitor social login plugin.
         const googleUser = await SocialLogin.login({
           provider: 'google',
-          options: {
-            scopes: ['email', 'profile'],
-          },
+          options: { scopes: ['email', 'profile'] },
         });
-
         const idToken =
           googleUser.result.responseType === 'online'
             ? googleUser.result.idToken
             : null;
-
-        if (idToken) {
-          // Sign in to Firebase using the acquired token
-          const credential = GoogleAuthProvider.credential(idToken);
-          const result = await signInWithCredential(auth, credential);
-
-          const token = await result.user.getIdToken();
-          setAuthTokenCookie(token);
-          await fetch('/api/user', { method: 'POST' });
-          router.push('/');
-        } else {
-          throw new Error('Failed to get Google authentication token');
-        }
-      } else {
-        // Web uses standard popup
-        const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
+        if (!idToken) throw new Error('Failed to get Google token');
+        const cred = GoogleAuthProvider.credential(idToken);
+        const result = await signInWithCredential(auth, cred);
         const token = await result.user.getIdToken();
         setAuthTokenCookie(token);
         await fetch('/api/user', { method: 'POST' });
         router.push('/');
+      } else {
+        const provider = new GoogleAuthProvider();
+        const result = await signInWithPopup(auth, provider);
+        const token = await result.user.getIdToken();
+        setAuthTokenCookie(token);
+        const res = await fetch('/api/user', { method: 'POST' });
+        const data = await res.json();
+        router.push(
+          mode === 'register' && data.isNewUser ? '/onboarding' : '/',
+        );
       }
     } catch (err: any) {
-      console.error(
-        'Google Sign In Error Details:',
-        JSON.stringify(err, null, 2),
-      );
-      console.error('Original Error:', err);
-      setError(
-        `Google Error: ${err.message || JSON.stringify(err) || 'Failed to sign in'}`,
-      );
+      setError(err.message || 'Google sign-in failed');
       setLoading(false);
     }
   };
 
-  const handleEmailSignIn = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
-      // 1. Sign in with Firebase
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        email,
-        password,
-      );
-      const user = userCredential.user;
-
-      // 2. Get ID token
-      const token = await user.getIdToken();
-
-      // 3. Set Cookie
+      const uc = await signInWithEmailAndPassword(auth, email, password);
+      const token = await uc.user.getIdToken();
       setAuthTokenCookie(token);
-
-      // 4. Sync user to MongoDB
-      await fetch('/api/user', {
-        method: 'POST',
-      });
-
-      // 5. Redirect
+      await fetch('/api/user', { method: 'POST' });
       router.push('/');
     } catch (err: any) {
-      console.error(err);
-      let msg = 'Failed to sign in';
-      if (
-        err.code === 'auth/invalid-credential' ||
-        err.code === 'auth/user-not-found' ||
-        err.code === 'auth/wrong-password'
-      ) {
-        msg = 'Invalid email or password';
-      } else if (err.code === 'auth/invalid-email') {
-        msg = 'Invalid email address';
-      } else if (err.code === 'auth/network-request-failed') {
-        msg = 'Network error — check your connection';
-      } else if (err.code) {
-        msg = `Error: ${err.code}`;
-      }
-      setError(msg);
+      const codes: Record<string, string> = {
+        'auth/invalid-credential': 'Invalid email or password',
+        'auth/user-not-found': 'Invalid email or password',
+        'auth/wrong-password': 'Invalid email or password',
+        'auth/invalid-email': 'Invalid email address',
+        'auth/network-request-failed': 'Network error — check your connection',
+      };
+      setError(codes[err.code] ?? `Error: ${err.code}`);
     } finally {
       setLoading(false);
     }
   };
 
-  /* -------------- UI -------------- */
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (password !== confirm) {
+      setError('Passwords do not match');
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const uc = await createUserWithEmailAndPassword(auth, email, password);
+      const token = await uc.user.getIdToken();
+      setAuthTokenCookie(token);
+      const res = await fetch('/api/user', { method: 'POST' });
+      const data = await res.json();
+      router.push(data.isNewUser ? '/onboarding' : '/');
+    } catch (err: any) {
+      const codes: Record<string, string> = {
+        'auth/email-already-in-use': 'Email is already in use',
+        'auth/weak-password': 'Password should be at least 6 characters',
+        'auth/invalid-email': 'Invalid email address',
+      };
+      setError(codes[err.code] ?? 'Failed to create account');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const strength = getPasswordStrength(password);
+  const passwordsMatch = confirm.length > 0 && password === confirm;
+  const passwordsMismatch = confirm.length > 0 && password !== confirm;
+
   return (
-    <main className="relative flex items-center justify-center w-full h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] p-4 pb-32 md:pb-60 overflow-hidden bg-background">
-      {/* ─── Decorative Blobs ─── */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-primary/10 blur-[100px] rounded-full pointer-events-none z-0" />
+    <main className="fixed inset-0 flex items-center justify-center p-4 overflow-hidden bg-background">
+      <div className="relative z-10 flex flex-col items-center w-full max-w-sm -translate-y-8">
+        {/* Frog */}
+        <div className="relative z-20 pointer-events-none -mb-9">
+          <Frog
+            width={200}
+            height={200}
+            indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+          />
+        </div>
 
-      <div className="relative z-10 flex flex-col items-center w-full max-w-sm">
-        {/* ─── The Peeking Frog ─── */}
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{
-            delay: 0.1,
-            type: 'spring',
-            stiffness: 100,
-            damping: 20,
-          }}
-          className="relative z-20 -mb-10 pointer-events-none"
-        >
-          <div className="relative">
-            <Frog
-              width={240}
-              height={240}
-              indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
-            />
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full"
-        >
-          <Card className="overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-border/50 bg-card/80 backdrop-blur-2xl rounded-[32px] pt-12">
-            <CardHeader className="pt-2 pb-6 text-center">
-              <CardTitle className="text-3xl font-black tracking-tighter uppercase text-foreground">
-                Welcome back
-              </CardTitle>
-              <p className="text-sm font-bold tracking-wide text-muted-foreground">
-                I'm Hungry!
-              </p>
-            </CardHeader>
-
-            <CardContent className="space-y-6">
-              {error && (
+        {/* Card */}
+        <div className="w-full overflow-hidden rounded-[32px] border border-border/50 bg-card/80 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
+          <div className="px-6 pt-10 pb-2">
+            <AnimatePresence mode="wait" custom={dir}>
+              {/* ── Step 0: Choose path ── */}
+              {step === 0 && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="p-3 text-[11px] font-black uppercase tracking-wider text-center text-destructive border border-destructive/50 rounded-2xl bg-destructive/10"
+                  key="choice"
+                  custom={dir}
+                  variants={slide}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  {error}
+                  <div className="mb-8 text-center">
+                    <h1 className="text-3xl font-black tracking-tight text-foreground">
+                      Hoppy to see you!
+                    </h1>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                      Do you already have a frog,
+                      <br />
+                      or are you here to adopt one?
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col gap-3">
+                    <button
+                      onClick={() => pickMode('login')}
+                      className="group relative w-full py-4 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/30"
+                    >
+                      I already have a frog
+                    </button>
+                    <button
+                      onClick={() => pickMode('register')}
+                      className="w-full py-4 text-sm font-black tracking-widest uppercase transition-all bg-transparent border-2 rounded-2xl border-border/60 hover:bg-muted/40 text-foreground"
+                    >
+                      Adopt a frog
+                    </button>
+                  </div>
                 </motion.div>
               )}
 
-              <form onSubmit={handleEmailSignIn} className="space-y-3">
-                <div className="space-y-1">
-                  <Label
-                    htmlFor="email"
-                    className="ml-1 text-xs font-bold uppercase text-muted-foreground"
-                  >
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="hello@example.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
-                    required
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label
-                    htmlFor="password"
-                    className="ml-1 text-xs font-bold uppercase text-muted-foreground"
-                  >
-                    Password
-                  </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
-                    required
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full h-12 mt-2 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25"
+              {/* ── Step 1: Email ── */}
+              {step === 1 && (
+                <motion.div
+                  key="email"
+                  custom={dir}
+                  variants={slide}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 >
-                  {loading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    'Sign In'
-                  )}
-                </Button>
-              </form>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-border/60" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="px-2 font-bold tracking-widest bg-background text-muted-foreground">
-                    Or
-                  </span>
-                </div>
-              </div>
-
-              <Button
-                variant="outline"
-                type="button"
-                onClick={handleGoogleSignIn}
-                disabled={loading}
-                className="w-full h-12 font-bold tracking-wide transition-all rounded-2xl border-border bg-background hover:bg-muted/50"
-              >
-                {loading ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : (
-                  <>
-                    <svg
-                      className="w-4 h-4 mr-2"
-                      aria-hidden="true"
-                      focusable="false"
-                      data-prefix="fab"
-                      data-icon="google"
-                      role="img"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 488 512"
+                  <div className="flex items-center gap-3 mb-5">
+                    <button
+                      onClick={back}
+                      className="flex items-center justify-center transition border rounded-full w-9 h-9 border-border/60 bg-background text-muted-foreground hover:bg-muted shrink-0"
                     >
-                      <path
-                        fill="currentColor"
-                        d="M488 261.8C488 403.3 391.1 504 248 504 110.8 504 0 393.2 0 256S110.8 8 248 8c66.8 0 123 24.5 166.3 64.9l-67.5 64.9C258.5 52.6 94.3 116.6 94.3 256c0 86.5 69.1 156.6 153.7 156.6 98.2 0 135-70.4 140.8-106.9H248v-85.3h236.1c2.3 12.7 3.9 24.9 3.9 41.4z"
-                      ></path>
-                    </svg>
-                    Continue with Google
-                  </>
-                )}
-              </Button>
-            </CardContent>
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <div>
+                      <h1 className="text-xl font-black leading-tight tracking-tight uppercase text-foreground">
+                        {mode === 'register'
+                          ? 'Nice to *ribbit* meet you'
+                          : 'I *ribbit* missed you'}
+                      </h1>
+                    </div>
+                  </div>
 
-            <CardFooter className="flex flex-col gap-4 py-6 border-t bg-muted/30 border-border">
+                  <button
+                    onClick={handleGoogle}
+                    disabled={loading}
+                    className="flex items-center justify-center w-full h-12 gap-3 text-sm font-bold tracking-wide transition-all border rounded-2xl border-border bg-background hover:bg-muted/50"
+                  >
+                    {loading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>{GOOGLE_ICON} Continue with Google</>
+                    )}
+                  </button>
+
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border/60" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="px-2 font-bold tracking-widest bg-card text-muted-foreground">
+                        Or
+                      </span>
+                    </div>
+                  </div>
+
+                  <form onSubmit={goToPassword} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="email"
+                        className="ml-1 text-xs font-bold uppercase text-muted-foreground"
+                      >
+                        Email
+                      </Label>
+                      <Input
+                        ref={emailRef}
+                        id="email"
+                        type="email"
+                        placeholder="hello@example.com"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="h-12 rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
+                        required
+                        autoFocus
+                      />
+                    </div>
+                    {error && <ErrorMsg>{error}</ErrorMsg>}
+                    <button
+                      type="submit"
+                      disabled={!email.trim() || loading}
+                      className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Continue <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </form>
+                </motion.div>
+              )}
+
+              {/* ── Step 2: Password ── */}
+              {step === 2 && (
+                <motion.div
+                  key="password"
+                  custom={dir}
+                  variants={slide}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <div className="flex items-center gap-3 mb-5">
+                    <button
+                      onClick={back}
+                      className="flex items-center justify-center transition border rounded-full w-9 h-9 border-border/60 bg-background text-muted-foreground hover:bg-muted shrink-0"
+                    >
+                      <ArrowLeft className="w-4 h-4" />
+                    </button>
+                    <div>
+                      <h1 className="text-xl font-black leading-tight tracking-tight uppercase text-foreground">
+                        {mode === 'register' ? 'Almost there' : 'One step away'}
+                      </h1>
+                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                        {email}
+                      </p>
+                    </div>
+                  </div>
+
+                  <form
+                    onSubmit={mode === 'login' ? handleSignIn : handleRegister}
+                    className="space-y-4"
+                  >
+                    {/* Password */}
+                    <div className="space-y-1.5">
+                      <Label
+                        htmlFor="password"
+                        className="ml-1 text-xs font-bold uppercase text-muted-foreground"
+                      >
+                        Password
+                      </Label>
+                      <div className="relative">
+                        <Input
+                          ref={passwordRef}
+                          id="password"
+                          type={showPw ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="h-12 rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30 pr-11"
+                          required
+                          minLength={6}
+                        />
+                        <button
+                          type="button"
+                          tabIndex={-1}
+                          onClick={() => setShowPw((v) => !v)}
+                          className="absolute transition -translate-y-1/2 right-3 top-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showPw ? (
+                            <EyeOff className="w-4 h-4" />
+                          ) : (
+                            <Eye className="w-4 h-4" />
+                          )}
+                        </button>
+                      </div>
+                      {mode === 'register' && password.length > 0 && (
+                        <div className="flex items-center gap-2 px-1">
+                          <div className="flex flex-1 gap-1">
+                            {[1, 2, 3, 4].map((bar) => (
+                              <div
+                                key={bar}
+                                className={cn(
+                                  'h-1 flex-1 rounded-full transition-all duration-300',
+                                  bar <= strength.score
+                                    ? strength.color
+                                    : 'bg-border/40',
+                                )}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
+                            {strength.label}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Confirm password (register only) */}
+                    {mode === 'register' && (
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="confirm"
+                          className="ml-1 text-xs font-bold uppercase text-muted-foreground"
+                        >
+                          Confirm Password
+                        </Label>
+                        <div className="relative">
+                          <Input
+                            id="confirm"
+                            type={showConfirm ? 'text' : 'password'}
+                            placeholder="••••••••"
+                            value={confirm}
+                            onChange={(e) => setConfirm(e.target.value)}
+                            className={cn(
+                              'h-12 rounded-xl bg-background/50 focus-visible:ring-primary/30 pr-11',
+                              passwordsMismatch
+                                ? 'border-destructive/60'
+                                : passwordsMatch
+                                  ? 'border-primary/50'
+                                  : 'border-border/60',
+                            )}
+                            required
+                          />
+                          <div className="absolute flex items-center gap-1 -translate-y-1/2 right-3 top-1/2">
+                            {confirm.length > 0 && (
+                              <motion.span
+                                initial={{ scale: 0.5, opacity: 0 }}
+                                animate={{ scale: 1, opacity: 1 }}
+                              >
+                                {passwordsMatch ? (
+                                  <Check className="w-4 h-4 text-primary" />
+                                ) : (
+                                  <X className="w-4 h-4 text-destructive" />
+                                )}
+                              </motion.span>
+                            )}
+                            <button
+                              type="button"
+                              tabIndex={-1}
+                              onClick={() => setShowConfirm((v) => !v)}
+                              className="ml-1 transition text-muted-foreground hover:text-foreground"
+                            >
+                              {showConfirm ? (
+                                <EyeOff className="w-4 h-4" />
+                              ) : (
+                                <Eye className="w-4 h-4" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {error && <ErrorMsg>{error}</ErrorMsg>}
+
+                    <button
+                      type="submit"
+                      disabled={
+                        loading || (mode === 'register' && !passwordsMatch)
+                      }
+                      className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : mode === 'login' ? (
+                        'Sign In'
+                      ) : (
+                        'Create Account'
+                      )}
+                    </button>
+                  </form>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 mt-3 text-center border-t bg-muted/30 border-border">
+            {step === 0 ? (
               <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                Don&apos;t have an account?{' '}
-                <Link
-                  href="/register"
+                By continuing you agree to our{' '}
+                <span className="cursor-pointer text-primary hover:underline">
+                  Terms
+                </span>
+              </p>
+            ) : mode === 'login' ? (
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                No frog yet?{' '}
+                <button
+                  onClick={() => {
+                    setError(null);
+                    setMode('register');
+                    setStep(1);
+                  }}
                   className="ml-1 text-primary hover:underline decoration-2 underline-offset-4"
                 >
-                  Create one
-                </Link>
+                  Adopt one
+                </button>
               </p>
-            </CardFooter>
-          </Card>
-        </motion.div>
+            ) : (
+              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                Already have a frog?{' '}
+                <button
+                  onClick={() => {
+                    setError(null);
+                    setMode('login');
+                    setStep(1);
+                  }}
+                  className="ml-1 text-primary hover:underline decoration-2 underline-offset-4"
+                >
+                  Sign in
+                </button>
+              </p>
+            )}
+          </div>
+        </div>
       </div>
     </main>
   );
 }
 
-/* small helper component */
-function FieldError({ msg }: { msg: string }) {
+function ErrorMsg({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[10px] font-black uppercase tracking-wider text-red-500 ml-1 animate-in fade-in slide-in-from-top-1">
-      {msg}
-    </p>
+    <motion.p
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="text-[11px] font-black uppercase tracking-wider text-center text-destructive bg-destructive/10 border border-destructive/30 rounded-xl px-3 py-2"
+    >
+      {children}
+    </motion.p>
   );
 }

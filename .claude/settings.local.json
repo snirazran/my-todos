@@ -30,7 +30,11 @@
       "Bash(NODE_OPTIONS='' npx tsc --noEmit)",
       "Bash(git stash *)",
       "Bash(pnpm add *)",
-      "Bash(node_modules/.bin/tsc --noEmit)"
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "Bash(pnpm build *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm config *)",
+      "Bash(xargs cat *)"
     ]
   }
 }

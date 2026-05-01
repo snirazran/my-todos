@@ -73,6 +73,7 @@ export type UserDoc = {
   aiSuggestionRefreshes?: unknown;
   activeFrogodoroTimer?: ActiveFrogodoroTimer | null;
   lastRecapWeek?: string;
+  onboardingCompleted?: boolean;
 };
 
 export type ActiveFrogodoroTimer = {

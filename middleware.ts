@@ -39,7 +39,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   // Be specific to avoid blocking static assets or other open routes
-  matcher: ['/manage-tasks/:path*', '/api/user/:path*', '/login', '/register'],
+  matcher: ['/manage-tasks/:path*', '/api/user/:path*', '/login', '/register', '/onboarding'],
   // Exclude public api routes if any? /api/auth is in isAuthRoute check.
   // Note: /api/skins usually requires auth but maybe we handle it in route?
   // Let's protect /api/skins as well if possible, or leave it to route handler.
