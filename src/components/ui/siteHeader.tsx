@@ -10,6 +10,8 @@ import {
   LayoutDashboard,
   ScrollText,
   Shirt,
+  ShoppingBag,
+  Repeat,
   Sparkles,
   LogIn,
   LogOut,
@@ -27,24 +29,43 @@ import WeeklyWrapped from '@/components/ui/WeeklyWrapped';
 import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
+import Fly from '@/components/ui/fly';
+
+const wardrobeItems = [
+  { tab: 'inventory' as const, label: 'Inventory', icon: Shirt, color: 'text-primary bg-primary/10' },
+  { tab: 'shop' as const, label: 'Shop', icon: ShoppingBag, color: 'text-violet-500 bg-violet-500/10' },
+  { tab: 'trade' as const, label: 'Trade', icon: Repeat, color: 'text-amber-500 bg-amber-500/10' },
+];
 
 export default function SiteHeader() {
   const { user, loading } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
-  const { 
-    isQuestsOpen, 
-    openQuests, 
-    openWardrobe, 
-    isWeeklyWrappedOpen, 
-    openWeeklyWrapped, 
+  const {
+    isQuestsOpen,
+    openQuests,
+    isWeeklyWrappedOpen,
+    openWeeklyWrapped,
     closeWeeklyWrapped,
     isDebugMode
   } = useUIStore();
   const { indices } = useWardrobeIndices(!!user);
-  const { unseenCount, unseenContainerCount } = useInventory(!!user, true);
+  const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory(!!user, true);
+  const flyBalance = inventoryData?.wardrobe?.flies;
   const inventoryBadge = unseenCount + unseenContainerCount;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const [wardrobeDropdownOpen, setWardrobeDropdownOpen] = useState(false);
+  const wardrobeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (wardrobeRef.current && !wardrobeRef.current.contains(event.target as Node)) {
+        setWardrobeDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Weekly Recap Fetching
   const { data: recapData } = useSWR<WeeklyRecapData>(
@@ -93,13 +114,13 @@ export default function SiteHeader() {
       isActive: isQuestsOpen,
     },
     {
-      label: 'Inventory',
+      label: 'Wardrobe',
       icon: Shirt,
       onClick: () => {
-        if (pathname !== '/') router.push('/');
-        openWardrobe();
+        if (!user) { router.push('/login'); return; }
+        setWardrobeDropdownOpen((prev) => !prev);
       },
-      isActive: false,
+      isActive: pathname === '/wardrobe' || wardrobeDropdownOpen,
     },
   ];
 
@@ -152,6 +173,57 @@ export default function SiteHeader() {
               }
             `;
 
+            if (item.label === 'Wardrobe') {
+              return (
+                <div key={item.label} className="relative" ref={wardrobeRef}>
+                  <button onClick={item.onClick} className={buttonClass}>
+                    <Icon className="w-4 h-4" />
+                    <span>{item.label}</span>
+                    {inventoryBadge > 0 && (
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ml-1">
+                        {inventoryBadge > 9 ? '9+' : inventoryBadge}
+                      </span>
+                    )}
+                  </button>
+
+                  <AnimatePresence>
+                    {wardrobeDropdownOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                        transition={{ duration: 0.18 }}
+                        className="absolute left-1/2 -translate-x-1/2 top-full mt-2 z-50 w-72 origin-top"
+                      >
+                        <div className="p-3 bg-popover border border-border rounded-2xl shadow-xl ring-1 ring-black/5">
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1 pb-2">
+                            Style Studio
+                          </p>
+                          <div className="grid grid-cols-3 gap-2">
+                            {wardrobeItems.map(({ tab, label, icon: TabIcon, color }) => (
+                              <button
+                                key={tab}
+                                onClick={() => {
+                                  setWardrobeDropdownOpen(false);
+                                  router.push(`/wardrobe?tab=${tab}`);
+                                }}
+                                className="flex flex-col items-center gap-2 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-all active:scale-95"
+                              >
+                                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${color}`}>
+                                  <TabIcon className="w-5 h-5" />
+                                </div>
+                                <span className="text-xs font-bold text-foreground">{label}</span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            }
+
             if (item.onClick) {
               return (
                 <button
@@ -161,11 +233,6 @@ export default function SiteHeader() {
                 >
                   <Icon className="w-4 h-4" />
                   <span>{item.label}</span>
-                  {item.label === 'Inventory' && inventoryBadge > 0 && (
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ml-1">
-                      {inventoryBadge > 9 ? '9+' : inventoryBadge}
-                    </span>
-                  )}
                   {item.label === 'Quests' && questClaimableCount > 0 ? (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
                       {questClaimableCount > 99 ? '99+' : questClaimableCount}
@@ -203,21 +270,11 @@ export default function SiteHeader() {
 
         {/* ───────── Right Side (Desktop: User Menu, Mobile: Hamburger) ───────── */}
         <div className="flex items-center gap-3 shrink-0">
-          {showRecapIndicator && (
-            <motion.button
-              initial={{ x: 10, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={() => openWeeklyWrapped()}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white shadow-md shadow-purple-500/10 border border-white/10 whitespace-nowrap"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-200 animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-wider">
-                Wrapped
-              </span>
-              <ChevronRight className="w-3 h-3 opacity-70" />
-            </motion.button>
+          {user && flyBalance !== undefined && (
+            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted/60 border border-border/50 shrink-0">
+              <Fly size={22} paused={false} y={-3} />
+              <span className="text-xs font-black tabular-nums text-foreground">{flyBalance.toLocaleString()}</span>
+            </div>
           )}
 
           <RightActions

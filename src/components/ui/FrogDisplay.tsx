@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { WardrobePanel } from '@/components/ui/skins/WardrobePanel';
 import { Brain, Shirt, ScrollText } from 'lucide-react';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
@@ -70,6 +70,7 @@ export function FrogDisplay({
   paused = false,
   showActionButtons = true,
 }: Props) {
+  const router = useRouter();
   const { unseenCount, unseenContainerCount } = useInventory(
     !isGuest && (!deferInventorySummary || openWardrobe),
     true,
@@ -334,7 +335,7 @@ export function FrogDisplay({
             </button>
 
             <button
-              onClick={() => onOpenChange(true)}
+              onClick={() => router.push('/wardrobe')}
               className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
                     bg-card/80 backdrop-blur-2xl
                     text-muted-foreground hover:text-primary
@@ -362,8 +363,6 @@ export function FrogDisplay({
         isGuest={isGuest}
         onQuestsChanged={onQuestsChanged}
       />
-
-      <WardrobePanel open={openWardrobe} onOpenChange={onOpenChange} />
     </div>
   );
 }

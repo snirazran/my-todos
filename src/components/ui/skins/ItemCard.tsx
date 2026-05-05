@@ -265,7 +265,7 @@ function ItemCardComponent({
 
       <div
         className={cn(
-          'mt-4 mb-2 md:mt-5 md:mb-3 mx-auto w-full aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl flex items-center justify-center relative overflow-hidden',
+          'mt-4 mb-1 md:mt-5 md:mb-2 mx-auto w-full aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl flex items-center justify-center relative overflow-hidden',
           'bg-gradient-to-br shadow-inner',
           config.gradient,
         )}
@@ -315,37 +315,22 @@ function ItemCardComponent({
         )}
       </div>
 
-      {/* Name & Price */}
-      <div className="flex-1 flex flex-col items-center justify-end gap-1 md:gap-1.5 pb-1">
-        <h4 className="w-full text-xs font-bold leading-tight text-center truncate md:text-sm text-foreground">
-          {item.name}
-        </h4>
-      </div>
-
       {/* Actions */}
-      <div className="w-full mx-auto mt-1 md:w-3/4">
-        {(mode === 'inventory' || mode === 'trade') && !customAction && (
+      <div className="w-full mx-auto mt-0 md:w-3/4">
+        {((mode === 'inventory' && item.slot === 'container') || mode === 'trade') && !customAction && (
           <div
             className={cn(
               'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
-              isEquipped
-                ? 'bg-green-600 text-white shadow-md'
-                : isSelected
-                  ? 'bg-primary text-primary-foreground shadow-md'
-                  : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
+              isSelected
+                ? 'bg-primary text-primary-foreground shadow-md'
+                : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
             )}
           >
             {actionLoading
               ? '...'
               : mode === 'trade'
-                ? isSelected
-                  ? 'SELECTED'
-                  : 'SELECT'
-                : item.slot === 'container'
-                  ? 'OPEN'
-                  : isEquipped
-                    ? 'EQUIPPED'
-                    : 'EQUIP'}
+                ? isSelected ? 'SELECTED' : 'SELECT'
+                : 'OPEN'}
           </div>
         )}
 
@@ -412,7 +397,7 @@ function ItemCardComponent({
           onSell &&
           (item.priceFlies ?? 0) > 0 &&
           !customAction && (
-            <div className="mt-2 text-center w-full">
+            <div className="mt-1 text-center w-full">
               <Button
                 variant="ghost"
                 size="sm"
@@ -420,12 +405,12 @@ function ItemCardComponent({
                   e.stopPropagation();
                   onSell();
                 }}
-                className="w-full h-7 rounded-lg text-[10px] font-bold uppercase tracking-wide text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900 transition-all shadow-none hover:shadow-sm active:scale-95 gap-1.5"
+                className="w-full h-5 rounded-md text-[9px] font-bold uppercase tracking-wide text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900 transition-all shadow-none active:scale-95 gap-1 px-1"
               >
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-0.5">
                   Sell
-                  <span className="mx-1 opacity-40">|</span>
-                  <Fly size={18} className="opacity-80" y={-3} paused={true} />+
+                  <span className="mx-0.5 opacity-40">|</span>
+                  <Fly size={14} className="opacity-80" y={-2} paused={true} />+
                   {Math.floor((item.priceFlies || 0) / 2)}
                 </span>
               </Button>

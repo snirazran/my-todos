@@ -199,8 +199,9 @@ export function FilterBar({
                 }
                 onChange(opt.id);
               }}
+              title={opt.label}
               className={cn(
-                'relative flex-none flex items-center gap-2 px-5 py-3 rounded-2xl transition-all duration-200 border-[2px] shadow-sm select-none',
+                'relative flex-none flex items-center justify-center gap-2 px-4 py-3 rounded-2xl transition-all duration-200 border-[2px] shadow-sm select-none',
                 'text-sm font-bold whitespace-nowrap',
                 isActive
                   ? 'bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/20 shadow-none'
@@ -208,7 +209,7 @@ export function FilterBar({
               )}
             >
               {opt.icon}
-              {opt.label}
+              <span className="hidden md:inline">{opt.label}</span>
               {badgeCount > 0 ? (
                 <span className={cn("absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center text-[10px] font-bold rounded-full border-2 border-background shadow-sm animate-in zoom-in", badgeClassName || "text-white bg-rose-500")}>
                   {badgeCount}
