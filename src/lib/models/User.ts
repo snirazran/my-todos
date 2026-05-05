@@ -13,6 +13,10 @@ const UserSchema = new Schema<UserDoc>(
     ageRange: { type: String },
     aboutGender: { type: String },
     usedBefore: { type: String },
+    onboardingResponses: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
     email: { type: String, required: true, lowercase: true, index: true },
     passwordHash: { type: String, required: false },
     createdAt: { type: Date, default: Date.now },

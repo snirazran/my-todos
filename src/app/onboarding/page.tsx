@@ -9,7 +9,7 @@ import FrogNameStep from './steps/FrogNameStep';
 import HumanNameStep from './steps/HumanNameStep';
 import NotificationStep from './steps/NotificationStep';
 import AboutIntroStep from './steps/AboutIntroStep';
-import AgeStep from './steps/AgeStep';
+import ProfileQuestionsStep from './steps/ProfileQuestionsStep';
 
 const STEP_IDS = ['welcome', 'gender', 'name', 'humanName', 'notifications', 'aboutIntro', 'age'] as const;
 
@@ -75,6 +75,7 @@ export default function OnboardingPage() {
             ageRange: selections.age?.[0] ?? null,
             aboutGender: selections.aboutGender?.[0] ?? null,
             usedBefore: selections.usedBefore?.[0] ?? null,
+            onboardingResponses: selections,
           }),
         });
       } catch {
@@ -109,7 +110,7 @@ export default function OnboardingPage() {
         {currentId === 'humanName' && <HumanNameStep {...stepProps} />}
         {currentId === 'notifications' && <NotificationStep {...stepProps} />}
         {currentId === 'aboutIntro' && <AboutIntroStep {...stepProps} />}
-        {currentId === 'age' && <AgeStep {...stepProps} />}
+        {currentId === 'age' && <ProfileQuestionsStep {...stepProps} />}
 
       </div>
     </main>

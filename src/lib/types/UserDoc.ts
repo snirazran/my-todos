@@ -58,6 +58,7 @@ export type UserDoc = {
   ageRange?: string;
   aboutGender?: string;
   usedBefore?: string;
+  onboardingResponses?: Record<string, string[]>;
   email: string;
   passwordHash: string;
   createdAt: Date;
