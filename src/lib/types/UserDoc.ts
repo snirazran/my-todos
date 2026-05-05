@@ -53,6 +53,11 @@ export type UserSkins = {
 export type UserDoc = {
   _id: string;
   name: string;
+  frogName?: string;
+  frogPronouns?: string;
+  ageRange?: string;
+  aboutGender?: string;
+  usedBefore?: string;
   email: string;
   passwordHash: string;
   createdAt: Date;

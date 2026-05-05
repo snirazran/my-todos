@@ -8,6 +8,11 @@ const UserSchema = new Schema<UserDoc>(
   {
     _id: { type: String, required: true },
     name: { type: String, required: true },
+    frogName: { type: String, default: 'Cookie' },
+    frogPronouns: { type: String },
+    ageRange: { type: String },
+    aboutGender: { type: String },
+    usedBefore: { type: String },
     email: { type: String, required: true, lowercase: true, index: true },
     passwordHash: { type: String, required: false },
     createdAt: { type: Date, default: Date.now },

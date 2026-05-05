@@ -10,6 +10,8 @@ interface FrogSpeechBubbleProps {
   total: number;
   readyQuests?: number;
   clickedAt?: number;
+  fixedMessage?: string;
+  className?: string;
 }
 
 export function FrogSpeechBubble({
@@ -18,6 +20,8 @@ export function FrogSpeechBubble({
   readyQuests = 0,
   isCatching,
   clickedAt = 0,
+  fixedMessage,
+  className = '',
 }: FrogSpeechBubbleProps & { isCatching?: boolean }) {
   const [message, setMessage] = useState('');
   const [isVisible, setIsVisible] = useState(false);
@@ -123,11 +127,13 @@ export function FrogSpeechBubble({
     prevClickedRef.current = clickedAt;
   }, [clickedAt, done, isCatching, message, readyQuests, total]);
 
-  const isLongMessage = message.length > 33;
+  const displayMessage = fixedMessage ?? message;
+  const isLongMessage = displayMessage.length > 33;
+  const shouldShow = fixedMessage ? true : isVisible;
 
   return (
     <AnimatePresence>
-      {isVisible && message && (
+      {shouldShow && displayMessage && (
         <motion.div
           initial={{ opacity: 1, y: 10, scale: 0.9 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -135,11 +141,11 @@ export function FrogSpeechBubble({
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           className={`absolute ${
             isLongMessage ? '-top-6' : 'top-0'
-          } -left-[8%] -translate-x-1/2 z-50 w-72 pointer-events-none`}
+          } -left-[8%] -translate-x-1/2 z-50 w-72 pointer-events-none ${className}`}
         >
           <div className="relative p-4 border shadow-sm bg-card rounded-[20px] border-border/50">
-            <p className="text-sm font-bold leading-snug text-center text-foreground">
-              {message}
+            <p className="whitespace-pre-line text-sm font-bold leading-snug text-center text-foreground">
+              {displayMessage}
             </p>
 
             {/* Speech Bubble Arrow */}

@@ -5,7 +5,12 @@ import { requireUserId } from '@/lib/auth';
 import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 
-export async function POST() {
+const VALID_PRONOUNS = new Set(['he', 'she', 'they']);
+const VALID_AGE_RANGES = new Set(['under-18', '18-24', '25-34', '35-44', '45-54', '55-64', '65-plus']);
+const VALID_ABOUT_GENDERS = new Set(['male', 'female', 'non-binary', 'prefer-not']);
+const VALID_USED_BEFORE = new Set(['first-time', 'starting-fresh']);
+
+export async function POST(req: Request) {
   let uid: string;
   try {
     uid = await requireUserId();
@@ -14,8 +19,60 @@ export async function POST() {
   }
 
   try {
+    let body: {
+      frogName?: unknown;
+      frogPronouns?: unknown;
+      humanName?: unknown;
+      ageRange?: unknown;
+      aboutGender?: unknown;
+      usedBefore?: unknown;
+    } = {};
+    try {
+      body = await req.json();
+    } catch {
+      body = {};
+    }
+
+    const frogName =
+      typeof body.frogName === 'string' && body.frogName.trim()
+        ? body.frogName.trim().slice(0, 24)
+        : 'Cookie';
+    const frogPronouns =
+      typeof body.frogPronouns === 'string' && VALID_PRONOUNS.has(body.frogPronouns)
+        ? body.frogPronouns
+        : undefined;
+    const humanName =
+      typeof body.humanName === 'string' && body.humanName.trim()
+        ? body.humanName.trim().slice(0, 40)
+        : undefined;
+    const ageRange =
+      typeof body.ageRange === 'string' && VALID_AGE_RANGES.has(body.ageRange)
+        ? body.ageRange
+        : undefined;
+    const aboutGender =
+      typeof body.aboutGender === 'string' && VALID_ABOUT_GENDERS.has(body.aboutGender)
+        ? body.aboutGender
+        : undefined;
+    const usedBefore =
+      typeof body.usedBefore === 'string' && VALID_USED_BEFORE.has(body.usedBefore)
+        ? body.usedBefore
+        : undefined;
+
     await connectMongo();
-    await UserModel.updateOne({ _id: uid }, { $set: { onboardingCompleted: true } });
+    await UserModel.updateOne(
+      { _id: uid },
+      {
+        $set: {
+          onboardingCompleted: true,
+          frogName,
+          ...(frogPronouns ? { frogPronouns } : {}),
+          ...(humanName ? { name: humanName } : {}),
+          ...(ageRange ? { ageRange } : {}),
+          ...(aboutGender ? { aboutGender } : {}),
+          ...(usedBefore ? { usedBefore } : {}),
+        },
+      },
+    );
     return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Failed to save onboarding' }, { status: 500 });
