@@ -10,8 +10,7 @@ import { FrogSpeechBubble } from './FrogSpeechBubble';
 import { useInventory } from '@/hooks/useInventory';
 import { cn } from '@/lib/utils';
 import { CurrencyShop } from '@/components/ui/shop/CurrencyShop';
-import { QuestsPopup, prefetchQuests } from './QuestsPopup';
-import { useUIStore } from '@/lib/uiStore';
+import { prefetchQuests } from './QuestsPanel';
 
 type Props = {
   frogRef: React.RefObject<FrogHandle>;
@@ -34,7 +33,6 @@ type Props = {
   isGuest?: boolean;
   questClaimableCount?: number;
   questActiveCount?: number;
-  onQuestsChanged?: () => void | Promise<void>;
   onOpenProgressCoach?: () => void;
   progressCoachIsPremium?: boolean;
   deferInventorySummary?: boolean;
@@ -63,7 +61,6 @@ export function FrogDisplay({
   isGuest,
   questClaimableCount = 0,
   questActiveCount = 0,
-  onQuestsChanged,
   onOpenProgressCoach,
   progressCoachIsPremium = false,
   deferInventorySummary = false,
@@ -78,7 +75,6 @@ export function FrogDisplay({
   const [clickedAt, setClickedAt] = React.useState(0);
   const [shopOpen, setShopOpen] = React.useState(false);
 
-  const { isQuestsOpen, setQuestsOpen } = useUIStore();
   const wardrobeBadge = unseenCount + unseenContainerCount;
 
   // Local state for smooth hunger updates
@@ -308,7 +304,7 @@ export function FrogDisplay({
             )}
 
             <button
-              onClick={() => setQuestsOpen(true)}
+              onClick={() => router.push(isGuest ? '/login' : '/quests')}
               onPointerEnter={isGuest ? undefined : prefetchQuests}
               onFocus={isGuest ? undefined : prefetchQuests}
               onTouchStart={isGuest ? undefined : prefetchQuests}
@@ -356,13 +352,6 @@ export function FrogDisplay({
           </div>
         )}
       </div>
-
-      <QuestsPopup
-        show={isQuestsOpen}
-        onClose={() => setQuestsOpen(false)}
-        isGuest={isGuest}
-        onQuestsChanged={onQuestsChanged}
-      />
     </div>
   );
 }

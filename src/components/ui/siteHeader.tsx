@@ -42,8 +42,6 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const {
-    isQuestsOpen,
-    openQuests,
     isWeeklyWrappedOpen,
     openWeeklyWrapped,
     closeWeeklyWrapped,

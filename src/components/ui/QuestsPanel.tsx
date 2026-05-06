@@ -5,7 +5,6 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
 import { Check, Clock, Compass, Gift, Lock, ScrollText, Sparkles, X } from 'lucide-react';
-import { BaseSheet } from './BaseSheet';
 import { cn } from '@/lib/utils';
 import TagPopup from './TagPopup';
 import { FilterBar, type FilterOption } from './skins/FilterBar';
@@ -30,7 +29,6 @@ import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
-import { useSheetOverscrollDrag } from './useSheetOverscrollDrag';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -110,18 +108,12 @@ function createFlyRewardItem(amount: number): ItemDef {
   };
 }
 
-export function QuestsPopup({
-  show,
-  onClose,
+export function QuestsPanel({
   isGuest,
   onQuestsChanged,
-  embedded,
 }: {
-  show: boolean;
-  onClose: () => void;
   isGuest?: boolean;
   onQuestsChanged?: () => void | Promise<void>;
-  embedded?: boolean;
 }) {
   const [claimingObjectiveId, setClaimingObjectiveId] = useState<string | null>(
     null,
@@ -143,7 +135,6 @@ export function QuestsPopup({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const initialTopPinnedRef = useRef(false);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const overscrollDrag = useSheetOverscrollDrag();
 
   const {
     data,
@@ -151,7 +142,7 @@ export function QuestsPopup({
     isLoading,
     mutate: mutateQuests,
   } = useSWR<QuestsResponse>(
-    !isGuest && show ? getQuestsUrl(timezone) : null,
+    !isGuest ? getQuestsUrl(timezone) : null,
     fetcher,
     {
       revalidateOnFocus: false,
@@ -172,10 +163,6 @@ export function QuestsPopup({
   }, [claimMessage]);
 
   useEffect(() => {
-    if (!show) {
-      initialTopPinnedRef.current = false;
-      return;
-    }
     if (isLoading || !data || initialTopPinnedRef.current) return;
 
     const el = scrollContainerRef.current;
@@ -188,13 +175,7 @@ export function QuestsPopup({
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, [data, isLoading, show]);
-
-  useEffect(() => {
-    if (show) return;
-    setRewardRevealQueue([]);
-    setOpeningGiftKey(null);
-  }, [show]);
+  }, [data, isLoading]);
 
   const categoryMap = useMemo(
     () =>
@@ -498,49 +479,9 @@ export function QuestsPopup({
     await refreshQuestData();
   };
 
-  const renderContent = ({
-    isDesktop,
-    dragControls,
-    isDragging,
-  }: {
-    isDesktop: boolean;
-    dragControls?: any;
-    isDragging: boolean;
-  }) => {
-    if (dragControls) overscrollDrag.setContext(dragControls, !isDesktop);
-
+  const renderContent = () => {
     return (
       <>
-              {!embedded && (
-                <div
-                  onPointerDown={(e) => !isDesktop && dragControls && dragControls.start(e)}
-                  className="px-4 py-4 border-b border-border/50 md:px-6"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary/10 shrink-0">
-                        <ScrollText className="w-5 h-5 text-primary" />
-                      </div>
-                      <div className="min-w-0">
-                        <h2 className="text-xl font-black tracking-tight text-foreground uppercase leading-none">
-                          Quests
-                        </h2>
-                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5 opacity-70">
-                          Track your progress
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button
-                        onClick={onClose}
-                        className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95"
-                      >
-                        <X className="w-4 h-4" strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
               <div className="flex-1 overflow-hidden">
                 {isGuest ? (
                   <EmptyState
@@ -566,27 +507,28 @@ export function QuestsPopup({
                     <div
                       ref={(el) => {
                         scrollContainerRef.current = el;
-                        overscrollDrag.bind(el);
                       }}
                       className={cn(
                         'no-scrollbar flex-1 min-h-0 px-4 pt-4 overflow-y-auto md:px-6 md:pb-6 overscroll-none [overflow-anchor:none]',
-                        embedded
-                          ? 'pb-[calc(5rem+env(safe-area-inset-bottom))]'
-                          : 'pb-4',
+                        'pb-[calc(5rem+env(safe-area-inset-bottom))]',
                       )}
                     >
-                      <div className="space-y-6">
+                      <div className="flex flex-col">
                         {data.activeSeason && (
-                          <div className={embedded ? '-mx-4 -mt-4 md:-mx-6' : ''}>
+                          <div className="-mx-4 -mt-4 md:-mx-6">
                             <QuestSeasonBanner
                               season={data.activeSeason}
                               rewardCatalog={data.rewardCatalog}
                               isPremium={data.isPremium}
-                              flush={embedded}
+                              flush
                               onView={() => setSeasonEventOpen(true)}
                             />
                           </div>
                         )}
+                        <div className={cn(
+                          "flex flex-col gap-8",
+                          data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:px-6 -mx-4 md:-mx-6 bg-background rounded-t-[24px]"
+                        )}>
                         <div className="space-y-4">
                           {(() => {
                             const dailyQuests = data.dailyQuests ?? [];
@@ -603,10 +545,10 @@ export function QuestsPopup({
                                   rewardCatalog={data.rewardCatalog}
                                   isPremium={data.isPremium}
                                   claimingObjectiveId={claimingObjectiveId}
-                                  onClaimObjective={(objectiveId) =>
+                                    onClaimObjective={(objectiveId) =>
                                     handleClaimObjective(quest.id, objectiveId)
                                   }
-                                  paused={isDragging || carouselDragging}
+                                  paused={carouselDragging}
                                 />
                               );
                             }
@@ -630,7 +572,7 @@ export function QuestsPopup({
                                         objectiveId,
                                       )
                                     }
-                                    paused={isDragging || carouselDragging}
+                                    paused={carouselDragging}
                                   />
                                 ))}
                               </QuestCarousel>
@@ -698,7 +640,7 @@ export function QuestsPopup({
                                   objectiveId,
                                 )
                               }
-                              paused={isDragging || carouselDragging}
+                              paused={carouselDragging}
                             />
                           ) : (
                             <QuestCarousel
@@ -726,11 +668,12 @@ export function QuestsPopup({
                                   onClaimObjective={(objectiveId) =>
                                     handleClaimObjective(quest.id, objectiveId)
                                   }
-                                  paused={isDragging || carouselDragging}
+                                  paused={carouselDragging}
                                 />
                               ))}
                             </QuestCarousel>
                           )}
+                        </div>
                         </div>
                       </div>
                     </div>
@@ -743,7 +686,7 @@ export function QuestsPopup({
                 isPremium={data?.isPremium ?? false}
                 onClaim={handleRewardRevealClaim}
                 onOpenGift={handleRewardRevealOpenGift}
-                paused={isDragging}
+                paused={false}
               />
               <QuestSeasonEventOverlay
                 season={data?.activeSeason ?? null}
@@ -753,7 +696,7 @@ export function QuestsPopup({
                 claiming={claimingSeason}
                 onClose={() => setSeasonEventOpen(false)}
                 onClaim={handleClaimSeasonDay}
-                paused={isDragging}
+                paused={false}
               />
       </>
     );
@@ -761,22 +704,9 @@ export function QuestsPopup({
 
   return (
     <>
-      {embedded ? (
-        <div className="flex flex-col w-full h-full bg-background">
-          {renderContent({ isDesktop: true, dragControls: undefined, isDragging: false })}
-        </div>
-      ) : (
-        <BaseSheet
-          open={show}
-          onOpenChange={(v) => {
-            if (!v) onClose();
-          }}
-          className="h-[92vh] sm:h-[88vh] sm:max-w-[1080px]"
-          zIndex={1050}
-        >
-          {({ isDesktop, dragControls, isDragging }) => renderContent({ isDesktop, dragControls, isDragging })}
-        </BaseSheet>
-      )}
+      <div className="flex flex-col w-full h-full bg-background">
+        {renderContent()}
+      </div>
 
       <TagPopup
         open={editingFocusCategoryId !== null}
@@ -876,7 +806,7 @@ function QuestSeasonBanner({
           </div>
         </div>
 
-        <div className="absolute inset-x-3 bottom-4 z-10 flex items-center gap-3 rounded-[24px] bg-background p-3 shadow-lg">
+        <div className="absolute inset-x-3 bottom-10 z-10 flex items-center gap-3 rounded-[24px] bg-background p-3 shadow-lg">
           {claimedToday ? (
             <>
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">

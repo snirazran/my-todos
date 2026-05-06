@@ -13,10 +13,6 @@ import {
   Layout,
   Fit,
   Alignment,
-  useViewModel,
-  useViewModelInstance,
-  useViewModelInstanceBoolean,
-  useViewModelInstanceTrigger,
 } from '@rive-app/react-canvas-lite';
 import { useRiveAsset } from '@/hooks/useRiveAsset';
 import { useRiveVisibility } from '@/hooks/useRiveVisibility';
@@ -40,39 +36,18 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
 
     const riveUrl = useRiveAsset('/fly_idle.riv');
 
-    const riveOptions = useMemo(
-      () => ({
-        src: riveUrl || undefined,
-        artboard: 'fly',
-        animations: ['Wings', 'Body'],
-        autoplay: true,
-        autoBind: true,
-        layout: FLY_LAYOUT,
-        onLoad: () => {
-          onLoad?.();
-        },
-      }),
-      [onLoad, riveUrl]
-    );
-
-    const { RiveComponent, rive } = useRive(riveOptions);
+    const { RiveComponent, rive } = useRive({
+      src: riveUrl || undefined,
+      animations: ['Wings', 'Body'],
+      autoplay: true,
+      autoBind: false,
+      layout: FLY_LAYOUT,
+      onLoad: () => {
+        onLoad?.();
+      },
+    });
 
     useRiveVisibility(rive, innerRef, !paused, 'fly');
-
-    const viewModel = useViewModel(rive, { useDefault: true });
-    const viewModelInstance = useViewModelInstance(viewModel, {
-      useDefault: true,
-      rive,
-    });
-    const pausedBinding = useViewModelInstanceBoolean(
-      'paused',
-      viewModelInstance,
-    );
-    const isPausedBinding = useViewModelInstanceBoolean(
-      'isPaused',
-      viewModelInstance,
-    );
-    const playBinding = useViewModelInstanceTrigger('play', viewModelInstance);
 
     useEffect(() => {
       if (!rive) return;
@@ -91,22 +66,19 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
 
     useEffect(() => {
       if (!rive) return;
-      if (pausedBinding.value !== null) pausedBinding.setValue(paused);
-      if (isPausedBinding.value !== null) isPausedBinding.setValue(paused);
       if (paused) {
         rive.pause();
       } else if (rive.isPaused) {
         rive.play();
       }
-    }, [isPausedBinding, paused, pausedBinding, rive]);
+    }, [paused, rive]);
 
     const handleClick = useCallback(
       (e: React.MouseEvent) => {
         onClick?.(e);
-        playBinding.trigger();
         rive?.play();
       },
-      [onClick, playBinding, rive]
+      [onClick, rive]
     );
 
     return (

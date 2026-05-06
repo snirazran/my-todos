@@ -3,7 +3,6 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { Home, LayoutDashboard, ScrollText, Shirt, ShoppingBag, Repeat } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
-import { useUIStore } from '@/lib/uiStore';
 import { useInventory } from '@/hooks/useInventory';
 import useSWR from 'swr';
 import { useState, useEffect } from 'react';
@@ -14,7 +13,6 @@ export default function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  const { isQuestsOpen, openQuests } = useUIStore();
   const { unseenCount, unseenContainerCount } = useInventory(!!user, true);
   const inventoryBadge = unseenCount + unseenContainerCount;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;

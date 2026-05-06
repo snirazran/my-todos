@@ -8,11 +8,6 @@ interface UIState {
   toggleWardrobe: () => void;
   setWardrobeOpen: (open: boolean) => void;
 
-  isQuestsOpen: boolean;
-  openQuests: () => void;
-  closeQuests: () => void;
-  setQuestsOpen: (open: boolean) => void;
-
   isQuestOnboardingOpen: boolean;
   openQuestOnboarding: () => void;
   closeQuestOnboarding: () => void;
@@ -37,11 +32,6 @@ export const useUIStore = create<UIState>()(
       closeWardrobe: () => set({ isWardrobeOpen: false }),
       toggleWardrobe: () => set((state) => ({ isWardrobeOpen: !state.isWardrobeOpen })),
       setWardrobeOpen: (open: boolean) => set({ isWardrobeOpen: open }),
-
-      isQuestsOpen: false,
-      openQuests: () => set({ isQuestsOpen: true }),
-      closeQuests: () => set({ isQuestsOpen: false }),
-      setQuestsOpen: (open: boolean) => set({ isQuestsOpen: open }),
 
       isQuestOnboardingOpen: false,
       openQuestOnboarding: () => set({ isQuestOnboardingOpen: true }),

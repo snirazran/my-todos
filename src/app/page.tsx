@@ -31,7 +31,7 @@ import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
-import { getQuestsUrl } from '@/components/ui/QuestsPopup';
+import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
 import { DailyRewardPopup } from '@/components/ui/daily-reward/DailyRewardPopup';
@@ -81,7 +81,6 @@ export default function Home() {
     closeQuestOnboarding,
     isWardrobeOpen,
     setWardrobeOpen,
-    isQuestsOpen,
     setIsCinematicActive,
     isDebugMode,
   } = useUIStore();
@@ -253,7 +252,6 @@ export default function Home() {
 
   const isAnyPanelOpen =
     isWardrobeOpen ||
-    isQuestsOpen ||
     isQuestOnboardingOpen ||
     shouldShowMissedReview ||
     showQuickAdd ||
@@ -572,9 +570,6 @@ export default function Home() {
               isGuest={!user}
               questClaimableCount={questsData?.claimableCount ?? 0}
               questActiveCount={questsData?.activeCount ?? 0}
-              onQuestsChanged={async () => {
-                await mutateQuests();
-              }}
               onOpenProgressCoach={() => setShowProgressCoach(true)}
               progressCoachIsPremium={isPremium}
               paused={isAnyPanelOpen}

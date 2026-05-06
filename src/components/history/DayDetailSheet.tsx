@@ -14,7 +14,6 @@ import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
-import { useUIStore } from '@/lib/uiStore';
 
 type DayDetailSheetProps = {
   open: boolean;
@@ -46,9 +45,6 @@ export default function DayDetailSheet({
   const [wardrobeOpen, setWardrobeOpen] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [activeTab, setActiveTab] = useState<'all' | 'tasks' | 'habits'>('all');
-
-  const { isQuestsOpen } = useUIStore();
-
   const filterMenuRef = useRef<HTMLDivElement>(null);
   const frogRef = useRef<FrogHandle>(null);
   const frogBoxRef = useRef<HTMLDivElement>(null);
@@ -255,7 +251,7 @@ export default function DayDetailSheet({
       >
         {({ isDesktop, dragControls, isDragging }) => {
           overscrollDrag.setContext(dragControls, !isDesktop);
-          const isAnyPanelOpen = wardrobeOpen || isDragging || isQuestsOpen;
+          const isAnyPanelOpen = wardrobeOpen || isDragging;
 
           return (
             <div ref={sheetRef} className="flex flex-col h-full relative">

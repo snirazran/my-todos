@@ -619,6 +619,12 @@ async function syncQuestForTemplate(args: {
         const existing = await QuestModel.findOne({ userId, questId });
         if (existing) return existing;
       }
+      // VersionError: a concurrent request already updated this quest doc.
+      // Since this is a sync, the other request's update is sufficient.
+      if (err.name === 'VersionError') {
+        const existing = await QuestModel.findOne({ userId, questId });
+        if (existing) return existing;
+      }
       throw err;
     }
   }
