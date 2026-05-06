@@ -101,11 +101,13 @@ export function QuestsPopup({
   onClose,
   isGuest,
   onQuestsChanged,
+  embedded,
 }: {
   show: boolean;
   onClose: () => void;
   isGuest?: boolean;
   onQuestsChanged?: () => void | Promise<void>;
+  embedded?: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<'daily' | 'category'>('category');
   const [claimingId, setClaimingId] = useState<string | null>(null);
@@ -556,49 +558,49 @@ export function QuestsPopup({
     await refreshQuestData();
   };
 
-  return (
-    <>
-      <BaseSheet
-        open={show}
-        onOpenChange={(v) => {
-          if (!v) onClose();
-        }}
-        className="h-[92vh] sm:h-[88vh] sm:max-w-[1080px]"
-        zIndex={1050}
-      >
-        {({ isDesktop, dragControls, isDragging }) => {
-          overscrollDrag.setContext(dragControls, !isDesktop);
+  const renderContent = ({
+    isDesktop,
+    dragControls,
+    isDragging,
+  }: {
+    isDesktop: boolean;
+    dragControls?: any;
+    isDragging: boolean;
+  }) => {
+    if (dragControls) overscrollDrag.setContext(dragControls, !isDesktop);
 
-          return (
-            <>
-              <div
-                onPointerDown={(e) => !isDesktop && dragControls.start(e)}
-                className="px-4 py-4 border-b border-border/50 md:px-6"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary/10 shrink-0">
-                      <ScrollText className="w-5 h-5 text-primary" />
+    return (
+      <>
+              {!embedded && (
+                <div
+                  onPointerDown={(e) => !isDesktop && dragControls && dragControls.start(e)}
+                  className="px-4 py-4 border-b border-border/50 md:px-6"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="flex items-center justify-center w-11 h-11 rounded-2xl bg-primary/10 shrink-0">
+                        <ScrollText className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <h2 className="text-xl font-black tracking-tight text-foreground uppercase leading-none">
+                          Quests
+                        </h2>
+                        <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5 opacity-70">
+                          Track your progress
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <h2 className="text-xl font-black tracking-tight text-foreground uppercase leading-none">
-                        Quests
-                      </h2>
-                      <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-widest mt-0.5 opacity-70">
-                        Track your progress
-                      </p>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={onClose}
+                        className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95"
+                      >
+                        <X className="w-4 h-4" strokeWidth={2.5} />
+                      </button>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      onClick={onClose}
-                      className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95"
-                    >
-                      <X className="w-4 h-4" strokeWidth={2.5} />
-                    </button>
                   </div>
                 </div>
-              </div>
+              )}
               <div className="flex-1 overflow-hidden">
                 {isGuest ? (
                   <EmptyState
@@ -890,10 +892,28 @@ export function QuestsPopup({
                 onOpenGift={handleRewardRevealOpenGift}
                 paused={isDragging}
               />
-            </>
-          );
-        }}
-      </BaseSheet>
+      </>
+    );
+  };
+
+  return (
+    <>
+      {embedded ? (
+        <div className="flex flex-col w-full h-full bg-background">
+          {renderContent({ isDesktop: true, dragControls: undefined, isDragging: false })}
+        </div>
+      ) : (
+        <BaseSheet
+          open={show}
+          onOpenChange={(v) => {
+            if (!v) onClose();
+          }}
+          className="h-[92vh] sm:h-[88vh] sm:max-w-[1080px]"
+          zIndex={1050}
+        >
+          {({ isDesktop, dragControls, isDragging }) => renderContent({ isDesktop, dragControls, isDragging })}
+        </BaseSheet>
+      )}
 
       <TagPopup
         open={editingFocusCategoryId !== null}

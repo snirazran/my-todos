@@ -108,10 +108,9 @@ export default function SiteHeader() {
           router.push('/login');
           return;
         }
-        if (pathname !== '/') router.push('/');
-        openQuests();
+        router.push('/quests');
       },
-      isActive: isQuestsOpen,
+      isActive: pathname === '/quests',
     },
     {
       label: 'Wardrobe',

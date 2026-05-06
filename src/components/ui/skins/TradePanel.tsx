@@ -185,11 +185,11 @@ export function TradePanel({
   }, [inventory, catalog, targetRarity, activeFilter, sortBy]);
 
   const availableGrid = useInfiniteScroll(availableItems, {
-    initial: gridInitialSize,
-    batch: gridBatchSize,
-    resetKey: `${activeFilter}|${sortBy}|${targetRarity ?? ''}|${gridInitialSize}|${gridBatchSize}`,
+    initial: availableItems.length,
+    batch: availableItems.length || 1,
+    resetKey: `${activeFilter}|${sortBy}|${targetRarity ?? ''}|${availableItems.length}`,
     rootRef: inventoryScrollRef,
-    enabled: inventoryHasScrolled,
+    enabled: false,
   });
 
   useEffect(() => {
@@ -394,8 +394,8 @@ export function TradePanel({
                         actionLabel={null}
                         isNew={unseenItems.includes(item.id)}
                         deferPreview
-                        pausePreview={paused}
-                        previewDelayMs={150 + index * 55}
+                        pausePreview={true}
+                        previewDelayMs={index * 20}
                       />
                     </div>
                   );
@@ -478,7 +478,7 @@ export function TradePanel({
                             }}
                             width={60}
                             height={60}
-                            paused={paused}
+                            paused={false}
                           />
                         </div>
                       ) : (
