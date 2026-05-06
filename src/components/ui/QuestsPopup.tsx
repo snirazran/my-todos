@@ -995,6 +995,8 @@ function QuestRewardRevealOverlay({
   paused?: boolean;
 }) {
   const entry = queue[0] ?? null;
+  if (typeof document === 'undefined') return null;
+
   return createPortal(
     <AnimatePresence mode="wait">
       {entry && (
