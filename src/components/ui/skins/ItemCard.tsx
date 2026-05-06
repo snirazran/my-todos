@@ -214,7 +214,7 @@ function ItemCardComponent({
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
       className={cn(
-        'group relative flex flex-col p-2.5 pb-1 md:p-3.5 md:pb-1.5 transition-all duration-300 rounded-2xl border-[3px] overflow-hidden cursor-pointer active:scale-95 w-full max-w-[240px] mx-auto',
+        'group relative flex flex-col p-2.5 pb-1 md:p-3.5 md:pb-1.5 transition-all duration-300 rounded-2xl border-[3px] overflow-hidden cursor-pointer active:scale-95 w-full max-w-[240px] lg:max-w-[360px] mx-auto',
         config.border,
         config.bg,
         isEquipped

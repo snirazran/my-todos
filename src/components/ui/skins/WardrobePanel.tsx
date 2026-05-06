@@ -238,6 +238,20 @@ function WardrobeManagerContent({
     prevOpen.current = open;
   }, [open]);
 
+  // Mark Seen on unmount (covers the dedicated /wardrobe page, where `open` stays true)
+  useEffect(() => {
+    return () => {
+      fetch('/api/skins/inventory', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'markSeen' }),
+        keepalive: true,
+      })
+        .then(() => mutateInventoryCaches())
+        .catch(() => {});
+    };
+  }, []);
+
   const refreshInventory = () => {
     mutate();
     mutateInventoryCaches();
@@ -675,7 +689,7 @@ function WardrobeManagerContent({
                 </div>
               ) : activeTab === 'inventory' ? (
                 <>
-                  <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                  <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-20 md:pb-4">
                     {inventoryGrid.visibleItems.map((item, index) => (
                       <ItemCard
                         key={item.id}
@@ -750,7 +764,7 @@ function WardrobeManagerContent({
                 <WardrobeGridSkeleton />
               ) : activeTab === 'shop' ? (
                 <>
-                  <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+                  <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-20 md:pb-4">
                     {shopGrid.visibleItems.map((item, index) => {
                       const count =
                         data?.wardrobe?.inventory?.[item.id] ?? 0;
@@ -846,7 +860,7 @@ function WardrobeManagerContent({
 
 function WardrobeGridSkeleton() {
   return (
-    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 pb-20 md:pb-4">
+    <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-20 md:pb-4">
       {Array.from({ length: 8 }).map((_, index) => (
         <div
           key={index}

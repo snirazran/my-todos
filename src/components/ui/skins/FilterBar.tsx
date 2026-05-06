@@ -209,7 +209,6 @@ export function FilterBar({
               )}
             >
               {opt.icon}
-              <span className="hidden md:inline">{opt.label}</span>
               {badgeCount > 0 ? (
                 <span className={cn("absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center text-[10px] font-bold rounded-full border-2 border-background shadow-sm animate-in zoom-in", badgeClassName || "text-white bg-rose-500")}>
                   {badgeCount}

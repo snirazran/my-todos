@@ -292,7 +292,7 @@ export function TradePanel({
 
   // --- Render ---
   return (
-    <div className="relative flex flex-col lg:flex-row w-full h-full overflow-y-auto lg:overflow-hidden bg-background">
+    <div className="relative flex flex-col lg:flex-row lg:gap-4 w-full h-full overflow-y-auto lg:overflow-hidden bg-background">
       {/* --- RESULT OVERLAY --- */}
       {mounted && tradeResult && 
         createPortal(
@@ -373,7 +373,7 @@ export function TradePanel({
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-3 gap-3 md:gap-4 pb-4">
+              <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-3 lg:grid-cols-2 gap-3 md:gap-4 pb-4">
                 {availableGrid.visibleItems.map((item, index) => {
                   const owned = inventory[item.id] || 0;
                   const selected = selectedCounts[item.id] || 0;
@@ -415,7 +415,7 @@ export function TradePanel({
       </div>
 
       {/* --- CONTRACT (Side/Bottom Dock - Order 2) --- */}
-      <div className="fixed bottom-16 md:bottom-20 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto shrink-0 z-[60] order-2 lg:w-[320px] xl:w-[360px] bg-card border-t lg:border-t-0 lg:border-l border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
+      <div className="fixed bottom-16 md:bottom-20 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto lg:self-start shrink-0 z-[60] order-2 lg:w-[320px] xl:w-[360px] bg-card lg:bg-card/40 border-t lg:border-t-0 lg:border lg:border-border/60 lg:rounded-2xl lg:shadow-sm border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30 shrink-0">
             <div>
@@ -441,7 +441,7 @@ export function TradePanel({
         </div>
 
         {/* Scrollable Content (Sidebar) or Fixed (Bottom Bar) */}
-        <div className="flex-1 p-2 lg:p-4 flex flex-col pointer-events-auto w-full max-w-md mx-auto lg:max-w-none lg:mx-0 lg:overflow-y-auto">
+        <div className="flex-1 lg:flex-none p-2 lg:p-4 flex flex-col pointer-events-auto w-full max-w-md mx-auto lg:max-w-none lg:mx-0">
            {/* Grid */}
            <div className="grid grid-cols-5 gap-1.5 lg:gap-3 mb-2 lg:mb-4">
                 {Array.from({ length: 10 }).map((_, i) => {

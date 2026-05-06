@@ -38,8 +38,8 @@ export default function WardrobePage() {
 
   return (
     <main className="h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] overflow-hidden bg-background">
-      <div className="flex flex-col w-full h-full gap-0 px-4 pt-0 pb-4 mx-auto max-w-7xl md:px-6 md:pb-6 md:pt-4 lg:grid lg:grid-cols-12 lg:gap-6">
-        <section className="z-20 flex flex-col shrink-0 lg:col-span-4 lg:sticky lg:top-0 pointer-events-none">
+      <div className="flex flex-col w-full h-full max-w-3xl gap-0 px-4 pt-0 pb-4 mx-auto md:px-6 md:pb-6 md:pt-4">
+        <section className="z-20 flex flex-col pointer-events-none shrink-0">
           <div className="flex items-start justify-center">
             <div className="scale-[0.78] origin-top pointer-events-none lg:scale-90">
               <Frog
@@ -52,7 +52,7 @@ export default function WardrobePage() {
           </div>
         </section>
 
-        <section className="relative z-10 flex flex-col flex-1 min-h-0 lg:col-span-8 lg:flex-none lg:h-full -mt-12 md:mt-0">
+        <section className="relative z-10 flex flex-col flex-1 min-h-0 -mt-12 md:-mt-[4.20rem] lg:-mt-12">
           <WardrobePageContent
             defaultTab={defaultTab}
             onClose={() => router.push('/')}
