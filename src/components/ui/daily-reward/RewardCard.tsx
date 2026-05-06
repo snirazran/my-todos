@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Fly from '../fly';
 import { byId, ItemDef } from '@/lib/skins/catalog';
@@ -58,6 +58,9 @@ export function SingleRewardCard({
   previewDelayMs = 0,
   previewRootMargin,
   previewUnmountDelayMs,
+  hideDropRates,
+  forceFullOpacity,
+  lockOverlay,
 }: {
   day: number;
   rewardType: 'FLIES' | 'ITEM' | 'BOX';
@@ -73,6 +76,9 @@ export function SingleRewardCard({
   previewDelayMs?: number;
   previewRootMargin?: string;
   previewUnmountDelayMs?: number;
+  hideDropRates?: boolean;
+  forceFullOpacity?: boolean;
+  lockOverlay?: boolean;
 }) {
   const isReady = status === 'READY';
   const isLockedPremium = status === 'LOCKED_PREMIUM';
@@ -151,7 +157,7 @@ export function SingleRewardCard({
         className={cn(
           'relative transition-all duration-300 w-full max-w-[192px] mx-auto scale-100',
           onClick && 'cursor-pointer',
-          muted && 'opacity-70',
+          muted && !forceFullOpacity && 'opacity-70',
         )}
       >
         <ItemCard
@@ -165,6 +171,7 @@ export function SingleRewardCard({
           customPreview={customPreview}
           hidePrice={true}
           hideRarity={rewardType === 'FLIES'} // Hide rarity for flies
+          hideDropRates={hideDropRates}
           deferPreview={deferPreview && rewardType !== 'FLIES'}
           pausePreview={pausePreview && itemDef.slot !== 'container'}
           previewDelayMs={previewDelayMs}
@@ -172,8 +179,13 @@ export function SingleRewardCard({
           previewUnmountDelayMs={previewUnmountDelayMs}
           previewClassName="translate-y-[18%] scale-110"
         />
-        {muted && (
+        {muted && !forceFullOpacity && (
           <div className="pointer-events-none absolute inset-0 rounded-2xl bg-background/20" />
+        )}
+        {lockOverlay && (
+          <span className="pointer-events-none absolute bottom-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white shadow-md ring-2 ring-white">
+            <Lock className="h-3.5 w-3.5" strokeWidth={3} />
+          </span>
         )}
       </div>
 

@@ -99,6 +99,7 @@ function ItemCardComponent({
   customPreview,
   hidePrice,
   hideRarity,
+  hideDropRates,
   staticPreview = false,
   deferPreview = false,
   pausePreview = false,
@@ -122,6 +123,7 @@ function ItemCardComponent({
   customPreview?: React.ReactNode;
   hidePrice?: boolean;
   hideRarity?: boolean;
+  hideDropRates?: boolean;
   staticPreview?: boolean;
   deferPreview?: boolean;
   pausePreview?: boolean;
@@ -403,7 +405,7 @@ function ItemCardComponent({
           )}
 
         {/* Drop Rates Button (Containers only) */}
-        {item.slot === 'container' && (
+        {item.slot === 'container' && !hideDropRates && (
           <DropRatesButton giftId={item.id} name={item.name} />
         )}
       </div>
