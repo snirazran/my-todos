@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
-import { syncQuestState } from '@/lib/quests/engine';
+import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
 import { getActiveQuestSeasonView } from '@/lib/quests/seasons';
 
 const isDataUrl = (value: unknown): value is string =>
@@ -155,6 +155,15 @@ export async function GET(req: Request) {
         normalizeQuestTag(tag, index, dashboard.isPremium),
       )
       .filter(Boolean);
+    const seasonRewardCatalog = activeSeason
+      ? buildRewardCatalog(
+          dashboard.catalog,
+          activeSeason.rewardsByDay.flatMap((entry) => [
+            entry.freeRewards,
+            entry.premiumRewards,
+          ]),
+        )
+      : {};
 
     return NextResponse.json(
       {
@@ -176,7 +185,10 @@ export async function GET(req: Request) {
           withTemplateCover(q, dashboard.templatesWithCover),
         ),
         unlockedAnimationIds: dashboard.focusProfile.unlockedAnimationIds ?? [],
-        rewardCatalog: dashboard.rewardCatalog,
+        rewardCatalog: {
+          ...dashboard.rewardCatalog,
+          ...seasonRewardCatalog,
+        },
       },
       {
         headers: {

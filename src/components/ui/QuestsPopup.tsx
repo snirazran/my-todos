@@ -140,6 +140,8 @@ export function QuestsPopup({
   const [dailyPage, setDailyPage] = useState(0);
   const [carouselDragging, setCarouselDragging] = useState(false);
   const rewardRevealIdRef = useRef(0);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const initialTopPinnedRef = useRef(false);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const overscrollDrag = useSheetOverscrollDrag();
 
@@ -168,6 +170,25 @@ export function QuestsPopup({
     const timeout = window.setTimeout(() => setClaimMessage(null), 5000);
     return () => window.clearTimeout(timeout);
   }, [claimMessage]);
+
+  useEffect(() => {
+    if (!show) {
+      initialTopPinnedRef.current = false;
+      return;
+    }
+    if (isLoading || !data || initialTopPinnedRef.current) return;
+
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    initialTopPinnedRef.current = true;
+    el.scrollTop = 0;
+    const frame = window.requestAnimationFrame(() => {
+      el.scrollTop = 0;
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [data, isLoading, show]);
 
   useEffect(() => {
     if (show) return;
@@ -565,9 +586,12 @@ export function QuestsPopup({
                       </div>
                     )}
                     <div
-                      ref={overscrollDrag.bind}
+                      ref={(el) => {
+                        scrollContainerRef.current = el;
+                        overscrollDrag.bind(el);
+                      }}
                       className={cn(
-                        'flex-1 min-h-0 px-4 pt-4 overflow-y-auto md:px-6 md:pb-6 overscroll-none',
+                        'no-scrollbar flex-1 min-h-0 px-4 pt-4 overflow-y-auto md:px-6 md:pb-6 overscroll-none [overflow-anchor:none]',
                         embedded
                           ? 'pb-[calc(5rem+env(safe-area-inset-bottom))]'
                           : 'pb-4',
@@ -575,12 +599,15 @@ export function QuestsPopup({
                     >
                       <div className="space-y-6">
                         {data.activeSeason && (
-                          <QuestSeasonBanner
-                            season={data.activeSeason}
-                            rewardCatalog={data.rewardCatalog}
-                            isPremium={data.isPremium}
-                            onView={() => setSeasonEventOpen(true)}
-                          />
+                          <div className={embedded ? '-mx-4 -mt-4 md:-mx-6' : ''}>
+                            <QuestSeasonBanner
+                              season={data.activeSeason}
+                              rewardCatalog={data.rewardCatalog}
+                              isPremium={data.isPremium}
+                              flush={embedded}
+                              onView={() => setSeasonEventOpen(true)}
+                            />
+                          </div>
                         )}
                         <div className="space-y-4">
                           {(() => {
@@ -839,11 +866,13 @@ function QuestSeasonBanner({
   season,
   rewardCatalog,
   isPremium,
+  flush = false,
   onView,
 }: {
   season: QuestSeasonView;
   rewardCatalog: Record<string, ItemDef>;
   isPremium: boolean;
+  flush?: boolean;
   onView: () => void;
 }) {
   const timeLeft = useSeasonCountdown(season.endsAt);
@@ -853,25 +882,28 @@ function QuestSeasonBanner({
     (entry) => entry.day === season.currentDay,
   );
   const previewReward =
-    (isPremium
-      ? currentReward?.premiumRewards?.[0]
-      : currentReward?.freeRewards?.[0]) ??
     currentReward?.freeRewards?.[0] ??
     currentReward?.premiumRewards?.[0];
 
   return (
-    <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
-      <div className="relative h-[260px] overflow-hidden">
+    <div
+      className={cn(
+        'relative overflow-hidden bg-card shadow-sm',
+        flush
+          ? 'rounded-none border-0 border-b border-border/50'
+          : 'rounded-[28px] border border-border/50',
+      )}
+    >
+      <div className={cn('relative overflow-hidden', flush ? 'h-[430px]' : 'h-[390px]')}>
         {season.coverImageUrl ? (
           <img
             src={season.coverImageUrl}
             alt={season.name}
-            className="h-full w-full object-cover"
+            className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (
-          <div className="h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
+          <div className="absolute inset-0 h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/12 to-transparent" />
         <div className="absolute inset-x-0 top-0 flex justify-center p-4">
           <div className="flex flex-col items-center gap-2">
             <span className="inline-flex h-8 items-center gap-2 rounded-full bg-white/95 px-3 text-sm font-black text-slate-900 shadow-sm">
@@ -883,18 +915,14 @@ function QuestSeasonBanner({
             </h2>
           </div>
         </div>
-      </div>
 
-      <div className="-mt-10 px-3 pb-3">
-        <div className="relative z-10 flex items-center gap-3 rounded-[24px] bg-background p-3 shadow-lg">
+        <div className="absolute inset-x-3 bottom-4 z-10 flex items-center gap-3 rounded-[24px] bg-background p-3 shadow-lg">
           <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted/60">
             {previewReward ? (
-              <RewardTile
+              <SeasonRewardPreview
                 reward={previewReward}
                 rewardCatalog={rewardCatalog}
                 isPremium={isPremium}
-                compact
-                className="h-16 w-16"
               />
             ) : (
               <Gift className="h-8 w-8 text-muted-foreground" />
@@ -904,26 +932,31 @@ function QuestSeasonBanner({
             <p className="text-lg font-black text-foreground">
               Unlock Day {season.currentDay}!
             </p>
-            <div className="mt-3 h-8 overflow-hidden rounded-full bg-muted">
-              <div className="flex h-full items-center">
+            <div className="relative mt-3 h-8 overflow-hidden rounded-full bg-muted">
+              <div className="absolute inset-1">
                 <div
-                  className="h-full rounded-full bg-amber-400 transition-all"
-                  style={{ width: `${pct}%` }}
+                  className="h-full min-w-7 rounded-full bg-amber-400 transition-all"
+                  style={{ width: pct > 0 ? `${pct}%` : '1.75rem' }}
                 />
-                <span className="-ml-[50%] w-full text-center text-sm font-black tabular-nums text-muted-foreground">
-                  {progress} / {season.dailyTargetFlies}
-                </span>
               </div>
+              <span className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-muted-foreground">
+                {progress} / {season.dailyTargetFlies}
+                <Fly size={18} y={-3} paused={false} />
+              </span>
             </div>
           </div>
-          <div className="flex shrink-0 flex-col items-stretch gap-2">
-            <span className="rounded-2xl bg-orange-500 px-4 py-2 text-center text-sm font-black text-white shadow-[0_4px_0_#c2410c]">
+          <div className="relative flex w-[8.5rem] shrink-0 items-end pt-6">
+            <span className="absolute inset-x-0 top-0 z-10 h-7 animate-bounce rounded-t-xl rounded-b-md bg-orange-500 px-2 text-center text-sm font-black leading-7 text-white">
               On now!
+              <span
+                className="absolute inset-x-0 -bottom-[7px] h-2 bg-orange-500"
+                style={{ clipPath: 'polygon(0 0, 100% 0, 50% 100%)' }}
+              />
             </span>
             <button
               type="button"
               onClick={onView}
-              className="rounded-2xl bg-lime-600 px-4 py-3 text-sm font-black text-white shadow-[0_5px_0_#3f6212] transition active:translate-y-1 active:shadow-none"
+              className="w-full rounded-2xl bg-lime-600 px-4 pb-3 pt-4 text-sm font-black text-white shadow-[0_5px_0_#3f6212] transition active:translate-y-1 active:shadow-none"
             >
               View Event
             </button>
@@ -931,6 +964,59 @@ function QuestSeasonBanner({
         </div>
       </div>
     </div>
+  );
+}
+
+function SeasonRewardPreview({
+  reward,
+  rewardCatalog,
+  isPremium,
+  paused = false,
+  className,
+}: {
+  reward: QuestReward;
+  rewardCatalog: Record<string, ItemDef>;
+  isPremium: boolean;
+  paused?: boolean;
+  className?: string;
+}) {
+  const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
+  const rarity = item?.rarity ?? (reward.type === 'FLIES' ? 'uncommon' : 'rare');
+  const raysClass = GIFT_RARITY_CONFIG[rarity]?.rays ?? GIFT_RARITY_CONFIG.rare.rays;
+
+  return (
+    <div
+      className={cn(
+        'relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-white',
+        className,
+      )}
+    >
+      <SeasonPrizeRays colorClass={raysClass} />
+      <RewardTile
+        reward={reward}
+        rewardCatalog={rewardCatalog}
+        isPremium={isPremium}
+        compact
+        paused={paused}
+        className="relative z-10 h-[72px] w-[72px] rounded-2xl border-0 bg-transparent shadow-none"
+      />
+    </div>
+  );
+}
+
+function SeasonPrizeRays({ colorClass }: { colorClass: string }) {
+  return (
+    <div
+      className={cn(
+        'absolute inset-[-65%] animate-[spin_18s_linear_infinite] opacity-100',
+        colorClass,
+      )}
+      style={{
+        background:
+          'repeating-conic-gradient(from 0deg, transparent 0deg 12deg, currentColor 12deg 24deg)',
+      }}
+      aria-hidden
+    />
   );
 }
 
@@ -967,6 +1053,7 @@ function QuestSeasonEventOverlay({
     ...currentFreeRewards,
     ...(isPremium ? currentPremiumRewards : []),
   ];
+  const eventPreviewReward = currentFreeRewards[0] ?? currentPremiumRewards[0];
   const claimed = season.claimedDays.includes(season.currentDay);
 
   return createPortal(
@@ -1008,8 +1095,17 @@ function QuestSeasonEventOverlay({
         <div className="-mt-10 px-4">
           <div className="relative z-10 rounded-[28px] bg-card p-4 shadow-xl">
             <div className="flex items-center gap-4">
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-muted">
-                <Fly size={44} paused={paused} />
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted">
+                {eventPreviewReward ? (
+                  <SeasonRewardPreview
+                    reward={eventPreviewReward}
+                    rewardCatalog={rewardCatalog}
+                    isPremium={isPremium}
+                    paused={paused}
+                  />
+                ) : (
+                  <Gift className="h-8 w-8 text-muted-foreground" />
+                )}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-2xl font-black text-foreground">

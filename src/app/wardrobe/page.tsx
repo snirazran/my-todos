@@ -37,7 +37,7 @@ export default function WardrobePage() {
   }, [data?.catalog, data?.wardrobe?.equipped]);
 
   return (
-    <main className="h-[calc(100vh-3.5rem)] md:h-[calc(100vh-4rem)] overflow-hidden bg-background">
+    <main className="h-[100dvh] md:h-[calc(100vh-4rem)] overflow-hidden bg-background">
       <div className="flex flex-col w-full h-full max-w-3xl gap-0 px-4 pt-0 pb-4 mx-auto md:px-6 md:pb-6 md:pt-4">
         <section className="z-20 flex flex-col pointer-events-none shrink-0">
           <div className="flex items-start justify-center">

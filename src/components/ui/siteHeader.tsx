@@ -123,12 +123,31 @@ export default function SiteHeader() {
     },
   ];
 
-  // Fixed height so pages can reserve space (mobile/desktop)
-  // mobile: h-14 (=3.5rem), md: h-16 (=4rem)
+  // Desktop keeps a full header. Mobile only gets lightweight home-page controls.
   if (pathname === '/onboarding') return null;
 
   return (
-    <header className="sticky md:relative top-0 z-[90] w-full h-14 md:h-16 backdrop-blur-xl border-b border-border/40 bg-background/95">
+    <>
+      {pathname === '/' && (
+        <div className="fixed right-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center gap-2 rounded-full bg-card/75 px-2 py-1 shadow-sm ring-1 ring-border/40 backdrop-blur-xl md:hidden">
+          {user && flyBalance !== undefined && (
+            <div className="flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1">
+              <Fly size={22} paused={false} y={-3} />
+              <span className="text-xs font-black tabular-nums text-foreground">
+                {flyBalance.toLocaleString()}
+              </span>
+            </div>
+          )}
+          <RightActions
+            user={user}
+            loading={loading}
+            onSignIn={() => router.push('/login')}
+            onSignOut={() => clearAuthTokenCookie()}
+            compactMobileHome
+          />
+        </div>
+      )}
+      <header className="relative z-[90] hidden w-full h-16 border-b border-border/40 bg-background/95 backdrop-blur-xl md:block">
       <div className="flex items-center justify-between h-full gap-4 px-6 py-3 mx-auto max-w-7xl md:px-10">
         {/* ───────── Logo ───────── */}
         <Link
@@ -295,7 +314,8 @@ export default function SiteHeader() {
           }
         `}</style>
       </div>
-    </header>
+      </header>
+    </>
   );
 }
 
@@ -324,11 +344,13 @@ function RightActions({
   loading,
   onSignIn,
   onSignOut,
+  compactMobileHome = false,
 }: {
   user: any;
   loading: boolean;
   onSignIn: () => void;
   onSignOut: () => void;
+  compactMobileHome?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [adminDialogOpen, setAdminDialogOpen] = useState(false);
@@ -396,7 +418,7 @@ function RightActions({
         <div className="hidden md:block">
           <ThemeToggle />
         </div>
-        {pathname !== '/login' && (
+        {pathname !== '/login' && !compactMobileHome && (
           <Button
             onClick={onSignIn}
             className="gap-2 font-bold bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg shadow-primary/20 rounded-full"
