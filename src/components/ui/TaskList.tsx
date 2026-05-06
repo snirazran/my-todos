@@ -1293,8 +1293,8 @@ export default function TaskList({
                   }
                   className="w-full flex items-center gap-3 px-3 py-3 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-[22px] transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
-                    <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
+                    <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
                   </div>
                   <p className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
                     Add your first task
@@ -1320,8 +1320,8 @@ export default function TaskList({
                   }
                   className="w-full flex items-center gap-3 px-3 py-3 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-[22px] transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
-                    <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
+                    <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
                   </div>
                   <p className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
                     {selectedTags.length > 0
@@ -1399,8 +1399,8 @@ export default function TaskList({
                     onClick={() => onAddRequested('', null, { preselectToday: true })}
                     className="group relative flex w-full items-center gap-3 px-3 py-3 rounded-[22px] border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99]"
                   >
-                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
-                      <Plus className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
+                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
+                      <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
                     </div>
                     <span className="text-sm font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
                       Add a task

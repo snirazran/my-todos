@@ -35,7 +35,6 @@ import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
-import { DailyRewardPopup } from '@/components/ui/daily-reward/DailyRewardPopup';
 import { MissedTasksPopup, type MissedTasksStatus } from '@/components/ui/MissedTasksPopup';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
@@ -218,6 +217,9 @@ export default function Home() {
   const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>('pick');
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const [showTimer, setShowTimer] = useState(false);
+  const [frogodoroHydrated, setFrogodoroHydrated] = useState(() =>
+    useFrogodoroStore.persist.hasHydrated(),
+  );
   const lastHandledTimerCompletionRef = useRef<number | null>(null);
   const [showProgressCoach, setShowProgressCoach] = useState(false);
 
@@ -265,42 +267,16 @@ export default function Home() {
   }, [cinematic, setIsCinematicActive]);
 
   const { showNotification } = useNotification();
-  const [showDailyReward, setShowDailyReward] = useState(false);
 
-  // Check Daily Reward Status
   useEffect(() => {
-    if (!user) return;
+    if (useFrogodoroStore.persist.hasHydrated()) {
+      setFrogodoroHydrated(true);
+    }
 
-    const checkReward = async () => {
-      try {
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const res = await fetch(`/api/daily-reward/status?timezone=${encodeURIComponent(tz)}`);
-        const data = await res.json();
-        if (data.dailyRewards) {
-          const today = new Date().getDate();
-          const currentMonthKey = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
-
-          // Only show if it's the correct month AND today isn't claimed
-          if (data.dailyRewards.month === currentMonthKey) {
-            const hasClaimedToday =
-              data.dailyRewards.claimedDays.includes(today);
-            if (!hasClaimedToday) {
-              setShowDailyReward(true);
-            }
-          } else {
-            // New month, definitely show
-            setShowDailyReward(true);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to check daily reward', e);
-      }
-    };
-
-    // customizable delay or check
-    const timer = setTimeout(checkReward, 1000); // Small delay to let app load
-    return () => clearTimeout(timer);
-  }, [user]);
+    return useFrogodoroStore.persist.onFinishHydration(() => {
+      setFrogodoroHydrated(true);
+    });
+  }, []);
 
   // Live frogodoro session stats for the active task
   const {
@@ -345,6 +321,8 @@ export default function Home() {
   const doneCount = data.filter((t) => t.completed).length;
 
   useEffect(() => {
+    if (!frogodoroHydrated) return;
+
     if (lastHandledTimerCompletionRef.current === null) {
       lastHandledTimerCompletionRef.current = lastCompletionId;
       return;
@@ -360,7 +338,13 @@ export default function Home() {
 
     if (completedTask) setTimerTask(completedTask);
     setShowTimer(true);
-  }, [data, frogTaskId, lastCompletedTaskId, lastCompletionId]);
+  }, [
+    data,
+    frogTaskId,
+    frogodoroHydrated,
+    lastCompletedTaskId,
+    lastCompletionId,
+  ]);
 
   // Note: We don't rely purely on 'rate' anymore for triggering, but we keep it for the progress bar
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
@@ -905,7 +889,6 @@ export default function Home() {
         open={
           !!user &&
           hungerStatus.stolenFlies > 0 &&
-          !showDailyReward &&
           !shouldShowMissedReview
         }
         stolenFlies={hungerStatus.stolenFlies}
@@ -917,11 +900,6 @@ export default function Home() {
           await fetch('/api/hunger/acknowledge', { method: 'POST' });
           mutateToday();
         }}
-      />
-
-      <DailyRewardPopup
-        show={showDailyReward && !shouldShowMissedReview}
-        onClose={() => setShowDailyReward(false)}
       />
 
       {activeMissedTasksData && (

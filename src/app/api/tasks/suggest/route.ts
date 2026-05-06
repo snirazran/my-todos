@@ -69,10 +69,6 @@ async function getTodayTaskCount(uid: string, tz: string): Promise<number> {
   });
 }
 
-function getSuggestCount(todayTaskCount: number): number {
-  return todayTaskCount === 0 ? 5 : todayTaskCount === 1 ? 4 : 3;
-}
-
 async function generatePool(
   uid: string,
   tz: string,
@@ -234,10 +230,7 @@ export async function GET(req: Request) {
       (s) => !cache!.usedTexts.includes(s.text),
     );
 
-    const todayTaskCount = await getTodayTaskCount(uid, tz);
-    const suggestCount = getSuggestCount(todayTaskCount);
-
-    const suggestions = available.slice(0, suggestCount);
+    const suggestions = available.slice(0, 1);
 
     return NextResponse.json({
       suggestions,

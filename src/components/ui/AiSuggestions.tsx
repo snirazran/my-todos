@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef } from 'react';
 import useSWR from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Plus, X, RefreshCw, ChevronDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
 import Fly from '@/components/ui/fly';
 import { PremiumLimitDialog } from './PremiumLimitDialog';
@@ -188,6 +189,20 @@ export default function AiSuggestions({
               </div>
 
               <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleRefresh();
+                  }}
+                  disabled={refreshing}
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground/40 hover:text-primary hover:bg-primary/10 transition-colors active:scale-95 md:opacity-0 group-hover:opacity-100",
+                    refreshing && "animate-spin text-primary opacity-100"
+                  )}
+                  aria-label="Refresh suggestion"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </button>
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
