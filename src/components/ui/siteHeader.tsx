@@ -118,9 +118,9 @@ export default function SiteHeader() {
       icon: Shirt,
       onClick: () => {
         if (!user) { router.push('/login'); return; }
-        setWardrobeDropdownOpen((prev) => !prev);
+        router.push('/wardrobe');
       },
-      isActive: pathname === '/wardrobe' || wardrobeDropdownOpen,
+      isActive: pathname === '/wardrobe',
     },
   ];
 

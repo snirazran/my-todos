@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Lock, Shirt, X, ShoppingBag, Repeat, ChevronDown } from 'lucide-react';
+import { Lock, Shirt, X, ShoppingBag, Repeat, ChevronDown, Sparkles, Paintbrush, Crown, Hand } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
@@ -421,22 +421,22 @@ function WardrobeManagerContent({
 
   const shopItems = useMemo(() => {
     if (!data?.catalog) return [];
-    return getFilteredItems(data.catalog);
+    return getFilteredItems(data.catalog.filter((i) => i.slot !== 'container'));
   }, [data, activeFilter, sortBy]);
 
   const inventoryGrid = useInfiniteScroll(inventoryItems, {
-    initial: gridInitialSize,
-    batch: gridBatchSize,
-    resetKey: `inv|${activeFilter}|${sortBy}|${gridInitialSize}|${gridBatchSize}|${open ? 'open' : 'closed'}`,
+    initial: inventoryItems.length,
+    batch: inventoryItems.length || 1,
+    resetKey: `inv|${activeFilter}|${sortBy}|${inventoryItems.length}|${open ? 'open' : 'closed'}`,
     rootRef: inventoryScrollRef,
-    enabled: inventoryHasScrolled,
+    enabled: false,
   });
   const shopGrid = useInfiniteScroll(shopItems, {
-    initial: gridInitialSize,
-    batch: gridBatchSize,
-    resetKey: `shop|${activeFilter}|${sortBy}|${gridInitialSize}|${gridBatchSize}|${open ? 'open' : 'closed'}`,
+    initial: shopItems.length,
+    batch: shopItems.length || 1,
+    resetKey: `shop|${activeFilter}|${sortBy}|${shopItems.length}|${open ? 'open' : 'closed'}`,
     rootRef: shopScrollRef,
-    enabled: shopHasScrolled,
+    enabled: false,
   });
 
   useEffect(() => {
@@ -597,15 +597,24 @@ function WardrobeManagerContent({
               <SortMenu value={sortBy} onChange={setSortBy} />
             </div>
 
-            {activeTab !== 'trade' && (
-              <div className="w-full min-w-0">
-                <FilterBar
-                  active={activeFilter}
-                  onChange={handleFilterChange}
-                  badges={filterBadges}
-                />
-              </div>
-            )}
+            <div className="w-full min-w-0">
+              <FilterBar
+                active={activeFilter === 'container' && activeTab !== 'inventory' ? 'all' : activeFilter}
+                onChange={handleFilterChange}
+                badges={filterBadges}
+                options={
+                  activeTab !== 'inventory'
+                    ? [
+                        { id: 'all', label: 'All Items', icon: <Sparkles className="w-5 h-5" /> },
+                        { id: 'skin', label: 'Skins', icon: <Paintbrush className="w-5 h-5" /> },
+                        { id: 'hat', label: 'Hats', icon: <Crown className="w-5 h-5" /> },
+                        { id: 'body', label: 'Body', icon: <Shirt className="w-5 h-5" /> },
+                        { id: 'held', label: 'Held', icon: <Hand className="w-5 h-5" /> },
+                      ]
+                    : undefined
+                }
+              />
+            </div>
           </div>
 
           <div

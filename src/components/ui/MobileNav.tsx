@@ -66,9 +66,9 @@ export default function MobileNav() {
           router.push('/login');
           return;
         }
-        setWardrobePopupOpen((prev) => !prev);
+        router.push('/wardrobe');
       },
-      isActive: pathname === '/wardrobe' || wardrobePopupOpen,
+      isActive: pathname === '/wardrobe',
     },
   ];
 

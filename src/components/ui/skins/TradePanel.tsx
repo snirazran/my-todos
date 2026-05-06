@@ -146,12 +146,11 @@ export function TradePanel({
   }, []);
 
   const availableItems = useMemo(() => {
-    const ownedIds = Object.keys(inventory);
+    const ownedIds = Object.keys(inventory).filter((id) => (inventory[id] ?? 0) > 0);
     let result = catalog.filter((item) => {
       if (!ownedIds.includes(item.id)) return false;
       if (item.slot === 'container') return false; // NEW: Skip gifts
       if (targetRarity && item.rarity !== targetRarity) return false;
-      if (!targetRarity && item.rarity === 'legendary') return false;
       
       // Apply activeFilter
       if (activeFilter !== 'all') {
@@ -359,16 +358,13 @@ export function TradePanel({
         }}
         className="flex-1 flex flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto order-1 bg-background lg:bg-transparent"
       >
-        <div className="flex items-center justify-between px-4 py-3 lg:px-6 lg:py-4 shrink-0">
-          <h3 className="text-sm font-bold tracking-wider uppercase text-muted-foreground">
-            Your Inventory
-          </h3>
-          {!availableItems.length && (
+        {!availableItems.length && (
+          <div className="flex items-center justify-end px-4 py-3 lg:px-6 lg:py-4 shrink-0">
             <span className="text-xs text-muted-foreground/60">
               No tradeable items found
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         <div className="px-4 pb-52 lg:pb-6 lg:px-6">
           {availableItems.length === 0 ? (
@@ -419,7 +415,7 @@ export function TradePanel({
       </div>
 
       {/* --- CONTRACT (Side/Bottom Dock - Order 2) --- */}
-      <div className="fixed bottom-0 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto shrink-0 z-[60] order-2 lg:w-[320px] xl:w-[360px] bg-card border-t lg:border-t-0 lg:border-l border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
+      <div className="fixed bottom-16 md:bottom-20 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto shrink-0 z-[60] order-2 lg:w-[320px] xl:w-[360px] bg-card border-t lg:border-t-0 lg:border-l border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30 shrink-0">
             <div>

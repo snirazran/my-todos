@@ -214,7 +214,7 @@ function ItemCardComponent({
       // UX TWEAK: Smaller padding on mobile (p-2.5) -> Normal on desktop (md:p-3.5)
       // Added min-h-[220px] to ensure card has presence even if image fails
       className={cn(
-        'group relative flex flex-col p-2.5 md:p-3.5 transition-all duration-300 rounded-2xl border-[3px] overflow-hidden cursor-pointer active:scale-95 w-full max-w-[240px] mx-auto',
+        'group relative flex flex-col p-2.5 pb-1 md:p-3.5 md:pb-1.5 transition-all duration-300 rounded-2xl border-[3px] overflow-hidden cursor-pointer active:scale-95 w-full max-w-[240px] mx-auto',
         config.border,
         config.bg,
         isEquipped
@@ -343,20 +343,20 @@ function ItemCardComponent({
 
         {/* Shop Button */}
         {mode === 'shop' && !customAction && (
-          <Button
+          <button
             key="buy"
-            variant="secondary"
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onAction?.(e);
             }}
-            disabled={!canAfford || actionLoading}
+            disabled={actionLoading}
             className={cn(
-              'w-full font-bold transition-all duration-300 shadow-sm active:scale-95 h-7 md:h-8 rounded-lg text-[10px] md:text-xs uppercase tracking-wide',
+              'group/buy w-full flex items-center justify-center gap-1 h-8 text-sm md:text-base font-black tracking-tight transition-colors active:scale-95 bg-transparent border-0 shadow-none',
               canAfford
-                ? 'bg-primary hover:bg-primary/90 text-primary-foreground shadow-primary/25'
-                : 'bg-secondary text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900 cursor-not-allowed opacity-100', // High contrast error state
-              actionLoading && 'opacity-80 cursor-wait',
+                ? cn(config.text, 'hover:brightness-110')
+                : 'text-red-500 dark:text-red-400',
+              actionLoading && 'opacity-60 cursor-wait',
             )}
           >
             {actionLoading ? (
@@ -364,32 +364,17 @@ function ItemCardComponent({
             ) : actionLabel ? (
               <span>{actionLabel}</span>
             ) : (
-              <span className="flex items-center gap-1">
-                {ownedCount > 0 ? 'Buy' : 'Buy'}
-                {!hidePrice && (
-                  <>
-                    <span
-                      className={cn(
-                        'mx-1',
-                        canAfford ? 'opacity-40' : 'opacity-40 text-red-400',
-                      )}
-                    >
-                      |
-                    </span>
-                    <Fly
-                      size={18}
-                      className={cn(canAfford ? 'opacity-80' : 'opacity-100')}
-                      y={-2}
-                      paused={true}
-                    />
-                    <span className={cn(canAfford ? '' : 'font-black')}>
-                      {item.priceFlies}
-                    </span>
-                  </>
-                )}
-              </span>
+              <>
+                <Fly
+                  size={22}
+                  className="transition-transform group-hover/buy:scale-110"
+                  y={-3}
+                  paused={true}
+                />
+                <span className="tabular-nums leading-none">{item.priceFlies}</span>
+              </>
             )}
-          </Button>
+          </button>
         )}
 
         {/* Sell Button (Inventory Mode) */}
