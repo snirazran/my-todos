@@ -2,7 +2,16 @@
 
 import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Clock, Gift, Plus, Trophy, X } from 'lucide-react';
+import {
+  CalendarDays,
+  Check,
+  Clock,
+  Compass,
+  Gift,
+  Plus,
+  Trophy,
+  X,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import type { ItemDef } from '@/lib/skins/catalog';
@@ -363,6 +372,10 @@ export function DailyQuestPresentationCard({
               <span className="leading-none">{timeLeft}</span>
             </span>
           )}
+          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
+            <CalendarDays className="w-3 h-3 shrink-0" />
+            <span className="leading-none">Daily</span>
+          </span>
         </div>
         <div className="absolute z-30 flex flex-wrap justify-end gap-1.5 bottom-3 right-3 sm:bottom-4 sm:right-4 sm:gap-2">
           {quest.rewards.map((reward, index) => (
@@ -503,14 +516,20 @@ export function CategoryQuestPresentationCard({
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/32 to-black/10" />
         <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/80 to-transparent" />
-        {timeLeft && (
-          <div className="absolute inset-x-0 top-0 flex items-start gap-3 p-4">
+        <div className="absolute inset-x-0 top-0 flex flex-wrap items-start gap-3 p-4">
+          {timeLeft && (
             <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
               <Clock className="w-3 h-3 shrink-0" />
               <span className="leading-none">{timeLeft}</span>
             </span>
-          </div>
-        )}
+          )}
+          <span className="inline-flex h-7 max-w-[calc(100%-2rem)] items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
+            <Compass className="w-3 h-3 shrink-0" />
+            <span className="truncate leading-none">
+              {category?.shortLabel || category?.name || 'Focus'}
+            </span>
+          </span>
+        </div>
         <div className="absolute z-30 flex flex-wrap justify-end gap-1.5 bottom-3 right-3 sm:bottom-5 sm:right-5 sm:gap-2">
           {quest.rewards.map((reward, index) => (
             <RewardTile

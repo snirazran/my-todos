@@ -13,6 +13,7 @@ import {
   Wind,
   Bell,
   CalendarClock,
+  RefreshCw,
   Send,
   CheckCircle,
   XCircle,
@@ -301,6 +302,51 @@ export function AdminSettingsDialog({
     }
   };
 
+  const handleRefreshQuests = async (scope: 'daily' | 'focus') => {
+    const loadingKey =
+      scope === 'focus' ? 'refresh-focus-quests' : 'refresh-daily-quests';
+    setLoading(loadingKey);
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res = await fetch('/api/quests/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          timezone,
+          ...(scope === 'focus' ? { scope: 'focus' } : {}),
+        }),
+      });
+
+      if (res.ok) {
+        mutate((key) =>
+          typeof key === 'string' && key.startsWith('/api/quests'),
+        );
+        alert(
+          scope === 'focus'
+            ? 'Focus quests refreshed'
+            : 'Daily quests refreshed',
+        );
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(
+          data.error ||
+            (scope === 'focus'
+              ? 'Failed to refresh focus quests'
+              : 'Failed to refresh daily quests'),
+        );
+      }
+    } catch {
+      alert(
+        scope === 'focus'
+          ? 'Error refreshing focus quests'
+          : 'Error refreshing daily quests',
+      );
+    } finally {
+      setLoading(null);
+    }
+  };
+
   /* cosmetics popup is now a separate component */
 
   const mainDialog = createPortal(
@@ -578,6 +624,52 @@ export function AdminSettingsDialog({
                     </div>
                   </div>
                   {loading === 'reset-ai' && (
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  )}
+                </Button>
+
+                {/* Refresh Daily Quests */}
+                <Button
+                  onClick={() => handleRefreshQuests('daily')}
+                  disabled={loading !== null}
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-auto py-4 px-4"
+                >
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <RefreshCw className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-sm">
+                      Refresh Daily Quests
+                    </div>
+                    <div className="text-xs text-muted-foreground font-normal">
+                      Reroll today&apos;s daily quest selection
+                    </div>
+                  </div>
+                  {loading === 'refresh-daily-quests' && (
+                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  )}
+                </Button>
+
+                {/* Refresh Focus Quests */}
+                <Button
+                  onClick={() => handleRefreshQuests('focus')}
+                  disabled={loading !== null}
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-auto py-4 px-4"
+                >
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                    <RefreshCw className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-sm">
+                      Refresh Focus Quests
+                    </div>
+                    <div className="text-xs text-muted-foreground font-normal">
+                      Rebuild quests for the selected focus areas
+                    </div>
+                  </div>
+                  {loading === 'refresh-focus-quests' && (
                     <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
                   )}
                 </Button>

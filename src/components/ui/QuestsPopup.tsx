@@ -4,17 +4,8 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
-import {
-  ScrollText,
-  X,
-  Compass,
-  CalendarDays,
-  RefreshCw,
-  Sparkles,
-} from 'lucide-react';
+import { ScrollText, X, Compass, Sparkles } from 'lucide-react';
 import { BaseSheet } from './BaseSheet';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import TagPopup from './TagPopup';
 import { FilterBar, type FilterOption } from './skins/FilterBar';
@@ -109,14 +100,11 @@ export function QuestsPopup({
   onQuestsChanged?: () => void | Promise<void>;
   embedded?: boolean;
 }) {
-  const [activeTab, setActiveTab] = useState<'daily' | 'category'>('category');
   const [claimingId, setClaimingId] = useState<string | null>(null);
   const [claimingObjectiveId, setClaimingObjectiveId] = useState<string | null>(
     null,
   );
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
-  const [refreshingDaily, setRefreshingDaily] = useState(false);
-  const [refreshingFocus, setRefreshingFocus] = useState(false);
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string>('all');
   const [editingFocusCategoryId, setEditingFocusCategoryId] =
     useState<MacroCategoryId | null>(null);
@@ -210,57 +198,6 @@ export function QuestsPopup({
       ),
     [data?.tags],
   );
-  // Count only claimable rewards (completed objectives with unclaimed rewards + claimable quests)
-  const countDaily = useMemo(() => {
-    return (data?.dailyQuests ?? []).reduce((sum, quest) => {
-      if (quest.claimed) return sum;
-      let count = 0;
-      // Count quest itself if claimable
-      if (quest.claimable) count++;
-      // Count completed objectives with unclaimed rewards
-      quest.logic.forEach((block) => {
-        if (
-          (block.rewards?.length ?? 0) > 0 &&
-          block.progress >= block.target &&
-          !quest.claimedObjectiveIds.includes(block.id)
-        ) {
-          count++;
-        }
-      });
-      return sum + count;
-    }, 0);
-  }, [data?.dailyQuests]);
-
-  const countCategory = useMemo(() => {
-    return (data?.categoryQuests ?? []).reduce((sum, quest) => {
-      if (quest.claimed) return sum;
-      let count = 0;
-      if (quest.claimable) count++;
-      quest.logic.forEach((block) => {
-        if (
-          (block.rewards?.length ?? 0) > 0 &&
-          block.progress >= block.target &&
-          !quest.claimedObjectiveIds.includes(block.id)
-        ) {
-          count++;
-        }
-      });
-      return sum + count;
-    }, 0);
-  }, [data?.categoryQuests]);
-
-  // Count active (in-progress, not yet claimable) quests as fallback
-  const activeDailyCount = useMemo(() => {
-    return (data?.dailyQuests ?? []).filter((q) => !q.claimed && !q.claimable)
-      .length;
-  }, [data?.dailyQuests]);
-
-  const activeCategoryCount = useMemo(() => {
-    return (data?.categoryQuests ?? []).filter(
-      (q) => !q.claimed && !q.claimable,
-    ).length;
-  }, [data?.categoryQuests]);
-
   const subCategoryOptions: FilterOption[] = useMemo(() => {
     const options: FilterOption[] = [
       { id: 'all', label: 'All', icon: <Sparkles className="w-4 h-4" /> },
@@ -301,7 +238,7 @@ export function QuestsPopup({
     });
 
     return badges;
-  }, [data?.categoryQuests, countCategory]);
+  }, [data?.categoryQuests]);
 
   const activeCategoryBadges = useMemo(() => {
     const badges: Record<string, number> = {};
@@ -313,7 +250,7 @@ export function QuestsPopup({
     });
 
     return badges;
-  }, [data?.categoryQuests, activeCategoryCount]);
+  }, [data?.categoryQuests]);
 
   const filteredCategoryQuests = useMemo(() => {
     if (!data?.categoryQuests) return [];
@@ -483,49 +420,6 @@ export function QuestsPopup({
     }
   };
 
-  const handleRefreshDaily = async () => {
-    if (refreshingDaily) return;
-    setRefreshingDaily(true);
-    setClaimMessage(null);
-    try {
-      const res = await fetch('/api/quests/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timezone }),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || 'Could not refresh quests');
-      setClaimMessage('Daily quests refreshed');
-      await refreshQuestData();
-    } catch (err: any) {
-      setClaimMessage(err.message || 'Could not refresh quests');
-    } finally {
-      setRefreshingDaily(false);
-    }
-  };
-
-  const handleRefreshFocus = async () => {
-    if (refreshingFocus) return;
-    setRefreshingFocus(true);
-    setClaimMessage(null);
-    try {
-      const res = await fetch('/api/quests/refresh', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ timezone, scope: 'focus' }),
-      });
-      const payload = await res.json();
-      if (!res.ok)
-        throw new Error(payload.error || 'Could not refresh focus quests');
-      setClaimMessage('Focus quests refreshed');
-      await refreshQuestData();
-    } catch (err: any) {
-      setClaimMessage(err.message || 'Could not refresh focus quests');
-    } finally {
-      setRefreshingFocus(false);
-    }
-  };
-
   const handleSaveFocusTags = async (categoryId: string, newTags: string[]) => {
     if (!data) return;
     const nextTags = newTags.slice(0, 1);
@@ -616,73 +510,79 @@ export function QuestsPopup({
                   />
                 ) : (
                   <div className="flex flex-col h-full">
-                    <div className="px-4 pt-4 md:px-6">
-                      <Tabs
-                        value={activeTab}
-                        onValueChange={(value) =>
-                          setActiveTab(value as 'daily' | 'category')
-                        }
-                      >
-                        <TabsList className="flex items-center w-full h-12 gap-2 p-1 border rounded-full shadow-sm border-border/50 bg-background/50 backdrop-blur-2xl md:h-14">
-                          <TabsTrigger
-                            value="category"
-                            className="
-                              flex-1 h-full rounded-full relative
-                              flex items-center justify-center gap-1.5
-                              text-[11px] md:text-sm font-black tracking-widest uppercase
-                              transition-all duration-300
-                              data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-primary/20 data-[state=active]:ring-1 data-[state=active]:ring-primary/20
-                              data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                            "
-                          >
-                            <Compass className="w-4 h-4" />
-                            <span>My Focus</span>
-                            {countCategory > 0 ? (
-                              <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal animate-in zoom-in">
-                                {countCategory}
-                              </span>
-                            ) : activeCategoryCount > 0 ? (
-                              <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-muted-foreground/50 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal">
-                                {activeCategoryCount}
-                              </span>
-                            ) : null}
-                          </TabsTrigger>
-                          <TabsTrigger
-                            value="daily"
-                            className="
-                              flex-1 h-full rounded-full relative
-                              flex items-center justify-center gap-1.5
-                              text-[11px] md:text-sm font-black tracking-widest uppercase
-                              transition-all duration-300
-                              data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none data-[state=active]:border-primary/20 data-[state=active]:ring-1 data-[state=active]:ring-primary/20
-                              data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                            "
-                          >
-                            <CalendarDays className="w-4 h-4" />
-                            <span>Daily</span>
-                            {countDaily > 0 ? (
-                              <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal animate-in zoom-in">
-                                {countDaily}
-                              </span>
-                            ) : activeDailyCount > 0 ? (
-                              <span className="flex h-5 min-w-5 px-0.5 items-center justify-center rounded-full bg-muted-foreground/50 text-[10px] font-bold text-white shadow-sm -ml-0.5 leading-none tracking-normal">
-                                {activeDailyCount}
-                              </span>
-                            ) : null}
-                          </TabsTrigger>
-                        </TabsList>
-                      </Tabs>
-                      {claimMessage && (
-                        <div className="px-4 py-3 mt-4 text-sm font-medium border rounded-2xl border-primary/20 bg-primary/10 text-foreground">
+                    {claimMessage && (
+                      <div className="px-4 pt-4 md:px-6">
+                        <div className="px-4 py-3 text-sm font-medium border rounded-2xl border-primary/20 bg-primary/10 text-foreground">
                           {claimMessage}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     <div
                       ref={overscrollDrag.bind}
-                      className="flex-1 min-h-0 px-4 pt-4 pb-4 overflow-y-auto md:px-6 md:pb-6 overscroll-none"
+                      className={cn(
+                        'flex-1 min-h-0 px-4 pt-4 overflow-y-auto md:px-6 md:pb-6 overscroll-none',
+                        embedded
+                          ? 'pb-[calc(5rem+env(safe-area-inset-bottom))]'
+                          : 'pb-4',
+                      )}
                     >
-                      {activeTab === 'category' ? (
+                      <div className="space-y-6">
+                        <div className="space-y-4">
+                          {(() => {
+                            const dailyQuests = data.dailyQuests ?? [];
+                            if (dailyQuests.length === 0) {
+                              return (
+                                <PanelCard>No active daily quests here.</PanelCard>
+                              );
+                            }
+                            if (dailyQuests.length === 1) {
+                              const quest = dailyQuests[0];
+                              return (
+                                <DailyQuestPresentationCard
+                                  quest={quest}
+                                  rewardCatalog={data.rewardCatalog}
+                                  isPremium={data.isPremium}
+                                  claiming={claimingId === quest.id}
+                                  claimingObjectiveId={claimingObjectiveId}
+                                  onClaim={() => handleClaim('daily', quest.id)}
+                                  onClaimObjective={(objectiveId) =>
+                                    handleClaimObjective(quest.id, objectiveId)
+                                  }
+                                  paused={isDragging || carouselDragging}
+                                />
+                              );
+                            }
+                            return (
+                              <QuestCarousel
+                                activePage={dailyPage}
+                                onPageChange={setDailyPage}
+                                count={dailyQuests.length}
+                                onDragChange={setCarouselDragging}
+                              >
+                                {dailyQuests.map((quest) => (
+                                  <DailyQuestPresentationCard
+                                    key={quest.id}
+                                    quest={quest}
+                                    rewardCatalog={data.rewardCatalog}
+                                    isPremium={data.isPremium}
+                                    claiming={claimingId === quest.id}
+                                    claimingObjectiveId={claimingObjectiveId}
+                                    onClaim={() =>
+                                      handleClaim('daily', quest.id)
+                                    }
+                                    onClaimObjective={(objectiveId) =>
+                                      handleClaimObjective(
+                                        quest.id,
+                                        objectiveId,
+                                      )
+                                    }
+                                    paused={isDragging || carouselDragging}
+                                  />
+                                ))}
+                              </QuestCarousel>
+                            );
+                          })()}
+                        </div>
                         <div className="space-y-4">
                           {!data.onboarding?.complete && (
                             <PanelCard>
@@ -790,96 +690,8 @@ export function QuestsPopup({
                               ))}
                             </QuestCarousel>
                           )}
-                          {data.onboarding?.complete &&
-                            selectedCategories.length > 0 && (
-                              <div className="flex justify-center pt-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={handleRefreshFocus}
-                                  disabled={refreshingFocus}
-                                  className="font-bold rounded-2xl"
-                                >
-                                  <RefreshCw
-                                    className={cn(
-                                      'mr-2 h-4 w-4',
-                                      refreshingFocus && 'animate-spin',
-                                    )}
-                                  />
-                                  {refreshingFocus
-                                    ? 'Refreshing...'
-                                    : 'Refresh My Focus'}
-                                </Button>
-                              </div>
-                            )}
                         </div>
-                      ) : (
-                        <div className="space-y-4">
-                          {(() => {
-                            const dailyQuests = data.dailyQuests ?? [];
-                            if (dailyQuests.length === 0) return null;
-                            if (dailyQuests.length === 1) {
-                              const quest = dailyQuests[0];
-                              return (
-                                <DailyQuestPresentationCard
-                                  quest={quest}
-                                  rewardCatalog={data.rewardCatalog}
-                                  isPremium={data.isPremium}
-                                  claiming={claimingId === quest.id}
-                                  claimingObjectiveId={claimingObjectiveId}
-                                  onClaim={() => handleClaim('daily', quest.id)}
-                                  onClaimObjective={(objectiveId) =>
-                                    handleClaimObjective(quest.id, objectiveId)
-                                  }
-                                  paused={isDragging || carouselDragging}
-                                />
-                              );
-                            }
-                            return (
-                              <QuestCarousel
-                                activePage={dailyPage}
-                                onPageChange={setDailyPage}
-                                count={dailyQuests.length}
-                                onDragChange={setCarouselDragging}
-                              >
-                                {dailyQuests.map((quest) => (
-                                  <DailyQuestPresentationCard
-                                    key={quest.id}
-                                    quest={quest}
-                                    rewardCatalog={data.rewardCatalog}
-                                    isPremium={data.isPremium}
-                                    claiming={claimingId === quest.id}
-                                    claimingObjectiveId={claimingObjectiveId}
-                                    onClaim={() =>
-                                      handleClaim('daily', quest.id)
-                                    }
-                                    onClaimObjective={(objectiveId) =>
-                                      handleClaimObjective(
-                                        quest.id,
-                                        objectiveId,
-                                      )
-                                    }
-                                    paused={isDragging || carouselDragging}
-                                  />
-                                ))}
-                              </QuestCarousel>
-                            );
-                          })()}
-                          <div className="flex justify-center pt-2">
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={handleRefreshDaily}
-                              disabled={refreshingDaily}
-                              className="font-bold rounded-2xl"
-                            >
-                              {refreshingDaily
-                                ? 'Refreshing...'
-                                : 'Refresh Daily Quests'}
-                            </Button>
-                          </div>
-                        </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 )}
