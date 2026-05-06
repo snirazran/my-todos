@@ -218,7 +218,7 @@ export default function Home() {
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const [showTimer, setShowTimer] = useState(false);
   const [frogodoroHydrated, setFrogodoroHydrated] = useState(() =>
-    useFrogodoroStore.persist.hasHydrated(),
+    useFrogodoroStore.persist?.hasHydrated?.() ?? false,
   );
   const lastHandledTimerCompletionRef = useRef<number | null>(null);
   const [showProgressCoach, setShowProgressCoach] = useState(false);
@@ -269,11 +269,14 @@ export default function Home() {
   const { showNotification } = useNotification();
 
   useEffect(() => {
-    if (useFrogodoroStore.persist.hasHydrated()) {
+    const persistApi = useFrogodoroStore.persist;
+    if (!persistApi) return;
+
+    if (persistApi.hasHydrated()) {
       setFrogodoroHydrated(true);
     }
 
-    return useFrogodoroStore.persist.onFinishHydration(() => {
+    return persistApi.onFinishHydration(() => {
       setFrogodoroHydrated(true);
     });
   }, []);
