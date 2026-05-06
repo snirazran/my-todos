@@ -92,7 +92,7 @@ export function SingleRewardCard({
     rewardType === 'FLIES' ? (
       <div className="flex flex-col items-center justify-center gap-1 h-full w-full pb-0">
         <div className="relative">
-          <Fly size={60} paused={pausePreview} />
+          <Fly size={60} paused={pausePreview} interactive={false} />
         </div>
       </div>
     ) : undefined;
@@ -183,7 +183,7 @@ export function SingleRewardCard({
           <div className="pointer-events-none absolute inset-0 rounded-2xl bg-background/20" />
         )}
         {lockOverlay && (
-          <span className="pointer-events-none absolute bottom-2 right-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white shadow-md ring-2 ring-white">
+          <span className="pointer-events-none absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white shadow-md ring-2 ring-white">
             <Lock className="h-3.5 w-3.5" strokeWidth={3} />
           </span>
         )}

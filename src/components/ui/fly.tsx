@@ -27,10 +27,23 @@ type FlyProps = {
   x?: number;
   paused?: boolean;
   onLoad?: () => void;
+  interactive?: boolean;
 };
 
 const Fly = forwardRef<HTMLDivElement, FlyProps>(
-  ({ onClick, size = 30, className, x = 0, y = 0, paused = false, onLoad }, ref) => {
+  (
+    {
+      onClick,
+      size = 30,
+      className,
+      x = 0,
+      y = 0,
+      paused = false,
+      onLoad,
+      interactive = true,
+    },
+    ref,
+  ) => {
     const innerRef = useRef<HTMLDivElement>(null);
     useImperativeHandle(ref, () => innerRef.current!);
 
@@ -75,10 +88,11 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
 
     const handleClick = useCallback(
       (e: React.MouseEvent) => {
+        if (!interactive) return;
         onClick?.(e);
         rive?.play();
       },
-      [onClick, rive]
+      [interactive, onClick, rive]
     );
 
     return (
@@ -93,7 +107,8 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
           verticalAlign: 'middle',
           marginInlineStart: x,
           transform: y ? `translateY(${y}px)` : undefined,
-          cursor: 'pointer',
+          cursor: interactive ? 'pointer' : undefined,
+          pointerEvents: interactive ? undefined : 'none',
           lineHeight: 0,
         }}
       >

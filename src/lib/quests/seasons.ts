@@ -4,7 +4,7 @@ import QuestSeasonModel, {
   type QuestSeasonDayReward,
 } from '@/lib/models/QuestSeason';
 import UserModel from '@/lib/models/User';
-import { getZonedToday } from '@/lib/utils';
+import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import type { QuestRewards } from '@/lib/quests/types';
 
 export type QuestSeasonView = {
@@ -77,9 +77,24 @@ function getDayCount(startsAt: Date, endsAt: Date) {
   return Math.max(1, Math.ceil(durationMs / 86_400_000));
 }
 
-function getCurrentSeasonDay(startsAt: Date, endsAt: Date) {
-  const now = Date.now();
-  const raw = Math.floor((now - startsAt.getTime()) / 86_400_000) + 1;
+function ymdToUtcDay(ymd: string) {
+  const [year, month, day] = ymd.split('-').map(Number);
+  if (!year || !month || !day) return null;
+  return Math.floor(Date.UTC(year, month - 1, day) / 86_400_000);
+}
+
+export function getCurrentSeasonDay(
+  startsAt: Date,
+  endsAt: Date,
+  timezone: string,
+  now = new Date(),
+) {
+  const startDay = ymdToUtcDay(getZonedYMD(startsAt, timezone));
+  const todayDay = ymdToUtcDay(getZonedYMD(now, timezone));
+  const raw =
+    startDay === null || todayDay === null
+      ? Math.floor((now.getTime() - startsAt.getTime()) / 86_400_000) + 1
+      : todayDay - startDay + 1;
   return Math.min(getDayCount(startsAt, endsAt), Math.max(1, raw));
 }
 
@@ -109,7 +124,11 @@ export async function getActiveQuestSeasonView(args: {
   if (!season || !user) return null;
 
   const today = getZonedToday(args.timezone);
-  const currentDay = getCurrentSeasonDay(season.startsAt, season.endsAt);
+  const currentDay = getCurrentSeasonDay(
+    season.startsAt,
+    season.endsAt,
+    args.timezone,
+  );
   const claimedDays = getClaimedDays(user, season.seasonId);
   const dailyFly = user.wardrobe?.flyDaily;
   const progressFlies = dailyFly?.date === today ? dailyFly.earned ?? 0 : 0;

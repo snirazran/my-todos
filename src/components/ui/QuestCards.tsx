@@ -355,17 +355,17 @@ export function DailyQuestPresentationCard({
         ) : (
           <div className="h-[220px] w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
         )}
-        <div className="absolute inset-x-0 top-0 flex items-start justify-end gap-3 p-4">
-          {timeLeft && (
-            <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
-              <Clock className="w-3 h-3 shrink-0" />
-              <span className="leading-none">{timeLeft}</span>
-            </span>
-          )}
+        <div className="absolute inset-x-0 top-0 flex flex-wrap items-start justify-start gap-3 p-4">
           <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
             <CalendarDays className="w-3 h-3 shrink-0" />
             <span className="leading-none">Daily</span>
           </span>
+          {timeLeft ? (
+            <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
+              <Clock className="w-3 h-3 shrink-0" />
+              <span className="leading-none">{timeLeft}</span>
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -463,19 +463,19 @@ export function CategoryQuestPresentationCard({
             }}
           />
         )}
-        <div className="absolute inset-x-0 top-0 flex flex-wrap items-start justify-end gap-3 p-4">
-          {timeLeft && (
-            <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
-              <Clock className="w-3 h-3 shrink-0" />
-              <span className="leading-none">{timeLeft}</span>
-            </span>
-          )}
+        <div className="absolute inset-x-0 top-0 flex flex-wrap items-start justify-start gap-3 p-4">
           <span className="inline-flex h-7 max-w-[calc(100%-2rem)] items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
             <Compass className="w-3 h-3 shrink-0" />
             <span className="truncate leading-none">
               {category?.shortLabel || category?.name || 'Focus'}
             </span>
           </span>
+          {timeLeft ? (
+            <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
+              <Clock className="w-3 h-3 shrink-0" />
+              <span className="leading-none">{timeLeft}</span>
+            </span>
+          ) : null}
         </div>
       </div>
 
@@ -893,7 +893,7 @@ function QuestRewardDetailCard({
           <div className="absolute right-1.5 top-1.5 z-20 rounded-lg border border-white/10 bg-black/50 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-sm backdrop-blur-sm">
             {quantityLabel}
           </div>
-          <Fly size={62} y={-1} paused={paused} />
+          <Fly size={62} y={-1} paused={paused} interactive={false} />
         </div>
         <p className="pb-1 text-xs font-bold leading-tight text-foreground">
           {rewardLabel(reward, rewardCatalog, isPremium)}
@@ -989,7 +989,12 @@ export const RewardTile = memo(function RewardTile({
     >
       {reward.type === 'FLIES' ? (
         <div className="relative flex items-center justify-center w-full h-full">
-          <Fly size={compact ? 30 : 22} y={-1} paused={paused} />
+          <Fly
+            size={compact ? 30 : 22}
+            y={-1}
+            paused={paused}
+            interactive={false}
+          />
         </div>
       ) : item?.slot === 'container' && hasHydrated ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">

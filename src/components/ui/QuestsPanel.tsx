@@ -4,10 +4,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
-import { Check, Clock, Compass, Gift, Lock, ScrollText, Sparkles, X } from 'lucide-react';
+import { Check, Clock, Gift, Lock, ScrollText, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TagPopup from './TagPopup';
-import { FilterBar, type FilterOption } from './skins/FilterBar';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type {
   CategoryQuestProgressView,
@@ -108,6 +107,47 @@ function createFlyRewardItem(amount: number): ItemDef {
   };
 }
 
+function getFocusQuestSortScore(quest: CategoryQuestProgressView) {
+  const openObjectives = quest.logic.filter(
+    (block) => !quest.claimedObjectiveIds.includes(block.id),
+  );
+
+  if (openObjectives.length === 0) {
+    return {
+      claimable: 0,
+      bestProgressRatio: 0,
+      nearestRemaining: Number.MAX_SAFE_INTEGER,
+      totalProgress: 0,
+    };
+  }
+
+  let claimable = quest.claimable ? 1 : 0;
+  let bestProgressRatio = 0;
+  let nearestRemaining = Number.POSITIVE_INFINITY;
+  let totalProgress = 0;
+
+  openObjectives.forEach((block) => {
+    const target = Math.max(1, block.target);
+    const progress = Math.max(0, block.progress);
+    const progressRatio = Math.min(progress / target, 1);
+    const remaining = Math.max(0, target - progress);
+
+    if (progress >= target) claimable = 1;
+    bestProgressRatio = Math.max(bestProgressRatio, progressRatio);
+    nearestRemaining = Math.min(nearestRemaining, remaining);
+    totalProgress += progress;
+  });
+
+  return {
+    claimable,
+    bestProgressRatio,
+    nearestRemaining: Number.isFinite(nearestRemaining)
+      ? nearestRemaining
+      : Number.MAX_SAFE_INTEGER,
+    totalProgress,
+  };
+}
+
 export function QuestsPanel({
   isGuest,
   onQuestsChanged,
@@ -121,14 +161,12 @@ export function QuestsPanel({
   const [seasonEventOpen, setSeasonEventOpen] = useState(false);
   const [claimingSeason, setClaimingSeason] = useState(false);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
-  const [activeSubCategoryId, setActiveSubCategoryId] = useState<string>('all');
   const [editingFocusCategoryId, setEditingFocusCategoryId] =
     useState<MacroCategoryId | null>(null);
   const [rewardRevealQueue, setRewardRevealQueue] = useState<
     QuestRewardRevealEntry[]
   >([]);
   const [openingGiftKey, setOpeningGiftKey] = useState<string | null>(null);
-  const [categoryPage, setCategoryPage] = useState(0);
   const [dailyPage, setDailyPage] = useState(0);
   const [carouselDragging, setCarouselDragging] = useState(false);
   const rewardRevealIdRef = useRef(0);
@@ -224,80 +262,20 @@ export function QuestsPanel({
       ),
     [data?.tags],
   );
-  const subCategoryOptions: FilterOption[] = useMemo(() => {
-    const options: FilterOption[] = [
-      { id: 'all', label: 'All', icon: <Sparkles className="w-4 h-4" /> },
-    ];
-    if (data?.macroCategories) {
-      data.macroCategories.forEach((cat) => {
-        options.push({
-          id: cat.id,
-          label: cat.shortLabel || cat.name,
-          icon: <Compass className="w-4 h-4" />,
-        });
-      });
-    }
-    return options;
-  }, [data?.macroCategories]);
-
-  const categoryBadges = useMemo(() => {
-    const badges: Record<string, number> = {};
-    if (!data?.categoryQuests) return badges;
-
-    // per category badge — only claimable objective rewards
-    data.categoryQuests.forEach((quest) => {
-      if (!quest.categoryId) return;
-      let count = 0;
-      quest.logic.forEach((block) => {
-        if (
-          (block.rewards?.length ?? 0) > 0 &&
-          block.progress >= block.target &&
-          !quest.claimedObjectiveIds.includes(block.id)
-        ) {
-          count++;
-        }
-      });
-      if (count > 0) {
-        badges[quest.categoryId] = (badges[quest.categoryId] ?? 0) + count;
-      }
-    });
-
-    return badges;
-  }, [data?.categoryQuests]);
-
-  const activeCategoryBadges = useMemo(() => {
-    const badges: Record<string, number> = {};
-    if (!data?.categoryQuests) return badges;
-
-    data.categoryQuests.forEach((quest) => {
-      if (!quest.categoryId) return;
-      const hasInProgress = quest.logic.some(
-        (block) =>
-          (block.rewards?.length ?? 0) > 0 &&
-          (block.progress < block.target ||
-            quest.claimedObjectiveIds.includes(block.id) === false),
-      );
-      const hasClaimable = quest.logic.some(
-        (block) =>
-          (block.rewards?.length ?? 0) > 0 &&
-          block.progress >= block.target &&
-          !quest.claimedObjectiveIds.includes(block.id),
-      );
-      if (hasInProgress && !hasClaimable) {
-        badges[quest.categoryId] = (badges[quest.categoryId] ?? 0) + 1;
-      }
-    });
-
-    return badges;
-  }, [data?.categoryQuests]);
-
   const filteredCategoryQuests = useMemo(() => {
-    if (!data?.categoryQuests) return [];
-    if (activeSubCategoryId === 'all') return data.categoryQuests;
-    return data.categoryQuests.filter(
-      (q) => q.categoryId === activeSubCategoryId,
-    );
-  }, [data?.categoryQuests, activeSubCategoryId]);
+    const quests = data?.categoryQuests ?? [];
+    return [...quests].sort((a, b) => {
+      const aScore = getFocusQuestSortScore(a);
+      const bScore = getFocusQuestSortScore(b);
+
+      return (
+        bScore.claimable - aScore.claimable ||
+        bScore.bestProgressRatio - aScore.bestProgressRatio ||
+        aScore.nearestRemaining - bScore.nearestRemaining ||
+        bScore.totalProgress - aScore.totalProgress
+      );
+    });
+  }, [data?.categoryQuests]);
 
   const editingFocusCategory = editingFocusCategoryId
     ? categoryMap[editingFocusCategoryId]
@@ -593,62 +571,10 @@ export function QuestsPanel({
                                 here.
                               </PanelCard>
                             )}
-                          {data.onboarding?.complete && (
-                            <FilterBar
-                              active={activeSubCategoryId}
-                              onChange={(id: string) => {
-                                setActiveSubCategoryId(id);
-                                setCategoryPage(0);
-                              }}
-                              options={subCategoryOptions}
-                              badges={categoryBadges}
-                              badgeClassName="text-white bg-amber-500"
-                              fallbackBadges={activeCategoryBadges}
-                              fallbackBadgeClassName="text-white bg-muted-foreground/50"
-                            />
-                          )}
                           {filteredCategoryQuests.length === 0 ? (
                             <PanelCard>No active focus quests here.</PanelCard>
-                          ) : filteredCategoryQuests.length === 1 ? (
-                            <CategoryQuestPresentationCard
-                              quest={filteredCategoryQuests[0]}
-                              category={
-                                categoryMap[
-                                  filteredCategoryQuests[0].categoryId
-                                ]
-                              }
-                              rewardCatalog={data.rewardCatalog}
-                              isPremium={data.isPremium}
-                              claimingObjectiveId={claimingObjectiveId}
-                              linkedTags={
-                                (
-                                  categoryTagMap.get(
-                                    filteredCategoryQuests[0].categoryId,
-                                  ) ?? []
-                                )
-                                  .map((tagId) => tagCatalog.get(tagId))
-                                  .filter(Boolean) as QuestTagChip[]
-                              }
-                              onEditTags={() =>
-                                setEditingFocusCategoryId(
-                                  filteredCategoryQuests[0].categoryId,
-                                )
-                              }
-                              onClaimObjective={(objectiveId) =>
-                                handleClaimObjective(
-                                  filteredCategoryQuests[0].id,
-                                  objectiveId,
-                                )
-                              }
-                              paused={carouselDragging}
-                            />
                           ) : (
-                            <QuestCarousel
-                              activePage={categoryPage}
-                              onPageChange={setCategoryPage}
-                              count={filteredCategoryQuests.length}
-                              onDragChange={setCarouselDragging}
-                            >
+                            <div className="space-y-4">
                               {filteredCategoryQuests.map((quest) => (
                                 <CategoryQuestPresentationCard
                                   key={quest.id}
@@ -671,7 +597,7 @@ export function QuestsPanel({
                                   paused={carouselDragging}
                                 />
                               ))}
-                            </QuestCarousel>
+                            </div>
                           )}
                         </div>
                         </div>
@@ -794,13 +720,19 @@ function QuestSeasonBanner({
         ) : (
           <div className="absolute inset-0 h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
         )}
-        <div className="absolute inset-x-0 top-0 flex justify-center p-4">
+        <div className="absolute inset-x-0 top-10 flex justify-center p-4">
           <div className="flex flex-col items-center gap-2">
             <span className="inline-flex h-8 items-center gap-2 rounded-full bg-white/95 px-3 text-sm font-black text-slate-900 shadow-sm">
               <Clock className="h-4 w-4" />
               {timeLeft}
             </span>
-            <h2 className="max-w-[18rem] text-center text-3xl font-black uppercase leading-none text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.9)]">
+            <h2
+              className="max-w-[20rem] text-center text-4xl font-black uppercase leading-none text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.9)] sm:text-5xl"
+              style={{
+                fontWeight: 1000,
+                WebkitTextStroke: '1px rgba(15, 23, 42, 0.85)',
+              }}
+            >
               {season.name}
             </h2>
           </div>
@@ -846,7 +778,7 @@ function QuestSeasonBanner({
                   </div>
                   <span className="absolute inset-0 flex items-center justify-center gap-1.5 text-sm font-black tabular-nums text-muted-foreground">
                     {progress} / {season.dailyTargetFlies}
-                    <Fly size={18} y={-3} paused={false} />
+                    <Fly size={18} y={-3} paused={false} interactive={false} />
                   </span>
                 </div>
               </div>
@@ -963,8 +895,8 @@ function QuestSeasonEventOverlay({
 
   return createPortal(
     <div className="fixed inset-0 z-[1200] bg-background">
-      <div className="h-full overflow-y-auto bg-teal-700">
-        <div className="relative h-[320px] overflow-hidden">
+      <div className="h-full overflow-y-auto bg-background">
+        <div className="relative h-[310px] overflow-hidden">
           {season.coverImageUrl ? (
             <img
               src={season.coverImageUrl}
@@ -972,115 +904,109 @@ function QuestSeasonEventOverlay({
               className="h-full w-full object-cover"
             />
           ) : (
-            <div className="h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
+            <div className="h-full w-full bg-[linear-gradient(135deg,#22c55e_0%,#14b8a6_55%,#064e3b_100%)]" />
           )}
+          <div className="absolute inset-0 bg-gradient-to-b from-black/8 via-transparent to-black/12" />
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md"
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground shadow-sm backdrop-blur-md"
             aria-label="Close season event"
           >
             <X className="h-5 w-5" />
           </button>
-          <div className="pointer-events-none absolute inset-x-0 top-12 flex justify-center px-4">
+          <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center px-4">
             <h2
-              className="max-w-[18rem] text-center text-3xl font-black uppercase leading-none text-white"
+              className="max-w-[20rem] text-center text-4xl font-black uppercase leading-none text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.55)]"
               style={{
-                WebkitTextStroke: '4px #0f172a',
-                paintOrder: 'stroke fill',
+                fontWeight: 1000,
+                WebkitTextStroke: '1.25px rgba(15, 23, 42, 0.86)',
               }}
             >
               {season.name}
             </h2>
           </div>
-          <div className="absolute bottom-2 left-4 inline-flex items-center gap-2.5 rounded-2xl bg-lime-600 pl-3 pr-4 py-2.5 text-white shadow-[0_4px_0_#3f6212] ring-1 ring-black/10">
-            <Clock className="h-5 w-5 shrink-0" />
-            <div className="flex flex-col leading-tight">
-              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-white/55">
-                Ends in
-              </span>
-              <span className="text-base font-black tabular-nums">
-                {timeLeft}
-              </span>
-            </div>
-          </div>
-          <div className="absolute bottom-2 right-4 flex w-[10rem] flex-col items-stretch">
-            <button
-              type="button"
-              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-500 px-4 pb-3 pt-4 text-base font-black text-white shadow-[0_5px_0_#3730a3] transition active:translate-y-1 active:shadow-none"
-            >
-              Frog
-              <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-black uppercase tracking-widest text-indigo-600">
-                Plus
-              </span>
-            </button>
+          <div className="absolute bottom-9 left-5 inline-flex h-9 items-center gap-2 rounded-full border border-primary/35 bg-primary/90 pl-2.5 pr-3.5 text-primary-foreground ring-1 ring-white/20 backdrop-blur-md">
+            <Clock className="h-4 w-4" strokeWidth={2.8} />
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/70">
+              Ends in
+            </span>
+            <span className="text-sm font-black tabular-nums">
+              {timeLeft}
+            </span>
           </div>
         </div>
 
-        {goalReached ? (
-          <div className="relative z-10 flex w-full items-center justify-between gap-3 bg-orange-500 px-4 py-3 text-white">
-            <div className="min-w-0">
-              <p className="text-base font-black leading-tight">
-                Day {season.currentDay} completed!
-              </p>
-              <p className="text-xs font-semibold leading-tight text-white/90">
-                Return tomorrow to start Day {season.currentDay + 1}
-              </p>
-            </div>
-            <div className="relative shrink-0">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-lg font-black text-amber-900 shadow-[0_3px_0_rgba(0,0,0,0.18)]">
-                {season.currentDay}
-              </div>
-              <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white ring-2 ring-orange-500">
-                <Check className="h-3 w-3" strokeWidth={4} />
-              </span>
-            </div>
-          </div>
-        ) : (
-          <div className="relative z-10 -mt-6 flex w-full justify-center bg-card px-3 py-3">
-            <div className="flex w-full max-w-md items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-                <Fly size={36} y={-5} paused={paused} />
-              </div>
-              <div className="relative h-8 flex-1 overflow-hidden rounded-full bg-muted">
-                <div className="absolute inset-1">
-                  <div
-                    className="h-full min-w-7 rounded-full bg-amber-400 transition-all"
-                    style={{ width: pct > 0 ? `${pct}%` : '1.75rem' }}
-                  />
+        <div className="relative z-10 -mt-8 rounded-t-[32px] bg-background pt-5">
+          {goalReached ? (
+            <div className="mx-4 overflow-hidden rounded-[24px] border border-primary/15 bg-card">
+              <div className="flex items-center justify-between gap-3 px-5 py-2.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary ring-1 ring-primary/20">
+                    <Check className="h-4 w-4" strokeWidth={4} />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="truncate text-[15px] font-black leading-tight text-foreground">
+                      Day {season.currentDay} completed!
+                    </p>
+                    <p className="mt-0.5 truncate text-[11px] font-bold leading-tight text-muted-foreground">
+                      Day {season.currentDay + 1} opens tomorrow
+                    </p>
+                  </div>
                 </div>
-                <span className="absolute inset-0 flex items-center justify-center text-sm font-black tabular-nums text-muted-foreground">
-                  {progress} / {season.dailyTargetFlies}
+                <span className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-primary-foreground">
+                  Done
                 </span>
               </div>
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-amber-100 text-lg font-black text-amber-900">
-                {season.currentDay}
+            </div>
+          ) : (
+            <div className="mx-5 flex justify-center rounded-[24px] border border-border bg-card/95 px-3 py-3 shadow-lg shadow-black/10 backdrop-blur-md">
+              <div className="flex w-full max-w-md items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                  <Fly size={36} y={-5} paused={paused} interactive={false} />
+                </div>
+                <div className="relative h-8 flex-1 overflow-hidden rounded-full border border-border/60 bg-muted">
+                  <div className="absolute inset-1">
+                    <div
+                      className="h-full min-w-7 rounded-full bg-amber-400 transition-all"
+                      style={{ width: pct > 0 ? `${pct}%` : '1.75rem' }}
+                    />
+                  </div>
+                  <span className="absolute inset-0 flex items-center justify-center text-sm font-black tabular-nums text-muted-foreground">
+                    {progress} / {season.dailyTargetFlies}
+                  </span>
+                </div>
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg font-black text-primary ring-1 ring-primary/20">
+                  {season.currentDay}
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div>
-          <div className="bg-teal-700 p-4 text-white">
-            <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2 px-1">
-              <div className="flex h-10 items-center justify-center gap-2 rounded-2xl border border-white/25 bg-white/10 text-[11px] font-black uppercase tracking-widest text-white">
+        <div className="px-4 pb-5 pt-5">
+          <div className="bg-transparent p-0 text-foreground">
+            <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <div className="flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-muted/35 px-4 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                 <Gift className="w-4 h-4" />
                 <span>Free</span>
               </div>
               <div className="w-10" />
               <button
                 type="button"
-                className="flex h-10 items-center justify-center gap-2 rounded-full bg-amber-400 px-4 text-[12px] font-black uppercase tracking-widest text-slate-900 shadow-[0_4px_0_#b45309] active:translate-y-0.5 active:shadow-[0_2px_0_#b45309]"
+                className="relative flex h-10 items-center justify-center gap-2 overflow-hidden rounded-xl border border-primary/35 bg-primary px-4 text-[11px] font-black uppercase tracking-[0.16em] text-primary-foreground ring-1 ring-white/15 transition hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0"
               >
-                <Sparkles className="w-4 h-4" />
-                <span>Frog Plus</span>
+                <Sparkles className="w-4 h-4 text-amber-200" />
+                <span>Frog</span>
+                <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-black leading-none tracking-[0.12em] text-primary-foreground ring-1 ring-white/20">
+                  Plus
+                </span>
               </button>
             </div>
 
-            <div className="relative mt-4 px-1">
-              <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-white/15" />
+            <div className="relative mt-4 px-1 pb-1">
+              <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60" />
               <div
-                className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,0.45)]"
+                className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)]"
                 style={{
                   height: `calc(${Math.min(
                     100,
@@ -1106,7 +1032,7 @@ function QuestSeasonEventOverlay({
                       key={entry.day}
                       className={cn(
                         'relative grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center rounded-2xl px-1 py-2 transition-all duration-300',
-                        isCurrent && 'bg-white/10 ring-1 ring-amber-300/40',
+                        !isCurrent && 'hover:bg-muted/30',
                       )}
                     >
                       <div className="flex w-full justify-center pr-2 sm:pr-3">
@@ -1145,14 +1071,14 @@ function QuestSeasonEventOverlay({
 
                       <div className="relative z-20 flex justify-center">
                         {isCurrent && (
-                          <span className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-amber-400/25 animate-ping-ring" />
+                          <span className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-primary/20 animate-ping-ring" />
                         )}
                         <div
                           className={cn(
-                            'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none text-white shadow-[0_4px_0_rgba(0,0,0,0.18)] ring-1 ring-black/10',
+                            'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.12)] ring-1 ring-primary/20',
                             isClaimed && !isCurrent
-                              ? 'bg-amber-500'
-                              : 'bg-orange-500',
+                              ? 'bg-primary/85'
+                              : 'bg-primary',
                           )}
                         >
                           {isClaimed && !isCurrent ? (
@@ -1222,6 +1148,7 @@ function QuestSeasonEventOverlay({
           </div>
         </div>
       </div>
+      </div>
     </div>,
     document.body,
   );
@@ -1264,7 +1191,7 @@ function PremiumFlyCounter({
 
   return (
     <div className="relative flex items-center justify-center w-full h-full">
-      <Fly size={132} paused={paused} />
+      <Fly size={132} paused={paused} interactive={false} />
       <motion.span
         key={displayAmount}
         animate={showDouble ? { scale: [1.3, 1] } : {}}
@@ -1349,7 +1276,7 @@ function QuestRewardRevealOverlay({
                     />
                   ) : (
                     <div className="relative flex items-center justify-center w-full h-full">
-                      <Fly size={132} paused={paused} />
+                      <Fly size={132} paused={paused} interactive={false} />
                       <span className="absolute z-40 px-3 py-1 text-sm font-black text-white border shadow-sm right-3 top-3 rounded-xl border-white/20 bg-black/45 backdrop-blur-sm">
                         x{entry.fliesGranted}
                       </span>

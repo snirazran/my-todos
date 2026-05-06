@@ -5,18 +5,10 @@ import QuestSeasonModel from '@/lib/models/QuestSeason';
 import UserModel from '@/lib/models/User';
 import { getZonedToday } from '@/lib/utils';
 import {
+  getCurrentSeasonDay,
   grantRewardsToUser,
   normalizeSeasonDayRewards,
 } from '@/lib/quests/seasons';
-
-function getDayCount(startsAt: Date, endsAt: Date) {
-  return Math.max(1, Math.ceil((endsAt.getTime() - startsAt.getTime()) / 86_400_000));
-}
-
-function getCurrentSeasonDay(startsAt: Date, endsAt: Date) {
-  const raw = Math.floor((Date.now() - startsAt.getTime()) / 86_400_000) + 1;
-  return Math.min(getDayCount(startsAt, endsAt), Math.max(1, raw));
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -50,7 +42,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const day = getCurrentSeasonDay(season.startsAt, season.endsAt);
+    const day = getCurrentSeasonDay(
+      season.startsAt,
+      season.endsAt,
+      timezone,
+      now,
+    );
     const today = getZonedToday(timezone);
     const progressFlies =
       user.wardrobe?.flyDaily?.date === today
