@@ -298,7 +298,7 @@ function HabitTrayItem({
         className="flex items-center gap-3 p-3 cursor-default select-none"
       >
         {/* Bullet - non-interactive */}
-        <div className="relative w-7 h-7 shrink-0 pointer-events-none">
+        <div className="relative w-9 h-9 shrink-0 pointer-events-none">
           <AnimatePresence initial={false} mode="wait">
             {!isDone ? (
               <motion.div
@@ -308,8 +308,8 @@ function HabitTrayItem({
                 exit={{ opacity: 0, scale: 0.8 }}
                 className="absolute inset-0 flex items-center justify-center text-muted-foreground/40"
               >
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60">
-                  <Fly size={24} y={-3} />
+                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60">
+                  <Fly size={32} y={-3} />
                 </div>
               </motion.div>
             ) : (

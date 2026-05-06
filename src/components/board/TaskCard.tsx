@@ -229,7 +229,7 @@ export default function TaskCard({
       >
         <div
           className={[
-            'shrink-0 text-muted-foreground group-hover:text-primary transition-colors relative h-7 w-7',
+            'shrink-0 text-muted-foreground group-hover:text-primary transition-colors relative h-10 w-10',
             compact
               ? 'flex items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60'
               : 'place-items-center mt-0.5',
@@ -242,7 +242,7 @@ export default function TaskCard({
             }`}
           >
             <Fly
-              size={compact ? 24 : 28}
+              size={compact ? 36 : 40}
               paused={task.completed}
               y={compact ? -3 : -4}
             />
@@ -254,7 +254,7 @@ export default function TaskCard({
             }`}
           >
             <CheckCircle2
-              className={`${compact ? 'w-6 h-6' : 'w-7 h-7'} text-green-500`}
+              className={`${compact ? 'w-8 h-8' : 'w-9 h-9'} text-green-500`}
             />
           </div>
         </div>

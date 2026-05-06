@@ -16,6 +16,7 @@ import {
   Bell,
   Timer,
   Plus,
+  Flame,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import {
@@ -60,6 +61,7 @@ import TagPopup from '@/components/ui/TagPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
 import AiSuggestions from '@/components/ui/AiSuggestions';
+import { format } from 'date-fns';
 
 interface Task {
   id: string;
@@ -83,6 +85,8 @@ interface Task {
   startTime?: string;
   endTime?: string;
   reminder?: string;
+  completedDates?: string[];
+  timesPerWeek?: number;
 }
 
 interface SortableTaskItemProps {
@@ -496,7 +500,7 @@ const SortableTaskItem = React.forwardRef<
               className={`relative z-10 flex items-center flex-1 min-w-0 gap-2 pl-1.5 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
             >
               {/* Bullet */}
-              <div className="relative flex-shrink-0 w-7 h-7">
+              <div className="relative flex-shrink-0 w-10 h-10">
                 <AnimatePresence initial={false}>
                   {!isDone ? (
                     <motion.div
@@ -524,7 +528,7 @@ const SortableTaskItem = React.forwardRef<
                           }}
                           className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 md:hover:text-primary"
                         >
-                          <Circle className="w-6 h-6" />
+                          <Circle className="w-8 h-8" />
                         </button>
                       )}
                     </motion.div>
@@ -542,12 +546,13 @@ const SortableTaskItem = React.forwardRef<
                       }}
                     >
                       <button
+                        className="flex items-center justify-center w-full h-full"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleTaskToggle(task, false);
                         }}
                       >
-                        <CheckCircle2 className="text-green-500 w-6 h-6 drop-shadow-sm" />
+                        <CheckCircle2 className="text-green-500 w-8 h-8 drop-shadow-sm" />
                       </button>
                     </motion.div>
                   )}
@@ -634,6 +639,103 @@ const SortableTaskItem = React.forwardRef<
                     <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                   )}
                 </span>
+                
+                {/* Habit Weekly Goal Progress Dots */}
+                {task.type === 'habit' && (
+                  <div className="flex items-center gap-1 mt-1.5 pl-px">
+                    {(() => {
+                      const goal = task.timesPerWeek || 7;
+                      const todayDateStr = format(new Date(), 'yyyy-MM-dd');
+                      
+                      // Effective completed dates for this view
+                      let allCompleted = [...(task.completedDates || [])];
+                      if (isDone) {
+                        if (!allCompleted.includes(todayDateStr)) allCompleted.push(todayDateStr);
+                      } else {
+                        allCompleted = allCompleted.filter((d) => d !== todayDateStr);
+                      }
+
+                      // Helper: get Sun-Sat week dates for a given date
+                      const getWeekDates = (refDate: string) => {
+                        const d = new Date(refDate);
+                        const dow = d.getDay();
+                        const sun = new Date(d);
+                        sun.setDate(d.getDate() - dow);
+                        sun.setHours(0, 0, 0, 0);
+                        const dates: string[] = [];
+                        for (let i = 0; i < 7; i++) {
+                          const wd = new Date(sun);
+                          wd.setDate(sun.getDate() + i);
+                          dates.push(wd.toISOString().split('T')[0]);
+                        }
+                        return dates;
+                      };
+
+                      const weekDates = getWeekDates(todayDateStr);
+                      const completedThisWeek = weekDates.filter((d) =>
+                        allCompleted.includes(d),
+                      ).length;
+
+                      // Weekly streak
+                      let weekStreak = 0;
+                      const currentWeekMet = completedThisWeek >= goal;
+                      let checkDate = todayDateStr;
+
+                      if (currentWeekMet) {
+                        weekStreak++;
+                        const prev = new Date(weekDates[0]);
+                        prev.setDate(prev.getDate() - 1);
+                        checkDate = prev.toISOString().split('T')[0];
+                      } else {
+                        const prev = new Date(weekDates[0]);
+                        prev.setDate(prev.getDate() - 1);
+                        checkDate = prev.toISOString().split('T')[0];
+                      }
+
+                      while (true) {
+                        const wk = getWeekDates(checkDate);
+                        const count = wk.filter((d) =>
+                          allCompleted.includes(d),
+                        ).length;
+                        if (count >= goal) {
+                          weekStreak++;
+                          const prev = new Date(wk[0]);
+                          prev.setDate(prev.getDate() - 1);
+                          checkDate = prev.toISOString().split('T')[0];
+                        } else {
+                          break;
+                        }
+                      }
+
+                      return (
+                        <>
+                          {Array.from({ length: goal }).map((_, i) => {
+                            const isFilled = i < completedThisWeek;
+                            return (
+                              <div
+                                key={i}
+                                className={`w-2.5 h-2.5 rounded-full border transition-all duration-300 flex-shrink-0 ${
+                                  isFilled
+                                    ? 'bg-green-500 border-green-600 shadow-sm shadow-green-500/20'
+                                    : 'bg-muted border-border/50'
+                                }`}
+                              />
+                            );
+                          })}
+                          {weekStreak > 0 && (
+                            <span className="inline-flex items-center gap-0.5 ml-1 text-muted-foreground/50">
+                              <Flame className="w-3.5 h-3.5 text-orange-400" />
+                              <span className="text-[11px] font-semibold text-muted-foreground/60">
+                                {weekStreak} {weekStreak === 1 ? 'week' : 'weeks'}
+                              </span>
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 {task.frogodoroSession && (task.frogodoroSession.timeSpent > 0 || (task.frogodoroSession.shortBreaks ?? 0) > 0 || (task.frogodoroSession.longBreaks ?? 0) > 0) && (
                   <div className="flex flex-wrap items-center gap-1 mt-0.5">
                     {task.frogodoroSession.timeSpent > 0 && (() => { const s = task.frogodoroSession!.timeSpent; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
@@ -1189,12 +1291,12 @@ export default function TaskList({
                   onClick={() =>
                     onAddRequested('', null, { preselectToday: true })
                   }
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+                  className="w-full flex items-center gap-3 px-3 py-3 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-[22px] transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
-                    <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
+                    <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
-                  <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+                  <p className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
                     Add your first task
                   </p>
                 </button>
@@ -1216,12 +1318,12 @@ export default function TaskList({
                   onClick={() =>
                     onAddRequested('', null, { preselectToday: true })
                   }
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
+                  className="w-full flex items-center gap-3 px-3 py-3 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-[22px] transition-all cursor-pointer group"
                 >
-                  <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
-                    <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
+                    <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                   </div>
-                  <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
+                  <p className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
                     {selectedTags.length > 0
                       ? 'No tasks match your filters'
                       : 'Add another task'}
@@ -1290,6 +1392,21 @@ export default function TaskList({
                 </div>
 
                 {aiSuggestionsBlock}
+
+                {/* Inline Add Task Button */}
+                <div className="mt-1.5 mb-1">
+                  <button
+                    onClick={() => onAddRequested('', null, { preselectToday: true })}
+                    className="group relative flex w-full items-center gap-3 px-3 py-3 rounded-[22px] border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99]"
+                  >
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
+                      <Plus className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
+                    </div>
+                    <span className="text-sm font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
+                      Add a task
+                    </span>
+                  </button>
+                </div>
 
                 {/* Completed Tasks Section */}
                 {showCompleted && completedTasks.length > 0 && (

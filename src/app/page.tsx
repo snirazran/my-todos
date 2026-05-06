@@ -13,6 +13,7 @@ import {
   Plus,
   Sparkles,
   ChevronRight,
+  Filter,
 } from 'lucide-react';
 import { HabitPanel } from '@/components/ui/HabitPanel';
 import BacklogTray from '@/components/board/BacklogTray';
@@ -55,7 +56,7 @@ import type { FocusCategoryTagMap, MacroCategoryDefinition, MacroCategoryId } fr
 
 // Force re-compilation of this file to pick up useTaskData.tsx change
 
-const FLY_PX = 24;
+const FLY_PX = 40;
 type HomeTab = 'all' | 'today' | 'habits';
 
 const demoTasks: Task[] = [
@@ -256,7 +257,6 @@ export default function Home() {
     shouldShowMissedReview ||
     showQuickAdd ||
     showTimer ||
-    showProgressCoach ||
     isBacklogOpen;
 
   // Sync cinematic state with UI store
@@ -546,7 +546,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen pb-20 md:pb-8 bg-background">
-      <div className="px-3 pt-1 pb-4 mx-auto max-w-7xl md:px-6">
+      <div className="px-3 pt-12 pb-4 mx-auto max-w-7xl md:px-6">
         <Header router={router} />
 
         <div className="relative grid items-start grid-cols-1 gap-2 lg:grid-cols-12 lg:gap-5">
@@ -580,300 +580,162 @@ export default function Home() {
             className="flex flex-col gap-2 lg:col-span-8 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
-            <div className="flex items-center justify-center w-full px-2 md:px-0 md:w-auto md:justify-start">
-              <div className="flex items-center w-full max-w-[calc(100vw-1rem)] md:max-w-none md:w-auto p-0.5 rounded-[16px] bg-card/80 backdrop-blur-2xl border border-border/50 shadow-sm relative group z-20">
-                <button
-                  onClick={() => setActiveTab('all')}
-                  className={`
-        flex-1 md:flex-none justify-center relative px-2.5 sm:px-4 py-2 text-[10px] font-black uppercase rounded-[11px] transition-all flex items-center whitespace-nowrap
-        ${
-          activeTab === 'all'
-            ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
-            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-        }
-      `}
-                >
-                  <div className="flex items-center justify-center gap-2 mr-[-0.15em]">
-                    <LayoutDashboard
-                      className={`w-3.5 h-3.5 ${activeTab === 'all' ? 'text-primary' : 'text-muted-foreground'}`}
-                    />
-                    <span>All</span>
-                    <TaskCounter
-                      count={visibleTodayCount}
-                      pendingCount={pendingToToday}
-                      isActive={activeTab === 'all'}
-                    />
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between px-2 md:px-0">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 group cursor-pointer ml-3">
+                    <CalendarCheck className="w-5 h-5 text-primary" />
+                    <span className="text-sm font-black tracking-tight text-foreground lowercase">
+                      {openTaskCount + openHabitCount} {openTaskCount + openHabitCount === 1 ? 'fly' : 'flies'} left for today!
+                    </span>
                   </div>
-                </button>
-                <button
-                  onClick={() => setActiveTab('today')}
-                  className={`
-        flex-1 md:flex-none justify-center relative px-2.5 sm:px-4 py-2 text-[10px] font-black uppercase rounded-[11px] transition-all flex items-center whitespace-nowrap
-        ${
-          activeTab === 'today'
-            ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
-            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-        }
-      `}
-                >
-                  <div className="flex items-center justify-center gap-2 mr-[-0.15em]">
-                    <CalendarCheck
-                      className={`w-3.5 h-3.5 ${activeTab === 'today' ? 'text-primary' : 'text-muted-foreground'}`}
-                    />
-                    <span>Tasks</span>
-                    <TaskCounter
-                      count={visibleTaskCount}
-                      pendingCount={pendingToToday}
-                      isActive={activeTab === 'today'}
-                    />
-                  </div>
-                </button>
-                <button
-                  onClick={() => setActiveTab('habits')}
-                  className={`
-        flex-1 md:flex-none justify-center relative px-2.5 sm:px-4 py-2 text-[10px] font-black uppercase rounded-[11px] transition-all flex items-center whitespace-nowrap
-        ${
-          activeTab === 'habits'
-            ? 'bg-primary/10 text-primary shadow-sm ring-1 ring-primary/20'
-            : 'text-muted-foreground hover:text-foreground hover:bg-muted/30'
-        }
-      `}
-                >
-                  <div className="flex items-center justify-center gap-2 mr-[-0.15em]">
-                    <CalendarClock
-                      className={`w-3.5 h-3.5 ${activeTab === 'habits' ? 'text-primary' : 'text-muted-foreground'}`}
-                    />
-                    <span>Habits</span>
-                    <TaskCounter
-                      count={visibleHabitCount}
-                      isActive={activeTab === 'habits'}
-                    />
-                  </div>
-                </button>
+                </div>
 
-                {/* 3-DOTS MENU ADDED HERE */}
-                <div className="w-[1px] h-5 bg-border/50 mx-0.5" />
-                <button
-                  ref={headerMenuBtnRef}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsHeaderMenuOpen(!isHeaderMenuOpen);
-                  }}
-                  className={`relative p-1.5 rounded-full transition-colors ${
-                    isHeaderMenuOpen || selectedTags.length > 0 || showCompleted
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-                  }`}
-                >
-                  <EllipsisVertical className="w-[18px] h-[18px]" />
-                  {(selectedTags.length > 0 || showCompleted) && (
-                    <div className="absolute top-0.5 right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
-                  )}
-                </button>
-
-                <FilterDropdown
-                  isOpen={isHeaderMenuOpen}
-                  onClose={() => setIsHeaderMenuOpen(false)}
-                  triggerRef={headerMenuBtnRef}
-                  showTypeFilters={false}
-                  showCompleted={showCompleted}
-                  onShowCompletedChange={setShowCompleted}
-                  availableTags={tags || []}
-                  selectedTags={selectedTags}
-                  onTagsChange={setSelectedTags}
-                />
-              </div>
-            </div>
-
-            <div className="min-h-[360px] pb-16" ref={taskListRef}>
-              <AnimatePresence mode="wait" initial={false}>
-                {activeTab === 'all' ? (
-                  <motion.div
-                    key="all"
-                    className="w-full"
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    {renderGuestPrompt()}
-                    <OverviewSectionHeader
-                      icon={<CalendarClock className="w-3.5 h-3.5" />}
-                      title="Habits"
-                      count={visibleHabitCount}
-                      detail={showCompleted ? 'visible' : 'left today'}
-                    />
-                    {habits.length > 0 ? (
-                      <HabitPanel
-                        habits={habits}
-                        onToggle={handleToggle}
-                        onEdit={(id, text) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          editTask(id, text, false);
-                        }}
-                        onDelete={(id) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          deleteTask(id, true);
-                        }}
-                        onSchedule={(id, data) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          scheduleTask(id, data);
-                        }}
-                        onAddRequested={(prefill, isHabit) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          setQuickText(prefill || '');
-                          setQuickAddMode(isHabit ? 'habit' : 'pick');
-                          setShowQuickAdd(true);
-                        }}
-                        tags={tags}
-                        flyRefs={flyRefs}
-                        showCompleted={showCompleted}
-                        visuallyCompleted={visuallyDone}
-                        onReorder={reorderTasks}
-                        date={todayDateStr}
-                        paused={isAnyPanelOpen}
-                      />
-                    ) : (
-                      <div className="px-4 pt-2 pb-3">
-                        <div className="rounded-[22px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-1.5">
-                          <button
-                            onClick={() => {
-                              if (!user) {
-                                router.push('/login');
-                                return;
-                              }
-                              setQuickText('');
-                              setQuickAddMode('habit');
-                              setShowQuickAdd(true);
-                            }}
-                            className="w-full flex items-center gap-2.5 px-3 py-2.5 border border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
-                          >
-                            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted border border-muted-foreground/10">
-                              <Plus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-                            </div>
-                            <p className="text-sm font-semibold text-muted-foreground group-hover:text-primary transition-colors">
-                              Add your first habit
-                            </p>
-                          </button>
-                        </div>
-                      </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    ref={headerMenuBtnRef}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsHeaderMenuOpen(!isHeaderMenuOpen);
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all",
+                      isHeaderMenuOpen || selectedTags.length > 0 || showCompleted
+                        ? "bg-primary/10 text-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                     )}
-                    <OverviewSectionHeader
-                      icon={<CalendarCheck className="w-3.5 h-3.5" />}
-                      title="Tasks"
-                      count={visibleTaskCount}
-                      detail={showCompleted ? 'visible' : 'left today'}
-                    />
-                    <TaskList
-                      tasks={data}
-                      toggle={handleToggle}
-                      showConfetti={rate === 100}
-                      visuallyCompleted={visuallyDone}
-                        renderBullet={(task, isVisuallyDone, isPaused) =>
-                          task.completed || isVisuallyDone ? null : (
-                            <div
-                              ref={(el) => {
-                                flyRefs.current[task.id] = el;
-                              }}
-                              className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60"
-                            >
-                              <Fly
-                                onClick={() => null}
-                                size={24}
-                                y={-3}
-                                x={0}
-                                paused={isPaused}
-                              />
-                            </div>
-                          )
-                        }
-                        onAddRequested={(prefill) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          setQuickText(prefill || '');
-                          setQuickAddMode('pick');
-                          setShowQuickAdd(true);
+                  >
+                    <Filter className="w-3.5 h-3.5" />
+                    <span>Filter</span>
+                    {(selectedTags.length > 0 || showCompleted) && (
+                      <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    )}
+                  </button>
+                  <FilterDropdown
+                    isOpen={isHeaderMenuOpen}
+                    onClose={() => setIsHeaderMenuOpen(false)}
+                    triggerRef={headerMenuBtnRef}
+                    showTypeFilters={false}
+                    showCompleted={showCompleted}
+                    onShowCompletedChange={setShowCompleted}
+                    availableTags={tags || []}
+                    selectedTags={selectedTags}
+                    onTagsChange={setSelectedTags}
+                  />
+                </div>
+              </div>
+
+              <div className="min-h-[360px] pb-16" ref={taskListRef}>
+                {renderGuestPrompt()}
+                <TaskList
+                  tasks={[...habits, ...data]}
+                  toggle={handleToggle}
+                  showConfetti={rate === 100}
+                  visuallyCompleted={visuallyDone}
+                  renderBullet={(task, isVisuallyDone, isPaused) =>
+                    task.completed || isVisuallyDone ? null : (
+                      <div
+                        ref={(el) => {
+                          flyRefs.current[task.id] = el;
                         }}
-                        weeklyIds={weeklyIds}
-                        onDeleteToday={(id) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          deleteTask(id);
-                        }}
-                        onDeleteFromWeek={async (taskId) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          const dow = new Date().getDay();
-                          await fetch('/api/tasks?view=board', {
-                            method: 'DELETE',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ day: dow, taskId }),
-                          });
-                          deleteTask(taskId);
-                        }}
-                        onDoLater={(id) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          moveTaskToBacklog(id);
-                        }}
-                        onReorder={reorderTasks}
-                        pendingToToday={pendingToToday}
-                        onToggleRepeat={(id) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          toggleRepeat(id);
-                        }}
-                        onEditTask={(id, text) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          editTask(id, text, false);
-                        }}
-                        onScheduleTask={(id, data) => {
-                          if (!user) {
-                            router.push('/login');
-                            return;
-                          }
-                          return scheduleTask(id, data);
-                        }}
-                        onStartTimer={(t) => {
-                          if (!user) { router.push('/login'); return; }
-                          setTimerTask(t as Task);
-                          setShowTimer(true);
-                        }}
-                        isGuest={!user}
-                        tags={tags}
-                        showCompleted={showCompleted}
-                        selectedTags={selectedTags}
-                        onSetSelectedTags={setSelectedTags}
-                        isGlowActive={isTaskGlow}
-                        isFrozen={cinematic}
-                        paused={isAnyPanelOpen}
-                        onAcceptSuggestion={user ? async (text: string, tagIds?: string[]) => {
-                          const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-muted border border-muted-foreground/10 shrink-0"
+                      >
+                        <Fly
+                          onClick={() => null}
+                          size={36}
+                          y={-3}
+                          x={0}
+                          paused={isPaused}
+                        />
+                      </div>
+                    )
+                  }
+                  onAddRequested={(prefill) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    setQuickText(prefill || '');
+                    setQuickAddMode('pick');
+                    setShowQuickAdd(true);
+                  }}
+                  weeklyIds={weeklyIds}
+                  onDeleteToday={(id) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    deleteTask(id);
+                  }}
+                  onDeleteFromWeek={async (taskId) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    const dow = new Date().getDay();
+                    await fetch('/api/tasks?view=board', {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ day: dow, taskId }),
+                    });
+                    deleteTask(taskId);
+                  }}
+                  onDoLater={(id) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    moveTaskToBacklog(id);
+                  }}
+                  onReorder={(reordered) => {
+                    // Split reordered back to habits and tasks
+                    const newHabits = reordered.filter(t => t.type === 'habit');
+                    const newTasks = reordered.filter(t => t.type !== 'habit');
+                    reorderTasks(reordered);
+                  }}
+                  pendingToToday={pendingToToday}
+                  onToggleRepeat={(id) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    toggleRepeat(id);
+                  }}
+                  onEditTask={(id, text) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    editTask(id, text, false);
+                  }}
+                  onScheduleTask={(id, data) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    return scheduleTask(id, data);
+                  }}
+                  onStartTimer={(t) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    setTimerTask(t as Task);
+                    setShowTimer(true);
+                  }}
+                  isGuest={!user}
+                  tags={tags}
+                  showCompleted={showCompleted}
+                  selectedTags={selectedTags}
+                  onSetSelectedTags={setSelectedTags}
+                  isGlowActive={isTaskGlow}
+                  isFrozen={cinematic}
+                  paused={isAnyPanelOpen}
+                  onAcceptSuggestion={
+                    user
+                      ? async (text: string, tagIds?: string[]) => {
+                          const tz =
+                            Intl.DateTimeFormat().resolvedOptions().timeZone;
                           const todayApiDay = new Date().getDay();
                           await fetch('/api/tasks?view=board', {
                             method: 'POST',
@@ -887,218 +749,14 @@ export default function Home() {
                             }),
                           });
                           mutateToday();
-                        } : undefined}
-                        aiSuggestionFocusCategoryIds={
-                          questOnboarding?.selectedCategoryIds ?? []
                         }
-                      />
-                    </motion.div>
-                ) : activeTab === 'today' ? (
-                  <motion.div
-                    key="today"
-                    className="w-full"
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    {!user && (
-                      <div className="relative overflow-hidden mb-3 rounded-xl bg-primary/5 border border-primary/10 shadow-sm">
-                        <div className="relative flex items-center gap-4 p-4">
-                          <div className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-background text-primary shadow-sm ring-1 ring-primary/20">
-                            <span className="text-xl animate-bounce">🍽️</span>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h3 className="text-sm font-black text-foreground tracking-tight mb-0.5">
-                              The Frog is Hungry!
-                            </h3>
-                            <p className="text-xs font-medium text-muted-foreground leading-relaxed">
-                              Catch a fly to make her happy and unlock a special{' '}
-                              <span className="text-primary font-bold">
-                                Gift
-                              </span>
-                              !
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <OverviewSectionHeader
-                      icon={<CalendarCheck className="w-3.5 h-3.5" />}
-                      title="Tasks"
-                      count={visibleTaskCount}
-                      detail={showCompleted ? 'visible' : 'left today'}
-                    />
-                    <TaskList
-                      tasks={data}
-                      toggle={handleToggle}
-                      showConfetti={rate === 100}
-                      visuallyCompleted={visuallyDone}
-                      renderBullet={(task, isVisuallyDone, isPaused) =>
-                        task.completed || isVisuallyDone ? null : (
-                          <div
-                            ref={(el) => {
-                              flyRefs.current[task.id] = el;
-                            }}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60"
-                          >
-                            <Fly
-                              onClick={() => null}
-                              size={24}
-                              y={-3}
-                              x={0}
-                              paused={isPaused}
-                            />
-                          </div>
-                        )
-                      }
-                      onAddRequested={(prefill) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        setQuickText(prefill || '');
-                        setQuickAddMode('pick');
-                        setShowQuickAdd(true);
-                      }}
-                      weeklyIds={weeklyIds}
-                      onDeleteToday={(id) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        deleteTask(id);
-                      }}
-                      onDeleteFromWeek={async (taskId) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        const dow = new Date().getDay();
-                        await fetch('/api/tasks?view=board', {
-                          method: 'DELETE',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ day: dow, taskId }),
-                        });
-                        deleteTask(taskId);
-                      }}
-                      onDoLater={(id) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        moveTaskToBacklog(id);
-                      }}
-                      onReorder={reorderTasks}
-                      pendingToToday={pendingToToday}
-                      onToggleRepeat={(id) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        toggleRepeat(id);
-                      }}
-                      onEditTask={(id, text) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        editTask(id, text, false);
-                      }}
-                      onScheduleTask={(id, data) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        return scheduleTask(id, data);
-                      }}
-                      onStartTimer={(t) => {
-                        if (!user) { router.push('/login'); return; }
-                        setTimerTask(t as Task);
-                        setShowTimer(true);
-                      }}
-                      isGuest={!user}
-                      tags={tags}
-                      showCompleted={showCompleted}
-                      selectedTags={selectedTags}
-                      onSetSelectedTags={setSelectedTags}
-                      isGlowActive={isTaskGlow}
-                      isFrozen={cinematic}
-                      paused={isAnyPanelOpen}
-                      onAcceptSuggestion={user ? async (text: string, tagIds?: string[]) => {
-                        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-                        const todayApiDay = new Date().getDay();
-                        await fetch('/api/tasks?view=board', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            text,
-                            days: [todayApiDay],
-                            repeat: 'this-week',
-                            tags: tagIds ?? [],
-                            timezone: tz,
-                          }),
-                        });
-                        mutateToday();
-                      } : undefined}
-                      aiSuggestionFocusCategoryIds={
-                        questOnboarding?.selectedCategoryIds ?? []
-                      }
-                    />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="habits"
-                    className="w-full"
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                    transition={{ duration: 0.2 }}
-                  >
-                    <HabitPanel
-                      habits={habits}
-                      onToggle={handleToggle}
-                      onEdit={(id, text) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        editTask(id, text, false);
-                      }}
-                      onDelete={(id) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        deleteTask(id, true);
-                      }}
-                      onSchedule={(id, data) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        scheduleTask(id, data);
-                      }}
-                      onAddRequested={(prefill, isHabit) => {
-                        if (!user) {
-                          router.push('/login');
-                          return;
-                        }
-                        setQuickText(prefill || '');
-                        setQuickAddMode(isHabit ? 'habit' : 'pick');
-                        setShowQuickAdd(true);
-                      }}
-                      tags={tags}
-                      flyRefs={flyRefs}
-                      showCompleted={showCompleted}
-                      visuallyCompleted={visuallyDone}
-                      onReorder={reorderTasks}
-                      date={format(new Date(), 'yyyy-MM-dd')}
-                      paused={isAnyPanelOpen}
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                      : undefined
+                  }
+                  aiSuggestionFocusCategoryIds={
+                    questOnboarding?.selectedCategoryIds ?? []
+                  }
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -1291,14 +949,6 @@ export default function Home() {
         />
       )}
 
-      <ProgressCoachPopup
-        open={showProgressCoach}
-        onClose={() => setShowProgressCoach(false)}
-        isPremium={isPremium}
-        historyData={coachHistoryData ?? []}
-        availableTags={tags}
-      />
-
       <QuestOnboardingPopup
         show={
           !!user &&
@@ -1325,36 +975,36 @@ export default function Home() {
 
       {/* Floating Add Task Button - Home Page Version */}
       <div className="fixed bottom-0 left-0 right-0 z-[40] px-3 pb-[calc(env(safe-area-inset-bottom)+84px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[300px] md:max-w-[360px] relative min-h-[48px] flex items-center justify-center gap-1.5">
-          {(activeTab === 'all' || activeTab === 'today' || activeTab === 'habits') && (
-            <BacklogBox
-              count={laterThisWeek.length}
-              isDragOver={false}
-              isDragging={false}
-              proximity={0}
-              onClick={() => setIsBacklogOpen(true)}
-              forwardRef={null}
-            />
-          )}
+        <div className="pointer-events-auto mx-auto w-full max-w-[340px] md:max-w-[400px] relative min-h-[48px] flex items-center justify-center gap-2">
+          <BacklogBox
+            count={laterThisWeek.length}
+            isDragOver={false}
+            isDragging={false}
+            proximity={0}
+            onClick={() => setIsBacklogOpen(true)}
+            forwardRef={null}
+          />
           <div
-            className="flex-1 min-w-0 pointer-events-auto"
-            style={{ whiteSpace: 'nowrap' }}
+            className="flex-1 min-w-0 pointer-events-auto h-[48px]"
           >
             <AddTaskButton
-              className="w-full"
+              className="w-full h-full rounded-[18px] text-[13px] font-black"
               onClick={() => {
                 if (!user) {
                   router.push('/login');
                   return;
                 }
                 setQuickText('');
-                setQuickAddMode(activeTab === 'habits' ? 'habit' : 'pick');
+                setQuickAddMode('pick');
                 setShowQuickAdd(true);
               }}
               label={
-                <span className="flex items-center">
-                  Add a <Fly size={24} y={-3} x={4} paused={isAnyPanelOpen} />
-                </span>
+                <div className="flex items-center justify-center gap-1">
+                  <span>Add a</span>
+                  <div className="relative w-7 h-7 flex items-center justify-center">
+                    <Fly size={28} y={-4} x={0} paused={isAnyPanelOpen} />
+                  </div>
+                </div>
               }
               showFly={false}
               paused={isAnyPanelOpen}
@@ -1464,15 +1114,7 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
 function Header({ router }: { router: any }) {
   return (
     <div className="flex flex-col gap-1 mb-1 md:mb-2 md:flex-row md:items-center md:justify-between">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground md:text-4xl">
-          {format(new Date(), 'EEEE')}
-        </h1>
-        <p className="flex items-center gap-1.5 text-sm font-medium md:text-base text-muted-foreground">
-          <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4" />
-          {format(new Date(), 'MMMM d, yyyy')}
-        </p>
-      </div>
+      {/* Date removed as per request */}
     </div>
   );
 }

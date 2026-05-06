@@ -49,8 +49,8 @@ export default function DragOverlay({
           opacity: 0.95,
         }}
       >
-        <span className="relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60">
-          <Fly size={24} y={-3} />
+        <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60">
+          <Fly size={32} y={-3} />
         </span>
         <div className="flex-1 min-w-0 flex flex-col">
           {(tags && tags.length > 0 || startTime || reminder) && (

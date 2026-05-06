@@ -185,7 +185,7 @@ export function FrogDisplay({
             */}
 
       <div
-        className="relative z-10 -mt-6 flex items-center justify-between 
+        className="relative z-10 -mt-6 flex items-center justify-center 
 
               w-[340px] max-w-[min(94vw,100%)] h-[64px] px-2
 
@@ -201,156 +201,58 @@ export function FrogDisplay({
       >
         {/* Decorative Top Highlight to simulate glass edge light */}
         <div className="absolute inset-x-4 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/80 to-transparent opacity-50" />
-        {/* Left Section: Unified Balance & Hunger Pill */}
-        <div className="relative flex items-center ml-1">
-          {typeof flyBalance === 'number' ? (
-            <div
-              onClick={() => {
-                if (!isGuest) setShopOpen(true);
-              }}
-              className={cn(
-                'group relative overflow-hidden flex items-center gap-2 pl-2 pr-4 py-1.5 h-[50px] rounded-[15px] bg-muted/50 shadow-inner border border-border/30 transition-all cursor-pointer active:scale-95 duration-200',
-                !isGuest && 'hover:bg-muted/80',
-                hungerPercent <= 20 && 'ring-2 ring-rose-500/20',
-                isGuest && 'cursor-default active:scale-100 hover:bg-muted/50',
-              )}
-            >
-              {/* Hunger Fill Background */}
-
-              <div
-                className={cn(
-                  'absolute bottom-0 left-0 right-0 z-0 h-full origin-bottom',
-                  animateHunger &&
-                    'transition-transform duration-1000 ease-in-out',
-                  hungerColor,
-                )}
-                style={{
-                  transform: `scaleY(${hungerPercent / 100})`,
-                  opacity: 0.2,
-                }}
-              />
-
-              {/* Icon Container */}
-
-              <div className="relative z-10 flex items-center justify-center w-8 h-8 rounded-full shadow-sm bg-background ring-1 ring-black/5 shrink-0">
-                <Fly
-                  size={21}
-                  y={-2}
-                  className={cn(
-                    'transition-transform duration-300 text-muted-foreground',
-                    animateBalance && 'group-hover:rotate-12',
-                  )}
-                  paused={paused}
-                />
-              </div>
-
-              <div className="relative z-10 flex flex-col justify-center">
-                {/* Hunger Status - Integrated Line at the top */}
-
-                <div className="flex items-center gap-1.5 mb-0.5">
+        
+        {/* Full Width Hunger Pill */}
+        <div className="relative w-full h-full flex flex-col justify-center gap-1.5 px-3">
+          {typeof hunger === 'number' ? (
+            <>
+              {/* Hunger Title and Status */}
+              <div className="flex justify-between items-end w-full px-0.5">
+                <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-[0.15em]">
+                  Hunger Level
+                </span>
+                <div className="flex items-center gap-2">
                   <div
                     className={cn(
-                      'w-1.5 h-1.5 rounded-full ring-1 ring-white/10 shadow-sm',
+                      'w-2 h-2 rounded-full shadow-sm animate-pulse',
                       hungerColor,
                     )}
                   />
-
                   <span
                     className={cn(
-                      'text-[8px] font-black uppercase tracking-[0.15em]',
-
+                      'text-[10px] font-black uppercase tracking-[0.1em]',
                       hungerTextColor,
                     )}
                   >
                     {hungerStatus}
                   </span>
                 </div>
-
-                <span className="text-xl font-black leading-none tracking-tight text-foreground tabular-nums">
-                  {flyBalance}
-                </span>
               </div>
-            </div>
+
+              <div
+                className={cn(
+                  'group relative overflow-hidden flex items-center justify-start h-[14px] w-full rounded-full bg-muted/30 shadow-inner border border-border/20 transition-all duration-200',
+                  hungerPercent <= 20 && 'ring-1 ring-rose-500/10',
+                )}
+              >
+                {/* Hunger Fill Background - Horizontal */}
+                <div
+                  className={cn(
+                    'absolute top-0 left-0 bottom-0 z-0 w-full origin-left',
+                    animateHunger && 'transition-transform duration-1000 ease-in-out',
+                    hungerColor,
+                  )}
+                  style={{
+                    transform: `scaleX(${hungerPercent / 100})`,
+                    opacity: 0.8,
+                  }}
+                />
+              </div>
+            </>
           ) : (
-            <div className="w-24" />
+            <div className="flex-1" />
           )}
         </div>
-        {/* Spacer */}
-        <div className="flex-1" />
-
-        {/* Right: Gift & Wardrobe Buttons */}
-        {showActionButtons && (
-          <div className="flex items-center gap-1.5">
-            {onOpenProgressCoach && !isGuest && (
-              <button
-                onClick={onOpenProgressCoach}
-                className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
-                    bg-card/80 backdrop-blur-2xl
-                    text-muted-foreground hover:text-primary
-                    shadow-sm hover:shadow-md
-                    border border-border/50
-                    transition-all duration-300 ease-out
-                    active:scale-95 active:translate-y-0.5"
-                title="Progress Coach"
-              >
-                <div className="absolute inset-0 bg-primary/10 rounded-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <Brain className="relative w-[18px] h-[18px] stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
-                {!progressCoachIsPremium && (
-                  <span className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full border-2 border-background bg-primary px-1 text-[8px] font-black text-primary-foreground shadow-sm">
-                    PRO
-                  </span>
-                )}
-              </button>
-            )}
-
-            <button
-              onClick={() => router.push(isGuest ? '/login' : '/quests')}
-              onPointerEnter={isGuest ? undefined : prefetchQuests}
-              onFocus={isGuest ? undefined : prefetchQuests}
-              onTouchStart={isGuest ? undefined : prefetchQuests}
-              className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
-                    bg-card/80 backdrop-blur-2xl
-                    text-muted-foreground hover:text-primary
-                    shadow-sm hover:shadow-md
-                    border border-border/50
-                    transition-all duration-300 ease-out
-                    active:scale-95 active:translate-y-0.5"
-              title="Quests"
-            >
-              <div className="absolute inset-0 bg-primary/10 rounded-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <ScrollText className="relative w-[18px] h-[18px] stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
-              {questClaimableCount > 0 ? (
-                <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background shadow-sm z-20 animate-in zoom-in">
-                  {questClaimableCount > 99 ? '99+' : questClaimableCount}
-                </span>
-              ) : questActiveCount > 0 ? (
-                <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-muted-foreground/60 rounded-full border-2 border-background shadow-sm z-20">
-                  {questActiveCount > 9 ? '9+' : questActiveCount}
-                </span>
-              ) : null}
-            </button>
-
-            <button
-              onClick={() => router.push('/wardrobe')}
-              className="group relative flex items-center justify-center w-[44px] h-[44px] rounded-[13px]
-                    bg-card/80 backdrop-blur-2xl
-                    text-muted-foreground hover:text-primary
-                    shadow-sm hover:shadow-md
-                    border border-border/50
-                    transition-all duration-300 ease-out
-                    active:scale-95 active:translate-y-0.5"
-              title="Open Wardrobe"
-            >
-              <div className="absolute inset-0 bg-primary/10 rounded-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <Shirt className="relative w-[18px] h-[18px] stroke-[2px] transition-transform duration-300 group-hover:scale-110" />
-              {wardrobeBadge > 0 && (
-                <span className="absolute -top-2 -right-2 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background shadow-sm z-20">
-                  {wardrobeBadge > 9 ? '9+' : wardrobeBadge}
-                </span>
-              )}
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

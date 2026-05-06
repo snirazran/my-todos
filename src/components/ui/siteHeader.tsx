@@ -16,6 +16,8 @@ import {
   LogIn,
   LogOut,
   Compass,
+  Brain,
+  Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -30,6 +32,7 @@ import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import Fly from '@/components/ui/fly';
+import { CurrencyShop } from './shop/CurrencyShop';
 
 const wardrobeItems = [
   { tab: 'inventory' as const, label: 'Inventory', icon: Shirt, color: 'text-primary bg-primary/10' },
@@ -53,6 +56,7 @@ export default function SiteHeader() {
   const inventoryBadge = unseenCount + unseenContainerCount;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const [wardrobeDropdownOpen, setWardrobeDropdownOpen] = useState(false);
+  const [shopOpen, setShopOpen] = useState(false);
   const wardrobeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -99,6 +103,12 @@ export default function SiteHeader() {
       protected: true,
     },
     {
+      href: '/analytics',
+      label: 'Coach',
+      icon: Target,
+      protected: true,
+    },
+    {
       label: 'Quests',
       icon: ScrollText,
       onClick: () => {
@@ -127,23 +137,30 @@ export default function SiteHeader() {
   return (
     <>
       {pathname === '/' && (
-        <div className="fixed right-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center gap-2 rounded-full bg-card/75 px-2 py-1 shadow-sm ring-1 ring-border/40 backdrop-blur-xl md:hidden">
+        <>
+          <div className="fixed left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden">
+            <RightActions
+              user={user}
+              loading={loading}
+              onSignIn={() => router.push('/login')}
+              onSignOut={() => clearAuthTokenCookie()}
+              compactMobileHome
+            />
+          </div>
           {user && flyBalance !== undefined && (
-            <div className="flex items-center gap-1 rounded-full bg-muted/70 px-2 py-1">
-              <Fly size={22} paused={false} y={-3} />
-              <span className="text-xs font-black tabular-nums text-foreground">
-                {flyBalance.toLocaleString()}
-              </span>
+            <div
+              onClick={() => setShopOpen(true)}
+              className="fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden cursor-pointer transition-colors active:scale-95"
+            >
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-xl border border-border/50 shadow-sm">
+                <Fly size={28} paused={false} y={-3} />
+                <span className="text-xs font-black tabular-nums text-foreground">
+                  {flyBalance.toLocaleString()}
+                </span>
+              </div>
             </div>
           )}
-          <RightActions
-            user={user}
-            loading={loading}
-            onSignIn={() => router.push('/login')}
-            onSignOut={() => clearAuthTokenCookie()}
-            compactMobileHome
-          />
-        </div>
+        </>
       )}
       <header className="relative z-[90] hidden w-full h-16 border-b border-border/40 bg-background/95 backdrop-blur-xl md:block">
       <div className="flex items-center justify-between h-full gap-4 px-6 py-3 mx-auto max-w-7xl md:px-10">
@@ -160,6 +177,14 @@ export default function SiteHeader() {
             aria-hidden
           />
         </Link>
+
+        <CurrencyShop
+          open={shopOpen}
+          onOpenChange={setShopOpen}
+          balance={flyBalance ?? 0}
+          hunger={100} // Dummy value for header shop
+          maxHunger={100}
+        />
 
         {/* Global Modal rendering */}
         {isWeeklyWrappedOpen && (isDebugMode ? true : recapData) && createPortal(
@@ -286,19 +311,19 @@ export default function SiteHeader() {
 
         {/* ───────── Right Side (Desktop: User Menu, Mobile: Hamburger) ───────── */}
         <div className="flex items-center gap-3 shrink-0">
-          {user && flyBalance !== undefined && (
-            <div className="flex items-center gap-1 px-2 py-1 rounded-full bg-muted/60 border border-border/50 shrink-0">
-              <Fly size={22} paused={false} y={-3} />
-              <span className="text-xs font-black tabular-nums text-foreground">{flyBalance.toLocaleString()}</span>
-            </div>
-          )}
-
           <RightActions
             user={user}
             loading={loading}
             onSignIn={() => router.push('/login')}
             onSignOut={() => clearAuthTokenCookie()} // AuthContext handles state but manual cleanup helps
           />
+
+          {user && flyBalance !== undefined && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-xl border border-border/50 shadow-sm shrink-0">
+              <Fly size={20} paused={false} y={-3} />
+              <span className="text-xs font-black tabular-nums text-foreground">{flyBalance.toLocaleString()}</span>
+            </div>
+          )}
         </div>
         <style jsx>{`
           @keyframes float {
@@ -627,7 +652,7 @@ function MobileMenuButton({
   return (
     <button
       onClick={() => setIsOpen(!isOpen)}
-      className="p-2 -mr-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+      className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground transition-colors"
     >
       {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
     </button>
@@ -665,18 +690,18 @@ function MobileSheet({
             className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm md:hidden"
           />
           <motion.div
-            initial={{ x: '100%' }}
+            initial={{ x: '-100%' }}
             animate={{ x: 0 }}
-            exit={{ x: '100%' }}
+            exit={{ x: '-100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed z-[101] top-0 right-0 bottom-0 w-[85%] max-w-xs bg-background border-l border-border/50 shadow-2xl p-6 flex flex-col gap-6 h-[100dvh] md:hidden"
+            className="fixed z-[101] top-0 left-0 bottom-0 w-[85%] max-w-xs bg-background border-r border-border/50 shadow-2xl p-6 flex flex-col gap-6 h-[100dvh] md:hidden"
             style={{ backgroundColor: 'hsl(var(--background))' }} // Force solid background using valid HSL
           >
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-black tracking-tight">Menu</h2>
               <button
                 onClick={onClose}
-                className="p-2 -mr-2 rounded-full hover:bg-muted"
+                className="p-2 -ml-2 rounded-full hover:bg-muted"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -765,6 +790,19 @@ function MobileSheet({
                         History
                       </span>
                       <History className="h-5 w-5 text-blue-500" />
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        router.push('/analytics');
+                        onClose();
+                      }}
+                      className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
+                    >
+                      <span className="font-bold text-sm group-hover:text-foreground transition-colors">
+                        Progress Coach
+                      </span>
+                      <Brain className="h-5 w-5 text-primary" />
                     </button>
                   </>
                 )}

@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, LayoutDashboard, ScrollText, Shirt, ShoppingBag, Repeat } from 'lucide-react';
+import { Home, LayoutDashboard, ScrollText, Shirt, ShoppingBag, Repeat, Brain, Target } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
 import useSWR from 'swr';
@@ -44,6 +44,12 @@ export default function MobileNav() {
       protected: true,
     },
     {
+      href: '/analytics',
+      label: 'Coach',
+      icon: Target,
+      protected: true,
+    },
+    {
       label: 'Quests',
       icon: ScrollText,
       onClick: () => {
@@ -72,7 +78,7 @@ export default function MobileNav() {
   return (
     <>
       <nav className="fixed bottom-0 left-0 z-50 w-full bg-background/90 backdrop-blur-lg border-t border-border md:hidden pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-4 h-16">
+        <div className="grid grid-cols-5 h-16">
           {navItems.map((item) => {
             const isActive = item.href ? pathname === item.href : item.isActive;
             const Icon = item.icon;

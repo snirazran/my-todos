@@ -257,8 +257,8 @@ export default React.memo(function TaskList({
           onClick={() => onAddRequested('')}
           className="flex flex-col items-center justify-center w-full py-3 text-center transition-all border-2 border-dashed cursor-pointer border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-[14px] group"
         >
-          <div className="flex items-center justify-center w-8 h-8 mb-1.5 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
-            <Fly size={18} y={-2} />
+          <div className="flex items-center justify-center w-11 h-11 mb-1.5 transition-all border rounded-full bg-muted border-muted-foreground/10 grayscale opacity-70 group-hover:grayscale-0 group-hover:opacity-100">
+            <Fly size={36} y={-3} />
           </div>
           <p className="text-xs font-bold transition-colors text-muted-foreground group-hover:text-primary">
             Add a task

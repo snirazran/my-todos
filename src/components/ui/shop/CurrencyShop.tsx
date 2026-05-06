@@ -153,7 +153,7 @@ export function CurrencyShop({
                     </h2>
                     <div className="flex items-center gap-3 mt-0.5">
                       <div className="flex items-center gap-1.5">
-                        <Fly size={14} y={-1} paused={false} />
+                        <Fly size={20} y={-1} paused={false} />
                         <span className="text-[10px] font-black text-muted-foreground tabular-nums">
                           {balance}
                         </span>

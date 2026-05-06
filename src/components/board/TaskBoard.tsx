@@ -620,7 +620,7 @@ export default function TaskBoard({
               className="w-full h-12 md:h-[56px]"
               label={
                 <span className="flex items-center">
-                  Add a <Fly size={24} y={-3} x={4} />
+                  Add a <Fly size={32} y={-3} x={4} />
                 </span>
               }
               showFly={false}

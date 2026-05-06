@@ -53,7 +53,7 @@ export function AddTaskButton({
 
         {showFly && (
           <span className="opacity-100 transition-all duration-300">
-            <Fly size={24} y={-3} x={-5} paused={paused} />
+            <Fly size={32} y={-3} x={-5} paused={paused} />
           </span>
         )}
       </span>

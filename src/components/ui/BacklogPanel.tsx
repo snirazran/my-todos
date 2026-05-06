@@ -364,9 +364,9 @@ function BacklogTaskItem({
         {/* Content Container (Matches TaskList structure) */}
         <div className="flex items-center flex-1 min-w-0 gap-3 pl-2">
           {/* Fly Icon */}
-          <div className="flex items-center justify-center flex-shrink-0 w-7 h-7">
+          <div className="flex items-center justify-center flex-shrink-0 w-9 h-9">
             <Fly
-              size={28}
+              size={36}
               y={-4}
               x={-2}
               className="text-primary transition-all"
@@ -666,8 +666,8 @@ export default function BacklogPanel({
               onClick={onAddRequested}
               className="w-full flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-muted-foreground/20 bg-muted/30 hover:bg-muted/50 rounded-xl transition-all cursor-pointer group"
             >
-              <div className="flex items-center justify-center w-14 h-14 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10">
-                <Fly size={32} y={-4} />
+              <div className="flex items-center justify-center w-16 h-16 mb-3 transition-all border rounded-full bg-muted border-muted-foreground/10">
+                <Fly size={48} y={-4} />
               </div>
               <p className="text-sm font-bold text-muted-foreground group-hover:text-primary transition-colors">
                 Save a task

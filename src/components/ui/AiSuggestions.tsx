@@ -134,127 +134,74 @@ export default function AiSuggestions({
   };
 
   return (
-    <>
-      {/* Header row */}
-      <div className="flex items-center gap-2 px-2 pt-2 pb-1">
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center gap-2 flex-1 min-w-0"
-        >
-          <div className="flex h-5 w-5 items-center justify-center rounded-md bg-primary/10">
-            <Sparkles className="h-3 w-3 text-primary" />
-          </div>
-          <span className="text-[11px] font-black uppercase tracking-[0.14em] text-primary">
-            AI Suggestions
-          </span>
-          <span className="text-[10px] font-semibold text-muted-foreground">
-            {suggestions.length} task{suggestions.length !== 1 ? 's' : ''}
-          </span>
-        </button>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
-          aria-label="Refresh suggestions"
-        >
-          <RefreshCw
-            className={`h-3 w-3 ${refreshing ? 'animate-spin' : ''}`}
-          />
-        </button>
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex h-6 w-6 items-center justify-center rounded-full text-muted-foreground"
-        >
-          <ChevronDown
-            className={`h-3.5 w-3.5 transition-transform ${collapsed ? '-rotate-90' : ''}`}
-          />
-        </button>
-      </div>
-
-      {/* Suggestion cards */}
+    <div className="flex flex-col gap-1.5 pb-1.5">
       <AnimatePresence initial={false}>
-        {!collapsed && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ type: 'tween', duration: 0.15, ease: 'easeOut' }}
-            className="overflow-hidden"
-          >
-            <div className="flex flex-col gap-1.5 pb-1.5">
-              {suggestions.map((suggestion) => {
-                const tags = (suggestion.tagIds ?? [])
-                  .map((id) => getTagDetails?.(id))
-                  .filter(Boolean) as { id: string; name: string; color?: string }[];
-                return (
-                  <motion.div
-                    key={suggestion.text}
-                    layout
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0, height: 0 }}
-                    transition={{ duration: 0.15 }}
-                    className="group relative flex w-full items-start gap-1.5 px-2 py-2 rounded-xl border border-dashed border-border/60 cursor-pointer hover:bg-accent/40 transition-colors"
-                    onClick={() => !adding && handleAccept(suggestion)}
-                  >
-                    <div className="flex items-center flex-1 min-w-0 gap-2 pl-1.5">
-                      <div className="relative flex-shrink-0 w-7 h-7 flex items-center justify-center">
-                        <Fly size={24} y={-3} />
-                      </div>
+        {suggestions.map((suggestion) => {
+          const tags = (suggestion.tagIds ?? [])
+            .map((id) => getTagDetails?.(id))
+            .filter(Boolean) as { id: string; name: string; color?: string }[];
+          return (
+            <motion.div
+              key={suggestion.text}
+              layout
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="group relative flex w-full items-center gap-3 px-3 py-3 rounded-[22px] border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-colors"
+              onClick={() => !adding && handleAccept(suggestion)}
+            >
+              <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
+                {adding === suggestion.text ? (
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
+                ) : (
+                  <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
+                )}
+              </div>
 
-                      <div className="flex-1 min-w-0">
-                        {tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mb-1">
-                            {tags.map((tag) => (
-                              <span
-                                key={tag.id}
-                                className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal shadow-sm"
-                                style={
-                                  tag.color
-                                    ? {
-                                        backgroundColor: `${tag.color}20`,
-                                        color: tag.color,
-                                        borderColor: `${tag.color}40`,
-                                      }
-                                    : undefined
-                                }
-                              >
-                                {tag.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                        <span className="text-sm font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
-                          {suggestion.text}
-                        </span>
-                      </div>
-                    </div>
+              <div className="flex-1 min-w-0 flex flex-col items-start gap-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-black text-emerald-600 dark:text-emerald-400">
+                    AI Suggestions
+                  </span>
+                  {tags.map((tag) => (
+                    <span
+                      key={tag.id}
+                      className="inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal shadow-sm"
+                      style={
+                        tag.color
+                          ? {
+                              backgroundColor: `${tag.color}20`,
+                              color: tag.color,
+                              borderColor: `${tag.color}40`,
+                            }
+                          : undefined
+                      }
+                    >
+                      {tag.name}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-sm font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
+                  {suggestion.text}
+                </span>
+              </div>
 
-                    <div className="flex items-center gap-1 shrink-0">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg text-primary">
-                        {adding === suggestion.text ? (
-                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-primary/30 border-t-primary" />
-                        ) : (
-                          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                        )}
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDismiss(suggestion.text);
-                        }}
-                        className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground hover:text-foreground transition-colors active:scale-95"
-                        aria-label="Dismiss"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDismiss(suggestion.text);
+                  }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground/40 hover:text-red-500 hover:bg-red-500/10 transition-colors active:scale-95 md:opacity-0 group-hover:opacity-100"
+                  aria-label="Dismiss"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </motion.div>
+          );
+        })}
       </AnimatePresence>
 
       <PremiumLimitDialog
@@ -268,6 +215,6 @@ export default function AiSuggestions({
           </>
         }
       />
-    </>
+    </div>
   );
 }
