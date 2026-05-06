@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
-import { ScrollText, X, Compass, Sparkles } from 'lucide-react';
+import { Clock, Compass, Gift, ScrollText, Sparkles, X } from 'lucide-react';
 import { BaseSheet } from './BaseSheet';
 import { cn } from '@/lib/utils';
 import TagPopup from './TagPopup';
@@ -16,10 +16,12 @@ import type {
   FocusCategoryTagMap,
   MacroCategoryDefinition,
   MacroCategoryId,
+  QuestReward,
 } from '@/lib/quests/types';
 import {
   CategoryQuestPresentationCard,
   DailyQuestPresentationCard,
+  RewardTile,
   type QuestTagChip,
 } from './QuestCards';
 import { RewardCard } from './gift-box/RewardCard';
@@ -42,8 +44,28 @@ type QuestsResponse = {
   macroCategories: MacroCategoryDefinition[];
   dailyQuests: DailyQuestProgressView[];
   categoryQuests: CategoryQuestProgressView[];
+  activeSeason?: QuestSeasonView | null;
   rewardCatalog: Record<string, ItemDef>;
   unlockedAnimationIds: string[];
+};
+
+type QuestSeasonView = {
+  id: string;
+  name: string;
+  coverImageUrl?: string;
+  startsAt: string;
+  endsAt: string;
+  dailyTargetFlies: number;
+  currentDay: number;
+  dayCount: number;
+  progressFlies: number;
+  claimedDays: number[];
+  claimable: boolean;
+  rewardsByDay: Array<{
+    day: number;
+    freeRewards: QuestReward[];
+    premiumRewards: QuestReward[];
+  }>;
 };
 
 type QuestRewardSummary = {
@@ -104,6 +126,8 @@ export function QuestsPopup({
   const [claimingObjectiveId, setClaimingObjectiveId] = useState<string | null>(
     null,
   );
+  const [seasonEventOpen, setSeasonEventOpen] = useState(false);
+  const [claimingSeason, setClaimingSeason] = useState(false);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const [activeSubCategoryId, setActiveSubCategoryId] = useState<string>('all');
   const [editingFocusCategoryId, setEditingFocusCategoryId] =
@@ -420,6 +444,29 @@ export function QuestsPopup({
     }
   };
 
+  const handleClaimSeasonDay = async () => {
+    const season = data?.activeSeason;
+    if (!season || claimingSeason) return;
+    setClaimingSeason(true);
+    setClaimMessage(null);
+    try {
+      const res = await fetch('/api/quests/season/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seasonId: season.id, timezone }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Claim failed');
+      queueRewardReveal(payload.rewardSummary);
+      await refreshQuestData();
+      mutateInventoryCaches();
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Claim failed');
+    } finally {
+      setClaimingSeason(false);
+    }
+  };
+
   const handleSaveFocusTags = async (categoryId: string, newTags: string[]) => {
     if (!data) return;
     const nextTags = newTags.slice(0, 1);
@@ -527,6 +574,14 @@ export function QuestsPopup({
                       )}
                     >
                       <div className="space-y-6">
+                        {data.activeSeason && (
+                          <QuestSeasonBanner
+                            season={data.activeSeason}
+                            rewardCatalog={data.rewardCatalog}
+                            isPremium={data.isPremium}
+                            onView={() => setSeasonEventOpen(true)}
+                          />
+                        )}
                         <div className="space-y-4">
                           {(() => {
                             const dailyQuests = data.dailyQuests ?? [];
@@ -704,6 +759,16 @@ export function QuestsPopup({
                 onOpenGift={handleRewardRevealOpenGift}
                 paused={isDragging}
               />
+              <QuestSeasonEventOverlay
+                season={data?.activeSeason ?? null}
+                open={seasonEventOpen}
+                rewardCatalog={data?.rewardCatalog ?? {}}
+                isPremium={data?.isPremium ?? false}
+                claiming={claimingSeason}
+                onClose={() => setSeasonEventOpen(false)}
+                onClaim={handleClaimSeasonDay}
+                paused={isDragging}
+              />
       </>
     );
   };
@@ -738,6 +803,340 @@ export function QuestsPopup({
         onSave={handleSaveFocusTags}
       />
     </>
+  );
+}
+
+function formatSeasonCountdown(endsAt: string) {
+  const diffMs = new Date(endsAt).getTime() - Date.now();
+  if (!Number.isFinite(diffMs) || diffMs <= 0) return 'Ended';
+  const totalMinutes = Math.max(1, Math.ceil(diffMs / 60_000));
+  const days = Math.floor(totalMinutes / 1_440);
+  const hours = Math.floor((totalMinutes % 1_440) / 60);
+  const minutes = totalMinutes % 60;
+  if (days > 0) return hours > 0 ? `${days}d ${hours}h` : `${days}d`;
+  if (hours > 0) return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`;
+  return `${minutes}m`;
+}
+
+function useSeasonCountdown(endsAt?: string) {
+  const [label, setLabel] = useState('');
+
+  useEffect(() => {
+    if (!endsAt) {
+      setLabel('');
+      return;
+    }
+    const update = () => setLabel(formatSeasonCountdown(endsAt));
+    update();
+    const id = window.setInterval(update, 60_000);
+    return () => window.clearInterval(id);
+  }, [endsAt]);
+
+  return label;
+}
+
+function QuestSeasonBanner({
+  season,
+  rewardCatalog,
+  isPremium,
+  onView,
+}: {
+  season: QuestSeasonView;
+  rewardCatalog: Record<string, ItemDef>;
+  isPremium: boolean;
+  onView: () => void;
+}) {
+  const timeLeft = useSeasonCountdown(season.endsAt);
+  const progress = Math.min(season.progressFlies, season.dailyTargetFlies);
+  const pct = Math.min(100, (progress / Math.max(1, season.dailyTargetFlies)) * 100);
+  const currentReward = season.rewardsByDay.find(
+    (entry) => entry.day === season.currentDay,
+  );
+  const previewReward =
+    (isPremium
+      ? currentReward?.premiumRewards?.[0]
+      : currentReward?.freeRewards?.[0]) ??
+    currentReward?.freeRewards?.[0] ??
+    currentReward?.premiumRewards?.[0];
+
+  return (
+    <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
+      <div className="relative h-[260px] overflow-hidden">
+        {season.coverImageUrl ? (
+          <img
+            src={season.coverImageUrl}
+            alt={season.name}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/12 to-transparent" />
+        <div className="absolute inset-x-0 top-0 flex justify-center p-4">
+          <div className="flex flex-col items-center gap-2">
+            <span className="inline-flex h-8 items-center gap-2 rounded-full bg-white/95 px-3 text-sm font-black text-slate-900 shadow-sm">
+              <Clock className="h-4 w-4" />
+              {timeLeft}
+            </span>
+            <h2 className="max-w-[18rem] text-center text-3xl font-black uppercase leading-none text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.9)]">
+              {season.name}
+            </h2>
+          </div>
+        </div>
+      </div>
+
+      <div className="-mt-10 px-3 pb-3">
+        <div className="relative z-10 flex items-center gap-3 rounded-[24px] bg-background p-3 shadow-lg">
+          <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted/60">
+            {previewReward ? (
+              <RewardTile
+                reward={previewReward}
+                rewardCatalog={rewardCatalog}
+                isPremium={isPremium}
+                compact
+                className="h-16 w-16"
+              />
+            ) : (
+              <Gift className="h-8 w-8 text-muted-foreground" />
+            )}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-lg font-black text-foreground">
+              Unlock Day {season.currentDay}!
+            </p>
+            <div className="mt-3 h-8 overflow-hidden rounded-full bg-muted">
+              <div className="flex h-full items-center">
+                <div
+                  className="h-full rounded-full bg-amber-400 transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+                <span className="-ml-[50%] w-full text-center text-sm font-black tabular-nums text-muted-foreground">
+                  {progress} / {season.dailyTargetFlies}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="flex shrink-0 flex-col items-stretch gap-2">
+            <span className="rounded-2xl bg-orange-500 px-4 py-2 text-center text-sm font-black text-white shadow-[0_4px_0_#c2410c]">
+              On now!
+            </span>
+            <button
+              type="button"
+              onClick={onView}
+              className="rounded-2xl bg-lime-600 px-4 py-3 text-sm font-black text-white shadow-[0_5px_0_#3f6212] transition active:translate-y-1 active:shadow-none"
+            >
+              View Event
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function QuestSeasonEventOverlay({
+  season,
+  open,
+  rewardCatalog,
+  isPremium,
+  claiming,
+  onClose,
+  onClaim,
+  paused = false,
+}: {
+  season: QuestSeasonView | null;
+  open: boolean;
+  rewardCatalog: Record<string, ItemDef>;
+  isPremium: boolean;
+  claiming: boolean;
+  onClose: () => void;
+  onClaim: () => void;
+  paused?: boolean;
+}) {
+  const timeLeft = useSeasonCountdown(season?.endsAt);
+  if (!open || !season || typeof document === 'undefined') return null;
+
+  const progress = Math.min(season.progressFlies, season.dailyTargetFlies);
+  const pct = Math.min(100, (progress / Math.max(1, season.dailyTargetFlies)) * 100);
+  const currentRewards =
+    season.rewardsByDay.find((entry) => entry.day === season.currentDay) ??
+    null;
+  const currentFreeRewards = currentRewards?.freeRewards ?? [];
+  const currentPremiumRewards = currentRewards?.premiumRewards ?? [];
+  const currentClaimRewards = [
+    ...currentFreeRewards,
+    ...(isPremium ? currentPremiumRewards : []),
+  ];
+  const claimed = season.claimedDays.includes(season.currentDay);
+
+  return createPortal(
+    <div className="fixed inset-0 z-[1200] bg-background">
+      <div className="h-full overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))]">
+        <div className="relative h-[320px] overflow-hidden">
+          {season.coverImageUrl ? (
+            <img
+              src={season.coverImageUrl}
+              alt={season.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md"
+            aria-label="Close season event"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div className="absolute inset-x-0 top-12 flex flex-col items-center gap-3 px-4 text-center">
+            <span className="inline-flex h-9 items-center gap-2 rounded-full bg-white/95 px-3 text-sm font-black text-slate-900 shadow-sm">
+              <Clock className="h-4 w-4" />
+              {timeLeft}
+            </span>
+            <h2 className="text-4xl font-black uppercase leading-none text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.9)]">
+              {season.name}
+            </h2>
+            <button className="rounded-full bg-amber-400 px-5 py-2 text-sm font-black uppercase tracking-[0.12em] text-slate-900 shadow-[0_4px_0_#b45309]">
+              Activate Frog Plus
+            </button>
+          </div>
+        </div>
+
+        <div className="-mt-10 px-4">
+          <div className="relative z-10 rounded-[28px] bg-card p-4 shadow-xl">
+            <div className="flex items-center gap-4">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-muted">
+                <Fly size={44} paused={paused} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-2xl font-black text-foreground">
+                  Unlock Day {season.currentDay}!
+                </p>
+                <div className="mt-3 h-8 overflow-hidden rounded-full bg-muted">
+                  <div className="relative h-full">
+                    <div
+                      className="h-full rounded-full bg-amber-400"
+                      style={{ width: `${pct}%` }}
+                    />
+                    <span className="absolute inset-0 flex items-center justify-center text-sm font-black tabular-nums text-muted-foreground">
+                      {progress} / {season.dailyTargetFlies}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={onClaim}
+                disabled={!season.claimable || claiming || claimed}
+                className={cn(
+                  'rounded-2xl px-4 py-3 text-sm font-black text-white transition',
+                  season.claimable && !claimed
+                    ? 'bg-lime-600 shadow-[0_5px_0_#3f6212] active:translate-y-1 active:shadow-none'
+                    : 'cursor-not-allowed bg-muted text-muted-foreground',
+                )}
+              >
+                {claimed ? 'Claimed' : claiming ? 'Claiming...' : 'Claim'}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 px-4">
+          <div className="rounded-[28px] bg-teal-700 p-4 text-white">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-2xl font-black">Daily Prizes</h3>
+              <span className="text-sm font-bold text-white/80">
+                Day {season.currentDay} of {season.dayCount}
+              </span>
+            </div>
+            <div className="space-y-3">
+              {season.rewardsByDay.map((entry) => {
+                const isCurrent = entry.day === season.currentDay;
+                const isClaimed = season.claimedDays.includes(entry.day);
+                return (
+                  <div
+                    key={entry.day}
+                    className={cn(
+                      'flex items-center gap-3 rounded-[24px] bg-white p-3 text-slate-900',
+                      !isCurrent && 'opacity-75',
+                    )}
+                  >
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border-4 border-teal-700 text-sm font-black text-teal-700">
+                      {entry.day}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-lg font-black">Day {entry.day}</p>
+                      <p className="text-xs font-bold text-slate-500">
+                        {isClaimed ? 'Claimed' : isCurrent ? 'Current prize' : 'Locked'}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {entry.freeRewards.map((reward, index) => (
+                        <RewardTile
+                          key={`${entry.day}-free-${reward.type}-${reward.itemId ?? reward.amount ?? index}`}
+                          reward={reward}
+                          rewardCatalog={rewardCatalog}
+                          isPremium={isPremium}
+                          compact
+                          paused={paused}
+                          className="h-14 w-14 rounded-2xl"
+                        />
+                      ))}
+                      {entry.premiumRewards.map((reward, index) => (
+                        <div
+                          key={`${entry.day}-premium-${reward.type}-${reward.itemId ?? reward.amount ?? index}`}
+                          className="relative"
+                          title="Premium reward"
+                        >
+                          <RewardTile
+                            reward={reward}
+                            rewardCatalog={rewardCatalog}
+                            isPremium={isPremium}
+                            compact
+                            paused={paused}
+                            className={cn(
+                              'h-14 w-14 rounded-2xl',
+                              !isPremium && 'opacity-55 grayscale',
+                            )}
+                          />
+                          <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-1.5 py-0.5 text-[8px] font-black uppercase text-white">
+                            Plus
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {currentClaimRewards.length > 0 && (
+              <div className="mt-4 rounded-[24px] bg-white/10 p-4">
+                <p className="text-sm font-black uppercase tracking-[0.16em] text-white/70">
+                  Today&apos;s Claim
+                </p>
+                <div className="mt-3 flex flex-wrap gap-3">
+                  {currentClaimRewards.map((reward, index) => (
+                    <RewardTile
+                      key={`current-${reward.type}-${reward.itemId ?? reward.amount ?? index}`}
+                      reward={reward}
+                      rewardCatalog={rewardCatalog}
+                      isPremium={isPremium}
+                      compact
+                      className="h-16 w-16 rounded-2xl"
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 

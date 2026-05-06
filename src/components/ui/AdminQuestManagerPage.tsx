@@ -62,6 +62,22 @@ type AdminQuestTemplate = {
   isActive: boolean;
 };
 
+type AdminQuestSeason = {
+  id: string;
+  name: string;
+  coverImageUrl?: string;
+  startsAt: string;
+  endsAt: string;
+  dailyTargetFlies: number;
+  dayRewards: Array<{
+    day: number;
+    freeRewards: QuestRewards;
+    premiumRewards: QuestRewards;
+    rewards?: QuestRewards;
+  }>;
+  isActive: boolean;
+};
+
 type MetaRewardItem = QuestRewardCatalogItem;
 type AdminCategory = {
   id: string;
@@ -85,7 +101,7 @@ type CategoryFormState = {
   backgroundTo: string;
 };
 
-type ViewLevel = 'home' | 'daily' | 'focus' | 'category' | 'form';
+type ViewLevel = 'home' | 'daily' | 'focus' | 'season' | 'category' | 'form';
 
 type FormState = {
   id?: string;
@@ -101,9 +117,31 @@ type FormState = {
   isActive: boolean;
 };
 
+type SeasonFormState = {
+  id?: string;
+  name: string;
+  coverImageUrl?: string;
+  startsAt: string;
+  endsAt: string;
+  dailyTargetFlies: number;
+  dayCount: number;
+  dayRewards: Array<{
+    day: number;
+    freeRewards: QuestRewards;
+    premiumRewards: QuestRewards;
+  }>;
+  isActive: boolean;
+};
+
+type SeasonRewardPickerTarget = {
+  day: number;
+  tier: 'free' | 'premium';
+};
+
 type RewardPickerTab = 'flies' | 'item' | 'box';
 type ConfirmAction =
   | 'save-quest'
+  | 'save-season'
   | 'delete-quest'
   | 'save-category'
   | `delete-category:${string}`;
@@ -142,6 +180,25 @@ const emptyForm = (): FormState => ({
   visibilityConditions: [],
   isActive: true,
 });
+
+const emptySeasonForm = (): SeasonFormState => {
+  const now = new Date();
+  const end = new Date(now.getTime() + 7 * 86_400_000);
+  return {
+    name: '',
+    coverImageUrl: undefined,
+    startsAt: toDateTimeLocalValue(now),
+    endsAt: toDateTimeLocalValue(end),
+    dailyTargetFlies: 3,
+    dayCount: 7,
+    dayRewards: Array.from({ length: 7 }, (_, index) => ({
+      day: index + 1,
+      freeRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }],
+      premiumRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 100 }],
+    })),
+    isActive: true,
+  };
+};
 
 const visibilityMetricLabel: Record<QuestVisibilityMetric, string> = {
   daily_tasks_count: 'User tasks today',
@@ -213,6 +270,23 @@ function durationFromParts(daysValue: string, hoursValue: string) {
   return total > 0 ? total : undefined;
 }
 
+function toDateTimeLocalValue(date: Date) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
+function isoToDateTimeLocalValue(value?: string) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  return toDateTimeLocalValue(date);
+}
+
+function isoFromDateTimeLocalValue(value: string) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : value;
+}
+
 function buildPreviewLogicBlock(block: QuestLogicBlock): QuestCardLogicBlock {
   const isRandom = block.amountMode === 'random';
   const target = isRandom
@@ -280,6 +354,10 @@ function normalizeRewardList(rewards: QuestReward[]) {
   return [...flies, ...items, ...boxes];
 }
 
+function normalizeSingleReward(rewards: QuestReward[]) {
+  return normalizeRewardList(rewards).slice(0, 1);
+}
+
 function rewardTypeLabel(type: QuestRewardType) {
   if (type === 'FLIES') return 'Flies';
   if (type === 'BOX') return 'Box';
@@ -290,13 +368,21 @@ export function AdminQuestManagerPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [templates, setTemplates] = useState<AdminQuestTemplate[]>([]);
+  const [seasons, setSeasons] = useState<AdminQuestSeason[]>([]);
   const [rewardItems, setRewardItems] = useState<MetaRewardItem[]>([]);
   const [adminCategories, setAdminCategories] = useState<AdminCategory[]>([]);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [seasonForm, setSeasonForm] = useState<SeasonFormState>(
+    emptySeasonForm,
+  );
   const [rewardPickerOpen, setRewardPickerOpen] = useState(false);
+  const [seasonRewardPickerTarget, setSeasonRewardPickerTarget] =
+    useState<SeasonRewardPickerTarget | null>(null);
+  const [confirmSeasonPrizeSave, setConfirmSeasonPrizeSave] = useState(false);
   const [conditionsPopupOpen, setConditionsPopupOpen] = useState(false);
   const [availabilityPopupOpen, setAvailabilityPopupOpen] = useState(false);
   const [coverFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
+  const [seasonFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
   const [categoryFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
@@ -330,18 +416,26 @@ export function AdminQuestManagerPage() {
     setLoading(true);
     setResult(null);
     try {
-      const [templatesRes, metaRes, categoriesRes] = await Promise.all([
+      const [templatesRes, metaRes, categoriesRes, seasonsRes] = await Promise.all([
         fetch('/api/admin/quests', { credentials: 'include' }),
         fetch('/api/admin/quests/meta', { credentials: 'include' }),
         fetch('/api/admin/quests/categories', { credentials: 'include' }),
+        fetch('/api/admin/quests/seasons', { credentials: 'include' }),
       ]);
       const templatesData = await templatesRes.json();
       const metaData = await metaRes.json();
       const categoriesData = await categoriesRes.json();
-      if (!templatesRes.ok || !metaRes.ok) {
-        throw new Error(templatesData.error || metaData.error || 'Could not load quest manager');
+      const seasonsData = await seasonsRes.json();
+      if (!templatesRes.ok || !metaRes.ok || !seasonsRes.ok) {
+        throw new Error(
+          templatesData.error ||
+            metaData.error ||
+            seasonsData.error ||
+            'Could not load quest manager',
+        );
       }
       setTemplates(templatesData.templates ?? []);
+      setSeasons(seasonsData.seasons ?? []);
       setRewardItems(metaData.rewardsCatalog ?? []);
       setAdminCategories(categoriesData.categories ?? []);
     } catch (error) {
@@ -559,6 +653,15 @@ export function AdminQuestManagerPage() {
         : 'Create Quest';
   const questDeleteButtonLabel =
     confirmAction === 'delete-quest' ? 'Tap Again to Delete' : 'Delete';
+  const seasonSaveButtonLabel = saving
+    ? 'Saving...'
+    : confirmAction === 'save-season'
+      ? seasonForm.id
+        ? 'Tap Again to Save'
+        : 'Tap Again to Create'
+      : seasonForm.id
+        ? 'Save Season'
+        : 'Create Season';
   const categorySaveButtonLabel = savingCategory
     ? 'Saving...'
     : confirmAction === 'save-category'
@@ -592,9 +695,113 @@ export function AdminQuestManagerPage() {
     setView('form');
   };
 
+  const setSeasonDayCount = (dayCount: number) => {
+    const nextCount = Math.max(1, Math.min(90, Math.floor(dayCount) || 1));
+    setSeasonForm((prev) => ({
+      ...prev,
+      dayCount: nextCount,
+      dayRewards: Array.from({ length: nextCount }, (_, index) => {
+        const day = index + 1;
+        return (
+          prev.dayRewards.find((entry) => entry.day === day) ?? {
+            day,
+            freeRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }],
+            premiumRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 100 }],
+          }
+        );
+      }),
+    }));
+  };
+
+  const startEditingSeason = (season?: AdminQuestSeason) => {
+    if (!season) {
+      setSeasonForm(emptySeasonForm());
+      setView('season');
+      return;
+    }
+    setSeasonForm({
+      id: season.id,
+      name: season.name,
+      coverImageUrl: season.coverImageUrl,
+      startsAt: isoToDateTimeLocalValue(season.startsAt),
+      endsAt: isoToDateTimeLocalValue(season.endsAt),
+      dailyTargetFlies: season.dailyTargetFlies,
+      dayCount: Math.max(1, season.dayRewards.length),
+      dayRewards: season.dayRewards.map((entry) => ({
+        day: entry.day,
+        freeRewards: normalizeRewardList(entry.freeRewards ?? entry.rewards ?? []),
+        premiumRewards: normalizeRewardList(entry.premiumRewards ?? []),
+      })),
+      isActive: season.isActive,
+    });
+    setResult(null);
+    setConfirmAction(null);
+    setView('season');
+  };
+
+  const saveSeason = async () => {
+    if (!confirmBeforeAction('save-season')) return;
+    setSaving(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/quests/seasons', {
+        method: seasonForm.id ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          ...seasonForm,
+          startsAt: isoFromDateTimeLocalValue(seasonForm.startsAt),
+          endsAt: isoFromDateTimeLocalValue(seasonForm.endsAt),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save season');
+      await loadData();
+      if (data.season) startEditingSeason(data.season);
+      setResult({
+        type: 'success',
+        message: seasonForm.id ? 'Season updated' : 'Season created',
+      });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Could not save season',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteSeason = async () => {
+    if (!seasonForm.id) return;
+    setSaving(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/quests/seasons', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id: seasonForm.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not delete season');
+      await loadData();
+      setSeasonForm(emptySeasonForm());
+      setView('home');
+      setResult({ type: 'success', message: 'Season deleted' });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Could not delete season',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   // ── Home view ────────────────────────────────────────────────────────────
   const renderHome = () => (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-3">
       <button
         onClick={() => setView('daily')}
         className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-blue-500/25 hover:bg-blue-500/[0.04]"
@@ -625,6 +832,22 @@ export function AdminQuestManagerPage() {
         <p className="mt-1 text-sm text-muted-foreground">Quests organized by focus category.</p>
         <p className="mt-4 text-3xl font-black text-foreground">{adminCategories.length}</p>
         <p className="text-xs text-muted-foreground">categor{adminCategories.length !== 1 ? 'ies' : 'y'}</p>
+      </button>
+
+      <button
+        onClick={() => startEditingSeason(seasons[0])}
+        className="group rounded-2xl border border-border/40 bg-card/60 p-6 text-left transition hover:border-amber-500/25 hover:bg-amber-500/[0.04]"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <Gift className="h-6 w-6" />
+          </div>
+          <ChevronRight className="h-5 w-5 text-muted-foreground/30 transition group-hover:translate-x-0.5 group-hover:text-muted-foreground" />
+        </div>
+        <p className="mt-5 text-lg font-black text-foreground">Season</p>
+        <p className="mt-1 text-sm text-muted-foreground">Configure the banner, timer, daily goal, and day prizes.</p>
+        <p className="mt-4 text-3xl font-black text-foreground">{seasons.length}</p>
+        <p className="text-xs text-muted-foreground">season{seasons.length !== 1 ? 's' : ''}</p>
       </button>
     </div>
   );
@@ -819,6 +1042,284 @@ export function AdminQuestManagerPage() {
   };
 
   // ── Interactive preview-centered quest editor ─────────────────────────────
+  const renderSeason = () => {
+    const selectedDayRewards =
+      seasonRewardPickerTarget === null
+        ? []
+        : seasonRewardPickerTarget.tier === 'free'
+          ? seasonForm.dayRewards.find(
+              (entry) => entry.day === seasonRewardPickerTarget.day,
+            )?.freeRewards ?? []
+          : seasonForm.dayRewards.find(
+              (entry) => entry.day === seasonRewardPickerTarget.day,
+            )?.premiumRewards ?? [];
+
+    return (
+      <div className="mx-auto w-full max-w-3xl space-y-5">
+        {result && (
+          <div
+            className={cn(
+              'flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-medium',
+              result.type === 'success'
+                ? 'bg-emerald-500/8 text-emerald-600 dark:text-emerald-400'
+                : 'bg-red-500/8 text-red-600 dark:text-red-400',
+            )}
+          >
+            {result.type === 'success' ? (
+              <CheckCircle className="h-4 w-4 shrink-0" />
+            ) : (
+              <XCircle className="h-4 w-4 shrink-0" />
+            )}
+            {result.message}
+          </div>
+        )}
+
+        <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
+          <div className="relative h-[260px] overflow-hidden">
+            {seasonForm.coverImageUrl ? (
+              <img
+                src={seasonForm.coverImageUrl}
+                alt="Season cover"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
+            )}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
+            <input
+              ref={(el) => {
+                seasonFileInputRef.current = el;
+              }}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+                const coverImageUrl = await readFileAsDataUrl(file);
+                setSeasonForm((prev) => ({ ...prev, coverImageUrl }));
+              }}
+            />
+            <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 p-4">
+              <span className="rounded-full border border-white/20 bg-black/35 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-white backdrop-blur-md">
+                {seasonForm.dayCount} days
+              </span>
+              <button
+                type="button"
+                onClick={() => seasonFileInputRef.current?.click()}
+                className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs font-bold text-white/90 backdrop-blur-sm transition hover:bg-black/70"
+              >
+                <Camera className="h-3.5 w-3.5" />
+                {seasonForm.coverImageUrl ? 'Change' : 'Add photo'}
+              </button>
+            </div>
+            <div className="absolute inset-x-0 bottom-0 z-10 p-5">
+              <input
+                value={seasonForm.name}
+                onChange={(event) =>
+                  setSeasonForm((prev) => ({ ...prev, name: event.target.value }))
+                }
+                placeholder="Season name..."
+                className="w-full bg-transparent text-4xl font-black tracking-tight text-white placeholder-white/50 outline-none drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
+              />
+              <p className="mt-2 text-sm font-bold uppercase tracking-[0.16em] text-white/75">
+                Unlock Day 1
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 p-4 md:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                Starts At
+              </span>
+              <input
+                type="datetime-local"
+                value={seasonForm.startsAt}
+                onChange={(event) =>
+                  setSeasonForm((prev) => ({ ...prev, startsAt: event.target.value }))
+                }
+                className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                Ends At
+              </span>
+              <input
+                type="datetime-local"
+                value={seasonForm.endsAt}
+                onChange={(event) =>
+                  setSeasonForm((prev) => ({ ...prev, endsAt: event.target.value }))
+                }
+                className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                Goal Flies Per Day
+              </span>
+              <input
+                type="number"
+                min={1}
+                value={seasonForm.dailyTargetFlies}
+                onChange={(event) =>
+                  setSeasonForm((prev) => ({
+                    ...prev,
+                    dailyTargetFlies: Math.max(1, Number(event.target.value) || 1),
+                  }))
+                }
+                className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                Amount Of Days
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={90}
+                value={seasonForm.dayCount}
+                onChange={(event) => setSeasonDayCount(Number(event.target.value))}
+                className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
+              />
+            </label>
+            <label className="flex items-center gap-2 rounded-2xl border border-border/50 bg-background/80 px-4 py-3 text-sm font-bold text-muted-foreground md:col-span-2">
+              <input
+                type="checkbox"
+                checked={seasonForm.isActive}
+                onChange={(event) =>
+                  setSeasonForm((prev) => ({ ...prev, isActive: event.target.checked }))
+                }
+                className="h-4 w-4"
+              />
+              Active season
+            </label>
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-border/50 bg-card p-4 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-lg font-black text-foreground">Day Prizes</h2>
+            <p className="text-xs text-muted-foreground">
+              Pick the reward shown for each event day.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {seasonForm.dayRewards.map((entry) => (
+              <div
+                key={entry.day}
+                className="rounded-2xl border border-border/50 bg-background/70 p-3"
+              >
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-sm font-black text-primary">
+                    D{entry.day}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-black text-foreground">
+                      Day {entry.day}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Free + premium prizes
+                    </p>
+                  </div>
+                </div>
+                <div className="grid gap-2">
+                  {(['free', 'premium'] as const).map((tier) => {
+                    const rewards =
+                      tier === 'free' ? entry.freeRewards : entry.premiumRewards;
+                    return (
+                      <button
+                        key={`${entry.day}-${tier}`}
+                        type="button"
+                        onClick={() =>
+                          setSeasonRewardPickerTarget({ day: entry.day, tier })
+                        }
+                        className="flex items-center gap-2 rounded-xl border border-border/40 bg-card px-3 py-2 text-left transition hover:border-primary/30 hover:bg-primary/5"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">
+                            {tier === 'free' ? 'Free' : 'Premium'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {rewards[0] ? '1 reward' : 'No reward'}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 -space-x-2">
+                          {rewards.slice(0, 1).map((reward, index) => (
+                            <RewardTile
+                              key={`${entry.day}-${tier}-${reward.type}-${reward.itemId ?? reward.amount ?? index}`}
+                              reward={reward}
+                              rewardCatalog={rewardCatalog}
+                              isPremium={false}
+                              className="h-10 w-10 rounded-xl border-background"
+                            />
+                          ))}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 rounded-[24px] border border-border/50 bg-background/95 px-4 py-3 shadow-lg backdrop-blur">
+          <p className="flex-1 text-sm text-muted-foreground">
+            {seasonForm.id ? 'Editing existing season.' : 'Creating a new season.'}
+          </p>
+          {seasonForm.id && (
+            <Button size="sm" variant="destructive" onClick={deleteSeason} disabled={saving} className="rounded-xl">
+              Delete
+            </Button>
+          )}
+          <Button size="sm" variant="outline" onClick={() => setView('home')} disabled={saving} className="rounded-xl">
+            Cancel
+          </Button>
+          <Button size="sm" onClick={saveSeason} disabled={saving} className="rounded-xl font-black">
+            {seasonSaveButtonLabel}
+          </Button>
+        </div>
+
+        <RewardPickerDialog
+          open={seasonRewardPickerTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSeasonRewardPickerTarget(null);
+              setConfirmSeasonPrizeSave(false);
+            }
+          }}
+          rewards={selectedDayRewards}
+          rewardItems={rewardItems}
+          rewardCatalog={rewardCatalog}
+          singleSelect
+          confirmSave={confirmSeasonPrizeSave}
+          onRequestConfirmSave={() => setConfirmSeasonPrizeSave(true)}
+          onSave={(rewards) => {
+            if (seasonRewardPickerTarget === null) return;
+            const nextRewards = normalizeSingleReward(rewards);
+            setSeasonForm((prev) => ({
+              ...prev,
+              dayRewards: prev.dayRewards.map((entry) =>
+                entry.day === seasonRewardPickerTarget.day
+                  ? {
+                      ...entry,
+                      [seasonRewardPickerTarget.tier === 'free'
+                        ? 'freeRewards'
+                        : 'premiumRewards']: nextRewards,
+                    }
+                  : entry,
+                ),
+            }));
+            setConfirmSeasonPrizeSave(false);
+          }}
+        />
+      </div>
+    );
+  };
+
   const renderForm = () => (
     <div className="mx-auto w-full max-w-xl space-y-6">
       {result && (
@@ -1104,11 +1605,12 @@ export function AdminQuestManagerPage() {
     view === 'home' ? null :
     view === 'daily' ? 'Quest Manager' :
     view === 'focus' ? 'Quest Manager' :
+    view === 'season' ? 'Quest Manager' :
     view === 'category' ? 'Focus Quests' :
     form.placement === 'daily' ? 'Daily Quests' : selectedCategory?.name ?? 'Focus Quests';
 
   const handleBack = () => {
-    if (view === 'daily' || view === 'focus') setView('home');
+    if (view === 'daily' || view === 'focus' || view === 'season') setView('home');
     else if (view === 'category') setView('focus');
     else if (view === 'form') setView(form.placement === 'daily' ? 'daily' : 'category');
   };
@@ -1132,6 +1634,7 @@ export function AdminQuestManagerPage() {
             {view === 'home' && 'Quest Manager'}
             {view === 'daily' && 'Daily Quests'}
             {view === 'focus' && 'Focus Quests'}
+            {view === 'season' && 'Season'}
             {view === 'category' && (selectedCategory?.name ?? 'Category')}
             {view === 'form' && (form.id ? 'Edit Quest' : 'New Quest')}
           </h1>
@@ -1162,6 +1665,7 @@ export function AdminQuestManagerPage() {
                 {view === 'home' && renderHome()}
                 {view === 'daily' && renderDaily()}
                 {view === 'focus' && renderFocus()}
+                {view === 'season' && renderSeason()}
                 {view === 'category' && renderCategory()}
               </>
             )}
@@ -1505,6 +2009,7 @@ function ObjectivesEditorDialog({
           rewards={rewardPickerBlock.rewards ?? []}
           rewardItems={rewardItems}
           rewardCatalog={rewardCatalog}
+          singleSelect
           onSave={(rewards) => {
             onUpdate(rewardPickerForBlockId!, { rewards: normalizeRewardList(rewards).length > 0 ? normalizeRewardList(rewards) : undefined });
             setRewardPickerForBlockId(null);
@@ -1599,6 +2104,9 @@ function RewardPickerDialog({
   rewards,
   rewardItems,
   rewardCatalog,
+  singleSelect = false,
+  confirmSave = false,
+  onRequestConfirmSave,
   onSave,
 }: {
   open: boolean;
@@ -1606,6 +2114,9 @@ function RewardPickerDialog({
   rewards: QuestReward[];
   rewardItems: MetaRewardItem[];
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
+  singleSelect?: boolean;
+  confirmSave?: boolean;
+  onRequestConfirmSave?: () => void;
   onSave: (rewards: QuestReward[]) => void;
 }) {
   const [activeTab, setActiveTab] = useState<RewardPickerTab>('flies');
@@ -1615,8 +2126,8 @@ function RewardPickerDialog({
 
   useEffect(() => {
     if (!open) return;
-    setDraft(normalizeRewardList(rewards));
-  }, [open, rewards]);
+    setDraft(singleSelect ? normalizeSingleReward(rewards) : normalizeRewardList(rewards));
+  }, [open, rewards, singleSelect]);
 
   const fliesReward = draft.find((reward) => reward.type === 'FLIES');
   const itemOptions = rewardItems.filter((item) => item.slot !== 'container');
@@ -1627,6 +2138,9 @@ function RewardPickerDialog({
       const existing = current.find((reward) => reward.type === 'FLIES');
       if (existing) {
         return current.filter((reward) => reward.type !== 'FLIES');
+      }
+      if (singleSelect) {
+        return [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }];
       }
       return [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }, ...current];
     });
@@ -1660,12 +2174,27 @@ function RewardPickerDialog({
           (reward) => !(reward.type === type && reward.itemId === itemId),
         );
       }
+      if (singleSelect) {
+        return [
+          {
+            type,
+            itemId,
+            ...(type === 'BOX'
+              ? { amount: 1, amountMode: 'fixed' as const }
+              : {}),
+          },
+        ];
+      }
       return [...current, { type, itemId, ...(type === 'BOX' ? { amount: 1, amountMode: 'fixed' as const } : {}) }];
     });
   };
 
   const handleSave = () => {
-    onSave(normalizeRewardList(draft));
+    if (confirmSave && onRequestConfirmSave) {
+      onRequestConfirmSave();
+      return;
+    }
+    onSave(singleSelect ? normalizeSingleReward(draft) : normalizeRewardList(draft));
     onOpenChange(false);
   };
 
@@ -1968,7 +2497,7 @@ function RewardPickerDialog({
             onClick={handleSave}
             disabled={draft.length === 0}
           >
-            Save Rewards
+            {confirmSave ? 'Tap Again to Save' : 'Save Rewards'}
           </Button>
         </DialogFooter>
       </DialogContent>

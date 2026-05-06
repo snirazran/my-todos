@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import { syncQuestState } from '@/lib/quests/engine';
+import { getActiveQuestSeasonView } from '@/lib/quests/seasons';
 
 const isDataUrl = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith('data:');
@@ -96,12 +97,15 @@ export async function GET(req: Request) {
       view === 'home' ||
       searchParams.get('includeCategories') === '1';
 
-    const dashboard = await syncQuestState({
-      userId,
-      timezone,
-      includeCatalog: !isSummary,
-      includeCategories,
-    });
+    const [dashboard, activeSeason] = await Promise.all([
+      syncQuestState({
+        userId,
+        timezone,
+        includeCatalog: !isSummary,
+        includeCategories,
+      }),
+      getActiveQuestSeasonView({ userId, timezone }),
+    ]);
     // Count prizes ready to collect (claimable quests + completed objectives with unclaimed rewards)
     const claimableCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
       (sum, quest) => {
@@ -135,6 +139,7 @@ export async function GET(req: Request) {
             selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
             categoryTagMap: dashboard.focusProfile.categoryTagMap,
           },
+          activeSeason,
           ...(includeCategories ? { macroCategories: lightMacroCategories } : {}),
         },
         {
@@ -163,6 +168,7 @@ export async function GET(req: Request) {
         },
         tags,
         macroCategories: lightMacroCategories,
+        activeSeason,
         dailyQuests: dashboard.dailyQuests.map((q) =>
           withTemplateCover(q, dashboard.templatesWithCover),
         ),
