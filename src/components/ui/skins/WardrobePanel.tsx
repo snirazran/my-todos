@@ -693,7 +693,7 @@ function WardrobeManagerContent({
                           (item.slot !== 'container' &&
                            data?.wardrobe?.equipped?.[item.slot] !== item.id)
                         }
-                        previewDelayMs={150 + index * 55}
+                        previewDelayMs={index * 20}
                       />
                     ))}
                   </div>
@@ -765,7 +765,7 @@ function WardrobeManagerContent({
                           onAction={(e) => handleBuyItem(item, e)}
                           deferPreview
                           pausePreview={(item.slot !== 'container' && isDragging) || (item.slot !== 'container' && confirmingBuyId !== item.id)}
-                          previewDelayMs={150 + index * 55}
+                          previewDelayMs={index * 20}
                         />
                       );
                     })}
