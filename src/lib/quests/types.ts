@@ -61,7 +61,6 @@ export type QuestTemplateView = {
   placement: QuestPlacement;
   categoryId?: MacroCategoryId;
   durationMinutes?: number;
-  rewards: QuestRewards;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
   isActive: boolean;
@@ -99,7 +98,6 @@ export type QuestProgressView = {
   completed: boolean;
   claimable: boolean;
   claimed: boolean;
-  rewards: QuestRewards;
   logic: ResolvedQuestLogicBlock[];
   claimedObjectiveIds: string[];
 };

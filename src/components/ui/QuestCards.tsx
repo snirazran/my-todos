@@ -64,7 +64,6 @@ type QuestCardData = {
   durationMinutes?: number;
   startedAt?: string;
   expiresAt?: string;
-  rewards: QuestReward[];
   logic: QuestCardLogicBlock[];
   completed: boolean;
   claimable: boolean;
@@ -77,9 +76,6 @@ type BaseCardProps = {
   isPremium: boolean;
   claiming?: boolean;
   claimingObjectiveId?: string | null;
-  buttonLabel?: string;
-  buttonDisabled?: boolean;
-  onClaim?: () => void;
   onClaimObjective?: (objectiveId: string) => void;
   paused?: boolean;
 };
@@ -328,11 +324,7 @@ export function DailyQuestPresentationCard({
   quest,
   rewardCatalog,
   isPremium,
-  claiming = false,
   claimingObjectiveId,
-  buttonLabel,
-  buttonDisabled,
-  onClaim,
   onClaimObjective,
   paused = false,
 }: BaseCardProps & {
@@ -358,14 +350,12 @@ export function DailyQuestPresentationCard({
             alt={quest.title}
             loading="lazy"
             decoding="async"
-            className="h-[220px] w-full object-cover"
+            className="h-[150px] w-full object-cover"
           />
         ) : (
           <div className="h-[220px] w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/28 to-transparent" />
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
-        <div className="absolute inset-x-0 top-0 flex items-start gap-3 p-4">
+        <div className="absolute inset-x-0 top-0 flex items-start justify-end gap-3 p-4">
           {timeLeft && (
             <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
               <Clock className="w-3 h-3 shrink-0" />
@@ -376,35 +366,6 @@ export function DailyQuestPresentationCard({
             <CalendarDays className="w-3 h-3 shrink-0" />
             <span className="leading-none">Daily</span>
           </span>
-        </div>
-        <div className="absolute z-30 flex flex-wrap justify-end gap-1.5 bottom-3 right-3 sm:bottom-4 sm:right-4 sm:gap-2">
-          {quest.rewards.map((reward, index) => (
-            <RewardTile
-              key={`${reward.type}-${reward.itemId ?? reward.amount ?? reward.minAmount ?? index}`}
-              reward={reward}
-              rewardCatalog={rewardCatalog}
-              isPremium={isPremium}
-              compact
-              paused={paused}
-              className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
-              hydrateDelayMs={150 + index * 55}
-              onClick={() =>
-                setRewardPopup({
-                  eyebrow: 'Quest',
-                  title: 'Rewards',
-                  rewards: quest.rewards,
-                })
-              }
-            />
-          ))}
-        </div>
-        <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[108px] sm:pr-[116px]">
-          <h3 className="text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]">
-            {quest.title}
-          </h3>
-          <p className="mt-1.5 text-sm text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
-            {quest.description}
-          </p>
         </div>
       </div>
 
@@ -429,18 +390,10 @@ export function DailyQuestPresentationCard({
               onClaimObjective ? () => onClaimObjective(block.id) : undefined
             }
             isLast={i === visibleLogic.length - 1}
+            isFirst={i === 0}
           />
         ))}
 
-        <QuestRewardFooter
-          quest={quest}
-          rewardCatalog={rewardCatalog}
-          isPremium={isPremium}
-          claiming={claiming}
-          buttonLabel={buttonLabel}
-          buttonDisabled={buttonDisabled}
-          onClaim={onClaim}
-        />
       </div>
       <RewardDetailsPopup
         open={!!rewardPopup}
@@ -461,13 +414,9 @@ export function CategoryQuestPresentationCard({
   category,
   rewardCatalog,
   isPremium,
-  claiming = false,
   claimingObjectiveId,
   linkedTags,
   onEditTags,
-  buttonLabel,
-  buttonDisabled,
-  onClaim,
   onClaimObjective,
   paused = false,
 }: BaseCardProps & {
@@ -504,19 +453,17 @@ export function CategoryQuestPresentationCard({
             alt={category?.name ?? quest.title}
             loading="lazy"
             decoding="async"
-            className="h-[220px] w-full object-cover"
+            className="h-[150px] w-full object-cover"
           />
         ) : (
           <div
-            className="h-[220px] w-full"
+            className="h-[150px] w-full"
             style={{
               background: `linear-gradient(135deg, ${category?.backgroundFrom ?? '#0f172a'}, ${category?.backgroundTo ?? '#1e293b'})`,
             }}
           />
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/32 to-black/10" />
-        <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-black/80 to-transparent" />
-        <div className="absolute inset-x-0 top-0 flex flex-wrap items-start gap-3 p-4">
+        <div className="absolute inset-x-0 top-0 flex flex-wrap items-start justify-end gap-3 p-4">
           {timeLeft && (
             <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
               <Clock className="w-3 h-3 shrink-0" />
@@ -529,35 +476,6 @@ export function CategoryQuestPresentationCard({
               {category?.shortLabel || category?.name || 'Focus'}
             </span>
           </span>
-        </div>
-        <div className="absolute z-30 flex flex-wrap justify-end gap-1.5 bottom-3 right-3 sm:bottom-5 sm:right-5 sm:gap-2">
-          {quest.rewards.map((reward, index) => (
-            <RewardTile
-              key={`${reward.type}-${reward.itemId ?? reward.amount ?? reward.minAmount ?? index}`}
-              reward={reward}
-              rewardCatalog={rewardCatalog}
-              isPremium={isPremium}
-              compact
-              paused={paused}
-              className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
-              hydrateDelayMs={150 + index * 55}
-              onClick={() =>
-                setRewardPopup({
-                  eyebrow: 'Quest',
-                  title: 'Rewards',
-                  rewards: quest.rewards,
-                })
-              }
-            />
-          ))}
-        </div>
-        <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[108px] sm:p-5 sm:pr-[132px]">
-          <h3 className="text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]">
-            {quest.title}
-          </h3>
-          <p className="mt-1.5 text-sm text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
-            {quest.description}
-          </p>
         </div>
       </div>
 
@@ -589,6 +507,7 @@ export function CategoryQuestPresentationCard({
                 onClaimObjective ? () => onClaimObjective(block.id) : undefined
               }
               isLast={i === visibleLogic.length - 1}
+            isFirst={i === 0}
             />
             {block.tagMode !== 'focus_category_tags' &&
             getTagScopeMessage(block) ? (
@@ -635,18 +554,6 @@ export function CategoryQuestPresentationCard({
           </div>
         ))}
 
-        <QuestRewardFooter
-          quest={quest}
-          rewardCatalog={rewardCatalog}
-          isPremium={isPremium}
-          claiming={claiming}
-          buttonLabel={
-            buttonLabel ??
-            (needsFocusTags ? 'Select a tag to start' : undefined)
-          }
-          buttonDisabled={buttonDisabled}
-          onClaim={onClaim}
-        />
       </div>
       <RewardDetailsPopup
         open={!!rewardPopup}
@@ -665,8 +572,8 @@ function progressBarColor(pct: number, complete: boolean, claimed: boolean) {
   if (claimed) return 'bg-emerald-400 dark:bg-emerald-500';
   if (complete) return 'bg-emerald-500 dark:bg-emerald-400';
   if (pct >= 80) return 'bg-emerald-500 dark:bg-emerald-400';
-  if (pct >= 50) return 'bg-yellow-400 dark:bg-yellow-500';
-  return 'bg-red-400 dark:bg-red-500';
+  if (pct >= 50) return 'bg-amber-400 dark:bg-amber-500';
+  return 'bg-amber-400 dark:bg-amber-500';
 }
 
 function ObjectiveRow({
@@ -678,6 +585,7 @@ function ObjectiveRow({
   onOpenRewards,
   onClaimObjective,
   isLast,
+  isFirst,
   paused = false,
 }: {
   block: QuestCardLogicBlock;
@@ -688,6 +596,7 @@ function ObjectiveRow({
   onOpenRewards?: (rewards: QuestReward[]) => void;
   onClaimObjective?: () => void;
   isLast?: boolean;
+  isFirst?: boolean;
   paused?: boolean;
 }) {
   const safeTarget = Math.max(1, block.target);
@@ -697,36 +606,44 @@ function ObjectiveRow({
   const objectiveClaimable =
     hasRewards && objectiveComplete && !objectiveClaimed;
 
+  const stepDone = objectiveClaimed || (objectiveComplete && !hasRewards);
+
   return (
     <div className={cn('py-3', !isLast && 'border-b border-border/20')}>
-      {/* Title row: label + counter + claim/status */}
-      <div className="flex items-center gap-3">
+      <div className="min-w-0">
+        {/* Title row */}
         <p
           className={cn(
-            'flex-1 text-sm md:text-base font-black leading-snug',
-            objectiveClaimed
-              ? 'text-muted-foreground line-through decoration-muted-foreground/40'
+            'text-sm md:text-base font-black leading-snug',
+            stepDone
+              ? 'text-emerald-600 line-through decoration-emerald-500/60 dark:text-emerald-400'
               : 'text-foreground',
           )}
         >
           {formatQuestObjective(block)}
         </p>
-        <span className="shrink-0 text-xs md:text-sm font-black tabular-nums text-muted-foreground">
-          {Math.min(block.progress, safeTarget)}/
-          {block.targetLabel ?? block.target}
-        </span>
-      </div>
 
-      {/* Progress bar — color shifts by percentage */}
-      <div className="h-2 md:h-2.5 mt-2 overflow-hidden rounded-full bg-muted/50">
-        <div
-          className={cn(
-            'h-full rounded-full transition-all duration-500',
-            progressBarColor(pct, objectiveComplete, objectiveClaimed ?? false),
-          )}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+        {/* Progress bar with counter inside */}
+        <div className="relative h-7 mt-2 overflow-hidden rounded-full bg-muted">
+          <div className="absolute inset-1">
+            <div
+              className={cn(
+                'h-full min-w-6 rounded-full transition-all duration-500',
+                progressBarColor(
+                  pct,
+                  objectiveComplete,
+                  objectiveClaimed ?? false,
+                ),
+              )}
+              style={{ width: pct > 0 ? `${pct}%` : '1.5rem' }}
+            />
+          </div>
+          <span className="absolute inset-0 flex items-center justify-center text-xs font-black tabular-nums text-foreground/70">
+            {Math.min(block.progress, safeTarget)}
+            {' / '}
+            {block.targetLabel ?? block.target}
+          </span>
+        </div>
 
       {/* Reward row */}
       {hasRewards && (
@@ -740,7 +657,7 @@ function ObjectiveRow({
                 isPremium={isPremium ?? false}
                 compact
                 paused={paused}
-                className="h-14 w-14 rounded-2xl sm:h-16 sm:w-16 sm:rounded-[20px]"
+                className="h-16 w-16 rounded-2xl sm:h-20 sm:w-20 sm:rounded-[22px]"
                 hydrateDelayMs={150 + index * 55}
                 onClick={() => onOpenRewards?.(block.rewards ?? [])}
               />
@@ -791,57 +708,7 @@ function ObjectiveRow({
           </span>
         </div>
       )}
-    </div>
-  );
-}
-
-function QuestRewardFooter({
-  quest,
-  isPremium,
-  claiming,
-  buttonLabel,
-  buttonDisabled,
-  onClaim,
-}: {
-  quest: Pick<QuestCardData, 'rewards' | 'completed' | 'claimable' | 'claimed'>;
-  rewardCatalog: Record<string, QuestRewardCatalogItem>;
-  isPremium: boolean;
-  claiming?: boolean;
-  buttonLabel?: string;
-  buttonDisabled?: boolean;
-  onClaim?: () => void;
-}) {
-  const label =
-    buttonLabel ?? getQuestButtonLabel(quest, isPremium, claiming ?? false);
-  const disabled = (buttonDisabled ?? !quest.claimable) || (claiming ?? false);
-
-  if (quest.claimed) {
-    return (
-      <div className="flex items-center justify-center py-2 mt-2">
-        <span className="text-[12px] font-black uppercase tracking-[0.14em] text-emerald-600 dark:text-emerald-400">
-          Quest Complete
-        </span>
       </div>
-    );
-  }
-
-  return (
-    <div className="pt-2 mt-2">
-      <Button
-        onClick={onClaim}
-        disabled={disabled}
-        className={cn(
-          'w-full font-black tracking-[0.2em] uppercase h-11 rounded-2xl text-[11px] transition-all border-0 flex items-center justify-center',
-          quest.claimable && !claiming
-            ? 'bg-emerald-500 text-white shadow-[0_4px_0_0_#059669] hover:translate-y-[-1px] hover:shadow-[0_5px_0_0_#059669] active:translate-y-[2px] active:shadow-none'
-            : 'bg-muted/50 text-muted-foreground/50 cursor-not-allowed shadow-none',
-        )}
-      >
-        <div className="flex items-center justify-center gap-2 mr-[-0.2em]">
-          {quest.claimable && !claiming && <Trophy className="h-3.5 w-3.5" />}
-          <span>{label}</span>
-        </div>
-      </Button>
     </div>
   );
 }
@@ -1224,13 +1091,3 @@ function getRewardOwnedCount(reward: QuestReward, _isPremium: boolean) {
   return base;
 }
 
-function getQuestButtonLabel(
-  quest: Pick<QuestCardData, 'claimable' | 'claimed' | 'completed'>,
-  isPremium: boolean,
-  claiming: boolean,
-) {
-  if (quest.claimed) return 'Claimed';
-  if (claiming) return 'Claiming...';
-  if (quest.claimable) return 'Claim All Rewards';
-  return 'In Progress';
-}

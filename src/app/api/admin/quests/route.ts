@@ -199,7 +199,6 @@ function sanitizeTemplateBody(body: any) {
   const visibilityConditions = Array.isArray(body?.visibilityConditions)
     ? body.visibilityConditions.map(sanitizeVisibilityCondition).filter(Boolean)
     : [];
-  const rewards = sanitizeRewards(body?.rewards);
   const isActive = body?.isActive !== false;
   const durationMinutes = sanitizeDurationMinutes(body?.durationMinutes);
 
@@ -209,8 +208,8 @@ function sanitizeTemplateBody(body: any) {
     return { error: 'A category quest needs a valid category' };
   }
   if (!logic.length) return { error: 'Add at least one logic block' };
-  if (rewards.length === 0) {
-    return { error: 'Add at least one reward' };
+  if ((logic as QuestLogicBlock[]).some((b) => !(b.rewards?.length ?? 0))) {
+    return { error: 'Each objective needs at least one reward' };
   }
 
   const normalizedLogic: QuestLogicBlock[] = (logic as QuestLogicBlock[]).map(
@@ -235,7 +234,6 @@ function sanitizeTemplateBody(body: any) {
       coverImageUrl,
       logic: normalizedLogic,
       visibilityConditions: visibilityConditions as QuestVisibilityCondition[],
-      rewards,
       isActive,
     },
   };

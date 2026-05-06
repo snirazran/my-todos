@@ -366,7 +366,6 @@ function templateToView(doc: QuestTemplateDoc): QuestTemplateView {
       doc.placement === 'category' && doc.durationMinutes && doc.durationMinutes > 0
         ? doc.durationMinutes
         : undefined,
-    rewards: sanitizeRewardSet(doc.rewards),
     logic: doc.logic,
     visibilityConditions: doc.visibilityConditions ?? [],
     isActive: doc.isActive,
@@ -395,7 +394,6 @@ function questDocToView(doc: QuestDoc): QuestProgressView {
     completed,
     claimable: completed && !claimed,
     claimed,
-    rewards: sanitizeRewardSet(doc.rewards),
     logic: doc.logic,
     claimedObjectiveIds: doc.claimedObjectiveIds ?? [],
   };
@@ -474,7 +472,6 @@ async function syncQuestForTemplate(args: {
       target: 0,
       progress: 0,
       logic: [],
-      rewards: template.rewards,
     });
 
   if (!doc.rollKey) {
@@ -594,16 +591,6 @@ async function syncQuestForTemplate(args: {
   );
   const completed = progress >= target;
 
-  const resolvedQuestRewards = template.rewards
-    .filter((reward): reward is QuestReward =>
-      isSupportedReward(reward as { type?: string }),
-    )
-    .map((reward, index) =>
-      resolveReward(
-        reward,
-        `${userId}:${template.templateId}:${windowKey}:${doc.rollKey}:reward:${index}`,
-      ),
-    );
   const nextCompletedAt = completed ? doc.completedAt ?? new Date() : null;
 
   let changed = !!(doc as any).isNew;
@@ -617,14 +604,12 @@ async function syncQuestForTemplate(args: {
   changed = setQuestField(doc, 'startedAt', nextStartedAt) || changed;
   changed = setQuestField(doc, 'expiresAt', nextExpiresAt) || changed;
   changed = setQuestField(doc, 'logic', resolvedLogic) || changed;
-  changed = setQuestField(doc, 'rewards', resolvedQuestRewards) || changed;
   changed = setQuestField(doc, 'target', target) || changed;
   changed = setQuestField(doc, 'progress', progress) || changed;
   changed = setQuestField(doc, 'completedAt', nextCompletedAt) || changed;
 
   if (changed) {
     doc.markModified('logic');
-    doc.markModified('rewards');
     try {
       await doc.save();
     } catch (err: any) {
@@ -812,8 +797,6 @@ export async function syncQuestState(args: {
     categoryQuests,
     rewardCatalog: includeCatalog
       ? buildRewardCatalog(catalog, [
-          ...dailyQuests.map((quest) => quest.rewards),
-          ...categoryQuests.map((quest) => quest.rewards),
           ...dailyQuests.flatMap((quest) =>
             quest.logic.map((block) => block.rewards ?? []),
           ),
@@ -943,9 +926,6 @@ export async function claimQuestReward(args: {
   }
   quest.claimedObjectiveIds = Array.from(alreadyClaimed);
   quest.markModified('claimedObjectiveIds');
-
-  // Claim quest-level rewards
-  applyRewards(quest.rewards);
 
   quest.claimedAt = new Date();
   user.markModified('wardrobe');

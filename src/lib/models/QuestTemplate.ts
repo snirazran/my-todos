@@ -3,7 +3,6 @@ import type {
   MacroCategoryId,
   QuestLogicBlock,
   QuestPlacement,
-  QuestRewards,
   QuestVisibilityCondition,
 } from '@/lib/quests/types';
 
@@ -16,7 +15,6 @@ export interface QuestTemplateDoc {
   placement: QuestPlacement;
   categoryId?: MacroCategoryId;
   durationMinutes?: number;
-  rewards: QuestRewards;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
   isActive: boolean;
@@ -43,7 +41,6 @@ const QuestTemplateSchema = new Schema<QuestTemplateDoc>(
       type: Number,
       default: undefined,
     },
-    rewards: { type: Schema.Types.Mixed, required: true },
     logic: { type: [Schema.Types.Mixed], default: [] } as any,
     visibilityConditions: { type: [Schema.Types.Mixed], default: [] } as any,
     isActive: { type: Boolean, default: true, index: true },

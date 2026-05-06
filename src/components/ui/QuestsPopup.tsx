@@ -123,7 +123,6 @@ export function QuestsPopup({
   onQuestsChanged?: () => void | Promise<void>;
   embedded?: boolean;
 }) {
-  const [claimingId, setClaimingId] = useState<string | null>(null);
   const [claimingObjectiveId, setClaimingObjectiveId] = useState<string | null>(
     null,
   );
@@ -264,11 +263,10 @@ export function QuestsPopup({
     const badges: Record<string, number> = {};
     if (!data?.categoryQuests) return badges;
 
-    // per category badge — only claimable rewards
+    // per category badge — only claimable objective rewards
     data.categoryQuests.forEach((quest) => {
-      if (!quest.categoryId || quest.claimed) return;
+      if (!quest.categoryId) return;
       let count = 0;
-      if (quest.claimable) count++;
       quest.logic.forEach((block) => {
         if (
           (block.rewards?.length ?? 0) > 0 &&
@@ -291,8 +289,22 @@ export function QuestsPopup({
     if (!data?.categoryQuests) return badges;
 
     data.categoryQuests.forEach((quest) => {
-      if (!quest.categoryId || quest.claimed || quest.claimable) return;
-      badges[quest.categoryId] = (badges[quest.categoryId] ?? 0) + 1;
+      if (!quest.categoryId) return;
+      const hasInProgress = quest.logic.some(
+        (block) =>
+          (block.rewards?.length ?? 0) > 0 &&
+          (block.progress < block.target ||
+            quest.claimedObjectiveIds.includes(block.id) === false),
+      );
+      const hasClaimable = quest.logic.some(
+        (block) =>
+          (block.rewards?.length ?? 0) > 0 &&
+          block.progress >= block.target &&
+          !quest.claimedObjectiveIds.includes(block.id),
+      );
+      if (hasInProgress && !hasClaimable) {
+        badges[quest.categoryId] = (badges[quest.categoryId] ?? 0) + 1;
+      }
     });
 
     return badges;
@@ -406,41 +418,6 @@ export function QuestsPopup({
       setClaimMessage(err.message || 'Could not open gift');
     } finally {
       setOpeningGiftKey(null);
-    }
-  };
-
-  const handleClaim = async (
-    claimType: 'daily' | 'category',
-    targetId: string,
-  ) => {
-    if (claimingId) return;
-    setClaimingId(targetId);
-    setClaimMessage(null);
-    try {
-      const res = await fetch('/api/quests/claim', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ claimType, targetId, timezone }),
-      });
-      const payload = await res.json();
-      if (!res.ok) throw new Error(payload.error || 'Claim failed');
-      const revealedCount = queueRewardReveal(payload.rewardSummary);
-      if (revealedCount === 0) {
-        const bits: string[] = [];
-        if (payload.rewardSummary?.fliesGranted)
-          bits.push(`${payload.rewardSummary.fliesGranted} flies`);
-        if (payload.rewardSummary?.grantedItemIds?.length)
-          bits.push(`${payload.rewardSummary.grantedItemIds.length} items`);
-        setClaimMessage(
-          bits.length ? `Claimed ${bits.join(' + ')}` : 'Reward claimed',
-        );
-      }
-      await refreshQuestData();
-      mutateInventoryCaches();
-    } catch (err: any) {
-      setClaimMessage(err.message || 'Claim failed');
-    } finally {
-      setClaimingId(null);
     }
   };
 
@@ -625,9 +602,7 @@ export function QuestsPopup({
                                   quest={quest}
                                   rewardCatalog={data.rewardCatalog}
                                   isPremium={data.isPremium}
-                                  claiming={claimingId === quest.id}
                                   claimingObjectiveId={claimingObjectiveId}
-                                  onClaim={() => handleClaim('daily', quest.id)}
                                   onClaimObjective={(objectiveId) =>
                                     handleClaimObjective(quest.id, objectiveId)
                                   }
@@ -648,11 +623,7 @@ export function QuestsPopup({
                                     quest={quest}
                                     rewardCatalog={data.rewardCatalog}
                                     isPremium={data.isPremium}
-                                    claiming={claimingId === quest.id}
                                     claimingObjectiveId={claimingObjectiveId}
-                                    onClaim={() =>
-                                      handleClaim('daily', quest.id)
-                                    }
                                     onClaimObjective={(objectiveId) =>
                                       handleClaimObjective(
                                         quest.id,
@@ -706,9 +677,6 @@ export function QuestsPopup({
                               }
                               rewardCatalog={data.rewardCatalog}
                               isPremium={data.isPremium}
-                              claiming={
-                                claimingId === filteredCategoryQuests[0].id
-                              }
                               claimingObjectiveId={claimingObjectiveId}
                               linkedTags={
                                 (
@@ -722,12 +690,6 @@ export function QuestsPopup({
                               onEditTags={() =>
                                 setEditingFocusCategoryId(
                                   filteredCategoryQuests[0].categoryId,
-                                )
-                              }
-                              onClaim={() =>
-                                handleClaim(
-                                  'category',
-                                  filteredCategoryQuests[0].id,
                                 )
                               }
                               onClaimObjective={(objectiveId) =>
@@ -752,7 +714,6 @@ export function QuestsPopup({
                                   category={categoryMap[quest.categoryId]}
                                   rewardCatalog={data.rewardCatalog}
                                   isPremium={data.isPremium}
-                                  claiming={claimingId === quest.id}
                                   claimingObjectiveId={claimingObjectiveId}
                                   linkedTags={
                                     (categoryTagMap.get(quest.categoryId) ?? [])
@@ -761,9 +722,6 @@ export function QuestsPopup({
                                   }
                                   onEditTags={() =>
                                     setEditingFocusCategoryId(quest.categoryId)
-                                  }
-                                  onClaim={() =>
-                                    handleClaim('category', quest.id)
                                   }
                                   onClaimObjective={(objectiveId) =>
                                     handleClaimObjective(quest.id, objectiveId)

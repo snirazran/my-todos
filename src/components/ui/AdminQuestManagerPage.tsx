@@ -56,7 +56,6 @@ type AdminQuestTemplate = {
   placement: QuestPlacement;
   categoryId?: string;
   durationMinutes?: number;
-  rewards: QuestRewards;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
   isActive: boolean;
@@ -111,7 +110,6 @@ type FormState = {
   placement: QuestPlacement;
   categoryId?: string;
   durationMinutes?: number;
-  rewards: QuestRewards;
   logic: QuestLogicBlock[];
   visibilityConditions: QuestVisibilityCondition[];
   isActive: boolean;
@@ -146,11 +144,6 @@ type ConfirmAction =
   | 'save-category'
   | `delete-category:${string}`;
 
-const createReward = (): QuestReward => ({
-  type: 'FLIES',
-  amountMode: 'fixed',
-  amount: 50,
-});
 const createLogic = (placement: QuestPlacement = 'daily'): QuestLogicBlock => ({
   id: crypto.randomUUID(),
   type: 'count',
@@ -175,7 +168,6 @@ const emptyForm = (): FormState => ({
   placement: 'daily',
   categoryId: undefined,
   durationMinutes: undefined,
-  rewards: [createReward()],
   logic: [createLogic()],
   visibilityConditions: [],
   isActive: true,
@@ -375,7 +367,6 @@ export function AdminQuestManagerPage() {
   const [seasonForm, setSeasonForm] = useState<SeasonFormState>(
     emptySeasonForm,
   );
-  const [rewardPickerOpen, setRewardPickerOpen] = useState(false);
   const [seasonRewardPickerTarget, setSeasonRewardPickerTarget] =
     useState<SeasonRewardPickerTarget | null>(null);
   const [confirmSeasonPrizeSave, setConfirmSeasonPrizeSave] = useState(false);
@@ -463,7 +454,6 @@ export function AdminQuestManagerPage() {
       placement: template.placement,
       categoryId: template.categoryId,
       durationMinutes: template.durationMinutes,
-      rewards: template.rewards.map((reward) => ({ ...reward })),
       logic: template.logic.map((block) => ({
         ...block,
         tagMode:
@@ -893,8 +883,6 @@ export function AdminQuestManagerPage() {
             )}
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
               <span>{template.logic.length} block{template.logic.length !== 1 ? 's' : ''}</span>
-              <span className="text-border">·</span>
-              <span>{template.rewards.length} reward{template.rewards.length !== 1 ? 's' : ''}</span>
               {placement === 'category' && template.durationMinutes && (
                 <>
                   <span className="text-border">&middot;</span>
@@ -909,25 +897,6 @@ export function AdminQuestManagerPage() {
               )}
             </div>
           </div>
-
-          {/* Reward tiles */}
-          {template.rewards.length > 0 && (
-            <div className="hidden shrink-0 items-center gap-2 sm:flex">
-              {template.rewards.slice(0, 3).map((reward, i) => (
-                <RewardTile
-                  key={`${reward.type}-${reward.itemId ?? i}`}
-                  reward={reward}
-                  rewardCatalog={rewardCatalog}
-                  isPremium={false}
-                  compact
-                  className="shadow-none"
-                />
-              ))}
-              {template.rewards.length > 3 && (
-                <span className="text-sm font-black text-muted-foreground">+{template.rewards.length - 3}</span>
-              )}
-            </div>
-          )}
 
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition group-hover:text-muted-foreground" />
         </button>
@@ -1387,28 +1356,8 @@ export function AdminQuestManagerPage() {
             </div>
           </div>
 
-          {/* Rewards + add button */}
-          <button
-            type="button"
-            onClick={() => setRewardPickerOpen(true)}
-            className="absolute z-20 flex cursor-pointer flex-wrap items-center justify-end gap-2 bottom-4 right-4"
-          >
-            {form.rewards.map((reward, index) => (
-              <RewardTile
-                key={`${reward.type}-${reward.itemId ?? reward.amount ?? reward.minAmount ?? index}`}
-                reward={reward}
-                rewardCatalog={rewardCatalog}
-                isPremium={false}
-                compact
-              />
-            ))}
-            <span className="flex h-9 w-9 items-center justify-center rounded-full border border-white/25 bg-black/40 text-white/80 backdrop-blur-sm transition hover:bg-black/60 hover:text-white">
-              <Plus className="h-4 w-4" />
-            </span>
-          </button>
-
           {/* Title and description */}
-          <div className="absolute inset-x-0 bottom-0 z-10 p-4 pr-[116px]">
+          <div className="absolute inset-x-0 bottom-0 z-10 p-4">
             {editingTitle ? (
               <input
                 autoFocus
@@ -1568,15 +1517,6 @@ export function AdminQuestManagerPage() {
       </div>
 
       {/* Popups */}
-      <RewardPickerDialog
-        open={rewardPickerOpen}
-        onOpenChange={setRewardPickerOpen}
-        rewards={form.rewards}
-        rewardItems={rewardItems}
-        rewardCatalog={rewardCatalog}
-        onSave={(rewards) => setForm((prev) => ({ ...prev, rewards: normalizeRewardList(rewards) }))}
-      />
-
       <ObjectivesEditorDialog
         open={conditionsPopupOpen}
         onOpenChange={setConditionsPopupOpen}
