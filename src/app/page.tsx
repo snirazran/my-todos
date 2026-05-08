@@ -781,13 +781,21 @@ export default function Home() {
       <div className="px-3 pt-12 pb-4 mx-auto max-w-7xl md:px-6">
         <Header router={router} />
 
-        <div className="relative grid items-start grid-cols-1 gap-2 lg:grid-cols-12 lg:gap-5">
-          <div className="relative z-10 flex flex-col gap-2 lg:col-span-4 lg:sticky lg:top-4 lg:gap-4">
-            <div
+        <div className="relative flex flex-col items-stretch gap-2 lg:gap-5">
+          <div className="relative z-10 flex flex-col gap-2 lg:gap-4">
+            <picture
               aria-hidden
-              className="absolute bottom-0 w-screen -translate-x-1/2 bg-center bg-cover pointer-events-none left-1/2 -top-16 -z-10"
-              style={{ backgroundImage: 'url(/background.png)' }}
-            />
+              className="absolute bottom-0 w-screen -translate-x-1/2 pointer-events-none left-1/2 -top-16 -z-10"
+            >
+              <source media="(min-width: 1920px)" srcSet="/bg-web-large.png" />
+              <source media="(min-width: 1280px)" srcSet="/bg-web.png" />
+              <source media="(min-width: 768px)" srcSet="/bg-tablet.png" />
+              <img
+                src="/bg-mobile.png"
+                alt=""
+                className="w-full h-full object-cover object-top"
+              />
+            </picture>
             <FrogDisplay
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
@@ -814,7 +822,7 @@ export default function Home() {
           </div>
 
           <div
-            className="flex flex-col gap-2 mt-2 lg:col-span-8 lg:gap-4"
+            className="flex flex-col gap-2 mt-2 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
             <div className="flex flex-col gap-2">

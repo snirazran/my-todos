@@ -112,15 +112,19 @@ export function FrogDisplay({
       return {
         bg: 'bg-emerald-500',
         text: 'text-emerald-500',
-        label: 'FULL TUMMY',
+        label: 'FULL TUMMY!',
       };
     if (p > 60)
-      return { bg: 'bg-lime-500', text: 'text-lime-500', label: 'HAPPY' };
+      return { bg: 'bg-lime-500', text: 'text-lime-500', label: 'SATISFIED!' };
     if (p > 40)
-      return { bg: 'bg-yellow-500', text: 'text-yellow-500', label: 'PECKISH' };
+      return {
+        bg: 'bg-yellow-500',
+        text: 'text-yellow-500',
+        label: 'A BIT HUNGRY',
+      };
     if (p > 20)
-      return { bg: 'bg-amber-500', text: 'text-amber-500', label: 'GRUMPY' };
-    return { bg: 'bg-rose-500', text: 'text-rose-500', label: 'HANGRY!!' };
+      return { bg: 'bg-amber-500', text: 'text-amber-500', label: 'HUNGRY!' };
+    return { bg: 'bg-rose-500', text: 'text-rose-500', label: 'STARVING!!' };
   };
 
   const {
@@ -145,7 +149,7 @@ export function FrogDisplay({
 
       <div
         ref={frogBoxRef}
-        className="relative z-50 -mb-8 origin-top scale-[0.82] transition-transform duration-500 -translate-y-3.5 pointer-events-none md:mb-0 md:scale-100 md:-translate-y-3.5"
+        className="relative z-50 -mb-6 transition-transform duration-500 origin-top scale-100 pointer-events-none -translate-y-9 md:mb-6 md:scale-100 md:translate-y-3"
       >
         <div
           className="cursor-pointer pointer-events-auto"
@@ -185,9 +189,9 @@ export function FrogDisplay({
             */}
 
       <div
-        className="relative z-10 -mt-6 flex items-center justify-center 
+        className="relative z-10 -mt-6 flex items-center justify-center
 
-              w-[340px] max-w-[min(94vw,100%)] h-[64px] px-2
+              w-[340px] max-w-[min(94vw,100%)] h-[50px] px-2
 
               bg-card/80
 
@@ -201,54 +205,32 @@ export function FrogDisplay({
       >
         {/* Decorative Top Highlight to simulate glass edge light */}
         <div className="absolute inset-x-4 top-0 h-[1px] bg-gradient-to-r from-transparent via-white/80 to-transparent opacity-50" />
-        
-        {/* Full Width Hunger Pill */}
-        <div className="relative w-full h-full flex flex-col justify-center gap-1.5 px-3">
-          {typeof hunger === 'number' ? (
-            <>
-              {/* Hunger Title and Status */}
-              <div className="flex justify-between items-end w-full px-0.5">
-                <span className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-[0.15em]">
-                  Hunger Level
-                </span>
-                <div className="flex items-center gap-2">
-                  <div
-                    className={cn(
-                      'w-2 h-2 rounded-full shadow-sm animate-pulse',
-                      hungerColor,
-                    )}
-                  />
-                  <span
-                    className={cn(
-                      'text-[10px] font-black uppercase tracking-[0.1em]',
-                      hungerTextColor,
-                    )}
-                  >
-                    {hungerStatus}
-                  </span>
-                </div>
-              </div>
 
-              <div
-                className={cn(
-                  'group relative overflow-hidden flex items-center justify-start h-[14px] w-full rounded-full bg-muted/30 shadow-inner border border-border/20 transition-all duration-200',
-                  hungerPercent <= 20 && 'ring-1 ring-rose-500/10',
-                )}
-              >
-                {/* Hunger Fill Background - Horizontal */}
+        {/* Full Width Hunger Pill */}
+        <div className="relative flex flex-col justify-center w-full h-full px-3">
+          {typeof hunger === 'number' ? (
+            <div
+              className={cn(
+                'relative h-6 w-full overflow-hidden rounded-full bg-muted transition-all duration-200',
+                hungerPercent <= 20 && 'ring-1 ring-rose-500/10',
+              )}
+            >
+              <div className="absolute inset-1">
                 <div
                   className={cn(
-                    'absolute top-0 left-0 bottom-0 z-0 w-full origin-left',
-                    animateHunger && 'transition-transform duration-1000 ease-in-out',
+                    'h-full min-w-6 rounded-full',
+                    animateHunger && 'transition-all duration-1000 ease-in-out',
                     hungerColor,
                   )}
-                  style={{
-                    transform: `scaleX(${hungerPercent / 100})`,
-                    opacity: 0.8,
-                  }}
+                  style={{ width: `${Math.max(hungerPercent, 4)}%` }}
                 />
               </div>
-            </>
+              <div className="absolute inset-0 flex items-center px-4 pointer-events-none">
+                <span className="text-[11px] font-black uppercase tracking-[0.15em] text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">
+                  {hungerStatus}
+                </span>
+              </div>
+            </div>
           ) : (
             <div className="flex-1" />
           )}
