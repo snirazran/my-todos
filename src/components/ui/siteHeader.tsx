@@ -652,7 +652,7 @@ function MobileMenuButton({
   return (
     <button
       onClick={() => setIsOpen(!isOpen)}
-      className="p-2 -ml-2 rounded-full text-muted-foreground hover:text-foreground transition-colors"
+      className="p-2 rounded-full bg-card border border-border/60 shadow-sm text-muted-foreground hover:text-foreground transition-colors"
     >
       {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
     </button>

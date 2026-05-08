@@ -35,7 +35,10 @@ import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
-import { MissedTasksPopup, type MissedTasksStatus } from '@/components/ui/MissedTasksPopup';
+import {
+  MissedTasksPopup,
+  type MissedTasksStatus,
+} from '@/components/ui/MissedTasksPopup';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import useSWR, { mutate as swrMutate } from 'swr';
@@ -51,7 +54,11 @@ import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
 import WeeklyWrapped from '@/components/ui/WeeklyWrapped';
 import ProgressCoachPopup from '@/components/ui/ProgressCoachPopup';
 import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
-import type { FocusCategoryTagMap, MacroCategoryDefinition, MacroCategoryId } from '@/lib/quests/types';
+import type {
+  FocusCategoryTagMap,
+  MacroCategoryDefinition,
+  MacroCategoryId,
+} from '@/lib/quests/types';
 
 // Force re-compilation of this file to pick up useTaskData.tsx change
 
@@ -114,7 +121,9 @@ export default function Home() {
   const [dismissMissedReview, setDismissMissedReview] = useState(false);
   const { data: missedTasksData, mutate: mutateMissedTasks } =
     useSWR<MissedTasksStatus>(
-      user ? `/api/missed-tasks?timezone=${encodeURIComponent(timezone)}` : null,
+      user
+        ? `/api/missed-tasks?timezone=${encodeURIComponent(timezone)}`
+        : null,
       (url: string) => fetch(url).then((res) => res.json()),
       { revalidateOnFocus: false },
     );
@@ -123,7 +132,11 @@ export default function Home() {
     { id: 'debug-tag-health', name: 'Health', color: '#22c55e' },
     { id: 'debug-tag-personal', name: 'Personal', color: '#f59e0b' },
   ];
-  const debugYesterday = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0]; })();
+  const debugYesterday = (() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return d.toISOString().split('T')[0];
+  })();
   const debugMissedTasksData: MissedTasksStatus | undefined = isDebugMode
     ? {
         today: new Date().toISOString().split('T')[0],
@@ -133,15 +146,66 @@ export default function Home() {
         flyBalance: 12,
         completionCost: 1,
         items: [
-          { id: 'debug-1', text: 'Finish project report', completed: false, date: debugYesterday, type: 'regular' as const, tags: ['debug-tag-work'] },
-          { id: 'debug-2', text: 'Review pull requests', completed: false, date: debugYesterday, type: 'weekly' as const, tags: ['debug-tag-work', 'debug-tag-personal'] },
-          { id: 'debug-3', text: 'Morning meditation', completed: false, date: debugYesterday, type: 'habit' as const, timesPerWeek: 7, completedDates: [(() => { const d = new Date(); d.setDate(d.getDate() - 3); return d.toISOString().split('T')[0]; })(), (() => { const d = new Date(); d.setDate(d.getDate() - 5); return d.toISOString().split('T')[0]; })()], tags: ['debug-tag-health'] },
-          { id: 'debug-4', text: 'Read 20 pages', completed: false, date: debugYesterday, type: 'habit' as const, timesPerWeek: 5, completedDates: [], tags: ['debug-tag-personal'] },
-          { id: 'debug-5', text: 'Go grocery shopping', completed: false, date: debugYesterday, type: 'regular' as const },
+          {
+            id: 'debug-1',
+            text: 'Finish project report',
+            completed: false,
+            date: debugYesterday,
+            type: 'regular' as const,
+            tags: ['debug-tag-work'],
+          },
+          {
+            id: 'debug-2',
+            text: 'Review pull requests',
+            completed: false,
+            date: debugYesterday,
+            type: 'weekly' as const,
+            tags: ['debug-tag-work', 'debug-tag-personal'],
+          },
+          {
+            id: 'debug-3',
+            text: 'Morning meditation',
+            completed: false,
+            date: debugYesterday,
+            type: 'habit' as const,
+            timesPerWeek: 7,
+            completedDates: [
+              (() => {
+                const d = new Date();
+                d.setDate(d.getDate() - 3);
+                return d.toISOString().split('T')[0];
+              })(),
+              (() => {
+                const d = new Date();
+                d.setDate(d.getDate() - 5);
+                return d.toISOString().split('T')[0];
+              })(),
+            ],
+            tags: ['debug-tag-health'],
+          },
+          {
+            id: 'debug-4',
+            text: 'Read 20 pages',
+            completed: false,
+            date: debugYesterday,
+            type: 'habit' as const,
+            timesPerWeek: 5,
+            completedDates: [],
+            tags: ['debug-tag-personal'],
+          },
+          {
+            id: 'debug-5',
+            text: 'Go grocery shopping',
+            completed: false,
+            date: debugYesterday,
+            type: 'regular' as const,
+          },
         ],
       }
     : undefined;
-  const activeMissedTasksData = isDebugMode ? debugMissedTasksData : missedTasksData;
+  const activeMissedTasksData = isDebugMode
+    ? debugMissedTasksData
+    : missedTasksData;
   const shouldShowMissedReview = isDebugMode
     ? !dismissMissedReview
     : !!user &&
@@ -159,7 +223,11 @@ export default function Home() {
   );
   const debugRecapData: WeeklyRecapData | undefined = isDebugMode
     ? (() => {
-        const d = (offset: number) => { const dt = new Date(); dt.setDate(dt.getDate() + offset); return dt.toISOString().split('T')[0]; };
+        const d = (offset: number) => {
+          const dt = new Date();
+          dt.setDate(dt.getDate() + offset);
+          return dt.toISOString().split('T')[0];
+        };
         return {
           weekStart: d(-7),
           weekEnd: d(-1),
@@ -168,36 +236,188 @@ export default function Home() {
           tasksCompleted: 14,
           completionRate: 78,
           activeDays: 6,
-          bestDay: { date: d(-4), dayName: 'Wed', tasksTotal: 5, tasksCompleted: 5, habitsTotal: 3, habitsCompleted: 3, focusMinutes: 45, focusCycles: 3 },
+          bestDay: {
+            date: d(-4),
+            dayName: 'Wed',
+            tasksTotal: 5,
+            tasksCompleted: 5,
+            habitsTotal: 3,
+            habitsCompleted: 3,
+            focusMinutes: 45,
+            focusCycles: 3,
+          },
           totalFocusMinutes: 185,
           totalFocusCycles: 12,
           fliesEarned: 14,
           currentStreak: 4,
           days: [
-            { date: d(-7), dayName: 'Mon', tasksTotal: 3, tasksCompleted: 2, habitsTotal: 3, habitsCompleted: 2, focusMinutes: 25, focusCycles: 1 },
-            { date: d(-6), dayName: 'Tue', tasksTotal: 4, tasksCompleted: 3, habitsTotal: 3, habitsCompleted: 3, focusMinutes: 30, focusCycles: 2 },
-            { date: d(-5), dayName: 'Wed', tasksTotal: 5, tasksCompleted: 5, habitsTotal: 3, habitsCompleted: 3, focusMinutes: 45, focusCycles: 3 },
-            { date: d(-4), dayName: 'Thu', tasksTotal: 2, tasksCompleted: 1, habitsTotal: 3, habitsCompleted: 2, focusMinutes: 25, focusCycles: 2 },
-            { date: d(-3), dayName: 'Fri', tasksTotal: 3, tasksCompleted: 2, habitsTotal: 3, habitsCompleted: 1, focusMinutes: 35, focusCycles: 2 },
-            { date: d(-2), dayName: 'Sat', tasksTotal: 1, tasksCompleted: 1, habitsTotal: 3, habitsCompleted: 2, focusMinutes: 15, focusCycles: 1 },
-            { date: d(-1), dayName: 'Sun', tasksTotal: 0, tasksCompleted: 0, habitsTotal: 3, habitsCompleted: 0, focusMinutes: 10, focusCycles: 1 },
+            {
+              date: d(-7),
+              dayName: 'Mon',
+              tasksTotal: 3,
+              tasksCompleted: 2,
+              habitsTotal: 3,
+              habitsCompleted: 2,
+              focusMinutes: 25,
+              focusCycles: 1,
+            },
+            {
+              date: d(-6),
+              dayName: 'Tue',
+              tasksTotal: 4,
+              tasksCompleted: 3,
+              habitsTotal: 3,
+              habitsCompleted: 3,
+              focusMinutes: 30,
+              focusCycles: 2,
+            },
+            {
+              date: d(-5),
+              dayName: 'Wed',
+              tasksTotal: 5,
+              tasksCompleted: 5,
+              habitsTotal: 3,
+              habitsCompleted: 3,
+              focusMinutes: 45,
+              focusCycles: 3,
+            },
+            {
+              date: d(-4),
+              dayName: 'Thu',
+              tasksTotal: 2,
+              tasksCompleted: 1,
+              habitsTotal: 3,
+              habitsCompleted: 2,
+              focusMinutes: 25,
+              focusCycles: 2,
+            },
+            {
+              date: d(-3),
+              dayName: 'Fri',
+              tasksTotal: 3,
+              tasksCompleted: 2,
+              habitsTotal: 3,
+              habitsCompleted: 1,
+              focusMinutes: 35,
+              focusCycles: 2,
+            },
+            {
+              date: d(-2),
+              dayName: 'Sat',
+              tasksTotal: 1,
+              tasksCompleted: 1,
+              habitsTotal: 3,
+              habitsCompleted: 2,
+              focusMinutes: 15,
+              focusCycles: 1,
+            },
+            {
+              date: d(-1),
+              dayName: 'Sun',
+              tasksTotal: 0,
+              tasksCompleted: 0,
+              habitsTotal: 3,
+              habitsCompleted: 0,
+              focusMinutes: 10,
+              focusCycles: 1,
+            },
           ],
           topTags: [
-            { tagId: 'debug-tag-work', tagName: 'Work', tagColor: '#3b82f6', completedCount: 8, totalCount: 10 },
-            { tagId: 'debug-tag-health', tagName: 'Health', tagColor: '#22c55e', completedCount: 5, totalCount: 7 },
-            { tagId: 'debug-tag-personal', tagName: 'Personal', tagColor: '#f59e0b', completedCount: 3, totalCount: 5 },
+            {
+              tagId: 'debug-tag-work',
+              tagName: 'Work',
+              tagColor: '#3b82f6',
+              completedCount: 8,
+              totalCount: 10,
+            },
+            {
+              tagId: 'debug-tag-health',
+              tagName: 'Health',
+              tagColor: '#22c55e',
+              completedCount: 5,
+              totalCount: 7,
+            },
+            {
+              tagId: 'debug-tag-personal',
+              tagName: 'Personal',
+              tagColor: '#f59e0b',
+              completedCount: 3,
+              totalCount: 5,
+            },
           ],
           habits: [
-            { id: 'h1', text: 'Morning meditation', goal: 7, completed: 5, tags: ['debug-tag-health'] },
-            { id: 'h2', text: 'Read 20 pages', goal: 5, completed: 3, tags: ['debug-tag-personal'] },
-            { id: 'h3', text: 'Stretch for 10 minutes', goal: 6, completed: 6, tags: ['debug-tag-health'] },
+            {
+              id: 'h1',
+              text: 'Morning meditation',
+              goal: 7,
+              completed: 5,
+              tags: ['debug-tag-health'],
+            },
+            {
+              id: 'h2',
+              text: 'Read 20 pages',
+              goal: 5,
+              completed: 3,
+              tags: ['debug-tag-personal'],
+            },
+            {
+              id: 'h3',
+              text: 'Stretch for 10 minutes',
+              goal: 6,
+              completed: 6,
+              tags: ['debug-tag-health'],
+            },
           ],
           focusAreas: [
-            { categoryId: 'sport', categoryName: 'Sport', accent: '#22c55e', tagIds: ['debug-tag-health'], tasksTotal: 7, tasksCompleted: 5, habitsTotal: 12, habitsCompleted: 9, focusMinutes: 60, topTags: [{ tagId: 'debug-tag-health', tagName: 'Health', tagColor: '#22c55e', completedCount: 5, totalCount: 7 }] },
-            { categoryId: 'mindfulness', categoryName: 'Mindfulness', accent: '#8b5cf6', tagIds: ['debug-tag-personal'], tasksTotal: 5, tasksCompleted: 3, habitsTotal: 7, habitsCompleted: 4, focusMinutes: 45, topTags: [{ tagId: 'debug-tag-personal', tagName: 'Personal', tagColor: '#f59e0b', completedCount: 3, totalCount: 5 }] },
+            {
+              categoryId: 'sport',
+              categoryName: 'Sport',
+              accent: '#22c55e',
+              tagIds: ['debug-tag-health'],
+              tasksTotal: 7,
+              tasksCompleted: 5,
+              habitsTotal: 12,
+              habitsCompleted: 9,
+              focusMinutes: 60,
+              topTags: [
+                {
+                  tagId: 'debug-tag-health',
+                  tagName: 'Health',
+                  tagColor: '#22c55e',
+                  completedCount: 5,
+                  totalCount: 7,
+                },
+              ],
+            },
+            {
+              categoryId: 'mindfulness',
+              categoryName: 'Mindfulness',
+              accent: '#8b5cf6',
+              tagIds: ['debug-tag-personal'],
+              tasksTotal: 5,
+              tasksCompleted: 3,
+              habitsTotal: 7,
+              habitsCompleted: 4,
+              focusMinutes: 45,
+              topTags: [
+                {
+                  tagId: 'debug-tag-personal',
+                  tagName: 'Personal',
+                  tagColor: '#f59e0b',
+                  completedCount: 3,
+                  totalCount: 5,
+                },
+              ],
+            },
           ],
           selectedCategoryIds: ['sport', 'mindfulness'],
-          prevWeek: { tasksCompleted: 10, completionRate: 62, totalFocusMinutes: 120, activeDays: 4, habitAvgRate: 55 },
+          prevWeek: {
+            tasksCompleted: 10,
+            completionRate: 62,
+            totalFocusMinutes: 120,
+            activeDays: 4,
+            habitAvgRate: 55,
+          },
           alreadySeen: false,
           skinsNew: 2,
           skinsRarest: 'Wizard Hat',
@@ -217,8 +437,8 @@ export default function Home() {
   const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>('pick');
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const [showTimer, setShowTimer] = useState(false);
-  const [frogodoroHydrated, setFrogodoroHydrated] = useState(() =>
-    useFrogodoroStore.persist?.hasHydrated?.() ?? false,
+  const [frogodoroHydrated, setFrogodoroHydrated] = useState(
+    () => useFrogodoroStore.persist?.hasHydrated?.() ?? false,
   );
   const lastHandledTimerCompletionRef = useRef<number | null>(null);
   const [showProgressCoach, setShowProgressCoach] = useState(false);
@@ -251,7 +471,12 @@ export default function Home() {
     triggerTongue,
     visuallyDone,
     speedUpTongue,
-  } = useFrogTongue({ frogRef, frogBoxRef, flyRefs, scrollContainerRef: mainScrollRef });
+  } = useFrogTongue({
+    frogRef,
+    frogBoxRef,
+    flyRefs,
+    scrollContainerRef: mainScrollRef,
+  });
 
   const isAnyPanelOpen =
     isWardrobeOpen ||
@@ -293,34 +518,53 @@ export default function Home() {
     lastCompletionId,
     lastCompletedTaskId,
   } = useFrogodoroStore();
-  const frogPhaseDuration = frogPhase === 'focus'
-    ? frogSettings.cycleDuration * 60
-    : frogPhase === 'shortBreak'
-      ? frogSettings.shortBreakDuration * 60
-      : frogSettings.longBreakDuration * 60;
+  const frogPhaseDuration =
+    frogPhase === 'focus'
+      ? frogSettings.cycleDuration * 60
+      : frogPhase === 'shortBreak'
+        ? frogSettings.shortBreakDuration * 60
+        : frogSettings.longBreakDuration * 60;
   const frogLiveElapsed = frogPhaseDuration - frogTimeLeft;
-  const frogHasActivity = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || frogRunning || frogLiveElapsed > 0;
+  const frogHasActivity =
+    sessionStats.focusSessions > 0 ||
+    sessionStats.shortBreaks > 0 ||
+    sessionStats.longBreaks > 0 ||
+    frogRunning ||
+    frogLiveElapsed > 0;
 
   // Data Switching
   const rawData = user ? tasks : guestTasks;
-  const data = frogTaskId && frogHasActivity
-    ? rawData.map((t) =>
-        t.id === frogTaskId
-          ? {
-              ...t,
-              frogodoroSession: {
-                date: format(new Date(), 'yyyy-MM-dd'),
-                completedCycles: sessionStats.focusSessions + (frogPhase === 'focus' && frogLiveElapsed > 0 ? 1 : 0),
-                timeSpent: sessionStats.focusTime + (frogPhase === 'focus' ? frogLiveElapsed : 0),
-                shortBreaks: sessionStats.shortBreaks + (frogPhase === 'shortBreak' && frogLiveElapsed > 0 ? 1 : 0),
-                shortBreakTime: sessionStats.shortBreakTime + (frogPhase === 'shortBreak' ? frogLiveElapsed : 0),
-                longBreaks: sessionStats.longBreaks + (frogPhase === 'longBreak' && frogLiveElapsed > 0 ? 1 : 0),
-                longBreakTime: sessionStats.longBreakTime + (frogPhase === 'longBreak' ? frogLiveElapsed : 0),
-              },
-            }
-          : t,
-      )
-    : rawData;
+  const data =
+    frogTaskId && frogHasActivity
+      ? rawData.map((t) =>
+          t.id === frogTaskId
+            ? {
+                ...t,
+                frogodoroSession: {
+                  date: format(new Date(), 'yyyy-MM-dd'),
+                  completedCycles:
+                    sessionStats.focusSessions +
+                    (frogPhase === 'focus' && frogLiveElapsed > 0 ? 1 : 0),
+                  timeSpent:
+                    sessionStats.focusTime +
+                    (frogPhase === 'focus' ? frogLiveElapsed : 0),
+                  shortBreaks:
+                    sessionStats.shortBreaks +
+                    (frogPhase === 'shortBreak' && frogLiveElapsed > 0 ? 1 : 0),
+                  shortBreakTime:
+                    sessionStats.shortBreakTime +
+                    (frogPhase === 'shortBreak' ? frogLiveElapsed : 0),
+                  longBreaks:
+                    sessionStats.longBreaks +
+                    (frogPhase === 'longBreak' && frogLiveElapsed > 0 ? 1 : 0),
+                  longBreakTime:
+                    sessionStats.longBreakTime +
+                    (frogPhase === 'longBreak' ? frogLiveElapsed : 0),
+                },
+              }
+            : t,
+        )
+      : rawData;
   const doneCount = data.filter((t) => t.completed).length;
 
   useEffect(() => {
@@ -382,7 +626,9 @@ export default function Home() {
     };
     macroCategories?: MacroCategoryDefinition[];
   }>(
-    user ? `/api/quests?view=home&timezone=${encodeURIComponent(timezone)}` : null,
+    user
+      ? `/api/quests?view=home&timezone=${encodeURIComponent(timezone)}`
+      : null,
     (url: string) => fetch(url).then((res) => res.json()),
     { revalidateOnFocus: false },
   );
@@ -403,7 +649,9 @@ export default function Home() {
   const isFirstDayOfWeek = [0, 1].includes(new Date().getDay()); // Sunday or Monday
 
   // Allow manual force show via ?wrapped=1
-  const forceShowWrapped = typeof window !== 'undefined' && window.location.search.includes('wrapped=1');
+  const forceShowWrapped =
+    typeof window !== 'undefined' &&
+    window.location.search.includes('wrapped=1');
 
   const showRecapIndicator = !!user && !!recapData && !showWeeklyWrapped;
 
@@ -414,12 +662,7 @@ export default function Home() {
       void mutateQuests();
     }
     wasMissedReviewOpen.current = shouldShowMissedReview;
-  }, [
-    shouldShowMissedReview,
-    mutateToday,
-    mutateBacklog,
-    mutateQuests,
-  ]);
+  }, [shouldShowMissedReview, mutateToday, mutateBacklog, mutateQuests]);
 
   useEffect(() => {
     if (questOnboarding?.complete) {
@@ -487,7 +730,9 @@ export default function Home() {
           session: { date: today, completedCycles: 1, timeSpent: 0 },
           timezone,
         }),
-      }).then(() => mutateToday()).catch(() => {});
+      })
+        .then(() => mutateToday())
+        .catch(() => {});
     }
 
     await triggerTongue({
@@ -509,18 +754,18 @@ export default function Home() {
 
   const renderGuestPrompt = () =>
     !user ? (
-      <div className="relative mx-3 mb-2 overflow-hidden rounded-xl bg-primary/5 border border-primary/10 shadow-sm">
+      <div className="relative mx-3 mb-2 overflow-hidden border shadow-sm rounded-xl bg-primary/5 border-primary/10">
         <div className="relative flex items-center gap-3 p-3">
-          <div className="flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl bg-background text-primary shadow-sm ring-1 ring-primary/20">
+          <div className="flex items-center justify-center flex-shrink-0 shadow-sm w-9 h-9 rounded-xl bg-background text-primary ring-1 ring-primary/20">
             <Fly size={24} y={-4} paused={isAnyPanelOpen} />
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-black text-foreground tracking-tight mb-0.5">
               The Frog is Hungry!
             </h3>
-            <p className="text-xs font-medium text-muted-foreground leading-relaxed">
+            <p className="text-xs font-medium leading-relaxed text-muted-foreground">
               Catch a fly to make her happy and unlock a special{' '}
-              <span className="text-primary font-bold">Gift</span>!
+              <span className="font-bold text-primary">Gift</span>!
             </p>
           </div>
         </div>
@@ -532,12 +777,17 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen pb-20 md:pb-8 bg-background">
+    <main className="min-h-screen pb-20 overflow-x-hidden md:pb-8 bg-background">
       <div className="px-3 pt-12 pb-4 mx-auto max-w-7xl md:px-6">
         <Header router={router} />
 
         <div className="relative grid items-start grid-cols-1 gap-2 lg:grid-cols-12 lg:gap-5">
-          <div className="z-10 flex flex-col gap-2 lg:col-span-4 lg:sticky lg:top-4 lg:gap-4">
+          <div className="relative z-10 flex flex-col gap-2 lg:col-span-4 lg:sticky lg:top-4 lg:gap-4">
+            <div
+              aria-hidden
+              className="absolute bottom-0 w-screen -translate-x-1/2 bg-center bg-cover pointer-events-none left-1/2 -top-16 -z-10"
+              style={{ backgroundImage: 'url(/background.png)' }}
+            />
             <FrogDisplay
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
@@ -564,16 +814,18 @@ export default function Home() {
           </div>
 
           <div
-            className="flex flex-col gap-2 lg:col-span-8 lg:gap-4"
+            className="flex flex-col gap-2 mt-2 lg:col-span-8 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between px-2 md:px-0">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 group cursor-pointer ml-3">
+                  <div className="flex items-center gap-2 ml-3 cursor-pointer group">
                     <CalendarCheck className="w-5 h-5 text-primary" />
-                    <span className="text-sm font-black tracking-tight text-foreground lowercase">
-                      {openTaskCount + openHabitCount} {openTaskCount + openHabitCount === 1 ? 'fly' : 'flies'} left for today!
+                    <span className="text-sm font-black tracking-tight lowercase text-foreground">
+                      {openTaskCount + openHabitCount}{' '}
+                      {openTaskCount + openHabitCount === 1 ? 'fly' : 'flies'}{' '}
+                      left for today!
                     </span>
                   </div>
                 </div>
@@ -586,10 +838,12 @@ export default function Home() {
                       setIsHeaderMenuOpen(!isHeaderMenuOpen);
                     }}
                     className={cn(
-                      "flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all",
-                      isHeaderMenuOpen || selectedTags.length > 0 || showCompleted
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                      'flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all',
+                      isHeaderMenuOpen ||
+                        selectedTags.length > 0 ||
+                        showCompleted
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
                     )}
                   >
                     <Filter className="w-3.5 h-3.5" />
@@ -625,7 +879,7 @@ export default function Home() {
                         ref={(el) => {
                           flyRefs.current[task.id] = el;
                         }}
-                        className="flex h-10 w-10 items-center justify-center rounded-full bg-muted border border-muted-foreground/10 shrink-0"
+                        className="flex items-center justify-center w-10 h-10 border rounded-full bg-muted border-muted-foreground/10 shrink-0"
                       >
                         <Fly
                           onClick={() => null}
@@ -676,8 +930,12 @@ export default function Home() {
                   }}
                   onReorder={(reordered) => {
                     // Split reordered back to habits and tasks
-                    const newHabits = reordered.filter(t => t.type === 'habit');
-                    const newTasks = reordered.filter(t => t.type !== 'habit');
+                    const newHabits = reordered.filter(
+                      (t) => t.type === 'habit',
+                    );
+                    const newTasks = reordered.filter(
+                      (t) => t.type !== 'habit',
+                    );
                     reorderTasks(reordered);
                   }}
                   pendingToToday={pendingToToday}
@@ -803,7 +1061,16 @@ export default function Home() {
         initialText={quickText}
         defaultRepeat="this-week"
         defaultMode={quickAddMode}
-        onSubmit={async ({ text, days, repeat, tags, timesPerWeek, startTime, endTime, reminder }) => {
+        onSubmit={async ({
+          text,
+          days,
+          repeat,
+          tags,
+          timesPerWeek,
+          startTime,
+          endTime,
+          reminder,
+        }) => {
           try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const dateStr = format(new Date(), 'yyyy-MM-dd');
@@ -811,7 +1078,17 @@ export default function Home() {
             const res = await fetch('/api/tasks?view=board', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ text, days, repeat, tags, timesPerWeek, timezone: tz, startTime, endTime, reminder }),
+              body: JSON.stringify({
+                text,
+                days,
+                repeat,
+                tags,
+                timesPerWeek,
+                timezone: tz,
+                startTime,
+                endTime,
+                reminder,
+              }),
             });
             const data = await res.json();
 
@@ -889,11 +1166,7 @@ export default function Home() {
       )}
 
       <HungerWarningModal
-        open={
-          !!user &&
-          hungerStatus.stolenFlies > 0 &&
-          !shouldShowMissedReview
-        }
+        open={!!user && hungerStatus.stolenFlies > 0 && !shouldShowMissedReview}
         stolenFlies={hungerStatus.stolenFlies}
         indices={indices}
         onAcknowledge={async () => {
@@ -965,9 +1238,7 @@ export default function Home() {
             onClick={() => setIsBacklogOpen(true)}
             forwardRef={null}
           />
-          <div
-            className="flex-1 min-w-0 pointer-events-auto h-[48px]"
-          >
+          <div className="flex-1 min-w-0 pointer-events-auto h-[48px]">
             <AddTaskButton
               className="w-full h-full rounded-[18px] text-[13px] font-black"
               onClick={() => {
@@ -982,7 +1253,7 @@ export default function Home() {
               label={
                 <div className="flex items-center justify-center gap-1">
                   <span>Add a</span>
-                  <div className="relative w-7 h-7 flex items-center justify-center">
+                  <div className="relative flex items-center justify-center w-7 h-7">
                     <Fly size={28} y={-4} x={0} paused={isAnyPanelOpen} />
                   </div>
                 </div>
@@ -1066,7 +1337,7 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
           `}
         >
           <span
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors duration-200"
+            className="flex items-center justify-center w-6 h-6 transition-colors duration-200 rounded-full bg-primary/15 text-primary"
             aria-hidden
           >
             {active ? (
@@ -1114,7 +1385,7 @@ function OverviewSectionHeader({
   return (
     <div className="flex items-center justify-between px-4 pt-1 pb-0">
       <div className="flex items-center gap-1.5 text-muted-foreground">
-        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-card border border-border/60 shadow-sm text-primary">
+        <span className="flex items-center justify-center w-6 h-6 border rounded-full shadow-sm bg-card border-border/60 text-primary">
           {icon}
         </span>
         <span className="text-[10px] font-black uppercase tracking-[0.16em]">
