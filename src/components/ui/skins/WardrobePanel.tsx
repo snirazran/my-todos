@@ -563,8 +563,8 @@ function WardrobeManagerContent({
           onValueChange={setActiveTab}
           className="flex flex-col h-full"
         >
-          <div className="px-4 pt-0 space-y-3 shrink-0 md:px-6 md:pt-5 md:space-y-4">
-            <div className="flex items-center justify-between gap-2 md:gap-4">
+          <div className="relative px-4 pt-0 space-y-3 shrink-0 md:px-6 md:pt-5 md:space-y-4">
+            <div className="relative z-10 flex items-center justify-between gap-2 md:gap-4">
               <TabsList
                 className={cn(
                   'flex-1 h-12 md:h-14 p-1 rounded-[20px] border border-border/50 shadow-sm flex items-center gap-1',
@@ -611,7 +611,7 @@ function WardrobeManagerContent({
               <SortMenu value={sortBy} onChange={setSortBy} />
             </div>
 
-            <div className="w-full min-w-0">
+            <div className="relative z-10 w-full min-w-0">
               <FilterBar
                 active={activeFilter === 'container' && activeTab !== 'inventory' ? 'all' : activeFilter}
                 onChange={handleFilterChange}
