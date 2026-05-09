@@ -6,7 +6,6 @@ import {
   CalendarClock,
   RotateCcw,
   Repeat,
-  Trash2,
   Pencil,
   Filter,
   ChevronDown,
@@ -57,6 +56,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import TaskMenu from '../board/TaskMenu';
+import TaskActionSheet from '../board/TaskActionSheet';
 import TagPopup from '@/components/ui/TagPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
@@ -199,6 +199,14 @@ const SortableTaskItem = React.forwardRef<
       [swipeThreshold - 1, swipeThreshold],
       ['#ffffff', '#ffffff'],
     );
+    // Left Swipe (Negative X) -> Edit Sheet (Sky/Blue)
+    const editActionOpacity = useTransform(x, [-25, 0], [1, 0]);
+    const editActionScale = useTransform(x, [-swipeThreshold, 0], [1.2, 0.8]);
+    const editActionColor = useTransform(
+      x,
+      [-swipeThreshold, -(swipeThreshold - 1)],
+      ['#3b82f6', '#9ca3af'],
+    );
 
     // Sync exit state
     useEffect(() => {
@@ -280,43 +288,25 @@ const SortableTaskItem = React.forwardRef<
       const offset = info.offset.x;
       const velocity = info.velocity.x;
 
-      // Strict Spotify-like snap logic (Swapped again: Open is now Left/Negative)
-      if (isOpen) {
-        // If already open (Left Swipe state -> Menu), closing needs Right motion (Positive)
-        if (offset > 15 || velocity > 100) {
-          setIsOpen(false);
-          window.dispatchEvent(
-            new CustomEvent('task-swipe-open', { detail: { id: null } }),
-          );
-        } else {
-          // Snap back to open (Negative X)
-          animate(x, -100, { type: 'spring', stiffness: 600, damping: 28 });
-        }
+      // Action: Swipe Right (Positive) -> Start Timer
+      if (offset > swipeThreshold && onStartTimer && !isDone) {
+        hasActionTriggeredRef.current = true;
+        window.dispatchEvent(
+          new CustomEvent('task-swipe-open', { detail: { id: null } }),
+        );
+        onStartTimer(task);
+        animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
+      }
+      // Action: Swipe Left (Negative) -> Open Edit Sheet
+      else if (offset < -swipeThreshold || velocity < -200) {
+        hasActionTriggeredRef.current = true;
+        window.dispatchEvent(
+          new CustomEvent('task-edit-request', { detail: { id: task.id } }),
+        );
+        animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
       } else {
-        // Closed state
-
-        // Action: Swipe Right (Positive) -> Start Timer
-        if (offset > swipeThreshold && onStartTimer && !isDone) {
-          hasActionTriggeredRef.current = true;
-          setIsOpen(false);
-          window.dispatchEvent(
-            new CustomEvent('task-swipe-open', { detail: { id: null } }),
-          );
-          onStartTimer(task);
-          // Snap back after triggering
-          animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
-        }
-        // Opening: Swipe Left (Negative) -> Edit/Trash - Reveal Menu
-        else if (offset < -60 || velocity < -200) {
-          setIsOpen(true);
-          window.dispatchEvent(
-            new CustomEvent('task-swipe-open', { detail: { id: task.id } }),
-          );
-          animate(x, -100, { type: 'spring', stiffness: 600, damping: 28 });
-        } else {
-          // Snap back
-          animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
-        }
+        // Snap back
+        animate(x, 0, { type: 'spring', stiffness: 600, damping: 28 });
       }
     };
 
@@ -401,38 +391,18 @@ const SortableTaskItem = React.forwardRef<
             </motion.div>
           </div>
 
-          {/* Swipe (Menu) Actions Layer */}
-          <div
-            className={`absolute inset-y-0 right-0 flex items-center pr-2 gap-1.5 transition-opacity ${!(isExitingLater || hasTriggeredExit) && (isOpen || isSwiping) ? 'opacity-100 duration-200' : isExitingLater || hasTriggeredExit ? 'opacity-0 duration-0' : 'opacity-0 duration-200 delay-200'}`}
-            aria-hidden={!isOpen || isExitingLater || hasTriggeredExit}
-          >
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                e.nativeEvent.stopImmediatePropagation();
-                onMenuOpen(e, task);
+          {/* Swipe Edit Affordance (revealed by Left Swipe) */}
+          <div className="absolute inset-y-0 right-0 flex items-center pr-4">
+            <motion.div
+              className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent text-white"
+              style={{
+                opacity: editActionOpacity,
+                scale: editActionScale,
+                backgroundColor: editActionColor,
               }}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-background text-foreground shadow-sm hover:bg-background/80 transition-colors"
-              title="More options"
-              tabIndex={isOpen ? 0 : -1}
             >
-              <EllipsisVertical className="w-5 h-5" />
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                e.nativeEvent.stopImmediatePropagation();
-                const event = new CustomEvent('task-delete-request', {
-                  detail: { id: task.id },
-                });
-                window.dispatchEvent(event);
-              }}
-              className="flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 shadow-sm transition-colors"
-              title="Delete"
-              tabIndex={isOpen ? 0 : -1}
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+              <Pencil className="w-4 h-4" />
+            </motion.div>
           </div>
 
           {/* Foreground Card (Swipeable) */}
@@ -440,7 +410,7 @@ const SortableTaskItem = React.forwardRef<
             drag={isDesktop || isDragging || swipeBlocked ? false : 'x'} // Disable swipe if sorting/dragging
             dragListener={!isDragging && !isDragDisabled} // Also ensure disabled listener logic matches
             dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
-            dragConstraints={{ left: -100, right: 70 }}
+            dragConstraints={{ left: -70, right: 70 }}
             dragElastic={0}
             dragMomentum={false}
             onDragStart={handleDragStart}
@@ -878,6 +848,7 @@ export default function TaskList({
     kind: 'regular' | 'weekly' | 'backlog' | 'edit';
   } | null>(null);
 
+  const [actionSheetId, setActionSheetId] = useState<string | null>(null);
   const [scheduleDialog, setScheduleDialog] = useState<{
     task: Task;
   } | null>(null);
@@ -886,6 +857,16 @@ export default function TaskList({
     open: boolean;
     taskId: string | null;
   }>({ open: false, taskId: null });
+
+  // Listen for swipe-left edit requests from individual cards
+  React.useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent).detail?.id as string | undefined;
+      if (id) setActionSheetId(id);
+    };
+    window.addEventListener('task-edit-request', handler);
+    return () => window.removeEventListener('task-edit-request', handler);
+  }, []);
 
   const [delayedCompleted, setDelayedCompleted] = useState<Set<string>>(
     new Set(),
@@ -1582,6 +1563,83 @@ export default function TaskList({
         onClose={() => setTagPopup({ open: false, taskId: null })}
         onSave={handleTagSave}
       />
+
+      {(() => {
+        const sheetTask = actionSheetId
+          ? tasks.find((t) => t.id === actionSheetId) ?? null
+          : null;
+        const close = () => setActionSheetId(null);
+        if (!sheetTask) {
+          return (
+            <TaskActionSheet
+              open={false}
+              onOpenChange={(o) => !o && close()}
+              task={null}
+              isCompleted={false}
+              isWeekly={false}
+              isHabit={false}
+            />
+          );
+        }
+        const isWeekly =
+          sheetTask.type === 'weekly' || weeklyIds.has(sheetTask.id);
+        const isHabit = sheetTask.type === 'habit';
+        const isCompletedTask =
+          !!sheetTask.completed || vSet.has(sheetTask.id);
+        return (
+          <TaskActionSheet
+            open={!!actionSheetId}
+            onOpenChange={(o) => !o && close()}
+            task={sheetTask as any}
+            isCompleted={isCompletedTask}
+            isWeekly={isWeekly}
+            isHabit={isHabit}
+            onComplete={() => toggle(sheetTask.id)}
+            onEdit={
+              onEditTask
+                ? () =>
+                    setDialog({
+                      task: sheetTask as any,
+                      kind: 'edit',
+                    })
+                : undefined
+            }
+            onAddTags={
+              !isGuest
+                ? () => setTagPopup({ open: true, taskId: sheetTask.id })
+                : undefined
+            }
+            onSchedule={
+              onScheduleTask
+                ? () => setScheduleDialog({ task: sheetTask as any })
+                : undefined
+            }
+            onToggleRepeat={
+              onToggleRepeat && !isHabit
+                ? () => onToggleRepeat(sheetTask.id)
+                : undefined
+            }
+            onDoLater={
+              onDoLater && !isCompletedTask && !isHabit
+                ? () => {
+                    setExitAction({ id: sheetTask.id, type: 'later' });
+                    setTimeout(() => onDoLater(sheetTask.id), 0);
+                    setTimeout(() => setExitAction(null), 800);
+                  }
+                : undefined
+            }
+            onDelete={() =>
+              setDialog({
+                task: sheetTask as any,
+                kind: taskKind(sheetTask as any) as
+                  | 'regular'
+                  | 'weekly'
+                  | 'backlog',
+              })
+            }
+          />
+        );
+      })()}
 
       {dialog &&
         dialogVariant !== 'regular' &&
