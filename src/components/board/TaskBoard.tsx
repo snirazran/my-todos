@@ -21,8 +21,6 @@ import MonthCalendar from './MonthCalendar';
 import { useDragManager } from './hooks/useDragManager';
 import { usePan } from './hooks/usePan';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
-import Fly from '../ui/fly';
-import { AddTaskButton } from '../ui/AddTaskButton';
 import BacklogBox from './BacklogBox';
 import HabitBox from './HabitBox';
 import BacklogTray from './BacklogTray';
@@ -623,6 +621,17 @@ export default function TaskBoard({
                 onTagsChange={(tags) => setSelectedTags(i, tags)}
                 showCompleted={getShowCompleted(i)}
                 onShowCompletedChange={(show) => setShowCompleted(i, show)}
+                onAddClick={
+                  cmpYmd(dk, todayKey) < 0
+                    ? undefined
+                    : () => {
+                        setQuickText('');
+                        setInitialDateKey(dk);
+                        setPageIndex(i);
+                        setQuickAddMode('pick');
+                        setShowQuickAdd(true);
+                      }
+                }
               >
                 <TaskList
                   day={i as any}
@@ -743,38 +752,6 @@ export default function TaskBoard({
             onClick={() => setHabitTrayOpen(true)}
             isDragging={!!drag?.active && drag?.taskType !== 'habit'}
           />
-          <motion.div
-            initial={false}
-            animate={{
-              opacity: drag?.active && drag?.taskType !== 'habit' ? 0 : 1,
-              scale: drag?.active && drag?.taskType !== 'habit' ? 0.9 : 1,
-              width: drag?.active && drag?.taskType !== 'habit' ? 0 : 'auto',
-              flexGrow: drag?.active && drag?.taskType !== 'habit' ? 0 : 1,
-            }}
-            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-            className={`min-w-0 ${drag?.active && drag?.taskType !== 'habit' ? 'overflow-hidden' : 'overflow-visible'}`}
-            style={{
-              pointerEvents: drag?.active && drag?.taskType !== 'habit' ? 'none' : 'auto',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <AddTaskButton
-              className="w-full h-12 md:h-[56px]"
-              label={
-                <span className="flex items-center">
-                  Add a <Fly size={32} y={-3} x={4} />
-                </span>
-              }
-              showFly={false}
-              onClick={() => {
-                setQuickText('');
-                setInitialDateKey(undefined);
-                setQuickAddMode('pick');
-                setShowQuickAdd(true);
-              }}
-              disabled={!!drag?.active && drag?.taskType !== 'habit'}
-            />
-          </motion.div>
         </div>
       </div>
 

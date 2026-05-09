@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { EllipsisVertical } from 'lucide-react';
+import { Plus, Filter, CalendarCheck } from 'lucide-react';
 import { FilterDropdown, FilterType } from '../ui/FilterDropdown';
 
 export default function DayColumn({
@@ -22,6 +22,7 @@ export default function DayColumn({
   onTagsChange,
   showCompleted = true,
   onShowCompletedChange,
+  onAddClick,
 }: {
   title: string;
   count?: number;
@@ -39,6 +40,8 @@ export default function DayColumn({
   onTagsChange?: (tags: string[]) => void;
   showCompleted?: boolean;
   onShowCompletedChange?: (show: boolean) => void;
+  /** When provided, renders a + button in the header that triggers add-task for this column. */
+  onAddClick?: () => void;
 }) {
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -101,10 +104,18 @@ export default function DayColumn({
           </h2>
 
           <div className="flex items-center gap-2 relative">
-            {count !== undefined && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground shadow-sm">
-                {count}
-              </span>
+            {onAddClick && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAddClick();
+                }}
+                title="Add task"
+                aria-label="Add task"
+                className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground hover:bg-primary/90 active:scale-90 transition-all"
+              >
+                <Plus size={14} strokeWidth={3} />
+              </button>
             )}
 
             <div className="relative" ref={menuRef}>
@@ -113,13 +124,15 @@ export default function DayColumn({
                   e.stopPropagation();
                   setShowMenu(!showMenu);
                 }}
+                aria-label="Filter"
+                title="Filter"
                 className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-90 ${
                   showMenu || isFiltered
                     ? 'bg-primary/10 text-primary'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                 }`}
               >
-                <EllipsisVertical size={18} />
+                <Filter size={16} />
                 {isFiltered && (
                   <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
                 )}
@@ -142,6 +155,19 @@ export default function DayColumn({
             </div>
           </div>
         </div>
+
+        {count !== undefined && (
+          <div className="flex items-center gap-1.5 -mt-1">
+            <CalendarCheck className="w-3.5 h-3.5 text-primary" />
+            <span
+              className={`text-xs font-bold ${
+                isPast ? 'text-muted-foreground/60' : 'text-muted-foreground'
+              }`}
+            >
+              {count} {count === 1 ? 'Fly' : 'Flies'}
+            </span>
+          </div>
+        )}
       </div>
 
       <div
