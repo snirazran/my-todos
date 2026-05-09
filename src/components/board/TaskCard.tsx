@@ -5,7 +5,6 @@ import {
   RotateCcw,
   CheckCircle2,
   Plus,
-  CalendarClock,
   CalendarDays,
   Clock,
   Bell,
@@ -375,11 +374,6 @@ export default function TaskCard({
               <div className="inline-flex items-center gap-1.5 shrink-0">
                 {isRepeating && (
                   <RotateCcw
-                    className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0"
-                  />
-                )}
-                {task.type === 'habit' && (
-                  <CalendarClock
                     className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0"
                   />
                 )}

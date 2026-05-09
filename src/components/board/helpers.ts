@@ -5,11 +5,9 @@ export type Task = {
   text: string;
   order: number;
   /** provided by /api/tasks?view=board */
-  type?: 'weekly' | 'regular' | 'backlog' | 'habit';
+  type?: 'weekly' | 'regular' | 'backlog';
   completed?: boolean;
   tags?: string[];
-  /** only present for habit tasks */
-  timesPerWeek?: number;
   completedDates?: string[];
   frogodoroSession?: {
     date: string;

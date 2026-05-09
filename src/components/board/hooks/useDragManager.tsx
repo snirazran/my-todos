@@ -8,7 +8,7 @@ export type DragState = {
   fromIndex: number;
   taskId: string;
   taskText: string;
-  taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
+  taskType?: 'weekly' | 'regular' | 'backlog';
   x: number;
   y: number;
   dx: number;
@@ -134,7 +134,7 @@ export function useDragManager() {
       index: number,
       taskId: string,
       taskText: string,
-      taskType: 'weekly' | 'regular' | 'backlog' | 'habit' | undefined,
+      taskType: 'weekly' | 'regular' | 'backlog' | undefined,
       clientX: number,
       clientY: number,
       rect: DOMRect,
@@ -194,7 +194,7 @@ export function useDragManager() {
       index: number;
       taskId: string;
       taskText: string;
-      taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
+      taskType?: 'weekly' | 'regular' | 'backlog';
       clientX: number;
       clientY: number;
       rectGetter: () => DOMRect;

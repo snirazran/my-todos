@@ -15,7 +15,6 @@ import {
 } from './helpers';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
-import { EditHabitDaysDialog } from '@/components/ui/EditHabitDaysDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import Fly from '@/components/ui/fly';
 import { Plus, LayoutList, ListTodo, Repeat } from 'lucide-react';
@@ -64,7 +63,7 @@ export default React.memo(function TaskList({
     index: number;
     taskId: string;
     taskText: string;
-    taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
+    taskType?: 'weekly' | 'regular' | 'backlog';
     clientX: number;
     clientY: number;
     pointerType: 'mouse' | 'touch';
@@ -102,7 +101,7 @@ export default React.memo(function TaskList({
   onAcceptSuggestion?: (text: string, tagIds?: string[]) => Promise<void> | void;
   aiSuggestionFocusCategoryIds?: string[];
   isToday?: boolean;
-  filter?: 'all' | 'tasks' | 'habits';
+  filter?: 'all' | 'tasks';
   selectedTags?: string[];
   showCompleted?: boolean;
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
@@ -121,7 +120,7 @@ export default React.memo(function TaskList({
   const [dialog, setDialog] = useState<{
     task: Task;
     day: DisplayDay;
-    kind?: 'edit' | 'editDays';
+    kind?: 'edit';
   } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -141,8 +140,7 @@ export default React.memo(function TaskList({
   const sourceIndex =
     isSelfDrag && dragFromIndex != null ? dragFromIndex : null;
 
-  const variantFor = (t: Task): 'regular' | 'weekly' | 'backlog' | 'habit' => {
-    if (t.type === 'habit') return 'habit';
+  const variantFor = (t: Task): 'regular' | 'weekly' | 'backlog' => {
     if (t.type === 'weekly') return 'weekly';
     if (t.type === 'backlog') return 'backlog';
     return 'regular';
@@ -166,7 +164,7 @@ export default React.memo(function TaskList({
     return ymdLocal(target);
   };
 
-  const dialogVariant: 'regular' | 'weekly' | 'backlog' | 'habit' = dialog
+  const dialogVariant: 'regular' | 'weekly' | 'backlog' = dialog
     ? variantFor(dialog.task)
     : 'regular';
 
@@ -174,7 +172,7 @@ export default React.memo(function TaskList({
     if (!dialog || busy) return;
     setBusy(true);
     try {
-      if (dialogVariant === 'weekly' || dialogVariant === 'habit') {
+      if (dialogVariant === 'weekly') {
         const date = dateForDisplayDay(dialog.day);
         if (date) {
           await fetch('/api/tasks', {
@@ -238,8 +236,6 @@ export default React.memo(function TaskList({
   );
 
   const filteredItems = items.filter((t) => {
-    if (filter === 'tasks' && t.type === 'habit') return false;
-    if (filter === 'habits' && t.type !== 'habit') return false;
     if (!showCompleted && t.completed) return false;
     if (selectedTags && selectedTags.length > 0) {
       const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));
@@ -308,8 +304,6 @@ export default React.memo(function TaskList({
     const t = items[i];
 
     // Filter Logic
-    if (filter === 'tasks' && t.type === 'habit') continue;
-    if (filter === 'habits' && t.type !== 'habit') continue;
     if (!showCompleted && t.completed) continue;
     if (selectedTags && selectedTags.length > 0) {
       const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));
@@ -417,9 +411,6 @@ export default React.memo(function TaskList({
         onClose={() => setMenu(null)}
         onAddTags={(id) => setTagPopup({ open: true, taskId: id })}
         addTagsPosition="second"
-        isHabit={
-          menu ? items.find((t) => t.id === menu.id)?.type === 'habit' : false
-        }
         onToggleRepeat={
           onToggleRepeat
             ? () => {
@@ -459,13 +450,6 @@ export default React.memo(function TaskList({
               }
             : undefined
         }
-        onChangeDays={() => {
-          if (menu) {
-            const t = items.find((it) => it.id === menu.id);
-            if (t) setDialog({ task: t, day, kind: 'editDays' });
-          }
-          setMenu(null);
-        }}
         onSchedule={
           onScheduleTask
             ? () => {
@@ -517,7 +501,7 @@ export default React.memo(function TaskList({
       )}
 
       <DeleteDialog
-        open={!!dialog && dialog.kind !== 'edit' && dialog.kind !== 'editDays'}
+        open={!!dialog && dialog.kind !== 'edit'}
         variant={dialogVariant}
         itemLabel={dialog?.task.text}
         dayLabel={
@@ -534,19 +518,11 @@ export default React.memo(function TaskList({
           dialogVariant !== 'backlog' ? handleDeleteToday : handleDeleteAll
         }
         onDeleteAll={
-          dialogVariant === 'weekly' || dialogVariant === 'habit'
+          dialogVariant === 'weekly'
             ? handleDeleteAll
             : dialogVariant === 'backlog'
               ? handleDeleteToday
               : undefined
-        }
-        onEditDays={
-          dialogVariant === 'habit'
-            ? () =>
-                setDialog((prev) =>
-                  prev ? { ...prev, kind: 'editDays' } : prev,
-                )
-            : undefined
         }
       />
 
@@ -558,7 +534,6 @@ export default React.memo(function TaskList({
         task={actionSheet?.task ?? null}
         isCompleted={!!actionSheet?.task.completed}
         isWeekly={actionSheet?.task.type === 'weekly'}
-        isHabit={actionSheet?.task.type === 'habit'}
         onComplete={
           actionSheet && !isFuture
             ? () => {
@@ -599,11 +574,6 @@ export default React.memo(function TaskList({
             ? () => onToggleRepeat(actionSheet.task.id, day)
             : undefined
         }
-        onChangeGoal={
-          actionSheet && actionSheet.task.type === 'habit'
-            ? () => setDialog({ task: actionSheet.task, day, kind: 'editDays' })
-            : undefined
-        }
         onDoLater={
           actionSheet && onDoLater
             ? () => onDoLater(day, actionSheet.task.id)
@@ -616,34 +586,6 @@ export default React.memo(function TaskList({
         }
       />
 
-      {dialog && dialog.kind === 'editDays' && (
-        <EditHabitDaysDialog
-          open
-          taskId={dialog.task.id}
-          taskLabel={dialog.task.text}
-          initialGoal={dialog.task.timesPerWeek ?? 7}
-          busy={busy}
-          onClose={() => setDialog(null)}
-          onSave={async (newGoal) => {
-            setBusy(true);
-            try {
-              await fetch('/api/tasks', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  taskId: dialog.task.id,
-                  timesPerWeek: newGoal,
-                }),
-              });
-              window.dispatchEvent(new Event('board-refresh'));
-            } finally {
-              setBusy(false);
-              setDialog(null);
-              setMenu(null);
-            }
-          }}
-        />
-      )}
     </>
   );
 });

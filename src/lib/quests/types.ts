@@ -14,13 +14,12 @@ export type QuestReward = {
 export type QuestRewards = QuestReward[];
 
 export type QuestPlacement = 'daily' | 'category';
-export type QuestSubject = 'task' | 'habit' | 'any';
+export type QuestSubject = 'task' | 'any';
 export type QuestCountAction = 'complete' | 'add';
 export type QuestAmountMode = 'fixed' | 'random';
 export type QuestLogicType = 'count' | 'focus_minutes';
 export type QuestVisibilityMetric =
   | 'daily_tasks_count'
-  | 'total_habits_count'
   | 'tags_count';
 export type QuestVisibilityOperator = 'gt' | 'lt';
 
@@ -121,7 +120,6 @@ export type MacroCategoryDefinition = {
   backgroundFrom: string;
   backgroundTo: string;
   taskSuggestions: string[];
-  habitSuggestions: Array<{ text: string; timesPerWeek: number }>;
   campaignHeadlines: string[];
   durationDaysOptions: number[];
   premiumAnimationId: string;

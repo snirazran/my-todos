@@ -46,7 +46,7 @@ type TagInput = {
 type SanitizedTask = {
   text: string;
   completed: boolean;
-  type: 'regular' | 'weekly' | 'habit';
+  type: 'regular' | 'weekly';
   tags: string[];
   focusMinutes: number;
 };
@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
         strongestPattern: 'Add and complete a few more tasks to unlock a useful read.',
         biggestRisk: 'The coach needs multiple days of activity before it can avoid guessing.',
         nextWeekPlan: [
-          'Use tasks and habits normally for a few more days.',
+          'Use tasks normally for a few more days.',
           'Come back after you have at least 3 completed or missed items.',
         ],
         insights: [],
@@ -187,7 +187,7 @@ function sanitizeDay(day: HistoryDayInput, tagLookup: Map<string, string>): Sani
       return {
         text: String(task?.text ?? '').slice(0, 80),
         completed: Boolean(task?.completed),
-        type: ['regular', 'weekly', 'habit'].includes(taskType)
+        type: ['regular', 'weekly'].includes(taskType)
           ? (taskType as SanitizedTask['type'])
           : 'regular',
         tags: tagIds.map((id) => tagLookup.get(id) ?? id).slice(0, 5),
@@ -206,8 +206,6 @@ function buildCoachPrompt(payload: CoachPromptPayload) {
   const dayLines = payload.days
     .map((day, index) => {
       const done = day.tasks.filter((task) => task.completed).length;
-      const habits = day.tasks.filter((task) => task.type === 'habit');
-      const habitDone = habits.filter((task) => task.completed).length;
       const focusMinutes = day.tasks.reduce((sum, task) => sum + task.focusMinutes, 0);
       const missed = day.tasks
         .filter((task) => !task.completed)
@@ -222,7 +220,7 @@ function buildCoachPrompt(payload: CoachPromptPayload) {
       const tags = Array.from(new Set(day.tasks.flatMap((task) => task.tags))).join(', ');
 
       return [
-        `day ${index + 1}: ${done} of ${day.tasks.length} tasks done, ${habitDone} of ${habits.length} habits done, focus ${focusMinutes}min`,
+        `day ${index + 1}: ${done} of ${day.tasks.length} tasks done, focus ${focusMinutes}min`,
         tags ? `tags: ${tags}` : '',
         completed ? `completed examples: ${completed}` : '',
         missed ? `missed examples: ${missed}` : '',
@@ -232,13 +230,13 @@ function buildCoachPrompt(payload: CoachPromptPayload) {
     })
     .join('\n');
 
-  return `You are a practical productivity analyst for a task and habit app.
+  return `You are a practical productivity analyst for a task app.
 
 Analyze the user's task history and produce premium-quality coaching. Do not write generic motivation. Make the output easy to scan inside a mobile app.
 
 Rules:
 - Be specific and honest.
-- Prefer patterns across days, task types, habits, overplanning, recovery after missed days, consistency, and neglected areas.
+- Prefer patterns across days, task types, overplanning, recovery after missed days, consistency, and neglected areas.
 - Do not invent data. If evidence is weak, say so and make the action small.
 - The user should immediately understand what to do differently next week.
 - Keep everything very short. No paragraphs.
@@ -248,7 +246,7 @@ Rules:
 - Avoid percentages unless absolutely necessary.
 - Do not combine two problems in one sentence.
 - The summary must describe one overall theme, not multiple different patterns.
-- biggestRisk must name one primary blocker only. Do not combine task load, habits, focus, tags, or family in one Fix line.
+- biggestRisk must name one primary blocker only. Do not combine task load, focus, tags, or family in one Fix line.
 - Avoid cause words like "triggers", "proves", or "means".
 - Avoid dramatic words like "cascading", "abandoned", "collapsed", "failure", "broken", or "sharply".
 - Avoid vague labels like "heavy days"; say "long task lists" or "busy days" instead.
@@ -260,9 +258,8 @@ Rules:
   - nextWeekPlan = 3 different app actions
   - insights[0] = one small experiment that does not repeat the task-count advice
 - Use the app's actual tools in suggestions when relevant:
-  - schedule a task or habit for a specific time
+  - schedule a task for a specific time
   - start a focus session on a task
-  - set how many times per week a habit should be done
   - add or adjust tags to separate areas like work, family, health, chores, or focus
   - reduce the number of tasks planned for heavy days
 - Prefer simple commands like "Schedule", "Tag", "Lower", "Set", "Move".
@@ -274,9 +271,9 @@ Rules:
   - title: "Schedule soft tasks"
   - body: "Open-ended reminders are easier to skip."
   - action: "Schedule one family task for a fixed time."
-  - title: "Separate habits"
-  - body: "Habits get buried when task lists are full."
-  - action: "Set your key habit to 3 times per week."
+  - title: "Separate focus"
+  - body: "Important tasks get buried when lists are full."
+  - action: "Tag one important task before adding more."
 
 RANGE: ${payload.dateRange}
 TOTAL: ${payload.completedTasks} of ${payload.totalTasks} tasks completed.

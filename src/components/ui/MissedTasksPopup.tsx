@@ -27,21 +27,10 @@ export type MissedTasksStatus = {
 
 export type MissedTaskItem = Task & {
   date: string;
-  type: 'regular' | 'weekly' | 'habit';
+  type: 'regular' | 'weekly';
 };
 
 type RepeatMoveMode = 'change-repeat' | 'just-once';
-
-function getWeekDates(date: string) {
-  const day = new Date(`${date}T12:00:00Z`);
-  const sunday = new Date(day);
-  sunday.setUTCDate(day.getUTCDate() - day.getUTCDay());
-  return Array.from({ length: 7 }, (_, index) => {
-    const d = new Date(sunday);
-    d.setUTCDate(sunday.getUTCDate() + index);
-    return d.toISOString().split('T')[0];
-  });
-}
 
 type Props = {
   show: boolean;
@@ -117,8 +106,7 @@ export function MissedTasksPopup({
   const completedCount = status.items.length - activeCount;
   const totalCount = status.items.length;
   const completionRate = totalCount > 0 ? (completedCount / totalCount) * 100 : 0;
-  const taskItems = items.filter((item) => item.type !== 'habit');
-  const habitItems = items.filter((item) => item.type === 'habit');
+  const taskItems = items;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   const dismiss = async () => {
@@ -323,7 +311,6 @@ export function MissedTasksPopup({
                     />
                   )}
                   {taskItems.map((item) => {
-                    const isTask = item.type !== 'habit';
                     const showRepeatChoice = repeatChoiceId === item.id;
                     const itemBusy = busyId === item.id;
                     return (
@@ -390,28 +377,24 @@ export function MissedTasksPopup({
                               >
                                 DID YESTERDAY
                               </button>
-                              {isTask && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => void runAction(item, 'save-later')}
-                                    disabled={isBusy}
-                                    className="inline-flex h-7 items-center gap-1 rounded-lg border border-border/70 bg-muted/50 px-2.5 text-[9px] font-black uppercase tracking-wide text-foreground transition hover:bg-muted disabled:opacity-50"
-                                  >
-                                    <FolderOpen className="h-3 w-3" />
-                                    DO LATER
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => void moveToToday(item)}
-                                    disabled={isBusy}
-                                    className="inline-flex h-7 items-center gap-1 rounded-lg border border-primary/25 bg-primary/10 px-2.5 text-[9px] font-black uppercase tracking-wide text-primary transition hover:bg-primary/15 disabled:opacity-50"
-                                  >
-                                    <CalendarPlus className="h-3 w-3" />
-                                    DO TODAY
-                                  </button>
-                                </>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => void runAction(item, 'save-later')}
+                                disabled={isBusy}
+                                className="inline-flex h-7 items-center gap-1 rounded-lg border border-border/70 bg-muted/50 px-2.5 text-[9px] font-black uppercase tracking-wide text-foreground transition hover:bg-muted disabled:opacity-50"
+                              >
+                                <FolderOpen className="h-3 w-3" />
+                                DO LATER
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void moveToToday(item)}
+                                disabled={isBusy}
+                                className="inline-flex h-7 items-center gap-1 rounded-lg border border-primary/25 bg-primary/10 px-2.5 text-[9px] font-black uppercase tracking-wide text-primary transition hover:bg-primary/15 disabled:opacity-50"
+                              >
+                                <CalendarPlus className="h-3 w-3" />
+                                DO TODAY
+                              </button>
                             </div>
                           </div>
                         </div>
@@ -442,90 +425,6 @@ export function MissedTasksPopup({
                             </div>
                           </div>
                         )}
-                      </div>
-                    );
-                  })}
-                  {habitItems.length > 0 && (
-                    <MissedSectionHeader
-                      icon={<CalendarClock className="h-3.5 w-3.5" />}
-                      title="Habits"
-                      count={habitItems.length}
-                    />
-                  )}
-                  {habitItems.map((item) => {
-                    const showRepeatChoice = repeatChoiceId === item.id;
-                    const itemBusy = busyId === item.id;
-                    return (
-                      <div
-                        key={item.id}
-                        className="rounded-2xl border border-border/70 bg-card/85 p-2.5 shadow-sm"
-                      >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/70"
-                            aria-hidden
-                          >
-                            <span
-                              ref={(node) => {
-                                if (node) flyRefs.current[item.id] = node;
-                                else delete flyRefs.current[item.id];
-                              }}
-                              className={cn(
-                                'flex h-9 w-9 items-center justify-center',
-                                visuallyDone.has(item.id) && 'opacity-0',
-                              )}
-                            >
-                              {itemBusy ? (
-                                <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                              ) : (
-                                <Fly size={25} y={-4} paused={isBusy} />
-                              )}
-                            </span>
-                          </div>
-
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex flex-wrap items-center gap-1">
-                              {item.tags?.map((tagId) => {
-                                const tag = getTagDetails(tagId);
-                                if (!tag) return null;
-                                return (
-                                  <span
-                                    key={tagId}
-                                    className="inline-flex rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none"
-                                    style={{
-                                      backgroundColor: `${tag.color}20`,
-                                      borderColor: `${tag.color}40`,
-                                      color: tag.color,
-                                    }}
-                                  >
-                                    {tag.name}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                            <p className="break-words text-sm font-bold leading-snug text-foreground">
-                              {item.text}
-                            </p>
-                            <HabitProgressDots
-                              date={status.yesterday}
-                              completedDates={item.completedDates ?? []}
-                              goal={item.timesPerWeek ?? 7}
-                            />
-
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => void completeItem(item)}
-                                disabled={isBusy}
-                                className="inline-flex h-7 items-center gap-1 rounded-lg bg-primary px-2.5 text-[9px] font-black uppercase tracking-wide text-primary-foreground shadow-sm transition disabled:opacity-50"
-                              >
-                                DID YESTERDAY
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-
-                        {showRepeatChoice && null}
                       </div>
                     );
                   })}
@@ -610,41 +509,6 @@ function MissedSectionHeader({
       </div>
       <span className="rounded-full bg-muted/70 px-2 py-1 text-[10px] font-black text-muted-foreground">
         {count}
-      </span>
-    </div>
-  );
-}
-
-function HabitProgressDots({
-  date,
-  completedDates,
-  goal,
-}: {
-  date: string;
-  completedDates: string[];
-  goal: number;
-}) {
-  const safeGoal = Math.max(1, Math.min(7, Math.floor(goal || 7)));
-  const weekDates = getWeekDates(date);
-  const completedThisWeek = weekDates.filter((day) =>
-    completedDates.includes(day),
-  ).length;
-
-  return (
-    <div className="mt-1.5 flex items-center gap-1">
-      {Array.from({ length: safeGoal }).map((_, index) => (
-        <span
-          key={index}
-          className={cn(
-            'h-2.5 w-2.5 shrink-0 rounded-full border transition-colors',
-            index < completedThisWeek
-              ? 'border-green-600 bg-green-500 shadow-sm shadow-green-500/20'
-              : 'border-border/60 bg-muted',
-          )}
-        />
-      ))}
-      <span className="ml-1 text-[10px] font-black text-muted-foreground">
-        {completedThisWeek}/{safeGoal}
       </span>
     </div>
   );

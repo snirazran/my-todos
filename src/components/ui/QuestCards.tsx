@@ -140,14 +140,10 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
   const numericTarget = Math.max(0, block.target ?? 0);
   const subjectLabel =
     block.subject === 'any'
-      ? 'tasks / habits'
-      : block.subject === 'habit'
-        ? numericTarget === 1 && !targetLabel.includes('-')
-          ? 'habit'
-          : 'habits'
-        : numericTarget === 1 && !targetLabel.includes('-')
-          ? 'task'
-          : 'tasks';
+      ? 'tasks'
+      : numericTarget === 1 && !targetLabel.includes('-')
+        ? 'task'
+        : 'tasks';
 
   const actionLabel = block.action === 'add' ? 'Add' : 'Complete';
   const scopeLabel =
@@ -162,8 +158,7 @@ function getTaggedSubjectCopy(block: QuestCardLogicBlock) {
 
   const subject = block.subject;
   if (subject === 'task') return 'tasks';
-  if (subject === 'habit') return 'habits';
-  return 'tasks or habits';
+  return 'tasks';
 }
 
 function getTagScopeMessage(block: QuestCardLogicBlock) {

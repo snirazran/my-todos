@@ -92,7 +92,7 @@ export default function ProgressCoachPage() {
                 Know exactly what to change next.
               </h3>
               <p className="mt-2 text-sm font-semibold leading-relaxed text-muted-foreground">
-                Progress Coach reads your recent tasks, habits, tags, and focus sessions, then turns them into a simple plan.
+                Progress Coach reads your recent tasks, tags, and focus sessions, then turns them into a simple plan.
               </p>
             </div>
           </div>

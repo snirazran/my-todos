@@ -42,8 +42,6 @@ type DayStats = {
   dayName: string;
   tasksTotal: number;
   tasksCompleted: number;
-  habitsTotal: number;
-  habitsCompleted: number;
   focusMinutes: number;
   focusCycles: number;
 };
@@ -56,14 +54,6 @@ type TagStat = {
   totalCount: number;
 };
 
-type HabitStat = {
-  id: string;
-  text: string;
-  goal: number;
-  completed: number;
-  tags: string[];
-};
-
 type FocusAreaStat = {
   categoryId: string;
   categoryName: string;
@@ -71,8 +61,6 @@ type FocusAreaStat = {
   tagIds: string[];
   tasksTotal: number;
   tasksCompleted: number;
-  habitsTotal: number;
-  habitsCompleted: number;
   focusMinutes: number;
   topTags: TagStat[];
 };
@@ -97,9 +85,6 @@ export type WeeklyRecapData = {
   // Tag breakdown
   topTags: TagStat[];
 
-  // Habits
-  habits: HabitStat[];
-
   // Focus areas
   focusAreas: FocusAreaStat[];
   selectedCategoryIds: string[];
@@ -110,7 +95,6 @@ export type WeeklyRecapData = {
     completionRate: number;
     totalFocusMinutes: number;
     activeDays: number;
-    habitAvgRate: number;
   } | null;
 
   // Has user seen this recap already
@@ -147,7 +131,6 @@ function computeWeekStats(
       let matchesDay = false;
       if (t.type === 'regular') matchesDay = t.date === dateStr;
       else if (t.type === 'weekly') matchesDay = t.dayOfWeek === dow;
-      else if (t.type === 'habit') matchesDay = true;
       if (!matchesDay) return false;
 
       if (t.createdAt) {
@@ -162,9 +145,6 @@ function computeWeekStats(
       return true;
     });
 
-    const nonHabit = dayTasks.filter((t) => t.type !== 'habit');
-    const habitTasks = dayTasks.filter((t) => t.type === 'habit');
-
     let focusMinutes = 0;
     let focusCycles = 0;
     for (const t of dayTasks) {
@@ -178,15 +158,11 @@ function computeWeekStats(
     return {
       date: dateStr,
       dayName: getDayName(dateStr),
-      tasksTotal: nonHabit.length,
-      tasksCompleted: nonHabit.filter(
+      tasksTotal: dayTasks.length,
+      tasksCompleted: dayTasks.filter(
         (t) =>
           (t.completedDates ?? []).includes(dateStr) ||
           (!!t.completed && t.type === 'regular'),
-      ).length,
-      habitsTotal: habitTasks.length,
-      habitsCompleted: habitTasks.filter((t) =>
-        (t.completedDates ?? []).includes(dateStr),
       ).length,
       focusMinutes,
       focusCycles,
@@ -196,7 +172,7 @@ function computeWeekStats(
   const tasksCompleted = days.reduce((s, d) => s + d.tasksCompleted, 0);
   const tasksTotal = days.reduce((s, d) => s + d.tasksTotal, 0);
   const activeDays = days.filter(
-    (d) => d.tasksCompleted > 0 || d.habitsCompleted > 0,
+    (d) => d.tasksCompleted > 0,
   ).length;
   const totalFocusMinutes = days.reduce((s, d) => s + d.focusMinutes, 0);
   const totalFocusCycles = days.reduce((s, d) => s + d.focusCycles, 0);
@@ -205,19 +181,8 @@ function computeWeekStats(
   const bestDay =
     [...days].sort(
       (a, b) =>
-        b.tasksCompleted + b.habitsCompleted - (a.tasksCompleted + a.habitsCompleted),
+        b.tasksCompleted - a.tasksCompleted,
     )[0] ?? null;
-
-  const habitAvgRate = (() => {
-    const habitTasks = tasks.filter((t) => t.type === 'habit');
-    if (habitTasks.length === 0) return 0;
-    const rates = habitTasks.map((h) => {
-      const goal = h.timesPerWeek ?? 7;
-      const done = dates.filter((d) => (h.completedDates ?? []).includes(d)).length;
-      return Math.min(100, Math.round((done / goal) * 100));
-    });
-    return Math.round(rates.reduce((a, b) => a + b, 0) / rates.length);
-  })();
 
   return {
     days,
@@ -228,7 +193,6 @@ function computeWeekStats(
     totalFocusMinutes,
     totalFocusCycles,
     bestDay,
-    habitAvgRate,
   };
 }
 
@@ -264,7 +228,6 @@ export async function GET(req: NextRequest) {
       $or: [
         { type: 'regular', date: { $gte: prevWeekRange.weekStart, $lte: lastWeek.weekEnd } },
         { type: 'weekly' },
-        { type: 'habit' },
       ],
     }).lean<TaskDoc[]>();
 
@@ -273,7 +236,7 @@ export async function GET(req: NextRequest) {
 
     // Count tasks added last week
     const tasksAdded = allTasks.filter((t) => {
-      if (t.type === 'habit' || t.type === 'weekly') return false;
+      if (t.type === 'weekly') return false;
       const created = new Intl.DateTimeFormat('en-CA', {
         timeZone: tz,
         year: 'numeric',
@@ -287,7 +250,7 @@ export async function GET(req: NextRequest) {
     let currentStreak = 0;
     for (let i = lastWeek.dates.length - 1; i >= 0; i--) {
       const d = lastWeekStats.days[i];
-      if (d.tasksCompleted > 0 || d.habitsCompleted > 0) {
+      if (d.tasksCompleted > 0) {
         currentStreak++;
       } else {
         break;
@@ -310,7 +273,6 @@ export async function GET(req: NextRequest) {
         let matchesDay = false;
         if (t.type === 'regular') matchesDay = t.date === dateStr;
         else if (t.type === 'weekly') matchesDay = t.dayOfWeek === dow;
-        else if (t.type === 'habit') matchesDay = true;
         if (!matchesDay) continue;
 
         const isCompleted =
@@ -337,19 +299,6 @@ export async function GET(req: NextRequest) {
       .sort((a, b) => b.completedCount - a.completedCount)
       .slice(0, 5);
 
-    // Habit stats
-    const habits: HabitStat[] = allTasks
-      .filter((t) => t.type === 'habit')
-      .map((t) => ({
-        id: t.id,
-        text: t.text,
-        goal: t.timesPerWeek ?? 7,
-        completed: lastWeek.dates.filter((d) =>
-          (t.completedDates ?? []).includes(d),
-        ).length,
-        tags: t.tags ?? [],
-      }));
-
     // Focus areas
     const focusProfile = (user as any).focusProfile;
     const selectedCategoryIds: string[] = focusProfile?.selectedCategoryIds ?? [];
@@ -363,8 +312,6 @@ export async function GET(req: NextRequest) {
 
       let tasksTotal = 0;
       let tasksCompleted = 0;
-      let habitsTotal = 0;
-      let habitsCompleted = 0;
       let focusMinutes = 0;
 
       for (const dateStr of lastWeek.dates) {
@@ -376,20 +323,14 @@ export async function GET(req: NextRequest) {
           let matchesDay = false;
           if (t.type === 'regular') matchesDay = t.date === dateStr;
           else if (t.type === 'weekly') matchesDay = t.dayOfWeek === dow;
-          else if (t.type === 'habit') matchesDay = true;
           if (!matchesDay) continue;
 
           const isCompleted =
             (t.completedDates ?? []).includes(dateStr) ||
             (!!t.completed && t.type === 'regular');
 
-          if (t.type === 'habit') {
-            habitsTotal++;
-            if (isCompleted) habitsCompleted++;
-          } else {
-            tasksTotal++;
-            if (isCompleted) tasksCompleted++;
-          }
+          tasksTotal++;
+          if (isCompleted) tasksCompleted++;
 
           const session = t.frogodoroSessions?.find((s) => s.date === dateStr);
           if (session) {
@@ -419,8 +360,6 @@ export async function GET(req: NextRequest) {
         tagIds,
         tasksTotal,
         tasksCompleted,
-        habitsTotal,
-        habitsCompleted,
         focusMinutes,
         topTags: areaTopTags,
       };
@@ -435,7 +374,6 @@ export async function GET(req: NextRequest) {
         completionRate: prev.completionRate,
         totalFocusMinutes: prev.totalFocusMinutes,
         activeDays: prev.activeDays,
-        habitAvgRate: prev.habitAvgRate,
       };
     }
 
@@ -496,7 +434,6 @@ export async function GET(req: NextRequest) {
       currentStreak,
       days: lastWeekStats.days,
       topTags,
-      habits,
       focusAreas,
       selectedCategoryIds,
       prevWeek,

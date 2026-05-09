@@ -15,7 +15,6 @@ import {
   ChevronRight,
   Filter,
 } from 'lucide-react';
-import { HabitPanel } from '@/components/ui/HabitPanel';
 import BacklogTray from '@/components/board/BacklogTray';
 import BacklogBox from '@/components/board/BacklogBox';
 //fix
@@ -63,7 +62,7 @@ import type {
 // Force re-compilation of this file to pick up useTaskData.tsx change
 
 const FLY_PX = 40;
-type HomeTab = 'all' | 'today' | 'habits';
+type HomeTab = 'all' | 'today';
 
 const demoTasks: Task[] = [
   {
@@ -96,7 +95,6 @@ export default function Home() {
   const {
     tasks,
     backlogTasks,
-    habits,
     isLoading,
     flyStatus,
     hungerStatus,
@@ -163,37 +161,6 @@ export default function Home() {
             tags: ['debug-tag-work', 'debug-tag-personal'],
           },
           {
-            id: 'debug-3',
-            text: 'Morning meditation',
-            completed: false,
-            date: debugYesterday,
-            type: 'habit' as const,
-            timesPerWeek: 7,
-            completedDates: [
-              (() => {
-                const d = new Date();
-                d.setDate(d.getDate() - 3);
-                return d.toISOString().split('T')[0];
-              })(),
-              (() => {
-                const d = new Date();
-                d.setDate(d.getDate() - 5);
-                return d.toISOString().split('T')[0];
-              })(),
-            ],
-            tags: ['debug-tag-health'],
-          },
-          {
-            id: 'debug-4',
-            text: 'Read 20 pages',
-            completed: false,
-            date: debugYesterday,
-            type: 'habit' as const,
-            timesPerWeek: 5,
-            completedDates: [],
-            tags: ['debug-tag-personal'],
-          },
-          {
             id: 'debug-5',
             text: 'Go grocery shopping',
             completed: false,
@@ -241,8 +208,6 @@ export default function Home() {
             dayName: 'Wed',
             tasksTotal: 5,
             tasksCompleted: 5,
-            habitsTotal: 3,
-            habitsCompleted: 3,
             focusMinutes: 45,
             focusCycles: 3,
           },
@@ -256,8 +221,6 @@ export default function Home() {
               dayName: 'Mon',
               tasksTotal: 3,
               tasksCompleted: 2,
-              habitsTotal: 3,
-              habitsCompleted: 2,
               focusMinutes: 25,
               focusCycles: 1,
             },
@@ -266,8 +229,6 @@ export default function Home() {
               dayName: 'Tue',
               tasksTotal: 4,
               tasksCompleted: 3,
-              habitsTotal: 3,
-              habitsCompleted: 3,
               focusMinutes: 30,
               focusCycles: 2,
             },
@@ -276,8 +237,6 @@ export default function Home() {
               dayName: 'Wed',
               tasksTotal: 5,
               tasksCompleted: 5,
-              habitsTotal: 3,
-              habitsCompleted: 3,
               focusMinutes: 45,
               focusCycles: 3,
             },
@@ -286,8 +245,6 @@ export default function Home() {
               dayName: 'Thu',
               tasksTotal: 2,
               tasksCompleted: 1,
-              habitsTotal: 3,
-              habitsCompleted: 2,
               focusMinutes: 25,
               focusCycles: 2,
             },
@@ -296,8 +253,6 @@ export default function Home() {
               dayName: 'Fri',
               tasksTotal: 3,
               tasksCompleted: 2,
-              habitsTotal: 3,
-              habitsCompleted: 1,
               focusMinutes: 35,
               focusCycles: 2,
             },
@@ -306,8 +261,6 @@ export default function Home() {
               dayName: 'Sat',
               tasksTotal: 1,
               tasksCompleted: 1,
-              habitsTotal: 3,
-              habitsCompleted: 2,
               focusMinutes: 15,
               focusCycles: 1,
             },
@@ -316,8 +269,6 @@ export default function Home() {
               dayName: 'Sun',
               tasksTotal: 0,
               tasksCompleted: 0,
-              habitsTotal: 3,
-              habitsCompleted: 0,
               focusMinutes: 10,
               focusCycles: 1,
             },
@@ -345,29 +296,6 @@ export default function Home() {
               totalCount: 5,
             },
           ],
-          habits: [
-            {
-              id: 'h1',
-              text: 'Morning meditation',
-              goal: 7,
-              completed: 5,
-              tags: ['debug-tag-health'],
-            },
-            {
-              id: 'h2',
-              text: 'Read 20 pages',
-              goal: 5,
-              completed: 3,
-              tags: ['debug-tag-personal'],
-            },
-            {
-              id: 'h3',
-              text: 'Stretch for 10 minutes',
-              goal: 6,
-              completed: 6,
-              tags: ['debug-tag-health'],
-            },
-          ],
           focusAreas: [
             {
               categoryId: 'sport',
@@ -376,8 +304,6 @@ export default function Home() {
               tagIds: ['debug-tag-health'],
               tasksTotal: 7,
               tasksCompleted: 5,
-              habitsTotal: 12,
-              habitsCompleted: 9,
               focusMinutes: 60,
               topTags: [
                 {
@@ -396,8 +322,6 @@ export default function Home() {
               tagIds: ['debug-tag-personal'],
               tasksTotal: 5,
               tasksCompleted: 3,
-              habitsTotal: 7,
-              habitsCompleted: 4,
               focusMinutes: 45,
               topTags: [
                 {
@@ -416,7 +340,6 @@ export default function Home() {
             completionRate: 62,
             totalFocusMinutes: 120,
             activeDays: 4,
-            habitAvgRate: 55,
           },
           alreadySeen: false,
           skinsNew: 2,
@@ -434,7 +357,6 @@ export default function Home() {
 
   const [quickText, setQuickText] = useState('');
   const [showQuickAdd, setShowQuickAdd] = useState(false);
-  const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>('pick');
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const [showTimer, setShowTimer] = useState(false);
   const [frogodoroHydrated, setFrogodoroHydrated] = useState(
@@ -596,22 +518,9 @@ export default function Home() {
   // Note: We don't rely purely on 'rate' anymore for triggering, but we keep it for the progress bar
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
 
-  // Include completed habits in gift milestone progress
-  const todayDateStr = format(new Date(), 'yyyy-MM-dd');
   const openTaskCount = data.filter((t) => !t.completed).length;
-  const openHabitCount = habits.filter(
-    (h) => !h.completedDates?.includes(todayDateStr) && !h.completed,
-  ).length;
-  const visibleTaskCount = showCompleted ? data.length : openTaskCount;
-  const visibleHabitCount = showCompleted ? habits.length : openHabitCount;
-  const visibleTodayCount = visibleTaskCount + visibleHabitCount;
-  const habitsDone = user
-    ? habits.filter(
-        (h) => h.completedDates?.includes(todayDateStr) || h.completed,
-      ).length
-    : 0;
-  const giftDone = doneCount + habitsDone;
-  const giftTotal = data.length + (user ? habits.length : 0);
+  const giftDone = doneCount;
+  const giftTotal = data.length;
   const flyBalance = user ? flyStatus.balance : 5;
   const laterThisWeek = user ? backlogTasks : [];
   const [dismissQuestOnboarding, setDismissQuestOnboarding] = useState(false);
@@ -695,8 +604,7 @@ export default function Home() {
 
   const handleToggle = async (taskId: string, explicitCompleted?: boolean) => {
     if (cinematic || grab) return;
-    const task =
-      data.find((t) => t.id === taskId) || habits.find((h) => h.id === taskId);
+    const task = data.find((t) => t.id === taskId);
     if (!task) return;
     const completed =
       explicitCompleted !== undefined ? explicitCompleted : !task.completed;
@@ -831,8 +739,8 @@ export default function Home() {
                   <div className="flex items-center gap-2 ml-3 cursor-pointer group">
                     <CalendarCheck className="w-5 h-5 text-primary" />
                     <span className="text-sm font-black tracking-tight lowercase text-foreground">
-                      {openTaskCount + openHabitCount}{' '}
-                      {openTaskCount + openHabitCount === 1 ? 'fly' : 'flies'}{' '}
+                      {openTaskCount}{' '}
+                      {openTaskCount === 1 ? 'fly' : 'flies'}{' '}
                       left for today!
                     </span>
                   </div>
@@ -877,7 +785,7 @@ export default function Home() {
               <div className="min-h-[360px] pb-16" ref={taskListRef}>
                 {renderGuestPrompt()}
                 <TaskList
-                  tasks={[...habits, ...data]}
+                  tasks={data}
                   toggle={handleToggle}
                   showConfetti={rate === 100}
                   visuallyCompleted={visuallyDone}
@@ -905,7 +813,6 @@ export default function Home() {
                       return;
                     }
                     setQuickText(prefill || '');
-                    setQuickAddMode('pick');
                     setShowQuickAdd(true);
                   }}
                   weeklyIds={weeklyIds}
@@ -937,13 +844,6 @@ export default function Home() {
                     moveTaskToBacklog(id);
                   }}
                   onReorder={(reordered) => {
-                    // Split reordered back to habits and tasks
-                    const newHabits = reordered.filter(
-                      (t) => t.type === 'habit',
-                    );
-                    const newTasks = reordered.filter(
-                      (t) => t.type !== 'habit',
-                    );
                     reorderTasks(reordered);
                   }}
                   pendingToToday={pendingToToday}
@@ -1068,13 +968,11 @@ export default function Home() {
         onOpenChange={setShowQuickAdd}
         initialText={quickText}
         defaultRepeat="this-week"
-        defaultMode={quickAddMode}
         onSubmit={async ({
           text,
           days,
           repeat,
           tags,
-          timesPerWeek,
           startTime,
           endTime,
           reminder,
@@ -1091,7 +989,6 @@ export default function Home() {
                 days,
                 repeat,
                 tags,
-                timesPerWeek,
                 timezone: tz,
                 startTime,
                 endTime,
@@ -1114,12 +1011,8 @@ export default function Home() {
                 });
               } else {
                 const currentDayOfWeek = new Date().getDay();
-                // Filter to only add tasks that match TODAY's date, or if it's a habit meant for today
+                // Filter to only add tasks that match TODAY's date
                 const relevantTasks = newTasks.filter((t: any) => {
-                  if (t.type === 'habit') {
-                    // Habits show on ALL days now, so it's always relevant
-                    return true;
-                  }
                   if (t.type === 'weekly') {
                     return t.dayOfWeek === currentDayOfWeek;
                   }
@@ -1255,7 +1148,6 @@ export default function Home() {
                   return;
                 }
                 setQuickText('');
-                setQuickAddMode('pick');
                 setShowQuickAdd(true);
               }}
               label={

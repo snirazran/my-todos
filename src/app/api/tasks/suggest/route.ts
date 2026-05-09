@@ -61,7 +61,6 @@ async function getTodayTaskCount(uid: string, tz: string): Promise<number> {
   return TaskModel.countDocuments({
     userId: uid,
     deletedAt: { $exists: false },
-    type: { $ne: 'habit' },
     $or: [
       { type: 'weekly', dayOfWeek: todayDow },
       { type: 'regular', date: todayDate },
@@ -84,7 +83,6 @@ async function generatePool(
     deletedAt: { $exists: false },
     $or: [
       { type: 'weekly' },
-      { type: 'habit' },
       { type: 'regular', weekStart },
       { type: 'backlog' },
     ],
@@ -92,10 +90,7 @@ async function generatePool(
     .select('text type tags dayOfWeek completed')
     .lean();
 
-  const habitTasks = tasks.filter((t: any) => t.type === 'habit');
-  const regularTasks = tasks.filter((t: any) => t.type !== 'habit');
-  const habitTexts = habitTasks.map((t: any) => t.text);
-  const taskTexts = regularTasks.map((t: any) => t.text);
+  const taskTexts = tasks.map((t: any) => t.text);
 
   const categories = selectedCategoryIds
     .map((id: string) => QUEST_MACRO_CATEGORIES.find((c) => c.id === id))
@@ -122,7 +117,7 @@ async function generatePool(
   const currentTime = timeFormatter.format(now);
   const currentDay = dayFormatter.format(now);
 
-  const prompt = buildPrompt(taskTexts, habitTexts, categories, currentTime, currentDay);
+  const prompt = buildPrompt(taskTexts, categories, currentTime, currentDay);
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) return [];
@@ -329,7 +324,6 @@ export async function PATCH(req: Request) {
 
 function buildPrompt(
   existingTasks: string[],
-  habits: string[],
   categories: any[],
   currentTime: string,
   currentDay: string,
@@ -343,18 +337,10 @@ function buildPrompt(
       ? existingTasks.map((t) => `- ${t}`).join('\n')
       : '(none yet)';
 
-  const habitList =
-    habits.length > 0
-      ? habits.map((t) => `- ${t}`).join('\n')
-      : '(none)';
-
   return `You are a personal productivity coach helping a user achieve their goals. It is currently ${currentDay}, ${currentTime}.
 
 The user chose these focus areas to improve in:
 ${categoryInfo}
-
-Their recurring habits:
-${habitList}
 
 Their tasks this week:
 ${taskList}
@@ -363,7 +349,7 @@ Suggest EXACTLY ${POOL_SIZE} new tasks (you MUST return all ${POOL_SIZE}) that:
 - Help them make progress on their focus areas
 - Spread suggestions across ALL of the user's focus areas, not just one
 - Are time-appropriate (morning tasks if morning, evening tasks if evening, etc.)
-- Do NOT duplicate or closely resemble any existing task or habit above
+- Do NOT duplicate or closely resemble any existing task above
 - Are specific and actionable, not generic advice
 - Each task text MUST be 45 characters or fewer
 

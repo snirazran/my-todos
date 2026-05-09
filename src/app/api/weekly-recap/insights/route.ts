@@ -96,29 +96,22 @@ export async function POST(req: NextRequest) {
 }
 
 function buildInsightsPrompt(data: any): string {
-  const habits = (data.habits ?? [])
-    .map(
-      (h: any) =>
-        `- "${h.text}" (${h.completed}/${h.goal} days)`,
-    )
-    .join('\n') || '(none)';
-
   const focusAreas = (data.focusAreas ?? [])
     .map(
       (a: any) =>
-        `- ${a.categoryName}: ${a.tasksCompleted}/${a.tasksTotal} tasks, ${a.habitsCompleted}/${a.habitsTotal} habits, ${a.focusMinutes}min focused`,
+        `- ${a.categoryName}: ${a.tasksCompleted}/${a.tasksTotal} tasks, ${a.focusMinutes}min focused`,
     )
     .join('\n') || '(none)';
 
   const dayBreakdown = (data.days ?? [])
     .map(
       (d: any) =>
-        `${d.dayName}: ${d.tasksCompleted}/${d.tasksTotal} tasks, ${d.habitsCompleted}/${d.habitsTotal} habits`,
+        `${d.dayName}: ${d.tasksCompleted}/${d.tasksTotal} tasks`,
     )
     .join('\n');
 
   const prevComparison = data.prevWeek
-    ? `Previous week: ${data.prevWeek.tasksCompleted} tasks done (${data.prevWeek.completionRate}% rate), ${data.prevWeek.totalFocusMinutes}min focused, ${data.prevWeek.activeDays} active days, ${data.prevWeek.habitAvgRate}% avg habit rate`
+    ? `Previous week: ${data.prevWeek.tasksCompleted} tasks done (${data.prevWeek.completionRate}% rate), ${data.prevWeek.totalFocusMinutes}min focused, ${data.prevWeek.activeDays} active days`
     : 'No previous week data.';
 
   return `You are a personal productivity coach analyzing a user's weekly task data. Be encouraging but honest.
@@ -133,9 +126,6 @@ WEEKLY STATS:
 DAY BY DAY:
 ${dayBreakdown}
 
-HABITS:
-${habits}
-
 FOCUS AREAS:
 ${focusAreas}
 
@@ -143,7 +133,7 @@ WEEK-OVER-WEEK:
 ${prevComparison}
 
 Generate 3-5 personalized insights. Mix strengths, areas for improvement, and actionable suggestions.
-Focus on patterns: which days are weak, which habits get skipped, if too many tasks are added but not completed, if focus time is low, which areas are neglected.
+Focus on patterns: which days are weak, if too many tasks are added but not completed, if focus time is low, which areas are neglected.
 
 Return ONLY raw JSON (no markdown, no backticks):
 {

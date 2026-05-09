@@ -12,12 +12,11 @@ export interface Task {
   text: string;
   completed: boolean;
   order?: number;
-  type?: 'regular' | 'weekly' | 'backlog' | 'habit';
-  origin?: 'regular' | 'weekly' | 'backlog' | 'habit';
-  kind?: 'regular' | 'weekly' | 'backlog' | 'habit';
+  type?: 'regular' | 'weekly' | 'backlog';
+  origin?: 'regular' | 'weekly' | 'backlog';
+  kind?: 'regular' | 'weekly' | 'backlog';
   tags?: string[];
   date?: string;
-  timesPerWeek?: number; // Target number of completions per week for habits
   completedDates?: string[];
   frogodoroSettings?: {
     cycleDuration: number;
@@ -66,7 +65,6 @@ type ExclusionSource = 'today' | 'backlog';
 
 type UseTaskDataOptions = {
   includeBacklog?: boolean;
-  includeHabits?: boolean;
 };
 
 // --- Fetcher ---
@@ -81,7 +79,6 @@ const sortTasks = (ts: Task[]) => {
 
 export function useTaskData({
   includeBacklog = true,
-  includeHabits = true,
 }: UseTaskDataOptions = {}) {
   const { user } = useAuth();
   const { showNotification, hideNotification } = useNotification();
@@ -103,9 +100,7 @@ export function useTaskData({
 
   // --- SWR Keys ---
   const todayKey = user
-    ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}${
-        includeHabits ? '' : '&includeHabits=0'
-      }`
+    ? `/api/tasks?date=${dateStr}&timezone=${encodeURIComponent(tz)}`
     : null;
   const backlogKey =
     user && includeBacklog ? `/api/tasks?view=board&day=-1` : null;
@@ -136,12 +131,10 @@ export function useTaskData({
       if (includeBacklog) mutateBacklog();
     };
 
-    window.addEventListener('habits-updated', handleUpdate);
     window.addEventListener('tags-updated', handleUpdate);
     window.addEventListener('board-refresh', handleUpdate);
 
     return () => {
-      window.removeEventListener('habits-updated', handleUpdate);
       window.removeEventListener('tags-updated', handleUpdate);
       window.removeEventListener('board-refresh', handleUpdate);
     };
@@ -186,12 +179,10 @@ export function useTaskData({
   }, [todayData, backlogData]);
 
   // --- Derived State ---
-  // Filter Today: Hide if excluded from 'today' and separate habits
+  // Filter Today: Hide if excluded from 'today'
   const tasks = (todayData?.tasks || []).filter(
-    (t) => pendingExclusions.get(t.id) !== 'today' && t.type !== 'habit',
+    (t) => pendingExclusions.get(t.id) !== 'today',
   );
-
-  const habits = (todayData?.tasks || []).filter((t) => t.type === 'habit');
 
   const weeklyIds = new Set(todayData?.weeklyIds || []);
   const flyStatus = todayData?.flyStatus || {
@@ -230,24 +221,9 @@ export function useTaskData({
       const prevBacklog = backlogData;
 
       // Optimistic Update
-      const updatedTasks = todayData.tasks.map((t) => {
-        if (t.id !== taskId) return t;
-        // For habits, also update completedDates so HabitPanel sees the change immediately
-        if (t.type === 'habit') {
-          const currentDates = t.completedDates ?? [];
-          const updatedDates = nextCompleted
-            ? currentDates.includes(dateStr)
-              ? currentDates
-              : [...currentDates, dateStr]
-            : currentDates.filter((d) => d !== dateStr);
-          return {
-            ...t,
-            completed: nextCompleted,
-            completedDates: updatedDates,
-          };
-        }
-        return { ...t, completed: nextCompleted };
-      });
+      const updatedTasks = todayData.tasks.map((t) =>
+        t.id === taskId ? { ...t, completed: nextCompleted } : t,
+      );
 
       const sortedTasks = sortTasks(updatedTasks);
 
@@ -446,7 +422,7 @@ export function useTaskData({
     async (item: {
       id: string;
       text: string;
-      type?: 'regular' | 'weekly' | 'backlog' | 'habit';
+      type?: 'regular' | 'weekly' | 'backlog';
       tags?: string[];
     }) => {
       if (!todayData || !backlogData) return;
@@ -819,7 +795,6 @@ export function useTaskData({
 
   return {
     tasks,
-    habits,
     backlogTasks,
     pendingToBacklog,
     pendingToToday,

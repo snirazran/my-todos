@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, CalendarClock, Tag, RotateCcw, Pencil, CalendarCheck, CalendarDays, Check, Timer } from 'lucide-react';
+import { Trash2, CalendarClock, Tag, RotateCcw, Pencil, CalendarCheck, Check, Timer } from 'lucide-react';
 import TagManager from '@/components/ui/TagManager';
 
 interface TaskMenuProps {
@@ -14,17 +14,15 @@ interface TaskMenuProps {
   addTagsPosition?: 'first' | 'second';
   onToggleRepeat?: () => void;
   isWeekly?: boolean;
-  isHabit?: boolean;
   onEdit?: (taskId: string) => void;
   onDoToday?: () => void;
   isDone?: boolean;
   onAddTags?: (taskId: string) => void;
-  onChangeDays?: () => void;
   onSchedule?: (taskId: string) => void;
   onStartTimer?: () => void;
 }
 
-export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, isHabit, onEdit, onDoToday, onChangeDays, onSchedule, onStartTimer }: TaskMenuProps) {
+export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, onEdit, onDoToday, onSchedule, onStartTimer }: TaskMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
   // We portal to document.body
@@ -90,7 +88,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
              >
                <Pencil className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-               {isHabit ? 'Edit Habit' : 'Edit Task'}
+               Edit Task
              </button>
           )}
 
@@ -146,7 +144,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             </button>
           )}
 
-          {onToggleRepeat && !isHabit && (
+          {onToggleRepeat && (
              <button
               onClick={() => {
                   onToggleRepeat();
@@ -168,20 +166,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             </button>
           )}
 
-          {onChangeDays && isHabit && (
-            <button
-              onClick={() => {
-                onChangeDays();
-                onClose();
-              }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-            >
-              <CalendarDays className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              Change Goal
-            </button>
-          )}
-
-          {onDoLater && !isDone && !isHabit && (
+          {onDoLater && !isDone && (
             <button
               onClick={() => {
                 onDoLater();
@@ -216,7 +201,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
             >
               <Trash2 className="h-4 w-4 text-red-500 group-hover:text-red-600 transition-colors" />
-              {isHabit ? 'Delete Habit' : 'Delete Task'}
+              Delete Task
             </button>
           )}
 

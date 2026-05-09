@@ -8,7 +8,6 @@ import {
   CalendarClock,
   Clock,
   RotateCcw,
-  CalendarDays,
   Trash2,
   X,
 } from 'lucide-react';
@@ -31,13 +30,11 @@ export default function TaskActionSheet({
   task,
   isCompleted,
   isWeekly,
-  isHabit,
   onComplete,
   onEdit,
   onAddTags,
   onSchedule,
   onToggleRepeat,
-  onChangeGoal,
   onDoLater,
   onDelete,
 }: {
@@ -46,13 +43,11 @@ export default function TaskActionSheet({
   task: Task | null;
   isCompleted: boolean;
   isWeekly: boolean;
-  isHabit: boolean;
   onComplete?: () => void;
   onEdit?: () => void;
   onAddTags?: () => void;
   onSchedule?: () => void;
   onToggleRepeat?: () => void;
-  onChangeGoal?: () => void;
   onDoLater?: () => void;
   onDelete?: () => void;
 }) {
@@ -69,7 +64,7 @@ export default function TaskActionSheet({
   if (onEdit)
     actions.push({
       key: 'edit',
-      label: isHabit ? 'Edit habit' : 'Edit task',
+      label: 'Edit task',
       icon: Pencil,
       onClick: onEdit,
     });
@@ -87,7 +82,7 @@ export default function TaskActionSheet({
       icon: Clock,
       onClick: onSchedule,
     });
-  if (onToggleRepeat && !isHabit)
+  if (onToggleRepeat)
     actions.push({
       key: 'repeat',
       label: 'Repeat weekly',
@@ -95,14 +90,7 @@ export default function TaskActionSheet({
       onClick: onToggleRepeat,
       active: isWeekly,
     });
-  if (onChangeGoal && isHabit)
-    actions.push({
-      key: 'goal',
-      label: 'Change goal',
-      icon: CalendarDays,
-      onClick: onChangeGoal,
-    });
-  if (onDoLater && !isCompleted && !isHabit)
+  if (onDoLater && !isCompleted)
     actions.push({
       key: 'doLater',
       label: 'Do later',

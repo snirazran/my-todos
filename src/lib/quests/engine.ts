@@ -122,8 +122,10 @@ function taskCompletionDates(task: TaskDoc) {
 
 function matchesSubject(task: TaskDoc, subject: QuestSubject) {
   if (subject === 'any') return true;
-  if (subject === 'habit') return task.type === 'habit';
-  return task.type !== 'habit';
+  return (
+    subject === 'task' &&
+    (task.type === 'regular' || task.type === 'weekly' || task.type === 'backlog')
+  );
 }
 
 function matchesLogicBlock(task: TaskDoc, block: QuestLogicBlock) {
@@ -301,9 +303,8 @@ function buildVisibilityMetrics(
 ) {
   return {
     daily_tasks_count: tasks.filter(
-      (task) => task.type !== 'habit' && task.date === todayKey,
+      (task) => task.type === 'regular' && task.date === todayKey,
     ).length,
-    total_habits_count: tasks.filter((task) => task.type === 'habit').length,
     tags_count: user.tags?.length ?? 0,
   };
 }
@@ -347,7 +348,6 @@ function categoryDocToDefinition(doc: QuestCategoryDoc): MacroCategoryDefinition
     backgroundFrom: doc.backgroundFrom,
     backgroundTo: doc.backgroundTo,
     taskSuggestions: [],
-    habitSuggestions: [],
     campaignHeadlines: [],
     durationDaysOptions: [],
     premiumAnimationId: '',

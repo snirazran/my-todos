@@ -47,9 +47,9 @@ function getWeekRating(rate: number): { label: string; color: string; bg: string
   return { label: 'Rough Week', color: 'text-red-400', bg: 'bg-red-500' };
 }
 
-function getDayRating(tasksCompleted: number, tasksTotal: number, habitsCompleted: number, habitsTotal: number) {
-  const total = tasksTotal + habitsTotal;
-  const done = tasksCompleted + habitsCompleted;
+function getDayRating(tasksCompleted: number, tasksTotal: number) {
+  const total = tasksTotal;
+  const done = tasksCompleted;
   if (total === 0) return { color: 'bg-muted/30', label: 'No tasks' };
   const pct = (done / total) * 100;
   if (pct >= 90) return { color: 'bg-emerald-500', label: 'Perfect' };
@@ -264,10 +264,10 @@ export default function WeeklyRecap({
               <Section title="Day by Day" icon={<Calendar className="h-4 w-4 text-muted-foreground" />} delay={0.2}>
                 <div className="space-y-1.5">
                   {data.days.map((day, i) => {
-                    const total = day.tasksTotal + day.habitsTotal;
-                    const done = day.tasksCompleted + day.habitsCompleted;
+                    const total = day.tasksTotal;
+                    const done = day.tasksCompleted;
                     const pct = total > 0 ? (done / total) * 100 : 0;
-                    const dayRating = getDayRating(day.tasksCompleted, day.tasksTotal, day.habitsCompleted, day.habitsTotal);
+                    const dayRating = getDayRating(day.tasksCompleted, day.tasksTotal);
                     return (
                       <motion.div
                         key={day.date}
@@ -312,7 +312,7 @@ export default function WeeklyRecap({
               </Section>
 
               {/* ── Best Day (right under day-by-day) ── */}
-              {data.bestDay && (data.bestDay.tasksCompleted > 0 || data.bestDay.habitsCompleted > 0) && (
+              {data.bestDay && data.bestDay.tasksCompleted > 0 && (
                 <motion.div
                   initial={{ scale: 0.95, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
@@ -328,7 +328,7 @@ export default function WeeklyRecap({
                       {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][new Date(data.bestDay.date + 'T12:00:00Z').getUTCDay()]}
                     </p>
                     <p className="text-xs font-semibold text-muted-foreground">
-                      {data.bestDay.tasksCompleted} tasks · {data.bestDay.habitsCompleted} habits
+                      {data.bestDay.tasksCompleted} tasks
                       {data.bestDay.focusMinutes > 0 && ` · ${data.bestDay.focusMinutes}m focused`}
                     </p>
                   </div>
@@ -387,40 +387,6 @@ export default function WeeklyRecap({
                   )}
                 </motion.div>
               </Section>
-
-              {/* ── Habits ── */}
-              {data.habits.length > 0 && (
-                <Section title="Habits" icon={<Target className="h-4 w-4 text-muted-foreground" />} delay={0.5}>
-                  <div className="space-y-2">
-                    {data.habits.map((h, i) => {
-                      const pct = h.goal > 0 ? Math.round((h.completed / h.goal) * 100) : 0;
-                      const barColor = pct >= 80 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-red-500';
-                      return (
-                        <motion.div
-                          key={h.id}
-                          initial={{ x: -10, opacity: 0 }}
-                          animate={{ x: 0, opacity: 1 }}
-                          transition={{ delay: 0.55 + i * 0.04 }}
-                          className="rounded-xl border border-border/50 bg-muted/20 p-3"
-                        >
-                          <div className="flex items-center justify-between mb-1.5">
-                            <span className="text-sm font-bold text-foreground truncate">{h.text}</span>
-                            <span className="text-xs font-bold text-muted-foreground shrink-0 ml-2">{h.completed}/{h.goal}d</span>
-                          </div>
-                          <div className="h-2 w-full rounded-full bg-muted/30 overflow-hidden">
-                            <motion.div
-                              className={cn('h-full rounded-full', barColor)}
-                              initial={{ width: 0 }}
-                              animate={{ width: `${pct}%` }}
-                              transition={{ delay: 0.6 + i * 0.04, duration: 0.5 }}
-                            />
-                          </div>
-                        </motion.div>
-                      );
-                    })}
-                  </div>
-                </Section>
-              )}
 
               {/* ── Top Tags ── */}
               {data.topTags.length > 0 && (
@@ -522,7 +488,6 @@ export default function WeeklyRecap({
                           </div>
                           <div className="flex gap-3 mt-2 text-[10px] font-semibold text-muted-foreground">
                             <span>{area.tasksCompleted}/{area.tasksTotal} tasks</span>
-                            <span>{area.habitsCompleted}/{area.habitsTotal} habits</span>
                             {area.focusMinutes > 0 && <span>{area.focusMinutes}m focus</span>}
                           </div>
                         </motion.div>

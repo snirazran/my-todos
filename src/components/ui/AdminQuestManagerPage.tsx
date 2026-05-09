@@ -194,7 +194,6 @@ const emptySeasonForm = (): SeasonFormState => {
 
 const visibilityMetricLabel: Record<QuestVisibilityMetric, string> = {
   daily_tasks_count: 'User tasks today',
-  total_habits_count: 'User habits total',
   tags_count: 'User tags count',
 };
 
@@ -1824,8 +1823,7 @@ function ObjectivesEditorDialog({
 
                   <InlinePillSelect value={block.subject} onChange={(v) => onUpdate(block.id, { subject: v as QuestSubject })}>
                     <option value="task">tasks</option>
-                    <option value="habit">habits</option>
-                    <option value="any">tasks or habits</option>
+                    <option value="any">any task</option>
                   </InlinePillSelect>
 
                   {block.tagMode !== 'ignore' && (
@@ -2002,7 +2000,6 @@ function AvailabilityEditorDialog({
                     <span className="text-[13px] font-medium text-foreground">Only show when</span>
                     <InlinePillSelect value={condition.metric} onChange={(v) => onUpdate(condition.id, { metric: v as QuestVisibilityMetric })}>
                       <option value="daily_tasks_count">tasks today</option>
-                      <option value="total_habits_count">total habits</option>
                       <option value="tags_count">tags count</option>
                     </InlinePillSelect>
                     <span className="text-[13px] font-medium text-foreground">is</span>

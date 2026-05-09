@@ -92,7 +92,6 @@ function toMissedItem(task: TaskDoc, date: string) {
     completed: false,
     tags: task.tags ?? [],
     completedDates: task.completedDates ?? [],
-    timesPerWeek: task.timesPerWeek,
     date,
     startTime: task.startTime,
     endTime: task.endTime,
@@ -111,7 +110,6 @@ async function getMissedTasks(
     $or: [
       { type: 'regular', date },
       { type: 'weekly', dayOfWeek: dow },
-      { type: 'habit' },
     ],
   })
     .sort({ order: 1 })
@@ -139,7 +137,6 @@ async function getMissedTaskDoc(
     $or: [
       { type: 'regular', date },
       { type: 'weekly', dayOfWeek: dow },
-      { type: 'habit' },
     ],
   })
     .lean<TaskDoc>()
@@ -503,12 +500,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'save-later') {
-    if (task.type === 'habit') {
-      return NextResponse.json(
-        { error: 'Habits cannot be saved for later' },
-        { status: 400 },
-      );
-    }
     const newTaskId = await saveMissedTaskForLater(
       userId,
       task,
@@ -522,12 +513,6 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'do-today') {
-    if (task.type === 'habit') {
-      return NextResponse.json(
-        { error: 'Habits are already active today' },
-        { status: 400 },
-      );
-    }
     const mode =
       body?.mode === 'change-repeat' ? 'change-repeat' : 'just-once';
     const newTaskId = await moveMissedTaskToToday(

@@ -68,9 +68,9 @@ interface Task {
   text: string;
   completed: boolean;
   order?: number;
-  type?: 'regular' | 'weekly' | 'backlog' | 'habit';
-  origin?: 'regular' | 'weekly' | 'backlog' | 'habit';
-  kind?: 'regular' | 'weekly' | 'backlog' | 'habit';
+  type?: 'regular' | 'weekly' | 'backlog';
+  origin?: 'regular' | 'weekly' | 'backlog';
+  kind?: 'regular' | 'weekly' | 'backlog';
   tags?: string[];
   frogodoroSession?: {
     date: string;
@@ -86,7 +86,6 @@ interface Task {
   endTime?: string;
   reminder?: string;
   completedDates?: string[];
-  timesPerWeek?: number;
 }
 
 interface SortableTaskItemProps {
@@ -602,110 +601,11 @@ const SortableTaskItem = React.forwardRef<
                   {isWeekly && (
                     <RotateCcw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
                   )}
-                  {task.type === 'habit' && (
-                    <Repeat className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
-                  )}
                   {task.calendarEventId && (
                     <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                   )}
                 </span>
                 
-                {/* Habit Weekly Goal Progress Dots */}
-                {task.type === 'habit' && (
-                  <div className="flex items-center gap-1 mt-1.5 pl-px">
-                    {(() => {
-                      const goal = task.timesPerWeek || 7;
-                      const todayDateStr = format(new Date(), 'yyyy-MM-dd');
-                      
-                      // Effective completed dates for this view
-                      let allCompleted = [...(task.completedDates || [])];
-                      if (isDone) {
-                        if (!allCompleted.includes(todayDateStr)) allCompleted.push(todayDateStr);
-                      } else {
-                        allCompleted = allCompleted.filter((d) => d !== todayDateStr);
-                      }
-
-                      // Helper: get Sun-Sat week dates for a given date
-                      const getWeekDates = (refDate: string) => {
-                        const d = new Date(refDate);
-                        const dow = d.getDay();
-                        const sun = new Date(d);
-                        sun.setDate(d.getDate() - dow);
-                        sun.setHours(0, 0, 0, 0);
-                        const dates: string[] = [];
-                        for (let i = 0; i < 7; i++) {
-                          const wd = new Date(sun);
-                          wd.setDate(sun.getDate() + i);
-                          dates.push(wd.toISOString().split('T')[0]);
-                        }
-                        return dates;
-                      };
-
-                      const weekDates = getWeekDates(todayDateStr);
-                      const completedThisWeek = weekDates.filter((d) =>
-                        allCompleted.includes(d),
-                      ).length;
-
-                      // Weekly streak
-                      let weekStreak = 0;
-                      const currentWeekMet = completedThisWeek >= goal;
-                      let checkDate = todayDateStr;
-
-                      if (currentWeekMet) {
-                        weekStreak++;
-                        const prev = new Date(weekDates[0]);
-                        prev.setDate(prev.getDate() - 1);
-                        checkDate = prev.toISOString().split('T')[0];
-                      } else {
-                        const prev = new Date(weekDates[0]);
-                        prev.setDate(prev.getDate() - 1);
-                        checkDate = prev.toISOString().split('T')[0];
-                      }
-
-                      while (true) {
-                        const wk = getWeekDates(checkDate);
-                        const count = wk.filter((d) =>
-                          allCompleted.includes(d),
-                        ).length;
-                        if (count >= goal) {
-                          weekStreak++;
-                          const prev = new Date(wk[0]);
-                          prev.setDate(prev.getDate() - 1);
-                          checkDate = prev.toISOString().split('T')[0];
-                        } else {
-                          break;
-                        }
-                      }
-
-                      return (
-                        <>
-                          {Array.from({ length: goal }).map((_, i) => {
-                            const isFilled = i < completedThisWeek;
-                            return (
-                              <div
-                                key={i}
-                                className={`w-2.5 h-2.5 rounded-full border transition-all duration-300 flex-shrink-0 ${
-                                  isFilled
-                                    ? 'bg-green-500 border-green-600 shadow-sm shadow-green-500/20'
-                                    : 'bg-muted border-border/50'
-                                }`}
-                              />
-                            );
-                          })}
-                          {weekStreak > 0 && (
-                            <span className="inline-flex items-center gap-0.5 ml-1 text-muted-foreground/50">
-                              <Flame className="w-3.5 h-3.5 text-orange-400" />
-                              <span className="text-[11px] font-semibold text-muted-foreground/60">
-                                {weekStreak} {weekStreak === 1 ? 'week' : 'weeks'}
-                              </span>
-                            </span>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-
                 {task.frogodoroSession && (task.frogodoroSession.timeSpent > 0 || (task.frogodoroSession.shortBreaks ?? 0) > 0 || (task.frogodoroSession.longBreaks ?? 0) > 0) && (
                   <div className="flex flex-wrap items-center gap-1 mt-0.5">
                     {task.frogodoroSession.timeSpent > 0 && (() => { const s = task.frogodoroSession!.timeSpent; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
@@ -1577,13 +1477,11 @@ export default function TaskList({
               task={null}
               isCompleted={false}
               isWeekly={false}
-              isHabit={false}
             />
           );
         }
         const isWeekly =
           sheetTask.type === 'weekly' || weeklyIds.has(sheetTask.id);
-        const isHabit = sheetTask.type === 'habit';
         const isCompletedTask =
           !!sheetTask.completed || vSet.has(sheetTask.id);
         return (
@@ -1593,7 +1491,6 @@ export default function TaskList({
             task={sheetTask as any}
             isCompleted={isCompletedTask}
             isWeekly={isWeekly}
-            isHabit={isHabit}
             onComplete={() => toggle(sheetTask.id)}
             onEdit={
               onEditTask
@@ -1615,12 +1512,12 @@ export default function TaskList({
                 : undefined
             }
             onToggleRepeat={
-              onToggleRepeat && !isHabit
+              onToggleRepeat
                 ? () => onToggleRepeat(sheetTask.id)
                 : undefined
             }
             onDoLater={
-              onDoLater && !isCompletedTask && !isHabit
+              onDoLater && !isCompletedTask
                 ? () => {
                     setExitAction({ id: sheetTask.id, type: 'later' });
                     setTimeout(() => onDoLater(sheetTask.id), 0);
@@ -1648,12 +1545,8 @@ export default function TaskList({
           <EditTaskDialog
             open={!!dialog && dialog.kind === 'edit'}
             initialText={dialog.task.text}
-            title={dialog.task.type === 'habit' ? 'Edit Habit' : 'Edit Task'}
-            subtitle={
-              dialog.task.type === 'habit'
-                ? 'Make changes to your habit below.'
-                : 'Make changes to your task below.'
-            }
+            title="Edit Task"
+            subtitle="Make changes to your task below."
             busy={busy}
             onClose={() => setDialog(null)}
             onSave={async (newText) => {

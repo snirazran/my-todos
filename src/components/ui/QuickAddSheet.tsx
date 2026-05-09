@@ -13,10 +13,8 @@ import {
 import {
   CalendarDays,
   CalendarCheck,
-  CalendarClock,
   RotateCcw,
   Info,
-  HelpCircle,
   Plus,
   X,
   Tag,
@@ -34,8 +32,7 @@ import Fly from '@/components/ui/fly';
 import { AnimatePresence, motion } from 'framer-motion';
 import { PremiumLimitDialog } from './PremiumLimitDialog';
 
-type RepeatChoice = 'this-week' | 'weekly' | 'habit';
-type WhenChoice = 'pick' | 'habit';
+type RepeatChoice = 'this-week' | 'weekly';
 
 type Props = Readonly<{
   open: boolean;
@@ -46,7 +43,6 @@ type Props = Readonly<{
     days: ApiDay[];
     repeat: RepeatChoice;
     tags: string[];
-    timesPerWeek?: number;
     startTime?: string;
     endTime?: string;
     reminder?: string;
@@ -54,7 +50,6 @@ type Props = Readonly<{
   initialText?: string;
   defaultRepeat?: RepeatChoice;
   defaultPickedDay?: number;
-  defaultMode?: WhenChoice;
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
   hideDayPicker?: boolean;
   hideRepeatPicker?: boolean;
@@ -344,19 +339,15 @@ export default function QuickAddSheet({
   initialText = '',
   defaultRepeat = 'this-week',
   defaultPickedDay,
-  defaultMode = 'pick',
   daysOrder,
   hideDayPicker = false,
   hideRepeatPicker = false,
 }: Props) {
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
-  const [when, setWhen] = useState<WhenChoice>(defaultMode);
-  const [timesPerWeek, setTimesPerWeek] = useState(7);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showTypeInfo, setShowTypeInfo] = useState(false);
   const [mounted, setMounted] = useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -393,7 +384,6 @@ export default function QuickAddSheet({
   useEffect(() => {
     if (open) {
       setText(initialText);
-      setWhen(defaultMode);
       // Use defaultPickedDay if provided, otherwise fallback to today
       const initialDay =
         defaultPickedDay !== undefined
@@ -401,7 +391,6 @@ export default function QuickAddSheet({
           : todayDisplayIndex(daysOrder);
       setPickedDays([initialDay]);
       setRepeat(defaultRepeat);
-      setTimesPerWeek(7);
       setTags([]);
       setTagInput('');
       setIsSubmitting(false);
@@ -425,7 +414,6 @@ export default function QuickAddSheet({
     initialText,
     defaultRepeat,
     defaultPickedDay,
-    defaultMode,
     daysOrder,
   ]);
 
@@ -579,17 +567,15 @@ export default function QuickAddSheet({
       .sort()
       .map((d) => apiDayFromDisplay(d, daysOrder));
 
-    if (apiDays.length === 0 && when !== 'habit') return;
+    if (apiDays.length === 0) return;
 
     setIsSubmitting(true);
     try {
-      const finalRepeat: RepeatChoice = when === 'habit' ? 'habit' : repeat;
       await onSubmit({
         text: trimmed,
-        days: when === 'habit' ? [0, 1, 2, 3, 4, 5, 6] : apiDays,
-        repeat: finalRepeat,
+        days: apiDays,
+        repeat,
         tags,
-        timesPerWeek: when === 'habit' ? timesPerWeek : undefined,
         startTime: startTime || undefined,
         endTime: endTime || undefined,
         reminder: notifyEnabled ? reminder : undefined,
@@ -603,7 +589,6 @@ export default function QuickAddSheet({
   if (!mounted) return null;
 
   const repeatsOn = repeat === 'weekly';
-  const isHabit = when === 'habit';
   const selectedReminderLabel = REMINDER_OPTIONS.find((o) => o.value === reminder)?.label || 'At time of event';
   
   const formatDisplay = (t: string) => {
@@ -647,9 +632,7 @@ export default function QuickAddSheet({
                         ref={inputRef}
                         value={text}
                         onChange={(e) => setText(e.target.value)}
-                        placeholder={
-                          when === 'habit' ? 'New habit...' : 'New task?'
-                        }
+                        placeholder="New task?"
                         disabled={isSubmitting}
                         spellCheck={false}
                         autoComplete="off"
@@ -1228,123 +1211,12 @@ export default function QuickAddSheet({
                       </AnimatePresence>
                     </div>
 
-                    {/* Segmented control */}
-                    {!hideDayPicker && (
-                      <div
-                        className="mb-3"
-                        style={{ transform: 'translateZ(0)' }}
-                      >
-                        <div className="flex gap-1.5 p-1.5 rounded-2xl bg-muted/50 ring-1 ring-border/50">
-                          <button
-                            type="button"
-                            aria-pressed={when === 'pick'}
-                            data-active={when === 'pick'}
-                            onClick={() => {
-                              setWhen('pick');
-                              setPickedDays((prev) =>
-                                prev.length ? prev : [todayDisplayIndex()],
-                              );
-                            }}
-                            className={[
-                              'flex-1 h-10 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-2 transition',
-                              'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                              'data-[active=true]:bg-card data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-border',
-                              'data-[active=false]:text-muted-foreground',
-                            ].join(' ')}
-                          >
-                            <CalendarCheck className="w-4 h-4" />
-                            Task
-                          </button>
-
-                          <button
-                            type="button"
-                            aria-pressed={when === 'habit'}
-                            data-active={when === 'habit'}
-                            onClick={() => {
-                              setWhen('habit');
-                              if (pickedDays.length === 0)
-                                setPickedDays([
-                                  todayDisplayIndex() as DisplayDay,
-                                ]);
-                              setRepeat('habit');
-                            }}
-                            className={[
-                              'flex-1 h-10 rounded-xl text-[14px] font-bold inline-flex items-center justify-center gap-2 transition',
-                              'focus:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                              'data-[active=true]:bg-card data-[active=true]:shadow-sm data-[active=true]:ring-1 data-[active=true]:ring-border',
-                              'data-[active=false]:text-muted-foreground',
-                            ].join(' ')}
-                          >
-                            <CalendarClock className="w-4 h-4" />
-                            Habit
-                          </button>
-
-                          {/* Question mark toggle */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setShowTypeInfo(!showTypeInfo);
-                            }}
-                            className={[
-                              'w-10 h-10 rounded-xl flex items-center justify-center transition',
-                              'focus:outline-none',
-                              showTypeInfo
-                                ? 'bg-card shadow-sm ring-1 ring-border text-muted-foreground'
-                                : 'text-muted-foreground/40 hover:text-muted-foreground',
-                            ].join(' ')}
-                            aria-label="What's the difference?"
-                          >
-                            <HelpCircle className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        <AnimatePresence>
-                          {showTypeInfo && (
-                            <motion.div
-                              initial={{ opacity: 0, height: 0 }}
-                              animate={{ opacity: 1, height: 'auto' }}
-                              exit={{ opacity: 0, height: 0 }}
-                              transition={{ duration: 0.2 }}
-                              className="overflow-hidden"
-                            >
-                              <div className="rounded-2xl bg-card border border-border/50 shadow-sm overflow-hidden">
-                                <div className="flex items-start gap-3 p-3.5 border-b border-border/30">
-                                  <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-primary/10 shrink-0 mt-0.5">
-                                    <CalendarCheck className="w-4 h-4 text-primary" />
-                                  </div>
-                                  <div>
-                                    <p className="text-[13px] font-black text-foreground mb-0.5">Task</p>
-                                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                      Something you need to get done. Pick which days it shows up, and optionally repeat it every week.
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex items-start gap-3 p-3.5">
-                                  <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-violet-500/10 shrink-0 mt-0.5">
-                                    <CalendarClock className="w-4 h-4 text-violet-500" />
-                                  </div>
-                                  <div>
-                                    <p className="text-[13px] font-black text-foreground mb-0.5">Habit</p>
-                                    <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                      Something you want to do regularly. Choose how many times per week and track your progress. Resets every Sunday!
-                                    </p>
-                                  </div>
-                                </div>
-                              </div>
-                            </motion.div>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    )}
-
-                    {/* DAY PICKER or TIMES PER WEEK */}
-                    {(when === 'pick' || when === 'habit') && (
-                      <div
-                        className="flex flex-col gap-4 mt-1 sm:flex-row sm:items-center"
-                        style={{ transform: 'translateZ(0)' }}
-                      >
-                        {!hideDayPicker && when !== 'habit' && (
+                    {/* DAY PICKER */}
+                    <div
+                      className="flex flex-col gap-4 mt-1 sm:flex-row sm:items-center"
+                      style={{ transform: 'translateZ(0)' }}
+                    >
+                        {!hideDayPicker && (
                           <div className="flex-1 min-w-0 -mx-2 px-2">
                             {isLater ? (
                               <div className="h-10 sm:h-11 flex items-center px-3 bg-primary/5 rounded-2xl border border-primary/10">
@@ -1384,34 +1256,7 @@ export default function QuickAddSheet({
                           </div>
                         )}
 
-                        {when === 'habit' && (
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-2 px-1">
-                              Goal: {timesPerWeek}x per week
-                            </p>
-                            <div className="flex justify-start gap-2 py-2 px-1">
-                              {[1, 2, 3, 4, 5, 6, 7].map((num) => (
-                                <button
-                                  key={num}
-                                  type="button"
-                                  onClick={() => setTimesPerWeek(num)}
-                                  className={`
-                                    w-10 h-10 rounded-full flex items-center justify-center text-sm font-black transition-all border shadow-sm
-                                    ${
-                                      timesPerWeek >= num
-                                        ? 'bg-primary/20 border-primary text-primary scale-110'
-                                        : 'bg-card border-border text-muted-foreground hover:bg-accent/50'
-                                    }
-                                  `}
-                                >
-                                  {num}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {!hideRepeatPicker && when !== 'habit' && (
+                        {!hideRepeatPicker && (
                           <div className="flex gap-2 sm:shrink-0 sm:pl-1">
                             <button
                               type="button"
@@ -1457,8 +1302,7 @@ export default function QuickAddSheet({
                             </button>
                           </div>
                         )}
-                      </div>
-                    )}
+                    </div>
 
                     {/* Actions */}
                     <div
@@ -1484,7 +1328,7 @@ export default function QuickAddSheet({
                           ) : (
                             <>
                               <Plus className="w-4 h-4 stroke-[3]" />
-                              <span>{when === 'habit' ? 'Add Habit' : 'Add Task'}</span>
+                              <span>Add Task</span>
                               <Fly size={32} x={-1} y={-3} />
                             </>
                           )}

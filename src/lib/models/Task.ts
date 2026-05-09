@@ -1,6 +1,6 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 
-export type TaskType = 'weekly' | 'regular' | 'backlog' | 'habit';
+export type TaskType = 'weekly' | 'regular' | 'backlog';
 export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
 
 export interface TaskDoc {
@@ -14,7 +14,6 @@ export interface TaskDoc {
   completedDates?: string[]; // YYYY-MM-DD entries where the task was completed
   suppressedDates?: string[]; // YYYY-MM-DD entries hidden for that date
   dayOfWeek?: Weekday;
-  timesPerWeek?: number; // Target number of completions per week for habits
   date?: string;
   weekStart?: string;
   createdAt: Date;
@@ -48,7 +47,7 @@ const TaskSchema = new Schema<TaskDoc>(
     userId: { type: String, ref: 'User', required: true, index: true },
     type: {
       type: String,
-      enum: ['weekly', 'regular', 'backlog', 'habit'],
+      enum: ['weekly', 'regular', 'backlog'],
       required: true,
     },
     id: { type: String, required: true, index: true },
@@ -58,7 +57,6 @@ const TaskSchema = new Schema<TaskDoc>(
     completedDates: { type: [String], default: [] },
     suppressedDates: { type: [String], default: [] },
     dayOfWeek: { type: Number, min: 0, max: 6 },
-    timesPerWeek: { type: Number, min: 1, max: 7 },
     date: { type: String },
     weekStart: { type: String },
     createdAt: { type: Date, default: Date.now },

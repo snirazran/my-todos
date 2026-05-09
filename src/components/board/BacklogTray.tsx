@@ -20,7 +20,7 @@ interface Props {
     index: number;
     taskId: string;
     taskText: string;
-    taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
+    taskType?: 'weekly' | 'regular' | 'backlog';
     clientX: number;
     clientY: number;
     pointerType: 'mouse' | 'touch';
@@ -126,8 +126,6 @@ export default React.memo(function BacklogTray({
   const isFiltered = filter !== 'all' || selectedTags.length > 0 || !showCompleted;
 
   const filteredTasks = tasks.filter((t) => {
-    if (filter === 'tasks' && t.type === 'habit') return false;
-    if (filter === 'habits' && t.type !== 'habit') return false;
     if (!showCompleted && t.completed) return false;
     if (selectedTags && selectedTags.length > 0) {
       const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));

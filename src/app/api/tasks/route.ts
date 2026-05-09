@@ -408,11 +408,9 @@ export async function POST(req: NextRequest) {
   const repeat =
     body?.repeat === 'backlog'
       ? 'backlog'
-      : body?.repeat === 'habit'
-        ? 'habit'
-        : body?.repeat === 'this-week'
-          ? 'this-week'
-          : 'weekly';
+      : body?.repeat === 'this-week'
+        ? 'this-week'
+        : 'weekly';
   if (!text)
     return NextResponse.json({ error: 'text is required' }, { status: 400 });
   const explicitDates: string[] = Array.isArray(body?.dates)
@@ -474,46 +472,6 @@ export async function POST(req: NextRequest) {
         reminder: task.reminder,
       });
     }
-    await syncGamification(uid, tz);
-    return NextResponse.json({
-      ok: true,
-      ids: createdIds,
-      tasks: createdTasks,
-    });
-  }
-  if (repeat === 'habit') {
-    const timesPerWeek = Number(body?.timesPerWeek) || 7;
-    const id = uuid();
-    // Use Sunday (0) for initial order placement if no days provided, or just default to 0
-    const firstDay = 0;
-    const order = await nextOrderForDay(uid, firstDay, weekDates[firstDay]);
-    const task = await TaskModel.create({
-      userId: uid,
-      type: 'habit',
-      id,
-      text,
-      order,
-      timesPerWeek,
-      createdAt: now,
-      updatedAt: now,
-      tags,
-      startTime,
-      endTime,
-      reminder,
-    });
-    createdIds.push(id);
-    createdTasks.push({
-      id: task.id,
-      text: task.text,
-      order: task.order,
-      completed: false,
-      type: 'habit',
-      tags: task.tags || [],
-      timesPerWeek: task.timesPerWeek,
-      startTime: task.startTime,
-      endTime: task.endTime,
-      reminder: task.reminder,
-    });
     await syncGamification(uid, tz);
     return NextResponse.json({
       ok: true,
@@ -718,23 +676,7 @@ export async function PUT(req: NextRequest) {
     }
   }
 
-  const { date, taskId, completed, tags, toggleType, order, text, daysOfWeek, timesPerWeek } = body ?? {};
-  if (timesPerWeek !== undefined && taskId) {
-    await TaskModel.updateOne(
-      { userId: uid, id: taskId, type: 'habit' },
-      { $set: { timesPerWeek, updatedAt: new Date() } },
-    );
-    await syncGamification(uid, tz);
-    return NextResponse.json({ ok: true });
-  }
-  if (daysOfWeek !== undefined && taskId) {
-    await TaskModel.updateOne(
-      { userId: uid, id: taskId, type: 'habit' },
-      { $set: { daysOfWeek, updatedAt: new Date() } },
-    );
-    await syncGamification(uid, tz);
-    return NextResponse.json({ ok: true });
-  }
+  const { date, taskId, completed, tags, toggleType, order, text } = body ?? {};
   // Handle schedule update (startTime, endTime, reminder) — before general validation
   if (body.schedule !== undefined && taskId) {
     const update: Record<string, unknown> = {};
@@ -875,7 +817,7 @@ export async function DELETE(req: NextRequest) {
       .exec();
     if (doc?.type === 'regular') {
       await TaskModel.deleteOne({ userId: uid, type: 'regular', id: taskId });
-    } else if (doc?.type === 'weekly' || doc?.type === 'habit') {
+    } else if (doc?.type === 'weekly') {
       await TaskModel.updateOne(
         { userId: uid, type: doc.type, id: taskId },
         { $addToSet: { suppressedDates: dateKey } },
@@ -896,7 +838,7 @@ export async function DELETE(req: NextRequest) {
   }).lean<TaskDoc>();
   if (!doc)
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-  if (doc.type === 'weekly' || doc.type === 'habit') {
+  if (doc.type === 'weekly') {
     if (body.permanent) {
       await TaskModel.updateOne(
         { userId: uid, id: taskId },
@@ -923,7 +865,6 @@ export async function DELETE(req: NextRequest) {
 async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
   const url = new URL(req.url);
   const dateParam = url.searchParams.get('date');
-  const includeHabits = url.searchParams.get('includeHabits') !== '0';
   const todayLocal = getZonedToday(tz);
   const date = dateParam ?? todayLocal;
   const dow = dowFromYMD(date);
@@ -933,7 +874,6 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
     $or: [
       { type: 'weekly', dayOfWeek: dow },
       { type: 'regular', date },
-      ...(includeHabits ? [{ type: 'habit' }] : []),
     ],
   })
     .sort({ order: 1 })
@@ -957,7 +897,6 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       origin: t.type as Origin,
       tags: t.tags ?? [],
       completedDates: t.completedDates ?? [],
-      timesPerWeek: t.timesPerWeek,
       frogodoroSettings: t.frogodoroSettings,
       frogodoroSession: t.frogodoroSessions?.find((s) => s.date === date) ?? null,
       calendarEventId: t.calendarEventId,
@@ -983,7 +922,6 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
 async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
   const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
   const dayParam = req.nextUrl.searchParams.get('day');
-  const includeHabits = req.nextUrl.searchParams.get('includeHabits') === '1';
   if (dayParam !== null) {
     const dayNum = Number(dayParam);
     if (dayNum === -1) {
@@ -1070,43 +1008,13 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         type: 'backlog',
         weekStart,
       },
-      ...(includeHabits
-        ? [
-            {
-              type: 'habit',
-              deletedAt: { $exists: false },
-            },
-          ]
-        : []),
     ],
   })
     .sort({ order: 1 })
     .lean<TaskDoc[]>()
     .exec();
 
-  const habits: any[] = [];
-
   for (const doc of boardDocs) {
-    if (doc.type === 'habit') {
-      habits.push({
-        id: doc.id,
-        text: doc.text,
-        order: doc.order ?? 0,
-        completed: !!doc.completed,
-        type: doc.type,
-        origin: doc.type as Origin,
-        tags: doc.tags ?? [],
-        completedDates: doc.completedDates ?? [],
-        timesPerWeek: doc.timesPerWeek,
-        frogodoroSettings: doc.frogodoroSettings,
-        calendarEventId: doc.calendarEventId,
-        startTime: doc.startTime,
-        endTime: doc.endTime,
-        reminder: doc.reminder,
-      });
-      continue;
-    }
-
     if (doc.type === 'backlog') {
       week[7].push({
         id: doc.id,
@@ -1157,9 +1065,8 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
   week.forEach((items) =>
     items.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
   );
-  habits.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
-  return NextResponse.json(includeHabits ? { week, habits } : week);
+  return NextResponse.json(week);
 }
 
 function enumerateDates(from: string, to: string): string[] {
@@ -1176,7 +1083,6 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
   const params = req.nextUrl.searchParams;
   const from = params.get('from');
   const to = params.get('to');
-  const includeHabits = params.get('includeHabits') === '1';
   if (!from || !to)
     return NextResponse.json(
       { error: 'from and to (YYYY-MM-DD) required' },
@@ -1203,9 +1109,6 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         date: { $in: dates },
       },
       { type: 'backlog', weekStart },
-      ...(includeHabits
-        ? [{ type: 'habit', deletedAt: { $exists: false } }]
-        : []),
     ],
   })
     .sort({ order: 1 })
@@ -1215,28 +1118,8 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
   const byDate: Record<string, any[]> = {};
   for (const d of dates) byDate[d] = [];
   const backlog: any[] = [];
-  const habits: any[] = [];
 
   for (const doc of docs) {
-    if (doc.type === 'habit') {
-      habits.push({
-        id: doc.id,
-        text: doc.text,
-        order: doc.order ?? 0,
-        completed: !!doc.completed,
-        type: doc.type,
-        origin: doc.type as Origin,
-        tags: doc.tags ?? [],
-        completedDates: doc.completedDates ?? [],
-        timesPerWeek: doc.timesPerWeek,
-        frogodoroSettings: doc.frogodoroSettings,
-        calendarEventId: doc.calendarEventId,
-        startTime: doc.startTime,
-        endTime: doc.endTime,
-        reminder: doc.reminder,
-      });
-      continue;
-    }
     if (doc.type === 'backlog') {
       backlog.push({
         id: doc.id,
@@ -1297,7 +1180,6 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
   }
   for (const d of dates)
     byDate[d].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  habits.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   backlog.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
   // expose user account creation date for slider lower bound
@@ -1308,7 +1190,6 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
 
   return NextResponse.json({
     byDate,
-    habits,
     backlog,
     accountCreatedAt,
   });
@@ -1457,13 +1338,6 @@ async function handleBoardPut(
           { userId: uid, type: 'weekly', id: t.id },
           { $set: { dayOfWeek: weekday, order: i + 1, updatedAt: now, tags } },
         );
-      if (ttype === 'habit')
-        return TaskModel.updateOne(
-          { userId: uid, type: 'habit', id: t.id },
-          {
-            $set: { order: i + 1, updatedAt: now, tags },
-          },
-        );
       if (ttype === 'regular')
         return TaskModel.updateOne(
           { userId: uid, type: 'regular', id: t.id },
@@ -1605,11 +1479,6 @@ async function handleBoardPutByDate(
           },
         );
       }
-      if (ttype === 'habit')
-        return TaskModel.updateOne(
-          { userId: uid, type: 'habit', id: t.id },
-          { $set: { order: i + 1, updatedAt: now, tags } },
-        );
       if (ttype === 'backlog')
         return Promise.all([
           TaskModel.deleteOne({
@@ -1699,7 +1568,7 @@ async function handleBoardDelete(
     await syncGamification(uid, tz);
     return NextResponse.json({ ok: true });
   }
-  if (doc?.type === 'weekly' || doc?.type === 'habit') {
+  if (doc?.type === 'weekly') {
     await TaskModel.updateOne(
       { userId: uid, type: doc.type, id: taskId },
       { $set: { deletedAt: new Date() } },

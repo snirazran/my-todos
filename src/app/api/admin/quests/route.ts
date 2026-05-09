@@ -25,7 +25,7 @@ const json = (body: unknown, status = 200) =>
 
 const VALID_PLACEMENTS = new Set<QuestPlacement>(['daily', 'category']);
 const VALID_LOGIC_TYPES = new Set<QuestLogicType>(['count', 'focus_minutes']);
-const VALID_SUBJECTS = new Set<QuestSubject>(['task', 'habit', 'any']);
+const VALID_SUBJECTS = new Set<QuestSubject>(['task', 'any']);
 const VALID_ACTIONS = new Set<QuestCountAction>(['complete', 'add']);
 const VALID_AMOUNT_MODES = new Set<QuestAmountMode>(['fixed', 'random']);
 const VALID_REWARD_TYPES = new Set<QuestRewardType>([
@@ -35,7 +35,6 @@ const VALID_REWARD_TYPES = new Set<QuestRewardType>([
 ]);
 const VALID_VISIBILITY_METRICS = new Set<QuestVisibilityMetric>([
   'daily_tasks_count',
-  'total_habits_count',
   'tags_count',
 ]);
 const VALID_VISIBILITY_OPERATORS = new Set<QuestVisibilityOperator>([

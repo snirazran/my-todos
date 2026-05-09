@@ -1,6 +1,6 @@
 'use client';
 import Fly from '@/components/ui/fly';
-import { Repeat, RotateCcw, CalendarDays, Clock, Bell } from 'lucide-react';
+import { RotateCcw, CalendarDays, Clock, Bell } from 'lucide-react';
 
 export default function DragOverlay({
   x,
@@ -26,7 +26,7 @@ export default function DragOverlay({
   height: number;
   text: string;
   tags?: { id: string; name: string; color: string }[];
-  taskType?: 'weekly' | 'regular' | 'backlog' | 'habit';
+  taskType?: 'weekly' | 'regular' | 'backlog';
   calendarEventId?: string;
   startTime?: string;
   endTime?: string;
@@ -92,9 +92,6 @@ export default function DragOverlay({
               <div className="inline-flex items-center gap-1.5 shrink-0">
                 {taskType === 'weekly' && (
                   <RotateCcw className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
-                )}
-                {taskType === 'habit' && (
-                  <Repeat className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
                 )}
                 {calendarEventId && (
                   <CalendarDays className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />

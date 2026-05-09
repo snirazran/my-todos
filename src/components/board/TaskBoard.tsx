@@ -22,12 +22,9 @@ import { useDragManager } from './hooks/useDragManager';
 import { usePan } from './hooks/usePan';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import BacklogBox from './BacklogBox';
-import HabitBox from './HabitBox';
 import BacklogTray from './BacklogTray';
-import HabitTray from './HabitTray';
-import { format } from 'date-fns';
 
-type RepeatChoice = 'this-week' | 'weekly' | 'habit';
+type RepeatChoice = 'this-week' | 'weekly';
 
 export default function TaskBoard({
   windowDates,
@@ -35,11 +32,6 @@ export default function TaskBoard({
   setTasksByDate,
   backlog,
   setBacklog,
-  habits = [],
-  onToggleHabit,
-  onEditHabit,
-  onDeleteHabit,
-  onEditHabitGoal,
   saveDate,
   saveBacklog,
   removeOnDate,
@@ -64,11 +56,6 @@ export default function TaskBoard({
   >;
   backlog: Task[];
   setBacklog: React.Dispatch<React.SetStateAction<Task[]>>;
-  habits?: Task[];
-  onToggleHabit?: (id: string) => void;
-  onEditHabit?: (id: string, text: string) => void;
-  onDeleteHabit?: (id: string) => void;
-  onEditHabitGoal?: (id: string, newGoal: number) => void;
   saveDate: (dateKey: string, tasks: Task[]) => Promise<void>;
   saveBacklog: (tasks: Task[]) => Promise<void>;
   removeOnDate: (dateKey: string, id: string) => Promise<void>;
@@ -84,7 +71,6 @@ export default function TaskBoard({
     dates: string[]; // explicit YYYY-MM-DD list
     repeat: RepeatChoice;
     tags: string[];
-    timesPerWeek?: number;
     startTime?: string;
     endTime?: string;
     reminder?: string;
@@ -108,7 +94,6 @@ export default function TaskBoard({
   aiSuggestionFocusCategoryIds?: string[];
 }) {
   const pathname = usePathname();
-  const [habitTrayOpen, setHabitTrayOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const {
     scrollerRef,
@@ -183,7 +168,7 @@ export default function TaskBoard({
 
   // Column filters per-index (transient; cleared if window shifts a lot)
   const [columnFilters, setColumnFilters] = useState<
-    Record<number, 'all' | 'tasks' | 'habits'>
+    Record<number, 'all' | 'tasks'>
   >({});
   const [columnTags, setColumnTags] = useState<Record<number, string[]>>({});
   const [columnShowCompleted, setColumnShowCompleted] = useState<
@@ -195,7 +180,7 @@ export default function TaskBoard({
     [columnFilters],
   );
   const setFilter = useCallback(
-    (i: number, f: 'all' | 'tasks' | 'habits') => {
+    (i: number, f: 'all' | 'tasks') => {
       setColumnFilters((prev) => ({ ...prev, [i]: f }));
     },
     [],
@@ -302,7 +287,6 @@ export default function TaskBoard({
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickText, setQuickText] = useState('');
-  const [quickAddMode, setQuickAddMode] = useState<'pick' | 'habit'>('pick');
   const [initialDateKey, setInitialDateKey] = useState<string | undefined>(
     undefined,
   );
@@ -628,7 +612,6 @@ export default function TaskBoard({
                         setQuickText('');
                         setInitialDateKey(dk);
                         setPageIndex(i);
-                        setQuickAddMode('pick');
                         setShowQuickAdd(true);
                       }
                 }
@@ -736,21 +719,16 @@ export default function TaskBoard({
         onClose={() => setCalendarOpen(false)}
       />
 
-      {/* Bottom toolbar (Backlog / Habits / Add) */}
+      {/* Bottom toolbar (Backlog) */}
       <div className="fixed bottom-0 left-0 right-0 z-[40] px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
-        <div className={`pointer-events-auto mx-auto w-full max-w-[300px] md:max-w-[400px] relative min-h-[48px] md:min-h-[56px] flex items-center justify-center transition-all duration-300 ${drag?.active && drag?.taskType !== 'habit' ? 'gap-0' : 'gap-1.5 md:gap-2'}`}>
+        <div className="pointer-events-auto mx-auto w-full max-w-[300px] md:max-w-[400px] relative min-h-[48px] md:min-h-[56px] flex items-center justify-center">
           <BacklogBox
             count={backlog.length}
             isDragOver={isDragOverBacklog}
-            isDragging={!!drag?.active && drag?.taskType !== 'habit'}
+            isDragging={!!drag?.active}
             proximity={backlogProximity}
             onClick={() => setBacklogOpen(true)}
             forwardRef={backlogBoxRef}
-          />
-          <HabitBox
-            count={habits.length}
-            onClick={() => setHabitTrayOpen(true)}
-            isDragging={!!drag?.active && drag?.taskType !== 'habit'}
           />
         </div>
       </div>
@@ -801,30 +779,11 @@ export default function TaskBoard({
         onShowCompletedChange={(show) => setShowCompleted(BACKLOG_IDX, show)}
       />
 
-      <HabitTray
-        isOpen={habitTrayOpen}
-        onClose={() => setHabitTrayOpen(false)}
-        habits={habits}
-        onToggle={(id) => onToggleHabit?.(id)}
-        onEdit={(id, text) => onEditHabit?.(id, text)}
-        onDelete={(id) => onDeleteHabit?.(id)}
-        onEditGoal={(id, goal) => onEditHabitGoal?.(id, goal)}
-        onSchedule={(taskId, data) => onScheduleTask?.(taskId, data)}
-        onAddRequested={() => {
-          setHabitTrayOpen(false);
-          setQuickAddMode('habit');
-          setShowQuickAdd(true);
-        }}
-        userTags={userTags}
-        date={format(new Date(), 'yyyy-MM-dd')}
-      />
-
       <QuickAddSheet
         open={showQuickAdd}
         onOpenChange={setShowQuickAdd}
         initialText={quickText}
         defaultRepeat="this-week"
-        defaultMode={quickAddMode}
         defaultPickedDay={
           // approximate: the QuickAddSheet uses 0..6 weekday display indices.
           // We derive a best-effort weekday-of-active-date for highlight purposes.
@@ -841,7 +800,6 @@ export default function TaskBoard({
           days,
           repeat,
           tags,
-          timesPerWeek,
           startTime,
           endTime,
           reminder,
@@ -870,7 +828,6 @@ export default function TaskBoard({
             dates,
             repeat: repeat as RepeatChoice,
             tags,
-            timesPerWeek,
             startTime,
             endTime,
             reminder,

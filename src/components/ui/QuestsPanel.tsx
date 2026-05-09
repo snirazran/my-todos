@@ -464,7 +464,7 @@ export function QuestsPanel({
                 {isGuest ? (
                   <EmptyState
                     title="Sign in to unlock quests"
-                    description="Quests use your tasks, habits, timer sessions, and tags."
+                    description="Quests use your tasks, timer sessions, and tags."
                   />
                 ) : isLoading ? (
                   <LoadingState />

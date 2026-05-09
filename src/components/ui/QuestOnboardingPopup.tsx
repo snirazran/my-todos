@@ -179,7 +179,7 @@ export function QuestOnboardingPopup({
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-muted-foreground">
                       Choose the areas that should guide your quests, task
-                      ideas, and habits.
+                      ideas.
                     </span>
                   </div>
                 </div>

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import { format } from 'date-fns';
 import TaskBoard from '@/components/board/TaskBoard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
@@ -15,7 +14,6 @@ import {
 
 type DateRangeResponse = {
   byDate: Record<string, Task[]>;
-  habits: Task[];
   backlog: Task[];
   accountCreatedAt: string | null;
 };
@@ -27,7 +25,6 @@ const EXTEND_STEP = 30;
 export default function ManageTasksPage() {
   const today = todayYmd();
   const [tasksByDate, setTasksByDate] = useState<Record<string, Task[]>>({});
-  const [habits, setHabits] = useState<Task[]>([]);
   const [backlog, setBacklog] = useState<Task[]>([]);
   const [accountCreatedAt, setAccountCreatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -55,14 +52,13 @@ export default function ManageTasksPage() {
   const fetchRange = useCallback(
     async (from: string, to: string, mergeOnly = false) => {
       const res = await fetch(
-        `/api/tasks?view=dateRange&from=${from}&to=${to}&includeHabits=1&timezone=${encodeURIComponent(tz)}`,
+        `/api/tasks?view=dateRange&from=${from}&to=${to}&timezone=${encodeURIComponent(tz)}`,
       );
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as DateRangeResponse;
       setTasksByDate((prev) =>
         mergeOnly ? { ...prev, ...data.byDate } : data.byDate,
       );
-      setHabits(data.habits ?? []);
       setBacklog(data.backlog ?? []);
       if (data.accountCreatedAt) setAccountCreatedAt(data.accountCreatedAt);
     },
@@ -224,16 +220,14 @@ export default function ManageTasksPage() {
       dates,
       repeat,
       tags,
-      timesPerWeek,
       startTime,
       endTime,
       reminder,
     }: {
       text: string;
       dates: string[];
-      repeat: 'this-week' | 'weekly' | 'habit';
+      repeat: 'this-week' | 'weekly';
       tags: string[];
-      timesPerWeek?: number;
       startTime?: string;
       endTime?: string;
       reminder?: string;
@@ -249,12 +243,9 @@ export default function ManageTasksPage() {
             days:
               repeat === 'weekly'
                 ? dates.map((d) => parseYmd(d).getDay())
-                : repeat === 'habit'
-                  ? [parseYmd(dates[0] ?? today).getDay()]
-                  : [],
+                : [],
             repeat,
             tags,
-            timesPerWeek,
             timezone: tz,
             startTime,
             endTime,
@@ -266,66 +257,7 @@ export default function ManageTasksPage() {
       }
       await refetchAll();
     },
-    [tz, today, refetchAll],
-  );
-
-  const onToggleHabit = useCallback(
-    async (id: string) => {
-      const dateStr = format(new Date(), 'yyyy-MM-dd');
-      setHabits((prev) =>
-        prev.map((h) => {
-          if (h.id !== id) return h;
-          const isDone = (h.completedDates ?? []).includes(dateStr);
-          const next = isDone
-            ? (h.completedDates ?? []).filter((d) => d !== dateStr)
-            : [...(h.completedDates ?? []), dateStr];
-          return { ...h, completedDates: next };
-        }),
-      );
-      await fetch('/api/tasks', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, taskId: id, timezone: tz }),
-      });
-      refetchAll();
-    },
     [tz, refetchAll],
-  );
-
-  const onEditHabit = useCallback(
-    async (id: string, text: string) => {
-      await fetch('/api/tasks', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: id, text }),
-      });
-      refetchAll();
-    },
-    [refetchAll],
-  );
-
-  const onDeleteHabit = useCallback(
-    async (id: string) => {
-      await fetch('/api/tasks', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: id }),
-      });
-      refetchAll();
-    },
-    [refetchAll],
-  );
-
-  const onEditHabitGoal = useCallback(
-    async (id: string, timesPerWeek: number) => {
-      await fetch('/api/tasks', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId: id, timesPerWeek }),
-      });
-      refetchAll();
-    },
-    [refetchAll],
   );
 
   const onToggleRepeat = useCallback(
@@ -442,11 +374,6 @@ export default function ManageTasksPage() {
           setTasksByDate={setTasksByDate}
           backlog={backlog}
           setBacklog={setBacklog}
-          habits={habits}
-          onToggleHabit={onToggleHabit}
-          onEditHabit={onEditHabit}
-          onDeleteHabit={onDeleteHabit}
-          onEditHabitGoal={onEditHabitGoal}
           saveDate={saveDate}
           saveBacklog={saveBacklog}
           removeOnDate={removeOnDate}

@@ -70,10 +70,6 @@ function getTaskReminderDate(task: TaskDoc, todayYMD: string) {
     return task.dayOfWeek === dow ? todayYMD : null;
   }
 
-  if (task.type === 'habit') {
-    return todayYMD;
-  }
-
   return null;
 }
 
@@ -188,11 +184,10 @@ export async function GET(req: NextRequest) {
       deletedAt: { $exists: false },
       startTime: { $exists: true, $ne: '' },
       reminder: { $exists: true, $ne: '' },
-      type: { $in: ['regular', 'weekly', 'habit'] },
+      type: { $in: ['regular', 'weekly'] },
       $or: [
         { type: 'regular', date: todayYMD },
         { type: 'weekly' },
-        { type: 'habit' },
       ],
     })
       .lean()

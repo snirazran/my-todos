@@ -145,7 +145,6 @@ export default function DayColumn({
                 filter={filter}
                 onFilterChange={onFilterChange}
                 showTypeFilters={false}
-                hideHabitFilter={true}
                 availableTags={availableTags}
                 selectedTags={selectedTags}
                 onTagsChange={(tags) => onTagsChange?.(tags)}

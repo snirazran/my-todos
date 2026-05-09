@@ -100,7 +100,7 @@ export default function ProgressCoach({
           ...EMPTY_RESPONSE,
           summary: 'No task history is available for this range yet.',
           biggestRisk: 'There is not enough activity here to find a reliable pattern.',
-          nextWeekPlan: ['Complete a few tasks or habits, then check this view again.'],
+          nextWeekPlan: ['Complete a few tasks, then check this view again.'],
         });
         return;
       }

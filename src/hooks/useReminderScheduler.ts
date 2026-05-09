@@ -29,7 +29,7 @@ export function useReminderScheduler() {
       await cancelNotification(task.id);
 
       // 3. Calculate trigger time
-      // Task date is either t.date or today's date (for habits/recurring)
+      // Task date is either t.date or today's date for recurring tasks.
       const dateStr = task.date || format(new Date(), 'yyyy-MM-dd');
       const [hours, minutes] = task.startTime.split(':').map(Number);
 
