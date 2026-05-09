@@ -663,6 +663,7 @@ export default function TaskBoard({
                   daysOrder={daysOrder}
                   emptyMode={cmpYmd(dk, todayKey) < 0 ? 'none' : 'add'}
                   disableDrag={cmpYmd(dk, todayKey) < 0}
+                  isFuture={cmpYmd(dk, todayKey) > 0}
                 />
               </DayColumn>
             </div>

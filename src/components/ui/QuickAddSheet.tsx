@@ -783,7 +783,7 @@ export default function QuickAddSheet({
                               ) : (
                                 <Clock className="w-3.5 h-3.5" />
                               )}
-                              {startTime ? formatDisplay(startTime) : 'Schedule'}
+                              {startTime ? formatDisplay(startTime) : 'Time'}
                             </button>
                         </div>
                         <span

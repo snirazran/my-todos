@@ -6,6 +6,7 @@ import {
   Pencil,
   Tag,
   CalendarClock,
+  Clock,
   RotateCcw,
   CalendarDays,
   Trash2,
@@ -82,8 +83,8 @@ export default function TaskActionSheet({
   if (onSchedule)
     actions.push({
       key: 'schedule',
-      label: 'Schedule',
-      icon: CalendarClock,
+      label: 'Time',
+      icon: Clock,
       onClick: onSchedule,
     });
   if (onToggleRepeat && !isHabit)

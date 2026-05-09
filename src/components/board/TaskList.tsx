@@ -49,6 +49,7 @@ export default React.memo(function TaskList({
   daysOrder,
   emptyMode = 'add',
   disableDrag = false,
+  isFuture = false,
 }: {
   day: DisplayDay;
   items: Task[];
@@ -109,6 +110,8 @@ export default React.memo(function TaskList({
   emptyMode?: 'add' | 'none';
   /** When true, tasks in this list cannot be dragged (e.g., past dates). */
   disableDrag?: boolean;
+  /** True if this column's date is in the future. Hides "Mark as complete" in the action sheet. */
+  isFuture?: boolean;
 }) {
   const [menu, setMenu] = useState<{
     id: string;
@@ -557,7 +560,7 @@ export default React.memo(function TaskList({
         isWeekly={actionSheet?.task.type === 'weekly'}
         isHabit={actionSheet?.task.type === 'habit'}
         onComplete={
-          actionSheet
+          actionSheet && !isFuture
             ? () => {
                 // Toggle completion via the same path used by the fly icon (PUT /api/tasks).
                 const t = actionSheet.task;

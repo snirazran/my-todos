@@ -279,7 +279,7 @@ export function ScheduleTaskDialog({
         <div className="flex items-start justify-between px-5 pt-5 pb-3">
           <div className="flex-1 min-w-0 pr-3">
             <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-              Schedule
+              Time
             </p>
             <h4 className="text-base font-bold text-slate-900 dark:text-white leading-snug truncate">
               {taskName}
