@@ -615,6 +615,7 @@ export default function TaskBoard({
                 listRef={setListRef(i)}
                 maxHeightClass="max-h-[calc(100svh-340px-var(--safe-bottom))] md:max-h-[calc(100svh-340px-var(--safe-bottom))]"
                 isToday={dk === todayKey}
+                isPast={cmpYmd(dk, todayKey) < 0}
                 filter={getFilter(i)}
                 onFilterChange={(f) => setFilter(i, f)}
                 availableTags={tagsData?.tags || []}

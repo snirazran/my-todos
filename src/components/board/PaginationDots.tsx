@@ -3,7 +3,7 @@
 import React from 'react';
 import { motion, LayoutGroup } from 'framer-motion';
 
-import { WEEK_ORDER, englishDays, dayLetterFromYmd, parseYmd, todayYmd } from './helpers';
+import { WEEK_ORDER, englishDays, dayLetterFromYmd, parseYmd, todayYmd, cmpYmd } from './helpers';
 
 interface Props {
   /** legacy: total dot count (ignored when `dates` is provided) */
@@ -46,6 +46,19 @@ export default function PaginationDots({
             const dayNum = parseYmd(d).getDate();
             const isActive = d === activeDate;
             const isToday = d === today;
+            const isPast = cmpYmd(d, today) < 0;
+
+            const letterColor = isActive
+              ? 'text-primary'
+              : isPast
+                ? 'text-muted-foreground/40'
+                : 'text-foreground/80';
+
+            const numberClasses = isActive
+              ? 'bg-gradient-to-br from-primary/25 to-emerald-400/25 text-primary scale-105 ring-1 ring-primary/40'
+              : isPast
+                ? 'text-muted-foreground/40 hover:text-muted-foreground/70 hover:bg-muted/20'
+                : 'text-foreground hover:text-foreground hover:bg-muted/30';
 
             return (
               <button
@@ -55,19 +68,13 @@ export default function PaginationDots({
                 aria-label={d}
               >
                 <span
-                  className={`text-[11px] font-bold tracking-wide leading-none mb-1
-                    ${isActive ? 'text-primary' : 'text-muted-foreground/70'}
-                  `}
+                  className={`text-[11px] font-bold tracking-wide leading-none mb-1 ${letterColor}`}
                 >
                   {letter}
                 </span>
                 <div
                   className={`flex items-center justify-center
-                    w-11 h-11 rounded-2xl text-[16px] font-black transition-all duration-200
-                    ${isActive
-                      ? 'bg-gradient-to-br from-primary/25 to-emerald-400/25 text-primary scale-105 ring-1 ring-primary/40'
-                      : 'text-muted-foreground/80 hover:text-foreground hover:bg-muted/30'}
-                  `}
+                    w-11 h-11 rounded-2xl text-[16px] font-black transition-all duration-200 ${numberClasses}`}
                 >
                   {dayNum}
                 </div>

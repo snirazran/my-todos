@@ -14,6 +14,7 @@ export default function DayColumn({
   /** Set true when a composer is open in this column to make it a bit shorter */
   compact = false,
   isToday = false,
+  isPast = false,
   filter = 'all',
   onFilterChange,
   availableTags = [],
@@ -30,6 +31,7 @@ export default function DayColumn({
   maxHeightClass?: string;
   compact?: boolean;
   isToday?: boolean;
+  isPast?: boolean;
   filter?: FilterType;
   onFilterChange?: (filter: FilterType) => void;
   availableTags?: { id: string; name: string; color: string }[];
@@ -56,12 +58,15 @@ export default function DayColumn({
     <section
       className={[
         'group relative flex flex-col overflow-visible',
-        'rounded-[20px] bg-card/80 backdrop-blur-2xl',
+        'rounded-[20px]',
+        isPast ? 'bg-muted/40' : 'bg-card/80',
+        'backdrop-blur-2xl',
         'border border-border/50 shadow-sm',
         appliedMax,
         'p-3',
         'min-h-[100px]',
-        'transition-colors duration-300 hover:bg-card/90',
+        'transition-colors duration-300',
+        isPast ? 'hover:bg-muted/50' : 'hover:bg-card/90',
       ].join(' ')}
     >
       <div className="flex flex-col gap-2 px-2 mb-4 pt-1">
@@ -72,7 +77,9 @@ export default function DayColumn({
                 className={`text-2xl font-black tracking-tight leading-none ${
                   isToday
                     ? 'text-primary'
-                    : 'text-foreground'
+                    : isPast
+                      ? 'text-muted-foreground/70'
+                      : 'text-foreground'
                 }`}
               >
                 {displayDate}
@@ -83,7 +90,11 @@ export default function DayColumn({
                 {displayName}
               </span>
             ) : (
-              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+              <span
+                className={`text-xs font-bold uppercase tracking-wide ${
+                  isPast ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                }`}
+              >
                 {displayName}
               </span>
             )}
