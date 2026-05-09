@@ -794,10 +794,12 @@ export default function TaskBoard({
             return (i >= 0 ? i : 0) as DisplayDay;
           })()
         }
+        defaultDateKey={initialDateKey ?? activeDateKey}
         daysOrder={daysOrder}
         onSubmit={async ({
           text,
           days,
+          dates: exactDates,
           repeat,
           tags,
           startTime,
@@ -815,8 +817,8 @@ export default function TaskBoard({
           const anchor = initialDateKey ?? activeDateKey;
           const anchorDate = parseYmd(anchor);
           const anchorDow = anchorDate.getDay();
-          const dates: string[] = [];
-          if (repeat === 'this-week') {
+          const dates: string[] = exactDates ?? [];
+          if (repeat === 'this-week' && !exactDates) {
             for (const d of days) {
               if (d === -1) continue;
               const offset = ((d - anchorDow) + 7) % 7;

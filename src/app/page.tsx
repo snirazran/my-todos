@@ -971,6 +971,7 @@ export default function Home() {
         onSubmit={async ({
           text,
           days,
+          dates,
           repeat,
           tags,
           startTime,
@@ -987,6 +988,7 @@ export default function Home() {
               body: JSON.stringify({
                 text,
                 days,
+                dates,
                 repeat,
                 tags,
                 timezone: tz,
