@@ -116,7 +116,11 @@ export default function TaskActionSheet({
   };
 
   return (
-    <BaseSheet open={open} onOpenChange={onOpenChange}>
+    <BaseSheet
+      open={open}
+      onOpenChange={onOpenChange}
+      className="sm:max-w-md"
+    >
       {() => (
         <div className="flex flex-col">
           {/* Header */}

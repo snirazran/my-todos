@@ -48,6 +48,7 @@ export default React.memo(function TaskList({
   showCompleted = true,
   daysOrder,
   emptyMode = 'add',
+  disableDrag = false,
 }: {
   day: DisplayDay;
   items: Task[];
@@ -106,6 +107,8 @@ export default React.memo(function TaskList({
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
   /** Controls what to render when there are no items. 'add' = show add-task button (default), 'none' = show "No activities for this day" placeholder. */
   emptyMode?: 'add' | 'none';
+  /** When true, tasks in this list cannot be dragged (e.g., past dates). */
+  disableDrag?: boolean;
 }) {
   const [menu, setMenu] = useState<{
     id: string;
@@ -389,6 +392,7 @@ export default React.memo(function TaskList({
             isAnyDragging={isAnyDragging}
             compact
             onTap={() => setActionSheet({ task: t })}
+            disableDrag={disableDrag}
           />
         </div>,
       );

@@ -3,7 +3,6 @@
 import React, { useRef, useCallback, useEffect } from 'react';
 import {
   RotateCcw,
-  EllipsisVertical,
   CheckCircle2,
   Plus,
   CalendarClock,
@@ -38,6 +37,7 @@ export default function TaskCard({
   hideDoTodayButton,
   compact = false,
   onTap,
+  disableDrag = false,
 }: {
   dragId: string;
   task: Task;
@@ -56,6 +56,8 @@ export default function TaskCard({
   compact?: boolean;
   /** Fired when user releases the press before the long-press timer fires (and didn't drag). */
   onTap?: () => void;
+  /** Disable initiating drag (e.g., past-date columns). Tap still works. */
+  disableDrag?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -154,6 +156,10 @@ export default function TaskCard({
         });
       }
 
+      // If drag is disabled (e.g. past dates), skip the grab timer.
+      // We still listen for pointermove/pointerup so onTap can fire.
+      if (disableDrag) return;
+
       const delay =
         e.pointerType === 'mouse' ? MOUSE_HOLD_DURATION : LONG_PRESS_DURATION;
 
@@ -183,7 +189,7 @@ export default function TaskCard({
         }
       }, delay);
     },
-    [handlePointerMove, handlePointerUp, handlePointerCancel, task.completed],
+    [handlePointerMove, handlePointerUp, handlePointerCancel, task.completed, disableDrag],
   );
 
   useEffect(() => {
@@ -226,7 +232,11 @@ export default function TaskCard({
         compact
           ? 'group relative overflow-visible flex items-center gap-2 px-2 py-2 select-none rounded-[14px] transition-all duration-200'
           : 'group relative overflow-visible flex items-start gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
-        task.completed ? 'cursor-default' : 'cursor-grab',
+        task.completed
+          ? 'cursor-default'
+          : disableDrag
+            ? 'cursor-pointer'
+            : 'cursor-grab',
         'bg-card border border-border/80',
         task.completed
           ? 'shadow-sm'
@@ -423,22 +433,6 @@ export default function TaskCard({
               <Plus className="w-4 h-4" />
             </button>
           )}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggleMenuRef.current(e.currentTarget.getBoundingClientRect());
-            }}
-            title="Task actions"
-            aria-label="Task actions"
-            aria-expanded={menuOpen}
-            className={[
-              'rounded-full p-1.5 hover:bg-accent transition-colors',
-              menuOpen ? 'bg-accent opacity-100' : '',
-            ].join(' ')}
-            type="button"
-          >
-            <EllipsisVertical className="w-4 h-4 text-muted-foreground" />
-          </button>
         </div>
       </motion.div>
     </div>

@@ -662,6 +662,7 @@ export default function TaskBoard({
                   showCompleted={getShowCompleted(i)}
                   daysOrder={daysOrder}
                   emptyMode={cmpYmd(dk, todayKey) < 0 ? 'none' : 'add'}
+                  disableDrag={cmpYmd(dk, todayKey) < 0}
                 />
               </DayColumn>
             </div>
