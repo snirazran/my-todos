@@ -10,9 +10,7 @@ import {
   type ApiDay,
   ymd,
   parseYmd,
-  todayYmd,
   cmpYmd,
-  addDays,
 } from './helpers';
 import DayColumn from './DayColumn';
 import TaskList from './TaskList';

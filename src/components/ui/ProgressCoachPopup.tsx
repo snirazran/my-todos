@@ -11,7 +11,7 @@ import {
   Target,
   X,
 } from 'lucide-react';
-import ProgressCoach from '@/components/history/ProgressCoach';
+import ProgressCoach from '@/components/coach/ProgressCoach';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 

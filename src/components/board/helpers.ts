@@ -53,16 +53,6 @@ const SUNDAY_FIRST: ReadonlyArray<Exclude<ApiDay, -1>> = [0, 1, 2, 3, 4, 5, 6];
 const MONDAY_FIRST: ReadonlyArray<Exclude<ApiDay, -1>> = [1, 2, 3, 4, 5, 6, 0];
 export const WEEK_ORDER = WEEK_START === 'monday' ? MONDAY_FIRST : SUNDAY_FIRST;
 
-// Rolling order: returns 7 days starting from today (0..6)
-export const getRollingWeekOrder = (): ReadonlyArray<Exclude<ApiDay, -1>> => {
-  const today = new Date().getDay() as Exclude<ApiDay, -1>; // 0..6
-  const order: Exclude<ApiDay, -1>[] = [];
-  for (let i = 0; i < 7; i++) {
-    order.push(((today + i) % 7) as Exclude<ApiDay, -1>);
-  }
-  return order;
-};
-
 // --- Mapping helpers ---
 
 /** UI/display day index (0..6, 7=Later) -> API day (-1 for Later, else 0..6) */
@@ -136,12 +126,5 @@ export const cmpYmd = (a: string, b: string): number =>
 export const todayYmd = (): string => ymd(new Date());
 
 // DnD ids (use display day index)
-export const droppableId = (displayDay: DisplayDay) => `day-${displayDay}`;
-export const parseDroppable = (id: string): { day: DisplayDay } => {
-  const n = Number(id.replace('day-', ''));
-  // clamp to 0..7 just in case
-  const safe = Number.isFinite(n) ? Math.max(0, Math.min(7, Math.trunc(n))) : 0;
-  return { day: safe as DisplayDay };
-};
 export const draggableIdFor = (displayDay: DisplayDay, taskId: string) =>
   `${taskId}__d${displayDay}`;

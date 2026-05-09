@@ -5,7 +5,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { format, subDays } from 'date-fns';
 import useSWR from 'swr';
 import { Brain, Lock, ShieldCheck, AlertTriangle, Target, CheckCircle2, Sparkles, ChevronLeft } from 'lucide-react';
-import ProgressCoach from '@/components/history/ProgressCoach';
+import ProgressCoach from '@/components/coach/ProgressCoach';
 import { useRouter } from 'next/navigation';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 

@@ -6,7 +6,6 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   Home,
-  History,
   LayoutDashboard,
   ScrollText,
   Shirt,
@@ -575,19 +574,6 @@ function RightActions({
 
                 <button
                   onClick={() => {
-                    router.push('/history');
-                    setIsOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-                >
-                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
-                    History
-                  </span>
-                  <History className="h-[1.2rem] w-[1.2rem] text-blue-500" />
-                </button>
-
-                <button
-                  onClick={() => {
                     setAdminDialogOpen(true);
                     setIsOpen(false);
                   }}
@@ -777,19 +763,6 @@ function MobileSheet({
                         Quest Focus
                       </span>
                       <Compass className="h-5 w-5 text-emerald-500" />
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        router.push('/history');
-                        onClose();
-                      }}
-                      className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
-                    >
-                      <span className="font-bold text-sm group-hover:text-foreground transition-colors">
-                        History
-                      </span>
-                      <History className="h-5 w-5 text-blue-500" />
                     </button>
 
                     <button

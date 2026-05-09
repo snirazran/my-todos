@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { DAYS } from '../helpers';
 
 export type DragState = {
   active: boolean;
