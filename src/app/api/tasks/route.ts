@@ -89,9 +89,14 @@ function isBoardMode(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   return (
     params.get('view') === 'board' ||
+    params.get('view') === 'dateRange' ||
     params.has('day') ||
     params.get('fullWeek') === '1'
   );
+}
+
+function isDateRangeMode(req: NextRequest) {
+  return req.nextUrl.searchParams.get('view') === 'dateRange';
 }
 
 const initDailyFly = (date: string): DailyFlyProgress => ({
@@ -382,6 +387,7 @@ export async function GET(req: NextRequest) {
   if (!uid) return unauth();
   await connectMongo();
   const tz = req.nextUrl.searchParams.get('timezone') || 'UTC';
+  if (isDateRangeMode(req)) return handleDateRangeGet(req, uid, tz);
   if (isBoardMode(req)) return handleBoardGet(req, uid, tz);
   return handleDailyGet(req, uid, tz);
 }
@@ -409,6 +415,11 @@ export async function POST(req: NextRequest) {
           : 'weekly';
   if (!text)
     return NextResponse.json({ error: 'text is required' }, { status: 400 });
+  const explicitDates: string[] = Array.isArray(body?.dates)
+    ? body.dates
+        .map(String)
+        .filter((s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s))
+    : [];
   const days =
     repeat === 'backlog'
       ? [-1]
@@ -416,7 +427,7 @@ export async function POST(req: NextRequest) {
           .map(Number)
           .filter(Number.isInteger)
           .filter((d) => d === -1 || isWeekday(d));
-  if (days.length === 0)
+  if (days.length === 0 && explicitDates.length === 0)
     return NextResponse.json(
       { error: 'days must include -1 or 0..6' },
       { status: 400 },
@@ -510,6 +521,40 @@ export async function POST(req: NextRequest) {
       tasks: createdTasks,
     });
   }
+  // Explicit-date creation (for date-slider UI). Always creates 'regular' tasks on those dates.
+  for (const date of explicitDates) {
+    const weekday = dowFromYMD(date);
+    const id = uuid();
+    const order = await nextOrderForDay(uid, weekday, date);
+    const task = await TaskModel.create({
+      userId: uid,
+      type: 'regular',
+      id,
+      text,
+      order,
+      date,
+      completed: false,
+      createdAt: now,
+      updatedAt: now,
+      tags,
+      startTime,
+      endTime,
+      reminder,
+    });
+    createdIds.push(id);
+    createdTasks.push({
+      id: task.id,
+      text: task.text,
+      order: task.order,
+      completed: false,
+      type: 'regular',
+      tags: task.tags || [],
+      date: task.date,
+      startTime: task.startTime,
+      endTime: task.endTime,
+      reminder: task.reminder,
+    });
+  }
   for (const d of days) {
     const id = uuid();
     createdIds.push(id);
@@ -586,6 +631,12 @@ export async function PUT(req: NextRequest) {
   const tz = body.timezone || 'UTC';
   if (body && Object.prototype.hasOwnProperty.call(body, 'day'))
     return handleBoardPut(uid, body, tz);
+  if (
+    body &&
+    Object.prototype.hasOwnProperty.call(body, 'dateKey') &&
+    Array.isArray(body.tasks)
+  )
+    return handleBoardPutByDate(uid, body, tz);
   // New: Handle "move" operation (atomic move between lists)
   if (body.move) {
     const { type, date: moveDate } = body.move;
@@ -809,6 +860,30 @@ export async function DELETE(req: NextRequest) {
   const tz = body.timezone || 'UTC';
   if (body && Object.prototype.hasOwnProperty.call(body, 'day'))
     return handleBoardDelete(uid, body, tz);
+  if (body && Object.prototype.hasOwnProperty.call(body, 'dateKey')) {
+    const { dateKey, taskId } = body;
+    if (!taskId)
+      return NextResponse.json(
+        { error: 'taskId is required' },
+        { status: 400 },
+      );
+    const doc = await TaskModel.findOne(
+      { userId: uid, id: taskId },
+      { type: 1 },
+    )
+      .lean<TaskDoc>()
+      .exec();
+    if (doc?.type === 'regular') {
+      await TaskModel.deleteOne({ userId: uid, type: 'regular', id: taskId });
+    } else if (doc?.type === 'weekly' || doc?.type === 'habit') {
+      await TaskModel.updateOne(
+        { userId: uid, type: doc.type, id: taskId },
+        { $addToSet: { suppressedDates: dateKey } },
+      );
+    }
+    await syncGamification(uid, tz);
+    return NextResponse.json({ ok: true });
+  }
   const { date, taskId } = body ?? {};
   if (!date || !taskId)
     return NextResponse.json(
@@ -1087,6 +1162,158 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
   return NextResponse.json(includeHabits ? { week, habits } : week);
 }
 
+function enumerateDates(from: string, to: string): string[] {
+  const out: string[] = [];
+  const start = new Date(`${from}T12:00:00Z`);
+  const end = new Date(`${to}T12:00:00Z`);
+  for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
+    out.push(d.toISOString().split('T')[0]);
+  }
+  return out;
+}
+
+async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
+  const params = req.nextUrl.searchParams;
+  const from = params.get('from');
+  const to = params.get('to');
+  const includeHabits = params.get('includeHabits') === '1';
+  if (!from || !to)
+    return NextResponse.json(
+      { error: 'from and to (YYYY-MM-DD) required' },
+      { status: 400 },
+    );
+
+  const dates = enumerateDates(from, to);
+  const dateSet = new Set(dates);
+  const dowSet = new Set(dates.map((d) => dowFromYMD(d)));
+
+  const { weekStart } = getRollingWeekDatesZoned(tz);
+
+  const docs: TaskDoc[] = await TaskModel.find({
+    userId: uid,
+    $or: [
+      {
+        type: 'weekly',
+        deletedAt: { $exists: false },
+        dayOfWeek: { $in: Array.from(dowSet) },
+      },
+      {
+        type: 'regular',
+        deletedAt: { $exists: false },
+        date: { $in: dates },
+      },
+      { type: 'backlog', weekStart },
+      ...(includeHabits
+        ? [{ type: 'habit', deletedAt: { $exists: false } }]
+        : []),
+    ],
+  })
+    .sort({ order: 1 })
+    .lean<TaskDoc[]>()
+    .exec();
+
+  const byDate: Record<string, any[]> = {};
+  for (const d of dates) byDate[d] = [];
+  const backlog: any[] = [];
+  const habits: any[] = [];
+
+  for (const doc of docs) {
+    if (doc.type === 'habit') {
+      habits.push({
+        id: doc.id,
+        text: doc.text,
+        order: doc.order ?? 0,
+        completed: !!doc.completed,
+        type: doc.type,
+        origin: doc.type as Origin,
+        tags: doc.tags ?? [],
+        completedDates: doc.completedDates ?? [],
+        timesPerWeek: doc.timesPerWeek,
+        frogodoroSettings: doc.frogodoroSettings,
+        calendarEventId: doc.calendarEventId,
+        startTime: doc.startTime,
+        endTime: doc.endTime,
+        reminder: doc.reminder,
+      });
+      continue;
+    }
+    if (doc.type === 'backlog') {
+      backlog.push({
+        id: doc.id,
+        text: doc.text,
+        order: doc.order,
+        type: doc.type,
+        completed: !!doc.completed,
+        tags: doc.tags ?? [],
+        frogodoroSettings: doc.frogodoroSettings,
+        calendarEventId: doc.calendarEventId,
+        startTime: doc.startTime,
+        endTime: doc.endTime,
+        reminder: doc.reminder,
+      });
+      continue;
+    }
+    if (doc.type === 'regular') {
+      if (!doc.date || !dateSet.has(doc.date)) continue;
+      if ((doc.suppressedDates ?? []).includes(doc.date)) continue;
+      byDate[doc.date].push({
+        id: doc.id,
+        text: doc.text,
+        order: doc.order,
+        type: doc.type,
+        completed:
+          (doc.completedDates ?? []).includes(doc.date) || !!doc.completed,
+        tags: doc.tags ?? [],
+        frogodoroSession:
+          doc.frogodoroSessions?.find((s) => s.date === doc.date) ?? null,
+        calendarEventId: doc.calendarEventId,
+        startTime: doc.startTime,
+        endTime: doc.endTime,
+        reminder: doc.reminder,
+      });
+      continue;
+    }
+    if (doc.type === 'weekly' && typeof doc.dayOfWeek === 'number') {
+      // expand into every matching date in the window
+      for (const d of dates) {
+        if (dowFromYMD(d) !== doc.dayOfWeek) continue;
+        if ((doc.suppressedDates ?? []).includes(d)) continue;
+        byDate[d].push({
+          id: doc.id,
+          text: doc.text,
+          order: doc.order,
+          type: doc.type,
+          completed: (doc.completedDates ?? []).includes(d),
+          tags: doc.tags ?? [],
+          frogodoroSession:
+            doc.frogodoroSessions?.find((s) => s.date === d) ?? null,
+          calendarEventId: doc.calendarEventId,
+          startTime: doc.startTime,
+          endTime: doc.endTime,
+          reminder: doc.reminder,
+        });
+      }
+    }
+  }
+  for (const d of dates)
+    byDate[d].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  habits.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  backlog.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  // expose user account creation date for slider lower bound
+  const user = (await UserModel.findById(uid, { createdAt: 1 }).lean()) as any;
+  const accountCreatedAt = user?.createdAt
+    ? new Date(user.createdAt).toISOString().split('T')[0]
+    : null;
+
+  return NextResponse.json({
+    byDate,
+    habits,
+    backlog,
+    accountCreatedAt,
+  });
+}
+
 async function handleBoardPut(
   uid: string,
   body: {
@@ -1297,6 +1524,133 @@ async function handleBoardPut(
             reminder: reminderVal,
           },
           $setOnInsert: { userId: uid, type: 'regular', createdAt: now },
+        },
+        { upsert: true },
+      );
+    }),
+  );
+  await syncGamification(uid, tz);
+  return NextResponse.json({ ok: true });
+}
+
+async function handleBoardPutByDate(
+  uid: string,
+  body: {
+    dateKey: string;
+    tasks: Array<{
+      id: string;
+      text?: string;
+      tags?: string[];
+      calendarEventId?: string;
+      startTime?: string;
+      endTime?: string;
+      reminder?: string;
+    }>;
+  },
+  tz: string,
+) {
+  const { dateKey, tasks } = body;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey))
+    return NextResponse.json({ error: 'invalid dateKey' }, { status: 400 });
+  const now = new Date();
+  const ids = tasks.map((t) => t.id);
+
+  // 1. Remove regular tasks for this date that are no longer in the list
+  await TaskModel.deleteMany({
+    userId: uid,
+    type: 'regular',
+    date: dateKey,
+    id: { $nin: ids },
+  });
+
+  const docs: TaskDoc[] = await TaskModel.find(
+    { userId: uid, id: { $in: ids } },
+    {
+      id: 1,
+      type: 1,
+      text: 1,
+      tags: 1,
+      calendarEventId: 1,
+      startTime: 1,
+      endTime: 1,
+      reminder: 1,
+    },
+  )
+    .lean<TaskDoc[]>()
+    .exec();
+  const typeById = new Map(docs.map((d) => [d.id, d.type]));
+  const textById = new Map(docs.map((d) => [d.id, d.text]));
+  const tagsById = new Map(docs.map((d) => [d.id, d.tags ?? []]));
+  const weekday = dowFromYMD(dateKey);
+  const { weekStart } = getRollingWeekDatesZoned(tz);
+
+  await Promise.all(
+    tasks.map((t, i) => {
+      const ttype = typeById.get(t.id);
+      const textFromReq = t.text ?? textById.get(t.id) ?? '';
+      const tags = t.tags ?? tagsById.get(t.id) ?? [];
+      if (ttype === 'weekly') {
+        // Convert to a one-off regular on this date so order persists
+        return TaskModel.updateOne(
+          { userId: uid, id: t.id },
+          {
+            $set: {
+              type: 'regular',
+              date: dateKey,
+              order: i + 1,
+              updatedAt: now,
+              tags,
+            },
+            $unset: { dayOfWeek: 1 },
+          },
+        );
+      }
+      if (ttype === 'habit')
+        return TaskModel.updateOne(
+          { userId: uid, type: 'habit', id: t.id },
+          { $set: { order: i + 1, updatedAt: now, tags } },
+        );
+      if (ttype === 'backlog')
+        return Promise.all([
+          TaskModel.deleteOne({
+            userId: uid,
+            type: 'backlog',
+            weekStart,
+            id: t.id,
+          }),
+          TaskModel.updateOne(
+            { userId: uid, type: 'regular', id: t.id },
+            {
+              $set: {
+                text: textFromReq,
+                tags,
+                date: dateKey,
+                order: i + 1,
+                completed: false,
+                updatedAt: now,
+              },
+              $setOnInsert: { userId: uid, type: 'regular', createdAt: now },
+            },
+            { upsert: true },
+          ),
+        ]);
+      // regular or unknown -> upsert as regular on this date
+      return TaskModel.updateOne(
+        { userId: uid, type: 'regular', id: t.id },
+        {
+          $set: {
+            text: textFromReq,
+            tags,
+            date: dateKey,
+            order: i + 1,
+            updatedAt: now,
+          },
+          $setOnInsert: {
+            userId: uid,
+            type: 'regular',
+            createdAt: now,
+            completed: false,
+          },
         },
         { upsert: true },
       );

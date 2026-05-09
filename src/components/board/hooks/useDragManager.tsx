@@ -367,7 +367,7 @@ export function useDragManager() {
 
       // Only check for new column if NOT locked in tray zone
       if (!isLockedTrayZone) {
-        for (let day = 0; day < DAYS; day++) {
+        for (let day = 0; day < slideRefs.current.length; day++) {
           const col = slideRefs.current[day];
           if (!col) continue;
           const r = col.getBoundingClientRect();
@@ -379,7 +379,7 @@ export function useDragManager() {
         // Fallback: Closest Column
         if (newDay == null) {
           let minDist = Infinity, best: number | null = null;
-          for (let day = 0; day < DAYS; day++) {
+          for (let day = 0; day < slideRefs.current.length; day++) {
             const col = slideRefs.current[day];
             if (!col) continue;
             const r = col.getBoundingClientRect();

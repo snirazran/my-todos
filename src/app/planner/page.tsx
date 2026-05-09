@@ -1,433 +1,466 @@
 'use client';
 
-import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { format } from 'date-fns';
-import useSWR from 'swr';
 import TaskBoard from '@/components/board/TaskBoard';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import {
   Task,
-  DAYS,
-  labelForDisplayDay,
-  apiDayFromDisplay,
-  displayDayFromApi,
-  todayDisplayIndex, // Import todayDisplayIndex
-  getRollingWeekOrder,
-  type ApiDay,
-  type DisplayDay,
+  ymd,
+  parseYmd,
+  todayYmd,
+  addDays,
+  cmpYmd,
 } from '@/components/board/helpers';
 
-const EXTRA = 'Maybe Today';
-type BoardResponse = Task[][] | { week: Task[][]; habits?: Task[] };
-type QuestSummaryResponse = {
-  onboarding?: {
-    selectedCategoryIds: string[];
-  };
+type DateRangeResponse = {
+  byDate: Record<string, Task[]>;
+  habits: Task[];
+  backlog: Task[];
+  accountCreatedAt: string | null;
 };
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+const INITIAL_PAST = 14;
+const INITIAL_FUTURE = 30;
+const EXTEND_STEP = 30;
 
 export default function ManageTasksPage() {
-  const [week, setWeek] = useState<Task[][]>(
-    Array.from({ length: DAYS }, () => []),
-  );
+  const today = todayYmd();
+  const [tasksByDate, setTasksByDate] = useState<Record<string, Task[]>>({});
   const [habits, setHabits] = useState<Task[]>([]);
+  const [backlog, setBacklog] = useState<Task[]>([]);
+  const [accountCreatedAt, setAccountCreatedAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Prevent parent <main> from scrolling on this page (it uses overflow-y-auto for home page)
+  // Sliding window of dates currently rendered
+  const [windowStart, setWindowStart] = useState<string>(addDays(today, -INITIAL_PAST));
+  const [windowEnd, setWindowEnd] = useState<string>(addDays(today, INITIAL_FUTURE));
+  const [activeDateKey, setActiveDateKey] = useState<string>(today);
+
+  // Prevent parent <main> from scrolling on this page
   useEffect(() => {
     const main = document.querySelector('main');
     if (main) {
       main.style.overflow = 'hidden';
-      return () => { main.style.overflow = ''; };
+      return () => {
+        main.style.overflow = '';
+      };
     }
   }, []);
-  // Calculate rolling week order once on mount
-  const processingWeekOrder = useMemo(() => getRollingWeekOrder(), []);
-  const todayIdx = useMemo(
-    () => todayDisplayIndex(processingWeekOrder),
-    [processingWeekOrder],
-  );
-  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const { data: questsData } = useSWR<QuestSummaryResponse>(
-    `/api/quests?view=home&timezone=${encodeURIComponent(timezone)}`,
-    fetcher,
-    { revalidateOnFocus: false },
-  );
 
-  /** Map API order (Sun..Sat, Later at index 7) -> Display order */
-  const mapApiToDisplay = useCallback(
-    (apiWeek: Task[][]): Task[][] => {
-      const out: Task[][] = Array.from({ length: DAYS }, () => []);
+  const tz = typeof window !== 'undefined'
+    ? Intl.DateTimeFormat().resolvedOptions().timeZone
+    : 'UTC';
 
-      const sortTasks = (tasks: Task[]) => {
-        // Sort by completed status (false first, true last)
-        // If same status, keep original order (stable sort)
-        return [...tasks].sort((a, b) => {
-          if (a.completed === b.completed) return 0;
-          return a.completed ? 1 : -1;
-        });
-      };
-
-      // API days 0..6 (Sun..Sat)
-      for (
-        let apiDay = 0 as ApiDay;
-        apiDay <= 6;
-        apiDay = (apiDay + 1) as ApiDay
-      ) {
-        const displayIdx = displayDayFromApi(apiDay, processingWeekOrder);
-        out[displayIdx] = sortTasks(apiWeek[apiDay] ?? []);
-      }
-      // Later bucket is already at index 7 from the API
-      out[7] = sortTasks(apiWeek[7] ?? []);
-      return out;
-    },
-    [processingWeekOrder],
-  );
-
-  const fetchWeek = useCallback(async () => {
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const fetchRange = useCallback(
+    async (from: string, to: string, mergeOnly = false) => {
       const res = await fetch(
-        `/api/tasks?view=board&includeHabits=1&timezone=${encodeURIComponent(tz)}`,
+        `/api/tasks?view=dateRange&from=${from}&to=${to}&includeHabits=1&timezone=${encodeURIComponent(tz)}`,
       );
       if (!res.ok) throw new Error(`status ${res.status}`);
-      const data = (await res.json()) as BoardResponse;
-      if (Array.isArray(data)) {
-        setWeek(mapApiToDisplay(data));
-        setHabits([]);
-      } else {
-        setWeek(mapApiToDisplay(data.week));
-        setHabits(data.habits ?? []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch weekly tasks:', err);
-    }
-  }, [mapApiToDisplay]);
+      const data = (await res.json()) as DateRangeResponse;
+      setTasksByDate((prev) =>
+        mergeOnly ? { ...prev, ...data.byDate } : data.byDate,
+      );
+      setHabits(data.habits ?? []);
+      setBacklog(data.backlog ?? []);
+      if (data.accountCreatedAt) setAccountCreatedAt(data.accountCreatedAt);
+    },
+    [tz],
+  );
 
+  // Initial load
   useEffect(() => {
     (async () => {
       setLoading(true);
-      await fetchWeek();
+      try {
+        await fetchRange(windowStart, windowEnd);
+      } catch (e) {
+        console.error('Initial planner fetch failed', e);
+      }
       setLoading(false);
     })();
-  }, [fetchWeek]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // Listen for global tag updates and board refresh requests
-  useEffect(() => {
-    window.addEventListener('tags-updated', fetchWeek);
-    window.addEventListener('board-refresh', fetchWeek);
-    return () => {
-      window.removeEventListener('tags-updated', fetchWeek);
-      window.removeEventListener('board-refresh', fetchWeek);
-    };
-  }, [fetchWeek]);
-
-  /** Save order for one display column (maps -> API day) */
-  const saveDay = async (displayDay: DisplayDay, tasks: Task[]) => {
-    const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
+  // Refetch helpers for board updates
+  const refetchAll = useCallback(async () => {
     try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      await fetch('/api/tasks?view=board', {
+      await fetchRange(windowStart, windowEnd);
+    } catch (e) {
+      console.error('Planner refetch failed', e);
+    }
+  }, [fetchRange, windowStart, windowEnd]);
+
+  useEffect(() => {
+    window.addEventListener('tags-updated', refetchAll);
+    window.addEventListener('board-refresh', refetchAll);
+    return () => {
+      window.removeEventListener('tags-updated', refetchAll);
+      window.removeEventListener('board-refresh', refetchAll);
+    };
+  }, [refetchAll]);
+
+  const windowDates = useMemo(() => {
+    const out: string[] = [];
+    let cur = windowStart;
+    while (cmpYmd(cur, windowEnd) <= 0) {
+      out.push(cur);
+      cur = addDays(cur, 1);
+    }
+    return out;
+  }, [windowStart, windowEnd]);
+
+  // Window expansion (called when user nears edge or jumps via calendar)
+  const extendingRef = useRef(false);
+  const onExtendWindow = useCallback(
+    async (direction: 'past' | 'future') => {
+      if (extendingRef.current) return;
+      extendingRef.current = true;
+      try {
+        if (direction === 'past') {
+          const minBound = accountCreatedAt ?? '1970-01-01';
+          if (cmpYmd(windowStart, minBound) <= 0) return;
+          const newStart = addDays(windowStart, -EXTEND_STEP);
+          const clamped = cmpYmd(newStart, minBound) < 0 ? minBound : newStart;
+          if (clamped === windowStart) return;
+          await fetchRange(clamped, addDays(windowStart, -1), true);
+          setWindowStart(clamped);
+        } else {
+          const newEnd = addDays(windowEnd, EXTEND_STEP);
+          await fetchRange(addDays(windowEnd, 1), newEnd, true);
+          setWindowEnd(newEnd);
+        }
+      } catch (e) {
+        console.error('extend window failed', e);
+      } finally {
+        extendingRef.current = false;
+      }
+    },
+    [accountCreatedAt, fetchRange, windowStart, windowEnd],
+  );
+
+  // Save tasks for a specific date (full reorder for that column)
+  const saveDate = useCallback(
+    async (dateKey: string, tasks: Task[]) => {
+      const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
+      try {
+        await fetch('/api/tasks?view=board', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dateKey,
+            tasks: ordered,
+            timezone: tz,
+          }),
+        });
+      } catch (e) {
+        console.warn('saveDate failed', e);
+      }
+    },
+    [tz],
+  );
+
+  const saveBacklog = useCallback(
+    async (tasks: Task[]) => {
+      const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
+      try {
+        await fetch('/api/tasks?view=board', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            day: -1,
+            tasks: ordered,
+            timezone: tz,
+          }),
+        });
+      } catch (e) {
+        console.warn('saveBacklog failed', e);
+      }
+    },
+    [tz],
+  );
+
+  const removeOnDate = useCallback(
+    async (dateKey: string, id: string) => {
+      setTasksByDate((prev) => {
+        const list = (prev[dateKey] ?? []).filter((t) => t.id !== id);
+        return { ...prev, [dateKey]: list };
+      });
+      try {
+        await fetch('/api/tasks?view=board', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dateKey, taskId: id, timezone: tz }),
+        });
+      } catch (e) {
+        console.error('Delete failed', e);
+        refetchAll();
+      }
+    },
+    [tz, refetchAll],
+  );
+
+  const removeFromBacklog = useCallback(
+    async (id: string) => {
+      setBacklog((prev) => prev.filter((t) => t.id !== id));
+      try {
+        await fetch('/api/tasks?view=board', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ day: -1, taskId: id, timezone: tz }),
+        });
+      } catch (e) {
+        console.error('Delete failed', e);
+        refetchAll();
+      }
+    },
+    [tz, refetchAll],
+  );
+
+  const onAddTask = useCallback(
+    async ({
+      text,
+      dates,
+      repeat,
+      tags,
+      timesPerWeek,
+      startTime,
+      endTime,
+      reminder,
+    }: {
+      text: string;
+      dates: string[];
+      repeat: 'this-week' | 'weekly' | 'habit';
+      tags: string[];
+      timesPerWeek?: number;
+      startTime?: string;
+      endTime?: string;
+      reminder?: string;
+    }) => {
+      try {
+        await fetch('/api/tasks?view=board', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text,
+            dates,
+            // include 'days' as well (sun..sat dows derived) for backwards compat with weekly repeat
+            days:
+              repeat === 'weekly'
+                ? dates.map((d) => parseYmd(d).getDay())
+                : repeat === 'habit'
+                  ? [parseYmd(dates[0] ?? today).getDay()]
+                  : [],
+            repeat,
+            tags,
+            timesPerWeek,
+            timezone: tz,
+            startTime,
+            endTime,
+            reminder,
+          }),
+        });
+      } catch (e) {
+        console.error('Add failed', e);
+      }
+      await refetchAll();
+    },
+    [tz, today, refetchAll],
+  );
+
+  const onToggleHabit = useCallback(
+    async (id: string) => {
+      const dateStr = format(new Date(), 'yyyy-MM-dd');
+      setHabits((prev) =>
+        prev.map((h) => {
+          if (h.id !== id) return h;
+          const isDone = (h.completedDates ?? []).includes(dateStr);
+          const next = isDone
+            ? (h.completedDates ?? []).filter((d) => d !== dateStr)
+            : [...(h.completedDates ?? []), dateStr];
+          return { ...h, completedDates: next };
+        }),
+      );
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateStr, taskId: id, timezone: tz }),
+      });
+      refetchAll();
+    },
+    [tz, refetchAll],
+  );
+
+  const onEditHabit = useCallback(
+    async (id: string, text: string) => {
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: id, text }),
+      });
+      refetchAll();
+    },
+    [refetchAll],
+  );
+
+  const onDeleteHabit = useCallback(
+    async (id: string) => {
+      await fetch('/api/tasks', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: id }),
+      });
+      refetchAll();
+    },
+    [refetchAll],
+  );
+
+  const onEditHabitGoal = useCallback(
+    async (id: string, timesPerWeek: number) => {
+      await fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId: id, timesPerWeek }),
+      });
+      refetchAll();
+    },
+    [refetchAll],
+  );
+
+  const onToggleRepeat = useCallback(
+    async (taskId: string, dateKey: string) => {
+      await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          day: apiDayFromDisplay(displayDay, processingWeekOrder), // 7 -> -1, else 0..6
-          tasks: ordered,
+          date: dateKey,
+          taskId,
+          toggleType: true,
           timezone: tz,
         }),
       });
-    } catch (e) {
-      console.warn('saveDay failed', e);
-    }
-  };
+      refetchAll();
+    },
+    [tz, refetchAll],
+  );
 
-  /** Delete from one display column (maps -> API day) */
-  const removeTask = async (displayDay: DisplayDay, id: string) => {
-    // Optimistic Update
-    setWeek((w) => {
-      const clone = [...w];
-      clone[displayDay] = clone[displayDay].filter((t) => t.id !== id);
-      return clone;
-    });
-
-    try {
-      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      await fetch('/api/tasks?view=board', {
-        method: 'DELETE',
+  const onScheduleTask = useCallback(
+    async (
+      taskId: string,
+      data: { startTime: string; endTime: string; reminder: string },
+    ) => {
+      await fetch('/api/tasks', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          day: apiDayFromDisplay(displayDay, processingWeekOrder), // 7 -> -1, else 0..6
-          taskId: id,
-          timezone: tz,
-        }),
+        body: JSON.stringify({ taskId, schedule: data, timezone: tz }),
       });
-    } catch (err) {
-      console.error('Delete failed', err);
-      // Re-fetch on error to ensure sync
-      fetchWeek();
-    }
-  };
+      refetchAll();
+    },
+    [tz, refetchAll],
+  );
 
-  /** Direct add from QuickAddSheet: days are API days (0..6) or -1 for "Later" */
-  const onAddTask = async ({
-    text,
-    days,
-    repeat,
-    tags,
-    timesPerWeek,
-    startTime,
-    endTime,
-    reminder,
-  }: {
-    text: string;
-    // -1 = Later, 0..6 = Sun..Sat (API days)
-    days: (-1 | 0 | 1 | 2 | 3 | 4 | 5 | 6)[];
-    repeat: 'this-week' | 'weekly' | 'habit';
-    tags: string[];
-    timesPerWeek?: number;
-    startTime?: string;
-    endTime?: string;
-    reminder?: string;
-  }) => {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    await fetch('/api/tasks?view=board', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text,
-        days,
-        repeat,
-        tags,
-        timesPerWeek,
-        timezone: tz,
-        startTime,
-        endTime,
-        reminder,
-      }),
-    });
-    fetchWeek();
-  };
+  // Live frogodoro overlay for today's column
+  const {
+    selectedTaskId: frogTaskId,
+    sessionStats,
+    settings: frogSettings,
+    phase: frogPhase,
+    timeLeft: frogTimeLeft,
+    isRunning: frogRunning,
+  } = useFrogodoroStore();
 
-  const onToggleHabit = async (id: string) => {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const dateStr = format(new Date(), 'yyyy-MM-dd');
-    
-    // Optimistic Update
-    setHabits(prev => prev.map(h => {
-      if (h.id === id) {
-        const isCurrentlyDone = (h.completedDates ?? []).includes(dateStr);
-        let nextDates = h.completedDates || [];
-        if (isCurrentlyDone) {
-          nextDates = nextDates.filter(d => d !== dateStr);
-        } else {
-          nextDates = [...nextDates, dateStr];
-        }
-        return { ...h, completedDates: nextDates };
-      }
-      return h;
-    }));
+  const liveTasksByDate = useMemo(() => {
+    if (!frogTaskId) return tasksByDate;
+    const phaseDuration =
+      frogPhase === 'focus'
+        ? frogSettings.cycleDuration * 60
+        : frogPhase === 'shortBreak'
+          ? frogSettings.shortBreakDuration * 60
+          : frogSettings.longBreakDuration * 60;
+    const liveElapsed = phaseDuration - frogTimeLeft;
+    const hasActivity =
+      sessionStats.focusSessions > 0 ||
+      sessionStats.shortBreaks > 0 ||
+      sessionStats.longBreaks > 0 ||
+      frogRunning ||
+      liveElapsed > 0;
+    if (!hasActivity) return tasksByDate;
 
-    await fetch('/api/tasks', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        date: dateStr,
-        taskId: id,
-        timezone: tz,
-      }),
-    });
-    fetchWeek();
-  };
-
-  const onEditHabit = async (id: string, text: string) => {
-    await fetch('/api/tasks', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId: id, text }),
-    });
-    fetchWeek();
-  };
-
-  const onDeleteHabit = async (id: string) => {
-    await fetch(`/api/tasks`, {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId: id }),
-    });
-    fetchWeek();
-  };
-
-  const onEditHabitGoal = async (id: string, timesPerWeek: number) => {
-    await fetch('/api/tasks', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ taskId: id, timesPerWeek }),
-    });
-    fetchWeek();
-  };
-
-  const onToggleRepeat = async (taskId: string, day: DisplayDay) => {
-    if (day === 7) return; // Ignore backlog for now
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    // In this view, 'day' corresponds directly to offset from today if we just used indices,
-    // but let's stick to strict API logic:
-    // 1. Get API day (0..6)
-    const apiDay = apiDayFromDisplay(day, processingWeekOrder);
-
-    // 2. Find closest future date with that weekday
-    const currentDow = today.getDay();
-    let daysUntil = apiDay - currentDow;
-    if (daysUntil < 0) daysUntil += 7;
-
-    const targetDate = new Date(today);
-    targetDate.setDate(today.getDate() + daysUntil);
-
-    const pad = (n: number) => String(n).padStart(2, '0');
-    const dateStr = `${targetDate.getFullYear()}-${pad(targetDate.getMonth() + 1)}-${pad(targetDate.getDate())}`;
-
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    // Optimistic Update
-    setWeek((prev) => {
-      const next = [...prev];
-      if (next[day]) {
-        next[day] = next[day].map((t) => {
-          if (t.id === taskId) {
-            const newType = t.type === 'weekly' ? 'regular' : 'weekly';
-            return { ...t, type: newType };
-          }
-          return t;
-        });
-      }
-      return next;
-    });
-
-    await fetch('/api/tasks', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        date: dateStr,
-        taskId,
-        toggleType: true,
-        timezone: tz,
-      }),
-    });
-
-    fetchWeek();
-  };
-
-  const onScheduleTask = async (
-    taskId: string,
-    data: { startTime: string; endTime: string; reminder: string },
-  ) => {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-    // Optimistic Update
-    setWeek((prev) => {
-      return prev.map((col) =>
-        col.map((t) =>
-          t.id === taskId
-            ? {
-                ...t,
-                startTime: data.startTime || undefined,
-                endTime: data.endTime || undefined,
-                reminder: data.reminder || undefined,
-              }
-            : t,
-        ),
-      );
-    });
-
-    await fetch('/api/tasks', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        taskId,
-        schedule: data,
-        timezone: tz,
-      }),
-    });
-
-    fetchWeek();
-  };
-
-  /** Titles in display order */
-  const titles = useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    return Array.from({ length: DAYS }, (_, i) => {
-      if (i === 7) return EXTRA;
-      const displayDay = i as Exclude<DisplayDay, 7>;
-
-      // With rolling order, index 0 is today, 1 is tomorrow, etc.
-      // But let's use the robust mapping for labels
-      const d = new Date(today);
-      d.setDate(today.getDate() + i);
-
-      const dayName = labelForDisplayDay(displayDay, processingWeekOrder);
-      // Format d/M
-      const dateStr = `${d.getDate()}/${d.getMonth() + 1}`;
-      return `${dayName} ${dateStr}`;
-    });
-  }, [processingWeekOrder]);
-
-  // Live frogodoro overlay for today's column (must be before any early return)
-  const { selectedTaskId: frogTaskId, sessionStats, settings: frogSettings, phase: frogPhase, timeLeft: frogTimeLeft, isRunning: frogRunning } = useFrogodoroStore();
+    const todayList = tasksByDate[today];
+    if (!todayList) return tasksByDate;
+    const updated = todayList.map((t) =>
+      t.id !== frogTaskId
+        ? t
+        : {
+            ...t,
+            frogodoroSession: {
+              date: today,
+              completedCycles:
+                sessionStats.focusSessions +
+                (frogPhase === 'focus' && liveElapsed > 0 ? 1 : 0),
+              timeSpent:
+                sessionStats.focusTime +
+                (frogPhase === 'focus' ? liveElapsed : 0),
+              shortBreaks:
+                sessionStats.shortBreaks +
+                (frogPhase === 'shortBreak' && liveElapsed > 0 ? 1 : 0),
+              shortBreakTime:
+                sessionStats.shortBreakTime +
+                (frogPhase === 'shortBreak' ? liveElapsed : 0),
+              longBreaks:
+                sessionStats.longBreaks +
+                (frogPhase === 'longBreak' && liveElapsed > 0 ? 1 : 0),
+              longBreakTime:
+                sessionStats.longBreakTime +
+                (frogPhase === 'longBreak' ? liveElapsed : 0),
+            },
+          },
+    );
+    return { ...tasksByDate, [today]: updated };
+  }, [
+    tasksByDate,
+    today,
+    frogTaskId,
+    frogPhase,
+    frogSettings,
+    frogTimeLeft,
+    frogRunning,
+    sessionStats,
+  ]);
 
   if (loading) {
-    return <LoadingScreen message="Loading weekly tasks..." fullscreen />;
+    return <LoadingScreen message="Loading planner..." fullscreen />;
   }
-  const frogPhaseDuration = frogPhase === 'focus' ? frogSettings.cycleDuration * 60 : frogPhase === 'shortBreak' ? frogSettings.shortBreakDuration * 60 : frogSettings.longBreakDuration * 60;
-  const frogLiveElapsed = frogPhaseDuration - frogTimeLeft;
-  const frogHasActivity = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || frogRunning || frogLiveElapsed > 0;
-  const liveWeek = frogTaskId && frogHasActivity
-    ? week.map((col, colIdx) =>
-        colIdx === todayIdx
-          ? col.map((t) =>
-              t.id === frogTaskId
-                ? {
-                    ...t,
-                    frogodoroSession: {
-                      date: format(new Date(), 'yyyy-MM-dd'),
-                      completedCycles: sessionStats.focusSessions + (frogPhase === 'focus' && frogLiveElapsed > 0 ? 1 : 0),
-                      timeSpent: sessionStats.focusTime + (frogPhase === 'focus' ? frogLiveElapsed : 0),
-                      shortBreaks: sessionStats.shortBreaks + (frogPhase === 'shortBreak' && frogLiveElapsed > 0 ? 1 : 0),
-                      shortBreakTime: sessionStats.shortBreakTime + (frogPhase === 'shortBreak' ? frogLiveElapsed : 0),
-                      longBreaks: sessionStats.longBreaks + (frogPhase === 'longBreak' && frogLiveElapsed > 0 ? 1 : 0),
-                      longBreakTime: sessionStats.longBreakTime + (frogPhase === 'longBreak' ? frogLiveElapsed : 0),
-                    },
-                  }
-                : t,
-            )
-          : col,
-      )
-    : week;
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-background">
       <div className="absolute inset-0">
         <TaskBoard
-          titles={titles}
-          week={liveWeek}
-          setWeek={setWeek}
+          windowDates={windowDates}
+          tasksByDate={liveTasksByDate}
+          setTasksByDate={setTasksByDate}
+          backlog={backlog}
+          setBacklog={setBacklog}
           habits={habits}
           onToggleHabit={onToggleHabit}
           onEditHabit={onEditHabit}
           onDeleteHabit={onDeleteHabit}
           onEditHabitGoal={onEditHabitGoal}
-          saveDay={saveDay}
-          removeTask={removeTask}
+          saveDate={saveDate}
+          saveBacklog={saveBacklog}
+          removeOnDate={removeOnDate}
+          removeFromBacklog={removeFromBacklog}
           onRequestAdd={() => {
             /* no-op: QuickAddSheet path is used */
           }}
           onQuickAdd={onAddTask}
-          todayDisplayIndex={todayIdx} // Pass todayIdx as a prop
-          daysOrder={processingWeekOrder} // Pass the rolling order
+          todayKey={today}
+          activeDateKey={activeDateKey}
+          setActiveDateKey={setActiveDateKey}
+          accountCreatedAt={accountCreatedAt}
+          onExtendWindow={onExtendWindow}
           onToggleRepeat={onToggleRepeat}
           onScheduleTask={onScheduleTask}
         />
@@ -435,64 +468,28 @@ export default function ManageTasksPage() {
 
       <style jsx global>{`
         @keyframes ripple {
-          0% {
-            transform: scale(0.9);
-            opacity: 0.3;
-          }
-          50% {
-            transform: scale(1.05);
-            opacity: 0.6;
-          }
-          100% {
-            transform: scale(0.9);
-            opacity: 0.3;
-          }
+          0% { transform: scale(0.9); opacity: 0.3; }
+          50% { transform: scale(1.05); opacity: 0.6; }
+          100% { transform: scale(0.9); opacity: 0.3; }
         }
-        .animate-ripple {
-          animation: ripple 11s ease-in-out infinite;
-        }
-        .animate-ripple-slow {
-          animation: ripple 16s ease-in-out infinite;
-        }
+        .animate-ripple { animation: ripple 11s ease-in-out infinite; }
+        .animate-ripple-slow { animation: ripple 16s ease-in-out infinite; }
         @keyframes bob {
-          0%,
-          100% {
-            transform: translateY(0);
-          }
-          50% {
-            transform: translateY(-4px);
-          }
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-4px); }
         }
-        .animate-bob {
-          animation: bob 3.6s ease-in-out infinite;
-        }
+        .animate-bob { animation: bob 3.6s ease-in-out infinite; }
         @keyframes buzz {
-          0% {
-            transform: translate(0, 0) rotate(0deg);
-          }
-          25% {
-            transform: translate(-1px, 1px) rotate(-1deg);
-          }
-          50% {
-            transform: translate(1px, -1px) rotate(1deg);
-          }
-          75% {
-            transform: translate(-1px, 0) rotate(0deg);
-          }
-          100% {
-            transform: translate(0, 0) rotate(0deg);
-          }
+          0% { transform: translate(0, 0) rotate(0deg); }
+          25% { transform: translate(-1px, 1px) rotate(-1deg); }
+          50% { transform: translate(1px, -1px) rotate(1deg); }
+          75% { transform: translate(-1px, 0) rotate(0deg); }
+          100% { transform: translate(0, 0) rotate(0deg); }
         }
-        .animate-buzz {
-          animation: buzz 400ms linear infinite;
-        }
+        .animate-buzz { animation: buzz 400ms linear infinite; }
         @keyframes cardShine {
-          0% {
-            background-position: -150% 0;
-          }
-          100% {
-            background-position: 250% 0;
-          }
+          0% { background-position: -150% 0; }
+          100% { background-position: 250% 0; }
         }
         .shine {
           background-image: linear-gradient(
@@ -503,9 +500,7 @@ export default function ManageTasksPage() {
           );
           background-size: 200% 100%;
         }
-        .shine:hover {
-          animation: cardShine 1200ms ease;
-        }
+        .shine:hover { animation: cardShine 1200ms ease; }
       `}</style>
     </div>
   );

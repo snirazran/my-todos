@@ -46,6 +46,7 @@ export default React.memo(function TaskList({
   selectedTags = [],
   showCompleted = true,
   daysOrder,
+  emptyMode = 'add',
 }: {
   day: DisplayDay;
   items: Task[];
@@ -102,6 +103,8 @@ export default React.memo(function TaskList({
   selectedTags?: string[];
   showCompleted?: boolean;
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
+  /** Controls what to render when there are no items. 'add' = show add-task button (default), 'none' = show "No activities for this day" placeholder. */
+  emptyMode?: 'add' | 'none';
 }) {
   const [menu, setMenu] = useState<{
     id: string;
@@ -249,6 +252,17 @@ export default React.memo(function TaskList({
   if (filteredItems.length === 0) {
     if (placeholderAt === 0) {
       rows.push(renderPlaceholder(`ph-empty-${day}`));
+    } else if (emptyMode === 'none') {
+      rows.push(
+        <div
+          key={`empty-none-${day}`}
+          className="flex items-center justify-center w-full py-4 text-center rounded-[14px] border border-dashed border-muted-foreground/20 bg-muted/20"
+        >
+          <p className="text-xs font-medium text-muted-foreground/80">
+            No activities for this day
+          </p>
+        </div>,
+      );
     } else {
       // THEMED EMPTY STATE / ADD BUTTON
       rows.push(

@@ -91,6 +91,50 @@ export const todayDisplayIndex = (
   return order.indexOf(apiToday) as Exclude<DisplayDay, 7>;
 };
 
+// --- Date-keyed helpers (planner date slider) ---
+
+const PAD = (n: number) => String(n).padStart(2, '0');
+
+/** YYYY-MM-DD in local time. */
+export const ymd = (d: Date): string =>
+  `${d.getFullYear()}-${PAD(d.getMonth() + 1)}-${PAD(d.getDate())}`;
+
+/** Parse YYYY-MM-DD as local-midnight Date. */
+export const parseYmd = (s: string): Date => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
+/** Add `n` days to a YYYY-MM-DD. */
+export const addDays = (s: string, n: number): string => {
+  const d = parseYmd(s);
+  d.setDate(d.getDate() + n);
+  return ymd(d);
+};
+
+/** Strict day-letter for a YYYY-MM-DD (M T W T F S S in week-start order). */
+export const dayLetterFromYmd = (s: string): string => {
+  const dow = parseYmd(s).getDay(); // 0=Sun..6=Sat
+  return ['S', 'M', 'T', 'W', 'T', 'F', 'S'][dow];
+};
+
+/** Short month label e.g. "May". */
+export const shortMonth = (s: string): string => {
+  return parseYmd(s).toLocaleString('en-US', { month: 'short' });
+};
+
+/** Long month label e.g. "May 2026". */
+export const longMonthYear = (s: string): string => {
+  return parseYmd(s).toLocaleString('en-US', { month: 'long', year: 'numeric' });
+};
+
+/** Compare two YYYY-MM-DD lexically (works because zero-padded). */
+export const cmpYmd = (a: string, b: string): number =>
+  a < b ? -1 : a > b ? 1 : 0;
+
+/** Today as YYYY-MM-DD (local). */
+export const todayYmd = (): string => ymd(new Date());
+
 // DnD ids (use display day index)
 export const droppableId = (displayDay: DisplayDay) => `day-${displayDay}`;
 export const parseDroppable = (id: string): { day: DisplayDay } => {

@@ -66,24 +66,32 @@ export default function DayColumn({
     >
       <div className="flex flex-col gap-2 px-2 mb-4 pt-1">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-black tracking-tight text-foreground uppercase flex items-baseline gap-2">
+          <h2 className="flex items-baseline gap-2">
+            {displayDate && (
+              <span
+                className={`text-2xl font-black tracking-tight leading-none ${
+                  isToday
+                    ? 'text-primary'
+                    : 'text-foreground'
+                }`}
+              >
+                {displayDate}
+              </span>
+            )}
             {isToday ? (
-              <span className="relative z-0 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-primary/20 to-emerald-400/20 text-primary">
+              <span className="relative z-0 px-1.5 py-0.5 rounded-md text-xs font-bold uppercase tracking-wide bg-gradient-to-r from-primary/20 to-emerald-400/20 text-primary">
                 {displayName}
               </span>
             ) : (
-              displayName
-            )}
-            {displayDate && (
-              <span className="text-sm font-bold text-muted-foreground">
-                {displayDate}
+              <span className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
+                {displayName}
               </span>
             )}
           </h2>
 
           <div className="flex items-center gap-2 relative">
             {count !== undefined && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground shadow-sm">
                 {count}
               </span>
             )}
