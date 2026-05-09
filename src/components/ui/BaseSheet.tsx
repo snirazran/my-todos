@@ -74,6 +74,11 @@ export function BaseSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => onOpenChange(false)}
+            onPointerDown={(e) => {
+              // Belt-and-suspenders: close on press-down too, in case the
+              // synthetic click never fires (mobile, animation overlap, etc).
+              if (e.target === e.currentTarget) onOpenChange(false);
+            }}
             className={cn(
               'fixed inset-0 bg-background/55 sm:bg-background/70 sm:backdrop-blur-md will-change-[opacity]',
               backdropClassName,

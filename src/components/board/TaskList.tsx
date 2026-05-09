@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
+import TaskActionSheet from './TaskActionSheet';
 import {
   Task,
   draggableIdFor,
@@ -125,6 +126,7 @@ export default React.memo(function TaskList({
   const [scheduleDialog, setScheduleDialog] = useState<{ task: Task } | null>(
     null,
   );
+  const [actionSheet, setActionSheet] = useState<{ task: Task } | null>(null);
 
   const placeholderAt =
     isDragging && targetDay === day && targetIndex != null ? targetIndex : null;
@@ -386,6 +388,7 @@ export default React.memo(function TaskList({
             userTags={userTags}
             isAnyDragging={isAnyDragging}
             compact
+            onTap={() => setActionSheet({ task: t })}
           />
         </div>,
       );
@@ -536,6 +539,72 @@ export default React.memo(function TaskList({
                 setDialog((prev) =>
                   prev ? { ...prev, kind: 'editDays' } : prev,
                 )
+            : undefined
+        }
+      />
+
+      <TaskActionSheet
+        open={!!actionSheet}
+        onOpenChange={(o) => {
+          if (!o) setActionSheet(null);
+        }}
+        task={actionSheet?.task ?? null}
+        isCompleted={!!actionSheet?.task.completed}
+        isWeekly={actionSheet?.task.type === 'weekly'}
+        isHabit={actionSheet?.task.type === 'habit'}
+        onComplete={
+          actionSheet
+            ? () => {
+                // Toggle completion via the same path used by the fly icon (PUT /api/tasks).
+                const t = actionSheet.task;
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const dateStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+                fetch('/api/tasks', {
+                  method: 'PUT',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    date: dateStr,
+                    taskId: t.id,
+                    completed: !t.completed,
+                  }),
+                }).then(() => window.dispatchEvent(new Event('board-refresh')));
+              }
+            : undefined
+        }
+        onEdit={
+          actionSheet && onEditTask
+            ? () => setDialog({ task: actionSheet.task, day, kind: 'edit' })
+            : undefined
+        }
+        onAddTags={
+          actionSheet
+            ? () => setTagPopup({ open: true, taskId: actionSheet.task.id })
+            : undefined
+        }
+        onSchedule={
+          actionSheet && onScheduleTask
+            ? () => setScheduleDialog({ task: actionSheet.task })
+            : undefined
+        }
+        onToggleRepeat={
+          actionSheet && onToggleRepeat
+            ? () => onToggleRepeat(actionSheet.task.id, day)
+            : undefined
+        }
+        onChangeGoal={
+          actionSheet && actionSheet.task.type === 'habit'
+            ? () => setDialog({ task: actionSheet.task, day, kind: 'editDays' })
+            : undefined
+        }
+        onDoLater={
+          actionSheet && onDoLater
+            ? () => onDoLater(day, actionSheet.task.id)
+            : undefined
+        }
+        onDelete={
+          actionSheet
+            ? () => setDialog({ task: actionSheet.task, day })
             : undefined
         }
       />

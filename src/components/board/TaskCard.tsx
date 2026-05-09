@@ -37,6 +37,7 @@ export default function TaskCard({
   onDoToday,
   hideDoTodayButton,
   compact = false,
+  onTap,
 }: {
   dragId: string;
   task: Task;
@@ -53,11 +54,15 @@ export default function TaskCard({
   onDoToday?: () => void;
   hideDoTodayButton?: boolean;
   compact?: boolean;
+  /** Fired when user releases the press before the long-press timer fires (and didn't drag). */
+  onTap?: () => void;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
   const startPos = useRef<{ x: number; y: number } | null>(null);
   const pointerIdRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
+  const movedOutRef = useRef(false);
 
   const getTagDetails = (tagIdentifier: string) => {
     // Try to find by ID first
@@ -72,9 +77,12 @@ export default function TaskCard({
   onGrabRef.current = onGrab;
   const onToggleMenuRef = useRef(onToggleMenu);
   onToggleMenuRef.current = onToggleMenu;
+  const onTapRef = useRef(onTap);
+  onTapRef.current = onTap;
 
   const MOVE_TOLERANCE = 8;
   const LONG_PRESS_DURATION = 300;
+  const MOUSE_HOLD_DURATION = 150;
   const defaultTouchAction = touchAction || 'auto';
 
   const cleanupLP = useCallback(() => {
@@ -86,7 +94,7 @@ export default function TaskCard({
     if (el) {
       el.removeEventListener('pointermove', handlePointerMove as any);
       el.removeEventListener('pointerup', handlePointerUp as any);
-      el.removeEventListener('pointercancel', handlePointerUp as any);
+      el.removeEventListener('pointercancel', handlePointerCancel as any);
 
       // Restore: allow vertical scrolling again after interaction ends
       el.style.touchAction = defaultTouchAction;
@@ -99,12 +107,26 @@ export default function TaskCard({
       if (!startPos.current) return;
       const dx = Math.abs(e.clientX - startPos.current.x);
       const dy = Math.abs(e.clientY - startPos.current.y);
-      if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) cleanupLP();
+      if (dx > MOVE_TOLERANCE || dy > MOVE_TOLERANCE) {
+        movedOutRef.current = true;
+        // Cancel pending long-press; without drag, this becomes a no-op tap-cancel.
+        if (longPressTimer.current) {
+          clearTimeout(longPressTimer.current);
+          longPressTimer.current = null;
+        }
+      }
     },
-    [cleanupLP], // cleanupLP depends on defaultTouchAction, but that is primitive string usually
+    [],
   );
 
-  const handlePointerUp = useCallback(() => cleanupLP(), [cleanupLP]);
+  const handlePointerUp = useCallback(() => {
+    // If LP never fired and pointer didn't move enough, treat as tap.
+    const wasTap = !longPressFiredRef.current && !movedOutRef.current;
+    cleanupLP();
+    if (wasTap) onTapRef.current?.();
+  }, [cleanupLP]);
+
+  const handlePointerCancel = useCallback(() => cleanupLP(), [cleanupLP]);
 
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
@@ -115,19 +137,10 @@ export default function TaskCard({
       if (target.closest('button, a, input, textarea, [role="button"]')) return;
 
       pointerIdRef.current = e.pointerId;
-
-      // If mouse and NOT requiring long press, grab immediately
-      if (e.pointerType === 'mouse' && !requireLongPress) {
-        onGrabRef.current({
-          clientX: e.clientX,
-          clientY: e.clientY,
-          pointerType: 'mouse',
-        });
-        return;
-      }
-
-      // Otherwise start long press timer
+      longPressFiredRef.current = false;
+      movedOutRef.current = false;
       startPos.current = { x: e.clientX, y: e.clientY };
+
       const el = cardRef.current;
       if (el) {
         el.addEventListener('pointermove', handlePointerMove as any, {
@@ -136,12 +149,16 @@ export default function TaskCard({
         el.addEventListener('pointerup', handlePointerUp as any, {
           passive: true,
         });
-        el.addEventListener('pointercancel', handlePointerUp as any, {
+        el.addEventListener('pointercancel', handlePointerCancel as any, {
           passive: true,
         });
       }
 
+      const delay =
+        e.pointerType === 'mouse' ? MOUSE_HOLD_DURATION : LONG_PRESS_DURATION;
+
       longPressTimer.current = window.setTimeout(() => {
+        longPressFiredRef.current = true;
         if (el && pointerIdRef.current !== null) {
           try {
             el.setPointerCapture(pointerIdRef.current);
@@ -164,9 +181,9 @@ export default function TaskCard({
           clearTimeout(longPressTimer.current);
           longPressTimer.current = null;
         }
-      }, LONG_PRESS_DURATION);
+      }, delay);
     },
-    [handlePointerMove, handlePointerUp, requireLongPress, task.completed], // Removed onGrab, cleanupLP dependencies
+    [handlePointerMove, handlePointerUp, handlePointerCancel, task.completed],
   );
 
   useEffect(() => {
