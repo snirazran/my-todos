@@ -697,14 +697,14 @@ export default function Home() {
 
   return (
     <main className="min-h-screen pb-20 overflow-x-hidden md:pb-8 bg-background">
-      <div className="px-3 pt-12 pb-4 mx-auto max-w-7xl md:px-6">
+      <div className="px-3 pt-12 pb-4 mx-auto max-w-4xl md:px-6">
         <Header router={router} />
 
         <div className="relative flex flex-col items-stretch gap-2 lg:gap-5">
           <div className="relative z-10 flex flex-col gap-2 lg:gap-4">
             <picture
               aria-hidden
-              className="absolute bottom-0 w-screen -translate-x-1/2 pointer-events-none left-1/2 -top-16 -z-10"
+              className="absolute -bottom-10 w-screen -translate-x-1/2 pointer-events-none left-1/2 -top-16 -z-10 md:-bottom-12"
             >
               <source media="(min-width: 1920px)" srcSet="/bg-web-large.png" />
               <source media="(min-width: 1280px)" srcSet="/bg-web.png" />
@@ -741,7 +741,7 @@ export default function Home() {
           </div>
 
           <div
-            className="flex flex-col gap-2 mt-2 lg:gap-4"
+            className="relative z-20 -mx-3 -mt-2 flex flex-col gap-2 rounded-t-[32px] bg-background px-4 pt-6 before:absolute before:bottom-0 before:left-1/2 before:top-8 before:-z-10 before:w-screen before:-translate-x-1/2 before:bg-background md:-mx-6 md:-mt-4 md:px-6 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
             <div className="flex flex-col gap-2">
