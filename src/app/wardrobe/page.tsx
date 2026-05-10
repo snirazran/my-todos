@@ -57,7 +57,7 @@ export default function WardrobePage() {
           </div>
         </section>
 
-        <section className="relative z-10 flex flex-col flex-1 min-h-0 mt-2 md:-mt-8 lg:-mt-4">
+        <section className="relative z-10 -mx-4 mt-2 flex min-h-0 flex-1 flex-col rounded-t-[32px] bg-background px-4 pt-5 md:-mx-6 md:-mt-8 md:px-6 md:pt-6 lg:-mt-4">
           <WardrobePageContent
             defaultTab={defaultTab}
             onClose={() => router.push('/')}
