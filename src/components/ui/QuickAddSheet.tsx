@@ -252,24 +252,41 @@ export default function QuickAddSheet({
                 <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
                   <div className="rounded-[28px] bg-popover/95 backdrop-blur-2xl ring-1 ring-border/80 shadow-[0_24px_48px_rgba(15,23,42,0.25)] p-4">
                     <div dir="ltr" className="w-full">
-                      <input
-                        ref={inputRef}
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        placeholder="New task?"
-                        disabled={isSubmitting}
-                        spellCheck={false}
-                        autoComplete="off"
-                        maxLength={45}
-                        className="w-full h-12 px-4 mb-1 rounded-[16px] bg-muted/50 text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 text-lg font-medium text-left"
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSubmit();
-                          }
-                          if (e.key === 'Escape') onOpenChange(false);
-                        }}
-                      />
+                      <div className="mb-1 flex items-center gap-2">
+                        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
+                          <Fly size={36} y={-3} />
+                        </div>
+                        <div className="relative flex-1">
+                          <input
+                            ref={inputRef}
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            placeholder="New task?"
+                            disabled={isSubmitting}
+                            spellCheck={false}
+                            autoComplete="off"
+                            maxLength={45}
+                            className="h-12 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-lg font-medium text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 text-left"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSubmit();
+                              }
+                              if (e.key === 'Escape') onOpenChange(false);
+                            }}
+                          />
+                          {text.length >= 40 && (
+                            <span
+                              aria-hidden="true"
+                              className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums ${
+                                text.length >= 45 ? 'text-rose-500' : 'text-rose-400'
+                              }`}
+                            >
+                              {text.length}/45
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
                       {(tags.length > 0 || startTime) && (
                         <div className="relative mb-3 mt-2 px-1 overflow-visible">
@@ -385,30 +402,27 @@ export default function QuickAddSheet({
                           </button>
                         )}
 
-                        <div className="flex justify-end px-3">
-                          <span
-                            className={`text-[11px] font-bold ${
-                              text.length >= 40
-                                ? 'text-rose-500'
-                                : 'text-slate-400'
-                            }`}
-                          >
-                            {text.length}/45
-                          </span>
-                        </div>
                       </div>
                     </div>
 
                     <div
-                      className="grid grid-cols-2 gap-3 mt-4"
+                      className="mt-4 flex items-center gap-2"
                       style={{ transform: 'translateZ(0)' }}
                     >
+                      <button
+                        type="button"
+                        aria-label="Cancel"
+                        onClick={() => onOpenChange(false)}
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+                      >
+                        <X className="h-5 w-5 stroke-[3]" />
+                      </button>
                       <button
                         type="button"
                         onClick={handleSubmit}
                         disabled={!text.trim() || isSubmitting}
                         className={[
-                          'relative h-12 rounded-full text-[15px] font-bold overflow-hidden transition-all',
+                          'relative h-12 flex-1 rounded-full text-[15px] font-bold overflow-hidden transition-all',
                           'bg-primary text-primary-foreground',
                           'shadow-sm ring-1 ring-white/20',
                           'hover:brightness-105 active:scale-[0.985]',
@@ -423,25 +437,8 @@ export default function QuickAddSheet({
                             <>
                               <Plus className="w-4 h-4 stroke-[3]" />
                               <span>Add Task</span>
-                              <Fly size={32} x={-1} y={-3} />
                             </>
                           )}
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => onOpenChange(false)}
-                        className={[
-                          'h-12 rounded-full text-[15px] font-semibold transition-all',
-                          'bg-secondary text-secondary-foreground',
-                          'hover:bg-secondary/80 active:scale-[0.985]',
-                          'ring-1 ring-border',
-                        ].join(' ')}
-                      >
-                        <span className="inline-flex items-center justify-center gap-2">
-                          <X className="w-4 h-4" />
-                          Cancel
                         </span>
                       </button>
                     </div>

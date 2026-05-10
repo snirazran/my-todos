@@ -204,14 +204,15 @@ export function PickerSheet(props: Props) {
         onClick={() => setActivePicker(null)}
         className="fixed inset-0 z-[1001] bg-black/35"
       />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1002] flex justify-center sm:bottom-6">
       <motion.div
-        initial={{ y: '100%' }}
+        initial={{ y: '120%' }}
         animate={{ y: 0 }}
-        exit={{ y: '100%' }}
+        exit={{ y: '120%' }}
         transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
-        className="fixed inset-x-0 bottom-0 z-[1002] rounded-t-[28px] bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-5 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70"
+        className="pointer-events-auto w-full rounded-t-[28px] bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-5 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:max-w-[520px] sm:rounded-[28px] sm:pb-6 sm:shadow-2xl"
       >
-        <div className="mx-auto w-full max-w-[680px]">
+        <div className="mx-auto w-full">
           <div className="relative mb-6 flex h-8 items-center justify-center">
             <button
               type="button"
@@ -275,6 +276,7 @@ export function PickerSheet(props: Props) {
           )}
         </div>
       </motion.div>
+      </div>
 
       <AnimatePresence>
         {activePicker === 'date' && showCalendarPicker && (
@@ -831,15 +833,16 @@ function CalendarOverlay({
         onClick={onClose}
         className="fixed inset-0 z-[1003] bg-black/10"
       />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1004] flex justify-center sm:bottom-6">
       <motion.div
         dir="ltr"
-        initial={{ y: '100%' }}
+        initial={{ y: '120%' }}
         animate={{ y: 0 }}
-        exit={{ y: '100%' }}
+        exit={{ y: '120%' }}
         transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.28 }}
-        className="fixed inset-x-0 bottom-0 z-[1004] rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-5 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] ring-1 ring-border/70"
+        className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-5 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] ring-1 ring-border/70 sm:max-w-[520px] sm:rounded-[28px] sm:pb-6 sm:shadow-2xl"
       >
-        <div className="mx-auto w-full max-w-[560px]">
+        <div className="mx-auto w-full">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-[17px] font-extrabold text-foreground">
               {calendarMonthLabel}
@@ -905,6 +908,7 @@ function CalendarOverlay({
           </div>
         </div>
       </motion.div>
+      </div>
     </>
   );
 }
@@ -939,15 +943,16 @@ function ReminderOverlay({
         onClick={onClose}
         className="fixed inset-0 z-[1005] bg-black/10"
       />
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1006] flex justify-center sm:bottom-6">
       <motion.div
         dir="ltr"
-        initial={{ y: '100%' }}
+        initial={{ y: '120%' }}
         animate={{ y: 0 }}
-        exit={{ y: '100%' }}
+        exit={{ y: '120%' }}
         transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.28 }}
-        className="fixed inset-x-0 bottom-0 z-[1006] rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-5 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] ring-1 ring-border/70"
+        className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-5 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] ring-1 ring-border/70 sm:max-w-[440px] sm:rounded-[28px] sm:pb-6 sm:shadow-2xl"
       >
-        <div className="mx-auto w-full max-w-[560px]">
+        <div className="mx-auto w-full">
           <div className="relative mb-5 flex h-8 items-center justify-center">
             <button
               type="button"
@@ -1025,6 +1030,7 @@ function ReminderOverlay({
           </button>
         </div>
       </motion.div>
+      </div>
     </>
   );
 }

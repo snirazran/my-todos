@@ -16,7 +16,6 @@ import {
   Filter,
 } from 'lucide-react';
 import BacklogTray from '@/components/board/BacklogTray';
-import BacklogBox from '@/components/board/BacklogBox';
 //fix
 import { useAuth } from '@/components/auth/AuthContext';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
@@ -27,7 +26,6 @@ import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
-import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
@@ -363,6 +361,7 @@ export default function Home() {
     () => useFrogodoroStore.persist?.hasHydrated?.() ?? false,
   );
   const lastHandledTimerCompletionRef = useRef<number | null>(null);
+  const homeMountTimeRef = useRef<number>(Date.now());
   const [showProgressCoach, setShowProgressCoach] = useState(false);
 
   /* State */
@@ -419,13 +418,21 @@ export default function Home() {
     const persistApi = useFrogodoroStore.persist;
     if (!persistApi) return;
 
-    if (persistApi.hasHydrated()) {
+    const prime = () => {
+      // Capture the persisted lastCompletionId at the exact moment hydration
+      // settles, so we don't mistake the default→persisted bump for a new
+      // completion and auto-open the timer on every refresh.
+      lastHandledTimerCompletionRef.current =
+        useFrogodoroStore.getState().lastCompletionId;
       setFrogodoroHydrated(true);
+    };
+
+    if (persistApi.hasHydrated()) {
+      prime();
+      return;
     }
 
-    return persistApi.onFinishHydration(() => {
-      setFrogodoroHydrated(true);
-    });
+    return persistApi.onFinishHydration(prime);
   }, []);
 
   // Live frogodoro session stats for the active task
@@ -491,15 +498,19 @@ export default function Home() {
 
   useEffect(() => {
     if (!frogodoroHydrated) return;
-
-    if (lastHandledTimerCompletionRef.current === null) {
-      lastHandledTimerCompletionRef.current = lastCompletionId;
-      return;
-    }
-
+    // Ref is primed in the hydration effect above; null means not yet primed.
+    if (lastHandledTimerCompletionRef.current === null) return;
     if (lastCompletionId === lastHandledTimerCompletionRef.current) return;
 
+    // GlobalTimer rehydrates server-side timer state on mount and may fire a
+    // synthetic completePhase if the persisted endTime had already passed.
+    // Treat completions that arrive in the first few seconds as rehydration
+    // artifacts and only update the ref — don't open the timer popup.
+    const isRehydrationArtifact =
+      Date.now() - homeMountTimeRef.current < 4000;
+
     lastHandledTimerCompletionRef.current = lastCompletionId;
+    if (isRehydrationArtifact) return;
 
     const completedTask =
       data.find((t) => t.id === lastCompletedTaskId) ??
@@ -1130,42 +1141,23 @@ export default function Home() {
         }}
       />
 
-      {/* Floating Add Task Button - Home Page Version */}
-      <div className="fixed bottom-0 left-0 right-0 z-[40] px-3 pb-[calc(env(safe-area-inset-bottom)+84px)] pointer-events-none">
-        <div className="pointer-events-auto mx-auto w-full max-w-[340px] md:max-w-[400px] relative min-h-[48px] flex items-center justify-center gap-2">
-          <BacklogBox
-            count={laterThisWeek.length}
-            isDragOver={false}
-            isDragging={false}
-            proximity={0}
-            onClick={() => setIsBacklogOpen(true)}
-            forwardRef={null}
-          />
-          <div className="flex-1 min-w-0 pointer-events-auto h-[48px]">
-            <AddTaskButton
-              className="w-full h-full rounded-[18px] text-[13px] font-black"
-              onClick={() => {
-                if (!user) {
-                  router.push('/login');
-                  return;
-                }
-                setQuickText('');
-                setShowQuickAdd(true);
-              }}
-              label={
-                <div className="flex items-center justify-center gap-1">
-                  <span>Add a</span>
-                  <div className="relative flex items-center justify-center w-7 h-7">
-                    <Fly size={28} y={-4} x={0} paused={isAnyPanelOpen} />
-                  </div>
-                </div>
-              }
-              showFly={false}
-              paused={isAnyPanelOpen}
-            />
-          </div>
-        </div>
-      </div>
+      {/* Floating Add Task FAB */}
+      <button
+        type="button"
+        aria-label="Add task"
+        onClick={() => {
+          if (!user) {
+            router.push('/login');
+            return;
+          }
+          setQuickText('');
+          setShowQuickAdd(true);
+        }}
+        className="fixed right-6 z-[40] grid h-14 w-14 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30 shadow-lg backdrop-blur-sm transition-all hover:bg-primary/25 active:scale-95 sm:hidden"
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 88px)' }}
+      >
+        <Plus className="h-6 w-6 stroke-[3]" />
+      </button>
 
       <BacklogTray
         isOpen={isBacklogOpen}
