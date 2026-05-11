@@ -636,7 +636,7 @@ function WardrobeManagerContent({
               'flex-1 relative mt-4 overflow-hidden',
               embedded
                 ? 'rounded-[28px] bg-transparent'
-                : 'rounded-t-[32px] border-t border-border/40',
+                : 'rounded-t-[24px] border-t border-border/40',
               embedded
                 ? ''
                 : isDesktop

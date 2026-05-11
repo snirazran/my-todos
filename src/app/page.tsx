@@ -741,7 +741,7 @@ export default function Home() {
           </div>
 
           <div
-            className="relative z-20 -mx-3 -mt-2 flex flex-col gap-2 rounded-t-[32px] bg-background px-4 pt-6 before:absolute before:bottom-0 before:left-1/2 before:top-8 before:-z-10 before:w-screen before:-translate-x-1/2 before:bg-background md:-mx-6 md:-mt-4 md:px-6 lg:gap-4"
+            className="relative z-20 -mx-3 -mt-2 flex flex-col gap-2 rounded-t-[24px] bg-background px-4 pt-6 before:absolute before:bottom-0 before:left-1/2 before:top-8 before:-z-10 before:w-screen before:-translate-x-1/2 before:bg-background md:-mx-6 md:-mt-4 md:px-6 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
             <div className="flex flex-col gap-2">
@@ -993,12 +993,13 @@ export default function Home() {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
             const dateStr = format(new Date(), 'yyyy-MM-dd');
 
+            const hasExplicitDates = Array.isArray(dates) && dates.length > 0;
             const res = await fetch('/api/tasks?view=board', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 text,
-                days,
+                days: hasExplicitDates ? [] : days,
                 dates,
                 repeat,
                 tags,

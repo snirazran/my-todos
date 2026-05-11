@@ -1154,7 +1154,7 @@ export default function TaskList({
           {/* Header Menu Removed - Moved to Page */}
         </div>
 
-        <div className="w-full rounded-[22px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
+        <div className="w-full rounded-[18px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
         <div
           className={`p-1.5 pb-0 space-y-0 md:overflow-y-auto overflow-y-visible md:max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
@@ -1172,7 +1172,7 @@ export default function TaskList({
                   onClick={() =>
                     onAddRequested('', null, { preselectToday: true })
                   }
-                  className="w-full flex items-center gap-3 px-3 py-3 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-[22px] transition-all cursor-pointer group"
+                  className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group"
                 >
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
                     <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
@@ -1199,7 +1199,7 @@ export default function TaskList({
                   onClick={() =>
                     onAddRequested('', null, { preselectToday: true })
                   }
-                  className="w-full flex items-center gap-3 px-3 py-3 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-[22px] transition-all cursor-pointer group"
+                  className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group"
                 >
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
                     <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
@@ -1278,14 +1278,16 @@ export default function TaskList({
                 <div className="mt-1.5 mb-1">
                   <button
                     onClick={() => onAddRequested('', null, { preselectToday: true })}
-                    className="group relative flex w-full items-center gap-3 px-3 py-3 rounded-[22px] border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99]"
+                    className="group relative flex w-full items-center px-2 py-2 rounded-xl border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99]"
                   >
-                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
-                      <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
+                    <div className="flex items-center flex-1 min-w-0 gap-2 pl-1.5">
+                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
+                        <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
+                      </div>
+                      <span className="text-sm font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
+                        Add a task
+                      </span>
                     </div>
-                    <span className="text-sm font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
-                      Add a task
-                    </span>
                   </button>
                 </div>
 

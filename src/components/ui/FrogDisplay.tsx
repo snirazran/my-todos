@@ -137,7 +137,7 @@ export function FrogDisplay({
     // Added mb-12 to create the requested space from the tabs below
 
     <div
-      className={`${className} flex flex-col items-center mb-2 md:mb-2 relative`}
+      className={`${className} flex flex-col items-center mb-2 md:mb-2 relative md:-translate-y-6 lg:-translate-y-9 xl:translate-y-0`}
     >
       <CurrencyShop
         open={shopOpen}
@@ -215,21 +215,41 @@ export function FrogDisplay({
                 hungerPercent <= 20 && 'ring-1 ring-rose-500/10',
               )}
             >
+              {/* Dark base label — readable on the muted bg where the fill doesn't reach (non-starving states) */}
+              {hungerPercent > 20 && (
+                <div className="absolute inset-0 flex items-center px-4 pointer-events-none">
+                  <span className="text-[11px] font-black uppercase tracking-[0.15em] text-foreground/75 whitespace-nowrap">
+                    {hungerStatus}
+                  </span>
+                </div>
+              )}
+              {/* Fill bar with white label inside; overflow-hidden clips the label to the fill width */}
               <div className="absolute inset-1">
                 <div
                   className={cn(
-                    'h-full min-w-6 rounded-full',
+                    'relative h-full min-w-6 rounded-full overflow-hidden',
                     animateHunger && 'transition-all duration-1000 ease-in-out',
                     hungerColor,
                   )}
                   style={{ width: `${Math.max(hungerPercent, 4)}%` }}
-                />
+                >
+                  {hungerPercent > 20 && (
+                    <div className="absolute top-0 bottom-0 left-3 flex items-center pointer-events-none">
+                      <span className="text-[11px] font-black uppercase tracking-[0.15em] text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)] whitespace-nowrap">
+                        {hungerStatus}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="absolute inset-0 flex items-center px-4 pointer-events-none">
-                <span className="text-[11px] font-black uppercase tracking-[0.15em] text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)]">
-                  {hungerStatus}
-                </span>
-              </div>
+              {/* Starving: render dark label on top of everything so it stays readable over the small red fill */}
+              {hungerPercent <= 20 && (
+                <div className="absolute inset-0 flex items-center px-4 pointer-events-none">
+                  <span className="text-[11px] font-black uppercase tracking-[0.15em] text-foreground/85 whitespace-nowrap">
+                    {hungerStatus}
+                  </span>
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex-1" />
