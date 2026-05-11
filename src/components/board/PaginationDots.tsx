@@ -74,7 +74,7 @@ export default function PaginationDots({
                 </span>
                 <div
                   className={`flex items-center justify-center
-                    w-11 h-11 rounded-2xl text-[16px] font-black transition-all duration-200 ${numberClasses}`}
+                    w-11 h-11 rounded-2xl text-[16px] font-black transition-colors duration-200 ${numberClasses}`}
                 >
                   {dayNum}
                 </div>

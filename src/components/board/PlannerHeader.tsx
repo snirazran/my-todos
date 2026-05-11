@@ -59,8 +59,7 @@ export default function PlannerHeader({
       onClick={onToggle}
       className="pointer-events-auto flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-card/40 backdrop-blur-xl text-foreground"
     >
-      <span aria-hidden className="text-base">📅</span>
-      <span className="text-sm font-semibold tracking-tight">{label}</span>
+      <span className="text-sm font-semibold tracking-tight leading-none">{label}</span>
       {expanded ? (
         <ChevronUp size={16} className="opacity-70" />
       ) : (

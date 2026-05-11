@@ -1586,20 +1586,39 @@ async function handleBoardDelete(
 }
 
 async function nextOrderForDay(userId: string, weekday: Weekday, date: string) {
-  const doc = await TaskModel.findOne(
-    {
-      userId,
-      $or: [
-        { type: 'weekly', dayOfWeek: weekday },
-        { type: 'regular', date },
-      ],
-    },
-    { order: 1 },
+  const dayQuery = {
+    userId,
+    $or: [
+      { type: 'weekly', dayOfWeek: weekday },
+      { type: 'regular', date },
+    ],
+  };
+  const tasks = await TaskModel.find(
+    dayQuery,
+    { order: 1, completed: 1, completedDates: 1, type: 1 },
   )
-    .sort({ order: -1 })
-    .lean<TaskDoc>()
+    .sort({ order: 1 })
+    .lean<TaskDoc[]>()
     .exec();
-  return (doc?.order ?? 0) + 1;
+
+  if (tasks.length === 0) return 1;
+
+  const isDoneForDate = (t: TaskDoc) =>
+    t.type === 'weekly'
+      ? Array.isArray(t.completedDates) && t.completedDates.includes(date)
+      : !!t.completed;
+
+  const firstDoneIdx = tasks.findIndex(isDoneForDate);
+  if (firstDoneIdx === -1) {
+    return (tasks[tasks.length - 1].order ?? 0) + 1;
+  }
+
+  const boundaryOrder = tasks[firstDoneIdx].order ?? 0;
+  await TaskModel.updateMany(
+    { ...dayQuery, order: { $gte: boundaryOrder } },
+    { $inc: { order: 1 } },
+  );
+  return boundaryOrder;
 }
 
 async function nextOrderBacklog(userId: string, weekStart: string) {

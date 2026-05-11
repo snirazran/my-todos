@@ -595,7 +595,7 @@ export default function TaskBoard({
                 title={titleForIndex(i)}
                 count={(tasksByDate[dk] ?? []).length}
                 listRef={setListRef(i)}
-                maxHeightClass="max-h-[calc(100svh-340px-var(--safe-bottom))] md:max-h-[calc(100svh-340px-var(--safe-bottom))]"
+                maxHeightClass="max-h-[calc(100svh-315px-var(--safe-bottom))] md:max-h-[calc(100svh-340px-var(--safe-bottom))]"
                 isToday={dk === todayKey}
                 isPast={cmpYmd(dk, todayKey) < 0}
                 filter={getFilter(i)}
