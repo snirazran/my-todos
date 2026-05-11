@@ -9,11 +9,11 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
 
-    const { itemIds } = await req.json(); // Expecting string[] of length 10
+    const { itemIds } = await req.json(); // Expecting string[] of length 5
 
-    if (!Array.isArray(itemIds) || itemIds.length !== 10) {
+    if (!Array.isArray(itemIds) || itemIds.length !== 5) {
       return NextResponse.json(
-        { error: 'Must provide exactly 10 items to trade.' },
+        { error: 'Must provide exactly 5 items to trade.' },
         { status: 400 },
       );
     }

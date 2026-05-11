@@ -89,6 +89,8 @@ import { FilterCategory } from './FilterBar';
 import { SortOrder } from './SortMenu';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
+const TRADE_ITEM_COUNT = 5;
+
 type TradePanelProps = {
   inventory: Record<string, number>;
   catalog: ItemDef[];
@@ -118,6 +120,10 @@ export function TradePanel({
   const [gridInitialSize, setGridInitialSize] = useState(4);
   const [gridBatchSize, setGridBatchSize] = useState(6);
   const inventoryScrollRef = useRef<HTMLDivElement | null>(null);
+  // Mobile-only collapse for the contract slot grid. Auto-expands when items are added,
+  // auto-collapses when cleared. Desktop (lg+) ignores this and always shows the grid.
+  const [isContractExpanded, setIsContractExpanded] = useState(false);
+  const prevSelectedCountRef = useRef(0);
 
   useEffect(() => {
     setMounted(true);
@@ -135,6 +141,14 @@ export function TradePanel({
   }, [activeFilter, sortBy, targetRarity]);
 
   useEffect(() => {
+    const prev = prevSelectedCountRef.current;
+    const curr = selectedIds.length;
+    if (prev === 0 && curr > 0) setIsContractExpanded(true);
+    else if (prev > 0 && curr === 0) setIsContractExpanded(false);
+    prevSelectedCountRef.current = curr;
+  }, [selectedIds.length]);
+
+  useEffect(() => {
     const query = window.matchMedia('(min-width: 768px)');
     const update = () => {
       setGridInitialSize(query.matches ? 10 : 4);
@@ -150,6 +164,7 @@ export function TradePanel({
     let result = catalog.filter((item) => {
       if (!ownedIds.includes(item.id)) return false;
       if (item.slot === 'container') return false; // NEW: Skip gifts
+      if (item.rarity === 'legendary') return false; // Legendary can't be traded up
       if (targetRarity && item.rarity !== targetRarity) return false;
       
       // Apply activeFilter
@@ -239,7 +254,7 @@ export function TradePanel({
 
   // --- Actions ---
   const handleSelect = (item: ItemDef) => {
-    if (selectedIds.length >= 10) return;
+    if (selectedIds.length >= TRADE_ITEM_COUNT) return;
     const currentlySelected = selectedCounts[item.id] || 0;
     const owned = inventory[item.id] || 0;
     if (currentlySelected < owned) {
@@ -257,7 +272,7 @@ export function TradePanel({
   };
 
   const handleConfirmTrade = async () => {
-    if (selectedIds.length !== 10) return;
+    if (selectedIds.length !== TRADE_ITEM_COUNT) return;
     setIsTrading(true);
     setError(null);
     try {
@@ -415,10 +430,22 @@ export function TradePanel({
       </div>
 
       {/* --- CONTRACT (Side/Bottom Dock - Order 2) --- */}
-      <div className="fixed bottom-16 md:bottom-20 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto lg:self-start shrink-0 z-[60] order-2 lg:w-[320px] xl:w-[360px] bg-card lg:bg-card/40 border-t lg:border-t-0 lg:border lg:border-border/60 lg:rounded-2xl lg:shadow-sm border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30 shrink-0">
-            <div>
+      <div className="fixed bottom-16 md:bottom-0 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto lg:self-start shrink-0 z-[60] order-2 lg:w-[320px] xl:w-[360px] bg-card lg:bg-card/40 border-t lg:border-t-0 lg:border lg:border-border/60 lg:rounded-2xl lg:shadow-sm border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
+        {/* Header (tap to expand/collapse on mobile) */}
+        <button
+          type="button"
+          onClick={() => setIsContractExpanded((v) => !v)}
+          aria-expanded={isContractExpanded}
+          className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30 shrink-0 w-full text-left lg:cursor-default"
+        >
+            <div className="flex items-center gap-2">
+              <ChevronDown
+                size={16}
+                className={cn(
+                  'lg:hidden transition-transform duration-200 text-muted-foreground',
+                  isContractExpanded ? '' : '-rotate-180',
+                )}
+              />
               <h3 className="flex items-center gap-2 text-sm font-black uppercase text-foreground">
                 Contract
                 {targetRarity && (
@@ -435,16 +462,25 @@ export function TradePanel({
             <div className="text-right">
               <div className="text-base font-black text-primary">
                 {selectedIds.length}
-                <span className="text-muted-foreground/40">/10</span>
+                <span className="text-muted-foreground/40">/{TRADE_ITEM_COUNT}</span>
               </div>
             </div>
-        </div>
+        </button>
 
         {/* Scrollable Content (Sidebar) or Fixed (Bottom Bar) */}
-        <div className="flex-1 lg:flex-none p-2 lg:p-4 flex flex-col pointer-events-auto w-full max-w-md mx-auto lg:max-w-none lg:mx-0">
-           {/* Grid */}
+        <div className="lg:p-4 flex flex-col pointer-events-auto w-full max-w-md mx-auto lg:max-w-none lg:mx-0">
+           {/* Slot grid + Trade Up controls (collapsible on mobile, always expanded on lg+) */}
+           <div
+             className={cn(
+               'overflow-hidden transition-[max-height,opacity,padding] duration-300 ease-out',
+               'lg:max-h-none lg:opacity-100 lg:p-0',
+               isContractExpanded
+                 ? 'max-h-[700px] opacity-100 p-2'
+                 : 'max-h-0 opacity-0 p-0',
+             )}
+           >
            <div className="grid grid-cols-5 gap-1.5 lg:gap-3 mb-2 lg:mb-4">
-                {Array.from({ length: 10 }).map((_, i) => {
+                {Array.from({ length: TRADE_ITEM_COUNT }).map((_, i) => {
                   const itemId = selectedIds[i];
                   const item = itemId
                     ? catalog.find((c) => c.id === itemId)
@@ -509,16 +545,16 @@ export function TradePanel({
                   </Button>
                 )}
                 <Button
-                  disabled={selectedIds.length !== 10 || isTrading}
+                  disabled={selectedIds.length !== TRADE_ITEM_COUNT || isTrading}
                   onClick={handleConfirmTrade}
                   className={cn(
                     'group relative flex-1 h-9 lg:h-14 font-black uppercase tracking-wider transition-all overflow-hidden text-sm',
-                    selectedIds.length === 10
+                    selectedIds.length === TRADE_ITEM_COUNT
                       ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30'
                       : 'bg-muted text-muted-foreground'
                   )}
                 >
-                  {selectedIds.length === 10 && (
+                  {selectedIds.length === TRADE_ITEM_COUNT && (
                     <span className="absolute top-0 z-10 block w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white opacity-20 group-hover:animate-shine" />
                   )}
 
@@ -532,8 +568,9 @@ export function TradePanel({
                 </Button>
              </div>
              <p className="text-[10px] text-center text-muted-foreground mt-1">
-                Combine 10 items to upgrade rarity.
+                Combine {TRADE_ITEM_COUNT} items to upgrade rarity.
               </p>
+           </div>
            </div>
         </div>
       </div>
