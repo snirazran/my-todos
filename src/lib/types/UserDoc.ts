@@ -59,8 +59,10 @@ export type UserDoc = {
   aboutGender?: string;
   usedBefore?: string;
   onboardingResponses?: Record<string, string[]>;
-  email: string;
-  passwordHash: string;
+  email?: string;
+  passwordHash?: string;
+  phoneNumber?: string;
+  isGuest?: boolean;
   createdAt: Date;
   wardrobe?: UserWardrobe;
   skins?: UserSkins;

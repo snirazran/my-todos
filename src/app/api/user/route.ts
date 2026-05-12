@@ -75,18 +75,28 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { uid, email, name } = decoded;
+    const { uid, email, name, phone_number: phoneNumber, firebase } = decoded as any;
+    const isAnonymous = firebase?.sign_in_provider === 'anonymous';
     await connectMongo();
 
     const existingUser = await UserModel.findById(uid).lean();
     if (existingUser) {
-      return NextResponse.json({ ok: true, isNewUser: false, user: existingUser });
+      const patch: Record<string, unknown> = {};
+      if (email && !existingUser.email) patch.email = email;
+      if (phoneNumber && !existingUser.phoneNumber) patch.phoneNumber = phoneNumber;
+      if (!isAnonymous && existingUser.isGuest) patch.isGuest = false;
+      if (Object.keys(patch).length) {
+        await UserModel.updateOne({ _id: uid }, { $set: patch });
+      }
+      return NextResponse.json({ ok: true, isNewUser: false, user: { ...existingUser, ...patch } });
     }
 
     const now = new Date();
     const newUser = await UserModel.create({
       _id: uid,
-      email: email || '',
+      ...(email ? { email } : {}),
+      ...(phoneNumber ? { phoneNumber } : {}),
+      isGuest: isAnonymous,
       name: name || 'Anonymous Frog',
       createdAt: now,
       wardrobe: {

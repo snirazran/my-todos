@@ -3,9 +3,11 @@
 import {
   signInWithPopup,
   GoogleAuthProvider,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
   signInWithCredential,
+  signInWithPhoneNumber,
+  RecaptchaVerifier,
+  sendSignInLinkToEmail,
+  type ConfirmationResult,
 } from 'firebase/auth';
 import { Capacitor } from '@capacitor/core';
 import { SocialLogin } from '@capgo/capacitor-social-login';
@@ -13,26 +15,17 @@ import { auth } from '@/lib/firebase';
 import { setAuthTokenCookie } from '@/lib/authCookie';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import {
-  Loader2,
-  ArrowLeft,
-  ArrowRight,
-  Eye,
-  EyeOff,
-  Check,
-  X,
-} from 'lucide-react';
+import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import dynamic from 'next/dynamic';
-import { cn } from '@/lib/utils';
 import Link from 'next/link';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
-type Mode = 'login' | 'register' | null;
-type Step = 0 | 1 | 2;
+type Method = 'phone' | 'email';
+type Step = 'enter' | 'verify-phone' | 'email-sent';
 
 const GOOGLE_ICON = (
   <svg
@@ -47,44 +40,32 @@ const GOOGLE_ICON = (
   </svg>
 );
 
-function getPasswordStrength(pw: string) {
-  if (!pw.length) return { score: 0, label: '', color: '' };
-  let score = 0;
-  if (pw.length >= 8) score++;
-  if (/[A-Z]/.test(pw)) score++;
-  if (/[0-9]/.test(pw)) score++;
-  if (/[^A-Za-z0-9]/.test(pw)) score++;
-  return [
-    { score: 1, label: 'Weak', color: 'bg-red-400' },
-    { score: 2, label: 'Fair', color: 'bg-orange-400' },
-    { score: 3, label: 'Good', color: 'bg-yellow-400' },
-    { score: 4, label: 'Strong', color: 'bg-primary' },
-  ][Math.max(0, score - 1)];
-}
-
 const slide = {
   enter: (dir: number) => ({ x: dir * 50, opacity: 0 }),
   center: { x: 0, opacity: 1 },
   exit: (dir: number) => ({ x: dir * -50, opacity: 0 }),
 };
 
-export default function AuthPage() {
+const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
+
+export default function LoginPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>(null);
-  const [step, setStep] = useState<Step>(0);
+  const [method, setMethod] = useState<Method>('phone');
+  const [step, setStep] = useState<Step>('enter');
   const [dir, setDir] = useState(1);
 
+  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [showPw, setShowPw] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
+  const [code, setCode] = useState('');
 
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const phoneRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
-  const passwordRef = useRef<HTMLInputElement>(null);
+  const codeRef = useRef<HTMLInputElement>(null);
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const confirmationRef = useRef<ConfirmationResult | null>(null);
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -100,34 +81,31 @@ export default function AuthPage() {
         },
       });
     }
+
+    return () => {
+      try {
+        recaptchaRef.current?.clear();
+      } catch {}
+      recaptchaRef.current = null;
+    };
   }, []);
 
-  const advance = (next: Step) => {
-    setDir(1);
-    setStep(next);
-  };
-  const back = () => {
-    setError(null);
-    setDir(-1);
-    if (step === 1) {
-      setMode(null);
-      setStep(0);
-    } else if (step === 2) setStep(1);
+  const ensureRecaptcha = () => {
+    if (recaptchaRef.current) return recaptchaRef.current;
+    recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      size: 'invisible',
+    });
+    return recaptchaRef.current;
   };
 
-  const pickMode = (m: Mode) => {
-    setError(null);
-    setMode(m);
-    advance(1);
-    setTimeout(() => emailRef.current?.focus(), 300);
-  };
-
-  const goToPassword = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setError(null);
-    advance(2);
-    setTimeout(() => passwordRef.current?.focus(), 300);
+  const finishSignIn = async (route = '/') => {
+    const user = auth.currentUser;
+    if (!user) return;
+    const token = await user.getIdToken();
+    setAuthTokenCookie(token);
+    const res = await fetch('/api/user', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+    router.push(data?.isNewUser ? '/onboarding' : route);
   };
 
   const handleGoogle = async () => {
@@ -145,91 +123,105 @@ export default function AuthPage() {
             : null;
         if (!idToken) throw new Error('Failed to get Google token');
         const cred = GoogleAuthProvider.credential(idToken);
-        const result = await signInWithCredential(auth, cred);
-        const token = await result.user.getIdToken();
-        setAuthTokenCookie(token);
-        await fetch('/api/user', { method: 'POST' });
-        router.push('/');
+        await signInWithCredential(auth, cred);
       } else {
         const provider = new GoogleAuthProvider();
-        const result = await signInWithPopup(auth, provider);
-        const token = await result.user.getIdToken();
-        setAuthTokenCookie(token);
-        const res = await fetch('/api/user', { method: 'POST' });
-        const data = await res.json();
-        router.push(
-          mode === 'register' && data.isNewUser ? '/onboarding' : '/',
-        );
+        await signInWithPopup(auth, provider);
       }
+      await finishSignIn();
     } catch (err: any) {
-      setError(err.message || 'Google sign-in failed');
+      setError(err?.message || 'Google sign-in failed');
       setLoading(false);
     }
   };
 
-  const handleSignIn = async (e: React.FormEvent) => {
+  const handleSendPhoneCode = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-    try {
-      const uc = await signInWithEmailAndPassword(auth, email, password);
-      const token = await uc.user.getIdToken();
-      setAuthTokenCookie(token);
-      await fetch('/api/user', { method: 'POST' });
-      router.push('/');
-    } catch (err: any) {
-      const codes: Record<string, string> = {
-        'auth/invalid-credential': 'Invalid email or password',
-        'auth/user-not-found': 'Invalid email or password',
-        'auth/wrong-password': 'Invalid email or password',
-        'auth/invalid-email': 'Invalid email address',
-        'auth/network-request-failed': 'Network error — check your connection',
-      };
-      setError(codes[err.code] ?? `Error: ${err.code}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (password !== confirm) {
-      setError('Passwords do not match');
-      return;
-    }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    const trimmed = phone.trim();
+    if (!trimmed.startsWith('+')) {
+      setError('Phone must start with country code (e.g. +1...)');
       return;
     }
     setLoading(true);
     setError(null);
     try {
-      const uc = await createUserWithEmailAndPassword(auth, email, password);
-      const token = await uc.user.getIdToken();
-      setAuthTokenCookie(token);
-      const res = await fetch('/api/user', { method: 'POST' });
-      const data = await res.json();
-      router.push(data.isNewUser ? '/onboarding' : '/');
+      const verifier = ensureRecaptcha();
+      const confirmation = await signInWithPhoneNumber(auth, trimmed, verifier);
+      confirmationRef.current = confirmation;
+      setDir(1);
+      setStep('verify-phone');
+      setTimeout(() => codeRef.current?.focus(), 300);
     } catch (err: any) {
-      const codes: Record<string, string> = {
-        'auth/email-already-in-use': 'Email is already in use',
-        'auth/weak-password': 'Password should be at least 6 characters',
-        'auth/invalid-email': 'Invalid email address',
+      const code = err?.code as string | undefined;
+      const map: Record<string, string> = {
+        'auth/invalid-phone-number': 'That phone number looks invalid',
+        'auth/too-many-requests': 'Too many attempts. Try again later.',
+        'auth/quota-exceeded': 'SMS quota exceeded. Try again later.',
       };
-      setError(codes[err.code] ?? 'Failed to create account');
+      setError(map[code ?? ''] ?? err?.message ?? 'Could not send code');
+      try {
+        recaptchaRef.current?.clear();
+      } catch {}
+      recaptchaRef.current = null;
     } finally {
       setLoading(false);
     }
   };
 
-  const strength = getPasswordStrength(password);
-  const passwordsMatch = confirm.length > 0 && password === confirm;
-  const passwordsMismatch = confirm.length > 0 && password !== confirm;
+  const handleVerifyPhoneCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!confirmationRef.current) {
+      setError('Verification expired — please request a new code');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      await confirmationRef.current.confirm(code.trim());
+      await finishSignIn();
+    } catch (err: any) {
+      const map: Record<string, string> = {
+        'auth/invalid-verification-code': 'Wrong code — try again',
+        'auth/code-expired': 'Code expired — request a new one',
+      };
+      setError(map[err?.code ?? ''] ?? err?.message ?? 'Verification failed');
+      setLoading(false);
+    }
+  };
+
+  const handleSendEmailLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = email.trim();
+    if (!trimmed) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const origin =
+        typeof window !== 'undefined' ? window.location.origin : '';
+      await sendSignInLinkToEmail(auth, trimmed, {
+        url: `${origin}/auth/email-callback`,
+        handleCodeInApp: true,
+      });
+      window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, trimmed);
+      setDir(1);
+      setStep('email-sent');
+    } catch (err: any) {
+      setError(err?.message || 'Could not send email link');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const back = () => {
+    setError(null);
+    setDir(-1);
+    setStep('enter');
+    setCode('');
+  };
 
   return (
     <main className="fixed inset-0 flex items-center justify-center p-4 overflow-hidden bg-background">
       <div className="relative z-10 flex flex-col items-center w-full max-w-sm -translate-y-8">
-        {/* Frog */}
         <div className="relative z-20 pointer-events-none -mb-9">
           <Frog
             width={200}
@@ -238,53 +230,12 @@ export default function AuthPage() {
           />
         </div>
 
-        {/* Card */}
         <div className="w-full overflow-hidden rounded-[32px] border border-border/50 bg-card/80 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
           <div className="px-6 pt-10 pb-2">
             <AnimatePresence mode="wait" custom={dir}>
-              {/* ── Step 0: Choose path ── */}
-              {step === 0 && (
+              {step === 'enter' && (
                 <motion.div
-                  key="choice"
-                  custom={dir}
-                  variants={slide}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <div className="mb-8 text-center">
-                    <h1 className="text-3xl font-black tracking-tight text-foreground">
-                      Hoppy to see you!
-                    </h1>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                      Do you already have a frog,
-                      <br />
-                      or are you here to adopt one?
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <button
-                      onClick={() => pickMode('login')}
-                      className="group relative w-full py-4 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/30"
-                    >
-                      I already have a frog
-                    </button>
-                    <button
-                      onClick={() => pickMode('register')}
-                      className="w-full py-4 text-sm font-black tracking-widest uppercase transition-all bg-transparent border-2 rounded-2xl border-border/60 hover:bg-muted/40 text-foreground"
-                    >
-                      Adopt a frog
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* ── Step 1: Email ── */}
-              {step === 1 && (
-                <motion.div
-                  key="email"
+                  key="enter"
                   custom={dir}
                   variants={slide}
                   initial="enter"
@@ -293,18 +244,127 @@ export default function AuthPage() {
                   transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="flex items-center gap-3 mb-5">
-                    <button
-                      onClick={back}
+                    <Link
+                      href="/welcome"
                       className="flex items-center justify-center transition border rounded-full w-9 h-9 border-border/60 bg-background text-muted-foreground hover:bg-muted shrink-0"
                     >
                       <ArrowLeft className="w-4 h-4" />
-                    </button>
+                    </Link>
                     <div>
                       <h1 className="text-xl font-black leading-tight tracking-tight uppercase text-foreground">
-                        {mode === 'register'
-                          ? 'Nice to *ribbit* meet you'
-                          : 'I *ribbit* missed you'}
+                        Welcome back!
                       </h1>
+                      <p className="text-xs text-muted-foreground">
+                        {method === 'phone'
+                          ? "We'll text you a verification code"
+                          : "We'll email you a sign-in link"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {method === 'phone' ? (
+                    <form onSubmit={handleSendPhoneCode} className="space-y-4">
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="phone"
+                          className="ml-1 text-xs font-bold uppercase text-muted-foreground"
+                        >
+                          Phone number
+                        </Label>
+                        <Input
+                          ref={phoneRef}
+                          id="phone"
+                          type="tel"
+                          inputMode="tel"
+                          placeholder="+1 555 123 4567"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="h-12 rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
+                          required
+                          autoFocus
+                        />
+                      </div>
+                      {error && <ErrorMsg>{error}</ErrorMsg>}
+                      <button
+                        type="submit"
+                        disabled={!phone.trim() || loading}
+                        className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            Next <ArrowRight className="w-4 h-4" />
+                          </>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setMethod('email');
+                          setTimeout(() => emailRef.current?.focus(), 50);
+                        }}
+                        className="block w-full mt-2 text-xs font-bold tracking-wide text-primary hover:underline"
+                      >
+                        Use email instead
+                      </button>
+                    </form>
+                  ) : (
+                    <form onSubmit={handleSendEmailLink} className="space-y-4">
+                      <div className="space-y-1.5">
+                        <Label
+                          htmlFor="email"
+                          className="ml-1 text-xs font-bold uppercase text-muted-foreground"
+                        >
+                          Email
+                        </Label>
+                        <Input
+                          ref={emailRef}
+                          id="email"
+                          type="email"
+                          placeholder="hello@example.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="h-12 rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
+                          required
+                          autoFocus
+                        />
+                      </div>
+                      {error && <ErrorMsg>{error}</ErrorMsg>}
+                      <button
+                        type="submit"
+                        disabled={!email.trim() || loading}
+                        className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {loading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          'Send sign-in link'
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setError(null);
+                          setMethod('phone');
+                          setTimeout(() => phoneRef.current?.focus(), 50);
+                        }}
+                        className="block w-full mt-2 text-xs font-bold tracking-wide text-primary hover:underline"
+                      >
+                        Use phone instead
+                      </button>
+                    </form>
+                  )}
+
+                  <div className="relative my-4">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-border/60" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="px-2 font-bold tracking-widest bg-card text-muted-foreground">
+                        Or
+                      </span>
                     </div>
                   </div>
 
@@ -319,54 +379,12 @@ export default function AuthPage() {
                       <>{GOOGLE_ICON} Continue with Google</>
                     )}
                   </button>
-
-                  <div className="relative my-4">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border/60" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="px-2 font-bold tracking-widest bg-card text-muted-foreground">
-                        Or
-                      </span>
-                    </div>
-                  </div>
-
-                  <form onSubmit={goToPassword} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <Label
-                        htmlFor="email"
-                        className="ml-1 text-xs font-bold uppercase text-muted-foreground"
-                      >
-                        Email
-                      </Label>
-                      <Input
-                        ref={emailRef}
-                        id="email"
-                        type="email"
-                        placeholder="hello@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="h-12 rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
-                        required
-                        autoFocus
-                      />
-                    </div>
-                    {error && <ErrorMsg>{error}</ErrorMsg>}
-                    <button
-                      type="submit"
-                      disabled={!email.trim() || loading}
-                      className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Continue <ArrowRight className="w-4 h-4" />
-                    </button>
-                  </form>
                 </motion.div>
               )}
 
-              {/* ── Step 2: Password ── */}
-              {step === 2 && (
+              {step === 'verify-phone' && (
                 <motion.div
-                  key="password"
+                  key="verify"
                   custom={dir}
                   variants={slide}
                   initial="enter"
@@ -383,193 +401,98 @@ export default function AuthPage() {
                     </button>
                     <div>
                       <h1 className="text-xl font-black leading-tight tracking-tight uppercase text-foreground">
-                        {mode === 'register' ? 'Almost there' : 'One step away'}
+                        Enter the code
                       </h1>
-                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                        {email}
+                      <p className="text-xs text-muted-foreground truncate max-w-[220px]">
+                        Sent to {phone}
                       </p>
                     </div>
                   </div>
 
-                  <form
-                    onSubmit={mode === 'login' ? handleSignIn : handleRegister}
-                    className="space-y-4"
-                  >
-                    {/* Password */}
+                  <form onSubmit={handleVerifyPhoneCode} className="space-y-4">
                     <div className="space-y-1.5">
                       <Label
-                        htmlFor="password"
+                        htmlFor="code"
                         className="ml-1 text-xs font-bold uppercase text-muted-foreground"
                       >
-                        Password
+                        Verification code
                       </Label>
-                      <div className="relative">
-                        <Input
-                          ref={passwordRef}
-                          id="password"
-                          type={showPw ? 'text' : 'password'}
-                          placeholder="••••••••"
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          className="h-12 rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30 pr-11"
-                          required
-                          minLength={6}
-                        />
-                        <button
-                          type="button"
-                          tabIndex={-1}
-                          onClick={() => setShowPw((v) => !v)}
-                          className="absolute transition -translate-y-1/2 right-3 top-1/2 text-muted-foreground hover:text-foreground"
-                        >
-                          {showPw ? (
-                            <EyeOff className="w-4 h-4" />
-                          ) : (
-                            <Eye className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                      {mode === 'register' && password.length > 0 && (
-                        <div className="flex items-center gap-2 px-1">
-                          <div className="flex flex-1 gap-1">
-                            {[1, 2, 3, 4].map((bar) => (
-                              <div
-                                key={bar}
-                                className={cn(
-                                  'h-1 flex-1 rounded-full transition-all duration-300',
-                                  bar <= strength.score
-                                    ? strength.color
-                                    : 'bg-border/40',
-                                )}
-                              />
-                            ))}
-                          </div>
-                          <span className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">
-                            {strength.label}
-                          </span>
-                        </div>
-                      )}
+                      <Input
+                        ref={codeRef}
+                        id="code"
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        placeholder="123456"
+                        value={code}
+                        onChange={(e) =>
+                          setCode(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        }
+                        className="h-12 rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30 tracking-[0.5em] text-center font-bold"
+                        required
+                      />
                     </div>
-
-                    {/* Confirm password (register only) */}
-                    {mode === 'register' && (
-                      <div className="space-y-1.5">
-                        <Label
-                          htmlFor="confirm"
-                          className="ml-1 text-xs font-bold uppercase text-muted-foreground"
-                        >
-                          Confirm Password
-                        </Label>
-                        <div className="relative">
-                          <Input
-                            id="confirm"
-                            type={showConfirm ? 'text' : 'password'}
-                            placeholder="••••••••"
-                            value={confirm}
-                            onChange={(e) => setConfirm(e.target.value)}
-                            className={cn(
-                              'h-12 rounded-xl bg-background/50 focus-visible:ring-primary/30 pr-11',
-                              passwordsMismatch
-                                ? 'border-destructive/60'
-                                : passwordsMatch
-                                  ? 'border-primary/50'
-                                  : 'border-border/60',
-                            )}
-                            required
-                          />
-                          <div className="absolute flex items-center gap-1 -translate-y-1/2 right-3 top-1/2">
-                            {confirm.length > 0 && (
-                              <motion.span
-                                initial={{ scale: 0.5, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                              >
-                                {passwordsMatch ? (
-                                  <Check className="w-4 h-4 text-primary" />
-                                ) : (
-                                  <X className="w-4 h-4 text-destructive" />
-                                )}
-                              </motion.span>
-                            )}
-                            <button
-                              type="button"
-                              tabIndex={-1}
-                              onClick={() => setShowConfirm((v) => !v)}
-                              className="ml-1 transition text-muted-foreground hover:text-foreground"
-                            >
-                              {showConfirm ? (
-                                <EyeOff className="w-4 h-4" />
-                              ) : (
-                                <Eye className="w-4 h-4" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
                     {error && <ErrorMsg>{error}</ErrorMsg>}
-
                     <button
                       type="submit"
-                      disabled={
-                        loading || (mode === 'register' && !passwordsMatch)
-                      }
+                      disabled={code.length < 6 || loading}
                       className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {loading ? (
                         <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : mode === 'login' ? (
-                        'Sign In'
                       ) : (
-                        'Create Account'
+                        'Verify'
                       )}
                     </button>
                   </form>
                 </motion.div>
               )}
+
+              {step === 'email-sent' && (
+                <motion.div
+                  key="emailsent"
+                  custom={dir}
+                  variants={slide}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                  className="text-center py-6"
+                >
+                  <h1 className="text-2xl font-black tracking-tight text-foreground">
+                    Check your email
+                  </h1>
+                  <p className="mt-3 text-sm text-muted-foreground">
+                    We sent a sign-in link to
+                    <br />
+                    <span className="font-bold text-foreground">{email}</span>
+                  </p>
+                  <button
+                    onClick={back}
+                    className="mt-6 text-xs font-bold tracking-wide text-primary hover:underline"
+                  >
+                    Use a different method
+                  </button>
+                </motion.div>
+              )}
             </AnimatePresence>
           </div>
 
-          {/* Footer */}
           <div className="px-6 py-4 mt-3 text-center border-t bg-muted/30 border-border">
-            {step === 0 ? (
-              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                By continuing you agree to our{' '}
-                <span className="cursor-pointer text-primary hover:underline">
-                  Terms
-                </span>
-              </p>
-            ) : mode === 'login' ? (
-              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                No frog yet?{' '}
-                <button
-                  onClick={() => {
-                    setError(null);
-                    setMode('register');
-                    setStep(1);
-                  }}
-                  className="ml-1 text-primary hover:underline decoration-2 underline-offset-4"
-                >
-                  Adopt one
-                </button>
-              </p>
-            ) : (
-              <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-                Already have a frog?{' '}
-                <button
-                  onClick={() => {
-                    setError(null);
-                    setMode('login');
-                    setStep(1);
-                  }}
-                  className="ml-1 text-primary hover:underline decoration-2 underline-offset-4"
-                >
-                  Sign in
-                </button>
-              </p>
-            )}
+            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+              No frog yet?{' '}
+              <Link
+                href="/welcome"
+                className="ml-1 text-primary hover:underline decoration-2 underline-offset-4"
+              >
+                Hatch one
+              </Link>
+            </p>
           </div>
         </div>
       </div>
+
+      <div id="recaptcha-container" />
     </main>
   );
 }

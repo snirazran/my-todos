@@ -5,8 +5,10 @@ export async function middleware(req: NextRequest) {
   const token = req.cookies.get('token')?.value;
   const isAuth = !!token;
   const isAuthRoute =
+    req.nextUrl.pathname.startsWith('/welcome') ||
     req.nextUrl.pathname.startsWith('/login') ||
     req.nextUrl.pathname.startsWith('/register') ||
+    req.nextUrl.pathname.startsWith('/auth') ||
     req.nextUrl.pathname.startsWith('/api/auth');
 
   // If user is not authenticated and tries to access protected route
@@ -24,8 +26,8 @@ export async function middleware(req: NextRequest) {
 
     // Original logic: if (!isAuth && !isAuthRoute) -> redirect login.
     // This implies home '/' requires login.
-    const loginUrl = new URL('/login', req.url);
-    return NextResponse.redirect(loginUrl);
+    const welcomeUrl = new URL('/welcome', req.url);
+    return NextResponse.redirect(welcomeUrl);
   }
 
   // If user IS authenticated and tries to access login/register, redirect to home
@@ -39,7 +41,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   // Be specific to avoid blocking static assets or other open routes
-  matcher: ['/manage-tasks/:path*', '/api/user/:path*', '/login', '/register', '/onboarding'],
+  matcher: ['/manage-tasks/:path*', '/api/user/:path*', '/welcome', '/login', '/register', '/onboarding'],
   // Exclude public api routes if any? /api/auth is in isAuthRoute check.
   // Note: /api/skins usually requires auth but maybe we handle it in route?
   // Let's protect /api/skins as well if possible, or leave it to route handler.

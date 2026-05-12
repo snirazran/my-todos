@@ -10,8 +10,10 @@ import HumanNameStep from './steps/HumanNameStep';
 import NotificationStep from './steps/NotificationStep';
 import AboutIntroStep from './steps/AboutIntroStep';
 import ProfileQuestionsStep from './steps/ProfileQuestionsStep';
+import CreateAccountStep from './steps/CreateAccountStep';
+import { auth } from '@/lib/firebase';
 
-const STEP_IDS = ['welcome', 'gender', 'name', 'humanName', 'notifications', 'aboutIntro', 'age'] as const;
+const STEP_IDS = ['welcome', 'gender', 'name', 'humanName', 'createAccount', 'notifications', 'aboutIntro', 'age'] as const;
 
 function isMobileDevice() {
   const userAgent = navigator.userAgent || '';
@@ -33,7 +35,12 @@ export default function OnboardingPage() {
   }, []);
 
   const stepIds = useMemo(
-    () => STEP_IDS.filter((id) => showNotificationStep || id !== 'notifications'),
+    () =>
+      STEP_IDS.filter((id) => {
+        if (id === 'notifications' && !showNotificationStep) return false;
+        if (id === 'createAccount' && !auth?.currentUser?.isAnonymous) return false;
+        return true;
+      }),
     [showNotificationStep],
   );
 
@@ -108,6 +115,7 @@ export default function OnboardingPage() {
         {currentId === 'gender' && <GenderStep {...stepProps} />}
         {currentId === 'name' && <FrogNameStep {...stepProps} />}
         {currentId === 'humanName' && <HumanNameStep {...stepProps} />}
+        {currentId === 'createAccount' && <CreateAccountStep {...stepProps} />}
         {currentId === 'notifications' && <NotificationStep {...stepProps} />}
         {currentId === 'aboutIntro' && <AboutIntroStep {...stepProps} />}
         {currentId === 'age' && <ProfileQuestionsStep {...stepProps} />}
