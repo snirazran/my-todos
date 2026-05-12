@@ -5,9 +5,10 @@ import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
+import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 
-const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
+const Frog = dynamic(() => import('@/components/ui/FrogOnDeck'), { ssr: false });
 
 type AboutQuestion = {
   id: string;
@@ -228,6 +229,7 @@ export default function ProfileQuestionsStep({
   direction,
 }: OnboardingStepProps) {
   const [questionIndex, setQuestionIndex] = useState(0);
+  const frogIndices = useMemo(() => randomFrogIndices(), [questionIndex]);
   const selectedSupportAreas = selections.supportAreas ?? [];
   const displayedQuestions = useMemo(() => {
     const followUpQuestions: AboutQuestion[] = selectedSupportAreas
@@ -370,28 +372,26 @@ export default function ProfileQuestionsStep({
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
         className="mt-2 flex flex-col items-center"
       >
-        <div className="relative mb-5">
+        <div className="relative mb-3">
           <div className="hidden md:block">
             <Frog
-              width={210}
-              height={210}
-              indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+              width={260}
+              height={260}
+              indices={frogIndices}
+              title={currentQuestion.title}
             />
           </div>
           <div className="block md:hidden">
             <Frog
-              width={170}
-              height={170}
-              indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+              width={210}
+              height={210}
+              indices={frogIndices}
+              title={currentQuestion.title}
             />
           </div>
         </div>
-
-        <h1 className="text-center text-2xl font-black tracking-tight text-foreground">
-          {currentQuestion.title}
-        </h1>
         {currentQuestion.subtitle && (
-          <p className="mt-2 text-center text-base md:text-lg font-medium text-muted-foreground">
+          <p className="text-center text-base md:text-lg font-medium text-muted-foreground mb-2">
             {currentQuestion.subtitle}
           </p>
         )}

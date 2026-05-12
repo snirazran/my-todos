@@ -131,7 +131,7 @@ export default function SiteHeader() {
   ];
 
   // Desktop keeps a full header. Mobile only gets lightweight home-page controls.
-  if (pathname === '/onboarding') return null;
+  if (pathname === '/onboarding' || pathname === '/welcome' || pathname?.startsWith('/auth/')) return null;
 
   return (
     <>

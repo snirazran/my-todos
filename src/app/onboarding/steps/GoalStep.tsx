@@ -1,12 +1,14 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Plus } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
+import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 
-const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
+const Frog = dynamic(() => import('@/components/ui/FrogOnDeck'), { ssr: false });
 
 const OPTIONS = [
   { id: 'productive', emoji: '⚡', label: 'Stay productive' },
@@ -17,14 +19,16 @@ const OPTIONS = [
 
 export default function GoalStep({ selections, onSelect, onNext, onBack, saving, direction }: OnboardingStepProps) {
   const selected = selections['goal'] ?? [];
+  const frogIndices = useMemo(() => randomFrogIndices(), []);
 
   return (
     <>
-      <div className="flex justify-center" style={{ marginTop: -30, marginBottom: -20 }}>
+      <div className="flex justify-center" style={{ marginTop: -30, marginBottom: 10 }}>
         <Frog
           width={200}
           height={200}
-          indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+          indices={frogIndices}
+          title="What's your main goal?"
         />
       </div>
 
@@ -38,10 +42,7 @@ export default function GoalStep({ selections, onSelect, onNext, onBack, saving,
             exit={{ opacity: 0, x: direction * -40 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            <h1 className="text-2xl font-black tracking-tight text-foreground text-center mb-1">
-              What&apos;s your main goal?
-            </h1>
-            <p className="text-sm font-medium text-muted-foreground text-center mb-8">
+            <p className="text-sm font-medium text-muted-foreground text-center mt-4 mb-6">
               We&apos;ll tailor your experience around this.
             </p>
 

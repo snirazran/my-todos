@@ -29,7 +29,7 @@ export default function MobileNav() {
   const questClaimableCount = questsData?.claimableCount ?? 0;
   const questActiveCount = questsData?.activeCount ?? 0;
 
-  if (pathname === '/login' || pathname === '/register' || pathname === '/onboarding') return null;
+  if (pathname === '/welcome' || pathname === '/login' || pathname === '/register' || pathname === '/onboarding' || pathname?.startsWith('/auth/')) return null;
 
   const navItems = [
     {

@@ -1,12 +1,14 @@
 'use client';
 
+import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { Check, Heart } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
+import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 
-const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
+const Frog = dynamic(() => import('@/components/ui/FrogOnDeck'), { ssr: false });
 
 const OPTIONS = [
   { id: 'he', label: 'he/him', color: 'text-blue-400 fill-blue-400', borderColor: 'border-blue-400/60 bg-blue-50 dark:bg-blue-400/10' },
@@ -16,6 +18,7 @@ const OPTIONS = [
 
 export default function GenderStep({ selections, onSelect, onNext, onBack, saving, direction }: OnboardingStepProps) {
   const selected = selections['gender'] ?? [];
+  const frogIndices = useMemo(() => randomFrogIndices(), []);
 
   return (
     <div className="flex-1 flex flex-col relative">
@@ -28,23 +31,29 @@ export default function GenderStep({ selections, onSelect, onNext, onBack, savin
         </svg>
       </button>
 
-      <div className="flex-[1]" />
+      <div className="h-10" />
 
       <div className="flex flex-col items-center px-4">
         <div className="hidden md:block">
           <Frog
             width={280}
             height={280}
-            indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+            indices={frogIndices}
+            title="Say hello to your frog!"
           />
         </div>
         <div className="block md:hidden">
           <Frog
             width={230}
             height={230}
-            indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+            indices={frogIndices}
+            title="Say hello to your frog!"
           />
         </div>
+
+        <p className="text-base md:text-lg font-medium text-muted-foreground text-center mt-4">
+          Choose your frog&apos;s pronouns
+        </p>
 
         <motion.div
           key="gender"
@@ -53,14 +62,8 @@ export default function GenderStep({ selections, onSelect, onNext, onBack, savin
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: direction * -40 }}
           transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full"
+          className="w-full mt-6 md:mt-8"
         >
-          <h1 className="text-2xl md:text-3xl font-black tracking-tight text-foreground text-center mb-1">
-            Say hello to your frog!
-          </h1>
-          <p className="text-base md:text-lg font-medium text-muted-foreground text-center mb-6 md:mb-8">
-            Choose your frog&apos;s pronouns
-          </p>
 
           <div className="flex flex-col gap-3 w-full">
             {OPTIONS.map((opt) => {

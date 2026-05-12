@@ -1,14 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
+import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 
-const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
+const Frog = dynamic(() => import('@/components/ui/FrogOnDeck'), { ssr: false });
 
 async function enableNotifications() {
   if (Capacitor.isNativePlatform()) {
@@ -37,6 +38,7 @@ async function enableNotifications() {
 }
 
 export default function NotificationStep({ selections, onNext, onBack, saving, direction }: OnboardingStepProps) {
+  const frogIndices = useMemo(() => randomFrogIndices(), []);
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
   const [requesting, setRequesting] = useState(false);
 
@@ -63,7 +65,7 @@ export default function NotificationStep({ selections, onNext, onBack, saving, d
         </svg>
       </button>
 
-      <div className="flex-[1]" />
+      <div className="h-10" />
 
       <motion.div
         key="notifications"
@@ -74,10 +76,6 @@ export default function NotificationStep({ selections, onNext, onBack, saving, d
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
         className="flex flex-col items-center px-4"
       >
-        <h1 className="mt-8 text-2xl md:text-3xl font-black tracking-tight text-foreground text-center">
-          Get reminders from {frogName}
-        </h1>
-
         <div className="mt-8 flex w-[calc(100%+4rem)] max-w-[calc(100vw-1.5rem)] items-center gap-3 rounded-3xl bg-muted/70 px-4 py-3 shadow-sm">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-background shadow-sm">
             <img src="/48x48.png" alt="" className="h-10 w-10 rounded-xl" />
@@ -95,14 +93,16 @@ export default function NotificationStep({ selections, onNext, onBack, saving, d
           <Frog
             width={280}
             height={280}
-            indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+            indices={frogIndices}
+            title={`Get reminders from ${frogName}`}
           />
         </div>
         <div className="mt-14 block md:hidden">
           <Frog
             width={230}
             height={230}
-            indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+            indices={frogIndices}
+            title={`Get reminders from ${frogName}`}
           />
         </div>
       </motion.div>

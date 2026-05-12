@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { OnboardingStepProps } from './steps/types';
-import WelcomeStep from './steps/WelcomeStep';
 import GenderStep from './steps/GenderStep';
 import FrogNameStep from './steps/FrogNameStep';
 import HumanNameStep from './steps/HumanNameStep';
@@ -12,8 +11,9 @@ import AboutIntroStep from './steps/AboutIntroStep';
 import ProfileQuestionsStep from './steps/ProfileQuestionsStep';
 import CreateAccountStep from './steps/CreateAccountStep';
 import { auth } from '@/lib/firebase';
+import { clearAuthTokenCookie } from '@/lib/authCookie';
 
-const STEP_IDS = ['welcome', 'gender', 'name', 'humanName', 'createAccount', 'notifications', 'aboutIntro', 'age'] as const;
+const STEP_IDS = ['gender', 'name', 'humanName', 'createAccount', 'notifications', 'aboutIntro', 'age'] as const;
 
 function isMobileDevice() {
   const userAgent = navigator.userAgent || '';
@@ -93,8 +93,24 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleBack = () => {
-    if (step === 0) return;
+  const handleBack = async () => {
+    if (step === 0) {
+      const current = auth?.currentUser;
+      try {
+        if (current?.isAnonymous) {
+          await current.delete();
+        } else {
+          await auth?.signOut();
+        }
+      } catch {
+        try {
+          await auth?.signOut();
+        } catch {}
+      }
+      clearAuthTokenCookie();
+      router.replace('/welcome');
+      return;
+    }
     setDirection(-1);
     setStep((s) => s - 1);
   };
@@ -111,7 +127,6 @@ export default function OnboardingPage() {
   return (
     <main className="fixed inset-0 flex flex-col items-center bg-background px-5 pt-4 overflow-y-auto">
       <div className="relative z-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col" style={{ minHeight: '100%' }}>
-        {currentId === 'welcome' && <WelcomeStep {...stepProps} />}
         {currentId === 'gender' && <GenderStep {...stepProps} />}
         {currentId === 'name' && <FrogNameStep {...stepProps} />}
         {currentId === 'humanName' && <HumanNameStep {...stepProps} />}
