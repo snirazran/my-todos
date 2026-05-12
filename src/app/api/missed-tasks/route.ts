@@ -13,10 +13,6 @@ import {
   MAX_HUNGER_MS,
   TASK_HUNGER_REWARD_MS,
 } from '@/lib/hungerLogic';
-import type { DailyFlyProgress } from '@/lib/types/UserDoc';
-
-const MISSED_COMPLETION_REWARD = 1;
-const DAILY_FLY_LIMIT = 15;
 
 type MissedAction = 'dismiss' | 'complete' | 'save-later' | 'do-today';
 type RepeatMoveMode = 'change-repeat' | 'just-once';
@@ -43,27 +39,6 @@ function weekStartForYMD(date: string) {
 
 function isPremium(user: Pick<UserDoc, 'premiumUntil'> | null) {
   return !!user?.premiumUntil && new Date(user.premiumUntil) > new Date();
-}
-
-const initDailyFly = (date: string): DailyFlyProgress => ({
-  date,
-  earned: 0,
-  taskIds: [],
-  limitNotified: false,
-});
-
-function normalizeDailyFly(
-  today: string,
-  flyDaily?: DailyFlyProgress,
-): DailyFlyProgress {
-  if (flyDaily?.date === today) {
-    return {
-      ...flyDaily,
-      taskIds: flyDaily.taskIds ?? [],
-      limitNotified: flyDaily.limitNotified ?? false,
-    };
-  }
-  return initDailyFly(today);
 }
 
 function existedOnDate(task: TaskDoc, date: string, timezone: string) {
@@ -202,12 +177,7 @@ async function getUserStatus(userId: string) {
   };
 }
 
-async function awardFlyForMissedCompletion(
-  userId: string,
-  taskId: string,
-  timezone: string,
-) {
-  const today = getZonedToday(timezone);
+async function raiseHungerForMissedCompletion(userId: string) {
   const user = await UserModel.findById(userId, {
     wardrobe: 1,
   }).lean<UserDoc>();
@@ -217,55 +187,24 @@ async function awardFlyForMissedCompletion(
   const { updates: hungerUpdates, status: hungerStatus } =
     calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
-  const daily = normalizeDailyFly(
-    today,
-    wardrobe.flyDaily as DailyFlyProgress | undefined,
-  );
-
-  const alreadyRewarded = (daily.taskIds ?? []).includes(taskId);
-  const atLimit = daily.earned >= DAILY_FLY_LIMIT;
-  let nextBalance = hungerUpdates['wardrobe.flies'] ?? wardrobe.flies ?? 0;
-
-  if (alreadyRewarded) {
-    if (Object.keys(hungerUpdates).length > 0) {
-      await UserModel.updateOne({ _id: userId }, { $set: hungerUpdates });
-    }
-    return { balance: nextBalance, awarded: false };
-  }
+  const nextBalance = hungerUpdates['wardrobe.flies'] ?? wardrobe.flies ?? 0;
 
   const nextHunger = Math.min(
     MAX_HUNGER_MS,
     Math.max(0, hungerStatus.hunger) + TASK_HUNGER_REWARD_MS,
   );
-  let nextEarned = daily.earned;
-  let awarded = false;
 
   const setFields: Record<string, unknown> = {
     ...hungerUpdates,
     'wardrobe.hunger': nextHunger,
     'wardrobe.lastHungerUpdate': new Date(),
   };
-
-  if (!atLimit) {
-    nextEarned += MISSED_COMPLETION_REWARD;
-    nextBalance += MISSED_COMPLETION_REWARD;
-    setFields['wardrobe.flies'] = nextBalance;
-    awarded = true;
-  }
-
-  setFields['wardrobe.flyDaily'] = {
-    date: today,
-    earned: nextEarned,
-    taskIds: Array.from(new Set([...(daily.taskIds ?? []), taskId])),
-    limitNotified:
-      (daily.limitNotified ?? false) || nextEarned >= DAILY_FLY_LIMIT,
-  };
   if (!user.wardrobe?.equipped) setFields['wardrobe.equipped'] = {};
   if (!user.wardrobe?.inventory) setFields['wardrobe.inventory'] = {};
 
   await UserModel.updateOne({ _id: userId }, { $set: setFields });
 
-  return { balance: nextBalance, awarded };
+  return { balance: nextBalance, awarded: false };
 }
 
 async function completeMissedTask(userId: string, task: TaskDoc, date: string) {
@@ -487,7 +426,7 @@ export async function POST(req: NextRequest) {
 
   if (action === 'complete') {
     await completeMissedTask(userId, task, yesterday);
-    const reward = await awardFlyForMissedCompletion(userId, task.id, timezone);
+    const reward = await raiseHungerForMissedCompletion(userId);
     await syncQuestState({ userId, timezone }).catch((error) => {
       console.error('Quest sync failed:', error);
     });

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { CalendarCheck, CalendarClock, CalendarPlus, FolderOpen, Loader2, RotateCcw, X } from 'lucide-react';
+import { CalendarCheck, CalendarClock, CalendarPlus, CheckCircle2, FolderOpen, Loader2, RotateCcw, X } from 'lucide-react';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import Fly from '@/components/ui/fly';
@@ -36,6 +36,11 @@ type Props = {
   show: boolean;
   status: MissedTasksStatus;
   tags: { id: string; name: string; color: string }[];
+  hunger?: number;
+  maxHunger?: number;
+  questClaimableCount?: number;
+  questActiveCount?: number;
+  isPremium?: boolean;
   onClose: () => void;
   onItemResolved: (id: string, flyBalance?: number) => void | Promise<void>;
   onStatusChanged: () => void | Promise<void>;
@@ -45,6 +50,11 @@ export function MissedTasksPopup({
   show,
   status,
   tags,
+  hunger,
+  maxHunger,
+  questClaimableCount = 0,
+  questActiveCount = 0,
+  isPremium = false,
   onClose,
   onItemResolved,
   onStatusChanged,
@@ -240,15 +250,12 @@ export function MissedTasksPopup({
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary ring-1 ring-primary/15">
-                    <CalendarClock className="h-5 w-5" />
+                    <CalendarCheck className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <h2 className="text-lg font-black leading-tight tracking-tight text-foreground">
-                      Leftover flies from yesterday.
+                    <h2 className="text-xl font-black leading-tight tracking-tight text-foreground">
+                      Did you finish your <span className="text-primary">tasks?</span>
                     </h2>
-                    <p className="mt-1 max-w-[24rem] text-xs font-semibold leading-snug text-muted-foreground">
-                      Maybe you finished these and forgot to mark them.
-                    </p>
                   </div>
                 </div>
                 <button
@@ -267,10 +274,20 @@ export function MissedTasksPopup({
                 scrollContainerRef.current = el;
                 overscrollDrag.bind(el);
               }}
-              className="flex-1 min-h-0 overflow-y-auto p-3 pb-24 space-y-3 overscroll-none"
+              className="flex-1 min-h-0 overflow-y-auto pb-24 overscroll-none"
               style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
             >
-              <div className="pt-1">
+              <div className="relative px-3 pt-1 pb-10">
+                <picture
+                  aria-hidden
+                  className="absolute top-0 -bottom-2 inset-x-0 -z-10 pointer-events-none"
+                >
+                  <img
+                    src="/yesterday.png"
+                    alt=""
+                    className="w-full h-full object-cover object-top"
+                  />
+                </picture>
                 <FrogDisplay
                   frogRef={frogRef}
                   frogBoxRef={frogBoxRef}
@@ -283,12 +300,19 @@ export function MissedTasksPopup({
                   onOpenChange={setWardrobeOpen}
                   mouthOpen={!!grab}
                   mouthOffset={{ y: -4 }}
-                  animateHunger={false}
+                  hunger={hunger}
+                  maxHunger={maxHunger}
+                  animateHunger
                   isCatching={cinematic}
+                  questClaimableCount={questClaimableCount}
+                  questActiveCount={questActiveCount}
+                  progressCoachIsPremium={isPremium}
                   paused={wardrobeOpen || isDragging}
-                  showActionButtons={false}
                 />
               </div>
+              <div
+                className="relative z-20 -mt-4 flex flex-col gap-2 rounded-t-[24px] bg-background px-3 pt-6 pb-4 before:absolute before:inset-x-0 before:bottom-0 before:top-8 before:-z-10 before:bg-background"
+              >
               {items.length === 0 ? (
                 <div className="rounded-2xl border border-border/50 bg-card/60 p-5 text-center">
                   <p className="text-sm font-black text-foreground">
@@ -302,98 +326,102 @@ export function MissedTasksPopup({
                   </button>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-2">
                   {taskItems.length > 0 && (
-                    <MissedSectionHeader
-                      icon={<CalendarCheck className="h-3.5 w-3.5" />}
-                      title="Tasks"
-                      count={taskItems.length}
-                    />
+                    <div className="flex items-center gap-2 ml-3 px-2 md:px-0">
+                      <CalendarCheck className="w-5 h-5 text-primary" />
+                      <span className="text-sm font-black tracking-tight lowercase text-foreground">
+                        {taskItems.length} {taskItems.length === 1 ? 'fly' : 'flies'} from yesterday
+                      </span>
+                    </div>
                   )}
+                  <div className="w-full rounded-[18px] bg-card/40 border border-border/50 shadow-sm overflow-hidden p-2 space-y-1.5">
                   {taskItems.map((item) => {
                     const showRepeatChoice = repeatChoiceId === item.id;
                     const itemBusy = busyId === item.id;
                     return (
                       <div
                         key={item.id}
-                        className="rounded-2xl border border-border/70 bg-card/85 p-2.5 shadow-sm"
+                        className="relative w-full rounded-xl border border-border/50 bg-card px-2 py-2 shadow-sm shadow-black/5 dark:shadow-black/20"
                       >
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/70"
-                            aria-hidden
-                          >
-                            <span
+                        <div className="flex items-center gap-2 pl-1.5">
+                          <div className="relative flex-shrink-0 w-10 h-10">
+                            <div
                               ref={(node) => {
                                 if (node) flyRefs.current[item.id] = node;
                                 else delete flyRefs.current[item.id];
                               }}
                               className={cn(
-                                'flex h-9 w-9 items-center justify-center',
+                                'flex items-center justify-center w-10 h-10 border rounded-full bg-muted border-muted-foreground/10 shrink-0',
                                 visuallyDone.has(item.id) && 'opacity-0',
                               )}
                             >
                               {itemBusy ? (
                                 <Loader2 className="h-4 w-4 animate-spin text-primary" />
                               ) : (
-                                <Fly size={25} y={-4} paused={isBusy} />
+                                <Fly size={36} y={-3} x={0} paused={isBusy} />
                               )}
-                            </span>
+                            </div>
                           </div>
 
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex flex-wrap items-center gap-1">
-                              {item.tags?.map((tagId) => {
-                                const tag = getTagDetails(tagId);
-                                if (!tag) return null;
-                                return (
-                                  <span
-                                    key={tagId}
-                                    className="inline-flex rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none"
-                                    style={{
-                                      backgroundColor: `${tag.color}20`,
-                                      borderColor: `${tag.color}40`,
-                                      color: tag.color,
-                                    }}
-                                  >
-                                    {tag.name}
-                                  </span>
-                                );
-                              })}
-                            </div>
-                            <p className="break-words text-sm font-bold leading-snug text-foreground">
-                              {item.text}
+                          <div className="flex-1 min-w-0">
+                            {item.tags && item.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mb-1">
+                                {item.tags.map((tagId) => {
+                                  const tag = getTagDetails(tagId);
+                                  if (!tag) return null;
+                                  return (
+                                    <span
+                                      key={tagId}
+                                      className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal shadow-sm transition-colors"
+                                      style={{
+                                        backgroundColor: `${tag.color}20`,
+                                        borderColor: `${tag.color}40`,
+                                        color: tag.color,
+                                      }}
+                                    >
+                                      {tag.name}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <span className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-sm font-semibold leading-snug break-words text-foreground">
+                                {item.text}
+                              </span>
                               {item.type === 'weekly' && (
-                                <RotateCcw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 inline ml-1.5 relative -top-px" />
+                                <RotateCcw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
                               )}
-                            </p>
+                            </span>
 
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <div className="mt-3 flex flex-wrap items-center gap-2.5">
                               <button
                                 type="button"
                                 onClick={() => void completeItem(item)}
                                 disabled={isBusy}
-                                className="inline-flex h-7 items-center gap-1 rounded-lg bg-primary px-2.5 text-[9px] font-black uppercase tracking-wide text-primary-foreground shadow-sm transition disabled:opacity-50"
+                                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3 text-[10px] font-black uppercase tracking-[0.08em] text-primary-foreground shadow-sm ring-1 ring-primary/40 transition-all hover:brightness-110 active:scale-95 disabled:opacity-50"
                               >
-                                DID YESTERDAY
+                                <CheckCircle2 className="h-3.5 w-3.5" />
+                                Did Yesterday
                               </button>
                               <button
                                 type="button"
                                 onClick={() => void runAction(item, 'save-later')}
                                 disabled={isBusy}
-                                className="inline-flex h-7 items-center gap-1 rounded-lg border border-border/70 bg-muted/50 px-2.5 text-[9px] font-black uppercase tracking-wide text-foreground transition hover:bg-muted disabled:opacity-50"
+                                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border/60 bg-card px-3 text-[10px] font-black uppercase tracking-[0.08em] text-muted-foreground shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 disabled:opacity-50"
                               >
-                                <FolderOpen className="h-3 w-3" />
-                                DO LATER
+                                <FolderOpen className="h-3.5 w-3.5" />
+                                Do Later
                               </button>
                               <button
                                 type="button"
                                 onClick={() => void moveToToday(item)}
                                 disabled={isBusy}
-                                className="inline-flex h-7 items-center gap-1 rounded-lg border border-primary/25 bg-primary/10 px-2.5 text-[9px] font-black uppercase tracking-wide text-primary transition hover:bg-primary/15 disabled:opacity-50"
+                                className="inline-flex h-8 items-center gap-1.5 rounded-full border border-primary/30 bg-primary/10 px-3 text-[10px] font-black uppercase tracking-[0.08em] text-primary shadow-sm transition-all hover:bg-primary/15 active:scale-95 disabled:opacity-50"
                               >
-                                <CalendarPlus className="h-3 w-3" />
-                                DO TODAY
+                                <CalendarPlus className="h-3.5 w-3.5" />
+                                Do Today
                               </button>
                             </div>
                           </div>
@@ -428,8 +456,10 @@ export function MissedTasksPopup({
                       </div>
                     );
                   })}
+                  </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
         );}}

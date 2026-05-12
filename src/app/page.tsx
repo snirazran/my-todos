@@ -1098,6 +1098,11 @@ export default function Home() {
           show={shouldShowMissedReview}
           status={activeMissedTasksData}
           tags={isDebugMode ? [...tags, ...debugMockTags] : tags}
+          hunger={user ? hungerStatus.hunger : undefined}
+          maxHunger={user ? hungerStatus.maxHunger : undefined}
+          questClaimableCount={questsData?.claimableCount ?? 0}
+          questActiveCount={questsData?.activeCount ?? 0}
+          isPremium={isPremium}
           onClose={() => setDismissMissedReview(true)}
           onItemResolved={async (id, nextFlyBalance) => {
             await mutateMissedTasks(
