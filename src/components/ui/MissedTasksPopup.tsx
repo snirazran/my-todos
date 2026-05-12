@@ -254,7 +254,7 @@ export function MissedTasksPopup({
                   </div>
                   <div className="min-w-0">
                     <h2 className="text-xl font-black leading-tight tracking-tight text-foreground">
-                      Did you finish your <span className="text-primary">tasks?</span>
+                      Did you finish yesterday&apos;s <span className="text-primary">tasks?</span>
                     </h2>
                   </div>
                 </div>
