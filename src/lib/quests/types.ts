@@ -120,6 +120,7 @@ export type MacroCategoryDefinition = {
   backgroundFrom: string;
   backgroundTo: string;
   taskSuggestions: string[];
+  quickAddSuggestions?: { text: string; emoji: string }[];
   campaignHeadlines: string[];
   durationDaysOptions: number[];
   premiumAnimationId: string;

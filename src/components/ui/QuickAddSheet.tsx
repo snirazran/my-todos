@@ -23,6 +23,7 @@ import {
 import Fly from '@/components/ui/fly';
 import { PremiumLimitDialog } from './PremiumLimitDialog';
 import { PickerSheet } from './quick-add/PickerSheet';
+import { SuggestionTabs } from './quick-add/SuggestionTabs';
 import { useTagManager } from './quick-add/useTagManager';
 import { useCalendarMonth } from './quick-add/useCalendarMonth';
 import {
@@ -77,6 +78,7 @@ export default function QuickAddSheet({
   const [reminder, setReminder] = useState('at_time');
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
+  const [autoAddedTagIds, setAutoAddedTagIds] = useState<string[]>([]);
 
   const calendar = useCalendarMonth(new Date());
 
@@ -120,6 +122,7 @@ export default function QuickAddSheet({
     setShowReminderPicker(false);
     setActivePicker(null);
     setShowCalendarPicker(false);
+    setAutoAddedTagIds([]);
 
     const initialDate = defaultDateKey ?? ymdLocal(new Date());
     setSelectedDateKey(initialDate);
@@ -299,14 +302,14 @@ export default function QuickAddSheet({
                                   setEndTime('');
                                   setNotifyEnabled(false);
                                 }}
-                                className="group shrink-0 relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border border-primary/20 bg-primary/10 text-primary transition-all shadow-sm hover:opacity-75 active:scale-95"
+                                className="group shrink-0 relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border border-primary/20 bg-primary/10 text-primary transition-all shadow-sm [@media(hover:hover)]:hover:opacity-75 active:scale-95"
                               >
                                 <Clock className="w-3 h-3" />
                                 <span>
                                   {formatTimeDisplay(startTime)}
                                   {endTime && ` - ${formatTimeDisplay(endTime)}`}
                                 </span>
-                                <X className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                <X className="w-3 h-3 opacity-50 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity" />
                               </button>
                             )}
                             {tags.map((tagId) => {
@@ -319,7 +322,7 @@ export default function QuickAddSheet({
                                   key={tagId}
                                   type="button"
                                   onClick={() => tagManager.removeTag(tagId)}
-                                  className="group shrink-0 relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all shadow-sm hover:opacity-75 active:scale-95"
+                                  className="group shrink-0 relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border transition-all shadow-sm [@media(hover:hover)]:hover:opacity-75 active:scale-95"
                                   style={
                                     color
                                       ? {
@@ -342,7 +345,7 @@ export default function QuickAddSheet({
                                   >
                                     {name}
                                   </span>
-                                  <X className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity" />
+                                  <X className="w-3 h-3 opacity-50 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity" />
                                 </button>
                               );
                             })}
@@ -357,7 +360,7 @@ export default function QuickAddSheet({
                             setActivePicker('tags');
                             setTimeout(() => tagInputRef.current?.focus(), 100);
                           }}
-                          className="group flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left transition-colors hover:bg-muted/45"
+                          className="group flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
                         >
                           <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
                             <Tag className="h-3.5 w-3.5 stroke-[3]" />
@@ -373,7 +376,7 @@ export default function QuickAddSheet({
                           <button
                             type="button"
                             onClick={() => setActivePicker('date')}
-                            className="group flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left transition-colors hover:bg-muted/45"
+                            className="group flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
                           >
                             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
                               <CalendarCheck className="h-3.5 w-3.5 stroke-[3]" />
@@ -391,7 +394,7 @@ export default function QuickAddSheet({
                           <button
                             type="button"
                             onClick={() => setActivePicker('repeat')}
-                            className="group flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left transition-colors hover:bg-muted/45"
+                            className="group flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
                           >
                             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
                               <RotateCcw className="h-3.5 w-3.5 stroke-[3]" />
@@ -403,6 +406,38 @@ export default function QuickAddSheet({
                         )}
 
                       </div>
+
+                      <SuggestionTabs
+                        open={open}
+                        onPick={(pick) => {
+                          setText(pick.text);
+                          setTags((prev) => {
+                            const removed = new Set(autoAddedTagIds);
+                            const seen = new Set<string>();
+                            const next: string[] = [];
+                            for (const id of prev) {
+                              if (removed.has(id)) continue;
+                              if (seen.has(id)) continue;
+                              seen.add(id);
+                              next.push(id);
+                            }
+                            for (const id of pick.tagIds) {
+                              if (seen.has(id)) continue;
+                              seen.add(id);
+                              next.push(id);
+                            }
+                            return next;
+                          });
+                          setAutoAddedTagIds(pick.tagIds);
+                          if (pick.startTime !== undefined) {
+                            setStartTime(pick.startTime);
+                            setEndTime(pick.endTime ?? '');
+                            setNotifyEnabled(!!pick.reminder);
+                            if (pick.reminder) setReminder(pick.reminder);
+                          }
+                          inputRef.current?.focus();
+                        }}
+                      />
                     </div>
 
                     <div
@@ -413,7 +448,7 @@ export default function QuickAddSheet({
                         type="button"
                         aria-label="Cancel"
                         onClick={() => onOpenChange(false)}
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
+                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/80 [@media(hover:hover)]:hover:text-foreground"
                       >
                         <X className="h-5 w-5 stroke-[3]" />
                       </button>
@@ -425,7 +460,7 @@ export default function QuickAddSheet({
                           'relative h-12 flex-1 rounded-full text-[15px] font-bold overflow-hidden transition-all',
                           'bg-primary text-primary-foreground',
                           'shadow-sm ring-1 ring-white/20',
-                          'hover:brightness-105 active:scale-[0.985]',
+                          '[@media(hover:hover)]:hover:brightness-105 active:scale-[0.985]',
                           'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
                         ].join(' ')}
                       >
