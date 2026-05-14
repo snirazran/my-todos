@@ -24,6 +24,7 @@ export async function GET() {
         name: c.name,
         shortLabel: c.shortLabel,
         description: c.description,
+        onboardingSentence: c.onboardingSentence ?? '',
         coverImageUrl: c.coverImageUrl,
         accent: c.accent,
         backgroundFrom: c.backgroundFrom,
@@ -41,7 +42,7 @@ export async function POST(req: NextRequest) {
     await requireUserId();
     await connectMongo();
     const body = await req.json();
-    const { name, shortLabel, description, accent, backgroundFrom, backgroundTo } = body;
+    const { name, shortLabel, description, onboardingSentence, accent, backgroundFrom, backgroundTo } = body;
     const coverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
 
     if (!name?.trim()) {
@@ -54,6 +55,7 @@ export async function POST(req: NextRequest) {
       name: name.trim(),
       shortLabel: shortLabel?.trim() ?? '',
       description: description?.trim() ?? '',
+      onboardingSentence: onboardingSentence?.trim() ?? '',
       ...(coverImageUrl ? { coverImageUrl } : {}),
       accent: accent ?? '#6366f1',
       backgroundFrom: backgroundFrom ?? '#1e1b4b',
@@ -68,6 +70,7 @@ export async function POST(req: NextRequest) {
         name: category.name,
         shortLabel: category.shortLabel,
         description: category.description,
+        onboardingSentence: category.onboardingSentence ?? '',
         coverImageUrl: category.coverImageUrl,
         accent: category.accent,
         backgroundFrom: category.backgroundFrom,
@@ -85,7 +88,7 @@ export async function PUT(req: NextRequest) {
     await requireUserId();
     await connectMongo();
     const body = await req.json();
-    const { id, name, shortLabel, description, accent, backgroundFrom, backgroundTo } = body;
+    const { id, name, shortLabel, description, onboardingSentence, accent, backgroundFrom, backgroundTo } = body;
     const coverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
 
     if (!id) return NextResponse.json({ error: 'Category id required' }, { status: 400 });
@@ -95,6 +98,7 @@ export async function PUT(req: NextRequest) {
       name: name.trim(),
       shortLabel: shortLabel?.trim() ?? '',
       description: description?.trim() ?? '',
+      onboardingSentence: onboardingSentence?.trim() ?? '',
       accent: accent ?? '#6366f1',
       backgroundFrom: backgroundFrom ?? '#1e1b4b',
       backgroundTo: backgroundTo ?? '#312e81',
@@ -120,6 +124,7 @@ export async function PUT(req: NextRequest) {
         name: category.name,
         shortLabel: category.shortLabel,
         description: category.description,
+        onboardingSentence: category.onboardingSentence ?? '',
         coverImageUrl: category.coverImageUrl,
         accent: category.accent,
         backgroundFrom: category.backgroundFrom,

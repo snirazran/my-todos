@@ -343,6 +343,7 @@ function categoryDocToDefinition(doc: QuestCategoryDoc): MacroCategoryDefinition
     name: doc.name,
     shortLabel: doc.shortLabel,
     description: doc.description,
+    onboardingSentence: doc.onboardingSentence,
     coverImageUrl: doc.coverImageUrl,
     accent: doc.accent,
     backgroundFrom: doc.backgroundFrom,

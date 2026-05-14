@@ -6,6 +6,7 @@ export interface QuestCategoryDoc {
   name: string;
   shortLabel: string;
   description: string;
+  onboardingSentence?: string;
   coverImageUrl?: string;
   accent: string;
   backgroundFrom: string;
@@ -21,6 +22,7 @@ const QuestCategorySchema = new Schema<QuestCategoryDoc>(
     name: { type: String, required: true },
     shortLabel: { type: String, default: '' },
     description: { type: String, default: '' },
+    onboardingSentence: { type: String, default: '' },
     coverImageUrl: { type: String, default: undefined },
     accent: { type: String, default: '#6366f1' },
     backgroundFrom: { type: String, default: '#1e1b4b' },

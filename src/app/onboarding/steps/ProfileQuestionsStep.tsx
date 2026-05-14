@@ -4,11 +4,20 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import useSWR from 'swr';
 import { cn } from '@/lib/utils';
 import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
+import type { MacroCategoryDefinition } from '@/lib/quests/types';
 
 const Frog = dynamic(() => import('@/components/ui/FrogOnDeck'), { ssr: false });
+
+type AboutOption = {
+  id: string;
+  label: string;
+  icon?: string;
+  iconImageUrl?: string;
+};
 
 type AboutQuestion = {
   id: string;
@@ -17,13 +26,8 @@ type AboutQuestion = {
   sectionLabel: string;
   sectionIndex: number;
   multiSelect?: boolean;
-  options: Array<{ id: string; label: string; icon?: string }>;
+  options: AboutOption[];
   plainOption?: { id: string; label: string };
-};
-
-type SupportFollowUpConfig = {
-  title: string;
-  options: Array<{ id: string; label: string; icon: string }>;
 };
 
 const ABOUT_QUESTIONS: AboutQuestion[] = [
@@ -134,91 +138,11 @@ const ABOUT_QUESTIONS: AboutQuestion[] = [
       { id: 'not-at-all', label: 'Not at all, I expect to see a major change', icon: '😮' },
     ],
   },
-  {
-    id: 'supportAreas',
-    title: 'What areas would you like support with?',
-    sectionLabel: 'Support Areas',
-    sectionIndex: 3,
-    multiSelect: true,
-    options: [
-      { id: 'self-acceptance', label: 'Self-acceptance and confidence', icon: '🌻' },
-      { id: 'more-active', label: 'Be more active', icon: '👟' },
-      { id: 'sleep-better', label: 'Sleep better', icon: '😴' },
-      { id: 'healthy-eating', label: 'Build healthy eating habits', icon: '🍎' },
-      { id: 'focus-productivity', label: 'Boost focus and productivity', icon: '🎯' },
-      { id: 'keep-routine', label: 'Build and keep a routine', icon: '🌱' },
-    ],
-  },
 ];
 
-const SUPPORT_AREA_FOLLOW_UPS: Record<string, SupportFollowUpConfig> = {
-  'self-acceptance': {
-    title: 'Which topics make it harder for you to feel confident or accept yourself?',
-    options: [
-      { id: 'energy-levels', label: 'Energy levels', icon: '🔋' },
-      { id: 'chronic-pain', label: 'Chronic pain', icon: '⛰️' },
-      { id: 'body-image', label: 'Body image', icon: '🧡' },
-      { id: 'overall-health', label: 'Overall health', icon: '💪' },
-      { id: 'social-skills', label: 'Social skills', icon: '☎️' },
-      { id: 'relationships', label: 'Relationships', icon: '🧑‍🤝‍🧑' },
-    ],
-  },
-  'more-active': {
-    title: 'What usually gets in the way of being more active?',
-    options: [
-      { id: 'low-energy', label: 'Low energy', icon: '🔋' },
-      { id: 'pain-discomfort', label: 'Pain or discomfort', icon: '🪨' },
-      { id: 'lack-of-time', label: 'Lack of time', icon: '⏰' },
-      { id: 'motivation', label: 'Motivation', icon: '🧠' },
-      { id: 'not-sure-where-start', label: 'Not sure where to start', icon: '🧭' },
-      { id: 'limited-access', label: 'Limited access or resources', icon: '🚧' },
-    ],
-  },
-  'sleep-better': {
-    title: 'What tends to make sleep harder for you?',
-    options: [
-      { id: 'hard-falling-asleep', label: 'Falling asleep', icon: '🌙' },
-      { id: 'wake-up-often', label: 'Waking up often', icon: '⏱️' },
-      { id: 'stress-racing-thoughts', label: 'Stress or racing thoughts', icon: '💭' },
-      { id: 'schedule', label: 'An inconsistent schedule', icon: '🗓️' },
-      { id: 'screen-time', label: 'Too much screen time', icon: '📱' },
-      { id: 'pain-discomfort', label: 'Pain or discomfort', icon: '🛌' },
-    ],
-  },
-  'healthy-eating': {
-    title: 'What makes healthy eating harder right now?',
-    options: [
-      { id: 'cravings', label: 'Cravings', icon: '🍫' },
-      { id: 'lack-of-time', label: 'Lack of time', icon: '⏰' },
-      { id: 'meal-planning', label: 'Meal planning', icon: '📝' },
-      { id: 'budget', label: 'Budget', icon: '💸' },
-      { id: 'emotional-eating', label: 'Emotional eating', icon: '💓' },
-      { id: 'energy-to-cook', label: 'Not enough energy to cook', icon: '🍳' },
-    ],
-  },
-  'focus-productivity': {
-    title: 'What most often affects your focus or productivity?',
-    options: [
-      { id: 'distractions', label: 'Distractions', icon: '📣' },
-      { id: 'overwhelm', label: 'Feeling overwhelmed', icon: '🌊' },
-      { id: 'low-energy', label: 'Low energy', icon: '🔋' },
-      { id: 'difficulty-starting', label: 'Difficulty getting started', icon: '🚦' },
-      { id: 'forgetfulness', label: 'Forgetfulness', icon: '🧩' },
-      { id: 'no-routine', label: 'Lack of routine', icon: '📍' },
-    ],
-  },
-  'keep-routine': {
-    title: 'What makes it hard to build or keep a routine?',
-    options: [
-      { id: 'inconsistent-energy', label: 'Inconsistent energy', icon: '🔋' },
-      { id: 'busy-schedule', label: 'A busy schedule', icon: '🗓️' },
-      { id: 'forgetting', label: 'Forgetting', icon: '🧠' },
-      { id: 'motivation', label: 'Motivation', icon: '🌱' },
-      { id: 'life-changes', label: 'Life changes or unpredictability', icon: '🌦️' },
-      { id: 'too-many-goals', label: 'Trying to change too much at once', icon: '🎯' },
-    ],
-  },
-};
+const FOCUS_AREAS_QUESTION_ID = 'focusAreas';
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function ProfileQuestionsStep({
   selections,
@@ -230,24 +154,39 @@ export default function ProfileQuestionsStep({
 }: OnboardingStepProps) {
   const [questionIndex, setQuestionIndex] = useState(0);
   const frogIndices = useMemo(() => randomFrogIndices(), [questionIndex]);
-  const selectedSupportAreas = selections.supportAreas ?? [];
-  const displayedQuestions = useMemo(() => {
-    const followUpQuestions: AboutQuestion[] = selectedSupportAreas
-      .filter((areaId) => SUPPORT_AREA_FOLLOW_UPS[areaId])
-      .map((areaId) => {
-        const config = SUPPORT_AREA_FOLLOW_UPS[areaId];
-        return {
-          id: `support-followup-${areaId}`,
-          title: config.title,
-          sectionLabel: 'Support Areas',
-          sectionIndex: 3,
-          multiSelect: true,
-          options: config.options,
-        };
-      });
 
-    return [...ABOUT_QUESTIONS, ...followUpQuestions];
-  }, [selectedSupportAreas]);
+  const tz =
+    typeof window !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : 'UTC';
+
+  const { data: questsData } = useSWR<{ macroCategories?: MacroCategoryDefinition[] }>(
+    `/api/quests?view=home&timezone=${encodeURIComponent(tz)}`,
+    fetcher,
+  );
+
+  const focusAreaCategories = questsData?.macroCategories ?? [];
+
+  const focusAreasQuestion: AboutQuestion = useMemo(
+    () => ({
+      id: FOCUS_AREAS_QUESTION_ID,
+      title: 'What areas would you like support with?',
+      sectionLabel: 'Focus Areas',
+      sectionIndex: 3,
+      multiSelect: true,
+      options: focusAreaCategories.map((c) => ({
+        id: c.id,
+        label: c.onboardingSentence?.trim() || c.name,
+        iconImageUrl: c.coverImageUrl,
+      })),
+    }),
+    [focusAreaCategories],
+  );
+
+  const displayedQuestions = useMemo(
+    () => [...ABOUT_QUESTIONS, focusAreasQuestion],
+    [focusAreasQuestion],
+  );
   const currentQuestion = displayedQuestions[questionIndex];
   const totalStages = 5;
   const milestoneCount = totalStages - 1;
@@ -406,6 +345,7 @@ export default function ProfileQuestionsStep({
             const isSelected = currentQuestion.multiSelect
               ? selectedValues.includes(option.id)
               : selected === option.id;
+            const hasIcon = !!option.icon || !!option.iconImageUrl;
             return (
               <button
                 key={option.id}
@@ -414,18 +354,26 @@ export default function ProfileQuestionsStep({
                 disabled={saving}
                 className={cn(
                   'h-[62px] rounded-3xl border-2 bg-background text-base font-black text-foreground shadow-sm transition-all duration-200 active:scale-[0.98] md:h-[68px] md:text-lg',
-                  option.icon && 'flex items-center justify-start gap-4 px-5 text-left',
+                  hasIcon && 'flex items-center justify-start gap-4 px-5 text-left',
                   isSelected
                     ? 'border-primary/60 bg-primary/10 text-primary'
                     : 'border-border/50 hover:border-primary/30 hover:bg-muted/30',
                   saving && 'cursor-not-allowed opacity-70',
                 )}
               >
-                {option.icon && (
+                {option.iconImageUrl ? (
+                  <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
+                    <img
+                      src={option.iconImageUrl}
+                      alt=""
+                      className="h-full w-full object-cover"
+                    />
+                  </span>
+                ) : option.icon ? (
                   <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-3xl leading-none">
                     {option.icon}
                   </span>
-                )}
+                ) : null}
                 <span className="flex-1">{option.label}</span>
                 {currentQuestion.multiSelect && (
                   <span

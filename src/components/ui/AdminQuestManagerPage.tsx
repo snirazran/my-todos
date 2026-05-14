@@ -83,6 +83,7 @@ type AdminCategory = {
   name: string;
   shortLabel: string;
   description: string;
+  onboardingSentence?: string;
   coverImageUrl?: string;
   accent: string;
   backgroundFrom: string;
@@ -94,6 +95,7 @@ type CategoryFormState = {
   name: string;
   shortLabel: string;
   description: string;
+  onboardingSentence: string;
   coverImageUrl?: string;
   accent: string;
   backgroundFrom: string;
@@ -392,6 +394,7 @@ export function AdminQuestManagerPage() {
     name: '',
     shortLabel: '',
     description: '',
+    onboardingSentence: '',
     coverImageUrl: undefined,
     accent: '#6366f1',
     backgroundFrom: '#1e1b4b',
@@ -563,8 +566,8 @@ export function AdminQuestManagerPage() {
     setEditingCategory(cat ?? null);
     setCategoryForm(
       cat
-        ? { name: cat.name, shortLabel: cat.shortLabel, description: cat.description, coverImageUrl: cat.coverImageUrl, accent: cat.accent, backgroundFrom: cat.backgroundFrom, backgroundTo: cat.backgroundTo }
-        : { name: '', shortLabel: '', description: '', coverImageUrl: undefined, accent: '#6366f1', backgroundFrom: '#1e1b4b', backgroundTo: '#312e81' },
+        ? { name: cat.name, shortLabel: cat.shortLabel, description: cat.description, onboardingSentence: cat.onboardingSentence ?? '', coverImageUrl: cat.coverImageUrl, accent: cat.accent, backgroundFrom: cat.backgroundFrom, backgroundTo: cat.backgroundTo }
+        : { name: '', shortLabel: '', description: '', onboardingSentence: '', coverImageUrl: undefined, accent: '#6366f1', backgroundFrom: '#1e1b4b', backgroundTo: '#312e81' },
     );
     setConfirmAction(null);
     setCategoryDialogOpen(true);
@@ -1636,6 +1639,18 @@ export function AdminQuestManagerPage() {
               <label className="grid gap-2">
                 <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Description</span>
                 <textarea rows={3} value={categoryForm.description} onChange={(e) => setCategoryForm((p) => ({ ...p, description: e.target.value }))} placeholder="What this category is about." className="rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary/30" />
+              </label>
+              <label className="grid gap-2">
+                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Onboarding Sentence</span>
+                <input
+                  value={categoryForm.onboardingSentence}
+                  onChange={(e) => setCategoryForm((p) => ({ ...p, onboardingSentence: e.target.value }))}
+                  placeholder="e.g. Be more active"
+                  className="h-11 rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary/30"
+                />
+                <span className="text-[11px] text-muted-foreground">
+                  Shown as this area&apos;s label in the user onboarding flow. Falls back to the name if empty.
+                </span>
               </label>
               <div className="grid grid-cols-3 gap-3">
                 <label className="grid gap-2">

@@ -115,6 +115,7 @@ export type MacroCategoryDefinition = {
   name: string;
   shortLabel: string;
   description: string;
+  onboardingSentence?: string;
   coverImageUrl?: string;
   accent: string;
   backgroundFrom: string;

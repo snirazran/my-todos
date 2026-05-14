@@ -71,20 +71,36 @@ export default function OnboardingPage() {
       setStep((s) => s + 1);
     } else {
       setSaving(true);
+      const focusAreaIds = selections.focusAreas ?? [];
       try {
-        await fetch('/api/onboarding', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            frogName: selections.frogName?.[0]?.trim() || 'Cookie',
-            frogPronouns: selections.gender?.[0] ?? null,
-            humanName: selections.humanName?.[0]?.trim() || null,
-            ageRange: selections.age?.[0] ?? null,
-            aboutGender: selections.aboutGender?.[0] ?? null,
-            usedBefore: selections.usedBefore?.[0] ?? null,
-            onboardingResponses: selections,
+        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        await Promise.all([
+          fetch('/api/onboarding', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              frogName: selections.frogName?.[0]?.trim() || 'Cookie',
+              frogPronouns: selections.gender?.[0] ?? null,
+              humanName: selections.humanName?.[0]?.trim() || null,
+              ageRange: selections.age?.[0] ?? null,
+              aboutGender: selections.aboutGender?.[0] ?? null,
+              usedBefore: selections.usedBefore?.[0] ?? null,
+              onboardingResponses: selections,
+            }),
           }),
-        });
+          focusAreaIds.length > 0
+            ? fetch('/api/quests/onboarding', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  selectedCategoryIds: focusAreaIds,
+                  categoryTagMap: [],
+                  createSuggestions: false,
+                  timezone,
+                }),
+              })
+            : Promise.resolve(),
+        ]);
       } catch {
         // best-effort
       } finally {
