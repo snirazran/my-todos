@@ -29,7 +29,11 @@ export const authOptions: AuthOptions = {
           email: creds.email,
         }).lean()) as (UserDoc & { _id: Required<UserDoc>['_id'] }) | null;
 
-        if (!dbUser || !(await compare(creds.password, dbUser.passwordHash))) {
+        if (
+          !dbUser ||
+          !dbUser.passwordHash ||
+          !(await compare(creds.password, dbUser.passwordHash))
+        ) {
           throw new Error('Invalid credentials');
         }
 
