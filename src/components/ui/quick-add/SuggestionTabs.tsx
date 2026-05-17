@@ -94,6 +94,9 @@ export function SuggestionTabs({
   );
 
   const [activeTab, setActiveTab] = useState<TabId>(tabs[0] ?? SAVED_TAB);
+  const [displayedCategoryIds, setDisplayedCategoryIds] = useState<
+    MacroCategoryId[] | null
+  >(null);
   const userPickedTabRef = useRef(false);
   const autoSelectedForOpenRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -112,6 +115,7 @@ export function SuggestionTabs({
     if (!open) {
       userPickedTabRef.current = false;
       autoSelectedForOpenRef.current = false;
+      setDisplayedCategoryIds(null);
     }
   }, [open]);
 
@@ -119,14 +123,35 @@ export function SuggestionTabs({
     if (!open) return;
     if (autoSelectedForOpenRef.current) return;
     if (userPickedTabRef.current) return;
+    if (backlogData === undefined) return;
+
     const hasBacklog = Array.isArray(backlogData) && backlogData.length > 0;
     if (hasBacklog) {
       setActiveTab(SAVED_TAB);
-      autoSelectedForOpenRef.current = true;
-    } else if (backlogData !== undefined) {
-      autoSelectedForOpenRef.current = true;
+      setDisplayedCategoryIds(focusCategories.map((c) => c.id));
+    } else if (focusCategories.length > 0) {
+      const idx = Math.floor(Math.random() * focusCategories.length);
+      const reordered = [
+        focusCategories[idx].id,
+        ...focusCategories
+          .filter((_, i) => i !== idx)
+          .map((c) => c.id),
+      ];
+      setDisplayedCategoryIds(reordered);
+      setActiveTab(reordered[0]);
+    } else {
+      setDisplayedCategoryIds([]);
     }
-  }, [open, backlogData]);
+    autoSelectedForOpenRef.current = true;
+  }, [open, backlogData, focusCategories]);
+
+  const orderedCategories = useMemo(() => {
+    if (!displayedCategoryIds) return focusCategories;
+    const byId = new Map(focusCategories.map((c) => [c.id, c]));
+    return displayedCategoryIds
+      .map((id) => byId.get(id))
+      .filter((c): c is (typeof focusCategories)[number] => !!c);
+  }, [displayedCategoryIds, focusCategories]);
 
   const pickTab = (tab: TabId) => {
     userPickedTabRef.current = true;
@@ -186,7 +211,7 @@ export function SuggestionTabs({
               Saved
             </button>
           )}
-          {focusCategories.map((c) => {
+          {orderedCategories.map((c) => {
             const isActive = activeTab === c.id;
             return (
               <button

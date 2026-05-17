@@ -202,9 +202,9 @@ export function PickerSheet(props: Props) {
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={() => setActivePicker(null)}
-        className="fixed inset-0 z-[1001] bg-black/35"
+        className="fixed inset-0 z-[1500] bg-black/35"
       />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1002] flex justify-center sm:bottom-6">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1501] flex justify-center sm:bottom-6">
       <motion.div
         initial={{ y: '120%' }}
         animate={{ y: 0 }}
@@ -541,9 +541,9 @@ function TagsView({
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   onClick={() => setPendingDelete(null)}
-                  className="fixed inset-0 z-[1010] bg-black/45"
+                  className="fixed inset-0 z-[1510] bg-black/45"
                 />
-                <div className="fixed inset-0 z-[1011] flex items-center justify-center p-4 pointer-events-none">
+                <div className="fixed inset-0 z-[1511] flex items-center justify-center p-4 pointer-events-none">
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
                   animate={{ opacity: 1, scale: 1 }}
@@ -831,9 +831,9 @@ function CalendarOverlay({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-[1003] bg-black/10"
+        className="fixed inset-0 z-[1502] bg-black/10"
       />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1004] flex justify-center sm:bottom-6">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1503] flex justify-center sm:bottom-6">
       <motion.div
         dir="ltr"
         initial={{ y: '120%' }}
@@ -941,9 +941,9 @@ function ReminderOverlay({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-[1005] bg-black/10"
+        className="fixed inset-0 z-[1504] bg-black/10"
       />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1006] flex justify-center sm:bottom-6">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1505] flex justify-center sm:bottom-6">
       <motion.div
         dir="ltr"
         initial={{ y: '120%' }}

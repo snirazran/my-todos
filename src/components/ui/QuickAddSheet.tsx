@@ -379,12 +379,13 @@ export default function QuickAddSheet({
                           type="button"
                           onClick={() => {
                             setActivePicker('tags');
-                            setTimeout(() => tagInputRef.current?.focus(), 100);
                           }}
-                          className="group flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
+                          className="group flex h-10 w-full items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
                         >
-                          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                            <Tag className="h-3.5 w-3.5 stroke-[3]" />
+                          <span className="grid h-full w-12 shrink-0 place-items-center">
+                            <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
+                              <Tag className="h-3.5 w-3.5 stroke-[3]" />
+                            </span>
                           </span>
                           <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground">
                             {tags.length > 0
@@ -397,16 +398,18 @@ export default function QuickAddSheet({
                           <button
                             type="button"
                             onClick={() => setActivePicker('date')}
-                            className="group flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
+                            className="group flex h-10 w-full items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
                           >
-                            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                              <CalendarCheck className="h-3.5 w-3.5 stroke-[3]" />
+                            <span className="grid h-full w-12 shrink-0 place-items-center">
+                              <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
+                                <CalendarCheck className="h-3.5 w-3.5 stroke-[3]" />
+                              </span>
                             </span>
                             <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground">
                               {selectedDateLabel}
                             </span>
                             {notifyEnabled && (
-                              <Bell className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                              <Bell className="h-3.5 w-3.5 shrink-0 mr-3 text-amber-500" />
                             )}
                           </button>
                         )}
@@ -415,10 +418,12 @@ export default function QuickAddSheet({
                           <button
                             type="button"
                             onClick={() => setActivePicker('repeat')}
-                            className="group flex h-9 w-full items-center gap-2.5 rounded-xl px-3 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
+                            className="group flex h-10 w-full items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
                           >
-                            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-primary/10 text-primary">
-                              <RotateCcw className="h-3.5 w-3.5 stroke-[3]" />
+                            <span className="grid h-full w-12 shrink-0 place-items-center">
+                              <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
+                                <RotateCcw className="h-3.5 w-3.5 stroke-[3]" />
+                              </span>
                             </span>
                             <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground">
                               {repeatLabel}
