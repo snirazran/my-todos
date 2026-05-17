@@ -1,18 +1,18 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { createPortal } from 'react-dom';
+import { motion } from 'framer-motion';
 import { Timer, Pause } from 'lucide-react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { cn } from '@/lib/utils';
-import { useNotification } from '@/components/providers/NotificationProvider';
-import { useUIStore } from '@/lib/uiStore';
 
 interface Props {
   onClick: () => void;
+  taskName?: string;
 }
 
-export default function FrogodoroPill({ onClick }: Props) {
+export default function FrogodoroPill({ onClick, taskName }: Props) {
   const {
     timerActive,
     isRunning,
@@ -21,18 +21,13 @@ export default function FrogodoroPill({ onClick }: Props) {
     selectedTaskId,
   } = useFrogodoroStore();
 
-  const { isVisible: isNotificationVisible } = useNotification();
-  const { isCinematicActive } = useUIStore();
-
-  const [mounted, setMounted] = useState(false);
+  const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
-    setMounted(true);
+    setPortalTarget(document.getElementById('frog-bottom-stack-top'));
   }, []);
 
-  if (!mounted) return null;
-
-  if (!selectedTaskId || !timerActive) return null;
+  if (!portalTarget || !selectedTaskId || !timerActive) return null;
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -40,71 +35,66 @@ export default function FrogodoroPill({ onClick }: Props) {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const getPhaseStyles = () =>
+  const phaseAccent =
     phase === 'focus'
-      ? 'bg-primary text-primary-foreground shadow-primary/20'
-      : 'bg-sky-500 text-white shadow-sky-500/20';
+      ? 'bg-primary text-primary-foreground'
+      : 'bg-sky-500 text-white';
 
-  const getTargetBottom = () => {
-    const base = 'env(safe-area-inset-bottom)';
-    if (isNotificationVisible) return `calc(${base} + 264px)`;
-    if (isCinematicActive) return `calc(${base} + 216px)`;
-    return `calc(${base} + 176px)`;
-  };
-
-  const targetBottom = getTargetBottom();
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ y: 100, x: '-50%', opacity: 0, bottom: targetBottom }}
-        animate={{ 
-          y: 0, 
-          x: '-50%', 
-          opacity: 1,
-          bottom: targetBottom
-        }}
-        exit={{ y: 100, x: '-50%', opacity: 0 }}
-        className="fixed left-1/2 z-[45]"
+  return createPortal(
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 20, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
+      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+      className={cn(
+        'pointer-events-auto w-full md:max-w-md md:mx-auto',
+        'flex items-center gap-3 px-4 py-3 rounded-[18px] border border-white/10 shadow-sm backdrop-blur-2xl',
+        phaseAccent,
+      )}
+    >
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-90 transition-opacity"
       >
-        <button
-          onClick={onClick}
-          className={cn(
-            "flex items-center gap-2.5 pl-3 pr-4 py-2 rounded-2xl shadow-xl",
-            "backdrop-blur-md transition-all active:scale-95 border border-white/10",
-            getPhaseStyles()
+        <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-white/20 shrink-0">
+          {isRunning ? (
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ repeat: Infinity, duration: 8, ease: 'linear' }}
+            >
+              <Timer className="w-4 h-4" />
+            </motion.div>
+          ) : (
+            <Pause className="w-4 h-4 fill-current" />
           )}
-        >
-          <div className="relative flex items-center justify-center w-7 h-7 rounded-xl bg-white/20">
-            {isRunning ? (
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 8, ease: "linear" }}
-              >
-                <Timer className="w-4 h-4" />
-              </motion.div>
-            ) : (
-              <Pause className="w-4 h-4 fill-current" />
-            )}
-            
-            {isRunning && (
-              <span className="absolute top-0 right-0 flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+
+          {isRunning && (
+            <span className="absolute top-0 right-0 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-1 items-center justify-between gap-3 min-w-0">
+          <div className="flex flex-col min-w-0 leading-tight">
+            <span className="text-[10px] font-black uppercase tracking-[0.12em] opacity-80">
+              {isRunning ? (phase === 'focus' ? 'Focus' : 'Break') : 'Paused'}
+            </span>
+            {taskName && (
+              <span className="text-sm font-bold truncate opacity-95">
+                {taskName}
               </span>
             )}
           </div>
-          
-          <div className="flex flex-col items-start leading-none">
-            <span className="text-[10px] font-black uppercase tracking-[0.1em] opacity-80 mb-0.5">
-              {isRunning ? (phase === 'focus' ? 'Focus' : 'Break') : 'Paused'}
-            </span>
-            <span className="text-sm font-black tabular-nums">
-              {formatTime(timeLeft)}
-            </span>
-          </div>
-        </button>
-      </motion.div>
-    </AnimatePresence>
+          <span className="text-base font-black tabular-nums shrink-0">
+            {formatTime(timeLeft)}
+          </span>
+        </div>
+      </button>
+    </motion.div>,
+    portalTarget,
   );
 }

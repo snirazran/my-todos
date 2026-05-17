@@ -241,7 +241,7 @@ export default function QuickAddSheet({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => onOpenChange(false)}
-                className="fixed inset-0 z-[999] bg-background/80 backdrop-blur-[2px]"
+                className="fixed inset-0 z-[1399] bg-background/80 backdrop-blur-[2px]"
               />
 
               <motion.div
@@ -253,7 +253,7 @@ export default function QuickAddSheet({
                   ease: [0.32, 0.72, 0, 1],
                   duration: 0.4,
                 }}
-                className="fixed inset-x-0 bottom-0 z-[1000] flex max-h-[100dvh] items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
+                className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
               >
                 <div className="pointer-events-auto mx-auto flex w-full max-w-[820px] flex-col pb-[env(safe-area-inset-bottom)]">
                   <div className="mb-2 flex shrink-0 justify-end px-3">

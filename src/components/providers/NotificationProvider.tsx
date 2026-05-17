@@ -11,6 +11,12 @@ import React, {
 import { AnimatePresence, motion } from 'framer-motion';
 import { X, CalendarCheck, FolderOpen } from 'lucide-react';
 
+interface NotificationItem {
+  id: number;
+  content: React.ReactNode;
+  undoAction?: () => void | Promise<void>;
+}
+
 interface NotificationContextType {
   showNotification: (
     content: React.ReactNode,
@@ -18,6 +24,9 @@ interface NotificationContextType {
   ) => void;
   hideNotification: () => void;
   isVisible: boolean;
+  count: number;
+  /** Measured pixel height of the visible notification stack (0 when empty). */
+  stackHeight: number;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(
@@ -34,189 +43,198 @@ export function useNotification() {
   return context;
 }
 
+const AUTO_DISMISS_MS = 3000;
+
 export function NotificationProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [queue, setQueue] = useState<
-    {
-      content: React.ReactNode;
-      undoAction?: () => void | Promise<void>;
-      id: number;
-    }[]
-  >([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [undoingId, setUndoingId] = useState<number | null>(null);
+  const [stackHeight, setStackHeight] = useState(0);
 
-  const [notification, setNotification] = useState<{
-    content: React.ReactNode;
-    undoAction?: () => void | Promise<void>;
-    id: number;
-  } | null>(null);
+  const timeoutsRef = useRef<Map<number, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
+  const stackRef = useRef<HTMLDivElement | null>(null);
 
-  const [isUndoing, setIsUndoing] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const processedIds = useRef<Set<number>>(new Set());
-
-  const hideNotification = useCallback(() => {
-    setNotification(null);
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
+  const dismiss = useCallback((id: number) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    const t = timeoutsRef.current.get(id);
+    if (t) {
+      clearTimeout(t);
+      timeoutsRef.current.delete(id);
     }
-    // Small delay before showing next in queue for smooth transition
-    setTimeout(() => {
-      setQueue((prev) => {
-        const nextQueue = prev.slice(1);
-        if (nextQueue.length === 0) {
-          processedIds.current.clear();
-        }
-        return nextQueue;
-      });
-    }, 150);
+  }, []);
+
+  // Backwards compatible — dismisses the oldest visible notification.
+  const hideNotification = useCallback(() => {
+    setNotifications((prev) => {
+      if (prev.length === 0) return prev;
+      const [head, ...rest] = prev;
+      const t = timeoutsRef.current.get(head.id);
+      if (t) {
+        clearTimeout(t);
+        timeoutsRef.current.delete(head.id);
+      }
+      return rest;
+    });
   }, []);
 
   const showNotification = useCallback(
     (content: React.ReactNode, undoAction?: () => void | Promise<void>) => {
-      setQueue((prev) => [
-        ...prev,
-        {
-          content,
-          undoAction,
-          id: Date.now() + Math.random(),
-        },
-      ]);
+      const id = Date.now() + Math.random();
+      setNotifications((prev) => [...prev, { id, content, undoAction }]);
+      const timeout = setTimeout(() => dismiss(id), AUTO_DISMISS_MS);
+      timeoutsRef.current.set(id, timeout);
     },
-    [],
+    [dismiss],
   );
 
-  // Effect to process the queue
   useEffect(() => {
-    if (queue.length > 0 && !notification) {
-      const next = queue[0];
+    const map = timeoutsRef.current;
+    return () => {
+      map.forEach((t) => clearTimeout(t));
+      map.clear();
+    };
+  }, []);
 
-      // Prevent re-processing the same notification ID
-      if (processedIds.current.has(next.id)) return;
+  // Track the rendered stack height so the FAB / Frogodoro pill can offset cleanly.
+  useEffect(() => {
+    const el = stackRef.current;
+    if (!el) return;
+    const update = () => setStackHeight(el.offsetHeight);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [notifications.length]);
 
-      processedIds.current.add(next.id);
-      setNotification(next);
-
-      // Auto dismiss after 3 seconds
-      timeoutRef.current = setTimeout(() => {
-        hideNotification();
-      }, 3000);
+  const handleUndo = async (item: NotificationItem) => {
+    if (!item.undoAction) return;
+    setUndoingId(item.id);
+    const t = timeoutsRef.current.get(item.id);
+    if (t) {
+      clearTimeout(t);
+      timeoutsRef.current.delete(item.id);
     }
-  }, [queue, notification, hideNotification]);
-
-  const handleUndo = async () => {
-    if (!notification?.undoAction) return;
-
-    setIsUndoing(true);
-    // Clear timeout so it doesn't dismiss while we are undoing
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-
     try {
-      await notification.undoAction();
+      await item.undoAction();
     } catch (error) {
       console.error('Undo failed', error);
     } finally {
-      setIsUndoing(false);
-      hideNotification();
+      setUndoingId(null);
+      dismiss(item.id);
     }
   };
 
-  const isSavedTasksToast = notification?.content === 'Moved to Saved Tasks';
-  const isMovedToTodayToast = notification?.content === 'Moved to Today';
-  const isMoveToast = isSavedTasksToast || isMovedToTodayToast;
-
   return (
     <NotificationContext.Provider
-      value={{ showNotification, hideNotification, isVisible: !!notification }}
+      value={{
+        showNotification,
+        hideNotification,
+        isVisible: notifications.length > 0,
+        count: notifications.length,
+        stackHeight,
+      }}
     >
       {children}
-      <AnimatePresence>
-        {notification && (
-          <div className="fixed bottom-0 left-0 right-0 z-[1300] flex justify-center pointer-events-none px-4 pb-[calc(env(safe-area-inset-bottom)+112px)]">
-            <motion.div
-              key={notification.id}
-              initial={{ opacity: 0, y: 50, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.95 }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-[18px] max-w-sm w-auto border shadow-sm backdrop-blur-2xl ${
-                isMoveToast
-                  ? 'bg-card/90 text-foreground border-border/50'
-                  : 'bg-popover/90 text-popover-foreground border-border'
-              }`}
-            >
-              {isMoveToast && (
-                <span
-                  aria-hidden
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 bg-background"
-                >
-                  {isSavedTasksToast ? (
-                    <FolderOpen size={14} />
-                  ) : (
-                    <CalendarCheck size={14} />
-                  )}
-                </span>
-              )}
-              <div
-                className={`flex-1 text-sm ${
-                  isMoveToast ? 'font-semibold' : 'font-medium'
+      <div
+        ref={stackRef}
+        className="fixed left-0 right-0 z-[1300] pointer-events-none flex flex-col gap-2 px-3 md:px-4 bottom-[calc(env(safe-area-inset-bottom)+72px)] md:bottom-[calc(env(safe-area-inset-bottom)+16px)]"
+      >
+        {/* Top slot: timer pill portals in here (above all toasts) */}
+        <div id="frog-bottom-stack-top" className="contents" />
+        <AnimatePresence initial={false}>
+          {notifications.map((n) => {
+            const isSavedTasksToast = n.content === 'Moved to Saved Tasks';
+            const isMovedToTodayToast = n.content === 'Moved to Today';
+            const isMoveToast = isSavedTasksToast || isMovedToTodayToast;
+            const isUndoing = undoingId === n.id;
+            return (
+              <motion.div
+                key={n.id}
+                layout
+                initial={{ opacity: 0, y: 20, scale: 0.96 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
+                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                className={`pointer-events-auto w-full md:max-w-md md:mx-auto flex items-center gap-3 px-4 py-3 rounded-[18px] border shadow-sm backdrop-blur-2xl ${
+                  isMoveToast
+                    ? 'bg-card/90 text-foreground border-border/50'
+                    : 'bg-popover/90 text-popover-foreground border-border'
                 }`}
               >
-                {notification.content}
-              </div>
-              {notification.undoAction && (
-                <button
-                  onClick={handleUndo}
-                  disabled={isUndoing}
-                  className="text-sm font-bold text-primary hover:text-primary/80 transition-colors uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                {isMoveToast && (
+                  <span
+                    aria-hidden
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 bg-background"
+                  >
+                    {isSavedTasksToast ? (
+                      <FolderOpen size={14} />
+                    ) : (
+                      <CalendarCheck size={14} />
+                    )}
+                  </span>
+                )}
+                <div
+                  className={`flex-1 text-sm ${
+                    isMoveToast ? 'font-semibold' : 'font-medium'
+                  }`}
                 >
-                  {isUndoing ? (
-                    <>
-                      <svg
-                        className="animate-spin h-3 w-3 text-current"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        ></circle>
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        ></path>
-                      </svg>
-                      Undo
-                    </>
-                  ) : (
-                    'Undo'
-                  )}
+                  {n.content}
+                </div>
+                {n.undoAction && (
+                  <button
+                    onClick={() => handleUndo(n)}
+                    disabled={isUndoing}
+                    className="text-sm font-bold text-primary hover:text-primary/80 transition-colors uppercase tracking-wider disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  >
+                    {isUndoing ? (
+                      <>
+                        <svg
+                          className="animate-spin h-3 w-3 text-current"
+                          xmlns="http://www.w3.org/2000/svg"
+                          fill="none"
+                          viewBox="0 0 24 24"
+                        >
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                          ></circle>
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          ></path>
+                        </svg>
+                        Undo
+                      </>
+                    ) : (
+                      'Undo'
+                    )}
+                  </button>
+                )}
+                <button
+                  onClick={() => dismiss(n.id)}
+                  disabled={isUndoing}
+                  className="p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                  aria-label="Close"
+                >
+                  <X size={16} />
                 </button>
-              )}
-              <button
-                onClick={hideNotification}
-                disabled={isUndoing}
-                className="p-1 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                aria-label="Close"
-              >
-                <X size={16} />
-              </button>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+        {/* Bottom slot: cinematic skip hint portals in here (below all toasts) */}
+        <div id="frog-bottom-stack-bottom" className="contents" />
+      </div>
     </NotificationContext.Provider>
   );
 }

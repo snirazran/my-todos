@@ -300,6 +300,7 @@ export default function ManageTasksPage() {
     phase: frogPhase,
     timeLeft: frogTimeLeft,
     isRunning: frogRunning,
+    phaseElapsed: frogPhaseElapsed,
   } = useFrogodoroStore();
 
   const liveTasksByDate = useMemo(() => {
@@ -309,6 +310,7 @@ export default function ManageTasksPage() {
         ? frogSettings.focusDuration * 60
         : frogSettings.breakDuration * 60;
     const liveElapsed = phaseDuration - frogTimeLeft;
+    const unsavedLiveElapsed = Math.max(0, liveElapsed - frogPhaseElapsed);
     const hasActivity =
       sessionStats.focusTime > 0 ||
       sessionStats.breakTime > 0 ||
@@ -326,11 +328,15 @@ export default function ManageTasksPage() {
             frogodoroSession: {
               date: today,
               focusTime:
-                sessionStats.focusTime +
-                (frogPhase === 'focus' ? liveElapsed : 0),
+                Math.max(
+                  sessionStats.focusTime,
+                  t.frogodoroSession?.focusTime ?? 0,
+                ) + (frogPhase === 'focus' ? unsavedLiveElapsed : 0),
               breakTime:
-                sessionStats.breakTime +
-                (frogPhase === 'break' ? liveElapsed : 0),
+                Math.max(
+                  sessionStats.breakTime,
+                  t.frogodoroSession?.breakTime ?? 0,
+                ) + (frogPhase === 'break' ? unsavedLiveElapsed : 0),
             },
           },
     );
@@ -343,6 +349,7 @@ export default function ManageTasksPage() {
     frogSettings,
     frogTimeLeft,
     frogRunning,
+    frogPhaseElapsed,
     sessionStats,
   ]);
 

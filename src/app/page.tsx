@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { format, subDays } from 'date-fns';
@@ -403,7 +404,7 @@ export default function Home() {
     setIsCinematicActive(cinematic);
   }, [cinematic, setIsCinematicActive]);
 
-  const { showNotification } = useNotification();
+  const { showNotification, stackHeight: notificationStackHeight } = useNotification();
 
   useEffect(() => {
     const persistApi = useFrogodoroStore.persist;
@@ -737,10 +738,10 @@ export default function Home() {
           </div>
 
           <div
-            className="relative z-20 -mx-3 -mt-2 flex flex-col gap-2 rounded-t-[24px] bg-background px-4 pt-6 before:absolute before:bottom-0 before:left-1/2 before:top-8 before:-z-10 before:w-screen before:-translate-x-1/2 before:bg-background md:-mx-6 md:-mt-4 md:px-6 lg:gap-4"
+            className="relative z-20 -mx-3 -mt-2 flex flex-col gap-2 rounded-t-[24px] bg-background px-4 pt-6 before:absolute before:bottom-0 before:left-1/2 before:top-8 before:-z-10 before:w-screen before:-translate-x-1/2 before:bg-background md:mx-auto md:-mt-4 md:w-full md:max-w-xl md:px-6 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 w-full">
               <div className="flex items-center justify-between px-2 md:px-0">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 ml-3 cursor-pointer group">
@@ -1075,6 +1076,10 @@ export default function Home() {
             if (t) setTimerTask(t);
             setShowTimer(true);
           }}
+          taskName={
+            data.find((t) => t.id === frogTaskId)?.text ??
+            backlogTasks.find((t) => t.id === frogTaskId)?.text
+          }
         />
       )}
 
@@ -1158,7 +1163,12 @@ export default function Home() {
           setShowQuickAdd(true);
         }}
         className="fixed right-6 z-[40] grid h-14 w-14 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30 shadow-lg backdrop-blur-sm transition-all hover:bg-primary/25 active:scale-95 sm:hidden"
-        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 88px)' }}
+        style={{
+          bottom: `calc(env(safe-area-inset-bottom) + ${
+            notificationStackHeight > 0 ? 80 + notificationStackHeight : 88
+          }px)`,
+          transition: 'bottom 200ms ease',
+        }}
       >
         <Plus className="h-6 w-6 stroke-[3]" />
       </button>
@@ -1203,6 +1213,11 @@ export default function Home() {
 /* ------------------------------------------------------------------ */
 function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
   const [active, setActive] = React.useState(false);
+  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    setPortalTarget(document.getElementById('frog-bottom-stack-bottom'));
+  }, []);
 
   const handleSkip = React.useCallback(() => {
     if (active) return;
@@ -1221,41 +1236,48 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
         onTouchStart={handleSkip}
       />
 
-      {/* Visual skip hint (non-interactive): aligned with bottom notification zone */}
-      <div className="fixed bottom-0 left-0 right-0 z-[56] flex justify-center pointer-events-none px-3 pb-[calc(env(safe-area-inset-bottom)+88px)]">
-        <div
-          className={`
-            flex items-center gap-2 rounded-full border px-3 py-2
-            shadow-sm backdrop-blur-2xl transition-all duration-200
-            ${
-              active
-                ? 'bg-card/90 border-primary/40'
-                : 'bg-card/80 border-border/50'
-            }
-          `}
-        >
-          <span
-            className="flex items-center justify-center w-6 h-6 transition-colors duration-200 rounded-full bg-primary/15 text-primary"
-            aria-hidden
+      {portalTarget &&
+        createPortal(
+          <motion.div
+            layout
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className={`
+              pointer-events-none w-full md:max-w-md md:mx-auto
+              flex items-center gap-3 px-4 py-3 rounded-[18px] border
+              shadow-sm backdrop-blur-2xl transition-all duration-200
+              ${
+                active
+                  ? 'bg-card/90 text-foreground border-primary/40'
+                  : 'bg-card/90 text-foreground border-border/50'
+              }
+            `}
           >
-            {active ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
-                <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
-              </svg>
-            ) : (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
-              </svg>
-            )}
-          </span>
-          <span
-            className={`text-[11px] font-semibold select-none whitespace-nowrap transition-colors duration-200 ${active ? 'text-primary' : 'text-muted-foreground'}`}
-          >
-            {active ? 'x2 speed' : 'Tap to speed'}
-          </span>
-        </div>
-      </div>
+            <span
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 shrink-0"
+              aria-hidden
+            >
+              {active ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
+                  <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
+                </svg>
+              )}
+            </span>
+            <span
+              className={`flex-1 text-sm font-semibold select-none transition-colors duration-200 ${active ? 'text-primary' : 'text-foreground'}`}
+            >
+              {active ? 'x2 speed' : 'Tap anywhere to speed up'}
+            </span>
+          </motion.div>,
+          portalTarget,
+        )}
     </>
   );
 }

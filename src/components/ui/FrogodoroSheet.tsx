@@ -365,7 +365,7 @@ export default function FrogodoroSheet({
 
                       <div className="space-y-3">
                         <p className="text-sm text-muted-foreground leading-relaxed">
-                          Switch between <span className="font-bold text-primary">Focus</span> and <span className="font-bold text-sky-500">Break Time</span> as you go. We just count the total seconds you spend in each — no session limits, no rules.
+                          Switch between <span className="font-bold text-primary">Focus</span> and <span className="font-bold text-sky-500">Break</span> as you go. We just count the total seconds you spend in each — no session limits, no rules.
                         </p>
                         <div className="overflow-hidden border rounded-2xl border-border/50 bg-muted/10">
                           <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b border-border/30">
@@ -375,7 +375,7 @@ export default function FrogodoroSheet({
                           </div>
                           <div className="flex items-center gap-3 px-4 py-2.5 bg-sky-500/5">
                             <div className="w-2.5 h-2.5 rounded-full bg-sky-400 shrink-0" />
-                            <p className="flex-1 text-sm font-semibold text-foreground">Break Time</p>
+                            <p className="flex-1 text-sm font-semibold text-foreground">Break</p>
                             <span className="text-xs font-black text-sky-500 tabular-nums">{settings.breakDuration}m</span>
                           </div>
                         </div>
@@ -441,7 +441,7 @@ export default function FrogodoroSheet({
                             <div className="flex items-center gap-3 rounded-xl bg-background px-3 py-3 shadow-sm">
                               <div className="w-3 h-3 rounded-full bg-sky-400 shrink-0" />
                               <div className="flex-1">
-                                <p className="text-sm font-black text-foreground">Break Time</p>
+                                <p className="text-sm font-black text-foreground">Break</p>
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <button
@@ -569,7 +569,7 @@ export default function FrogodoroSheet({
                         <div className="flex items-center justify-center gap-1 mb-4">
                           {[
                             { id: 'focus', label: 'Focus' },
-                            { id: 'break', label: 'Break Time' },
+                            { id: 'break', label: 'Break' },
                           ].map((p) => (
                             <button
                               key={p.id}
