@@ -2,7 +2,7 @@
 
 import React, {
   forwardRef,
-  useMemo,
+  memo,
   useCallback,
   useEffect,
   useRef,
@@ -30,7 +30,7 @@ type FlyProps = {
   interactive?: boolean;
 };
 
-const Fly = forwardRef<HTMLDivElement, FlyProps>(
+const Fly = memo(forwardRef<HTMLDivElement, FlyProps>(
   (
     {
       onClick,
@@ -116,6 +116,8 @@ const Fly = forwardRef<HTMLDivElement, FlyProps>(
       </div>
     );
   }
-);
+));
+
+Fly.displayName = 'Fly';
 
 export default Fly;

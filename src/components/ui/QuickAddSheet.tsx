@@ -145,6 +145,7 @@ export default function QuickAddSheet({
     isLater || anchorDisplayDay === 7 ? todayIndex : anchorDisplayDay
   ) as DisplayDay;
   const repeatsOn = repeat === 'weekly';
+  const hasTaskText = text.trim().length > 0;
 
   const selectedDateLabel = isLater
     ? 'Later'
@@ -250,12 +251,19 @@ export default function QuickAddSheet({
                   ease: [0.32, 0.72, 0, 1],
                   duration: 0.4,
                 }}
-                className="fixed left-0 right-0 z-[1000] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none bottom-0 will-change-transform"
+                className="fixed inset-x-0 bottom-0 z-[1000] flex max-h-[100dvh] items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
               >
                 <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
-                  <div className="rounded-[28px] bg-popover/95 backdrop-blur-2xl ring-1 ring-border/80 shadow-[0_24px_48px_rgba(15,23,42,0.25)] p-4">
-                    <div dir="ltr" className="w-full">
-                      <div className="mb-1 flex items-center gap-2">
+                  <div
+                    className={[
+                      'flex max-h-[calc(100dvh_-_2rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover/95 p-4 shadow-[0_24px_48px_rgba(15,23,42,0.25)] ring-1 ring-border/80 backdrop-blur-2xl sm:max-h-[calc(100dvh_-_2.5rem_-_env(safe-area-inset-bottom))]',
+                      hasTaskText
+                        ? ''
+                        : 'h-[calc(100dvh_-_2rem_-_env(safe-area-inset-bottom))] sm:h-[calc(100dvh_-_2.5rem_-_env(safe-area-inset-bottom))]',
+                    ].join(' ')}
+                  >
+                    <div dir="ltr" className="flex min-h-0 w-full flex-1 flex-col pt-1">
+                      <div className="mb-1 flex shrink-0 items-center gap-2">
                         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
                           <Fly size={36} y={-3} />
                         </div>
@@ -292,7 +300,7 @@ export default function QuickAddSheet({
                       </div>
 
                       {(tags.length > 0 || startTime) && (
-                        <div className="relative mb-3 mt-2 px-1 overflow-visible">
+                        <div className="relative mb-3 mt-2 shrink-0 overflow-visible px-1">
                           <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 pt-1 px-1 -mx-1 mask-fade-right">
                             {startTime && (
                               <button
@@ -353,7 +361,7 @@ export default function QuickAddSheet({
                         </div>
                       )}
 
-                      <div className="mt-2 mb-3 space-y-1">
+                      <div className="mb-3 mt-2 shrink-0 space-y-1">
                         <button
                           type="button"
                           onClick={() => {
@@ -407,76 +415,100 @@ export default function QuickAddSheet({
 
                       </div>
 
-                      <SuggestionTabs
-                        open={open}
-                        onPick={(pick) => {
-                          setText(pick.text);
-                          setTags((prev) => {
-                            const removed = new Set(autoAddedTagIds);
-                            const seen = new Set<string>();
-                            const next: string[] = [];
-                            for (const id of prev) {
-                              if (removed.has(id)) continue;
-                              if (seen.has(id)) continue;
-                              seen.add(id);
-                              next.push(id);
-                            }
-                            for (const id of pick.tagIds) {
-                              if (seen.has(id)) continue;
-                              seen.add(id);
-                              next.push(id);
-                            }
-                            return next;
-                          });
-                          setAutoAddedTagIds(pick.tagIds);
-                          if (pick.startTime !== undefined) {
-                            setStartTime(pick.startTime);
-                            setEndTime(pick.endTime ?? '');
-                            setNotifyEnabled(!!pick.reminder);
-                            if (pick.reminder) setReminder(pick.reminder);
-                          }
-                          inputRef.current?.focus();
-                        }}
-                      />
+                      {!hasTaskText && (
+                        <motion.div
+                          key="quick-add-suggestions"
+                          initial={{ opacity: 0, y: 8 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          transition={{ duration: 0.14, ease: 'easeOut' }}
+                          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                        >
+                          <SuggestionTabs
+                            open={open}
+                            className="h-full min-h-0"
+                            onPick={(pick) => {
+                              setText(pick.text);
+                              setTags((prev) => {
+                                const removed = new Set(autoAddedTagIds);
+                                const seen = new Set<string>();
+                                const next: string[] = [];
+                                for (const id of prev) {
+                                  if (removed.has(id)) continue;
+                                  if (seen.has(id)) continue;
+                                  seen.add(id);
+                                  next.push(id);
+                                }
+                                for (const id of pick.tagIds) {
+                                  if (seen.has(id)) continue;
+                                  seen.add(id);
+                                  next.push(id);
+                                }
+                                return next;
+                              });
+                              setAutoAddedTagIds(pick.tagIds);
+                              if (pick.startTime !== undefined) {
+                                setStartTime(pick.startTime);
+                                setEndTime(pick.endTime ?? '');
+                                setNotifyEnabled(!!pick.reminder);
+                                if (pick.reminder) setReminder(pick.reminder);
+                              }
+                              inputRef.current?.focus();
+                            }}
+                          />
+                        </motion.div>
+                      )}
                     </div>
 
-                    <div
-                      className="mt-4 flex items-center gap-2"
-                      style={{ transform: 'translateZ(0)' }}
-                    >
-                      <button
-                        type="button"
-                        aria-label="Cancel"
-                        onClick={() => onOpenChange(false)}
-                        className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/80 [@media(hover:hover)]:hover:text-foreground"
-                      >
-                        <X className="h-5 w-5 stroke-[3]" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSubmit}
-                        disabled={!text.trim() || isSubmitting}
-                        className={[
-                          'relative h-12 flex-1 rounded-full text-[15px] font-bold overflow-hidden transition-all',
-                          'bg-primary text-primary-foreground',
-                          'shadow-sm ring-1 ring-white/20',
-                          '[@media(hover:hover)]:hover:brightness-105 active:scale-[0.985]',
-                          'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
-                        ].join(' ')}
-                      >
-                        <span className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/25 to-transparent" />
-                        <span className="relative z-10 flex items-center justify-center gap-2">
-                          {isSubmitting ? (
-                            'Adding...'
-                          ) : (
-                            <>
-                              <Plus className="w-4 h-4 stroke-[3]" />
-                              <span>Add Task</span>
-                            </>
-                          )}
-                        </span>
-                      </button>
-                    </div>
+                    <AnimatePresence initial={false}>
+                      {hasTaskText && (
+                        <motion.div
+                          key="quick-add-actions"
+                          initial={{ opacity: 0, y: 6 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 6 }}
+                          transition={{ duration: 0.14, ease: 'easeOut' }}
+                          className="shrink-0"
+                        >
+                          <div
+                            className="mt-4 flex items-center gap-2"
+                            style={{ transform: 'translateZ(0)' }}
+                          >
+                            <button
+                              type="button"
+                              aria-label="Cancel"
+                              onClick={() => onOpenChange(false)}
+                              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/80 [@media(hover:hover)]:hover:text-foreground"
+                            >
+                              <X className="h-5 w-5 stroke-[3]" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleSubmit}
+                              disabled={!hasTaskText || isSubmitting}
+                              className={[
+                                'relative h-12 flex-1 rounded-full text-[15px] font-bold overflow-hidden transition-all',
+                                'bg-primary text-primary-foreground',
+                                'shadow-sm ring-1 ring-white/20',
+                                '[@media(hover:hover)]:hover:brightness-105 active:scale-[0.985]',
+                                'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
+                              ].join(' ')}
+                            >
+                              <span className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/25 to-transparent" />
+                              <span className="relative z-10 flex items-center justify-center gap-2">
+                                {isSubmitting ? (
+                                  'Adding...'
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4 stroke-[3]" />
+                                    <span>Add Task</span>
+                                  </>
+                                )}
+                              </span>
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
               </motion.div>

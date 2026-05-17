@@ -9,6 +9,7 @@ import type {
   MacroCategoryId,
 } from '@/lib/quests/types';
 import Fly from '@/components/ui/fly';
+import { cn } from '@/lib/utils';
 import { fetcher, formatTimeDisplay } from './utils';
 
 type FocusOnboarding = {
@@ -46,6 +47,7 @@ type Props = {
   /** Optional override; if omitted, SuggestionTabs fetches from /api/quests. */
   focusCategoryIds?: MacroCategoryId[];
   categoryTagMap?: FocusCategoryTagMap[];
+  className?: string;
   onPick: (pick: SuggestionPick) => void;
 };
 
@@ -53,6 +55,7 @@ export function SuggestionTabs({
   open,
   focusCategoryIds,
   categoryTagMap,
+  className,
   onPick,
 }: Props) {
   const hasOverride =
@@ -155,17 +158,74 @@ export function SuggestionTabs({
   if (focusCategories.length === 0) return null;
 
   return (
-    <div className="mt-3 border-t border-border/60 pt-3">
-      <div className="px-1 pb-2 flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+    <div
+      className={cn(
+        'mt-3 flex flex-col border-t border-border/60 pt-3',
+        className,
+      )}
+    >
+      <div className="flex shrink-0 items-center gap-1.5 px-1 pb-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
         <Sparkles className="h-3 w-3" />
         <span>Suggestions</span>
       </div>
 
-      <div className="relative">
+      <div className="-mx-1 mb-2 shrink-0 overflow-x-auto bg-popover/95 py-1 no-scrollbar">
+        <div className="flex min-w-max items-center gap-1 px-1">
+          {backlog.length > 0 && (
+            <button
+              key={`${SAVED_TAB}-first`}
+              type="button"
+              onClick={() => pickTab(SAVED_TAB)}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${
+                activeTab === SAVED_TAB
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted/50'
+              }`}
+            >
+              <FolderOpen className="h-3 w-3" />
+              Saved
+            </button>
+          )}
+          {focusCategories.map((c) => {
+            const isActive = activeTab === c.id;
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => pickTab(c.id)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${
+                  isActive
+                    ? 'bg-primary/15 text-primary'
+                    : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted/50'
+                }`}
+              >
+                {c.name}
+              </button>
+            );
+          })}
+          {backlog.length === 0 && (
+            <button
+              key={`${SAVED_TAB}-last`}
+              type="button"
+              onClick={() => pickTab(SAVED_TAB)}
+              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${
+                activeTab === SAVED_TAB
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted/50'
+              }`}
+            >
+              <FolderOpen className="h-3 w-3" />
+              Saved
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         <div
           ref={scrollRef}
           onScroll={updateFade}
-          className="max-h-[280px] overflow-y-auto px-1 pr-1.5"
+          className="h-full min-h-0 overflow-y-auto px-1 pr-1.5 pb-2 overscroll-contain"
           style={{ scrollbarGutter: 'stable' }}
         >
           {activeTab === SAVED_TAB ? (
@@ -243,58 +303,6 @@ export function SuggestionTabs({
             className="pointer-events-none absolute inset-x-0 bottom-0 h-6 bg-gradient-to-t from-popover/95 to-transparent rounded-b-md"
           />
         )}
-      </div>
-
-      <div className="mt-2 -mx-1 overflow-x-auto no-scrollbar">
-        <div className="flex items-center gap-1 px-1 min-w-max">
-          {backlog.length > 0 && (
-            <button
-              key={`${SAVED_TAB}-first`}
-              type="button"
-              onClick={() => pickTab(SAVED_TAB)}
-              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${
-                activeTab === SAVED_TAB
-                  ? 'bg-primary/15 text-primary'
-                  : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted/50'
-              }`}
-            >
-              <FolderOpen className="h-3 w-3" />
-              Saved
-            </button>
-          )}
-          {focusCategories.map((c) => {
-            const isActive = activeTab === c.id;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => pickTab(c.id)}
-                className={`shrink-0 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${
-                  isActive
-                    ? 'bg-primary/15 text-primary'
-                    : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted/50'
-                }`}
-              >
-                {c.name}
-              </button>
-            );
-          })}
-          {backlog.length === 0 && (
-            <button
-              key={`${SAVED_TAB}-last`}
-              type="button"
-              onClick={() => pickTab(SAVED_TAB)}
-              className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors ${
-                activeTab === SAVED_TAB
-                  ? 'bg-primary/15 text-primary'
-                  : 'text-muted-foreground [@media(hover:hover)]:hover:bg-muted/50'
-              }`}
-            >
-              <FolderOpen className="h-3 w-3" />
-              Saved
-            </button>
-          )}
-        </div>
       </div>
     </div>
   );
