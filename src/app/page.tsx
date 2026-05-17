@@ -434,8 +434,9 @@ export default function Home() {
     phase: frogPhase,
     timeLeft: frogTimeLeft,
     isRunning: frogRunning,
+    timerActive: frogTimerActive,
     phaseElapsed: frogPhaseElapsed,
-    pauseTimer: frogPauseTimer,
+    stopTimer: frogStopTimer,
     lastCompletionId,
     lastCompletedTaskId,
   } = useFrogodoroStore();
@@ -624,10 +625,29 @@ export default function Home() {
       return;
     }
 
-    // If this task has an active timer running, stop it and save the session
-    if (frogTaskId === taskId && frogRunning) {
-      frogPauseTimer();
-      // pauseTimer triggers GlobalTimer's pause-detection effect which saves elapsed time to DB
+    // If this task has an active timer (running or paused), flush any unsaved
+    // elapsed time, then fully stop the timer so the pill disappears.
+    if (frogTaskId === taskId && frogTimerActive) {
+      const unsavedElapsed = Math.max(0, frogLiveElapsed - frogPhaseElapsed);
+      if (unsavedElapsed > 0) {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        void fetch(`/api/tasks/${taskId}/frogodoro`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session: {
+              date: today,
+              focusTime: frogPhase === 'focus' ? unsavedElapsed : 0,
+              breakTime: frogPhase === 'break' ? unsavedElapsed : 0,
+            },
+            timezone: tz,
+          }),
+        })
+          .then(() => mutateToday())
+          .catch(() => {});
+      }
+      frogStopTimer();
     }
 
     await triggerTongue({
