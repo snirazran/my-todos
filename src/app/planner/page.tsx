@@ -306,15 +306,12 @@ export default function ManageTasksPage() {
     if (!frogTaskId) return tasksByDate;
     const phaseDuration =
       frogPhase === 'focus'
-        ? frogSettings.cycleDuration * 60
-        : frogPhase === 'shortBreak'
-          ? frogSettings.shortBreakDuration * 60
-          : frogSettings.longBreakDuration * 60;
+        ? frogSettings.focusDuration * 60
+        : frogSettings.breakDuration * 60;
     const liveElapsed = phaseDuration - frogTimeLeft;
     const hasActivity =
-      sessionStats.focusSessions > 0 ||
-      sessionStats.shortBreaks > 0 ||
-      sessionStats.longBreaks > 0 ||
+      sessionStats.focusTime > 0 ||
+      sessionStats.breakTime > 0 ||
       frogRunning ||
       liveElapsed > 0;
     if (!hasActivity) return tasksByDate;
@@ -328,24 +325,12 @@ export default function ManageTasksPage() {
             ...t,
             frogodoroSession: {
               date: today,
-              completedCycles:
-                sessionStats.focusSessions +
-                (frogPhase === 'focus' && liveElapsed > 0 ? 1 : 0),
-              timeSpent:
+              focusTime:
                 sessionStats.focusTime +
                 (frogPhase === 'focus' ? liveElapsed : 0),
-              shortBreaks:
-                sessionStats.shortBreaks +
-                (frogPhase === 'shortBreak' && liveElapsed > 0 ? 1 : 0),
-              shortBreakTime:
-                sessionStats.shortBreakTime +
-                (frogPhase === 'shortBreak' ? liveElapsed : 0),
-              longBreaks:
-                sessionStats.longBreaks +
-                (frogPhase === 'longBreak' && liveElapsed > 0 ? 1 : 0),
-              longBreakTime:
-                sessionStats.longBreakTime +
-                (frogPhase === 'longBreak' ? liveElapsed : 0),
+              breakTime:
+                sessionStats.breakTime +
+                (frogPhase === 'break' ? liveElapsed : 0),
             },
           },
     );

@@ -75,12 +75,8 @@ export default React.memo(function TaskList({
     reminder?: string;
     frogodoroSession?: {
       date: string;
-      completedCycles: number;
-      timeSpent: number;
-      shortBreaks?: number;
-      shortBreakTime?: number;
-      longBreaks?: number;
-      longBreakTime?: number;
+      focusTime: number;
+      breakTime: number;
     } | null;
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;

@@ -1,4 +1,8 @@
 import type { ApiDay } from '@/components/board/helpers';
+import type {
+  FocusCategoryTagMap,
+  MacroCategoryId,
+} from '@/lib/quests/types';
 
 export type RepeatChoice = 'this-week' | 'weekly';
 
@@ -33,6 +37,8 @@ export type QuickAddSheetProps = Readonly<{
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
   hideDayPicker?: boolean;
   hideRepeatPicker?: boolean;
+  focusCategoryIds?: MacroCategoryId[];
+  categoryTagMap?: FocusCategoryTagMap[];
 }>;
 
 export type ActivePicker = 'tags' | 'date' | 'repeat' | null;

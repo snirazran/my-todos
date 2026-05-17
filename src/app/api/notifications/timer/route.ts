@@ -9,7 +9,7 @@ import type { PomodoroPhase } from '@/lib/frogodoroStore';
 
 /**
  * POST /api/notifications/timer
- * Body: { phase: 'focus' | 'shortBreak' | 'longBreak', autoStartBreak?: boolean }
+ * Body: { phase: 'focus' | 'break', autoStartBreak?: boolean }
  *
  * Sends a push notification to all registered phone devices when a Frogodoro
  * phase finishes, including auto-started breaks and completed breaks.
@@ -24,11 +24,7 @@ export async function POST(req: NextRequest) {
 
   const { phase, autoStartBreak = false } = await req.json();
 
-  if (
-    phase !== 'focus' &&
-    phase !== 'shortBreak' &&
-    phase !== 'longBreak'
-  ) {
+  if (phase !== 'focus' && phase !== 'break') {
     return NextResponse.json({ error: 'Invalid timer phase' }, { status: 400 });
   }
 

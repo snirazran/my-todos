@@ -12,8 +12,7 @@ type HistoryTaskInput = {
   type?: unknown;
   tags?: unknown;
   frogodoroSession?: {
-    timeSpent?: unknown;
-    completedCycles?: unknown;
+    focusTime?: unknown;
   };
 };
 
@@ -182,7 +181,7 @@ function sanitizeDay(day: HistoryDayInput, tagLookup: Map<string, string>): Sani
     date,
     tasks: tasks.slice(0, MAX_TASKS_PER_DAY).map((task: HistoryTaskInput) => {
       const tagIds = normalizeStringArray(task?.tags);
-      const focusMs = Number(task?.frogodoroSession?.timeSpent ?? 0);
+      const focusMs = Number(task?.frogodoroSession?.focusTime ?? 0);
       const taskType = String(task?.type);
       return {
         text: String(task?.text ?? '').slice(0, 80),

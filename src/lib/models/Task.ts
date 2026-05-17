@@ -21,19 +21,13 @@ export interface TaskDoc {
   deletedAt?: Date;
   tags?: string[];
   frogodoroSettings?: {
-    cycleDuration: number;
-    shortBreakDuration: number;
-    longBreakDuration: number;
-    longBreakInterval: number;
+    focusDuration: number;
+    breakDuration: number;
   };
   frogodoroSessions?: {
     date: string;
-    completedCycles: number;
-    timeSpent: number;
-    shortBreaks?: number;
-    shortBreakTime?: number;
-    longBreaks?: number;
-    longBreakTime?: number;
+    focusTime: number;
+    breakTime: number;
   }[];
   calendarEventId?: string; // Google Calendar event ID for dedup
   startTime?: string; // e.g. "10:30"
@@ -65,10 +59,8 @@ const TaskSchema = new Schema<TaskDoc>(
     tags: { type: [String], default: [] },
     frogodoroSettings: {
       type: {
-        cycleDuration: { type: Number, default: 25 },
-        shortBreakDuration: { type: Number, default: 5 },
-        longBreakDuration: { type: Number, default: 30 },
-        longBreakInterval: { type: Number, default: 3 },
+        focusDuration: { type: Number, default: 25 },
+        breakDuration: { type: Number, default: 5 },
       },
       required: false,
     },
@@ -76,12 +68,8 @@ const TaskSchema = new Schema<TaskDoc>(
       type: [
         {
           date: { type: String, required: true },
-          completedCycles: { type: Number, default: 0 },
-          timeSpent: { type: Number, default: 0 },
-          shortBreaks: { type: Number, default: 0 },
-          shortBreakTime: { type: Number, default: 0 },
-          longBreaks: { type: Number, default: 0 },
-          longBreakTime: { type: Number, default: 0 },
+          focusTime: { type: Number, default: 0 },
+          breakTime: { type: Number, default: 0 },
         },
       ],
       default: [],

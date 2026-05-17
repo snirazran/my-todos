@@ -20,9 +20,7 @@ async function sendTimerNotification(phase: PomodoroPhase, autoStartBreak: boole
 }
 
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings): number {
-  if (phase === 'shortBreak') return settings.shortBreakDuration * 60;
-  if (phase === 'longBreak') return settings.longBreakDuration * 60;
-  return settings.cycleDuration * 60;
+  return phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
 }
 
 function getClientId() {
@@ -38,15 +36,17 @@ function getClientId() {
 export function GlobalTimer() {
   const {
     isRunning,
+    timerActive,
     endTime,
     timeLeft,
     phase,
     selectedTaskId,
     settings,
-    completedCycles,
     sessionStats,
+    phaseElapsed,
     tickTimer,
     completePhase,
+    setPhaseElapsed,
     hydrateActiveTimer,
   } = useFrogodoroStore();
 
@@ -74,23 +74,27 @@ export function GlobalTimer() {
   // Save Progress API Caller
   const saveProgress = async (
     taskId: string,
-    cycles: number,
-    spend: number,
-    breaks?: { shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number },
+    phaseForSave: PomodoroPhase,
+    seconds: number,
   ) => {
     const today = format(new Date(), 'yyyy-MM-dd');
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const session = {
+      date: today,
+      focusTime: phaseForSave === 'focus' ? seconds : 0,
+      breakTime: phaseForSave === 'break' ? seconds : 0,
+    };
+    window.dispatchEvent(
+      new CustomEvent('frogodoro-progress-saved', {
+        detail: { taskId, session },
+      }),
+    );
     try {
       await fetch(`/api/tasks/${taskId}/frogodoro`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session: {
-            date: today,
-            completedCycles: cycles,
-            timeSpent: spend,
-            ...breaks,
-          },
+          session,
           timezone,
         }),
       });
@@ -104,11 +108,13 @@ export function GlobalTimer() {
   const selectedTaskIdRef = useRef(selectedTaskId);
   const settingsRef = useRef(settings);
   const timeLeftRef = useRef(timeLeft);
+  const phaseElapsedRef = useRef(phaseElapsed);
 
   useEffect(() => { phaseRef.current = phase; }, [phase]);
   useEffect(() => { selectedTaskIdRef.current = selectedTaskId; }, [selectedTaskId]);
   useEffect(() => { settingsRef.current = settings; }, [settings]);
   useEffect(() => { timeLeftRef.current = timeLeft; }, [timeLeft]);
+  useEffect(() => { phaseElapsedRef.current = phaseElapsed; }, [phaseElapsed]);
 
   const publishActiveTimer = async (timer: Omit<ActiveFrogodoroTimer, 'updatedAt'>) => {
     try {
@@ -128,9 +134,27 @@ export function GlobalTimer() {
     }
   };
 
+  const clearActiveTimer = async () => {
+    try {
+      await fetch('/api/frogodoro/active', {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      lastRemoteUpdatedAtRef.current = '';
+      lastPublishedSignatureRef.current = '';
+    } catch {
+      // Cross-device timer sync is best-effort.
+    }
+  };
+
   // Publish meaningful timer state changes, not every second.
   useEffect(() => {
     if (!selectedTaskId || !clientIdRef.current || !hasLoadedRemoteTimerRef.current) return;
+
+    if (!timerActive) {
+      void clearActiveTimer();
+      return;
+    }
 
     if (suppressNextPublishRef.current) {
       suppressNextPublishRef.current = false;
@@ -151,7 +175,6 @@ export function GlobalTimer() {
       timeLeft: snapshotTimeLeft,
       endsAt: isRunning && endTime ? new Date(endTime).toISOString() : null,
       settings,
-      completedCycles,
       sessionStats,
     };
 
@@ -162,14 +185,13 @@ export function GlobalTimer() {
       timeLeft: timer.timeLeft,
       endsAt: timer.endsAt,
       settings: timer.settings,
-      completedCycles: timer.completedCycles,
       sessionStats: timer.sessionStats,
     });
 
     if (signature === lastPublishedSignatureRef.current) return;
     lastPublishedSignatureRef.current = signature;
     void publishActiveTimer(timer);
-  }, [completedCycles, endTime, isRunning, phase, selectedTaskId, sessionStats, settings]);
+  }, [endTime, isRunning, phase, selectedTaskId, sessionStats, settings, timerActive]);
 
   // Poll for timer changes started from another app window/device.
   useEffect(() => {
@@ -203,9 +225,11 @@ export function GlobalTimer() {
     };
 
     void loadActiveTimer();
+    if (!timerActive) return;
+
     const interval = window.setInterval(loadActiveTimer, 5000);
     return () => window.clearInterval(interval);
-  }, [hydrateActiveTimer, isRunning]);
+  }, [hydrateActiveTimer, isRunning, timerActive]);
 
   // Detect pause/stop to flush partial time for any phase
   useEffect(() => {
@@ -219,19 +243,15 @@ export function GlobalTimer() {
       if (selectedTaskId) {
         const phaseDuration = getPhaseDuration(phase, settings);
         const elapsed = phaseDuration - timeLeft;
-        if (elapsed > 0) {
-          if (phase === 'focus') {
-            saveProgress(selectedTaskId, 0, elapsed);
-          } else if (phase === 'shortBreak') {
-            saveProgress(selectedTaskId, 0, 0, { shortBreaks: 1, shortBreakTime: elapsed });
-          } else if (phase === 'longBreak') {
-            saveProgress(selectedTaskId, 0, 0, { longBreaks: 1, longBreakTime: elapsed });
-          }
+        const unsavedElapsed = elapsed - phaseElapsed;
+        if (unsavedElapsed > 0) {
+          saveProgress(selectedTaskId, phase, unsavedElapsed);
+          setPhaseElapsed(elapsed);
         }
       }
     }
     prevIsRunning.current = isRunning;
-  }, [isRunning, phase, selectedTaskId, settings, timeLeft]);
+  }, [isRunning, phase, phaseElapsed, selectedTaskId, setPhaseElapsed, settings, timeLeft]);
 
   // The Main Loop
   useEffect(() => {
@@ -244,7 +264,7 @@ export function GlobalTimer() {
       // Set title synchronously before tickTimer so it lands before React renders
       const m = Math.floor(remaining / 60).toString().padStart(2, '0');
       const s = (remaining % 60).toString().padStart(2, '0');
-      const icon = phaseRef.current === 'focus' ? '🐸' : phaseRef.current === 'shortBreak' ? '☕' : '💤';
+      const icon = phaseRef.current === 'focus' ? '🐸' : '☕';
       document.title = `${icon} ${m}:${s} - FrogTask`;
 
       tickTimer(remaining);
@@ -260,12 +280,9 @@ export function GlobalTimer() {
         // Auto Save on Complete — save the full phase duration
         if (selectedTaskIdRef.current) {
           const phaseDuration = getPhaseDuration(phaseRef.current, settingsRef.current);
-          if (phaseRef.current === 'focus') {
-            saveProgress(selectedTaskIdRef.current, 1, phaseDuration);
-          } else if (phaseRef.current === 'shortBreak') {
-            saveProgress(selectedTaskIdRef.current, 0, 0, { shortBreaks: 1, shortBreakTime: phaseDuration });
-          } else if (phaseRef.current === 'longBreak') {
-            saveProgress(selectedTaskIdRef.current, 0, 0, { longBreaks: 1, longBreakTime: phaseDuration });
+          const unsavedElapsed = Math.max(0, phaseDuration - phaseElapsedRef.current);
+          if (unsavedElapsed > 0) {
+            saveProgress(selectedTaskIdRef.current, phaseRef.current, unsavedElapsed);
           }
         }
 

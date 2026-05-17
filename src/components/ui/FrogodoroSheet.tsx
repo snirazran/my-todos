@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { format } from 'date-fns';
 import {
@@ -12,17 +12,15 @@ import {
   X,
   Plus,
   Minus,
-  CheckCircle2,
+  Square,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useFrogodoroStore,
   PomodoroPhase,
   DEFAULT_SETTINGS,
-  DEFAULT_SESSION_STATS,
 } from '@/lib/frogodoroStore';
 import { playTimerSound, unlockAudio, type TimerSound } from '@/lib/timerSounds';
-import { mutate } from 'swr';
 
 interface Task {
   id: string;
@@ -31,12 +29,8 @@ interface Task {
   tags?: string[];
   frogodoroSession?: {
     date: string;
-    completedCycles: number;
-    timeSpent: number;
-    shortBreaks?: number;
-    shortBreakTime?: number;
-    longBreaks?: number;
-    longBreakTime?: number;
+    focusTime: number;
+    breakTime: number;
   } | null;
   frogodoroSettings?: Record<string, unknown>;
 }
@@ -66,13 +60,14 @@ export default function FrogodoroSheet({
     phase,
     timeLeft,
     isRunning,
-    completedCycles,
+    timerActive,
     sessionStats,
     phaseElapsed: storeElapsed,
     setSettings,
     setTask,
     startTimer,
     pauseTimer,
+    stopTimer,
     switchPhase,
     completePhase,
     setPhaseElapsed,
@@ -113,12 +108,8 @@ export default function FrogodoroSheet({
       if (task.frogodoroSession) {
         const db = task.frogodoroSession;
         updateSessionStats({
-          focusSessions: db.completedCycles ?? 0,
-          focusTime: db.timeSpent ?? 0,
-          shortBreaks: db.shortBreaks ?? 0,
-          shortBreakTime: db.shortBreakTime ?? 0,
-          longBreaks: db.longBreaks ?? 0,
-          longBreakTime: db.longBreakTime ?? 0,
+          focusTime: db.focusTime ?? 0,
+          breakTime: db.breakTime ?? 0,
         });
       }
     }
@@ -134,22 +125,16 @@ export default function FrogodoroSheet({
 
   // Derived
   const phaseDuration =
-    phase === 'focus'
-      ? settings.cycleDuration * 60
-      : phase === 'shortBreak'
-        ? settings.shortBreakDuration * 60
-        : settings.longBreakDuration * 60;
+    phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
   const liveElapsed = phaseDuration - timeLeft;
 
   const hasStats =
-    sessionStats.focusSessions > 0 ||
-    sessionStats.shortBreaks > 0 ||
-    sessionStats.longBreaks > 0 ||
+    sessionStats.focusTime > 0 ||
+    sessionStats.breakTime > 0 ||
     isRunning ||
     liveElapsed > 0 ||
-    (task?.frogodoroSession?.timeSpent ?? 0) > 0 ||
-    (task?.frogodoroSession?.shortBreaks ?? 0) > 0 ||
-    (task?.frogodoroSession?.longBreaks ?? 0) > 0;
+    (task?.frogodoroSession?.focusTime ?? 0) > 0 ||
+    (task?.frogodoroSession?.breakTime ?? 0) > 0;
 
   // Phase time ref for stats
   const phaseTimeRef = useRef(storeElapsed);
@@ -180,13 +165,11 @@ export default function FrogodoroSheet({
   }, [isRunning]);
 
   const prevPhaseRef = useRef(phase);
-  const prevCyclesRef = useRef(completedCycles);
   useEffect(() => {
     prevPhaseRef.current = phase;
-    prevCyclesRef.current = completedCycles;
     phaseTimeRef.current = 0;
     setPhaseElapsed(0);
-  }, [phase, completedCycles]);
+  }, [phase]);
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -209,32 +192,11 @@ export default function FrogodoroSheet({
     if (elapsed <= 0) return;
     const today = format(new Date(), 'yyyy-MM-dd');
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    let session: Record<string, unknown> = {
+    const session = {
       date: today,
-      completedCycles: 0,
-      timeSpent: 0,
+      focusTime: currentPhase === 'focus' ? elapsed : 0,
+      breakTime: currentPhase === 'break' ? elapsed : 0,
     };
-    if (currentPhase === 'focus') {
-      session = { date: today, completedCycles: 1, timeSpent: elapsed };
-    } else if (currentPhase === 'shortBreak') {
-      session = {
-        date: today,
-        completedCycles: 0,
-        timeSpent: 0,
-        shortBreaks: 1,
-        shortBreakTime: elapsed,
-      };
-    } else if (currentPhase === 'longBreak') {
-      session = {
-        date: today,
-        completedCycles: 0,
-        timeSpent: 0,
-        longBreaks: 1,
-        longBreakTime: elapsed,
-      };
-    } else {
-      return;
-    }
     try {
       await fetch(`/api/tasks/${taskId}/frogodoro`, {
         method: 'PUT',
@@ -247,13 +209,30 @@ export default function FrogodoroSheet({
   };
 
   const toggleTimer = () => {
-    if (isRunning) pauseTimer();
-    else startTimer();
+    if (isRunning) {
+      pauseTimer();
+    } else {
+      startTimer();
+    }
+  };
+
+  const handleStopTimer = async () => {
+    const taskId = selectedTaskId;
+    const elapsed = liveElapsed;
+    const currentPhase = phase;
+
+    if (isRunning && taskId && elapsed > 0) {
+      await saveSessionToDb(taskId, currentPhase, elapsed);
+      onMutateToday?.();
+    }
+    stopTimer();
+    onOpenChange(false);
   };
 
   const handleManualSkip = async () => {
-    if (selectedTaskId && liveElapsed > 0) {
-      await saveSessionToDb(selectedTaskId, phase, liveElapsed);
+    const unsavedElapsed = Math.max(0, liveElapsed - storeElapsed);
+    if (selectedTaskId && unsavedElapsed > 0) {
+      await saveSessionToDb(selectedTaskId, phase, unsavedElapsed);
       onMutateToday?.();
     }
     completePhase(false, liveElapsed);
@@ -264,26 +243,9 @@ export default function FrogodoroSheet({
     if (selectedTaskId && liveElapsed > 0) {
       const updated = { ...sessionStats };
       if (phase === 'focus') {
-        updated.focusSessions = sessionStats.focusSessions + 1;
         updated.focusTime = sessionStats.focusTime + liveElapsed;
-        const today = format(new Date(), 'yyyy-MM-dd');
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            session: { date: today, completedCycles: 1, timeSpent: 0 },
-            timezone,
-          }),
-        })
-          .then(() => onMutateToday?.())
-          .catch(() => {});
-      } else if (phase === 'shortBreak') {
-        updated.shortBreaks = sessionStats.shortBreaks + 1;
-        updated.shortBreakTime = sessionStats.shortBreakTime + liveElapsed;
-      } else if (phase === 'longBreak') {
-        updated.longBreaks = sessionStats.longBreaks + 1;
-        updated.longBreakTime = sessionStats.longBreakTime + liveElapsed;
+      } else {
+        updated.breakTime = sessionStats.breakTime + liveElapsed;
       }
       updateSessionStats(updated);
     }
@@ -294,23 +256,13 @@ export default function FrogodoroSheet({
     if (selectedTaskId) {
       onMutateToday?.();
       try {
-        const {
-          cycleDuration,
-          shortBreakDuration,
-          longBreakDuration,
-          longBreakInterval,
-        } = settingsToSave;
+        const { focusDuration, breakDuration } = settingsToSave;
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         await fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            settings: {
-              cycleDuration,
-              shortBreakDuration,
-              longBreakDuration,
-              longBreakInterval,
-            },
+            settings: { focusDuration, breakDuration },
             timezone,
           }),
         });
@@ -328,12 +280,9 @@ export default function FrogodoroSheet({
 
   const getDurationControl = () => {
     if (phase === 'focus') {
-      return { key: 'cycleDuration' as const, min: 1, max: 120, step: 5 };
+      return { key: 'focusDuration' as const, min: 1, max: 120, step: 5 };
     }
-    if (phase === 'shortBreak') {
-      return { key: 'shortBreakDuration' as const, min: 1, max: 30, step: 1 };
-    }
-    return { key: 'longBreakDuration' as const, min: 5, max: 60, step: 5 };
+    return { key: 'breakDuration' as const, min: 1, max: 60, step: 1 };
   };
 
   const adjustCurrentDuration = (direction: -1 | 1) => {
@@ -357,17 +306,13 @@ export default function FrogodoroSheet({
     void persistTaskSettings(nextSettings);
   };
 
-  const getPhaseColor = () => {
-    if (phase === 'focus') return 'bg-primary text-primary-foreground';
-    if (phase === 'shortBreak') return 'bg-sky-500 dark:bg-sky-600 text-white';
-    return 'bg-indigo-500 dark:bg-indigo-600 text-white';
-  };
+  const getPhaseColor = () =>
+    phase === 'focus'
+      ? 'bg-primary text-primary-foreground'
+      : 'bg-sky-500 dark:bg-sky-600 text-white';
 
-  const getPhaseAccent = () => {
-    if (phase === 'focus') return 'text-primary';
-    if (phase === 'shortBreak') return 'text-sky-500';
-    return 'text-indigo-500';
-  };
+  const getPhaseAccent = () =>
+    phase === 'focus' ? 'text-primary' : 'text-sky-500';
 
   if (!mounted) return null;
 
@@ -419,37 +364,19 @@ export default function FrogodoroSheet({
                       </div>
 
                       <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          Switch between <span className="font-bold text-primary">Focus</span> and <span className="font-bold text-sky-500">Break Time</span> as you go. We just count the total seconds you spend in each — no session limits, no rules.
+                        </p>
                         <div className="overflow-hidden border rounded-2xl border-border/50 bg-muted/10">
                           <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b border-border/30">
                             <div className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" />
                             <p className="flex-1 text-sm font-semibold text-foreground">Focus</p>
-                            <span className="text-xs font-black text-primary tabular-nums">{settings.cycleDuration}m</span>
+                            <span className="text-xs font-black text-primary tabular-nums">{settings.focusDuration}m</span>
                           </div>
-                          <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border/30">
-                            <div className="w-2.5 flex justify-center shrink-0"><div className="w-px h-3 bg-border/50" /></div>
-                            <p className="text-[11px] text-muted-foreground/40 italic">then</p>
-                          </div>
-                          <div className="flex items-center gap-3 px-4 py-2.5 bg-sky-500/5 border-b border-border/30">
+                          <div className="flex items-center gap-3 px-4 py-2.5 bg-sky-500/5">
                             <div className="w-2.5 h-2.5 rounded-full bg-sky-400 shrink-0" />
-                            <p className="flex-1 text-sm font-semibold text-foreground">Short Break</p>
-                            <span className="text-xs font-black text-sky-500 tabular-nums">{settings.shortBreakDuration}m</span>
-                          </div>
-                          <div className="flex items-center gap-3 px-4 py-2 border-b border-border/30 bg-muted/20">
-                            <div className="w-2.5 flex justify-center shrink-0">
-                              <svg className="w-3 h-3 text-muted-foreground/35" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                            </div>
-                            <p className="text-[11px] text-muted-foreground/55 font-medium">Repeat {settings.longBreakInterval}x before the long break</p>
-                          </div>
-                          <div className="flex items-center gap-3 px-4 py-1.5 border-b border-border/30">
-                            <div className="w-2.5 flex justify-center shrink-0"><div className="w-px h-3 bg-border/50" /></div>
-                            <p className="text-[11px] text-muted-foreground/40 italic">then</p>
-                          </div>
-                          <div className="flex items-center gap-3 px-4 py-2.5 bg-indigo-500/5">
-                            <div className="w-2.5 h-2.5 rounded-full bg-indigo-500 shrink-0" />
-                            <p className="flex-1 text-sm font-semibold text-foreground">Long Break</p>
-                            <span className="text-xs font-black text-indigo-500 tabular-nums">{settings.longBreakDuration}m</span>
+                            <p className="flex-1 text-sm font-semibold text-foreground">Break Time</p>
+                            <span className="text-xs font-black text-sky-500 tabular-nums">{settings.breakDuration}m</span>
                           </div>
                         </div>
                       </div>
@@ -482,59 +409,56 @@ export default function FrogodoroSheet({
                       </div>
 
                       <div className="space-y-4">
-                        {/* Cycle Behavior */}
+                        {/* Durations */}
                         <div className="space-y-2">
-                          <p className="px-1 text-[11px] font-black uppercase tracking-widest text-primary/60">Cycle Behavior</p>
-                          <div className="overflow-hidden rounded-2xl border border-primary/10 bg-primary/5 p-2.5">
+                          <p className="px-1 text-[11px] font-black uppercase tracking-widest text-primary/60">Durations</p>
+                          <div className="overflow-hidden rounded-2xl border border-primary/10 bg-primary/5 p-2.5 space-y-2">
                             {/* Focus */}
-                            <div className="hidden">
+                            <div className="flex items-center gap-3 rounded-xl bg-background px-3 py-3 shadow-sm">
                               <div className="w-3 h-3 rounded-full bg-primary shrink-0" />
                               <div className="flex-1">
-                                <p className="text-sm font-semibold text-foreground">Focus</p>
+                                <p className="text-sm font-black text-foreground">Focus</p>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, cycleDuration: Math.max(5, localSettings.cycleDuration - 5) })} className="flex items-center justify-center w-6 h-6 text-sm transition-all border rounded-full bg-background border-border/70 text-muted-foreground active:scale-90">−</button>
-                                <span className="w-12 text-sm font-black text-center text-primary tabular-nums">{localSettings.cycleDuration}m</span>
-                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, cycleDuration: Math.min(120, localSettings.cycleDuration + 5) })} className="flex items-center justify-center w-6 h-6 text-sm transition-all rounded-full bg-primary/10 text-primary active:scale-90">+</button>
+                                <button
+                                  type="button"
+                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: Math.max(1, localSettings.focusDuration - 5) })}
+                                  className="flex items-center justify-center w-6 h-6 text-sm transition-all border rounded-full bg-background border-border/70 text-muted-foreground active:scale-90"
+                                >
+                                  −
+                                </button>
+                                <span className="w-12 text-sm font-black text-center text-primary tabular-nums">{localSettings.focusDuration}m</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: Math.min(120, localSettings.focusDuration + 5) })}
+                                  className="flex items-center justify-center w-6 h-6 text-sm transition-all rounded-full bg-primary/10 text-primary active:scale-90"
+                                >
+                                  +
+                                </button>
                               </div>
                             </div>
-                            {/* Short Break */}
-                            <div className="hidden">
+                            {/* Break */}
+                            <div className="flex items-center gap-3 rounded-xl bg-background px-3 py-3 shadow-sm">
                               <div className="w-3 h-3 rounded-full bg-sky-400 shrink-0" />
                               <div className="flex-1">
-                                <p className="text-sm font-semibold text-foreground">Short Break</p>
+                                <p className="text-sm font-black text-foreground">Break Time</p>
                               </div>
                               <div className="flex items-center gap-1.5">
-                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, shortBreakDuration: Math.max(1, localSettings.shortBreakDuration - 1) })} className="flex items-center justify-center w-6 h-6 text-sm transition-all border rounded-full bg-background border-border/70 text-muted-foreground active:scale-90">−</button>
-                                <span className="w-12 text-sm font-black text-center text-sky-500 tabular-nums">{localSettings.shortBreakDuration}m</span>
-                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, shortBreakDuration: Math.min(30, localSettings.shortBreakDuration + 1) })} className="flex items-center justify-center w-6 h-6 text-sm transition-all rounded-full bg-sky-500/10 text-sky-500 active:scale-90">+</button>
-                              </div>
-                            </div>
-                            {/* Rounds */}
-                            <div className="flex items-center gap-3 rounded-xl bg-background px-3 py-3 shadow-sm">
-                              <svg className="w-4 h-4 text-primary/70 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                              <div className="flex-1">
-                                <p className="text-sm font-black text-foreground">Rounds before long break</p>
-                                <p className="text-[11px] font-semibold text-muted-foreground">Long break after {localSettings.longBreakInterval} focus rounds</p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, longBreakInterval: Math.max(1, localSettings.longBreakInterval - 1) })} className="flex items-center justify-center w-6 h-6 text-sm transition-all border rounded-full bg-background border-border/70 text-muted-foreground active:scale-90">−</button>
-                                <span className="w-8 text-center text-base font-black tabular-nums text-foreground">{localSettings.longBreakInterval}</span>
-                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, longBreakInterval: Math.min(10, localSettings.longBreakInterval + 1) })} className="flex items-center justify-center w-6 h-6 text-sm transition-all rounded-full bg-primary/10 text-primary active:scale-90">+</button>
-                              </div>
-                            </div>
-                            {/* Long Break */}
-                            <div className="hidden">
-                              <div className="w-3 h-3 bg-indigo-500 rounded-full shrink-0" />
-                              <div className="flex-1">
-                                <p className="text-sm font-semibold text-foreground">Long Break</p>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, longBreakDuration: Math.max(5, localSettings.longBreakDuration - 5) })} className="flex items-center justify-center w-6 h-6 text-sm transition-all border rounded-full bg-background border-border/70 text-muted-foreground active:scale-90">−</button>
-                                <span className="w-12 text-sm font-black text-center text-indigo-500 tabular-nums">{localSettings.longBreakDuration}m</span>
-                                <button type="button" onClick={() => setLocalSettings({ ...localSettings, longBreakDuration: Math.min(60, localSettings.longBreakDuration + 5) })} className="flex items-center justify-center w-6 h-6 text-sm text-indigo-500 transition-all rounded-full bg-indigo-500/10 active:scale-90">+</button>
+                                <button
+                                  type="button"
+                                  onClick={() => setLocalSettings({ ...localSettings, breakDuration: Math.max(1, localSettings.breakDuration - 1) })}
+                                  className="flex items-center justify-center w-6 h-6 text-sm transition-all border rounded-full bg-background border-border/70 text-muted-foreground active:scale-90"
+                                >
+                                  −
+                                </button>
+                                <span className="w-12 text-sm font-black text-center text-sky-500 tabular-nums">{localSettings.breakDuration}m</span>
+                                <button
+                                  type="button"
+                                  onClick={() => setLocalSettings({ ...localSettings, breakDuration: Math.min(60, localSettings.breakDuration + 1) })}
+                                  className="flex items-center justify-center w-6 h-6 text-sm transition-all rounded-full bg-sky-500/10 text-sky-500 active:scale-90"
+                                >
+                                  +
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -644,9 +568,8 @@ export default function FrogodoroSheet({
                         {/* Phase Tabs */}
                         <div className="flex items-center justify-center gap-1 mb-4">
                           {[
-                            { id: 'focus', label: 'Focus Time' },
-                            { id: 'shortBreak', label: 'Short Break' },
-                            { id: 'longBreak', label: 'Long Break' },
+                            { id: 'focus', label: 'Focus' },
+                            { id: 'break', label: 'Break Time' },
                           ].map((p) => (
                             <button
                               key={p.id}
@@ -735,10 +658,16 @@ export default function FrogodoroSheet({
                             </button>
                           ) : (
                             <button
-                              onClick={() => setShowSettings(true)}
+                              onClick={
+                                timerActive ? handleStopTimer : () => setShowSettings(true)
+                              }
                               className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-all"
                             >
-                              <Settings2 className="w-5 h-5 text-white/90" />
+                              {timerActive ? (
+                                <Square className="w-5 h-5 fill-current opacity-90" />
+                              ) : (
+                                <Settings2 className="w-5 h-5 text-white/90" />
+                              )}
                             </button>
                           )}
                         </div>
@@ -748,38 +677,26 @@ export default function FrogodoroSheet({
                       {hasStats && (
                         <div className="flex items-center gap-2 px-4 py-3 flex-wrap border-t border-border/30">
                           {(() => {
-                            const storeHasData = sessionStats.focusSessions > 0 || sessionStats.shortBreaks > 0 || sessionStats.longBreaks > 0 || isRunning || liveElapsed > 0;
                             const db = task?.frogodoroSession;
-                            const inProgressFocus = storeHasData && phase === 'focus' && (isRunning || liveElapsed > 0) ? 1 : 0;
-                            const focusCycles = storeHasData ? sessionStats.focusSessions + inProgressFocus : (db?.completedCycles ?? 0);
-                            const focusTime = storeHasData ? sessionStats.focusTime + (phase === 'focus' ? liveElapsed : 0) : (db?.timeSpent ?? 0);
-                            const inProgressShort = storeHasData && phase === 'shortBreak' && (isRunning || liveElapsed > 0) ? 1 : 0;
-                            const shortBreaks = storeHasData ? sessionStats.shortBreaks + inProgressShort : (db?.shortBreaks ?? 0);
-                            const shortBreakTime = storeHasData ? sessionStats.shortBreakTime + (phase === 'shortBreak' ? liveElapsed : 0) : (db?.shortBreakTime ?? 0);
-                            const inProgressLong = storeHasData && phase === 'longBreak' && (isRunning || liveElapsed > 0) ? 1 : 0;
-                            const longBreaks = storeHasData ? sessionStats.longBreaks + inProgressLong : (db?.longBreaks ?? 0);
-                            const longBreakTime = storeHasData ? sessionStats.longBreakTime + (phase === 'longBreak' ? liveElapsed : 0) : (db?.longBreakTime ?? 0);
+                            const unsavedLiveElapsed = Math.max(0, liveElapsed - storeElapsed);
+                            const focusBaseTime = Math.max(sessionStats.focusTime, db?.focusTime ?? 0);
+                            const focusTime = focusBaseTime + (phase === 'focus' ? unsavedLiveElapsed : 0);
+                            const breakBaseTime = Math.max(sessionStats.breakTime, db?.breakTime ?? 0);
+                            const breakTime = breakBaseTime + (phase === 'break' ? unsavedLiveElapsed : 0);
                             return (
                               <>
-                                {(focusTime > 0 || (storeHasData && phase === 'focus')) && (
+                                {focusTime > 0 && (
                                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary/8 dark:bg-primary/15">
                                     <div className={`w-1.5 h-1.5 rounded-full bg-primary ${isRunning && phase === 'focus' ? 'animate-pulse' : ''}`} />
-                                    <span className="text-[11px] font-black text-primary tabular-nums">{focusCycles}</span>
-                                    <span className="text-[10px] font-bold text-primary/60 tabular-nums">{formatDuration(focusTime)}</span>
+                                    <span className="text-[10px] font-bold text-primary/60 uppercase tracking-wider">Focus</span>
+                                    <span className="text-[11px] font-black text-primary tabular-nums">{formatDuration(focusTime)}</span>
                                   </div>
                                 )}
-                                {(shortBreaks > 0 || shortBreakTime > 0 || (storeHasData && phase === 'shortBreak')) && (
+                                {breakTime > 0 && (
                                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-sky-500/8 dark:bg-sky-500/15">
-                                    <div className={`w-1.5 h-1.5 rounded-full bg-sky-500 ${isRunning && phase === 'shortBreak' ? 'animate-pulse' : ''}`} />
-                                    <span className="text-[11px] font-black text-sky-500 tabular-nums">{shortBreaks}</span>
-                                    <span className="text-[10px] font-bold text-sky-500/60 tabular-nums">{formatDuration(shortBreakTime)}</span>
-                                  </div>
-                                )}
-                                {(longBreaks > 0 || longBreakTime > 0 || (storeHasData && phase === 'longBreak')) && (
-                                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-indigo-500/8 dark:bg-indigo-500/15">
-                                    <div className={`w-1.5 h-1.5 rounded-full bg-indigo-500 ${isRunning && phase === 'longBreak' ? 'animate-pulse' : ''}`} />
-                                    <span className="text-[11px] font-black text-indigo-500 tabular-nums">{longBreaks}</span>
-                                    <span className="text-[10px] font-bold text-indigo-500/60 tabular-nums">{formatDuration(longBreakTime)}</span>
+                                    <div className={`w-1.5 h-1.5 rounded-full bg-sky-500 ${isRunning && phase === 'break' ? 'animate-pulse' : ''}`} />
+                                    <span className="text-[10px] font-bold text-sky-500/60 uppercase tracking-wider">Break</span>
+                                    <span className="text-[11px] font-black text-sky-500 tabular-nums">{formatDuration(breakTime)}</span>
                                   </div>
                                 )}
                               </>

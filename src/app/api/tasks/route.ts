@@ -472,7 +472,7 @@ export async function POST(req: NextRequest) {
         reminder: task.reminder,
       });
     }
-    await syncGamification(uid, tz);
+    void syncGamification(uid, tz);
     return NextResponse.json({
       ok: true,
       ids: createdIds,
@@ -577,7 +577,7 @@ export async function POST(req: NextRequest) {
       });
     }
   }
-  await syncGamification(uid, tz);
+  void syncGamification(uid, tz);
   return NextResponse.json({ ok: true, ids: createdIds, tasks: createdTasks });
 }
 
@@ -785,7 +785,7 @@ export async function PUT(req: NextRequest) {
       uid,
       tz,
     ));
-  await syncGamification(uid, tz);
+  void syncGamification(uid, tz);
   return NextResponse.json({
     ok: true,
     flyStatus,

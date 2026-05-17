@@ -43,7 +43,6 @@ type DayStats = {
   tasksTotal: number;
   tasksCompleted: number;
   focusMinutes: number;
-  focusCycles: number;
 };
 
 type TagStat = {
@@ -77,7 +76,6 @@ export type WeeklyRecapData = {
   activeDays: number;
   bestDay: DayStats | null;
   totalFocusMinutes: number;
-  totalFocusCycles: number;
   fliesEarned: number;
   currentStreak: number;
   days: DayStats[];
@@ -146,12 +144,10 @@ function computeWeekStats(
     });
 
     let focusMinutes = 0;
-    let focusCycles = 0;
     for (const t of dayTasks) {
       const session = t.frogodoroSessions?.find((s) => s.date === dateStr);
       if (session) {
-        focusMinutes += Math.round(session.timeSpent / 60000);
-        focusCycles += session.completedCycles;
+        focusMinutes += Math.round((session.focusTime ?? 0) / 60000);
       }
     }
 
@@ -165,7 +161,6 @@ function computeWeekStats(
           (!!t.completed && t.type === 'regular'),
       ).length,
       focusMinutes,
-      focusCycles,
     };
   });
 
@@ -175,7 +170,6 @@ function computeWeekStats(
     (d) => d.tasksCompleted > 0,
   ).length;
   const totalFocusMinutes = days.reduce((s, d) => s + d.focusMinutes, 0);
-  const totalFocusCycles = days.reduce((s, d) => s + d.focusCycles, 0);
   const completionRate = tasksTotal > 0 ? Math.round((tasksCompleted / tasksTotal) * 100) : 0;
 
   const bestDay =
@@ -191,7 +185,6 @@ function computeWeekStats(
     completionRate,
     activeDays,
     totalFocusMinutes,
-    totalFocusCycles,
     bestDay,
   };
 }
@@ -334,7 +327,7 @@ export async function GET(req: NextRequest) {
 
           const session = t.frogodoroSessions?.find((s) => s.date === dateStr);
           if (session) {
-            focusMinutes += Math.round(session.timeSpent / 60000);
+            focusMinutes += Math.round((session.focusTime ?? 0) / 60000);
           }
         }
       }
@@ -429,7 +422,6 @@ export async function GET(req: NextRequest) {
       activeDays: lastWeekStats.activeDays,
       bestDay: lastWeekStats.bestDay,
       totalFocusMinutes: lastWeekStats.totalFocusMinutes,
-      totalFocusCycles: lastWeekStats.totalFocusCycles,
       fliesEarned,
       currentStreak,
       days: lastWeekStats.days,

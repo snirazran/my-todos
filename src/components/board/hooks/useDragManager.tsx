@@ -22,12 +22,8 @@ export type DragState = {
   reminder?: string;
   frogodoroSession?: {
     date: string;
-    completedCycles: number;
-    timeSpent: number;
-    shortBreaks?: number;
-    shortBreakTime?: number;
-    longBreaks?: number;
-    longBreakTime?: number;
+    focusTime: number;
+    breakTime: number;
   } | null;
 };
 
@@ -143,7 +139,7 @@ export function useDragManager() {
       startTime?: string,
       endTime?: string,
       reminder?: string,
-      frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null
+      frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null
     ) => {
       document.body.style.userSelect = 'none';
       document.body.style.touchAction = 'none'; // block body scroll
@@ -203,7 +199,7 @@ export function useDragManager() {
       startTime?: string;
       endTime?: string;
       reminder?: string;
-      frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null;
+      frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null;
     }) => {
       const {
         day, index, taskId, taskText, taskType,

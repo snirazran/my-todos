@@ -207,10 +207,8 @@ export default function Home() {
             tasksTotal: 5,
             tasksCompleted: 5,
             focusMinutes: 45,
-            focusCycles: 3,
           },
           totalFocusMinutes: 185,
-          totalFocusCycles: 12,
           fliesEarned: 14,
           currentStreak: 4,
           days: [
@@ -220,7 +218,6 @@ export default function Home() {
               tasksTotal: 3,
               tasksCompleted: 2,
               focusMinutes: 25,
-              focusCycles: 1,
             },
             {
               date: d(-6),
@@ -228,7 +225,6 @@ export default function Home() {
               tasksTotal: 4,
               tasksCompleted: 3,
               focusMinutes: 30,
-              focusCycles: 2,
             },
             {
               date: d(-5),
@@ -236,7 +232,6 @@ export default function Home() {
               tasksTotal: 5,
               tasksCompleted: 5,
               focusMinutes: 45,
-              focusCycles: 3,
             },
             {
               date: d(-4),
@@ -244,7 +239,6 @@ export default function Home() {
               tasksTotal: 2,
               tasksCompleted: 1,
               focusMinutes: 25,
-              focusCycles: 2,
             },
             {
               date: d(-3),
@@ -252,7 +246,6 @@ export default function Home() {
               tasksTotal: 3,
               tasksCompleted: 2,
               focusMinutes: 35,
-              focusCycles: 2,
             },
             {
               date: d(-2),
@@ -260,7 +253,6 @@ export default function Home() {
               tasksTotal: 1,
               tasksCompleted: 1,
               focusMinutes: 15,
-              focusCycles: 1,
             },
             {
               date: d(-1),
@@ -268,7 +260,6 @@ export default function Home() {
               tasksTotal: 0,
               tasksCompleted: 0,
               focusMinutes: 10,
-              focusCycles: 1,
             },
           ],
           topTags: [
@@ -443,21 +434,19 @@ export default function Home() {
     phase: frogPhase,
     timeLeft: frogTimeLeft,
     isRunning: frogRunning,
+    phaseElapsed: frogPhaseElapsed,
     pauseTimer: frogPauseTimer,
     lastCompletionId,
     lastCompletedTaskId,
   } = useFrogodoroStore();
   const frogPhaseDuration =
     frogPhase === 'focus'
-      ? frogSettings.cycleDuration * 60
-      : frogPhase === 'shortBreak'
-        ? frogSettings.shortBreakDuration * 60
-        : frogSettings.longBreakDuration * 60;
+      ? frogSettings.focusDuration * 60
+      : frogSettings.breakDuration * 60;
   const frogLiveElapsed = frogPhaseDuration - frogTimeLeft;
   const frogHasActivity =
-    sessionStats.focusSessions > 0 ||
-    sessionStats.shortBreaks > 0 ||
-    sessionStats.longBreaks > 0 ||
+    sessionStats.focusTime > 0 ||
+    sessionStats.breakTime > 0 ||
     frogRunning ||
     frogLiveElapsed > 0;
 
@@ -465,34 +454,23 @@ export default function Home() {
   const rawData = user ? tasks : guestTasks;
   const data =
     frogTaskId && frogHasActivity
-      ? rawData.map((t) =>
-          t.id === frogTaskId
-            ? {
-                ...t,
-                frogodoroSession: {
-                  date: format(new Date(), 'yyyy-MM-dd'),
-                  completedCycles:
-                    sessionStats.focusSessions +
-                    (frogPhase === 'focus' && frogLiveElapsed > 0 ? 1 : 0),
-                  timeSpent:
-                    sessionStats.focusTime +
-                    (frogPhase === 'focus' ? frogLiveElapsed : 0),
-                  shortBreaks:
-                    sessionStats.shortBreaks +
-                    (frogPhase === 'shortBreak' && frogLiveElapsed > 0 ? 1 : 0),
-                  shortBreakTime:
-                    sessionStats.shortBreakTime +
-                    (frogPhase === 'shortBreak' ? frogLiveElapsed : 0),
-                  longBreaks:
-                    sessionStats.longBreaks +
-                    (frogPhase === 'longBreak' && frogLiveElapsed > 0 ? 1 : 0),
-                  longBreakTime:
-                    sessionStats.longBreakTime +
-                    (frogPhase === 'longBreak' ? frogLiveElapsed : 0),
-                },
-              }
-            : t,
-        )
+      ? rawData.map((t) => {
+          if (t.id !== frogTaskId) return t;
+          const db = t.frogodoroSession;
+          const unsavedLiveElapsed = Math.max(0, frogLiveElapsed - frogPhaseElapsed);
+          return {
+            ...t,
+            frogodoroSession: {
+              date: format(new Date(), 'yyyy-MM-dd'),
+              focusTime:
+                Math.max(sessionStats.focusTime, db?.focusTime ?? 0) +
+                (frogPhase === 'focus' ? unsavedLiveElapsed : 0),
+              breakTime:
+                Math.max(sessionStats.breakTime, db?.breakTime ?? 0) +
+                (frogPhase === 'break' ? unsavedLiveElapsed : 0),
+            },
+          };
+        })
       : rawData;
   const doneCount = data.filter((t) => t.completed).length;
 
@@ -525,6 +503,21 @@ export default function Home() {
     lastCompletedTaskId,
     lastCompletionId,
   ]);
+
+  useEffect(() => {
+    if (!timerTask) return;
+    const updatedTask = rawData.find((t) => t.id === timerTask.id);
+    const currentSession = JSON.stringify(timerTask.frogodoroSession ?? null);
+    const updatedSession = JSON.stringify(updatedTask?.frogodoroSession ?? null);
+    if (
+      updatedTask &&
+      (updatedTask.text !== timerTask.text ||
+        updatedTask.completed !== timerTask.completed ||
+        updatedSession !== currentSession)
+    ) {
+      setTimerTask(updatedTask);
+    }
+  }, [rawData, timerTask]);
 
   // Note: We don't rely purely on 'rate' anymore for triggering, but we keep it for the progress bar
   const rate = data.length > 0 ? (doneCount / data.length) * 100 : 0;
@@ -635,23 +628,6 @@ export default function Home() {
     if (frogTaskId === taskId && frogRunning) {
       frogPauseTimer();
       // pauseTimer triggers GlobalTimer's pause-detection effect which saves elapsed time to DB
-    }
-
-    // If there's in-progress focus time, the pause handler only saved time (completedCycles: 0).
-    // Count it as a completed cycle in the DB.
-    if (frogTaskId === taskId && frogPhase === 'focus' && frogLiveElapsed > 0) {
-      const today = format(new Date(), 'yyyy-MM-dd');
-      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-      fetch(`/api/tasks/${taskId}/frogodoro`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session: { date: today, completedCycles: 1, timeSpent: 0 },
-          timezone,
-        }),
-      })
-        .then(() => mutateToday())
-        .catch(() => {});
     }
 
     await triggerTongue({
@@ -979,6 +955,8 @@ export default function Home() {
         onOpenChange={setShowQuickAdd}
         initialText={quickText}
         defaultRepeat="this-week"
+        focusCategoryIds={questOnboarding?.selectedCategoryIds}
+        categoryTagMap={questOnboarding?.categoryTagMap}
         onSubmit={async ({
           text,
           days,
@@ -1022,7 +1000,7 @@ export default function Home() {
                 mutateBacklog((curr) => {
                   if (!curr) return newTasks;
                   return [...curr, ...newTasks];
-                });
+                }, false);
               } else {
                 const currentDayOfWeek = new Date().getDay();
                 // Filter to only add tasks that match TODAY's date
@@ -1040,7 +1018,7 @@ export default function Home() {
                       ...curr,
                       tasks: [...curr.tasks, ...relevantTasks],
                     };
-                  });
+                  }, false);
                 }
               }
             } else if (user) {
@@ -1224,7 +1202,7 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
       />
 
       {/* Visual skip hint (non-interactive): aligned with bottom notification zone */}
-      <div className="fixed bottom-0 left-0 right-0 z-[56] flex justify-center pointer-events-none px-3 pb-[calc(env(safe-area-inset-bottom)+152px)]">
+      <div className="fixed bottom-0 left-0 right-0 z-[56] flex justify-center pointer-events-none px-3 pb-[calc(env(safe-area-inset-bottom)+88px)]">
         <div
           className={`
             flex items-center gap-2 rounded-full border px-3 py-2

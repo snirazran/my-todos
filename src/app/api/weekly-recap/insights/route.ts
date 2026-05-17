@@ -119,7 +119,7 @@ function buildInsightsPrompt(data: any): string {
 WEEKLY STATS:
 - Tasks added: ${data.tasksAdded}, completed: ${data.tasksCompleted} (${data.completionRate}%)
 - Active days: ${data.activeDays}/7
-- Focus time: ${data.totalFocusMinutes} minutes (${data.totalFocusCycles} cycles)
+- Focus time: ${data.totalFocusMinutes} minutes
 - Streak: ${data.currentStreak} consecutive days
 - Flies earned: ${data.fliesEarned}
 

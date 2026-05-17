@@ -51,6 +51,8 @@ export default function QuickAddSheet({
   daysOrder,
   hideDayPicker = false,
   hideRepeatPicker = false,
+  focusCategoryIds,
+  categoryTagMap,
 }: QuickAddSheetProps) {
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
@@ -436,6 +438,8 @@ export default function QuickAddSheet({
                         >
                           <SuggestionTabs
                             open={open}
+                            focusCategoryIds={focusCategoryIds}
+                            categoryTagMap={categoryTagMap}
                             className="h-full min-h-0"
                             onPick={(pick) => {
                               setText(pick.text);

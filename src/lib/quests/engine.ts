@@ -196,7 +196,7 @@ function sumFocusSeconds(
       sum +
       (task.frogodoroSessions ?? []).reduce((taskSum, session) => {
         if (session.date >= startDate && session.date <= endDate) {
-          return taskSum + (session.timeSpent ?? 0);
+          return taskSum + (session.focusTime ?? 0);
         }
         return taskSum;
       }, 0)

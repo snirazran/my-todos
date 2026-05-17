@@ -30,7 +30,7 @@ interface Props {
     startTime?: string;
     endTime?: string;
     reminder?: string;
-    frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null;
+    frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null;
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
   activeDragId: string | null;

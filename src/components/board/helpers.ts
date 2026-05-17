@@ -11,12 +11,8 @@ export type Task = {
   completedDates?: string[];
   frogodoroSession?: {
     date: string;
-    completedCycles: number;
-    timeSpent: number;
-    shortBreaks?: number;
-    shortBreakTime?: number;
-    longBreaks?: number;
-    longBreakTime?: number;
+    focusTime: number;
+    breakTime: number;
   } | null;
   calendarEventId?: string;
   startTime?: string;

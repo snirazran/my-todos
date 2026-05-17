@@ -13,13 +13,12 @@ interface Props {
 }
 
 export default function FrogodoroPill({ onClick }: Props) {
-  const { 
-    isRunning, 
-    timeLeft, 
-    phase, 
-    selectedTaskId, 
-    sessionStats, 
-    settings 
+  const {
+    timerActive,
+    isRunning,
+    timeLeft,
+    phase,
+    selectedTaskId,
   } = useFrogodoroStore();
 
   const { isVisible: isNotificationVisible } = useNotification();
@@ -33,16 +32,7 @@ export default function FrogodoroPill({ onClick }: Props) {
 
   if (!mounted) return null;
 
-  const phaseDuration =
-    phase === 'focus'
-      ? settings.cycleDuration * 60
-      : phase === 'shortBreak'
-        ? settings.shortBreakDuration * 60
-        : settings.longBreakDuration * 60;
-  
-  const liveElapsed = phaseDuration - timeLeft;
-
-  if (!selectedTaskId || !isRunning) return null;
+  if (!selectedTaskId || !timerActive) return null;
 
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
@@ -50,11 +40,10 @@ export default function FrogodoroPill({ onClick }: Props) {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const getPhaseStyles = () => {
-    if (phase === 'focus') return 'bg-primary text-primary-foreground shadow-primary/20';
-    if (phase === 'shortBreak') return 'bg-sky-500 text-white shadow-sky-500/20';
-    return 'bg-indigo-500 text-white shadow-indigo-500/20';
-  };
+  const getPhaseStyles = () =>
+    phase === 'focus'
+      ? 'bg-primary text-primary-foreground shadow-primary/20'
+      : 'bg-sky-500 text-white shadow-sky-500/20';
 
   const getTargetBottom = () => {
     const base = 'env(safe-area-inset-bottom)';
@@ -108,7 +97,7 @@ export default function FrogodoroPill({ onClick }: Props) {
           
           <div className="flex flex-col items-start leading-none">
             <span className="text-[10px] font-black uppercase tracking-[0.1em] opacity-80 mb-0.5">
-              {phase === 'focus' ? 'Focus' : 'Break'}
+              {isRunning ? (phase === 'focus' ? 'Focus' : 'Break') : 'Paused'}
             </span>
             <span className="text-sm font-black tabular-nums">
               {formatTime(timeLeft)}

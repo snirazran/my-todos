@@ -3,52 +3,40 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { type TimerSound } from './timerSounds';
 import type { ActiveFrogodoroTimer } from './types/UserDoc';
 
-export type PomodoroPhase = 'focus' | 'shortBreak' | 'longBreak';
+export type PomodoroPhase = 'focus' | 'break';
 
 export interface FrogodoroSettings {
-  cycleDuration: number;
-  shortBreakDuration: number;
-  longBreakDuration: number;
-  longBreakInterval: number;
+  focusDuration: number;
+  breakDuration: number;
   autoStartBreaks: boolean;
   timerSound: TimerSound;
 }
 
 export const DEFAULT_SETTINGS: FrogodoroSettings = {
-  cycleDuration: 25,
-  shortBreakDuration: 5,
-  longBreakDuration: 30,
-  longBreakInterval: 3,
+  focusDuration: 25,
+  breakDuration: 5,
   autoStartBreaks: false,
   timerSound: 'bell',
 };
 
 export interface SessionStats {
-  focusSessions: number;
-  shortBreaks: number;
-  longBreaks: number;
   focusTime: number;
-  shortBreakTime: number;
-  longBreakTime: number;
+  breakTime: number;
 }
 
 export const DEFAULT_SESSION_STATS: SessionStats = {
-  focusSessions: 0,
-  shortBreaks: 0,
-  longBreaks: 0,
   focusTime: 0,
-  shortBreakTime: 0,
-  longBreakTime: 0,
+  breakTime: 0,
 };
 
 interface FrogodoroState {
   settings: FrogodoroSettings;
   selectedTaskId: string;
   phase: PomodoroPhase;
+  timerActive: boolean;
   isRunning: boolean;
   timeLeft: number; // in seconds
   endTime: number | null; // unix timestamp for background calc
-  completedCycles: number;
   currentSessionSpend: number; // accumulated focus time to sync
   sessionStats: SessionStats;
   phaseElapsed: number; // seconds spent in the current phase
@@ -61,6 +49,7 @@ interface FrogodoroState {
   setTask: (taskId: string, settings?: FrogodoroSettings) => void;
   startTimer: () => void;
   pauseTimer: () => void;
+  stopTimer: () => void;
   tickTimer: (newTimeLeft: number) => void;
   switchPhase: (phase: PomodoroPhase) => void;
   completePhase: (autoStart?: boolean, elapsedOverride?: number) => void;
@@ -72,16 +61,20 @@ interface FrogodoroState {
   hydrateActiveTimer: (timer: ActiveFrogodoroTimer) => void;
 }
 
+function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings) {
+  return phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
+}
+
 export const useFrogodoroStore = create<FrogodoroState>()(
   persist(
     (set, get) => ({
       settings: DEFAULT_SETTINGS,
       selectedTaskId: '',
       phase: 'focus',
+      timerActive: false,
       isRunning: false,
-      timeLeft: DEFAULT_SETTINGS.cycleDuration * 60,
+      timeLeft: DEFAULT_SETTINGS.focusDuration * 60,
       endTime: null,
-      completedCycles: 0,
       currentSessionSpend: 0,
       sessionStats: DEFAULT_SESSION_STATS,
       phaseElapsed: 0,
@@ -92,12 +85,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       setSettings: (settings) =>
         set((state) => {
           if (!state.isRunning) {
-            let time = settings.cycleDuration * 60;
-            if (state.phase === 'shortBreak')
-              time = settings.shortBreakDuration * 60;
-            if (state.phase === 'longBreak')
-              time = settings.longBreakDuration * 60;
-            return { settings, timeLeft: time };
+            return { settings, timeLeft: getPhaseDuration(state.phase, settings) };
           }
           return { settings };
         }),
@@ -106,18 +94,13 @@ export const useFrogodoroStore = create<FrogodoroState>()(
         const settings = taskSettings || DEFAULT_SETTINGS;
         set((state) => {
           const isSameTask = state.selectedTaskId === taskId;
-          let initialTime = settings.cycleDuration * 60;
-          if (state.phase === 'shortBreak')
-            initialTime = settings.shortBreakDuration * 60;
-          if (state.phase === 'longBreak')
-            initialTime = settings.longBreakDuration * 60;
           return {
             selectedTaskId: taskId,
             settings,
-            timeLeft: initialTime,
+            timeLeft: getPhaseDuration(state.phase, settings),
+            timerActive: false,
             isRunning: false,
             endTime: null,
-            completedCycles: isSameTask ? state.completedCycles : 0,
             currentSessionSpend: isSameTask ? state.currentSessionSpend : 0,
             sessionStats: isSameTask ? state.sessionStats : DEFAULT_SESSION_STATS,
             phaseElapsed: isSameTask ? state.phaseElapsed : 0,
@@ -127,31 +110,36 @@ export const useFrogodoroStore = create<FrogodoroState>()(
 
       startTimer: () => {
         set((state) => ({
+          timerActive: true,
           isRunning: true,
           endTime: Date.now() + state.timeLeft * 1000,
         }));
       },
 
       pauseTimer: () => {
-        set({ isRunning: false, endTime: null });
+        set({ timerActive: true, isRunning: false, endTime: null });
+      },
+
+      stopTimer: () => {
+        set((state) => ({
+          timerActive: false,
+          isRunning: false,
+          endTime: null,
+          timeLeft: getPhaseDuration(state.phase, state.settings),
+          phaseElapsed: 0,
+        }));
       },
 
       tickTimer: (newTimeLeft) => set({ timeLeft: newTimeLeft }),
 
       switchPhase: (newPhase) => {
-        set((state) => {
-          let time = state.settings.cycleDuration * 60;
-          if (newPhase === 'shortBreak')
-            time = state.settings.shortBreakDuration * 60;
-          if (newPhase === 'longBreak')
-            time = state.settings.longBreakDuration * 60;
-          return {
-            phase: newPhase,
-            isRunning: false,
-            endTime: null,
-            timeLeft: time,
-          };
-        });
+        set((state) => ({
+          phase: newPhase,
+          isRunning: false,
+          endTime: null,
+          timeLeft: getPhaseDuration(newPhase, state.settings),
+          phaseElapsed: 0,
+        }));
       },
 
       completePhase: (autoStart = false, elapsedOverride?: number) => {
@@ -162,55 +150,40 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             lastCompletedPhase: state.phase,
           };
 
+          const phaseDuration = getPhaseDuration(state.phase, state.settings);
+          const elapsed = elapsedOverride !== undefined ? elapsedOverride : phaseDuration;
+
           if (state.phase === 'focus') {
-            const newCycles = state.completedCycles + 1;
-            const nextPhase =
-              newCycles % state.settings.longBreakInterval === 0
-                ? 'longBreak'
-                : 'shortBreak';
-            let time = state.settings.shortBreakDuration * 60;
-            if (nextPhase === 'longBreak')
-              time = state.settings.longBreakDuration * 60;
-            const focusTime =
-              elapsedOverride !== undefined
-                ? elapsedOverride
-                : state.settings.cycleDuration * 60;
+            const nextPhase: PomodoroPhase = 'break';
+            const time = getPhaseDuration(nextPhase, state.settings);
             return {
-              completedCycles: newCycles,
               phase: nextPhase,
               isRunning: autoStart,
               endTime: autoStart ? Date.now() + time * 1000 : null,
               timeLeft: time,
+              phaseElapsed: 0,
               ...completionFields,
               sessionStats: {
                 ...state.sessionStats,
-                focusSessions: state.sessionStats.focusSessions + 1,
-                focusTime: state.sessionStats.focusTime + focusTime,
-              },
-            };
-          } else {
-            // Break finished → return to focus, never auto-start
-            const time = state.settings.cycleDuration * 60;
-            const fullBreakDuration =
-              state.phase === 'shortBreak'
-                ? state.settings.shortBreakDuration * 60
-                : state.settings.longBreakDuration * 60;
-            const breakTime =
-              elapsedOverride !== undefined ? elapsedOverride : fullBreakDuration;
-            return {
-              phase: 'focus',
-              isRunning: false,
-              endTime: null,
-              timeLeft: time,
-              ...completionFields,
-              sessionStats: {
-                ...state.sessionStats,
-                ...(state.phase === 'shortBreak'
-                  ? { shortBreaks: state.sessionStats.shortBreaks + 1, shortBreakTime: state.sessionStats.shortBreakTime + breakTime }
-                  : { longBreaks: state.sessionStats.longBreaks + 1, longBreakTime: state.sessionStats.longBreakTime + breakTime }),
+                focusTime: state.sessionStats.focusTime + elapsed,
               },
             };
           }
+
+          // Break finished → return to focus, never auto-start
+          const time = getPhaseDuration('focus', state.settings);
+          return {
+            phase: 'focus',
+            isRunning: false,
+            endTime: null,
+            timeLeft: time,
+            phaseElapsed: 0,
+            ...completionFields,
+            sessionStats: {
+              ...state.sessionStats,
+              breakTime: state.sessionStats.breakTime + elapsed,
+            },
+          };
         });
       },
 
@@ -233,13 +206,13 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           selectedTaskId: timer.taskId,
           settings: timer.settings,
           phase: timer.phase,
+          timerActive: true,
           isRunning: timer.status === 'running' && runningTimeLeft > 0,
           endTime:
             timer.status === 'running' && runningTimeLeft > 0
               ? Date.now() + runningTimeLeft * 1000
               : null,
           timeLeft: runningTimeLeft,
-          completedCycles: timer.completedCycles,
           sessionStats: timer.sessionStats,
         });
       },

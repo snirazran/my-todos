@@ -7,23 +7,17 @@ import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 
 export const dynamic = 'force-dynamic';
 
-const phases = new Set<PomodoroPhase>(['focus', 'shortBreak', 'longBreak']);
+const phases = new Set<PomodoroPhase>(['focus', 'break']);
 const statuses = new Set(['running', 'paused']);
 const defaultSettings = {
-  cycleDuration: 25,
-  shortBreakDuration: 5,
-  longBreakDuration: 30,
-  longBreakInterval: 3,
+  focusDuration: 25,
+  breakDuration: 5,
   autoStartBreaks: false,
   timerSound: 'bell' as const,
 };
 const defaultSessionStats = {
-  focusSessions: 0,
-  shortBreaks: 0,
-  longBreaks: 0,
   focusTime: 0,
-  shortBreakTime: 0,
-  longBreakTime: 0,
+  breakTime: 0,
 };
 
 function unauth() {
@@ -57,7 +51,6 @@ function normalizeTimer(input: unknown): ActiveFrogodoroTimer | null {
       ...defaultSettings,
       ...(timer.settings ?? {}),
     },
-    completedCycles: Math.max(0, Math.floor(timer.completedCycles ?? 0)),
     sessionStats: {
       ...defaultSessionStats,
       ...(timer.sessionStats ?? {}),

@@ -138,7 +138,7 @@ export function NotificationProvider({
       {children}
       <AnimatePresence>
         {notification && (
-          <div className="fixed bottom-0 left-0 right-0 z-[1300] flex justify-center pointer-events-none px-4 pb-[calc(env(safe-area-inset-bottom)+176px)]">
+          <div className="fixed bottom-0 left-0 right-0 z-[1300] flex justify-center pointer-events-none px-4 pb-[calc(env(safe-area-inset-bottom)+112px)]">
             <motion.div
               key={notification.id}
               initial={{ opacity: 0, y: 50, scale: 0.95 }}

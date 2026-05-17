@@ -74,12 +74,8 @@ interface Task {
   tags?: string[];
   frogodoroSession?: {
     date: string;
-    completedCycles: number;
-    timeSpent: number;
-    shortBreaks?: number;
-    shortBreakTime?: number;
-    longBreaks?: number;
-    longBreakTime?: number;
+    focusTime: number;
+    breakTime: number;
   } | null;
   calendarEventId?: string;
   startTime?: string;
@@ -145,6 +141,9 @@ const SortableTaskItem = React.forwardRef<
     const [hasTriggeredExit, setHasTriggeredExit] = useState(false); // Immediate exit tracking
     const isDraggingRef = React.useRef(false);
     const hasActionTriggeredRef = React.useRef(false);
+    const actionBlockTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(
+      null,
+    );
     const containerRef = React.useRef<HTMLDivElement>(null);
     const [isDesktop, setIsDesktop] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
@@ -266,6 +265,25 @@ const SortableTaskItem = React.forwardRef<
       };
     }, [task.id, isOpen]);
 
+    useEffect(() => {
+      return () => {
+        if (actionBlockTimeoutRef.current) {
+          clearTimeout(actionBlockTimeoutRef.current);
+        }
+      };
+    }, []);
+
+    const blockImmediatePostSwipeClick = () => {
+      hasActionTriggeredRef.current = true;
+      if (actionBlockTimeoutRef.current) {
+        clearTimeout(actionBlockTimeoutRef.current);
+      }
+      actionBlockTimeoutRef.current = setTimeout(() => {
+        hasActionTriggeredRef.current = false;
+        actionBlockTimeoutRef.current = null;
+      }, 250);
+    };
+
     const handleDragStart = () => {
       isDraggingRef.current = true;
       setIsSwiping(true);
@@ -289,7 +307,7 @@ const SortableTaskItem = React.forwardRef<
 
       // Action: Swipe Right (Positive) -> Start Timer
       if (offset > swipeThreshold && onStartTimer && !isDone) {
-        hasActionTriggeredRef.current = true;
+        blockImmediatePostSwipeClick();
         window.dispatchEvent(
           new CustomEvent('task-swipe-open', { detail: { id: null } }),
         );
@@ -298,7 +316,7 @@ const SortableTaskItem = React.forwardRef<
       }
       // Action: Swipe Left (Negative) -> Open Edit Sheet
       else if (offset < -swipeThreshold || velocity < -200) {
-        hasActionTriggeredRef.current = true;
+        blockImmediatePostSwipeClick();
         window.dispatchEvent(
           new CustomEvent('task-edit-request', { detail: { id: task.id } }),
         );
@@ -606,27 +624,20 @@ const SortableTaskItem = React.forwardRef<
                   )}
                 </span>
                 
-                {task.frogodoroSession && (task.frogodoroSession.timeSpent > 0 || (task.frogodoroSession.shortBreaks ?? 0) > 0 || (task.frogodoroSession.longBreaks ?? 0) > 0) && (
+                {task.frogodoroSession && ((task.frogodoroSession.focusTime ?? 0) > 0 || (task.frogodoroSession.breakTime ?? 0) > 0) && (
                   <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                    {task.frogodoroSession.timeSpent > 0 && (() => { const s = task.frogodoroSession!.timeSpent; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
-                      <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
+                    {(task.frogodoroSession.focusTime ?? 0) > 0 && (() => { const s = task.frogodoroSession!.focusTime; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
+                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
                         <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                        <span className="text-[11px] font-black text-primary tabular-nums">{task.frogodoroSession!.completedCycles}</span>
-                        <span className="text-[10px] font-bold text-primary/60 tabular-nums">{t}</span>
+                        <span className="text-[10px] font-bold text-primary/60 uppercase tracking-wider">Focus</span>
+                        <span className="text-[11px] font-black text-primary tabular-nums">{t}</span>
                       </div>
                     ); })()}
-                    {(task.frogodoroSession.shortBreaks ?? 0) > 0 && (() => { const s = task.frogodoroSession!.shortBreakTime ?? 0; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
-                      <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
+                    {(task.frogodoroSession.breakTime ?? 0) > 0 && (() => { const s = task.frogodoroSession!.breakTime ?? 0; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
+                      <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
                         <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
-                        <span className="text-[11px] font-black text-sky-500 tabular-nums">{task.frogodoroSession!.shortBreaks}</span>
-                        <span className="text-[10px] font-bold text-sky-500/60 tabular-nums">{t}</span>
-                      </div>
-                    ); })()}
-                    {(task.frogodoroSession.longBreaks ?? 0) > 0 && (() => { const s = task.frogodoroSession!.longBreakTime ?? 0; const m = Math.floor(s / 60); const sec = s % 60; const t = s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; return (
-                      <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-indigo-500/8 dark:bg-indigo-500/15">
-                        <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
-                        <span className="text-[11px] font-black text-indigo-500 tabular-nums">{task.frogodoroSession!.longBreaks}</span>
-                        <span className="text-[10px] font-bold text-indigo-500/60 tabular-nums">{t}</span>
+                        <span className="text-[10px] font-bold text-sky-500/60 uppercase tracking-wider">Break</span>
+                        <span className="text-[11px] font-black text-sky-500 tabular-nums">{t}</span>
                       </div>
                     ); })()}
                   </div>

@@ -92,7 +92,6 @@ export type ActiveFrogodoroTimer = {
   timeLeft: number;
   endsAt?: string | null;
   settings: FrogodoroSettings;
-  completedCycles: number;
   sessionStats: SessionStats;
   updatedAt: string;
 };

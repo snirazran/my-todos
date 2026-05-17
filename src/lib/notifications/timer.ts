@@ -27,19 +27,11 @@ export function getTimerNotification(
     };
   }
 
-  if (phase === 'shortBreak') {
+  if (phase === 'break') {
     return {
       type: 'break_complete',
-      title: 'Short break finished',
-      body: 'Ready to focus? Start your next session.',
-    };
-  }
-
-  if (phase === 'longBreak') {
-    return {
-      type: 'break_complete',
-      title: 'Long break finished',
-      body: 'Feeling refreshed? Time to get back to it.',
+      title: 'Break finished',
+      body: 'Ready to focus? Start again whenever you are.',
     };
   }
 

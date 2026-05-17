@@ -19,19 +19,13 @@ export interface Task {
   date?: string;
   completedDates?: string[];
   frogodoroSettings?: {
-    cycleDuration: number;
-    shortBreakDuration: number;
-    longBreakDuration: number;
-    longBreakInterval: number;
+    focusDuration: number;
+    breakDuration: number;
   };
   frogodoroSession?: {
     date: string;
-    completedCycles: number;
-    timeSpent: number;
-    shortBreaks?: number;
-    shortBreakTime?: number;
-    longBreaks?: number;
-    longBreakTime?: number;
+    focusTime: number;
+    breakTime: number;
   } | null;
   calendarEventId?: string;
   startTime?: string;
@@ -62,6 +56,13 @@ interface TasksResponse {
 }
 
 type ExclusionSource = 'today' | 'backlog';
+
+type FrogodoroSession = NonNullable<Task['frogodoroSession']>;
+
+type FrogodoroProgressEvent = CustomEvent<{
+  taskId: string;
+  session: FrogodoroSession;
+}>;
 
 type UseTaskDataOptions = {
   includeBacklog?: boolean;
@@ -139,6 +140,37 @@ export function useTaskData({
       window.removeEventListener('board-refresh', handleUpdate);
     };
   }, [includeBacklog, mutateToday, mutateBacklog]);
+
+  useEffect(() => {
+    const handleFrogodoroProgress = (event: Event) => {
+      const { taskId, session } = (event as FrogodoroProgressEvent).detail ?? {};
+      if (!taskId || !session) return;
+
+      mutateToday((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          tasks: current.tasks.map((task) => {
+            if (task.id !== taskId) return task;
+            const existing = task.frogodoroSession;
+            return {
+              ...task,
+              frogodoroSession: {
+                date: session.date,
+                focusTime: (existing?.focusTime ?? 0) + (session.focusTime ?? 0),
+                breakTime: (existing?.breakTime ?? 0) + (session.breakTime ?? 0),
+              },
+            };
+          }),
+        };
+      }, { revalidate: false });
+    };
+
+    window.addEventListener('frogodoro-progress-saved', handleFrogodoroProgress);
+    return () => {
+      window.removeEventListener('frogodoro-progress-saved', handleFrogodoroProgress);
+    };
+  }, [mutateToday]);
 
   // --- Cleanup Effect ---
   // Remove exclusions when task is confirmed gone from source list

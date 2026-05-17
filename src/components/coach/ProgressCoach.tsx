@@ -84,7 +84,7 @@ export default function ProgressCoach({
             type: task.type,
             completed: task.completed,
             tags: task.tags,
-            focusMinutes: task.frogodoroSession?.timeSpent ?? 0,
+            focusMinutes: task.frogodoroSession?.focusTime ?? 0,
           })),
         })),
       }),

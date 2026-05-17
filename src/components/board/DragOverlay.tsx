@@ -31,7 +31,7 @@ export default function DragOverlay({
   startTime?: string;
   endTime?: string;
   reminder?: string;
-  frogodoroSession?: { date: string; completedCycles: number; timeSpent: number; shortBreaks?: number; shortBreakTime?: number; longBreaks?: number; longBreakTime?: number; } | null;
+  frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null;
 }) {
   return (
     <div
@@ -99,29 +99,22 @@ export default function DragOverlay({
               </div>
             </div>
           </div>
-          {frogodoroSession && (frogodoroSession.timeSpent > 0 || (frogodoroSession.shortBreaks ?? 0) > 0 || (frogodoroSession.longBreaks ?? 0) > 0) && (() => {
+          {frogodoroSession && ((frogodoroSession.focusTime ?? 0) > 0 || (frogodoroSession.breakTime ?? 0) > 0) && (() => {
             const fmt = (s: number) => { const m = Math.floor(s / 60); const sec = s % 60; return s < 60 ? `${s}s` : sec > 0 ? `${m}m ${sec}s` : `${m}m`; };
             return (
               <div className="flex flex-wrap items-center gap-1 mt-0.5">
-                {frogodoroSession.timeSpent > 0 && (
-                  <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
+                {(frogodoroSession.focusTime ?? 0) > 0 && (
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-primary/8 dark:bg-primary/15">
                     <div className="w-1.5 h-1.5 rounded-full bg-primary flex-shrink-0" />
-                    <span className="text-[11px] font-black text-primary tabular-nums">{frogodoroSession.completedCycles}</span>
-                    <span className="text-[10px] font-bold text-primary/60 tabular-nums">{fmt(frogodoroSession.timeSpent)}</span>
+                    <span className="text-[10px] font-bold text-primary/60 uppercase tracking-wider">Focus</span>
+                    <span className="text-[11px] font-black text-primary tabular-nums">{fmt(frogodoroSession.focusTime)}</span>
                   </div>
                 )}
-                {(frogodoroSession.shortBreaks ?? 0) > 0 && (
-                  <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
+                {(frogodoroSession.breakTime ?? 0) > 0 && (
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-sky-500/8 dark:bg-sky-500/15">
                     <div className="w-1.5 h-1.5 rounded-full bg-sky-500 flex-shrink-0" />
-                    <span className="text-[11px] font-black text-sky-500 tabular-nums">{frogodoroSession.shortBreaks}</span>
-                    <span className="text-[10px] font-bold text-sky-500/60 tabular-nums">{fmt(frogodoroSession.shortBreakTime ?? 0)}</span>
-                  </div>
-                )}
-                {(frogodoroSession.longBreaks ?? 0) > 0 && (
-                  <div className="inline-flex items-center gap-1 pr-2 py-0.5 rounded-lg bg-indigo-500/8 dark:bg-indigo-500/15">
-                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0" />
-                    <span className="text-[11px] font-black text-indigo-500 tabular-nums">{frogodoroSession.longBreaks}</span>
-                    <span className="text-[10px] font-bold text-indigo-500/60 tabular-nums">{fmt(frogodoroSession.longBreakTime ?? 0)}</span>
+                    <span className="text-[10px] font-bold text-sky-500/60 uppercase tracking-wider">Break</span>
+                    <span className="text-[11px] font-black text-sky-500 tabular-nums">{fmt(frogodoroSession.breakTime)}</span>
                   </div>
                 )}
               </div>

@@ -68,7 +68,7 @@ export function SuggestionTabs({
 
   const { data: questsData } = useSWR<QuestsHomeResponse>(
     open && !hasOverride
-      ? `/api/quests?view=home&timezone=${encodeURIComponent(tz)}`
+      ? `/api/quests/focus?timezone=${encodeURIComponent(tz)}`
       : null,
     fetcher,
   );

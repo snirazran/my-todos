@@ -12,26 +12,18 @@ import type { ActiveFrogodoroTimer, NotificationPrefs } from '@/lib/types/UserDo
 
 const CRON_SECRET = process.env.CRON_SECRET;
 const DEFAULT_SETTINGS: FrogodoroSettings = {
-  cycleDuration: 25,
-  shortBreakDuration: 5,
-  longBreakDuration: 30,
-  longBreakInterval: 3,
+  focusDuration: 25,
+  breakDuration: 5,
   autoStartBreaks: false,
   timerSound: 'bell',
 };
 const DEFAULT_SESSION_STATS: SessionStats = {
-  focusSessions: 0,
-  shortBreaks: 0,
-  longBreaks: 0,
   focusTime: 0,
-  shortBreakTime: 0,
-  longBreakTime: 0,
+  breakTime: 0,
 };
 
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings) {
-  if (phase === 'shortBreak') return settings.shortBreakDuration * 60;
-  if (phase === 'longBreak') return settings.longBreakDuration * 60;
-  return settings.cycleDuration * 60;
+  return phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
 }
 
 function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
@@ -40,19 +32,16 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
     ...DEFAULT_SESSION_STATS,
     ...timer.sessionStats,
   };
+  const completedDuration = getPhaseDuration(timer.phase, settings);
 
   if (timer.phase === 'focus') {
-    const completedCycles = (timer.completedCycles ?? 0) + 1;
-    const nextPhase: PomodoroPhase =
-      completedCycles % settings.longBreakInterval === 0
-        ? 'longBreak'
-        : 'shortBreak';
+    const nextPhase: PomodoroPhase = 'break';
     const nextDuration = getPhaseDuration(nextPhase, settings);
     const autoStart = settings.autoStartBreaks;
 
     return {
       completedPhase: timer.phase,
-      completedDuration: getPhaseDuration(timer.phase, settings),
+      completedDuration,
       autoStartBreak: autoStart,
       nextTimer: {
         ...timer,
@@ -63,12 +52,9 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
           ? new Date(now.getTime() + nextDuration * 1000).toISOString()
           : null,
         settings,
-        completedCycles,
         sessionStats: {
           ...sessionStats,
-          focusSessions: sessionStats.focusSessions + 1,
-          focusTime:
-            sessionStats.focusTime + getPhaseDuration(timer.phase, settings),
+          focusTime: sessionStats.focusTime + completedDuration,
         },
         updatedAt: now.toISOString(),
       } satisfies ActiveFrogodoroTimer,
@@ -76,7 +62,6 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
   }
 
   const nextDuration = getPhaseDuration('focus', settings);
-  const completedDuration = getPhaseDuration(timer.phase, settings);
 
   return {
     completedPhase: timer.phase,
@@ -91,15 +76,7 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
       settings,
       sessionStats: {
         ...sessionStats,
-        ...(timer.phase === 'shortBreak'
-          ? {
-              shortBreaks: sessionStats.shortBreaks + 1,
-              shortBreakTime: sessionStats.shortBreakTime + completedDuration,
-            }
-          : {
-              longBreaks: sessionStats.longBreaks + 1,
-              longBreakTime: sessionStats.longBreakTime + completedDuration,
-            }),
+        breakTime: sessionStats.breakTime + completedDuration,
       },
       updatedAt: now.toISOString(),
     } satisfies ActiveFrogodoroTimer,
@@ -123,47 +100,20 @@ async function saveTimerProgress({
   const task = await TaskModel.findOne({ id: taskId, userId });
   if (!task) return;
 
-  const session =
-    phase === 'focus'
-      ? { date: today, completedCycles: 1, timeSpent: seconds }
-      : phase === 'shortBreak'
-        ? {
-            date: today,
-            completedCycles: 0,
-            timeSpent: 0,
-            shortBreaks: 1,
-            shortBreakTime: seconds,
-          }
-        : {
-            date: today,
-            completedCycles: 0,
-            timeSpent: 0,
-            longBreaks: 1,
-            longBreakTime: seconds,
-          };
+  const session = {
+    date: today,
+    focusTime: phase === 'focus' ? seconds : 0,
+    breakTime: phase === 'break' ? seconds : 0,
+  };
 
   if (!task.frogodoroSessions) task.frogodoroSessions = [];
   const idx = task.frogodoroSessions.findIndex((s: any) => s.date === today);
 
   if (idx !== -1) {
-    task.frogodoroSessions[idx].completedCycles += session.completedCycles || 0;
-    task.frogodoroSessions[idx].timeSpent += session.timeSpent || 0;
-    if ('shortBreaks' in session) {
-      task.frogodoroSessions[idx].shortBreaks =
-        (task.frogodoroSessions[idx].shortBreaks ?? 0) +
-        (session.shortBreaks ?? 0);
-      task.frogodoroSessions[idx].shortBreakTime =
-        (task.frogodoroSessions[idx].shortBreakTime ?? 0) +
-        (session.shortBreakTime ?? 0);
-    }
-    if ('longBreaks' in session) {
-      task.frogodoroSessions[idx].longBreaks =
-        (task.frogodoroSessions[idx].longBreaks ?? 0) +
-        (session.longBreaks ?? 0);
-      task.frogodoroSessions[idx].longBreakTime =
-        (task.frogodoroSessions[idx].longBreakTime ?? 0) +
-        (session.longBreakTime ?? 0);
-    }
+    task.frogodoroSessions[idx].focusTime =
+      (task.frogodoroSessions[idx].focusTime ?? 0) + session.focusTime;
+    task.frogodoroSessions[idx].breakTime =
+      (task.frogodoroSessions[idx].breakTime ?? 0) + session.breakTime;
   } else {
     task.frogodoroSessions.push(session);
   }
