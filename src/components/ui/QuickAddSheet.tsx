@@ -253,13 +253,24 @@ export default function QuickAddSheet({
                 }}
                 className="fixed inset-x-0 bottom-0 z-[1000] flex max-h-[100dvh] items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
               >
-                <div className="pointer-events-auto mx-auto w-full max-w-[820px] pb-[env(safe-area-inset-bottom)]">
+                <div className="pointer-events-auto mx-auto flex w-full max-w-[820px] flex-col pb-[env(safe-area-inset-bottom)]">
+                  <div className="mb-2 flex shrink-0 justify-end px-3">
+                    <button
+                      type="button"
+                      aria-label="Close"
+                      onClick={() => onOpenChange(false)}
+                      className="grid h-10 w-10 place-items-center rounded-full bg-popover/95 text-foreground shadow-sm ring-1 ring-border/70 backdrop-blur transition-colors [@media(hover:hover)]:hover:bg-muted"
+                    >
+                      <X className="h-5 w-5 stroke-[3]" />
+                    </button>
+                  </div>
+
                   <div
                     className={[
-                      'flex max-h-[calc(100dvh_-_2rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover/95 p-4 shadow-[0_24px_48px_rgba(15,23,42,0.25)] ring-1 ring-border/80 backdrop-blur-2xl sm:max-h-[calc(100dvh_-_2.5rem_-_env(safe-area-inset-bottom))]',
+                      'flex max-h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover/95 p-4 shadow-[0_24px_48px_rgba(15,23,42,0.25)] ring-1 ring-border/80 backdrop-blur-2xl sm:max-h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]',
                       hasTaskText
                         ? ''
-                        : 'h-[calc(100dvh_-_2rem_-_env(safe-area-inset-bottom))] sm:h-[calc(100dvh_-_2.5rem_-_env(safe-area-inset-bottom))]',
+                        : 'h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] sm:h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]',
                     ].join(' ')}
                   >
                     <div dir="ltr" className="flex min-h-0 w-full flex-1 flex-col pt-1">
@@ -470,17 +481,9 @@ export default function QuickAddSheet({
                           className="shrink-0"
                         >
                           <div
-                            className="mt-4 flex items-center gap-2"
+                            className="mt-4 flex items-center"
                             style={{ transform: 'translateZ(0)' }}
                           >
-                            <button
-                              type="button"
-                              aria-label="Cancel"
-                              onClick={() => onOpenChange(false)}
-                              className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted/80 [@media(hover:hover)]:hover:text-foreground"
-                            >
-                              <X className="h-5 w-5 stroke-[3]" />
-                            </button>
                             <button
                               type="button"
                               onClick={handleSubmit}
