@@ -18,6 +18,7 @@ import {
   ScrollText,
   Sparkles,
   Trash2,
+  X,
   XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -78,6 +79,12 @@ type AdminQuestSeason = {
 };
 
 type MetaRewardItem = QuestRewardCatalogItem;
+type QuickAddSuggestionDraft = {
+  id: string;
+  text: string;
+  emoji: string;
+};
+
 type AdminCategory = {
   id: string;
   name: string;
@@ -89,6 +96,7 @@ type AdminCategory = {
   backgroundFrom: string;
   backgroundTo: string;
   isBuiltIn: boolean;
+  quickAddSuggestions: { text: string; emoji: string }[];
 };
 
 type CategoryFormState = {
@@ -100,6 +108,7 @@ type CategoryFormState = {
   accent: string;
   backgroundFrom: string;
   backgroundTo: string;
+  quickAddSuggestions: QuickAddSuggestionDraft[];
 };
 
 type ViewLevel = 'home' | 'daily' | 'focus' | 'season' | 'category' | 'form';
@@ -399,6 +408,7 @@ export function AdminQuestManagerPage() {
     accent: '#6366f1',
     backgroundFrom: '#1e1b4b',
     backgroundTo: '#312e81',
+    quickAddSuggestions: [],
   });
 
   useEffect(() => {
@@ -566,8 +576,32 @@ export function AdminQuestManagerPage() {
     setEditingCategory(cat ?? null);
     setCategoryForm(
       cat
-        ? { name: cat.name, shortLabel: cat.shortLabel, description: cat.description, onboardingSentence: cat.onboardingSentence ?? '', coverImageUrl: cat.coverImageUrl, accent: cat.accent, backgroundFrom: cat.backgroundFrom, backgroundTo: cat.backgroundTo }
-        : { name: '', shortLabel: '', description: '', onboardingSentence: '', coverImageUrl: undefined, accent: '#6366f1', backgroundFrom: '#1e1b4b', backgroundTo: '#312e81' },
+        ? {
+            name: cat.name,
+            shortLabel: cat.shortLabel,
+            description: cat.description,
+            onboardingSentence: cat.onboardingSentence ?? '',
+            coverImageUrl: cat.coverImageUrl,
+            accent: cat.accent,
+            backgroundFrom: cat.backgroundFrom,
+            backgroundTo: cat.backgroundTo,
+            quickAddSuggestions: (cat.quickAddSuggestions ?? []).map((s) => ({
+              id: crypto.randomUUID(),
+              text: s.text,
+              emoji: s.emoji ?? '',
+            })),
+          }
+        : {
+            name: '',
+            shortLabel: '',
+            description: '',
+            onboardingSentence: '',
+            coverImageUrl: undefined,
+            accent: '#6366f1',
+            backgroundFrom: '#1e1b4b',
+            backgroundTo: '#312e81',
+            quickAddSuggestions: [],
+          },
     );
     setConfirmAction(null);
     setCategoryDialogOpen(true);
@@ -577,11 +611,17 @@ export function AdminQuestManagerPage() {
     if (!confirmBeforeAction('save-category')) return;
     setSavingCategory(true);
     try {
+      const payload = {
+        ...categoryForm,
+        quickAddSuggestions: categoryForm.quickAddSuggestions
+          .map((s) => ({ text: s.text.trim(), emoji: s.emoji.trim() }))
+          .filter((s) => s.text.length > 0),
+      };
       const res = await fetch('/api/admin/quests/categories', {
         method: editingCategory ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(editingCategory ? { id: editingCategory.id, ...categoryForm } : categoryForm),
+        body: JSON.stringify(editingCategory ? { id: editingCategory.id, ...payload } : payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not save category');
@@ -959,7 +999,7 @@ export function AdminQuestManagerPage() {
                 </p>
               </button>
               <div className={cn(
-                'flex shrink-0 items-center gap-1 opacity-0 transition group-hover:opacity-100',
+                'flex shrink-0 items-center gap-1 opacity-100 transition [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100',
                 confirmingDelete && 'opacity-100',
               )}>
                 <button
@@ -1616,8 +1656,8 @@ export function AdminQuestManagerPage() {
 
         {/* Category dialog */}
         <Dialog open={categoryDialogOpen} onOpenChange={(open) => { setCategoryDialogOpen(open); if (!open) setConfirmAction(null); }}>
-          <DialogContent className="max-w-lg rounded-[32px] p-0 overflow-hidden">
-            <div className="border-b border-border/50 bg-card/95 px-6 py-5">
+          <DialogContent className="flex max-h-[90vh] max-w-lg flex-col rounded-[32px] p-0 overflow-hidden">
+            <div className="shrink-0 border-b border-border/50 bg-card/95 px-6 py-5">
               <DialogHeader>
                 <DialogTitle className="text-2xl font-black">
                   {editingCategory ? 'Edit Category' : 'New Category'}
@@ -1627,7 +1667,7 @@ export function AdminQuestManagerPage() {
                 </DialogDescription>
               </DialogHeader>
             </div>
-            <div className="space-y-4 px-6 py-5">
+            <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
               <label className="grid gap-2">
                 <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Name</span>
                 <input value={categoryForm.name} onChange={(e) => setCategoryForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Sport" className="h-11 rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary/30" />
@@ -1720,8 +1760,81 @@ export function AdminQuestManagerPage() {
                   )}
                 </button>
               </div>
+              <div className="rounded-2xl border border-border/50 bg-background/70 p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Quick-Add Suggestions</p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCategoryForm((prev) => ({
+                        ...prev,
+                        quickAddSuggestions: [
+                          ...prev.quickAddSuggestions,
+                          { id: crypto.randomUUID(), text: '', emoji: '' },
+                        ],
+                      }))
+                    }
+                    className="rounded-lg bg-primary/10 px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.12em] text-primary transition hover:bg-primary/15"
+                  >
+                    + Add
+                  </button>
+                </div>
+                {categoryForm.quickAddSuggestions.length === 0 ? (
+                  <p className="text-[11px] text-muted-foreground">
+                    Shown in the quick-add sheet under this category. Add a few tasks users can pick with one tap.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {categoryForm.quickAddSuggestions.map((s, index) => (
+                      <div key={s.id} className="flex items-center gap-2">
+                        <input
+                          value={s.emoji}
+                          onChange={(e) =>
+                            setCategoryForm((prev) => ({
+                              ...prev,
+                              quickAddSuggestions: prev.quickAddSuggestions.map((item, i) =>
+                                i === index ? { ...item, emoji: e.target.value } : item,
+                              ),
+                            }))
+                          }
+                          placeholder="🏃"
+                          maxLength={8}
+                          className="h-9 w-12 shrink-0 rounded-xl border border-border bg-background text-center text-base outline-none focus:border-primary/30"
+                        />
+                        <input
+                          value={s.text}
+                          onChange={(e) =>
+                            setCategoryForm((prev) => ({
+                              ...prev,
+                              quickAddSuggestions: prev.quickAddSuggestions.map((item, i) =>
+                                i === index ? { ...item, text: e.target.value } : item,
+                              ),
+                            }))
+                          }
+                          placeholder="Task suggestion"
+                          maxLength={80}
+                          className="h-9 flex-1 rounded-xl border border-border bg-background px-3 text-sm outline-none focus:border-primary/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCategoryForm((prev) => ({
+                              ...prev,
+                              quickAddSuggestions: prev.quickAddSuggestions.filter((_, i) => i !== index),
+                            }))
+                          }
+                          aria-label="Remove suggestion"
+                          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border bg-background text-muted-foreground transition hover:border-destructive/40 hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-            <DialogFooter className="border-t border-border/50 bg-card/95 px-6 py-4 sm:gap-3">
+            <DialogFooter className="shrink-0 border-t border-border/50 bg-card/95 px-6 py-4 sm:gap-3">
               <Button variant="outline" className="rounded-2xl" onClick={() => { setCategoryDialogOpen(false); setConfirmAction(null); }}>Cancel</Button>
               <Button className="rounded-2xl font-black" onClick={() => void saveCategory()} disabled={savingCategory || !categoryForm.name.trim()}>
                 {categorySaveButtonLabel}

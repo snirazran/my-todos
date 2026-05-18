@@ -1,5 +1,10 @@
 import mongoose, { Schema, type Model } from 'mongoose';
 
+export interface QuickAddSuggestionEntry {
+  text: string;
+  emoji: string;
+}
+
 export interface QuestCategoryDoc {
   _id?: mongoose.Types.ObjectId;
   categoryId: string;
@@ -12,9 +17,18 @@ export interface QuestCategoryDoc {
   backgroundFrom: string;
   backgroundTo: string;
   isBuiltIn: boolean;
+  quickAddSuggestions: QuickAddSuggestionEntry[];
   createdAt: Date;
   updatedAt: Date;
 }
+
+const QuickAddSuggestionSchema = new Schema<QuickAddSuggestionEntry>(
+  {
+    text: { type: String, required: true },
+    emoji: { type: String, default: '' },
+  },
+  { _id: false },
+);
 
 const QuestCategorySchema = new Schema<QuestCategoryDoc>(
   {
@@ -28,6 +42,7 @@ const QuestCategorySchema = new Schema<QuestCategoryDoc>(
     backgroundFrom: { type: String, default: '#1e1b4b' },
     backgroundTo: { type: String, default: '#312e81' },
     isBuiltIn: { type: Boolean, default: false },
+    quickAddSuggestions: { type: [QuickAddSuggestionSchema], default: [] },
   },
   {
     collection: 'quest_categories',

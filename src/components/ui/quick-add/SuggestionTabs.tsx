@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { FolderOpen, Sparkles, Clock } from 'lucide-react';
-import { QUEST_MACRO_CATEGORIES } from '@/lib/quests/catalog';
 import type {
   FocusCategoryTagMap,
   MacroCategoryId,
@@ -11,6 +10,14 @@ import type {
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import { fetcher, formatTimeDisplay } from './utils';
+
+type QuickAddSuggestion = { text: string; emoji: string };
+type CategoryListEntry = {
+  id: MacroCategoryId;
+  name: string;
+  quickAddSuggestions: QuickAddSuggestion[];
+};
+type CategoriesResponse = { categories: CategoryListEntry[] };
 
 type FocusOnboarding = {
   selectedCategoryIds: MacroCategoryId[];
@@ -73,6 +80,11 @@ export function SuggestionTabs({
     fetcher,
   );
 
+  const { data: categoriesData } = useSWR<CategoriesResponse>(
+    open ? '/api/quests/categories' : null,
+    fetcher,
+  );
+
   const resolvedCategoryIds: MacroCategoryId[] = hasOverride
     ? focusCategoryIds!
     : questsData?.onboarding?.selectedCategoryIds ?? [];
@@ -80,13 +92,14 @@ export function SuggestionTabs({
     ? categoryTagMap!
     : questsData?.onboarding?.categoryTagMap ?? [];
 
-  const focusCategories = useMemo(
-    () =>
-      resolvedCategoryIds
-        .map((id) => QUEST_MACRO_CATEGORIES.find((c) => c.id === id))
-        .filter((c): c is (typeof QUEST_MACRO_CATEGORIES)[number] => !!c),
-    [resolvedCategoryIds],
-  );
+  const focusCategories = useMemo(() => {
+    const byId = new Map(
+      (categoriesData?.categories ?? []).map((c) => [c.id, c]),
+    );
+    return resolvedCategoryIds
+      .map((id) => byId.get(id))
+      .filter((c): c is CategoryListEntry => !!c);
+  }, [categoriesData, resolvedCategoryIds]);
 
   const tabs: TabId[] = useMemo(
     () => [...focusCategories.map((c) => c.id), SAVED_TAB],
