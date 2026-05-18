@@ -61,6 +61,7 @@ export default function QuickAddSheet({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showPremiumLimit, setShowPremiumLimit] = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
 
@@ -127,6 +128,7 @@ export default function QuickAddSheet({
     setActivePicker(null);
     setShowCalendarPicker(false);
     setAutoAddedTagIds([]);
+    setInputFocused(false);
 
     const initialDate = defaultDateKey ?? ymdLocal(new Date());
     setSelectedDateKey(initialDate);
@@ -256,7 +258,7 @@ export default function QuickAddSheet({
                   duration: 0.4,
                 }}
                 style={
-                  hasTaskText
+                  hasTaskText && inputFocused
                     ? {
                         bottom: keyboardInset,
                         height: viewportHeight ?? undefined,
@@ -295,6 +297,8 @@ export default function QuickAddSheet({
                             ref={inputRef}
                             value={text}
                             onChange={(e) => setText(e.target.value)}
+                            onFocus={() => setInputFocused(true)}
+                            onBlur={() => setInputFocused(false)}
                             placeholder="New task?"
                             disabled={isSubmitting}
                             spellCheck={false}
