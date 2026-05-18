@@ -98,6 +98,14 @@ export default function QuickAddSheet({
     }
   }, [activePicker]);
 
+  const prevTextLengthRef = useRef(text.length);
+  useEffect(() => {
+    if (open && prevTextLengthRef.current > 0 && text.length === 0 && inputFocused) {
+      inputRef.current?.blur();
+    }
+    prevTextLengthRef.current = text.length;
+  }, [open, text, inputFocused]);
+
   useEffect(() => {
     if (!open) return;
 
@@ -258,14 +266,17 @@ export default function QuickAddSheet({
                   duration: 0.4,
                 }}
                 style={
-                  hasTaskText && inputFocused
+                  hasTaskText
                     ? {
                         bottom: keyboardInset,
                         height: viewportHeight ?? undefined,
                       }
                     : undefined
                 }
-                className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
+                className={[
+                  'fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5',
+                  hasTaskText ? 'items-center' : 'items-end',
+                ].join(' ')}
               >
                 <div className="pointer-events-auto mx-auto flex w-full max-w-[820px] flex-col pb-[env(safe-area-inset-bottom)]">
                   <div className="mb-2 flex shrink-0 justify-end px-3">
