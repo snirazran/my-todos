@@ -255,11 +255,15 @@ export default function QuickAddSheet({
                   ease: [0.32, 0.72, 0, 1],
                   duration: 0.4,
                 }}
-                style={{
-                  bottom: keyboardInset,
-                  height: viewportHeight ?? undefined,
-                }}
-                className="fixed inset-x-0 z-[1400] flex max-h-[100dvh] items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
+                style={
+                  hasTaskText
+                    ? {
+                        bottom: keyboardInset,
+                        height: viewportHeight ?? undefined,
+                      }
+                    : undefined
+                }
+                className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
               >
                 <div className="pointer-events-auto mx-auto flex w-full max-w-[820px] flex-col pb-[env(safe-area-inset-bottom)]">
                   <div className="mb-2 flex shrink-0 justify-end px-3">
