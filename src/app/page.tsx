@@ -892,30 +892,6 @@ export default function Home() {
                   isGlowActive={isTaskGlow}
                   isFrozen={cinematic}
                   paused={isAnyPanelOpen}
-                  onAcceptSuggestion={
-                    user
-                      ? async (text: string, tagIds?: string[]) => {
-                          const tz =
-                            Intl.DateTimeFormat().resolvedOptions().timeZone;
-                          const todayApiDay = new Date().getDay();
-                          await fetch('/api/tasks?view=board', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              text,
-                              days: [todayApiDay],
-                              repeat: 'this-week',
-                              tags: tagIds ?? [],
-                              timezone: tz,
-                            }),
-                          });
-                          mutateToday();
-                        }
-                      : undefined
-                  }
-                  aiSuggestionFocusCategoryIds={
-                    questOnboarding?.selectedCategoryIds ?? []
-                  }
                 />
               </div>
             </div>

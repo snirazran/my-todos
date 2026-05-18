@@ -46,8 +46,6 @@ export default function TaskBoard({
   onToggleRepeat,
   onScheduleTask,
   onEditTask,
-  onAcceptSuggestion,
-  aiSuggestionFocusCategoryIds,
 }: {
   windowDates: string[];
   tasksByDate: Record<string, Task[]>;
@@ -90,8 +88,6 @@ export default function TaskBoard({
     taskId: string,
     newText: string,
   ) => Promise<void>;
-  onAcceptSuggestion?: (text: string, tagIds?: string[]) => Promise<void> | void;
-  aiSuggestionFocusCategoryIds?: string[];
 }) {
   const pathname = usePathname();
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -647,8 +643,6 @@ export default function TaskBoard({
                   onScheduleTask={onScheduleTask}
                   isAnyDragging={!!drag?.active}
                   isToday={dk === todayKey}
-                  onAcceptSuggestion={onAcceptSuggestion}
-                  aiSuggestionFocusCategoryIds={aiSuggestionFocusCategoryIds}
                   filter={getFilter(i)}
                   selectedTags={getSelectedTags(i)}
                   showCompleted={getShowCompleted(i)}

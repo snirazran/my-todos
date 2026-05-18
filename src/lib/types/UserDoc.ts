@@ -77,8 +77,6 @@ export type UserDoc = {
   calendarSyncEnabled?: boolean;
   calendarAccessToken?: string;
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
-  aiSuggestionCache?: unknown;
-  aiSuggestionRefreshes?: unknown;
   activeFrogodoroTimer?: ActiveFrogodoroTimer | null;
   lastRecapWeek?: string;
   onboardingCompleted?: boolean;

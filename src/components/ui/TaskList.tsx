@@ -60,7 +60,6 @@ import TaskActionSheet from '../board/TaskActionSheet';
 import TagPopup from '@/components/ui/TagPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
-import AiSuggestions from '@/components/ui/AiSuggestions';
 import { format } from 'date-fns';
 
 interface Task {
@@ -695,8 +694,6 @@ export default function TaskList({
   isGlowActive,
   isFrozen = false,
   paused = false,
-  onAcceptSuggestion,
-  aiSuggestionFocusCategoryIds,
 }: {
   tasks: Task[];
   toggle: (id: string, completed?: boolean) => void;
@@ -728,8 +725,6 @@ export default function TaskList({
   /** When true the current sort order is frozen (prevents layout shifts during tongue animation) */
   isFrozen?: boolean;
   paused?: boolean;
-  onAcceptSuggestion?: (text: string, tagIds?: string[]) => Promise<void> | void;
-  aiSuggestionFocusCategoryIds?: string[];
 }) {
   const router = useRouter(); // Import might be needed if not present
   const userTags = tags || [];
@@ -1148,16 +1143,6 @@ export default function TaskList({
     }
     return verticalRestricted;
   };
-  const aiSuggestionsBlock = onAcceptSuggestion ? (
-    <div className="mt-1.5 mb-1">
-      <AiSuggestions
-        onAccept={onAcceptSuggestion}
-        getTagDetails={getTagDetails}
-        focusCategoryIds={aiSuggestionFocusCategoryIds}
-      />
-    </div>
-  ) : null;
-
   return (
     <>
       <div dir="ltr" className="w-full px-4 pt-0 pb-3 overflow-visible">
@@ -1193,7 +1178,6 @@ export default function TaskList({
                   </p>
                 </button>
               </motion.div>
-              {aiSuggestionsBlock}
             </>
           ) : tasks.length > 0 &&
             sortedVisibleTasks.length === 0 &&
@@ -1222,7 +1206,6 @@ export default function TaskList({
                   </p>
                 </button>
               </motion.div>
-              {aiSuggestionsBlock}
             </>
           ) : (
             /* List Content */
@@ -1282,8 +1265,6 @@ export default function TaskList({
                     </AnimatePresence>
                   </SortableContext>
                 </div>
-
-                {aiSuggestionsBlock}
 
                 {/* Inline Add Task Button */}
                 <div className="mt-1.5 mb-1">

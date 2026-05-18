@@ -34,7 +34,9 @@
       "Bash(pnpm build *)",
       "Bash(pnpm install *)",
       "Bash(pnpm config *)",
-      "Bash(xargs cat *)"
+      "Bash(xargs cat *)",
+      "Bash(rm \"src/app/api/tasks/suggest/route.ts\" \"src/app/api/admin/reset-ai-suggestions/route.ts\" \"src/components/ui/AiSuggestions.tsx\")",
+      "Bash(rmdir \"src/app/api/tasks/suggest\" \"src/app/api/admin/reset-ai-suggestions\")"
     ]
   }
 }

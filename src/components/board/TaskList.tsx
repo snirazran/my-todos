@@ -19,7 +19,6 @@ import TagPopup from '@/components/ui/TagPopup';
 import Fly from '@/components/ui/fly';
 import { Plus, LayoutList, ListTodo, Repeat } from 'lucide-react';
 import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
-import AiSuggestions from '@/components/ui/AiSuggestions';
 
 export default React.memo(function TaskList({
   day,
@@ -39,8 +38,6 @@ export default React.memo(function TaskList({
   onEditTask,
   onDoLater,
   onScheduleTask,
-  onAcceptSuggestion,
-  aiSuggestionFocusCategoryIds,
   isToday = false,
   filter = 'all',
   selectedTags = [],
@@ -94,8 +91,6 @@ export default React.memo(function TaskList({
     taskId: string,
     data: { startTime: string; endTime: string; reminder: string },
   ) => Promise<void> | void;
-  onAcceptSuggestion?: (text: string, tagIds?: string[]) => Promise<void> | void;
-  aiSuggestionFocusCategoryIds?: string[];
   isToday?: boolean;
   filter?: 'all' | 'tasks';
   selectedTags?: string[];
@@ -239,15 +234,6 @@ export default React.memo(function TaskList({
     }
     return true;
   });
-  const aiSuggestionsBlock = isToday && onAcceptSuggestion ? (
-    <div className="mt-1.5">
-      <AiSuggestions
-        onAccept={onAcceptSuggestion}
-        focusCategoryIds={aiSuggestionFocusCategoryIds}
-      />
-    </div>
-  ) : null;
-
   // ---- Empty list: render a single placeholder (if targeting index 0) OR themed empty state
   if (filteredItems.length === 0) {
     if (placeholderAt === 0) {
@@ -280,12 +266,7 @@ export default React.memo(function TaskList({
         </button>,
       );
     }
-    return (
-      <>
-        {rows}
-        {aiSuggestionsBlock}
-      </>
-    );
+    return <>{rows}</>;
   }
 
   // ---- Non-empty list
@@ -401,7 +382,6 @@ export default React.memo(function TaskList({
   return (
     <>
       {rows}
-      {aiSuggestionsBlock}
       <TaskMenu
         menu={menu}
         onClose={() => setMenu(null)}
