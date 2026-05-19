@@ -57,7 +57,7 @@ import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import TaskMenu from '../board/TaskMenu';
 import TaskActionSheet from '../board/TaskActionSheet';
-import TagPopup from '@/components/ui/TagPopup';
+import TagsPopup from '@/components/ui/TagsPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { format } from 'date-fns';
@@ -1455,7 +1455,7 @@ export default function TaskList({
         }
       />
 
-      <TagPopup
+      <TagsPopup
         open={tagPopup.open}
         taskId={tagPopup.taskId}
         initialTags={tasks.find((t) => t.id === tagPopup.taskId)?.tags}

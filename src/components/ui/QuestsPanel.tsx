@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
 import { Check, Clock, Gift, Lock, ScrollText, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import TagPopup from './TagPopup';
+import TagsPopup from './TagsPopup';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type {
   CategoryQuestProgressView,
@@ -634,7 +634,7 @@ export function QuestsPanel({
         {renderContent()}
       </div>
 
-      <TagPopup
+      <TagsPopup
         open={editingFocusCategoryId !== null}
         taskId={editingFocusCategoryId}
         onClose={() => setEditingFocusCategoryId(null)}

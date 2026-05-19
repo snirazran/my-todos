@@ -6,7 +6,7 @@ import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
-import TagPopup from '@/components/ui/TagPopup';
+import TagsPopup from '@/components/ui/TagsPopup';
 import { FilterDropdown, FilterType } from '@/components/ui/FilterDropdown';
 import { SideOpenTray } from '@/components/ui/SideOpenTray';
 import { TimePopup } from '@/components/ui/TimePopup';
@@ -360,7 +360,7 @@ export default React.memo(function BacklogTray({
         />
       )}
 
-      <TagPopup
+      <TagsPopup
         open={tagPopup.open}
         taskId={tagPopup.taskId}
         initialTags={tasks.find((t) => t.id === tagPopup.taskId)?.tags}

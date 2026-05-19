@@ -25,7 +25,7 @@ import Fly from '@/components/ui/fly';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TaskMenu from '../board/TaskMenu';
 import useSWR from 'swr';
-import TagPopup from '@/components/ui/TagPopup';
+import TagsPopup from '@/components/ui/TagsPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TaskType } from '@/lib/models/Task';
 
@@ -751,7 +751,7 @@ export default function BacklogPanel({
         }}
       />
 
-      <TagPopup
+      <TagsPopup
         open={tagPopup.open}
         taskId={tagPopup.taskId}
         initialTags={later.find((t) => t.id === tagPopup.taskId)?.tags}

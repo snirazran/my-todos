@@ -4,7 +4,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, CalendarClock, Tag, RotateCcw, Pencil, CalendarCheck, Check, Timer } from 'lucide-react';
-import TagManager from '@/components/ui/TagManager';
 
 interface TaskMenuProps {
   menu: { id: string; top: number; left: number } | null;

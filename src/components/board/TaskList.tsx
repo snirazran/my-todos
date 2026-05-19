@@ -15,7 +15,7 @@ import {
 } from './helpers';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
-import TagPopup from '@/components/ui/TagPopup';
+import TagsPopup from '@/components/ui/TagsPopup';
 import Fly from '@/components/ui/fly';
 import { Plus, LayoutList, ListTodo, Repeat } from 'lucide-react';
 import { TimePopup } from '@/components/ui/TimePopup';
@@ -438,7 +438,7 @@ export default React.memo(function TaskList({
             : undefined
         }
       />
-      <TagPopup
+      <TagsPopup
         open={tagPopup.open}
         taskId={tagPopup.taskId}
         initialTags={items.find((t) => t.id === tagPopup.taskId)?.tags}
