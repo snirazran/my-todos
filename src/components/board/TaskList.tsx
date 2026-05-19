@@ -461,13 +461,14 @@ export default React.memo(function TaskList({
         />
       )}
 
-      {dialog && dialog.kind === 'edit' && onEditTask && (
+      {onEditTask && (
         <EditTaskDialog
-          open={!!dialog}
-          initialText={dialog.task.text}
+          open={dialog?.kind === 'edit'}
+          initialText={dialog?.task.text ?? ''}
           busy={busy}
           onClose={() => setDialog(null)}
           onSave={async (newText) => {
+            if (!dialog) return;
             setBusy(true);
             await onEditTask(dialog.day, dialog.task.id, newText);
             setBusy(false);

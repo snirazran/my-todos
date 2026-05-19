@@ -1,18 +1,20 @@
 'use client';
 
-import { X, Pencil } from 'lucide-react';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Check, Pencil, X } from 'lucide-react';
 
 interface Props {
   open: boolean;
   initialText: string;
   busy?: boolean;
   onClose: () => void;
-  onSave: (newText: string) => void;
+  onSave: (newText: string) => void | Promise<void>;
   title?: string;
-  subtitle?: string;
 }
+
+const MAX_LENGTH = 45;
 
 export function EditTaskDialog({
   open,
@@ -20,122 +22,141 @@ export function EditTaskDialog({
   busy,
   onClose,
   onSave,
-  title = 'Edit Task',
-  subtitle = 'Make changes to your task below.',
+  title = 'Edit task',
 }: Props) {
+  const [mounted, setMounted] = useState(false);
   const [text, setText] = useState(initialText);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Cache the title so the slide-down exit animation can still render it
+  // after the parent clears state.
+  const lastTitleRef = useRef(title);
   useEffect(() => {
-    if (open) {
-      setText(initialText);
-      // specific request for focus
-      setTimeout(() => inputRef.current?.focus(), 50);
-    }
+    if (open) lastTitleRef.current = title;
+  }, [open, title]);
+  const displayTitle = open ? title : lastTitleRef.current;
+
+  useEffect(() => setMounted(true), []);
+
+  useEffect(() => {
+    if (!open) return;
+    setText(initialText);
+    const id = window.setTimeout(() => inputRef.current?.focus(), 80);
+    return () => window.clearTimeout(id);
   }, [open, initialText]);
 
-  if (!open) return null;
-  if (typeof document === 'undefined') return null;
+  if (!mounted) return null;
 
-  const handleSave = () => {
-    if (text.trim()) {
-      onSave(text.trim());
-    }
+  const handleSave = async () => {
+    const trimmed = text.trim();
+    if (!trimmed || busy) return;
+    await onSave(trimmed);
   };
 
-  const dialogContent = (
-    <div
-      className="fixed inset-0 z-[10001] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-4 pb-6 sm:pb-0"
-      role="dialog"
-      aria-modal="true"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-    >
-      <div
-        className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-start justify-between px-5 pt-5 pb-3">
-          <div className="flex-1 min-w-0 pr-3">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-              Task
-            </p>
-            <h4 className="text-base font-bold text-slate-900 dark:text-white leading-snug truncate">
-              {title}
-            </h4>
-          </div>
-          <button
-            className="flex-shrink-0 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            key="edit-task-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
             onClick={onClose}
-            aria-label="Close"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="px-5 pb-2">
-          <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">
-            {subtitle}
-          </p>
-          <div className="relative">
-            <input
-              ref={inputRef}
-              type="text"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSave();
-                if (e.key === 'Escape') onClose();
+            className="fixed inset-0 z-[1500] bg-black/35"
+          />
+          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1501] flex justify-center sm:bottom-6">
+            <motion.div
+              key="edit-task-sheet"
+              initial={{ y: '120%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '120%' }}
+              transition={{
+                type: 'tween',
+                ease: [0.32, 0.72, 0, 1],
+                duration: 0.32,
               }}
-              maxLength={45}
-              className="w-full h-11 px-4 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white border-none ring-0 focus:ring-2 focus:ring-primary/50 text-sm font-medium placeholder:text-slate-400 transition-all"
-              placeholder="Description..."
-              disabled={busy}
-            />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold pointer-events-none">
-              <span
-                className={
-                  text.length >= 40
-                    ? 'text-rose-500'
-                    : 'text-slate-400 dark:text-slate-500'
-                }
-              >
-                {text.length}/45
-              </span>
-            </div>
+              className="pointer-events-auto flex min-h-[42dvh] w-full flex-col rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:min-h-[360px] sm:max-w-[440px] sm:rounded-[28px] sm:pb-8 sm:shadow-2xl"
+            >
+              <div className="mx-auto flex w-full flex-1 flex-col">
+                {/* Header */}
+                <div className="relative mb-5 flex h-8 items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="absolute left-0 grid h-8 w-8 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label="Close"
+                  >
+                    <X className="h-4 w-4 stroke-[3]" />
+                  </button>
+                  <h3 className="text-[16px] font-extrabold text-foreground">
+                    {displayTitle}
+                  </h3>
+                </div>
+
+                {/* Input row */}
+                <div className="mb-4 flex items-center gap-2">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted text-primary">
+                    <Pencil className="h-5 w-5 stroke-[2.5]" />
+                  </div>
+                  <div className="relative flex-1">
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={text}
+                      onChange={(e) => setText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                          handleSave();
+                        }
+                        if (e.key === 'Escape') onClose();
+                      }}
+                      maxLength={MAX_LENGTH}
+                      spellCheck={false}
+                      autoComplete="off"
+                      disabled={busy}
+                      placeholder="Task name"
+                      className="h-12 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-lg font-medium text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 text-left"
+                    />
+                    {text.length >= 40 && (
+                      <span
+                        aria-hidden="true"
+                        className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums ${
+                          text.length >= MAX_LENGTH
+                            ? 'text-rose-500'
+                            : 'text-rose-400'
+                        }`}
+                      >
+                        {text.length}/{MAX_LENGTH}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Save */}
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={busy || !text.trim()}
+                  className="mt-auto flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985] disabled:opacity-50"
+                >
+                  {busy ? (
+                    'Saving...'
+                  ) : (
+                    <>
+                      <Check className="h-4 w-4 stroke-[3]" />
+                      Save changes
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-
-        {/* Actions */}
-        <div className="px-4 pb-4 pt-3 flex flex-col gap-2">
-          <button
-            className="w-full h-11 rounded-xl bg-primary text-primary-foreground text-sm font-bold transition-all hover:brightness-105 active:scale-[0.98] disabled:opacity-50 shadow-sm"
-            onClick={handleSave}
-            disabled={busy || !text.trim()}
-          >
-            {busy ? 'Saving...' : 'Save changes'}
-          </button>
-          <button
-            className="w-full py-2.5 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
-            onClick={onClose}
-            disabled={busy}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body,
   );
-
-  return createPortal(dialogContent, document.body);
 }

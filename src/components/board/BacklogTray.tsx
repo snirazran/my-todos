@@ -368,22 +368,19 @@ export default React.memo(function BacklogTray({
         onSave={handleTagSave}
       />
 
-      {editItem && (
-        <EditTaskDialog
+      <EditTaskDialog
           open={!!editItem}
-          initialText={editItem.text}
+          initialText={editItem?.text ?? ''}
           busy={busy}
           onClose={() => setEditItem(null)}
           onSave={async (newText) => {
-            if (onEdit) {
-              setBusy(true);
-              await onEdit(editItem.id, newText);
-              setBusy(false);
-              setEditItem(null);
-            }
+            if (!editItem || !onEdit) return;
+            setBusy(true);
+            await onEdit(editItem.id, newText);
+            setBusy(false);
+            setEditItem(null);
           }}
         />
-      )}
 
       <DeleteDialog
         open={!!confirmItem}

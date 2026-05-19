@@ -1537,27 +1537,21 @@ export default function TaskList({
         );
       })()}
 
-      {dialog &&
-        dialogVariant !== 'regular' &&
-        dialogVariant !== 'weekly' &&
-        dialogVariant !== 'backlog' && (
-          <EditTaskDialog
-            open={!!dialog && dialog.kind === 'edit'}
-            initialText={dialog.task.text}
-            title="Edit Task"
-            subtitle="Make changes to your task below."
-            busy={busy}
-            onClose={() => setDialog(null)}
-            onSave={async (newText) => {
-              if (onEditTask) {
-                setBusy(true);
-                await onEditTask(dialog.task.id, newText);
-                setBusy(false);
-                setDialog(null);
-              }
-            }}
-          />
-        )}
+      {onEditTask && (
+        <EditTaskDialog
+          open={dialog?.kind === 'edit'}
+          initialText={dialog?.task.text ?? ''}
+          busy={busy}
+          onClose={() => setDialog(null)}
+          onSave={async (newText) => {
+            if (!dialog) return;
+            setBusy(true);
+            await onEditTask(dialog.task.id, newText);
+            setBusy(false);
+            setDialog(null);
+          }}
+        />
+      )}
 
       {onScheduleTask && (
         <TimePopup
