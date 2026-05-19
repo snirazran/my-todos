@@ -366,6 +366,9 @@ export default function QuickAddSheet({
                                   {formatTimeDisplay(startTime)}
                                   {endTime && ` - ${formatTimeDisplay(endTime)}`}
                                 </span>
+                                {notifyEnabled && (
+                                  <Bell className="w-3 h-3 text-amber-500" />
+                                )}
                                 <X className="w-3 h-3 opacity-50 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity" />
                               </button>
                             )}
@@ -441,12 +444,12 @@ export default function QuickAddSheet({
                                 <CalendarCheck className="h-3.5 w-3.5 stroke-[3]" />
                               </span>
                             </span>
-                            <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground">
-                              {selectedDateLabel}
+                            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-extrabold text-muted-foreground">
+                              <span className="truncate">{selectedDateLabel}</span>
+                              {notifyEnabled && (
+                                <Bell className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                              )}
                             </span>
-                            {notifyEnabled && (
-                              <Bell className="h-3.5 w-3.5 shrink-0 mr-3 text-amber-500" />
-                            )}
                           </button>
                         )}
 

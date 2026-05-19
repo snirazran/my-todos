@@ -5,6 +5,12 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
+type SheetTransition = {
+  type?: 'tween' | 'spring';
+  duration?: number;
+  ease?: readonly number[] | string;
+};
+
 export interface BaseSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -19,14 +25,16 @@ export interface BaseSheetProps {
   backdropClassName?: string;
   /** z-index for the backdrop (sheet is +1). Default 1050 */
   zIndex?: number;
+  /** Override the mobile slide-in/out transition */
+  mobileTransition?: SheetTransition;
 }
 
-const desktopTransition = {
+const defaultDesktopTransition = {
   type: 'tween' as const,
   duration: 0.18,
   ease: [0.25, 0.1, 0.25, 1] as const,
 };
-const mobileTransition = {
+const defaultMobileTransition = {
   type: 'tween' as const,
   duration: 0.14,
   ease: [0.25, 0.1, 0.25, 1] as const,
@@ -39,7 +47,9 @@ export function BaseSheet({
   className,
   backdropClassName,
   zIndex = 1050,
+  mobileTransition,
 }: BaseSheetProps) {
+  const resolvedMobileTransition = mobileTransition ?? defaultMobileTransition;
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -99,7 +109,7 @@ export function BaseSheet({
               exit={
                 isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%' }
               }
-              transition={isDesktop ? desktopTransition : mobileTransition}
+              transition={isDesktop ? defaultDesktopTransition : resolvedMobileTransition}
               drag={!isDesktop ? 'y' : false}
               dragControls={dragControls}
               dragListener={false}

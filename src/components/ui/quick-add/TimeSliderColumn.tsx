@@ -20,8 +20,10 @@ export function TimeSliderColumn<T extends string | number>({
   const isUpdatingRef = useRef(false);
   const isDraggingRef = useRef(false);
   const lastValueRef = useRef<T | null>(null);
+  const startXRef = useRef(0);
   const startYRef = useRef(0);
   const scrollTopRef = useRef(0);
+  const axisLockedRef = useRef<'y' | null>(null);
   const itemsRef = useRef(items);
   const valueRef = useRef(value);
   const onChangeRef = useRef(onChange);
@@ -48,20 +50,20 @@ export function TimeSliderColumn<T extends string | number>({
     return () => window.clearTimeout(t);
   }, [value, items]);
 
+  // Mouse-only custom drag. On touch, we let native CSS scroll-snap handle
+  // scrolling — that gives smooth momentum, reliable snapping, and live
+  // color updates via the scroll handler (which doesn't bail out when no
+  // custom drag is active).
   useEffect(() => {
-    const handleMove = (e: PointerEvent) => {
-      if (!isDraggingRef.current) return;
-      const el = ref.current;
-      if (!el) return;
-      el.scrollTop = scrollTopRef.current - (e.clientY - startYRef.current);
-    };
-    const handleUp = () => {
+    const releaseDrag = (snap: boolean) => {
       if (!isDraggingRef.current) return;
       isDraggingRef.current = false;
+      axisLockedRef.current = null;
       const el = ref.current;
       if (!el) return;
       el.style.cursor = '';
       el.style.scrollSnapType = 'y mandatory';
+      if (!snap) return;
       const list = itemsRef.current;
       const idx = Math.round(el.scrollTop / TIME_SLIDER_ITEM_H);
       const clamped = Math.max(0, Math.min(idx, list.length - 1));
@@ -72,11 +74,32 @@ export function TimeSliderColumn<T extends string | number>({
       }
       el.scrollTo({ top: clamped * TIME_SLIDER_ITEM_H, behavior: 'smooth' });
     };
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp);
+    const handleMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      const el = ref.current;
+      if (!el) return;
+      const dx = e.pageX - startXRef.current;
+      const dy = e.pageY - startYRef.current;
+      // Axis lock: the first ~6px of movement decides whether this is a
+      // vertical scroll. If the user moves more horizontally than
+      // vertically, release the drag entirely — no sideways sliding.
+      if (!axisLockedRef.current) {
+        if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+        if (Math.abs(dy) > Math.abs(dx)) {
+          axisLockedRef.current = 'y';
+        } else {
+          releaseDrag(false);
+          return;
+        }
+      }
+      el.scrollTop = scrollTopRef.current - dy;
+    };
+    const handleUp = () => releaseDrag(true);
+    window.addEventListener('mousemove', handleMove);
+    window.addEventListener('mouseup', handleUp);
     return () => {
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
+      window.removeEventListener('mousemove', handleMove);
+      window.removeEventListener('mouseup', handleUp);
     };
   }, []);
 
@@ -86,19 +109,25 @@ export function TimeSliderColumn<T extends string | number>({
     const idx = Math.round(el.scrollTop / TIME_SLIDER_ITEM_H);
     const clamped = Math.max(0, Math.min(idx, items.length - 1));
     const next = items[clamped];
-    const closeToSnap =
-      Math.abs(el.scrollTop - clamped * TIME_SLIDER_ITEM_H) < 5;
-    if (next !== value && closeToSnap) {
+    if (next !== valueRef.current) {
       lastValueRef.current = next;
-      onChange(next);
+      onChangeRef.current(next);
     }
   };
 
-  const handlePointerDown = (e: React.PointerEvent) => {
+  const handleMouseDown = (e: React.MouseEvent) => {
+    // Only respond to primary (left) button. Right/middle click should not
+    // start a drag.
+    if (e.button !== 0) return;
     const el = ref.current;
     if (!el) return;
+    // Suppress native text selection / drag-image so horizontal mouse
+    // movement during the drag can't slide anything sideways.
+    e.preventDefault();
     isDraggingRef.current = true;
-    startYRef.current = e.clientY;
+    axisLockedRef.current = null;
+    startXRef.current = e.pageX;
+    startYRef.current = e.pageY;
     scrollTopRef.current = el.scrollTop;
     el.style.cursor = 'grabbing';
     el.style.scrollSnapType = 'none';
@@ -108,11 +137,12 @@ export function TimeSliderColumn<T extends string | number>({
     <div
       ref={ref}
       onScroll={handleScroll}
-      onPointerDown={handlePointerDown}
+      onMouseDown={handleMouseDown}
       className="relative z-10 h-[176px] overflow-y-auto overscroll-contain no-scrollbar snap-y snap-mandatory select-none"
       style={{
         paddingTop: TIME_SLIDER_PAD,
         paddingBottom: TIME_SLIDER_PAD,
+        touchAction: 'pan-y',
       }}
     >
       {items.map((item) => {

@@ -193,25 +193,40 @@ export function PickerSheet(props: Props) {
     setShowReminderPicker(false);
   };
 
-  if (!activePicker) return null;
+  // Keep the last picker around so the slide-down exit animation can still
+  // render the right content after activePicker is cleared.
+  const lastActivePickerRef = useRef<ActivePicker>(activePicker);
+  useEffect(() => {
+    if (activePicker) lastActivePickerRef.current = activePicker;
+  }, [activePicker]);
+  const displayPicker = activePicker ?? lastActivePickerRef.current;
 
   return (
     <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={() => setActivePicker(null)}
-        className="fixed inset-0 z-[1500] bg-black/35"
-      />
+      <AnimatePresence>
+        {activePicker && (
+          <motion.div
+            key="picker-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18, ease: 'easeOut' }}
+            onClick={() => setActivePicker(null)}
+            className="fixed inset-0 z-[1500] bg-black/35"
+          />
+        )}
+      </AnimatePresence>
       <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1501] flex justify-center sm:bottom-6">
-      <motion.div
-        initial={{ y: '120%' }}
-        animate={{ y: 0 }}
-        exit={{ y: '120%' }}
-        transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
-        className="pointer-events-auto min-h-[42dvh] w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:min-h-[360px] sm:max-w-[560px] sm:rounded-[28px] sm:pb-8 sm:shadow-2xl"
-      >
+      <AnimatePresence>
+        {activePicker && displayPicker && (
+          <motion.div
+            key="picker-sheet"
+            initial={{ y: '120%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '120%' }}
+            transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
+            className="pointer-events-auto min-h-[42dvh] w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:min-h-[360px] sm:max-w-[560px] sm:rounded-[28px] sm:pb-8 sm:shadow-2xl"
+          >
         <div className="mx-auto w-full">
           <div className="relative mb-7 flex h-9 items-center justify-center">
             <button
@@ -223,15 +238,15 @@ export function PickerSheet(props: Props) {
               <X className="h-5 w-5 stroke-[3]" />
             </button>
             <h2 className="text-[18px] font-extrabold text-muted-foreground">
-              {activePicker === 'tags'
+              {displayPicker === 'tags'
                 ? 'Tags'
-                : activePicker === 'date'
+                : displayPicker === 'date'
                   ? 'Date and time'
                   : 'Repeat'}
             </h2>
           </div>
 
-          {activePicker === 'tags' && (
+          {displayPicker === 'tags' && (
             <TagsView
               tagManager={tagManager}
               selectedTagIds={selectedTagIds}
@@ -242,7 +257,7 @@ export function PickerSheet(props: Props) {
             />
           )}
 
-          {activePicker === 'date' && (
+          {displayPicker === 'date' && (
             <DateView
               isLater={isLater}
               selectedDay={selectedDay}
@@ -263,7 +278,7 @@ export function PickerSheet(props: Props) {
             />
           )}
 
-          {activePicker === 'repeat' && (
+          {displayPicker === 'repeat' && (
             <RepeatView
               currentMode={currentRepeatMode}
               setRepeatMode={setRepeatMode}
@@ -275,7 +290,9 @@ export function PickerSheet(props: Props) {
             />
           )}
         </div>
-      </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       </div>
 
       <AnimatePresence>
@@ -661,9 +678,10 @@ function DateView({
       setShowReminderPicker(false);
       return;
     }
-    openReminderPicker({ notifyEnabled: false, startTime: '' });
-    setNotifyEnabled(true);
-    if (!startTime) setStartTime('09:00');
+    // Only open the picker. Don't enable the reminder or seed a time yet —
+    // saveReminderTime commits notifyEnabled=true (and falls back to 09:00
+    // if the user never moved the slider). Cancel restores via snapshot.
+    openReminderPicker({ notifyEnabled: false, startTime });
   };
 
   const editReminderTime = () => {
@@ -985,8 +1003,8 @@ function ReminderOverlay({
             <h3 className="text-[16px] font-extrabold text-foreground">Time</h3>
           </div>
 
-          <div className="relative mx-auto mb-5 grid max-w-[300px] grid-cols-3 items-center overflow-hidden text-center">
-            <div className="pointer-events-none absolute inset-x-0 top-1/2 z-0 h-11 -translate-y-1/2 rounded-2xl bg-primary/10 ring-1 ring-primary/25" />
+          <div className="relative mx-auto mb-5 grid max-w-[300px] grid-cols-3 items-center text-center">
+            <div className="pointer-events-none absolute -inset-x-1 top-1/2 z-0 h-11 -translate-y-1/2 rounded-2xl bg-primary/10 ring-1 ring-primary/25" />
             <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-background to-transparent" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-background to-transparent" />
 

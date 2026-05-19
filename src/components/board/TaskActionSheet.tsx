@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import {
   CheckCircle2,
   Pencil,
@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
+import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import Fly from '@/components/ui/fly';
 import type { Task } from './helpers';
 
@@ -51,7 +52,16 @@ export default function TaskActionSheet({
   onDoLater?: () => void;
   onDelete?: () => void;
 }) {
-  if (!task) return null;
+  const overscrollDrag = useSheetOverscrollDrag();
+  // Keep the last task around so the slide-down exit animation can still
+  // render content after the parent clears `task` on close.
+  const lastTaskRef = useRef<Task | null>(task);
+  useEffect(() => {
+    if (task) lastTaskRef.current = task;
+  }, [task]);
+  const displayTask = task ?? lastTaskRef.current;
+
+  if (!displayTask) return null;
 
   const actions: Action[] = [];
   if (onComplete)
@@ -108,10 +118,21 @@ export default function TaskActionSheet({
     <BaseSheet
       open={open}
       onOpenChange={onOpenChange}
-      className="sm:max-w-md"
+      className="sm:max-w-md max-h-[92vh]"
+      zIndex={1400}
+      mobileTransition={{
+        type: 'tween',
+        ease: [0.32, 0.72, 0, 1],
+        duration: 0.32,
+      }}
     >
-      {() => (
-        <div className="flex flex-col">
+      {({ isDesktop, dragControls }) => {
+        overscrollDrag.setContext(dragControls, !isDesktop);
+        return (
+        <div
+          ref={overscrollDrag.bind}
+          className="flex flex-1 min-h-0 flex-col overflow-y-auto overscroll-none"
+        >
           {/* Header */}
           <div className="px-5 pt-4 pb-3 flex items-center justify-between">
             <button
@@ -144,7 +165,7 @@ export default function TaskActionSheet({
           </div>
 
           <h2 className="px-5 pb-4 text-center text-lg font-black tracking-tight text-foreground">
-            {task.text}
+            {displayTask.text}
           </h2>
 
           {/* Actions */}
@@ -176,7 +197,8 @@ export default function TaskActionSheet({
             })}
           </div>
         </div>
-      )}
+        );
+      }}
     </BaseSheet>
   );
 }
