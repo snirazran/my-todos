@@ -41,7 +41,9 @@
       "Bash(awk 'NR>=330 && NR<=640' /Users/snirazran/Fullstack/my-todos/src/components/ui/quick-add/PickerSheet.tsx)",
       "Bash(awk NR==330 || NR==632 || NR==633 *)",
       "Bash(awk 'NR<329 || NR>631' /Users/snirazran/Fullstack/my-todos/src/components/ui/quick-add/PickerSheet.tsx)",
-      "Bash(mv /tmp/PickerSheet.new /Users/snirazran/Fullstack/my-todos/src/components/ui/quick-add/PickerSheet.tsx)"
+      "Bash(mv /tmp/PickerSheet.new /Users/snirazran/Fullstack/my-todos/src/components/ui/quick-add/PickerSheet.tsx)",
+      "Bash(./node_modules/.bin/tsc --noEmit)",
+      "Bash(NODE_OPTIONS='' ./node_modules/.bin/tsc --noEmit)"
     ]
   }
 }

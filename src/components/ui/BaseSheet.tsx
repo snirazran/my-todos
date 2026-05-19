@@ -2,14 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useDragControls } from 'framer-motion';
+import {
+  AnimatePresence,
+  motion,
+  useDragControls,
+  type Transition,
+} from 'framer-motion';
 import { cn } from '@/lib/utils';
-
-type SheetTransition = {
-  type?: 'tween' | 'spring';
-  duration?: number;
-  ease?: readonly number[] | string;
-};
 
 export interface BaseSheetProps {
   open: boolean;
@@ -26,18 +25,18 @@ export interface BaseSheetProps {
   /** z-index for the backdrop (sheet is +1). Default 1050 */
   zIndex?: number;
   /** Override the mobile slide-in/out transition */
-  mobileTransition?: SheetTransition;
+  mobileTransition?: Transition;
 }
 
-const defaultDesktopTransition = {
-  type: 'tween' as const,
+const defaultDesktopTransition: Transition = {
+  type: 'tween',
   duration: 0.18,
-  ease: [0.25, 0.1, 0.25, 1] as const,
+  ease: [0.25, 0.1, 0.25, 1],
 };
-const defaultMobileTransition = {
-  type: 'tween' as const,
+const defaultMobileTransition: Transition = {
+  type: 'tween',
   duration: 0.14,
-  ease: [0.25, 0.1, 0.25, 1] as const,
+  ease: [0.25, 0.1, 0.25, 1],
 };
 
 export function BaseSheet({
