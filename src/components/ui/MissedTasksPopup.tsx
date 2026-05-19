@@ -306,7 +306,6 @@ export function MissedTasksPopup({
                   isCatching={cinematic}
                   questClaimableCount={questClaimableCount}
                   questActiveCount={questActiveCount}
-                  progressCoachIsPremium={isPremium}
                   paused={wardrobeOpen || isDragging}
                 />
               </div>

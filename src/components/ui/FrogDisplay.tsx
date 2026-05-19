@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { Brain, Shirt, ScrollText } from 'lucide-react';
+import { Shirt, ScrollText } from 'lucide-react';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';
@@ -33,8 +33,6 @@ type Props = {
   isGuest?: boolean;
   questClaimableCount?: number;
   questActiveCount?: number;
-  onOpenProgressCoach?: () => void;
-  progressCoachIsPremium?: boolean;
   deferInventorySummary?: boolean;
   paused?: boolean;
   showActionButtons?: boolean;
@@ -61,8 +59,6 @@ export function FrogDisplay({
   isGuest,
   questClaimableCount = 0,
   questActiveCount = 0,
-  onOpenProgressCoach,
-  progressCoachIsPremium = false,
   deferInventorySummary = false,
   paused = false,
   showActionButtons = true,

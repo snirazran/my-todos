@@ -578,7 +578,7 @@ export function QuestsPanel({
                         )}
                         <div className={cn(
                           "flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start",
-                          data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 -mx-4 bg-background rounded-t-[24px] md:rounded-none md:bg-transparent"
+                          data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 bg-background rounded-t-[24px] md:rounded-none md:bg-transparent"
                         )}>
                         <div className="space-y-4">
                           {(() => {

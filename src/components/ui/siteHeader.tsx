@@ -15,8 +15,6 @@ import {
   LogIn,
   LogOut,
   Compass,
-  Brain,
-  Target,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -100,12 +98,6 @@ export default function SiteHeader() {
       href: '/planner',
       label: 'Planner',
       icon: LayoutDashboard,
-      protected: true,
-    },
-    {
-      href: '/analytics',
-      label: 'Coach',
-      icon: Target,
       protected: true,
     },
     {
@@ -757,19 +749,6 @@ function MobileSheet({
                         Quest Focus
                       </span>
                       <Compass className="h-5 w-5 text-emerald-500" />
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        router.push('/analytics');
-                        onClose();
-                      }}
-                      className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
-                    >
-                      <span className="font-bold text-sm group-hover:text-foreground transition-colors">
-                        Progress Coach
-                      </span>
-                      <Brain className="h-5 w-5 text-primary" />
                     </button>
                   </>
                 )}

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { format, subDays } from 'date-fns';
+import { format } from 'date-fns';
 import {
   Calendar,
   LayoutDashboard,
@@ -50,7 +50,6 @@ import {
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
 import WeeklyWrapped from '@/components/ui/WeeklyWrapped';
-import ProgressCoachPopup from '@/components/ui/ProgressCoachPopup';
 import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
 import type {
   FocusCategoryTagMap,
@@ -354,7 +353,6 @@ export default function Home() {
   );
   const lastHandledTimerCompletionRef = useRef<number | null>(null);
   const homeMountTimeRef = useRef<number>(Date.now());
-  const [showProgressCoach, setShowProgressCoach] = useState(false);
 
   /* State */
   const [activeTab, setActiveTab] = useState<HomeTab>('all');
@@ -548,15 +546,6 @@ export default function Home() {
     { revalidateOnFocus: false },
   );
   const isPremium = !!questsData?.isPremium;
-  const coachHistoryFrom = format(subDays(new Date(), 6), 'yyyy-MM-dd');
-  const coachHistoryTo = format(new Date(), 'yyyy-MM-dd');
-  const { data: coachHistoryData } = useSWR<any[]>(
-    user && showProgressCoach
-      ? `/api/history?from=${coachHistoryFrom}&to=${coachHistoryTo}&timezone=${encodeURIComponent(timezone)}`
-      : null,
-    (url: string) => fetch(url).then((res) => res.json()),
-    { revalidateOnFocus: false },
-  );
   const questOnboarding = questsData?.onboarding;
   const wasMissedReviewOpen = useRef(false);
 
@@ -731,8 +720,6 @@ export default function Home() {
               isGuest={!user}
               questClaimableCount={questsData?.claimableCount ?? 0}
               questActiveCount={questsData?.activeCount ?? 0}
-              onOpenProgressCoach={() => setShowProgressCoach(true)}
-              progressCoachIsPremium={isPremium}
               paused={isAnyPanelOpen}
             />
           </div>
