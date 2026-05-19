@@ -693,6 +693,7 @@ export default function TaskList({
   isGuest,
   isGlowActive,
   isFrozen = false,
+  quickAddOpen = false,
   paused = false,
 }: {
   tasks: Task[];
@@ -724,6 +725,7 @@ export default function TaskList({
   isGlowActive?: boolean;
   /** When true the current sort order is frozen (prevents layout shifts during tongue animation) */
   isFrozen?: boolean;
+  quickAddOpen?: boolean;
   paused?: boolean;
 }) {
   const router = useRouter(); // Import might be needed if not present
@@ -1160,15 +1162,16 @@ export default function TaskList({
             <>
               <motion.div
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5 }}
+                animate={{ opacity: quickAddOpen ? 0 : 1 }}
+                transition={{ duration: quickAddOpen ? 0 : 0.5 }}
                 className="mb-2"
               >
                 <button
                   onClick={() =>
                     onAddRequested('', null, { preselectToday: true })
                   }
-                  className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group"
+                  className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group disabled:pointer-events-none"
+                  disabled={quickAddOpen}
                 >
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
                     <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
@@ -1186,15 +1189,16 @@ export default function TaskList({
             <>
               <motion.div
                 initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5 }}
+                animate={{ opacity: quickAddOpen ? 0 : 1 }}
+                transition={{ duration: quickAddOpen ? 0 : 0.5 }}
                 className="mb-2"
               >
                 <button
                   onClick={() =>
                     onAddRequested('', null, { preselectToday: true })
                   }
-                  className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group"
+                  className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group disabled:pointer-events-none"
+                  disabled={quickAddOpen}
                 >
                   <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
                     <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
@@ -1270,7 +1274,8 @@ export default function TaskList({
                 <div className="mt-1.5 mb-1">
                   <button
                     onClick={() => onAddRequested('', null, { preselectToday: true })}
-                    className="group relative flex w-full items-center px-2 py-2 rounded-xl border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99]"
+                    disabled={quickAddOpen}
+                    className="group relative flex w-full items-center px-2 py-2 rounded-xl border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-0"
                   >
                     <div className="flex items-center flex-1 min-w-0 gap-2 pl-1.5">
                       <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">

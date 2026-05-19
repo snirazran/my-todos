@@ -152,10 +152,9 @@ export default function QuickAddSheet({
   ) as DisplayDay;
   const repeatsOn = repeat === 'weekly';
   const hasTaskText = text.trim().length > 0;
-  const availableSheetHeight = Math.max(
-    320,
-    (viewportHeight ?? 900) - (hasTaskText && inputFocused ? keyboardInset : 0),
-  );
+  const keyboardActive = inputFocused && keyboardInset > 0;
+  const availableSheetHeight = Math.max(320, viewportHeight ?? 900);
+  const showSuggestions = !hasTaskText && !keyboardActive;
   const suggestionsPanelHeight = Math.min(
     Math.max(availableSheetHeight - 360, 220),
     500,
@@ -267,11 +266,8 @@ export default function QuickAddSheet({
                   duration: 0.32,
                 }}
                 style={{
-                  bottom: hasTaskText && inputFocused ? keyboardInset : 0,
-                  height:
-                    hasTaskText && inputFocused
-                      ? availableSheetHeight
-                      : undefined,
+                  bottom: keyboardActive ? keyboardInset : 0,
+                  height: keyboardActive ? availableSheetHeight : undefined,
                   transition:
                     'bottom 220ms cubic-bezier(0.32, 0.72, 0, 1), height 220ms cubic-bezier(0.32, 0.72, 0, 1)',
                   contain: 'layout paint style',
@@ -500,7 +496,7 @@ export default function QuickAddSheet({
                   </div>
 
                   <AnimatePresence initial={false}>
-                    {!hasTaskText && (
+                    {showSuggestions && (
                       <motion.div
                         key="quick-add-suggestions-slot"
                         initial={{ height: 0, marginTop: 0 }}

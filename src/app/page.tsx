@@ -891,6 +891,7 @@ export default function Home() {
                   onSetSelectedTags={setSelectedTags}
                   isGlowActive={isTaskGlow}
                   isFrozen={cinematic}
+                  quickAddOpen={showQuickAdd}
                   paused={isAnyPanelOpen}
                 />
               </div>
