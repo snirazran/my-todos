@@ -128,7 +128,14 @@ export function FrogSpeechBubble({
   }, [clickedAt, done, isCatching, message, readyQuests, total]);
 
   const displayMessage = fixedMessage ?? message;
-  const isLongMessage = displayMessage.length > 33;
+  const textSizeClass =
+    displayMessage.length > 48
+      ? 'text-[10px]'
+      : displayMessage.length > 40
+        ? 'text-[11px]'
+        : displayMessage.length > 32
+          ? 'text-xs'
+          : 'text-[13px]';
   const shouldShow = fixedMessage ? true : isVisible;
 
   return (
@@ -139,12 +146,10 @@ export function FrogSpeechBubble({
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 5, scale: 0.9 }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className={`absolute ${
-            isLongMessage ? '-top-6' : 'top-0'
-          } -left-[8%] -translate-x-1/2 z-50 w-72 pointer-events-none ${className}`}
+          className={`absolute top-1 left-[16%] z-[100] w-max min-w-[11rem] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 pointer-events-none ${className}`}
         >
-          <div className="relative p-4 border shadow-sm bg-card rounded-[20px] border-border/50">
-            <p className="whitespace-pre-line text-sm font-bold leading-snug text-center text-foreground">
+          <div className="relative rounded-[18px] border border-border/50 bg-card px-3.5 py-3 shadow-sm">
+            <p className={`whitespace-nowrap text-center font-bold leading-none text-foreground ${textSizeClass}`}>
               {displayMessage}
             </p>
 
