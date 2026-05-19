@@ -179,13 +179,18 @@ export async function createQuestSeason(payload: {
 }
 
 export function grantRewardsToUser(user: any, rewards: QuestRewards) {
-  const summary = { fliesGranted: 0, grantedItemIds: [] as string[] };
   if (!user.wardrobe) {
     user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
   }
   user.wardrobe.inventory = user.wardrobe.inventory ?? {};
   user.wardrobe.unseenItems = user.wardrobe.unseenItems ?? [];
   user.wardrobe.flies = user.wardrobe.flies ?? 0;
+  const summary = {
+    fliesGranted: 0,
+    flyBalanceBefore: user.wardrobe.flies,
+    flyBalanceAfter: user.wardrobe.flies,
+    grantedItemIds: [] as string[],
+  };
 
   for (const reward of rewards) {
     if (reward.type === 'FLIES') {
@@ -194,6 +199,7 @@ export function grantRewardsToUser(user: any, rewards: QuestRewards) {
         : reward.amount ?? 0;
       user.wardrobe.flies += amount;
       summary.fliesGranted += amount;
+      summary.flyBalanceAfter = user.wardrobe.flies;
     } else if (reward.itemId) {
       const amount = Math.max(1, reward.amount ?? 1);
       for (let i = 0; i < amount; i += 1) {

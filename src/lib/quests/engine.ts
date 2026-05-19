@@ -886,10 +886,6 @@ export async function claimQuestReward(args: {
   }
 
   const isPremium = isPremiumUser(user.toObject());
-  const summary = {
-    fliesGranted: 0,
-    grantedItemIds: [] as string[],
-  };
 
   if (!user.wardrobe) {
     user.wardrobe = {
@@ -902,6 +898,12 @@ export async function claimQuestReward(args: {
   user.wardrobe.inventory = user.wardrobe.inventory ?? {};
   user.wardrobe.unseenItems = user.wardrobe.unseenItems ?? [];
   user.wardrobe.flies = user.wardrobe.flies ?? 0;
+  const summary = {
+    fliesGranted: 0,
+    flyBalanceBefore: user.wardrobe.flies,
+    flyBalanceAfter: user.wardrobe.flies,
+    grantedItemIds: [] as string[],
+  };
 
   const multiplier = isPremium ? 2 : 1;
   const alreadyClaimed = new Set(quest.claimedObjectiveIds ?? []);
@@ -912,6 +914,7 @@ export async function claimQuestReward(args: {
         const amount = (reward.amount ?? 0) * multiplier;
         user.wardrobe!.flies += amount;
         summary.fliesGranted += amount;
+        summary.flyBalanceAfter = user.wardrobe!.flies;
       } else if (reward.itemId) {
         for (let i = 0; i < multiplier; i += 1) {
           user.wardrobe!.inventory[reward.itemId] =
@@ -968,7 +971,6 @@ export async function claimObjectiveReward(args: {
   if (block.progress < block.target) throw new Error('Objective not completed');
 
   const isPremium = isPremiumUser(user.toObject());
-  const summary = { fliesGranted: 0, grantedItemIds: [] as string[] };
 
   if (!user.wardrobe) {
     user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
@@ -976,6 +978,12 @@ export async function claimObjectiveReward(args: {
   user.wardrobe.inventory = user.wardrobe.inventory ?? {};
   user.wardrobe.unseenItems = user.wardrobe.unseenItems ?? [];
   user.wardrobe.flies = user.wardrobe.flies ?? 0;
+  const summary = {
+    fliesGranted: 0,
+    flyBalanceBefore: user.wardrobe.flies,
+    flyBalanceAfter: user.wardrobe.flies,
+    grantedItemIds: [] as string[],
+  };
 
   const multiplier = isPremium ? 2 : 1;
 
@@ -984,6 +992,7 @@ export async function claimObjectiveReward(args: {
       const amount = (reward.amount ?? 0) * multiplier;
       user.wardrobe.flies += amount;
       summary.fliesGranted += amount;
+      summary.flyBalanceAfter = user.wardrobe.flies;
     } else if (reward.itemId) {
       for (let i = 0; i < multiplier; i += 1) {
         user.wardrobe.inventory[reward.itemId] =

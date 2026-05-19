@@ -27,7 +27,8 @@ import { SingleRewardCard } from './daily-reward/RewardCard';
 import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
-import { mutateInventoryCaches } from '@/hooks/useInventory';
+import { AnimatedNumber } from './AnimatedNumber';
+import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -68,6 +69,8 @@ type QuestSeasonView = {
 
 type QuestRewardSummary = {
   fliesGranted?: number;
+  flyBalanceBefore?: number;
+  flyBalanceAfter?: number;
   grantedItemIds?: string[];
 };
 
@@ -75,10 +78,19 @@ type QuestRewardRevealEntry = {
   key: string;
   item: ItemDef;
   fliesGranted?: number;
+  flyBalanceBefore?: number;
+  flyBalanceAfter?: number;
   quantity?: number;
   baseQuantity?: number;
   baseFlies?: number;
   isQuestReward?: boolean;
+};
+
+type FlyGainToast = {
+  id: number;
+  amount: number;
+  from: number;
+  to: number;
 };
 
 const fetcher = async <T,>(url: string) => {
@@ -167,12 +179,16 @@ export function QuestsPanel({
     QuestRewardRevealEntry[]
   >([]);
   const [openingGiftKey, setOpeningGiftKey] = useState<string | null>(null);
+  const [flyGainToast, setFlyGainToast] = useState<FlyGainToast | null>(null);
   const [dailyPage, setDailyPage] = useState(0);
   const [carouselDragging, setCarouselDragging] = useState(false);
   const rewardRevealIdRef = useRef(0);
+  const flyGainToastIdRef = useRef(0);
+  const knownFlyBalanceRef = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const initialTopPinnedRef = useRef(false);
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const { data: inventoryData } = useInventory(!isGuest, true);
 
   const {
     data,
@@ -195,10 +211,23 @@ export function QuestsPanel({
   };
 
   useEffect(() => {
+    const balance = inventoryData?.wardrobe?.flies;
+    if (typeof balance === 'number' && Number.isFinite(balance)) {
+      knownFlyBalanceRef.current = balance;
+    }
+  }, [inventoryData?.wardrobe?.flies]);
+
+  useEffect(() => {
     if (!claimMessage) return;
     const timeout = window.setTimeout(() => setClaimMessage(null), 5000);
     return () => window.clearTimeout(timeout);
   }, [claimMessage]);
+
+  useEffect(() => {
+    if (!flyGainToast) return;
+    const timeout = window.setTimeout(() => setFlyGainToast(null), 3200);
+    return () => window.clearTimeout(timeout);
+  }, [flyGainToast]);
 
   useEffect(() => {
     if (isLoading || !data || initialTopPinnedRef.current) return;
@@ -292,10 +321,21 @@ export function QuestsPanel({
 
     if (fliesGranted > 0) {
       const baseFlies = isPremium ? Math.floor(fliesGranted / 2) : fliesGranted;
+      const flyBalanceBefore =
+        typeof summary?.flyBalanceBefore === 'number'
+          ? summary.flyBalanceBefore
+          : knownFlyBalanceRef.current;
+      const flyBalanceAfter =
+        typeof summary?.flyBalanceAfter === 'number'
+          ? summary.flyBalanceAfter
+          : flyBalanceBefore + fliesGranted;
+      knownFlyBalanceRef.current = flyBalanceAfter;
       nextEntries.push({
         key: `flies-${fliesGranted}-${rewardRevealIdRef.current}`,
         item: createFlyRewardItem(fliesGranted),
         fliesGranted,
+        flyBalanceBefore,
+        flyBalanceAfter,
         baseFlies: isPremium ? baseFlies : undefined,
         isQuestReward: true,
       });
@@ -330,13 +370,40 @@ export function QuestsPanel({
     return nextEntries.length;
   };
 
-  const handleRewardRevealClaim = () => {
+  const showFlyGainToast = (entry: QuestRewardRevealEntry) => {
+    if (!entry.fliesGranted) return;
+    const amount = Math.max(0, Math.floor(entry.fliesGranted));
+    if (amount <= 0) return;
+    const from =
+      typeof entry.flyBalanceBefore === 'number'
+        ? entry.flyBalanceBefore
+        : Math.max(0, knownFlyBalanceRef.current - amount);
+    const to =
+      typeof entry.flyBalanceAfter === 'number'
+        ? entry.flyBalanceAfter
+        : from + amount;
+
+    setFlyGainToast({
+      id: ++flyGainToastIdRef.current,
+      amount,
+      from,
+      to,
+    });
+  };
+
+  const handleRewardRevealClaim = (entry?: QuestRewardRevealEntry) => {
+    if (entry?.fliesGranted) {
+      showFlyGainToast(entry);
+    }
+    if (entry?.isQuestReward) {
+      mutateInventoryCaches();
+    }
     setRewardRevealQueue((current) => current.slice(1));
   };
 
   const handleRewardRevealOpenGift = async (entry: QuestRewardRevealEntry) => {
     if (entry.item.slot !== 'container') {
-      handleRewardRevealClaim();
+      handleRewardRevealClaim(entry);
       return;
     }
     if (openingGiftKey) return;
@@ -394,7 +461,6 @@ export function QuestsPanel({
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
       queueRewardReveal(payload.rewardSummary);
       await refreshQuestData();
-      mutateInventoryCaches();
     } catch (err: any) {
       setClaimMessage(err.message || 'Claim failed');
     } finally {
@@ -417,7 +483,6 @@ export function QuestsPanel({
       if (!res.ok) throw new Error(payload.error || 'Claim failed');
       queueRewardReveal(payload.rewardSummary);
       await refreshQuestData();
-      mutateInventoryCaches();
     } catch (err: any) {
       setClaimMessage(err.message || 'Claim failed');
     } finally {
@@ -614,6 +679,7 @@ export function QuestsPanel({
                 onOpenGift={handleRewardRevealOpenGift}
                 paused={false}
               />
+              <FlyGainToastPill toast={flyGainToast} />
               <QuestSeasonEventOverlay
                 season={data?.activeSeason ?? null}
                 open={seasonEventOpen}
@@ -1215,7 +1281,7 @@ function QuestRewardRevealOverlay({
   queue: QuestRewardRevealEntry[];
   openingGiftKey: string | null;
   isPremium: boolean;
-  onClaim: () => void;
+  onClaim: (entry: QuestRewardRevealEntry) => void;
   onOpenGift: (entry: QuestRewardRevealEntry) => void;
   paused?: boolean;
 }) {
@@ -1257,10 +1323,10 @@ function QuestRewardRevealOverlay({
               onClaim={
                 entry.item.slot === 'container'
                   ? () => onOpenGift(entry)
-                  : onClaim
+                  : () => onClaim(entry)
               }
               onOpenLater={
-                entry.item.slot === 'container' ? onClaim : undefined
+                entry.item.slot === 'container' ? () => onClaim(entry) : undefined
               }
               quantity={entry.quantity}
               baseQuantity={entry.baseQuantity}
@@ -1287,6 +1353,77 @@ function QuestRewardRevealOverlay({
               slotLabel={entry.fliesGranted ? 'currency' : undefined}
             />
           </div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
+function FlyGainToastPill({ toast }: { toast: FlyGainToast | null }) {
+  const [displayValue, setDisplayValue] = useState(0);
+
+  useEffect(() => {
+    if (!toast) return;
+    setDisplayValue(toast.from);
+    const startTimer = window.setTimeout(() => {
+      setDisplayValue(toast.to);
+    }, 260);
+    return () => window.clearTimeout(startTimer);
+  }, [toast]);
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <AnimatePresence mode="wait">
+      {toast && (
+        <motion.div
+          key={toast.id}
+          className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[10000] flex justify-center px-4"
+          initial={{ opacity: 0, y: -42, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -34, scale: 0.98 }}
+          transition={{
+            duration: 0.42,
+            ease: [0.32, 0.72, 0, 1],
+          }}
+        >
+          <motion.div
+            initial={{ boxShadow: '0 0 0 0 hsl(var(--primary) / 0)' }}
+            animate={{
+              boxShadow: [
+                '0 0 0 0 hsl(var(--primary) / 0)',
+                '0 0 0 10px hsl(var(--primary) / 0.18)',
+                '0 0 0 0 hsl(var(--primary) / 0)',
+              ],
+            }}
+            transition={{ delay: 0.26, duration: 0.58 }}
+            className="flex items-center gap-2 rounded-full border border-primary/25 bg-card/95 py-2 pl-2.5 pr-4 text-foreground shadow-xl shadow-black/15 ring-1 ring-white/25 backdrop-blur-xl"
+          >
+            <motion.div
+              animate={{
+                rotate: [0, -12, 13, -7, 0],
+                y: [0, -3, 0, -1, 0],
+              }}
+              transition={{
+                delay: 0.22,
+                duration: 0.62,
+                ease: [0.32, 0.72, 0, 1],
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10"
+            >
+              <Fly size={31} y={-4} paused={false} interactive={false} />
+            </motion.div>
+            <div className="flex items-baseline gap-1.5">
+              <span className="rounded-full bg-primary px-2 py-1 text-xs font-black leading-none text-primary-foreground">
+                +{toast.amount}
+              </span>
+              <AnimatedNumber
+                value={displayValue}
+                className="text-lg font-black tabular-nums leading-none"
+              />
+            </div>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>,
