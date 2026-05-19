@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useReminderScheduler } from '@/hooks/useReminderScheduler';
+import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import Fly from '@/components/ui/fly';
 
 // --- Types ---
@@ -281,6 +282,24 @@ export function useTaskData({
           // We use a functional update to ensure we're modifying the LATEST state (which might include the optimistic change)
           if (json.flyStatus || json.hungerStatus) {
             const newFlyStatus = json.flyStatus as FlyStatus | undefined;
+
+            // Push the new fly balance into the inventory caches so the
+            // header's fly counter updates instantly — without this, the
+            // header reads from /api/skins/inventory and only refreshes
+            // after a page reload.
+            if (newFlyStatus) {
+              const nextBalance = newFlyStatus.balance;
+              const patch = (curr: any) => {
+                if (!curr?.wardrobe) return curr;
+                if (curr.wardrobe.flies === nextBalance) return curr;
+                return {
+                  ...curr,
+                  wardrobe: { ...curr.wardrobe, flies: nextBalance },
+                };
+              };
+              mutate(INVENTORY_KEY, patch, { revalidate: false });
+              mutate(INVENTORY_SUMMARY_KEY, patch, { revalidate: false });
+            }
 
             // NOTIFICATIONS
             if (newFlyStatus) {

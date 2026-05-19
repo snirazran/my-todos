@@ -31,6 +31,7 @@ import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import Fly from '@/components/ui/fly';
+import { FlyCounter } from '@/components/ui/FlyCounter';
 import { CurrencyShop } from './shop/CurrencyShop';
 
 const wardrobeItems = [
@@ -147,16 +148,12 @@ export default function SiteHeader() {
             />
           </div>
           {user && flyBalance !== undefined && (
-            <div
-              onClick={() => setShopOpen(true)}
-              className="fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden cursor-pointer transition-colors active:scale-95"
-            >
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-xl border border-border/50 shadow-sm">
-                <Fly size={28} paused={false} y={-3} />
-                <span className="text-xs font-black tabular-nums text-foreground">
-                  {flyBalance.toLocaleString()}
-                </span>
-              </div>
+            <div className="fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] px-2 py-1 md:hidden">
+              <FlyCounter
+                balance={flyBalance}
+                variant="mobile"
+                onClick={() => setShopOpen(true)}
+              />
             </div>
           )}
         </>
@@ -318,10 +315,7 @@ export default function SiteHeader() {
           />
 
           {user && flyBalance !== undefined && (
-            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-card/80 backdrop-blur-xl border border-border/50 shadow-sm shrink-0">
-              <Fly size={20} paused={false} y={-3} />
-              <span className="text-xs font-black tabular-nums text-foreground">{flyBalance.toLocaleString()}</span>
-            </div>
+            <FlyCounter balance={flyBalance} variant="desktop" />
           )}
         </div>
         <style jsx>{`
