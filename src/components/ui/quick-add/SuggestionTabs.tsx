@@ -84,6 +84,8 @@ export function SuggestionTabs({
     open ? '/api/quests/categories' : null,
     fetcher,
   );
+  const focusDataReady =
+    categoriesData !== undefined && (hasOverride || questsData !== undefined);
 
   const resolvedCategoryIds: MacroCategoryId[] = hasOverride
     ? focusCategoryIds!
@@ -136,6 +138,7 @@ export function SuggestionTabs({
     if (!open) return;
     if (autoSelectedForOpenRef.current) return;
     if (userPickedTabRef.current) return;
+    if (!focusDataReady) return;
     if (backlogData === undefined) return;
 
     const hasBacklog = Array.isArray(backlogData) && backlogData.length > 0;
@@ -156,7 +159,7 @@ export function SuggestionTabs({
       setDisplayedCategoryIds([]);
     }
     autoSelectedForOpenRef.current = true;
-  }, [open, backlogData, focusCategories]);
+  }, [open, backlogData, focusCategories, focusDataReady]);
 
   const orderedCategories = useMemo(() => {
     if (!displayedCategoryIds) return focusCategories;

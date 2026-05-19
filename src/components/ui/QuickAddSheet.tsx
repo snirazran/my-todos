@@ -152,6 +152,7 @@ export default function QuickAddSheet({
   ) as DisplayDay;
   const repeatsOn = repeat === 'weekly';
   const hasTaskText = text.trim().length > 0;
+  const suggestionsPanelHeight = Math.min((viewportHeight ?? 900) * 0.54, 500);
 
   const selectedDateLabel = isLater
     ? 'Later'
@@ -257,17 +258,18 @@ export default function QuickAddSheet({
                   ease: [0.32, 0.72, 0, 1],
                   duration: 0.4,
                 }}
-                style={
-                  hasTaskText && inputFocused
-                    ? {
-                        bottom: keyboardInset,
-                        height: viewportHeight ?? undefined,
-                      }
-                    : undefined
-                }
+                style={{
+                  bottom: hasTaskText && inputFocused ? keyboardInset : 0,
+                  height:
+                    hasTaskText && inputFocused
+                      ? viewportHeight ?? undefined
+                      : undefined,
+                  transition:
+                    'bottom 220ms cubic-bezier(0.32, 0.72, 0, 1), height 220ms cubic-bezier(0.32, 0.72, 0, 1)',
+                }}
                 className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
               >
-                <div className="pointer-events-auto mx-auto flex w-full max-w-[820px] flex-col pb-[env(safe-area-inset-bottom)]">
+                <div className="pointer-events-auto mx-auto flex w-full max-w-[620px] flex-col pb-[env(safe-area-inset-bottom)]">
                   <div className="mb-2 flex shrink-0 justify-end px-3">
                     <button
                       type="button"
@@ -279,15 +281,8 @@ export default function QuickAddSheet({
                     </button>
                   </div>
 
-                  <div
-                    className={[
-                      'flex max-h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover/95 p-4 shadow-[0_24px_48px_rgba(15,23,42,0.25)] ring-1 ring-border/80 backdrop-blur-2xl sm:max-h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]',
-                      hasTaskText
-                        ? ''
-                        : 'h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] sm:h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]',
-                    ].join(' ')}
-                  >
-                    <div dir="ltr" className="flex min-h-0 w-full flex-1 flex-col pt-1">
+                  <div className="flex max-h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover/95 p-4 ring-1 ring-border/80 backdrop-blur-2xl sm:max-h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]">
+                    <div dir="ltr" className="w-full pt-1">
                       <div className="mb-1 flex shrink-0 items-center gap-2">
                         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
                           <Fly size={36} y={-3} />
@@ -446,20 +441,77 @@ export default function QuickAddSheet({
                         )}
 
                       </div>
+                    </div>
 
+                    <AnimatePresence initial={false}>
+                      {hasTaskText && (
+                        <motion.div
+                          key="quick-add-actions"
+                          initial={{ opacity: 0, y: 8, height: 0, marginTop: 0 }}
+                          animate={{ opacity: 1, y: 0, height: 48, marginTop: 16 }}
+                          exit={{ opacity: 0, y: 8, height: 0, marginTop: 0 }}
+                          transition={{
+                            duration: 0.22,
+                            ease: [0.32, 0.72, 0, 1],
+                          }}
+                          className="shrink-0 overflow-hidden"
+                        >
+                          <div
+                            className="flex items-center"
+                            style={{ transform: 'translateZ(0)' }}
+                          >
+                            <button
+                              type="button"
+                              onClick={handleSubmit}
+                              disabled={!hasTaskText || isSubmitting}
+                              className={[
+                                'relative h-12 flex-1 rounded-full text-[15px] font-bold overflow-hidden transition-all',
+                                'bg-primary text-primary-foreground',
+                                'shadow-sm ring-1 ring-white/20',
+                                '[@media(hover:hover)]:hover:brightness-105 active:scale-[0.985]',
+                                'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
+                              ].join(' ')}
+                            >
+                              <span className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/25 to-transparent" />
+                              <span className="relative z-10 flex items-center justify-center gap-2">
+                                {isSubmitting ? (
+                                  'Adding...'
+                                ) : (
+                                  <>
+                                    <Plus className="w-4 h-4 stroke-[3]" />
+                                    <span>Add Task</span>
+                                  </>
+                                )}
+                              </span>
+                            </button>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+
+                  <div
+                    className="pointer-events-none mt-3 min-h-0 overflow-hidden rounded-[28px]"
+                    style={{ height: suggestionsPanelHeight }}
+                  >
+                    <AnimatePresence initial={false}>
                       {!hasTaskText && (
                         <motion.div
                           key="quick-add-suggestions"
-                          initial={{ opacity: 0, y: 8 }}
+                          initial={{ opacity: 1, y: suggestionsPanelHeight + 24 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ duration: 0.14, ease: 'easeOut' }}
-                          className="flex min-h-0 flex-1 flex-col overflow-hidden"
+                          exit={{ opacity: 1, y: suggestionsPanelHeight + 24 }}
+                          transition={{
+                            duration: 0.28,
+                            ease: [0.32, 0.72, 0, 1],
+                          }}
+                          className="pointer-events-auto h-full min-h-0 overflow-hidden rounded-[28px] border border-border/80 bg-popover/95 p-4 backdrop-blur-2xl"
                         >
                           <SuggestionTabs
                             open={open}
                             focusCategoryIds={focusCategoryIds}
                             categoryTagMap={categoryTagMap}
-                            className="h-full min-h-0"
+                            className="mt-0 h-full min-h-0 border-t-0 pt-0"
                             onPick={(pick) => {
                               setText(pick.text);
                               setTags((prev) => {
@@ -489,49 +541,6 @@ export default function QuickAddSheet({
                               inputRef.current?.focus();
                             }}
                           />
-                        </motion.div>
-                      )}
-                    </div>
-
-                    <AnimatePresence initial={false}>
-                      {hasTaskText && (
-                        <motion.div
-                          key="quick-add-actions"
-                          initial={{ opacity: 0, y: 6 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: 6 }}
-                          transition={{ duration: 0.14, ease: 'easeOut' }}
-                          className="shrink-0"
-                        >
-                          <div
-                            className="mt-4 flex items-center"
-                            style={{ transform: 'translateZ(0)' }}
-                          >
-                            <button
-                              type="button"
-                              onClick={handleSubmit}
-                              disabled={!hasTaskText || isSubmitting}
-                              className={[
-                                'relative h-12 flex-1 rounded-full text-[15px] font-bold overflow-hidden transition-all',
-                                'bg-primary text-primary-foreground',
-                                'shadow-sm ring-1 ring-white/20',
-                                '[@media(hover:hover)]:hover:brightness-105 active:scale-[0.985]',
-                                'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
-                              ].join(' ')}
-                            >
-                              <span className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/25 to-transparent" />
-                              <span className="relative z-10 flex items-center justify-center gap-2">
-                                {isSubmitting ? (
-                                  'Adding...'
-                                ) : (
-                                  <>
-                                    <Plus className="w-4 h-4 stroke-[3]" />
-                                    <span>Add Task</span>
-                                  </>
-                                )}
-                              </span>
-                            </button>
-                          </div>
                         </motion.div>
                       )}
                     </AnimatePresence>
