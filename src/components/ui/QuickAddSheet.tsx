@@ -246,17 +246,18 @@ export default function QuickAddSheet({
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => onOpenChange(false)}
-                className="fixed inset-0 z-[1399] bg-background/80 backdrop-blur-[2px]"
+                transition={{ duration: 0.16, ease: 'easeOut' }}
+                className="fixed inset-0 z-[1399] bg-background/80 will-change-opacity"
               />
 
               <motion.div
-                initial={{ y: '100%', opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: '100%', opacity: 0 }}
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
                 transition={{
                   type: 'tween',
                   ease: [0.32, 0.72, 0, 1],
-                  duration: 0.4,
+                  duration: 0.32,
                 }}
                 style={{
                   bottom: hasTaskText && inputFocused ? keyboardInset : 0,
@@ -266,8 +267,9 @@ export default function QuickAddSheet({
                       : undefined,
                   transition:
                     'bottom 220ms cubic-bezier(0.32, 0.72, 0, 1), height 220ms cubic-bezier(0.32, 0.72, 0, 1)',
+                  contain: 'layout paint style',
                 }}
-                className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
+                className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
               >
                 <div className="pointer-events-auto mx-auto flex w-full max-w-[620px] flex-col pb-[env(safe-area-inset-bottom)]">
                   <div className="mb-2 flex shrink-0 justify-end px-3">
@@ -275,13 +277,13 @@ export default function QuickAddSheet({
                       type="button"
                       aria-label="Close"
                       onClick={() => onOpenChange(false)}
-                      className="grid h-10 w-10 place-items-center rounded-full bg-popover/95 text-foreground shadow-sm ring-1 ring-border/70 backdrop-blur transition-colors [@media(hover:hover)]:hover:bg-muted"
+                      className="grid h-10 w-10 place-items-center rounded-full bg-popover text-foreground shadow-sm ring-1 ring-border/70 transition-colors [@media(hover:hover)]:hover:bg-muted"
                     >
                       <X className="h-5 w-5 stroke-[3]" />
                     </button>
                   </div>
 
-                  <div className="flex max-h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover/95 p-4 ring-1 ring-border/80 backdrop-blur-2xl sm:max-h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]">
+                  <div className="flex max-h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover p-4 ring-1 ring-border/80 sm:max-h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]">
                     <div dir="ltr" className="w-full pt-1">
                       <div className="mb-1 flex shrink-0 items-center gap-2">
                         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
@@ -505,7 +507,7 @@ export default function QuickAddSheet({
                             duration: 0.28,
                             ease: [0.32, 0.72, 0, 1],
                           }}
-                          className="pointer-events-auto h-full min-h-0 overflow-hidden rounded-[28px] border border-border/80 bg-popover/95 p-4 backdrop-blur-2xl"
+                          className="pointer-events-auto h-full min-h-0 overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4"
                         >
                           <SuggestionTabs
                             open={open}
