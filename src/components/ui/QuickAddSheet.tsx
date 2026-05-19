@@ -349,8 +349,8 @@ export default function QuickAddSheet({
                       </div>
 
                       {(tags.length > 0 || startTime) && (
-                        <div className="relative mb-3 mt-2 shrink-0 overflow-visible px-1">
-                          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 pt-1 px-1 -mx-1 mask-fade-right">
+                        <div className="relative mb-1 mt-2 shrink-0 overflow-visible px-1">
+                          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5 pt-1 px-1 -mx-1 mask-fade-right">
                             {startTime && (
                               <button
                                 type="button"
@@ -410,7 +410,7 @@ export default function QuickAddSheet({
                         </div>
                       )}
 
-                      <div className="mb-0 mt-2 shrink-0 space-y-1">
+                      <div className="mb-0 mt-1 shrink-0 space-y-1">
                         <button
                           type="button"
                           onClick={() => {
@@ -508,7 +508,7 @@ export default function QuickAddSheet({
                               'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
                             ].join(' ')}
                           >
-                            <span className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-b from-primary/10 to-transparent" />
+                            <span className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-b from-white/35 to-transparent" />
                             <span className="relative z-10 flex items-center justify-center gap-2">
                               {isSubmitting ? (
                                 'Adding...'

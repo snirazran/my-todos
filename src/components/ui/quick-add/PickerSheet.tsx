@@ -365,9 +365,9 @@ function TagsView({
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <div>
-        <div className="mb-2 flex items-center gap-2">
+        <div className="mb-3 flex items-center gap-2">
           <div className="relative flex-1">
             <Tag className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -385,7 +385,7 @@ function TagsView({
               }}
               maxLength={TAG_MAX_LENGTH}
               placeholder={placeholder}
-              className="h-12 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-[15px] font-bold text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30"
+              className="h-12 w-full rounded-2xl border border-border bg-background pl-9 pr-3 text-base font-bold text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30"
             />
           </div>
           <button
@@ -393,7 +393,7 @@ function TagsView({
             onClick={handleAddTag}
             disabled={!tagInput}
             aria-label={showColorPicker ? 'Pick color' : 'Add tag'}
-            className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground transition-all hover:brightness-110 active:scale-95 disabled:opacity-30 disabled:active:scale-100"
+            className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary text-primary-foreground transition-all hover:brightness-110 active:scale-95 disabled:opacity-30 disabled:active:scale-100"
           >
             {showColorPicker ? (
               <Palette className="h-5 w-5 stroke-[2.5]" />
@@ -411,17 +411,32 @@ function TagsView({
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <div className="mb-2 rounded-xl border border-border bg-background p-2.5">
-                <div className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+              <div className="mb-4 rounded-2xl border border-border bg-muted/20 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
+                    New tag
+                  </span>
+                  <span
+                    className="inline-flex max-w-[180px] items-center justify-center rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider shadow-sm"
+                    style={{
+                      backgroundColor: `${newTagColor}20`,
+                      borderColor: `${newTagColor}40`,
+                      color: newTagColor,
+                    }}
+                  >
+                    <span className="truncate">{tagInput.trim() || 'Preview'}</span>
+                  </span>
+                </div>
+                <div className="mb-3 text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
                   Pick a color
                 </div>
-                <div className="mb-2 flex flex-wrap gap-2">
+                <div className="mb-4 flex flex-wrap gap-2.5">
                   {TAG_COLORS.map((c) => (
                     <button
                       key={c.name}
                       type="button"
                       onClick={() => setNewTagColor(c.value)}
-                      className={`h-7 w-7 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-background transition-transform ${
+                      className={`h-9 w-9 rounded-full ${c.bg} ring-2 ring-offset-2 ring-offset-background transition-transform active:scale-95 ${
                         newTagColor === c.value
                           ? 'scale-110 ring-primary'
                           : 'ring-transparent'
@@ -434,7 +449,12 @@ function TagsView({
                   type="button"
                   onClick={createAndSaveTag}
                   disabled={isCreatingTag}
-                  className="h-9 w-full rounded-xl bg-primary text-xs font-extrabold text-primary-foreground disabled:opacity-50"
+                  className="h-11 w-full rounded-2xl border text-sm font-extrabold transition-colors active:scale-[0.985] disabled:opacity-50"
+                  style={{
+                    backgroundColor: `${newTagColor}18`,
+                    borderColor: `${newTagColor}40`,
+                    color: newTagColor,
+                  }}
                 >
                   {isCreatingTag ? 'Saving...' : 'Save Tag'}
                 </button>
@@ -467,7 +487,7 @@ function TagsView({
               </button>
             </div>
 
-            <div className="flex max-h-[300px] min-h-[150px] flex-wrap gap-2.5 overflow-y-auto px-1 py-1.5">
+            <div className="flex max-h-[220px] content-start items-start gap-2 overflow-y-auto px-1 py-1.5">
               {filteredTags.map((st) => {
                 const isSelected = selectedTagIds.includes(st.id);
                 return (
@@ -486,26 +506,26 @@ function TagsView({
                       }
                       toggleTag(st);
                     }}
-                    className={`relative m-0.5 rounded-xl border px-3.5 py-2.5 text-[12px] font-extrabold uppercase tracking-wide transition-all ${
+                    className={`relative inline-flex max-w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all [@media(hover:hover)]:hover:opacity-75 active:scale-95 ${
                       isSelected
                         ? 'ring-2 ring-offset-1 ring-offset-background'
                         : st.disabled
                           ? 'cursor-pointer border-dashed opacity-60 grayscale'
-                          : 'bg-background opacity-80 hover:opacity-100'
+                          : ''
                     } ${manageTagsMode ? 'text-rose-500' : ''}`}
                     style={{
-                      backgroundColor: isSelected ? `${st.color}20` : undefined,
+                      backgroundColor: manageTagsMode ? undefined : `${st.color}20`,
                       color: manageTagsMode ? '#ef4444' : st.color,
                       borderColor: manageTagsMode
                         ? '#ef4444'
                         : isSelected
                           ? `${st.color}40`
-                          : `${st.color}25`,
+                          : `${st.color}40`,
                     }}
                   >
-                    {st.name}
+                    <span className="truncate">{st.name}</span>
                     {st.disabled && (
-                      <Lock className="ml-1 inline h-3 w-3" />
+                      <Lock className="h-3 w-3 shrink-0" />
                     )}
                     {manageTagsMode && (
                       <span className="absolute -left-1.5 -top-1.5 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-white">
@@ -523,7 +543,7 @@ function TagsView({
       <button
         type="button"
         onClick={onDone}
-        className="h-12 w-full rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-transform active:scale-[0.985]"
+        className="h-12 w-full rounded-2xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-transform active:scale-[0.985]"
       >
         Done
         {selectedTagIds.length > 0
