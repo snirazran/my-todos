@@ -84,6 +84,7 @@ export default function QuickAddSheet({
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   const [autoAddedTagIds, setAutoAddedTagIds] = useState<string[]>([]);
   const [sheetBaseHeight, setSheetBaseHeight] = useState<number | null>(null);
+  const [suggestionsReady, setSuggestionsReady] = useState(false);
 
   const calendar = useCalendarMonth(new Date());
   const { inset: keyboardInset, height: viewportHeight } = useKeyboardInset(open);
@@ -98,6 +99,16 @@ export default function QuickAddSheet({
       setShowReminderPicker(false);
     }
   }, [activePicker]);
+
+  useEffect(() => {
+    if (!open) {
+      setSuggestionsReady(false);
+      return;
+    }
+
+    const id = window.setTimeout(() => setSuggestionsReady(true), 180);
+    return () => window.clearTimeout(id);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -158,10 +169,10 @@ export default function QuickAddSheet({
     320,
     sheetBaseHeight ?? viewportHeight ?? 900,
   );
-  const showSuggestions = !hasTaskText && !keyboardActive;
+  const showSuggestions = suggestionsReady && !hasTaskText && !keyboardActive;
   const suggestionsPanelHeight = Math.min(
-    Math.max(availableSheetHeight - 360, 220),
-    500,
+    Math.max(availableSheetHeight - 420, 180),
+    420,
   );
 
   useEffect(() => {
@@ -524,8 +535,11 @@ export default function QuickAddSheet({
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 1, y: suggestionsPanelHeight + 24 }}
                           transition={{
-                            duration: 0.28,
-                            ease: [0.32, 0.72, 0, 1],
+                            y: {
+                              duration: hasTaskText ? 0.4 : 0.28,
+                              ease: [0.32, 0.72, 0, 1],
+                            },
+                            opacity: { duration: 0.28 },
                           }}
                           className="pointer-events-auto h-full min-h-0 overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4"
                         >
