@@ -58,6 +58,15 @@ type Props = {
   onPick: (pick: SuggestionPick) => void;
 };
 
+function shuffledIndices(length: number) {
+  const indices = Array.from({ length }, (_, i) => i);
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  return indices;
+}
+
 export function SuggestionTabs({
   open,
   focusCategoryIds,
@@ -112,6 +121,9 @@ export function SuggestionTabs({
   const [displayedCategoryIds, setDisplayedCategoryIds] = useState<
     MacroCategoryId[] | null
   >(null);
+  const [displayedSuggestionOrders, setDisplayedSuggestionOrders] = useState<
+    Partial<Record<MacroCategoryId, number[]>> | null
+  >(null);
   const userPickedTabRef = useRef(false);
   const autoSelectedForOpenRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -131,6 +143,7 @@ export function SuggestionTabs({
       userPickedTabRef.current = false;
       autoSelectedForOpenRef.current = false;
       setDisplayedCategoryIds(null);
+      setDisplayedSuggestionOrders(null);
     }
   }, [open]);
 
@@ -140,6 +153,15 @@ export function SuggestionTabs({
     if (userPickedTabRef.current) return;
     if (!focusDataReady) return;
     if (backlogData === undefined) return;
+
+    setDisplayedSuggestionOrders(
+      Object.fromEntries(
+        focusCategories.map((category) => [
+          category.id,
+          shuffledIndices(category.quickAddSuggestions.length),
+        ]),
+      ) as Partial<Record<MacroCategoryId, number[]>>,
+    );
 
     const hasBacklog = Array.isArray(backlogData) && backlogData.length > 0;
     if (hasBacklog) {
@@ -180,6 +202,16 @@ export function SuggestionTabs({
       : focusCategories.find((c) => c.id === activeTab) ?? null;
 
   const suggestions = activeCategory?.quickAddSuggestions ?? [];
+  const displayedSuggestions = useMemo(() => {
+    if (!activeCategory) return suggestions;
+
+    const order = displayedSuggestionOrders?.[activeCategory.id];
+    if (!order || order.length !== suggestions.length) return suggestions;
+
+    return order
+      .map((index) => suggestions[index])
+      .filter((suggestion): suggestion is QuickAddSuggestion => !!suggestion);
+  }, [activeCategory, displayedSuggestionOrders, suggestions]);
   const backlog = Array.isArray(backlogData) ? backlogData : [];
 
   const tagsForCategory = (categoryId: MacroCategoryId): string[] =>
@@ -194,7 +226,7 @@ export function SuggestionTabs({
 
   useEffect(() => {
     updateFade();
-  }, [activeTab, suggestions.length, backlog.length, open]);
+  }, [activeTab, displayedSuggestions.length, backlog.length, open]);
 
   if (focusCategories.length === 0) return null;
 
@@ -313,7 +345,7 @@ export function SuggestionTabs({
             )
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-              {suggestions.map((s, i) => (
+              {displayedSuggestions.map((s, i) => (
                 <button
                   key={`${activeTab}-${i}`}
                   type="button"

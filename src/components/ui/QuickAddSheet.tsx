@@ -503,7 +503,8 @@ export default function QuickAddSheet({
                               'group relative h-12 w-full rounded-[28px] text-[15px] font-black overflow-hidden transition-all',
                               'bg-popover text-primary',
                               'shadow-[0_5px_0_0_rgba(63,98,18,0.45)] ring-1 ring-primary/20',
-                              '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:brightness-105 [@media(hover:hover)]:hover:shadow-[0_6px_0_0_rgba(63,98,18,0.45)] active:translate-y-1 active:shadow-none',
+                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35',
+                              '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_6px_0_0_rgba(63,98,18,0.45)] active:translate-y-1 active:shadow-none',
                               'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
                             ].join(' ')}
                           >
