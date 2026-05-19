@@ -122,7 +122,7 @@ export function TimePopup({
                     <X className="h-4 w-4 stroke-[3]" />
                   </button>
                   <h3 className="text-[16px] font-extrabold text-foreground">
-                    Time
+                    Notify
                   </h3>
                 </div>
 

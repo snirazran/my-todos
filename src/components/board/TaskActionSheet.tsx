@@ -64,13 +64,6 @@ export default function TaskActionSheet({
   if (!displayTask) return null;
 
   const actions: Action[] = [];
-  if (onComplete)
-    actions.push({
-      key: 'complete',
-      label: isCompleted ? 'Mark as incomplete' : 'Mark as complete',
-      icon: CheckCircle2,
-      onClick: onComplete,
-    });
   if (onEdit)
     actions.push({
       key: 'edit',
@@ -88,7 +81,7 @@ export default function TaskActionSheet({
   if (onSchedule)
     actions.push({
       key: 'schedule',
-      label: 'Time',
+      label: 'Notify',
       icon: Clock,
       onClick: onSchedule,
     });
