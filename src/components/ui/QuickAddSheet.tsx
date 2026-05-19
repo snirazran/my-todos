@@ -453,7 +453,7 @@ export default function QuickAddSheet({
                         <motion.div
                           key="quick-add-actions"
                           initial={{ opacity: 0, y: 8, height: 0, marginTop: 0 }}
-                          animate={{ opacity: 1, y: 0, height: 48, marginTop: 16 }}
+                          animate={{ opacity: 1, y: 0, height: 48, marginTop: 2 }}
                           exit={{ opacity: 0, y: 8, height: 0, marginTop: 0 }}
                           transition={{
                             duration: 0.22,
