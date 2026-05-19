@@ -9,7 +9,7 @@ import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import { FilterDropdown, FilterType } from '@/components/ui/FilterDropdown';
 import { SideOpenTray } from '@/components/ui/SideOpenTray';
-import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
+import { TimePopup } from '@/components/ui/TimePopup';
 
 interface Props {
   isOpen: boolean;
@@ -345,15 +345,15 @@ export default React.memo(function BacklogTray({
         } : undefined}
       />
 
-      {scheduleDialog && onScheduleTask && (
-        <ScheduleTaskDialog
+      {onScheduleTask && (
+        <TimePopup
           open={!!scheduleDialog}
-          taskName={scheduleDialog.task.text}
-          initialStartTime={scheduleDialog.task.startTime || ''}
-          initialEndTime={scheduleDialog.task.endTime || ''}
-          initialReminder={scheduleDialog.task.reminder || ''}
+          taskName={scheduleDialog?.task.text ?? ''}
+          initialStartTime={scheduleDialog?.task.startTime || ''}
+          initialReminder={scheduleDialog?.task.reminder || ''}
           onClose={() => setScheduleDialog(null)}
           onSave={async (data) => {
+            if (!scheduleDialog) return;
             await onScheduleTask(scheduleDialog.task.id, data);
             setScheduleDialog(null);
           }}

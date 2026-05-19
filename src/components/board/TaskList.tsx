@@ -18,7 +18,7 @@ import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import TagPopup from '@/components/ui/TagPopup';
 import Fly from '@/components/ui/fly';
 import { Plus, LayoutList, ListTodo, Repeat } from 'lucide-react';
-import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
+import { TimePopup } from '@/components/ui/TimePopup';
 
 export default React.memo(function TaskList({
   day,
@@ -446,15 +446,15 @@ export default React.memo(function TaskList({
         onSave={handleTagSave}
       />
 
-      {scheduleDialog && onScheduleTask && (
-        <ScheduleTaskDialog
+      {onScheduleTask && (
+        <TimePopup
           open={!!scheduleDialog}
-          taskName={scheduleDialog.task.text}
-          initialStartTime={scheduleDialog.task.startTime || ''}
-          initialEndTime={scheduleDialog.task.endTime || ''}
-          initialReminder={scheduleDialog.task.reminder || ''}
+          taskName={scheduleDialog?.task.text ?? ''}
+          initialStartTime={scheduleDialog?.task.startTime || ''}
+          initialReminder={scheduleDialog?.task.reminder || ''}
           onClose={() => setScheduleDialog(null)}
           onSave={async (data) => {
+            if (!scheduleDialog) return;
             await onScheduleTask(scheduleDialog.task.id, data);
             setScheduleDialog(null);
           }}

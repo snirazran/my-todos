@@ -59,7 +59,7 @@ import TaskMenu from '../board/TaskMenu';
 import TaskActionSheet from '../board/TaskActionSheet';
 import TagPopup from '@/components/ui/TagPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
-import { ScheduleTaskDialog } from '@/components/ui/ScheduleTaskDialog';
+import { TimePopup } from '@/components/ui/TimePopup';
 import { format } from 'date-fns';
 
 interface Task {
@@ -1559,16 +1559,16 @@ export default function TaskList({
           />
         )}
 
-      {scheduleDialog && onScheduleTask && (
-        <ScheduleTaskDialog
+      {onScheduleTask && (
+        <TimePopup
           open={!!scheduleDialog}
-          taskName={scheduleDialog.task.text}
-          initialStartTime={scheduleDialog.task.startTime || ''}
-          initialEndTime={scheduleDialog.task.endTime || ''}
-          initialReminder={scheduleDialog.task.reminder || ''}
+          taskName={scheduleDialog?.task.text ?? ''}
+          initialStartTime={scheduleDialog?.task.startTime || ''}
+          initialReminder={scheduleDialog?.task.reminder || ''}
           busy={busy}
           onClose={() => setScheduleDialog(null)}
           onSave={async (data) => {
+            if (!scheduleDialog) return;
             setBusy(true);
             await onScheduleTask(scheduleDialog.task.id, data);
             setBusy(false);
