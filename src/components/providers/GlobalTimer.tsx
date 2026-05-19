@@ -204,6 +204,17 @@ export function GlobalTimer() {
         const data = await res.json();
         const timer = data?.timer as ActiveFrogodoroTimer | null;
         if (!timer?.updatedAt) {
+          // localStorage persists `timerActive: true` across sessions. On
+          // the first poll, if the server confirms there's no timer, clear
+          // the stale local state so the FrogodoroPill doesn't stick
+          // around pointing at a task that no longer exists.
+          if (!hasLoadedRemoteTimerRef.current) {
+            const store = useFrogodoroStore.getState();
+            if (store.timerActive) {
+              suppressNextPublishRef.current = true;
+              store.stopTimer();
+            }
+          }
           hasLoadedRemoteTimerRef.current = true;
           return;
         }
