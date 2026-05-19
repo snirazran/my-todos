@@ -210,19 +210,19 @@ export function PickerSheet(props: Props) {
         animate={{ y: 0 }}
         exit={{ y: '120%' }}
         transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
-        className="pointer-events-auto w-full rounded-t-[28px] bg-background px-4 pb-[calc(env(safe-area-inset-bottom)+24px)] pt-5 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:max-w-[520px] sm:rounded-[28px] sm:pb-6 sm:shadow-2xl"
+        className="pointer-events-auto min-h-[42dvh] w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:min-h-[360px] sm:max-w-[560px] sm:rounded-[28px] sm:pb-8 sm:shadow-2xl"
       >
         <div className="mx-auto w-full">
-          <div className="relative mb-6 flex h-8 items-center justify-center">
+          <div className="relative mb-7 flex h-9 items-center justify-center">
             <button
               type="button"
               onClick={() => setActivePicker(null)}
-              className="absolute left-0 grid h-9 w-9 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
+              className="absolute left-0 grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
               aria-label="Close picker"
             >
               <X className="h-5 w-5 stroke-[3]" />
             </button>
-            <h2 className="text-[17px] font-extrabold text-muted-foreground">
+            <h2 className="text-[18px] font-extrabold text-muted-foreground">
               {activePicker === 'tags'
                 ? 'Tags'
                 : activePicker === 'date'
@@ -385,7 +385,7 @@ function TagsView({
               }}
               maxLength={TAG_MAX_LENGTH}
               placeholder={placeholder}
-              className="h-11 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-sm font-bold text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30"
+              className="h-12 w-full rounded-xl border border-border bg-background pl-9 pr-3 text-[15px] font-bold text-foreground outline-none transition-shadow placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30"
             />
           </div>
           <button
@@ -393,7 +393,7 @@ function TagsView({
             onClick={handleAddTag}
             disabled={!tagInput}
             aria-label={showColorPicker ? 'Pick color' : 'Add tag'}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground transition-all hover:brightness-110 active:scale-95 disabled:opacity-30 disabled:active:scale-100"
+            className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground transition-all hover:brightness-110 active:scale-95 disabled:opacity-30 disabled:active:scale-100"
           >
             {showColorPicker ? (
               <Palette className="h-5 w-5 stroke-[2.5]" />
@@ -467,7 +467,7 @@ function TagsView({
               </button>
             </div>
 
-            <div className="flex max-h-[220px] flex-wrap gap-2 overflow-y-auto px-1 py-1.5">
+            <div className="flex max-h-[300px] min-h-[150px] flex-wrap gap-2.5 overflow-y-auto px-1 py-1.5">
               {filteredTags.map((st) => {
                 const isSelected = selectedTagIds.includes(st.id);
                 return (
@@ -486,7 +486,7 @@ function TagsView({
                       }
                       toggleTag(st);
                     }}
-                    className={`relative m-0.5 rounded-lg border px-3 py-2 text-[11px] font-extrabold uppercase tracking-wide transition-all ${
+                    className={`relative m-0.5 rounded-xl border px-3.5 py-2.5 text-[12px] font-extrabold uppercase tracking-wide transition-all ${
                       isSelected
                         ? 'ring-2 ring-offset-1 ring-offset-background'
                         : st.disabled
@@ -523,7 +523,7 @@ function TagsView({
       <button
         type="button"
         onClick={onDone}
-        className="h-11 w-full rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-transform active:scale-[0.985]"
+        className="h-12 w-full rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-transform active:scale-[0.985]"
       >
         Done
         {selectedTagIds.length > 0
@@ -651,8 +651,8 @@ function DateView({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-3 gap-2">
+    <div className="space-y-5">
+      <div className="grid grid-cols-3 gap-2.5">
         {[
           { label: 'Today', day: todayIndex },
           { label: 'Tomorrow', day: tomorrowIndex },
@@ -663,7 +663,7 @@ function DateView({
               key={label}
               type="button"
               onClick={() => selectSingleDay(day)}
-              className={`h-11 rounded-xl border text-[13px] font-extrabold transition-all ${
+              className={`h-14 rounded-2xl border text-[14px] font-extrabold transition-all ${
                 isSelected
                   ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
                   : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
@@ -676,7 +676,7 @@ function DateView({
         <button
           type="button"
           onClick={openCalendar}
-          className={`h-11 rounded-xl border text-[13px] font-extrabold transition-all ${
+          className={`h-14 rounded-2xl border text-[14px] font-extrabold transition-all ${
             isCustomDate
               ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
               : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
@@ -697,14 +697,14 @@ function DateView({
           }
         }}
         aria-pressed={notifyEnabled}
-        className={`flex h-14 w-full cursor-pointer items-center gap-3 rounded-2xl border px-3 text-left transition-all ${
+        className={`flex h-16 w-full cursor-pointer items-center gap-3.5 rounded-2xl border px-4 text-left transition-all ${
           notifyEnabled
             ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
             : 'border-border bg-background hover:border-primary/40 hover:bg-primary/5'
         }`}
       >
         <span
-          className={`grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors ${
+          className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors ${
             notifyEnabled
               ? 'bg-primary text-primary-foreground'
               : 'bg-amber-100 text-amber-500'
@@ -775,7 +775,7 @@ function RepeatView({
   ];
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {options.map((option) => {
         const active = option.mode === currentMode;
         return (
@@ -786,7 +786,7 @@ function RepeatView({
               setRepeatMode(option.mode);
               onClose();
             }}
-            className={`flex h-12 w-full items-center justify-between rounded-2xl border px-4 text-left text-[14px] font-extrabold transition-all ${
+            className={`flex h-[60px] w-full items-center justify-between rounded-2xl border px-4 text-left text-[15px] font-extrabold transition-all ${
               active
                 ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
                 : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'

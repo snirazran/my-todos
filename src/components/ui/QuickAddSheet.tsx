@@ -169,7 +169,7 @@ export default function QuickAddSheet({
     320,
     sheetBaseHeight ?? viewportHeight ?? 900,
   );
-  const showSuggestions = suggestionsReady && !hasTaskText && !keyboardActive;
+  const showSuggestions = suggestionsReady && !hasTaskText;
   const suggestionsPanelHeight = Math.min(
     Math.max(availableSheetHeight - 420, 180),
     420,
@@ -279,7 +279,7 @@ export default function QuickAddSheet({
                 exit={{ opacity: 0 }}
                 onClick={() => onOpenChange(false)}
                 transition={{ duration: 0.16, ease: 'easeOut' }}
-                className="fixed inset-0 z-[1399] bg-background/80 will-change-opacity"
+                className="fixed inset-0 z-[1399] bg-[linear-gradient(to_bottom,transparent_0%,transparent_18%,hsl(var(--primary)/0.18)_30%,hsl(var(--primary)/0.45)_42%,hsl(var(--primary)/0.75)_54%,hsl(var(--primary))_68%)] will-change-opacity"
               />
 
               <motion.div
@@ -470,51 +470,6 @@ export default function QuickAddSheet({
                       </div>
                     </div>
 
-                    <AnimatePresence initial={false}>
-                      {hasTaskText && (
-                        <motion.div
-                          key="quick-add-actions"
-                          initial={{ opacity: 0, y: 8, height: 0, marginTop: 0 }}
-                          animate={{ opacity: 1, y: 0, height: 48, marginTop: 10 }}
-                          exit={{ opacity: 0, y: 8, height: 0, marginTop: 0 }}
-                          transition={{
-                            duration: 0.22,
-                            ease: [0.32, 0.72, 0, 1],
-                          }}
-                          className="shrink-0 overflow-hidden"
-                        >
-                          <div
-                            className="flex items-center"
-                            style={{ transform: 'translateZ(0)' }}
-                          >
-                            <button
-                              type="button"
-                              onClick={handleSubmit}
-                              disabled={!hasTaskText || isSubmitting}
-                              className={[
-                                'relative h-12 flex-1 rounded-full text-[15px] font-bold overflow-hidden transition-all',
-                                'bg-primary text-primary-foreground',
-                                'shadow-sm ring-1 ring-white/20',
-                                '[@media(hover:hover)]:hover:brightness-105 active:scale-[0.985]',
-                                'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
-                              ].join(' ')}
-                            >
-                              <span className="absolute inset-0 pointer-events-none bg-gradient-to-b from-white/25 to-transparent" />
-                              <span className="relative z-10 flex items-center justify-center gap-2">
-                                {isSubmitting ? (
-                                  'Adding...'
-                                ) : (
-                                  <>
-                                    <Plus className="w-4 h-4 stroke-[3]" />
-                                    <span>Add Task</span>
-                                  </>
-                                )}
-                              </span>
-                            </button>
-                          </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
                   </div>
 
                   <motion.div
@@ -525,61 +480,102 @@ export default function QuickAddSheet({
                       duration: 0.28,
                       ease: [0.32, 0.72, 0, 1],
                     }}
-                    className="pointer-events-none min-h-0 overflow-hidden rounded-[28px]"
+                    className="pointer-events-none relative min-h-0 overflow-hidden rounded-[28px]"
                   >
                     <AnimatePresence initial={false}>
-                      {showSuggestions && (
+                      {hasTaskText && (
                         <motion.div
-                          key="quick-add-suggestions"
-                          initial={{ opacity: 1, y: suggestionsPanelHeight + 24 }}
+                          key="quick-add-actions"
+                          initial={{ opacity: 0, y: -64 }}
                           animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 1, y: suggestionsPanelHeight + 24 }}
+                          exit={{ opacity: 0, y: -64 }}
                           transition={{
-                            y: {
-                              duration: hasTaskText ? 0.4 : 0.28,
-                              ease: [0.32, 0.72, 0, 1],
-                            },
-                            opacity: { duration: 0.28 },
+                            duration: 0.4,
+                            ease: [0.32, 0.72, 0, 1],
                           }}
-                          className="pointer-events-auto h-full min-h-0 overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4"
+                          className="pointer-events-auto absolute inset-x-0 top-0 px-1 pt-1"
                         >
-                          <SuggestionTabs
-                            open={open}
-                            focusCategoryIds={focusCategoryIds}
-                            categoryTagMap={categoryTagMap}
-                            className="mt-0 h-full min-h-0 border-t-0 pt-0"
-                            onPick={(pick) => {
-                              setText(pick.text);
-                              setTags((prev) => {
-                                const removed = new Set(autoAddedTagIds);
-                                const seen = new Set<string>();
-                                const next: string[] = [];
-                                for (const id of prev) {
-                                  if (removed.has(id)) continue;
-                                  if (seen.has(id)) continue;
-                                  seen.add(id);
-                                  next.push(id);
-                                }
-                                for (const id of pick.tagIds) {
-                                  if (seen.has(id)) continue;
-                                  seen.add(id);
-                                  next.push(id);
-                                }
-                                return next;
-                              });
-                              setAutoAddedTagIds(pick.tagIds);
-                              if (pick.startTime !== undefined) {
-                                setStartTime(pick.startTime);
-                                setEndTime(pick.endTime ?? '');
-                                setNotifyEnabled(!!pick.reminder);
-                                if (pick.reminder) setReminder(pick.reminder);
-                              }
-                              inputRef.current?.focus();
-                            }}
-                          />
+                          <button
+                            type="button"
+                            onClick={handleSubmit}
+                            disabled={!hasTaskText || isSubmitting}
+                            className={[
+                              'group relative h-12 w-full rounded-[28px] text-[15px] font-black overflow-hidden transition-all',
+                              'bg-popover text-primary',
+                              'shadow-[0_5px_0_0_rgba(63,98,18,0.45)] ring-1 ring-primary/20',
+                              '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:brightness-105 [@media(hover:hover)]:hover:shadow-[0_6px_0_0_rgba(63,98,18,0.45)] active:translate-y-1 active:shadow-none',
+                              'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
+                            ].join(' ')}
+                          >
+                            <span className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-b from-primary/10 to-transparent" />
+                            <span className="relative z-10 flex items-center justify-center gap-2">
+                              {isSubmitting ? (
+                                'Adding...'
+                              ) : (
+                                <>
+                                  <Plus className="w-4 h-4 stroke-[3]" />
+                                  <span>Add Task</span>
+                                </>
+                              )}
+                            </span>
+                          </button>
                         </motion.div>
                       )}
                     </AnimatePresence>
+
+                    {suggestionsReady && (
+                      <motion.div
+                        key="quick-add-suggestions"
+                        initial={{ opacity: 1, y: suggestionsPanelHeight + 24 }}
+                        animate={{
+                          opacity: 1,
+                          y: showSuggestions ? 0 : suggestionsPanelHeight + 24,
+                        }}
+                        transition={{
+                          duration: 0.4,
+                          ease: [0.32, 0.72, 0, 1],
+                        }}
+                        className={[
+                          'absolute inset-0 h-full min-h-0 overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4',
+                          showSuggestions ? 'pointer-events-auto' : 'pointer-events-none',
+                        ].join(' ')}
+                      >
+                        <SuggestionTabs
+                          open={open}
+                          focusCategoryIds={focusCategoryIds}
+                          categoryTagMap={categoryTagMap}
+                          className="mt-0 h-full min-h-0 border-t-0 pt-0"
+                          onPick={(pick) => {
+                            setText(pick.text);
+                            setTags((prev) => {
+                              const removed = new Set(autoAddedTagIds);
+                              const seen = new Set<string>();
+                              const next: string[] = [];
+                              for (const id of prev) {
+                                if (removed.has(id)) continue;
+                                if (seen.has(id)) continue;
+                                seen.add(id);
+                                next.push(id);
+                              }
+                              for (const id of pick.tagIds) {
+                                if (seen.has(id)) continue;
+                                seen.add(id);
+                                next.push(id);
+                              }
+                              return next;
+                            });
+                            setAutoAddedTagIds(pick.tagIds);
+                            if (pick.startTime !== undefined) {
+                              setStartTime(pick.startTime);
+                              setEndTime(pick.endTime ?? '');
+                              setNotifyEnabled(!!pick.reminder);
+                              if (pick.reminder) setReminder(pick.reminder);
+                            }
+                            inputRef.current?.focus();
+                          }}
+                        />
+                      </motion.div>
+                    )}
                   </motion.div>
                 </div>
               </motion.div>
