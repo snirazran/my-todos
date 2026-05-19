@@ -83,6 +83,7 @@ export default function QuickAddSheet({
   const [notifyEnabled, setNotifyEnabled] = useState(false);
   const [showReminderPicker, setShowReminderPicker] = useState(false);
   const [autoAddedTagIds, setAutoAddedTagIds] = useState<string[]>([]);
+  const [sheetBaseHeight, setSheetBaseHeight] = useState<number | null>(null);
 
   const calendar = useCalendarMonth(new Date());
   const { inset: keyboardInset, height: viewportHeight } = useKeyboardInset(open);
@@ -153,12 +154,26 @@ export default function QuickAddSheet({
   const repeatsOn = repeat === 'weekly';
   const hasTaskText = text.trim().length > 0;
   const keyboardActive = inputFocused && keyboardInset > 0;
-  const availableSheetHeight = Math.max(320, viewportHeight ?? 900);
+  const availableSheetHeight = Math.max(
+    320,
+    sheetBaseHeight ?? viewportHeight ?? 900,
+  );
   const showSuggestions = !hasTaskText && !keyboardActive;
   const suggestionsPanelHeight = Math.min(
     Math.max(availableSheetHeight - 360, 220),
     500,
   );
+
+  useEffect(() => {
+    if (!open) {
+      setSheetBaseHeight(null);
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    if (keyboardInset > 0) return;
+
+    setSheetBaseHeight(window.visualViewport?.height ?? window.innerHeight);
+  }, [open, keyboardInset, viewportHeight]);
 
   const selectedDateLabel = isLater
     ? 'Later'
@@ -266,10 +281,6 @@ export default function QuickAddSheet({
                   duration: 0.32,
                 }}
                 style={{
-                  bottom: keyboardActive ? keyboardInset : 0,
-                  height: keyboardActive ? availableSheetHeight : undefined,
-                  transition:
-                    'bottom 220ms cubic-bezier(0.32, 0.72, 0, 1), height 220ms cubic-bezier(0.32, 0.72, 0, 1)',
                   contain: 'layout paint style',
                 }}
                 className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
@@ -286,7 +297,7 @@ export default function QuickAddSheet({
                     </button>
                   </div>
 
-                  <div className="flex max-h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover p-4 ring-1 ring-border/80 sm:max-h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]">
+                  <div className="flex max-h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover px-4 pb-2 pt-4 ring-1 ring-border/80 sm:max-h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]">
                     <div dir="ltr" className="w-full pt-1">
                       <div className="mb-1 flex shrink-0 items-center gap-2">
                         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
@@ -388,7 +399,7 @@ export default function QuickAddSheet({
                         </div>
                       )}
 
-                      <div className="mb-3 mt-2 shrink-0 space-y-1">
+                      <div className="mb-0 mt-2 shrink-0 space-y-1">
                         <button
                           type="button"
                           onClick={() => {
@@ -453,7 +464,7 @@ export default function QuickAddSheet({
                         <motion.div
                           key="quick-add-actions"
                           initial={{ opacity: 0, y: 8, height: 0, marginTop: 0 }}
-                          animate={{ opacity: 1, y: 0, height: 48, marginTop: 2 }}
+                          animate={{ opacity: 1, y: 0, height: 48, marginTop: 10 }}
                           exit={{ opacity: 0, y: 8, height: 0, marginTop: 0 }}
                           transition={{
                             duration: 0.22,
@@ -495,22 +506,18 @@ export default function QuickAddSheet({
                     </AnimatePresence>
                   </div>
 
-                  <AnimatePresence initial={false}>
-                    {showSuggestions && (
-                      <motion.div
-                        key="quick-add-suggestions-slot"
-                        initial={{ height: 0, marginTop: 0 }}
-                        animate={{
-                          height: suggestionsPanelHeight,
-                          marginTop: 12,
-                        }}
-                        exit={{ height: 0, marginTop: 0 }}
-                        transition={{
-                          duration: 0.28,
-                          ease: [0.32, 0.72, 0, 1],
-                        }}
-                        className="pointer-events-none min-h-0 overflow-hidden rounded-[28px]"
-                      >
+                  <motion.div
+                    key="quick-add-suggestions-slot"
+                    initial={{ height: suggestionsPanelHeight, marginTop: 12 }}
+                    animate={{ height: suggestionsPanelHeight, marginTop: 12 }}
+                    transition={{
+                      duration: 0.28,
+                      ease: [0.32, 0.72, 0, 1],
+                    }}
+                    className="pointer-events-none min-h-0 overflow-hidden rounded-[28px]"
+                  >
+                    <AnimatePresence initial={false}>
+                      {showSuggestions && (
                         <motion.div
                           key="quick-add-suggestions"
                           initial={{ opacity: 1, y: suggestionsPanelHeight + 24 }}
@@ -557,9 +564,9 @@ export default function QuickAddSheet({
                             }}
                           />
                         </motion.div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
                 </div>
               </motion.div>
 
