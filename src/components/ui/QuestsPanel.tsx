@@ -525,7 +525,7 @@ export function QuestsPanel({
   const renderContent = () => {
     return (
       <>
-              <div className="flex-1 overflow-hidden">
+              <div className="relative z-10 flex-1 overflow-hidden">
                 {isGuest ? (
                   <EmptyState
                     title="Sign in to unlock quests"
@@ -552,13 +552,21 @@ export function QuestsPanel({
                         scrollContainerRef.current = el;
                       }}
                       className={cn(
-                        'no-scrollbar flex-1 min-h-0 px-4 pt-4 overflow-y-auto md:px-6 md:pb-6 overscroll-none [overflow-anchor:none]',
+                        'no-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-none [overflow-anchor:none]',
+                        data.activeSeason
+                          ? 'px-0 pt-0 md:px-0 md:pt-0 md:pb-8'
+                          : 'px-4 pt-4 md:px-8 md:pt-8 md:pb-8',
                         'pb-[calc(5rem+env(safe-area-inset-bottom))]',
                       )}
                     >
-                      <div className="flex flex-col">
+                      <div
+                        className={cn(
+                          'mx-auto flex w-full flex-col',
+                          data.activeSeason ? 'max-w-none' : 'max-w-6xl',
+                        )}
+                      >
                         {data.activeSeason && (
-                          <div className="-mx-4 -mt-4 md:-mx-6">
+                          <div className="w-full">
                             <QuestSeasonBanner
                               season={data.activeSeason}
                               rewardCatalog={data.rewardCatalog}
@@ -569,8 +577,8 @@ export function QuestsPanel({
                           </div>
                         )}
                         <div className={cn(
-                          "flex flex-col gap-8",
-                          data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:px-6 -mx-4 md:-mx-6 bg-background rounded-t-[24px]"
+                          "flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start",
+                          data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 -mx-4 bg-background rounded-t-[24px] md:rounded-none md:bg-transparent"
                         )}>
                         <div className="space-y-4">
                           {(() => {
@@ -696,7 +704,7 @@ export function QuestsPanel({
 
   return (
     <>
-      <div className="flex flex-col w-full h-full bg-background">
+      <div className="relative flex h-full w-full flex-col overflow-hidden bg-background">
         {renderContent()}
       </div>
 
@@ -776,7 +784,7 @@ function QuestSeasonBanner({
           : 'rounded-[28px] border border-border/50',
       )}
     >
-      <div className={cn('relative overflow-hidden', flush ? 'h-[430px]' : 'h-[390px]')}>
+      <div className={cn('relative overflow-hidden', flush ? 'h-[430px] md:h-[360px]' : 'h-[390px]')}>
         {season.coverImageUrl ? (
           <img
             src={season.coverImageUrl}
@@ -804,7 +812,7 @@ function QuestSeasonBanner({
           </div>
         </div>
 
-        <div className="absolute inset-x-3 bottom-10 z-10 flex items-center gap-3 rounded-[24px] bg-background p-3 shadow-lg">
+        <div className="absolute inset-x-3 bottom-10 z-10 mx-auto flex max-w-xl items-center gap-3 rounded-[24px] bg-background p-3 shadow-lg">
           {claimedToday ? (
             <>
               <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md">
@@ -1590,18 +1598,18 @@ function QuestCarousel({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 cursor-grab select-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+        className="flex gap-3 overflow-x-auto snap-x snap-mandatory -mx-4 px-4 pb-1 cursor-grab select-none md:mx-0 md:grid md:grid-cols-1 md:gap-4 md:overflow-visible md:px-0 md:cursor-auto md:snap-none [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {pages.map((child, i) => {
-          const shouldRender = Math.abs(i - activePage) <= 1;
+          const shouldRender = true;
           return (
             <div
               key={i}
               ref={(el) => {
                 itemRefs.current[i] = el;
               }}
-              className="flex-none w-[88%] snap-center"
+              className="flex-none w-[88%] snap-center md:w-auto"
             >
               {shouldRender ? child : <div className="min-h-[420px]" />}
             </div>
@@ -1609,7 +1617,7 @@ function QuestCarousel({
         })}
       </div>
       {count > 1 && (
-        <div className="flex items-center justify-center gap-1.5 pt-3">
+        <div className="flex items-center justify-center gap-1.5 pt-3 md:hidden">
           {Array.from({ length: count }, (_, i) => (
             <button
               key={i}

@@ -31,8 +31,8 @@ export default function QuestsPage() {
   }, []);
 
   return (
-    <main className="h-[100dvh] md:h-[calc(100vh-4rem)] overflow-hidden bg-background">
-      <div className="flex flex-col w-full h-full max-w-3xl mx-auto">
+    <main className="h-[100dvh] overflow-hidden bg-background md:h-[calc(100vh-4rem)]">
+      <div className="flex h-full w-full flex-col">
         <QuestsPanel isGuest={!user} />
       </div>
     </main>
