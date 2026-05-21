@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { RefreshCcw, ShieldCheck, ChevronRight } from 'lucide-react';
+import { RefreshCcw, ShieldCheck, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import Link from 'next/link';
 import { mutate } from 'swr';
 
@@ -86,6 +86,20 @@ export default function AdminPage() {
             </div>
             <p className="text-sm text-muted-foreground">
               Manage quest macro-categories, tag mappings, and premium settings.
+            </p>
+          </Link>
+
+          {/* Background Manager Link */}
+          <Link href="/admin/backgrounds" className="p-6 rounded-3xl border border-border bg-card shadow-sm space-y-4 hover:border-primary/50 transition-colors group">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sky-500">
+                <ImageIcon className="w-5 h-5" />
+                <h2 className="text-lg font-bold text-foreground">Background Manager</h2>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Create shop backgrounds with name, cost, rarity, and a photo per screen size.
             </p>
           </Link>
         </div>

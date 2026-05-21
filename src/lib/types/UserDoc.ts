@@ -30,6 +30,11 @@ export type UserTag = {
   color: string;
 };
 
+export type UserBackgrounds = {
+  equipped: string | null;
+  inventory: Record<string, number>;
+};
+
 export type UserWardrobe = {
   equipped: Partial<Record<WardrobeSlot, string | null>>;
   inventory: Record<string, number>;
@@ -42,6 +47,8 @@ export type UserWardrobe = {
   hunger?: number; // Time remaining in ms (Max 24h = 86400000)
   lastHungerUpdate?: Date; // Timestamp of last calculation
   stolenFlies?: number; // Flies eaten by frog since last acknowledgement
+
+  backgrounds?: UserBackgrounds;
 };
 
 export type UserSkins = {

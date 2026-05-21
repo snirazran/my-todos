@@ -8,6 +8,7 @@ import {
   Shirt,
   Hand,
   Gift,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +18,8 @@ export type FilterCategory =
   | 'skin'
   | 'hat'
   | 'body'
-  | 'held';
+  | 'held'
+  | 'background';
 
 const CATEGORY_CONFIG: Record<
   FilterCategory,
@@ -29,6 +31,7 @@ const CATEGORY_CONFIG: Record<
   hat: { label: 'Hats', icon: <Crown className="w-5 h-5" /> },
   body: { label: 'Body', icon: <Shirt className="w-5 h-5" /> },
   held: { label: 'Held', icon: <Hand className="w-5 h-5" /> },
+  background: { label: 'Backgrounds', icon: <ImageIcon className="w-5 h-5" /> },
 };
 
 export interface FilterOption {

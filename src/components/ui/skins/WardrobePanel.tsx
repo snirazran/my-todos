@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Lock, Shirt, X, ShoppingBag, Repeat, ChevronDown, Sparkles, Paintbrush, Crown, Hand } from 'lucide-react';
+import { Lock, Shirt, X, ShoppingBag, Repeat, ChevronDown, Sparkles, Paintbrush, Crown, Hand, Image as ImageIcon, Gift } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
@@ -21,6 +21,7 @@ import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import { SellConfirmationDialog } from './SellConfirmationDialog';
+import { BackgroundsPanel } from './BackgroundsPanel';
 
 /* ---------------- Types & Data ---------------- */
 type ApiData = {
@@ -624,8 +625,17 @@ function WardrobeManagerContent({
                         { id: 'hat', label: 'Hats', icon: <Crown className="w-5 h-5" /> },
                         { id: 'body', label: 'Body', icon: <Shirt className="w-5 h-5" /> },
                         { id: 'held', label: 'Held', icon: <Hand className="w-5 h-5" /> },
+                        { id: 'background', label: 'Backgrounds', icon: <ImageIcon className="w-5 h-5" /> },
                       ]
-                    : undefined
+                    : [
+                        { id: 'all', label: 'All Items', icon: <Sparkles className="w-5 h-5" /> },
+                        { id: 'container', label: 'Gifts', icon: <Gift className="w-5 h-5" /> },
+                        { id: 'skin', label: 'Skins', icon: <Paintbrush className="w-5 h-5" /> },
+                        { id: 'hat', label: 'Hats', icon: <Crown className="w-5 h-5" /> },
+                        { id: 'body', label: 'Body', icon: <Shirt className="w-5 h-5" /> },
+                        { id: 'held', label: 'Held', icon: <Hand className="w-5 h-5" /> },
+                        { id: 'background', label: 'Backgrounds', icon: <ImageIcon className="w-5 h-5" /> },
+                      ]
                 }
               />
             </div>
@@ -676,7 +686,13 @@ function WardrobeManagerContent({
               }}
               className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
             >
-              {!canRenderItems ? (
+              {activeTab === 'inventory' && activeFilter === 'background' ? (
+                <BackgroundsPanel
+                  mode="inventory"
+                  isGuest={isGuest}
+                  onNotify={(n) => setNotif(n)}
+                />
+              ) : !canRenderItems ? (
                 <WardrobeGridSkeleton />
               ) : activeTab === 'inventory' && inventoryItems.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full opacity-50">
@@ -760,7 +776,15 @@ function WardrobeManagerContent({
               }}
               className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
             >
-              {!canRenderItems ? (
+              {activeTab === 'shop' && activeFilter === 'background' ? (
+                <BackgroundsPanel
+                  mode="shop"
+                  isGuest={isGuest}
+                  shopBalance={balance}
+                  onNotify={(n) => setNotif(n)}
+                  onSpend={() => refreshInventory()}
+                />
+              ) : !canRenderItems ? (
                 <WardrobeGridSkeleton />
               ) : activeTab === 'shop' ? (
                 <>

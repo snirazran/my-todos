@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -29,6 +29,7 @@ import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
@@ -656,6 +657,19 @@ export default function Home() {
   };
 
   const { indices } = useWardrobeIndices(!!user);
+  const { data: backgroundsData } = useBackgrounds(!!user);
+  const equippedBackground = useMemo(() => {
+    if (!backgroundsData?.equipped) return null;
+    return (
+      backgroundsData.catalog.find((b) => b.id === backgroundsData.equipped) ?? null
+    );
+  }, [backgroundsData]);
+  const bgImages = {
+    mobile: equippedBackground?.images?.mobile || '/bg-mobile.png',
+    tablet: equippedBackground?.images?.tablet || '/bg-tablet.png',
+    web: equippedBackground?.images?.web || '/bg-web.png',
+    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.png',
+  };
 
   const renderGuestPrompt = () =>
     !user ? (
@@ -689,14 +703,21 @@ export default function Home() {
         <div className="relative flex flex-col items-stretch gap-2 lg:gap-5">
           <div className="relative z-10 flex flex-col gap-2 lg:gap-4">
             <picture
+              key={equippedBackground?.id ?? 'default-bg'}
               aria-hidden
               className="absolute -bottom-10 w-screen -translate-x-1/2 pointer-events-none left-1/2 -top-16 -z-10 md:-bottom-12"
             >
-              <source media="(min-width: 1920px)" srcSet="/bg-web-large.png" />
-              <source media="(min-width: 1280px)" srcSet="/bg-web.png" />
-              <source media="(min-width: 768px)" srcSet="/bg-tablet.png" />
+              {bgImages.webLarge && (
+                <source media="(min-width: 1920px)" srcSet={bgImages.webLarge} />
+              )}
+              {bgImages.web && (
+                <source media="(min-width: 1280px)" srcSet={bgImages.web} />
+              )}
+              {bgImages.tablet && (
+                <source media="(min-width: 768px)" srcSet={bgImages.tablet} />
+              )}
               <img
-                src="/bg-mobile.png"
+                src={bgImages.mobile}
                 alt=""
                 className="w-full h-full object-cover object-top"
               />

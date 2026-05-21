@@ -21,6 +21,7 @@ import {
   ScrollText,
   Upload,
   Bug,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -724,6 +725,26 @@ export function AdminSettingsDialog({
                     <div className="font-bold text-sm">Quest Manager</div>
                     <div className="text-xs text-muted-foreground font-normal">
                       Create and edit DB-backed daily and category quests
+                    </div>
+                  </div>
+                </Button>
+
+                <Button
+                  onClick={() => {
+                    onOpenChange(false);
+                    router.push('/admin/backgrounds');
+                  }}
+                  disabled={loading !== null}
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-auto py-4 px-4"
+                >
+                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                    <ImageIcon className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-bold text-sm">Background Manager</div>
+                    <div className="text-xs text-muted-foreground font-normal">
+                      Manage shop backgrounds — name, cost, rarity, images per size
                     </div>
                   </div>
                 </Button>
