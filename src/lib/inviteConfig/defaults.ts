@@ -16,7 +16,7 @@ export async function ensureInviteConfig(): Promise<InviteConfigDoc> {
     ],
     giftOptions: [],
     shareTitle: 'Come join me on FrogTask!',
-    shareMessage: "I picked a gift just for you on FrogTask. Tap the link to claim it!",
+    shareMessage: 'I have a gift for you on FrogTask. Tap the link to claim it!',
     updatedAt: new Date(),
   });
 }

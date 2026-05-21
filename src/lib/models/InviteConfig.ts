@@ -66,7 +66,7 @@ const InviteConfigSchema = new Schema<InviteConfigDoc>(
     shareTitle: { type: String, default: 'Come join me on FrogTask!' },
     shareMessage: {
       type: String,
-      default: "I picked a gift just for you on FrogTask. Tap the link to claim it!",
+      default: 'I have a gift for you on FrogTask. Tap the link to claim it!',
     },
     updatedAt: { type: Date, default: Date.now },
   },

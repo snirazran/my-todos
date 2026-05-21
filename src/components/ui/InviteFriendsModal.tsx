@@ -105,7 +105,7 @@ export function InviteFriendsModal({
     async (url: string) => {
       const shareData = {
         title: config?.shareTitle || 'Come join me on FrogTask!',
-        text: config?.shareMessage || 'I picked a gift just for you on FrogTask.',
+        text: config?.shareMessage || 'I have a gift for you on FrogTask. Tap the link to claim it!',
         url,
       };
       try {
@@ -231,14 +231,14 @@ function OverviewStep({
           alt=""
           className="absolute inset-0 hidden h-full w-full object-cover object-[center_32%] md:block"
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-950/15 via-emerald-800/25 to-emerald-900/80" />
-        <div className="absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-b from-transparent via-emerald-950/35 to-emerald-950/55" />
+        <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_48%,rgba(0,0,0,0.22)_72%,rgba(0,0,0,0.62)_100%)]" />
+        <div className="absolute inset-x-0 bottom-0 h-[50%] bg-gradient-to-b from-transparent via-black/30 to-black/76" />
         <CloseButton onClose={onClose} className="left-4 top-4 text-white" />
         <div className="relative z-10 mx-auto flex h-full min-h-[32dvh] max-w-xl flex-col items-center justify-end">
-          <h2 className="text-3xl font-black tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]">
+          <h2 className="text-3xl font-black tracking-tight [text-shadow:0_2px_0_rgba(25,83,43,0.75),0_4px_14px_rgba(0,0,0,0.32)]">
             {config.headline}
           </h2>
-          <p className="mt-2 max-w-md text-sm font-bold text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.45)]">
+          <p className="mt-2 max-w-md text-sm font-bold text-white [text-shadow:0_1px_0_rgba(25,83,43,0.85),0_3px_10px_rgba(0,0,0,0.28)]">
             {config.subheading}
           </p>
         </div>
