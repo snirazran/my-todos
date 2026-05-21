@@ -417,6 +417,10 @@ function PickStep({
           </div>
           <div className="relative z-10 -translate-y-3">
             <Frog width={250} height={190} />
+            <div className="absolute right-4 top-12 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-2">
+              What do I get?
+              <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />
+            </div>
           </div>
         </div>
 
@@ -435,7 +439,7 @@ function PickStep({
                 <button
                   key={gift.id}
                   onClick={() => onSelect(gift.id)}
-                  className={`aspect-square w-[30%] min-w-[96px] max-w-[150px] overflow-visible rounded-[22px] border-4 bg-[#8fc36d] p-4 transition-all active:scale-95 ${
+                  className={`aspect-square w-[32%] min-w-[112px] max-w-[150px] overflow-visible rounded-[22px] border-4 bg-[#8fc36d] p-1 transition-all active:scale-95 ${
                     isSelected
                       ? 'border-white ring-4 ring-inset ring-white/25'
                       : 'border-white/15 hover:border-white/70'
@@ -519,16 +523,18 @@ function GiftPreview({ item, active = false }: { item: CatalogItem | null; activ
 
   if (item.slot === 'container') {
     return (
-      <div className="flex h-full w-full items-center justify-center">
-      <GiftRive color={item.riveIndex} isMilestone={false} paused={!active} />
+      <div className="flex h-full w-full items-center justify-center overflow-visible">
+        <div className="h-[155%] w-[155%]">
+          <GiftRive color={item.riveIndex} isMilestone={false} paused={!active} />
+        </div>
       </div>
     );
   }
 
   const indices = itemToIndices(item);
   return (
-    <div className="flex h-full w-full items-center justify-center">
-      <Frog width={168} height={126} indices={indices} paused={!active} />
+    <div className="flex h-full w-full items-center justify-center overflow-visible">
+      <Frog width={230} height={172} indices={indices} paused={!active} />
     </div>
   );
 }
