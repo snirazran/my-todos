@@ -646,6 +646,49 @@ function MobileSheet({
                   onOpenCommunity={() => setView('community')}
                   onOpenProfile={() => setView('profile')}
                   onOpenPlus={() => setPlusOpen(true)}
+                  onReportIssue={() => {
+                    const platform = typeof navigator !== 'undefined' ? navigator.platform : 'unknown';
+                    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
+                    const timezone =
+                      typeof Intl !== 'undefined'
+                        ? Intl.DateTimeFormat().resolvedOptions().timeZone
+                        : 'unknown';
+                    const now = new Date().toISOString();
+                    const uid = user?.uid ?? 'guest';
+                    const lines = [
+                      'Please describe the issue and the steps you took to encounter it (screenshots are helpful too!)',
+                      '',
+                      '',
+                      '',
+                      '===============',
+                      'Error Metadata',
+                      '===============',
+                      `Account: ${uid}`,
+                      `Plus: ${userInfo?.isPremium ? 'Yes' : 'No'}`,
+                      `OS / Platform: ${platform}`,
+                      `User Agent: ${ua}`,
+                      `Timezone: ${timezone}`,
+                      `Reported At: ${now}`,
+                    ];
+                    const subject = encodeURIComponent('FrogTask — Report an issue');
+                    const body = encodeURIComponent(lines.join('\n'));
+                    window.location.href = `mailto:support@frogtask.com?subject=${subject}&body=${body}`;
+                  }}
+                  onHelpCenter={() => {
+                    const uid = user?.uid ?? 'guest';
+                    const lines = [
+                      'Hi FrogTask team,',
+                      '',
+                      'I have a question:',
+                      '',
+                      '',
+                      '',
+                      `— Account: ${uid}`,
+                    ];
+                    const subject = encodeURIComponent('FrogTask — Help request');
+                    const body = encodeURIComponent(lines.join('\n'));
+                    window.location.href = `mailto:support@frogtask.com?subject=${subject}&body=${body}`;
+                  }}
                   onGoAdmin={() => {
                     router.push('/admin');
                     onClose();
@@ -743,6 +786,8 @@ function MainView({
   onOpenCommunity,
   onOpenProfile,
   onOpenPlus,
+  onReportIssue,
+  onHelpCenter,
   onGoAdmin,
   onSignOut,
   flashSoon,
@@ -762,6 +807,8 @@ function MainView({
   onOpenCommunity: () => void;
   onOpenProfile: () => void;
   onOpenPlus: () => void;
+  onReportIssue: () => void;
+  onHelpCenter: () => void;
   onGoAdmin: () => void;
   onSignOut: () => void;
   flashSoon: (label: string) => void;
@@ -868,12 +915,12 @@ function MainView({
         <MenuRow
           icon={<HelpCircle className="w-5 h-5 text-sky-500" />}
           label="Help center"
-          onClick={() => flashSoon('Help center')}
+          onClick={onHelpCenter}
         />
         <MenuRow
           icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
           label="Report an issue"
-          onClick={() => flashSoon('Report an issue')}
+          onClick={onReportIssue}
         />
       </MenuSection>
 
