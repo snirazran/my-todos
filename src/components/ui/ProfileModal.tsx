@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, ChevronRight, Heart, X } from 'lucide-react';
+import { AlertCircle, Check, ChevronRight, Heart, X } from 'lucide-react';
 
 export type ProfileField = 'petName' | 'petPronouns' | 'yourName' | 'birthday';
 
@@ -57,12 +57,14 @@ export function ProfileModal({
   data: ProfileData;
   onSave?: (field: ProfileField, value: string) => void | Promise<void>;
   onCreateAccount?: () => void;
-  onDeleteData?: () => void;
+  onDeleteData?: () => void | Promise<void>;
 }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
   const [editing, setEditing] = useState<ProfileField | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -133,35 +135,37 @@ export function ProfileModal({
                 </div>
               </div>
 
-              {data.isGuest && (
-                <div
-                  className="border-t border-border/40 px-4 pt-4"
-                  style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
-                >
-                  <div className="mx-auto max-w-md space-y-3 text-center">
-                    <div>
-                      <p className="text-sm font-black text-foreground">Guest Mode</p>
-                      <p className="mt-1 text-xs font-medium text-muted-foreground">
-                        Create an account to save your progress
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={onCreateAccount}
-                      className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-foreground transition-colors hover:bg-accent/50 active:scale-[0.99]"
-                    >
-                      Create Account
-                    </button>
-                    <button
-                      type="button"
-                      onClick={onDeleteData}
-                      className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-rose-500 transition-colors hover:bg-rose-50 active:scale-[0.99]"
-                    >
-                      Delete Data
-                    </button>
-                  </div>
+              <div
+                className="border-t border-border/40 px-4 pt-4"
+                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
+              >
+                <div className="mx-auto max-w-md space-y-3 text-center">
+                  {data.isGuest && (
+                    <>
+                      <div>
+                        <p className="text-sm font-black text-foreground">Guest Mode</p>
+                        <p className="mt-1 text-xs font-medium text-muted-foreground">
+                          Create an account to save your progress
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={onCreateAccount}
+                        className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-foreground transition-colors hover:bg-accent/50 active:scale-[0.99]"
+                      >
+                        Create Account
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDelete(true)}
+                    className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-rose-500 transition-colors hover:bg-rose-50 active:scale-[0.99]"
+                  >
+                    Delete Data
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           </motion.div>
 
@@ -195,6 +199,24 @@ export function ProfileModal({
               currentValue={data.birthday ?? null}
               onClose={() => setEditing(null)}
               onSave={(value) => handleSave('birthday', value)}
+            />
+          )}
+          {confirmingDelete && (
+            <DeleteConfirmDialog
+              deleting={deleting}
+              onClose={() => {
+                if (!deleting) setConfirmingDelete(false);
+              }}
+              onConfirm={async () => {
+                if (deleting) return;
+                setDeleting(true);
+                try {
+                  await onDeleteData?.();
+                } finally {
+                  setDeleting(false);
+                  setConfirmingDelete(false);
+                }
+              }}
             />
           )}
         </>
@@ -476,6 +498,52 @@ function BirthdayDialog({
       >
         {saving ? 'Saving…' : 'Save'}
       </button>
+    </DialogShell>
+  );
+}
+
+function DeleteConfirmDialog({
+  deleting,
+  onClose,
+  onConfirm,
+}: {
+  deleting: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+}) {
+  return (
+    <DialogShell onClose={onClose}>
+      <div className="mt-2 flex flex-col items-center text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-500 text-white">
+          <AlertCircle className="h-7 w-7" strokeWidth={2.5} />
+        </div>
+        <h3 className="mt-4 text-lg font-black leading-tight tracking-tight text-foreground">
+          Are you sure you want to permanently delete your account &amp; data?
+        </h3>
+        <p className="mt-2 text-sm font-medium text-muted-foreground">
+          This is not reversible, and you will not be able to retrieve your account or
+          data. This does not cancel any active subscriptions. Go to &quot;Manage Subscription&quot;
+          to cancel.
+        </p>
+      </div>
+      <div className="mt-5 space-y-3">
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={deleting}
+          className="h-12 w-full rounded-2xl bg-rose-500 text-base font-black tracking-tight text-white shadow-[0_4px_0_0_#9b1c1c] ring-1 ring-rose-700/40 transition-all hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#9b1c1c] active:translate-y-1 active:shadow-none disabled:opacity-60 disabled:pointer-events-none"
+        >
+          {deleting ? 'Deleting…' : 'Delete My Data'}
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          disabled={deleting}
+          className="h-12 w-full rounded-2xl bg-muted text-base font-black tracking-tight text-muted-foreground transition-colors hover:bg-muted/80 active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none"
+        >
+          Cancel
+        </button>
+      </div>
     </DialogShell>
   );
 }

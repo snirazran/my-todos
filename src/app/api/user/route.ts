@@ -3,6 +3,10 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId, requireAuth } from '@/lib/auth';
 import UserModel, { type UserDoc } from '@/lib/models/User';
+import TaskModel from '@/lib/models/Task';
+import QuestModel from '@/lib/models/Quest';
+import ReferralModel from '@/lib/models/Referral';
+import { getAdminAuth } from '@/lib/firebaseAdmin';
 import connectMongo from '@/lib/mongoose';
 
 export async function GET(req: NextRequest) {
@@ -209,6 +213,55 @@ export async function PATCH(req: NextRequest) {
         : {
             error: 'Failed to update user settings',
             details: error instanceof Error ? error.message : 'Unknown user update error',
+          },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  let uid: string;
+  try {
+    uid = await requireUserId();
+  } catch (error) {
+    return NextResponse.json(
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Unauthorized' }
+        : {
+            error: 'Unauthorized',
+            details: error instanceof Error ? error.message : 'Unknown auth error',
+          },
+      { status: 401 },
+    );
+  }
+
+  try {
+    await connectMongo();
+
+    await Promise.all([
+      TaskModel.deleteMany({ userId: uid }),
+      QuestModel.deleteMany({ userId: uid }),
+      ReferralModel.deleteMany({ inviterId: uid }),
+      ReferralModel.updateMany({ claimedByUserId: uid }, { $set: { claimedByUserId: null } }),
+    ]);
+
+    await UserModel.deleteOne({ _id: uid });
+
+    try {
+      await getAdminAuth().deleteUser(uid);
+    } catch (err) {
+      console.warn('Failed to delete firebase auth user', err);
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error('Error deleting user account:', error);
+    return NextResponse.json(
+      process.env.NODE_ENV === 'production'
+        ? { error: 'Failed to delete account' }
+        : {
+            error: 'Failed to delete account',
+            details: error instanceof Error ? error.message : 'Unknown delete error',
           },
       { status: 500 },
     );

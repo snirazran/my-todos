@@ -22,6 +22,7 @@ import { useUIStore } from '@/lib/uiStore';
 import { clearAuthTokenCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
 import GoogleCalendarSync from '@/components/ui/GoogleCalendarSync';
+import { SkinRotationRow } from '@/components/ui/SkinRotation';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import WeeklyWrapped from '@/components/ui/WeeklyWrapped';
@@ -671,11 +672,12 @@ function MobileSheet({
               petPronouns: userInfo?.frogPronouns ?? null,
               yourName: userInfo?.name ?? user?.displayName ?? null,
               birthday: userInfo?.birthday ?? null,
-              isGuest: !user,
+              isGuest: !user || !!user?.isAnonymous,
             }}
             onCreateAccount={() => {
               setProfileOpen(false);
-              onSignIn?.();
+              router.push('/login?upgrade=1');
+              onClose();
             }}
             onSave={async (field, value) => {
               const fieldMap: Record<string, string> = {
@@ -697,7 +699,17 @@ function MobileSheet({
                 console.error('Failed to save profile field', err);
               }
             }}
-            onDeleteData={() => flashSoon('Delete data')}
+            onDeleteData={async () => {
+              try {
+                const res = await fetch('/api/user', { method: 'DELETE' });
+                if (!res.ok) throw new Error('Failed to delete account');
+                setProfileOpen(false);
+                onSignOut();
+              } catch (err) {
+                console.error(err);
+                flashSoon('Could not delete account');
+              }
+            }}
           />
         </motion.div>
       )}
@@ -933,10 +945,12 @@ function PreferencesView({
         />
       </MenuSection>
 
+      <MenuSection title="Wardrobe">
+        <SkinRotationRow />
+      </MenuSection>
+
       <MenuSection title="Integrations">
-        <div className="p-4 rounded-2xl bg-card border border-border/50">
-          <GoogleCalendarSync />
-        </div>
+        <GoogleCalendarSync />
       </MenuSection>
     </div>
   );

@@ -197,19 +197,18 @@ export default function GoogleCalendarSync() {
   return (
     <button
       onClick={() => handleToggle(!enabled)}
-      className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+      className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent/50"
     >
-      <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
-        Calendar Sync
-      </span>
-      <div className="flex items-center gap-2">
-        {syncing && <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-500" />}
-        <Switch
-          checked={enabled}
-          onCheckedChange={handleToggle}
-          className="data-[state=checked]:bg-blue-500 pointer-events-none"
-        />
+      <div className="h-9 w-9 rounded-full bg-muted/40 flex items-center justify-center shrink-0">
+        <CalendarRange className="w-5 h-5 text-blue-500" />
       </div>
+      <span className="flex-1 text-sm font-bold truncate">Google Calendar sync</span>
+      {syncing && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+      <Switch
+        checked={enabled}
+        onCheckedChange={handleToggle}
+        className="data-[state=checked]:bg-blue-500 pointer-events-none"
+      />
     </button>
   );
 }

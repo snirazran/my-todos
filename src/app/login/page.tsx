@@ -5,10 +5,14 @@ import {
   GoogleAuthProvider,
   signInWithCredential,
   signInWithPhoneNumber,
+  linkWithPopup,
+  linkWithCredential,
+  linkWithPhoneNumber,
   RecaptchaVerifier,
   sendSignInLinkToEmail,
   type ConfirmationResult,
 } from 'firebase/auth';
+import { useSearchParams } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { SocialLogin } from '@capgo/capacitor-social-login';
 import { auth } from '@/lib/firebase';
@@ -50,6 +54,8 @@ const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isUpgrade = searchParams?.get('upgrade') === '1';
   const [method, setMethod] = useState<Method>('phone');
   const [step, setStep] = useState<Step>('enter');
   const [dir, setDir] = useState(1);
@@ -112,6 +118,8 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
+      const current = auth.currentUser;
+      const shouldLink = isUpgrade && current?.isAnonymous;
       if (Capacitor.isNativePlatform()) {
         const googleUser = await SocialLogin.login({
           provider: 'google',
@@ -123,14 +131,28 @@ export default function LoginPage() {
             : null;
         if (!idToken) throw new Error('Failed to get Google token');
         const cred = GoogleAuthProvider.credential(idToken);
-        await signInWithCredential(auth, cred);
+        if (shouldLink && current) {
+          await linkWithCredential(current, cred);
+        } else {
+          await signInWithCredential(auth, cred);
+        }
       } else {
         const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
+        if (shouldLink && current) {
+          await linkWithPopup(current, provider);
+        } else {
+          await signInWithPopup(auth, provider);
+        }
       }
       await finishSignIn();
     } catch (err: any) {
-      setError(err?.message || 'Google sign-in failed');
+      const map: Record<string, string> = {
+        'auth/credential-already-in-use':
+          'That Google account is already linked to another user.',
+        'auth/email-already-in-use':
+          'That email is already linked to another account.',
+      };
+      setError(map[err?.code ?? ''] ?? err?.message ?? 'Google sign-in failed');
       setLoading(false);
     }
   };
@@ -146,7 +168,11 @@ export default function LoginPage() {
     setError(null);
     try {
       const verifier = ensureRecaptcha();
-      const confirmation = await signInWithPhoneNumber(auth, trimmed, verifier);
+      const current = auth.currentUser;
+      const confirmation =
+        isUpgrade && current?.isAnonymous
+          ? await linkWithPhoneNumber(current, trimmed, verifier)
+          : await signInWithPhoneNumber(auth, trimmed, verifier);
       confirmationRef.current = confirmation;
       setDir(1);
       setStep('verify-phone');
@@ -229,6 +255,17 @@ export default function LoginPage() {
             indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
           />
         </div>
+
+        {isUpgrade && (
+          <div className="mb-3 w-full rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-center shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+            <p className="text-sm font-black text-amber-900 dark:text-amber-200">
+              You&apos;re in Guest Mode
+            </p>
+            <p className="mt-0.5 text-xs font-medium text-amber-800/90 dark:text-amber-100/80">
+              Create an account to save your progress — your pet and data will be kept.
+            </p>
+          </div>
+        )}
 
         <div className="w-full overflow-hidden rounded-[32px] border border-border/50 bg-card/80 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
           <div className="px-6 pt-10 pb-2">
