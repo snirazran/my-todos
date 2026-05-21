@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
     await connectMongo();
     
     const user = await UserModel.findById(uid)
-      .select('createdAt premiumUntil calendarSyncEnabled calendarAccessToken')
+      .select('createdAt premiumUntil calendarSyncEnabled calendarAccessToken name frogName')
       .lean();
 
     if (!user) {
@@ -43,6 +43,8 @@ export async function GET(req: NextRequest) {
       isPremium,
       calendarSyncEnabled: user.calendarSyncEnabled || false,
       hasCalendarToken: !!user.calendarAccessToken,
+      name: user.name ?? null,
+      frogName: user.frogName ?? null,
     });
   } catch (error) {
     console.error('Error fetching user data:', error);

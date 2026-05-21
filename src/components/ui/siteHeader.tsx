@@ -338,6 +338,16 @@ import {
   Sun,
   User,
   Settings,
+  Bell,
+  Mail,
+  Users,
+  SlidersHorizontal,
+  Database,
+  Pause,
+  CreditCard,
+  HelpCircle,
+  AlertTriangle,
+  ChevronLeft,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState, useRef, useEffect } from 'react';
@@ -345,6 +355,7 @@ import { createPortal } from 'react-dom';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
+import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 
 function RightActions({
   user,
@@ -618,12 +629,20 @@ function MobileMenuButton({
   return (
     <button
       onClick={() => setIsOpen(!isOpen)}
-      className="p-2 rounded-full bg-card border border-border/60 shadow-sm text-muted-foreground hover:text-foreground transition-colors"
+      className="p-2 rounded-full bg-card/80 border border-border/50 shadow-sm backdrop-blur-xl text-muted-foreground hover:text-foreground transition-colors"
     >
       {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
     </button>
   );
 }
+
+type UserInfo = {
+  name?: string | null;
+  frogName?: string | null;
+  isPremium?: boolean;
+};
+
+const userInfoFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function MobileSheet({
   isOpen,
@@ -640,163 +659,443 @@ function MobileSheet({
 }: any) {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  const [view, setView] = useState<'main' | 'preferences'>('main');
+  const [toast, setToast] = useState<string | null>(null);
+  const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, requestEnable, loading: notifLoading } = useNotificationStatus();
+  const { data: userInfo } = useSWR<UserInfo>(
+    showAuth && user ? '/api/user' : null,
+    userInfoFetcher,
+    { revalidateOnFocus: false },
+  );
+
   useEffect(() => setMounted(true), []);
+
+  // Reset to main view whenever the sheet opens
+  useEffect(() => {
+    if (isOpen) setView('main');
+  }, [isOpen]);
+
+  const flashSoon = (label: string) => {
+    setToast(`${label} — coming soon`);
+    window.setTimeout(() => setToast(null), 1800);
+  };
+
+  const handleEnableNotifs = async () => {
+    const next = await requestEnable();
+    if (next === 'granted') setToast('Notifications enabled');
+    else if (next === 'denied') setToast('Notifications were blocked. Enable them from system settings.');
+    else setToast('Permission still pending');
+    window.setTimeout(() => setToast(null), 2500);
+  };
+
   if (!mounted) return null;
+
+  const displayName = userInfo?.name || user?.displayName || 'You';
+  const frogName = userInfo?.frogName || 'Frog';
 
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-[100] bg-background/80 backdrop-blur-sm md:hidden"
-          />
-          <motion.div
-            initial={{ x: '-100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
-            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-            className="fixed z-[101] top-0 left-0 bottom-0 w-[85%] max-w-xs bg-background border-r border-border/50 shadow-2xl p-6 flex flex-col gap-6 h-[100dvh] md:hidden"
-            style={{ backgroundColor: 'hsl(var(--background))' }} // Force solid background using valid HSL
+        <motion.div
+          initial={{ x: '-100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '-100%' }}
+          transition={{ type: 'spring', damping: 28, stiffness: 220 }}
+          className="fixed z-[101] inset-0 bg-background h-[100dvh] w-full overflow-y-auto md:hidden"
+          style={{ backgroundColor: 'hsl(var(--background))' }}
+        >
+          {/* Top bar */}
+          <div
+            className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl"
+            style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-black tracking-tight">Menu</h2>
+            <div className="px-4 py-3 flex items-center justify-between">
               <button
-                onClick={onClose}
-                className="p-2 -ml-2 rounded-full hover:bg-muted"
+                onClick={view === 'preferences' ? () => setView('main') : onClose}
+                className="p-2 -ml-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                aria-label={view === 'preferences' ? 'Back' : 'Close'}
               >
-                <X className="w-5 h-5" />
+                <ChevronLeft className="w-6 h-6" />
               </button>
+              {view === 'preferences' && (
+                <h2 className="text-base font-black tracking-tight">Preferences</h2>
+              )}
+              <div className="w-10" aria-hidden />
             </div>
+          </div>
 
-            {showAuth && user && (
-              <div className="p-4 rounded-2xl bg-muted/30 border border-border/50 flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm text-lg">
-                  <span>{user.displayName?.[0] || 'U'}</span>
-                </div>
-                <div className="min-w-0">
-                  <p className="font-bold text-sm truncate">
-                    {user.displayName}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">
-                    {user.email}
-                  </p>
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                  Appearance
-                </label>
-                <button
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
+          <div className="px-5 pb-10 space-y-5">
+            {/* Toast */}
+            <AnimatePresence>
+              {toast && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  className="fixed left-1/2 top-16 z-[200] -translate-x-1/2 rounded-full bg-foreground text-background px-4 py-2 text-xs font-bold shadow-lg"
                 >
-                  <span className="font-bold text-sm group-hover:text-foreground transition-colors">
-                    Color Mode
-                  </span>
-                  <div className="relative h-9 w-9 flex items-center justify-center">
-                    <AnimatePresence mode="popLayout" initial={false}>
-                      {theme === 'dark' ? (
-                        <motion.div
-                          key="moon"
-                          initial={{ y: 10, opacity: 0, rotate: 45 }}
-                          animate={{ y: 0, opacity: 1, rotate: 0 }}
-                          exit={{ y: -10, opacity: 0, rotate: -45 }}
-                          transition={{ duration: 0.2, ease: 'easeInOut' }}
-                          className="absolute"
-                        >
-                          <Moon className="h-[1.2rem] w-[1.2rem] text-violet-400" />
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="sun"
-                          initial={{ y: 10, opacity: 0, rotate: 45 }}
-                          animate={{ y: 0, opacity: 1, rotate: 0 }}
-                          exit={{ y: -10, opacity: 0, rotate: -45 }}
-                          transition={{ duration: 0.2, ease: 'easeInOut' }}
-                          className="absolute"
-                        >
-                          <Sun className="h-[1.2rem] w-[1.2rem] text-amber-500" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </button>
+                  {toast}
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-                {showAuth && (
-                  <>
-                    <button
-                      onClick={() => {
-                        onOpenQuestOnboarding();
-                        onClose();
-                      }}
-                      className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
-                    >
-                      <span className="font-bold text-sm group-hover:text-foreground transition-colors">
-                        Quest Focus
-                      </span>
-                      <Compass className="h-5 w-5 text-emerald-500" />
-                    </button>
-                  </>
-                )}
-
-                {isAdmin && (
-                  <button
-                    onClick={() => {
-                      router.push('/admin');
-                      onClose();
-                    }}
-                    className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
-                  >
-                    <span className="font-bold text-sm group-hover:text-foreground transition-colors">
-                      Admin Settings
-                    </span>
-                    <Settings className="h-5 w-5 text-amber-500" />
-                  </button>
-                )}
-
-                {showAuth && (
-                  <GoogleCalendarSync />
-                )}
-              </div>
-            </div>
-
-            <div className="mt-auto">
-              {showAuth && (
-                <button
-                  onClick={() => {
+            {view === 'main' ? (
+              showAuth && user ? (
+                <MainView
+                  displayName={displayName}
+                  frogName={frogName}
+                  isPremium={!!userInfo?.isPremium}
+                  isAdmin={!!isAdmin}
+                  canEnableNotifs={canEnableNotifs}
+                  notifsEnabled={notifsEnabled}
+                  isNative={isNative}
+                  notifLoading={notifLoading}
+                  onEnableNotifs={handleEnableNotifs}
+                  onOpenPreferences={() => setView('preferences')}
+                  onGoAdmin={() => {
+                    router.push('/admin');
+                    onClose();
+                  }}
+                  onSignOut={() => {
                     onSignOut();
                     onClose();
                   }}
-                  className="w-full flex items-center justify-center gap-2 p-4 rounded-xl font-bold bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
-                >
-                  <LogOut className="w-5 h-5" />
-                  Sign Out
-                </button>
-              )}
-              {!showAuth && (
-                <button
-                  onClick={() => {
-                    onSignIn();
-                    onClose();
-                  }}
-                  className="w-full flex items-center justify-center gap-2 p-4 rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
-                >
-                  <LogIn className="w-5 h-5" />
-                  Sign In
-                </button>
-              )}
-            </div>
-          </motion.div>
-        </>
+                  flashSoon={flashSoon}
+                />
+              ) : (
+                <SignedOutView onSignIn={onSignIn} onClose={onClose} />
+              )
+            ) : (
+              <PreferencesView
+                theme={theme}
+                setTheme={setTheme}
+                onOpenQuestOnboarding={() => {
+                  onOpenQuestOnboarding();
+                  onClose();
+                }}
+              />
+            )}
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>,
     document.body,
+  );
+}
+
+function MainView({
+  displayName,
+  frogName,
+  isPremium,
+  isAdmin,
+  canEnableNotifs,
+  notifsEnabled,
+  isNative,
+  notifLoading,
+  onEnableNotifs,
+  onOpenPreferences,
+  onGoAdmin,
+  onSignOut,
+  flashSoon,
+}: {
+  displayName: string;
+  frogName: string;
+  isPremium: boolean;
+  isAdmin: boolean;
+  canEnableNotifs: boolean;
+  notifsEnabled: boolean;
+  isNative: boolean;
+  notifLoading: boolean;
+  onEnableNotifs: () => void;
+  onOpenPreferences: () => void;
+  onGoAdmin: () => void;
+  onSignOut: () => void;
+  flashSoon: (label: string) => void;
+}) {
+  return (
+    <div className="space-y-5">
+      {/* User card */}
+      <div className="rounded-2xl bg-card border border-border/50 px-5 py-4 shadow-sm">
+        <p className="text-xl font-black tracking-tight truncate">
+          <span>{displayName}</span>
+          <span className="text-muted-foreground mx-1.5">&amp;</span>
+          <span>{frogName}</span>
+        </p>
+      </div>
+
+      {/* Enable notifications promo (mobile only, when not enabled) */}
+      {isNative && canEnableNotifs && !notifsEnabled && (
+        <PromoCard
+          icon={<Bell className="w-7 h-7 text-amber-300" strokeWidth={2.5} />}
+          title="Enable notifications"
+          subtitle={`Get reminded to check in on ${frogName}!`}
+          actionLabel={notifLoading ? 'Enabling…' : 'Enable'}
+          onAction={onEnableNotifs}
+          disabled={notifLoading}
+        />
+      )}
+
+      {/* FrogTask Plus promo */}
+      {!isPremium && (
+        <PromoCard
+          icon={
+            <span className="inline-flex items-center gap-1">
+              <Sparkles className="w-5 h-5 text-amber-300" strokeWidth={2.5} />
+            </span>
+          }
+          title="FrogTask Plus"
+          titleBadge="PLUS"
+          subtitle="Customize the app to your needs"
+          actionLabel="Try 7 days free"
+          onAction={() => flashSoon('FrogTask Plus')}
+        />
+      )}
+
+      {/* Community */}
+      <MenuSection title="Community">
+        <MenuRow
+          icon={<Mail className="w-5 h-5 text-rose-500" />}
+          label="Invite friends"
+          onClick={() => flashSoon('Invite friends')}
+        />
+        <MenuRow
+          icon={<Users className="w-5 h-5 text-violet-500" />}
+          label="Join our frog community"
+          onClick={() => flashSoon('Frog community')}
+        />
+      </MenuSection>
+
+      {/* Account */}
+      <MenuSection title="Account">
+        {isNative && (
+          <MenuRow
+            icon={<Bell className="w-5 h-5 text-amber-500" />}
+            label="Notifications"
+            trailing={
+              <span className="text-[11px] font-bold text-muted-foreground">
+                {notifsEnabled ? 'On' : 'Off'}
+              </span>
+            }
+            onClick={onEnableNotifs}
+          />
+        )}
+        <MenuRow
+          icon={<User className="w-5 h-5 text-sky-500" />}
+          label="Profile"
+          onClick={() => flashSoon('Profile')}
+        />
+        <MenuRow
+          icon={<SlidersHorizontal className="w-5 h-5 text-emerald-500" />}
+          label="Preferences"
+          onClick={onOpenPreferences}
+        />
+        <MenuRow
+          icon={<Database className="w-5 h-5 text-cyan-500" />}
+          label="Your data"
+          onClick={() => flashSoon('Your data')}
+        />
+        <MenuRow
+          icon={<Pause className="w-5 h-5 text-orange-500" />}
+          label="Pause mode"
+          onClick={() => flashSoon('Pause mode')}
+        />
+      </MenuSection>
+
+      {/* Subscriptions */}
+      <MenuSection title="Subscriptions">
+        <MenuRow
+          icon={<CreditCard className="w-5 h-5 text-violet-500" />}
+          label="FrogTask Plus — Monthly"
+          trailing={<span className="text-[11px] font-bold text-muted-foreground">$4.99</span>}
+          onClick={() => flashSoon('Monthly subscription')}
+        />
+        <MenuRow
+          icon={<Sparkles className="w-5 h-5 text-amber-500" />}
+          label="FrogTask Plus — Yearly"
+          trailing={<span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">Save 50%</span>}
+          onClick={() => flashSoon('Yearly subscription')}
+        />
+      </MenuSection>
+
+      {/* Support */}
+      <MenuSection title="Support">
+        <MenuRow
+          icon={<HelpCircle className="w-5 h-5 text-sky-500" />}
+          label="Help center"
+          onClick={() => flashSoon('Help center')}
+        />
+        <MenuRow
+          icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
+          label="Report an issue"
+          onClick={() => flashSoon('Report an issue')}
+        />
+      </MenuSection>
+
+      {/* Admin */}
+      {isAdmin && (
+        <MenuSection title="Admin">
+          <MenuRow
+            icon={<Settings className="w-5 h-5 text-amber-500" />}
+            label="Admin Settings"
+            onClick={onGoAdmin}
+          />
+        </MenuSection>
+      )}
+
+      <button
+        onClick={onSignOut}
+        className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl font-bold bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+      >
+        <LogOut className="w-5 h-5" />
+        Sign Out
+      </button>
+    </div>
+  );
+}
+
+function PreferencesView({
+  theme,
+  setTheme,
+  onOpenQuestOnboarding,
+}: {
+  theme?: string;
+  setTheme: (t: string) => void;
+  onOpenQuestOnboarding: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <MenuSection title="Appearance">
+        <button
+          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+          className="w-full flex items-center justify-between px-4 py-4 bg-card hover:bg-accent/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+        >
+          <span className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-muted/50 flex items-center justify-center">
+              {theme === 'dark' ? (
+                <Moon className="w-5 h-5 text-violet-400" />
+              ) : (
+                <Sun className="w-5 h-5 text-amber-500" />
+              )}
+            </div>
+            <span className="font-bold text-sm">Color Mode</span>
+          </span>
+          <span className="text-[11px] font-bold text-muted-foreground capitalize">
+            {theme === 'dark' ? 'Dark' : 'Light'}
+          </span>
+        </button>
+      </MenuSection>
+
+      <MenuSection title="Quests">
+        <MenuRow
+          icon={<Compass className="w-5 h-5 text-emerald-500" />}
+          label="Quest Focus"
+          onClick={onOpenQuestOnboarding}
+        />
+      </MenuSection>
+
+      <MenuSection title="Integrations">
+        <div className="p-4 rounded-2xl bg-card border border-border/50">
+          <GoogleCalendarSync />
+        </div>
+      </MenuSection>
+    </div>
+  );
+}
+
+function SignedOutView({ onSignIn, onClose }: { onSignIn: () => void; onClose: () => void }) {
+  return (
+    <div className="pt-8">
+      <button
+        onClick={() => {
+          onSignIn();
+          onClose();
+        }}
+        className="w-full flex items-center justify-center gap-2 p-4 rounded-xl font-bold bg-primary text-primary-foreground hover:bg-primary/90 transition-colors shadow-lg shadow-primary/20"
+      >
+        <LogIn className="w-5 h-5" />
+        Sign In
+      </button>
+    </div>
+  );
+}
+
+function PromoCard({
+  icon,
+  title,
+  titleBadge,
+  subtitle,
+  actionLabel,
+  onAction,
+  disabled,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  titleBadge?: string;
+  subtitle: string;
+  actionLabel: string;
+  onAction: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div className="rounded-2xl bg-violet-500 dark:bg-violet-600 text-white px-4 py-4 flex items-center gap-3 shadow-sm">
+      <div className="flex items-center justify-center w-11 h-11 shrink-0">{icon}</div>
+      <div className="flex-1 min-w-0">
+        <p className="text-base font-black tracking-tight flex items-center gap-2">
+          {title}
+          {titleBadge && (
+            <span className="text-[10px] font-black tracking-wider bg-white/90 text-violet-700 rounded-md px-1.5 py-0.5">
+              {titleBadge}
+            </span>
+          )}
+        </p>
+        <p className="text-xs font-medium text-white/90">{subtitle}</p>
+      </div>
+      <button
+        onClick={onAction}
+        disabled={disabled}
+        className="bg-white text-violet-700 font-black text-xs rounded-xl px-3 py-2 shadow-sm shrink-0 active:scale-95 transition-transform disabled:opacity-70"
+      >
+        {actionLabel}
+      </button>
+    </div>
+  );
+}
+
+function MenuSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground px-1">
+        {title}
+      </p>
+      <div className="rounded-2xl bg-card border border-border/50 overflow-hidden divide-y divide-border/50">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function MenuRow({
+  icon,
+  label,
+  trailing,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  trailing?: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-accent/50 transition-colors text-left"
+    >
+      <div className="h-9 w-9 rounded-full bg-muted/40 flex items-center justify-center shrink-0">
+        {icon}
+      </div>
+      <span className="flex-1 text-sm font-bold truncate">{label}</span>
+      {trailing}
+      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+    </button>
   );
 }
