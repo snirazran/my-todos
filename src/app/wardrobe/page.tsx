@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { WardrobePageContent } from '@/components/ui/skins/WardrobePanel';
 import { useInventory } from '@/hooks/useInventory';
+import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
 
 export default function WardrobePage() {
@@ -12,6 +13,19 @@ export default function WardrobePage() {
   const searchParams = useSearchParams();
   const frogRef = useRef<FrogHandle>(null);
   const { data } = useInventory(true);
+  const { data: backgroundsData } = useBackgrounds(true);
+  const equippedBackground = useMemo(() => {
+    if (!backgroundsData?.equipped) return null;
+    return (
+      backgroundsData.catalog.find((b) => b.id === backgroundsData.equipped) ?? null
+    );
+  }, [backgroundsData]);
+  const bgImages = {
+    mobile: equippedBackground?.images?.mobile || '/bg-mobile.png',
+    tablet: equippedBackground?.images?.tablet || '/bg-tablet.png',
+    web: equippedBackground?.images?.web || '/bg-web.png',
+    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.png',
+  };
   const defaultTab =
     (searchParams.get('tab') as 'inventory' | 'shop' | 'trade') || 'inventory';
 
@@ -38,11 +52,24 @@ export default function WardrobePage() {
 
   return (
     <main className="relative h-[100dvh] md:h-[calc(100vh-4rem)] overflow-hidden bg-background">
-      <div
+      <picture
+        key={equippedBackground?.id ?? 'default-bg'}
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[243px] md:h-[263px] bg-cover bg-bottom bg-no-repeat z-0"
-        style={{ backgroundImage: 'url(/bg-shop.png)' }}
-      />
+        className="pointer-events-none absolute inset-x-0 top-0 h-[243px] md:h-[263px] z-0"
+      >
+        {bgImages.webLarge && (
+          <source media="(min-width: 1920px)" srcSet={bgImages.webLarge} />
+        )}
+        {bgImages.web && <source media="(min-width: 1280px)" srcSet={bgImages.web} />}
+        {bgImages.tablet && (
+          <source media="(min-width: 768px)" srcSet={bgImages.tablet} />
+        )}
+        <img
+          src={bgImages.mobile}
+          alt=""
+          className="h-full w-full object-cover object-bottom"
+        />
+      </picture>
       <div className="relative z-10 flex flex-col w-full h-full max-w-3xl gap-0 px-4 pt-0 pb-4 mx-auto md:px-6 md:pb-6 md:pt-4">
         <section className="z-20 flex flex-col pointer-events-none shrink-0">
           <div className="flex items-start justify-center">

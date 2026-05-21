@@ -44,16 +44,12 @@ function formatPronouns(value?: string | null) {
   return value;
 }
 
-export function ProfileModal({
-  open,
-  onClose,
+export function ProfilePanel({
   data,
   onSave,
   onCreateAccount,
   onDeleteData,
 }: {
-  open: boolean;
-  onClose: () => void;
   data: ProfileData;
   onSave?: (field: ProfileField, value: string) => void | Promise<void>;
   onCreateAccount?: () => void;
@@ -65,18 +61,6 @@ export function ProfileModal({
   const [editing, setEditing] = useState<ProfileField | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        if (editing) setEditing(null);
-        else onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editing, onClose, open]);
 
   if (!mounted) return null;
 
@@ -95,134 +79,91 @@ export function ProfileModal({
     setEditing(null);
   };
 
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm"
-          />
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-            className="fixed inset-0 z-[201] overflow-hidden bg-black/20 shadow-2xl"
-          >
-            <div className="mx-auto flex h-full w-full flex-col overflow-hidden bg-white md:my-6 md:h-[calc(100dvh-3rem)] md:w-[min(100vw-3rem,56rem)] md:rounded-[32px]">
-              <div className="relative flex items-center justify-center px-4 pb-3 pt-5">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="absolute left-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-muted text-foreground transition-colors hover:bg-muted/80"
-                  aria-label="Close"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-                <h2 className="text-base font-black tracking-tight text-foreground">
-                  Profile
-                </h2>
-              </div>
+  return (
+    <div className="space-y-6">
+      <ProfileSection title="Your pet" rows={petRows} onEdit={setEditing} />
+      <ProfileSection title="You" rows={youRows} onEdit={setEditing} />
 
-              <div className="flex-1 overflow-y-auto px-4 pb-6 pt-2">
-                <div className="mx-auto max-w-md space-y-6">
-                  <ProfileSection title="Your pet" rows={petRows} onEdit={setEditing} />
-                  <ProfileSection title="You" rows={youRows} onEdit={setEditing} />
-                </div>
-              </div>
-
-              <div
-                className="border-t border-border/40 px-4 pt-4"
-                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
-              >
-                <div className="mx-auto max-w-md space-y-3 text-center">
-                  {data.isGuest && (
-                    <>
-                      <div>
-                        <p className="text-sm font-black text-foreground">Guest Mode</p>
-                        <p className="mt-1 text-xs font-medium text-muted-foreground">
-                          Create an account to save your progress
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={onCreateAccount}
-                        className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-foreground transition-colors hover:bg-accent/50 active:scale-[0.99]"
-                      >
-                        Create Account
-                      </button>
-                    </>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setConfirmingDelete(true)}
-                    className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-rose-500 transition-colors hover:bg-rose-50 active:scale-[0.99]"
-                  >
-                    Delete Data
-                  </button>
-                </div>
-              </div>
+      <div className="space-y-3 pt-2 text-center">
+        {data.isGuest && (
+          <>
+            <div>
+              <p className="text-sm font-black text-foreground">Guest Mode</p>
+              <p className="mt-1 text-xs font-medium text-muted-foreground">
+                Create an account to save your progress
+              </p>
             </div>
-          </motion.div>
+            <button
+              type="button"
+              onClick={onCreateAccount}
+              className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-foreground transition-colors hover:bg-accent/50 active:scale-[0.99]"
+            >
+              Create Account
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => setConfirmingDelete(true)}
+          className="h-12 w-full rounded-2xl border border-border/50 bg-card text-sm font-black tracking-tight text-rose-500 transition-colors hover:bg-rose-50 active:scale-[0.99]"
+        >
+          Delete Data
+        </button>
+      </div>
 
-          {editing === 'petName' && (
-            <TextEditDialog
-              title="Change pet name"
-              initialValue={data.petName ?? ''}
-              maxLength={24}
-              onClose={() => setEditing(null)}
-              onSave={(value) => handleSave('petName', value)}
-            />
-          )}
-          {editing === 'yourName' && (
-            <TextEditDialog
-              title="Change your name"
-              initialValue={data.yourName ?? ''}
-              maxLength={40}
-              onClose={() => setEditing(null)}
-              onSave={(value) => handleSave('yourName', value)}
-            />
-          )}
-          {editing === 'petPronouns' && (
-            <PronounsDialog
-              currentValue={data.petPronouns ?? null}
-              onClose={() => setEditing(null)}
-              onSave={(value) => handleSave('petPronouns', value)}
-            />
-          )}
-          {editing === 'birthday' && (
-            <BirthdayDialog
-              currentValue={data.birthday ?? null}
-              onClose={() => setEditing(null)}
-              onSave={(value) => handleSave('birthday', value)}
-            />
-          )}
-          {confirmingDelete && (
-            <DeleteConfirmDialog
-              deleting={deleting}
-              onClose={() => {
-                if (!deleting) setConfirmingDelete(false);
-              }}
-              onConfirm={async () => {
-                if (deleting) return;
-                setDeleting(true);
-                try {
-                  await onDeleteData?.();
-                } finally {
-                  setDeleting(false);
-                  setConfirmingDelete(false);
-                }
-              }}
-            />
-          )}
-        </>
-      )}
-    </AnimatePresence>,
-    document.body,
+      <AnimatePresence>
+        {editing === 'petName' && (
+          <TextEditDialog
+            title="Change pet name"
+            initialValue={data.petName ?? ''}
+            maxLength={24}
+            onClose={() => setEditing(null)}
+            onSave={(value) => handleSave('petName', value)}
+          />
+        )}
+        {editing === 'yourName' && (
+          <TextEditDialog
+            title="Change your name"
+            initialValue={data.yourName ?? ''}
+            maxLength={40}
+            onClose={() => setEditing(null)}
+            onSave={(value) => handleSave('yourName', value)}
+          />
+        )}
+        {editing === 'petPronouns' && (
+          <PronounsDialog
+            currentValue={data.petPronouns ?? null}
+            onClose={() => setEditing(null)}
+            onSave={(value) => handleSave('petPronouns', value)}
+          />
+        )}
+        {editing === 'birthday' && (
+          <BirthdayDialog
+            currentValue={data.birthday ?? null}
+            onClose={() => setEditing(null)}
+            onSave={(value) => handleSave('birthday', value)}
+          />
+        )}
+      </AnimatePresence>
+
+      <DeleteDataDialog
+        open={confirmingDelete}
+        deleting={deleting}
+        onClose={() => {
+          if (!deleting) setConfirmingDelete(false);
+        }}
+        onConfirm={async () => {
+          if (deleting) return;
+          setDeleting(true);
+          try {
+            await onDeleteData?.();
+          } finally {
+            setDeleting(false);
+            setConfirmingDelete(false);
+          }
+        }}
+      />
+    </div>
   );
 }
 
@@ -265,7 +206,8 @@ function DialogShell({
   children: React.ReactNode;
   onClose: () => void;
 }) {
-  return (
+  if (typeof document === 'undefined') return null;
+  return createPortal(
     <>
       <motion.div
         initial={{ opacity: 0 }}
@@ -293,7 +235,8 @@ function DialogShell({
           {children}
         </motion.div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }
 
@@ -502,49 +445,55 @@ function BirthdayDialog({
   );
 }
 
-function DeleteConfirmDialog({
+export function DeleteDataDialog({
+  open,
   deleting,
   onClose,
   onConfirm,
 }: {
+  open: boolean;
   deleting: boolean;
   onClose: () => void;
   onConfirm: () => void | Promise<void>;
 }) {
   return (
-    <DialogShell onClose={onClose}>
-      <div className="mt-2 flex flex-col items-center text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-500 text-white">
-          <AlertCircle className="h-7 w-7" strokeWidth={2.5} />
-        </div>
-        <h3 className="mt-4 text-lg font-black leading-tight tracking-tight text-foreground">
-          Are you sure you want to permanently delete your account &amp; data?
-        </h3>
-        <p className="mt-2 text-sm font-medium text-muted-foreground">
-          This is not reversible, and you will not be able to retrieve your account or
-          data. This does not cancel any active subscriptions. Go to &quot;Manage Subscription&quot;
-          to cancel.
-        </p>
-      </div>
-      <div className="mt-5 space-y-3">
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={deleting}
-          className="h-12 w-full rounded-2xl bg-rose-500 text-base font-black tracking-tight text-white shadow-[0_4px_0_0_#9b1c1c] ring-1 ring-rose-700/40 transition-all hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#9b1c1c] active:translate-y-1 active:shadow-none disabled:opacity-60 disabled:pointer-events-none"
-        >
-          {deleting ? 'Deleting…' : 'Delete My Data'}
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          disabled={deleting}
-          className="h-12 w-full rounded-2xl bg-muted text-base font-black tracking-tight text-muted-foreground transition-colors hover:bg-muted/80 active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none"
-        >
-          Cancel
-        </button>
-      </div>
-    </DialogShell>
+    <AnimatePresence>
+      {open && (
+        <DialogShell onClose={onClose}>
+          <div className="mt-2 flex flex-col items-center text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-rose-500 text-white">
+              <AlertCircle className="h-7 w-7" strokeWidth={2.5} />
+            </div>
+            <h3 className="mt-4 text-lg font-black leading-tight tracking-tight text-foreground">
+              Are you sure you want to permanently delete your account &amp; data?
+            </h3>
+            <p className="mt-2 text-sm font-medium text-muted-foreground">
+              This is not reversible, and you will not be able to retrieve your account or
+              data. This does not cancel any active subscriptions. Go to &quot;Manage
+              Subscription&quot; to cancel.
+            </p>
+          </div>
+          <div className="mt-5 space-y-3">
+            <button
+              type="button"
+              onClick={onConfirm}
+              disabled={deleting}
+              className="h-12 w-full rounded-2xl bg-rose-500 text-base font-black tracking-tight text-white shadow-[0_4px_0_0_#9b1c1c] ring-1 ring-rose-700/40 transition-all hover:-translate-y-0.5 hover:shadow-[0_5px_0_0_#9b1c1c] active:translate-y-1 active:shadow-none disabled:opacity-60 disabled:pointer-events-none"
+            >
+              {deleting ? 'Deleting…' : 'Delete My Data'}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={deleting}
+              className="h-12 w-full rounded-2xl bg-muted text-base font-black tracking-tight text-muted-foreground transition-colors hover:bg-muted/80 active:scale-[0.99] disabled:opacity-60 disabled:pointer-events-none"
+            >
+              Cancel
+            </button>
+          </div>
+        </DialogShell>
+      )}
+    </AnimatePresence>
   );
 }
 

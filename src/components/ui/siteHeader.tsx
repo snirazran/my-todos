@@ -358,8 +358,8 @@ import { signOut } from 'firebase/auth';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
-import { CommunityModal } from '@/components/ui/CommunityModal';
-import { ProfileModal } from '@/components/ui/ProfileModal';
+import { CommunityPanel } from '@/components/ui/CommunityModal';
+import { ProfilePanel } from '@/components/ui/ProfileModal';
 
 function RightActions({
   user,
@@ -535,11 +535,9 @@ function MobileSheet({
 }: any) {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const [view, setView] = useState<'main' | 'preferences'>('main');
+  const [view, setView] = useState<'main' | 'preferences' | 'community' | 'profile'>('main');
   const [toast, setToast] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
-  const [communityOpen, setCommunityOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
   const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, requestEnable, loading: notifLoading } = useNotificationStatus();
   const { data: userInfo, mutate: refreshUserInfo } = useSWR<UserInfo>(
     showAuth && user ? '/api/user' : null,
@@ -583,6 +581,7 @@ function MobileSheet({
           className="fixed z-[101] inset-0 bg-background h-[100dvh] w-full overflow-y-auto"
           style={{ backgroundColor: 'hsl(var(--background))' }}
         >
+        <div className="mx-auto w-full md:max-w-xl md:border-x md:border-border/50 md:min-h-full md:bg-background">
           {/* Top bar */}
           <div
             className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl"
@@ -590,14 +589,20 @@ function MobileSheet({
           >
             <div className="px-4 py-3 flex items-center justify-between">
               <button
-                onClick={view === 'preferences' ? () => setView('main') : onClose}
+                onClick={view !== 'main' ? () => setView('main') : onClose}
                 className="p-2 -ml-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                aria-label={view === 'preferences' ? 'Back' : 'Close'}
+                aria-label={view !== 'main' ? 'Back' : 'Close'}
               >
                 <ChevronLeft className="w-6 h-6" />
               </button>
               {view === 'preferences' && (
                 <h2 className="text-base font-black tracking-tight">Preferences</h2>
+              )}
+              {view === 'community' && (
+                <h2 className="text-base font-black tracking-tight">Join our frog community</h2>
+              )}
+              {view === 'profile' && (
+                <h2 className="text-base font-black tracking-tight">Profile</h2>
               )}
               <div className="w-10" aria-hidden />
             </div>
@@ -636,8 +641,8 @@ function MobileSheet({
                     onClose();
                   }}
                   onInviteFriends={() => setInviteOpen(true)}
-                  onOpenCommunity={() => setCommunityOpen(true)}
-                  onOpenProfile={() => setProfileOpen(true)}
+                  onOpenCommunity={() => setView('community')}
+                  onOpenProfile={() => setView('profile')}
                   onGoAdmin={() => {
                     router.push('/admin');
                     onClose();
@@ -651,7 +656,7 @@ function MobileSheet({
               ) : (
                 <SignedOutView onSignIn={onSignIn} onClose={onClose} />
               )
-            ) : (
+            ) : view === 'preferences' ? (
               <PreferencesView
                 theme={theme}
                 setTheme={setTheme}
@@ -660,57 +665,57 @@ function MobileSheet({
                   onClose();
                 }}
               />
+            ) : view === 'community' ? (
+              <CommunityPanel />
+            ) : (
+              <ProfilePanel
+                data={{
+                  petName: userInfo?.frogName ?? null,
+                  petPronouns: userInfo?.frogPronouns ?? null,
+                  yourName: userInfo?.name ?? user?.displayName ?? null,
+                  birthday: userInfo?.birthday ?? null,
+                  isGuest: !user || !!user?.isAnonymous,
+                }}
+                onCreateAccount={() => {
+                  router.push('/login?upgrade=1');
+                  onClose();
+                }}
+                onDeleteData={async () => {
+                  try {
+                    const res = await fetch('/api/user', { method: 'DELETE' });
+                    if (!res.ok) throw new Error('Failed to delete account');
+                    onSignOut();
+                    onClose();
+                  } catch (err) {
+                    console.error(err);
+                    flashSoon('Could not delete account');
+                  }
+                }}
+                onSave={async (field, value) => {
+                  const fieldMap: Record<string, string> = {
+                    petName: 'frogName',
+                    petPronouns: 'frogPronouns',
+                    yourName: 'name',
+                    birthday: 'birthday',
+                  };
+                  const apiField = fieldMap[field];
+                  if (!apiField) return;
+                  try {
+                    await fetch('/api/user', {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ [apiField]: value }),
+                    });
+                    await refreshUserInfo();
+                  } catch (err) {
+                    console.error('Failed to save profile field', err);
+                  }
+                }}
+              />
             )}
           </div>
+          </div>
           <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
-          <CommunityModal open={communityOpen} onClose={() => setCommunityOpen(false)} />
-          <ProfileModal
-            open={profileOpen}
-            onClose={() => setProfileOpen(false)}
-            data={{
-              petName: userInfo?.frogName ?? null,
-              petPronouns: userInfo?.frogPronouns ?? null,
-              yourName: userInfo?.name ?? user?.displayName ?? null,
-              birthday: userInfo?.birthday ?? null,
-              isGuest: !user || !!user?.isAnonymous,
-            }}
-            onCreateAccount={() => {
-              setProfileOpen(false);
-              router.push('/login?upgrade=1');
-              onClose();
-            }}
-            onSave={async (field, value) => {
-              const fieldMap: Record<string, string> = {
-                petName: 'frogName',
-                petPronouns: 'frogPronouns',
-                yourName: 'name',
-                birthday: 'birthday',
-              };
-              const apiField = fieldMap[field];
-              if (!apiField) return;
-              try {
-                await fetch('/api/user', {
-                  method: 'PATCH',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ [apiField]: value }),
-                });
-                await refreshUserInfo();
-              } catch (err) {
-                console.error('Failed to save profile field', err);
-              }
-            }}
-            onDeleteData={async () => {
-              try {
-                const res = await fetch('/api/user', { method: 'DELETE' });
-                if (!res.ok) throw new Error('Failed to delete account');
-                setProfileOpen(false);
-                onSignOut();
-              } catch (err) {
-                console.error(err);
-                flashSoon('Could not delete account');
-              }
-            }}
-          />
         </motion.div>
       )}
     </AnimatePresence>,
@@ -840,11 +845,6 @@ function MainView({
           icon={<SlidersHorizontal className="w-5 h-5 text-emerald-500" />}
           label="Preferences"
           onClick={onOpenPreferences}
-        />
-        <MenuRow
-          icon={<Database className="w-5 h-5 text-cyan-500" />}
-          label="Your data"
-          onClick={() => flashSoon('Your data')}
         />
         <MenuRow
           icon={<Pause className="w-5 h-5 text-orange-500" />}
