@@ -61,15 +61,15 @@ export function FlyCounter({ balance, variant = 'desktop', onClick }: Props) {
   }, [balance, pillControls, flyControls]);
 
   const isMobile = variant === 'mobile';
-  const flySize = isMobile ? 28 : 20;
+  const flySize = isMobile ? 28 : 24;
   const flyY = -3;
 
   return (
     <motion.div
       onClick={onClick}
-      className={`relative flex items-center gap-1.5 rounded-full border border-border/50 bg-card/80 px-3 py-1.5 shadow-sm backdrop-blur-xl ${
-        onClick ? 'cursor-pointer transition-colors active:scale-95' : ''
-      } shrink-0`}
+      className={`relative flex items-center gap-1.5 rounded-full border border-border/50 bg-card/80 shadow-sm backdrop-blur-xl ${
+        isMobile ? 'px-3 py-1.5' : 'h-10 px-3'
+      } ${onClick ? 'cursor-pointer transition-colors active:scale-95' : ''} shrink-0`}
       animate={pillControls}
     >
       <motion.div

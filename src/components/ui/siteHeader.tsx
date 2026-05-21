@@ -188,13 +188,13 @@ export default function SiteHeader() {
         )}
 
         {/* ───────── Desktop Navigation (Centered) ───────── */}
-        <div className="hidden md:flex items-center gap-1 absolute left-1/2 -translate-x-1/2">
+        <div className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-0.5 lg:gap-1">
           {navItems.map((item) => {
             const isActive = item.href ? pathname === item.href : item.isActive;
             const Icon = item.icon;
 
             const buttonClass = `
-              relative flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold transition-all
+              relative flex items-center gap-1.5 lg:gap-2 px-2.5 lg:px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap transition-all
               ${
                 isActive
                   ? 'bg-primary/10 text-primary hover:bg-primary/20'
@@ -207,7 +207,7 @@ export default function SiteHeader() {
                 <div key={item.label} className="relative" ref={wardrobeRef}>
                   <button onClick={item.onClick} className={buttonClass}>
                     <Icon className="w-4 h-4" />
-                    <span>{item.label}</span>
+                    <span className="hidden lg:inline">{item.label}</span>
                     {inventoryBadge > 0 && (
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ml-1">
                         {inventoryBadge > 9 ? '9+' : inventoryBadge}
@@ -261,7 +261,7 @@ export default function SiteHeader() {
                   className={buttonClass}
                 >
                   <Icon className="w-4 h-4" />
-                  <span>{item.label}</span>
+                  <span className="hidden lg:inline">{item.label}</span>
                   {item.label === 'Quests' && questClaimableCount > 0 ? (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
                       {questClaimableCount > 99 ? '99+' : questClaimableCount}
@@ -283,7 +283,7 @@ export default function SiteHeader() {
                   className={buttonClass}
                 >
                   <Icon className="w-4 h-4" />
-                  <span>{item.label}</span>
+                  <span className="hidden lg:inline">{item.label}</span>
                 </button>
               );
             }
@@ -291,7 +291,7 @@ export default function SiteHeader() {
             return (
               <Link key={item.href} href={item.href!} className={buttonClass}>
                 <Icon className="w-4 h-4" />
-                <span>{item.label}</span>
+                <span className="hidden lg:inline">{item.label}</span>
               </Link>
             );
           })}
@@ -378,18 +378,7 @@ function RightActions({
   const { openQuestOnboarding } = useUIStore();
   const { isAdmin } = useIsAdmin();
 
-  // Close on click outside (desktop only — mobile has its own close via MobileSheet)
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      // Only apply on desktop
-      if (window.innerWidth < 768) return;
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  // No click-outside listener needed — the settings sheet covers the entire viewport.
 
   const handleSignOut = async () => {
     await signOut(auth);
@@ -469,30 +458,11 @@ function RightActions({
       {/* Desktop Trigger */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="hidden md:flex items-center gap-2 pl-2 pr-1 py-1 rounded-full border border-border/50 bg-background hover:bg-accent/50 transition-all group"
+        aria-label="Open menu"
+        className="hidden md:flex h-10 items-center justify-center p-1 rounded-full border border-border/50 bg-background hover:bg-accent/50 transition-all group"
       >
         <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold shadow-sm group-hover:shadow-md transition-all">
           <span>{user.displayName?.[0] || 'U'}</span>
-        </div>
-        <div
-          className={`mr-2 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
-        >
-          <span className="sr-only">Open menu</span>
-          <svg
-            width="10"
-            height="6"
-            viewBox="0 0 10 6"
-            fill="none"
-            className="text-muted-foreground"
-          >
-            <path
-              d="M1 1L5 5L9 1"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
         </div>
       </button>
 
@@ -501,107 +471,7 @@ function RightActions({
         <MobileMenuButton isOpen={isOpen} setIsOpen={setIsOpen} />
       </div>
 
-      {/* Desktop Dropdown */}
-      <AnimatePresence>
-        {isOpen && (
-          <div className="hidden md:block absolute right-0 top-full mt-2 w-64 origin-top-right z-50">
-            <motion.div
-              initial={{ opacity: 0, y: -8, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.96 }}
-              transition={{ duration: 0.2 }}
-              className="p-3 bg-popover border border-border rounded-2xl shadow-xl ring-1 ring-black/5"
-            >
-              <div className="px-2 py-1.5 mb-2 border-b border-border/50">
-                <p className="font-bold text-sm text-foreground truncate">
-                  {user.displayName}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {user.email}
-                </p>
-              </div>
-
-              <div className="space-y-1">
-                <button
-                  onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-                >
-                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
-                    Color Mode
-                  </span>
-                  <div className="relative h-9 w-9 flex items-center justify-center">
-                    <AnimatePresence mode="popLayout" initial={false}>
-                      {theme === 'dark' ? (
-                        <motion.div
-                          key="moon"
-                          initial={{ y: 10, opacity: 0, rotate: 45 }}
-                          animate={{ y: 0, opacity: 1, rotate: 0 }}
-                          exit={{ y: -10, opacity: 0, rotate: -45 }}
-                          transition={{ duration: 0.2, ease: 'easeInOut' }}
-                          className="absolute"
-                        >
-                          <Moon className="h-[1.2rem] w-[1.2rem] text-violet-400" />
-                        </motion.div>
-                      ) : (
-                        <motion.div
-                          key="sun"
-                          initial={{ y: 10, opacity: 0, rotate: 45 }}
-                          animate={{ y: 0, opacity: 1, rotate: 0 }}
-                          exit={{ y: -10, opacity: 0, rotate: -45 }}
-                          transition={{ duration: 0.2, ease: 'easeInOut' }}
-                          className="absolute"
-                        >
-                          <Sun className="h-[1.2rem] w-[1.2rem] text-amber-500" />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </button>
-
-                <button
-                  onClick={handleOpenQuestOnboarding}
-                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-                >
-                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
-                    Quest Focus
-                  </span>
-                  <Compass className="h-[1.2rem] w-[1.2rem] text-emerald-500" />
-                </button>
-
-                {isAdmin && (
-                  <button
-                    onClick={() => {
-                      router.push('/admin');
-                      setIsOpen(false);
-                    }}
-                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-                  >
-                    <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
-                      Admin Settings
-                    </span>
-                    <Settings className="h-[1.2rem] w-[1.2rem] text-amber-500" />
-                  </button>
-                )}
-
-                <GoogleCalendarSync />
-
-                <button
-                  onClick={() => {
-                    handleSignOut();
-                    setIsOpen(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-2 py-2 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Sign out
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Mobile Menu Sheet */}
+      {/* Settings Sheet (mobile + desktop) */}
       <MobileSheet
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
@@ -701,7 +571,7 @@ function MobileSheet({
           animate={{ x: 0 }}
           exit={{ x: '-100%' }}
           transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-          className="fixed z-[101] inset-0 bg-background h-[100dvh] w-full overflow-y-auto md:hidden"
+          className="fixed z-[101] inset-0 bg-background h-[100dvh] w-full overflow-y-auto"
           style={{ backgroundColor: 'hsl(var(--background))' }}
         >
           {/* Top bar */}
