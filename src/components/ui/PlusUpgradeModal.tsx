@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, Check, Heart, Sparkles, Tag, Unlock, X } from 'lucide-react';
+import { Bell, Check, Heart, Image as ImageIcon, Shirt, Sparkle, Sparkles, Tag, Unlock, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
@@ -178,10 +178,11 @@ function Step0({
   onContinue: () => void;
   onMaybeLater: () => void;
 }) {
+  const indices = React.useMemo(() => randomIndices(), []);
   return (
     <div className="flex h-full flex-col px-6 pb-8 pt-16">
       <div className="mx-auto mt-2 flex w-full max-w-md justify-center">
-        <Frog width={170} height={170} indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }} />
+        <Frog width={170} height={170} indices={indices} />
       </div>
       <h2 className="mt-6 text-center text-2xl font-black tracking-tight">
         People with Plus are <span className="text-amber-300">2x better</span> at sticking
@@ -190,13 +191,13 @@ function Step0({
       <div className="mt-7 space-y-4 rounded-2xl bg-white/10 p-5">
         <FeatureRow
           icon={<Unlock className="h-5 w-5 text-amber-300" />}
-          title="Unlock your potential"
-          subtitle="Turbo-charge your self-care with over 150 more exercises"
+          title="Improve in all areas"
+          subtitle="Unlimited tags and quests, focus on more areas and earn more rewards"
         />
         <FeatureRow
-          icon={<Tag className="h-5 w-5 text-amber-300" />}
-          title="Daily deals"
-          subtitle="Discounts and customizations, just for you"
+          icon={<span className="text-sm font-black text-amber-300">×2</span>}
+          title="Double rewards"
+          subtitle="Earn double rewards from quests and tasks"
         />
         <FeatureRow
           icon={<Heart className="h-5 w-5 text-rose-300" fill="currentColor" />}
@@ -242,26 +243,51 @@ function FeatureRow({
 }
 
 const COMPARISON_ROWS: { label: string; free: boolean }[] = [
-  { label: 'No ads', free: true },
-  { label: 'Unlimited exercises', free: false },
-  { label: 'Custom emojis', free: false },
+  { label: 'Unlimited quests', free: false },
+  { label: 'Unlimited tags', free: false },
   { label: 'Double rewards', free: false },
-  { label: 'Daily shop deals', free: false },
+  { label: 'Plus-only skins', free: false },
+  { label: 'Plus-only backgrounds', free: false },
 ];
+
+function randomIndices() {
+  const rand = (n: number) => Math.floor(Math.random() * n);
+  return {
+    skin: rand(4),
+    hat: rand(6),
+    body: rand(4),
+    hand_item: rand(4),
+  };
+}
 
 function Step1({ onContinue }: { onContinue: () => void }) {
   return (
     <div className="flex h-full flex-col px-6 pb-8 pt-16">
-      <h2 className="text-2xl font-black tracking-tight">Have more fun with Plus!</h2>
+      <h2 className="text-center text-2xl font-black tracking-tight">Have more fun with Plus!</h2>
 
       <div className="relative mt-8">
-        <div className="absolute right-0 top-0 h-full w-[42%] rounded-2xl bg-white/15" />
+        {/* PLUS column highlight */}
+        <div className="absolute -right-3 -top-3 -bottom-3 w-[6.5rem] overflow-hidden rounded-2xl bg-white/15">
+          {/* Three evenly-spaced lanes with staggered timing for a calm, flowing stream */}
+          <FloatingSparkle delay={0.0} left="22%" size={14} duration={3.6} spin={180} />
+          <FloatingSparkle delay={1.2} left="22%" size={20} duration={3.6} spin={180} />
+          <FloatingSparkle delay={2.4} left="22%" size={11} duration={3.6} spin={180} />
+
+          <FloatingSparkle delay={0.6} left="50%" size={18} duration={3.6} spin={180} />
+          <FloatingSparkle delay={1.8} left="50%" size={12} duration={3.6} spin={180} />
+          <FloatingSparkle delay={3.0} left="50%" size={22} duration={3.6} spin={180} />
+
+          <FloatingSparkle delay={0.3} left="78%" size={11} duration={3.6} spin={180} />
+          <FloatingSparkle delay={1.5} left="78%" size={16} duration={3.6} spin={180} />
+          <FloatingSparkle delay={2.7} left="78%" size={13} duration={3.6} spin={180} />
+        </div>
+
         <div className="relative">
-          <div className="grid grid-cols-[1fr_auto_auto] items-end gap-x-4 pb-3 text-sm font-black">
+          <div className="grid grid-cols-[1fr_5rem_5rem] items-end pb-3 text-sm font-black">
             <div />
-            <div className="w-16 text-center text-white/85">Free</div>
-            <div className="flex w-16 justify-center">
-              <span className="rounded-md bg-white px-2 py-0.5 text-[11px] font-black text-foreground">
+            <div className="text-center text-white/90">Free</div>
+            <div className="flex justify-center">
+              <span className="rounded-lg bg-white px-2.5 py-1 text-[11px] font-black tracking-wider text-foreground">
                 PLUS
               </span>
             </div>
@@ -269,15 +295,15 @@ function Step1({ onContinue }: { onContinue: () => void }) {
           {COMPARISON_ROWS.map((row, i) => (
             <div
               key={row.label}
-              className={`grid grid-cols-[1fr_auto_auto] items-center gap-x-4 py-4 text-sm font-bold ${
-                i < COMPARISON_ROWS.length - 1 ? 'border-b border-white/15' : ''
+              className={`grid grid-cols-[1fr_5rem_5rem] items-center py-4 text-sm font-bold ${
+                i < COMPARISON_ROWS.length - 1 ? 'border-b border-white/20' : ''
               }`}
             >
               <span>{row.label}</span>
-              <div className="flex w-16 justify-center">
+              <div className="flex justify-center">
                 {row.free && <Check className="h-5 w-5 stroke-[3]" />}
               </div>
-              <div className="flex w-16 justify-center">
+              <div className="flex justify-center">
                 <Check className="h-5 w-5 stroke-[3]" />
               </div>
             </div>
@@ -299,25 +325,19 @@ function Step2({
   reminderDate: string;
   onContinue: () => void;
 }) {
+  const step2Indices = React.useMemo(() => randomIndices(), []);
   return (
     <div className="flex h-full flex-col px-6 pb-8 pt-16">
-      <h2 className="text-2xl font-black tracking-tight">
+      <h2 className="text-center text-2xl font-black tracking-tight">
         We&apos;ll remind you <span className="text-amber-300">2 days</span> before your
         trial ends
       </h2>
-      <p className="mt-3 text-sm font-medium text-white/90">
+      <p className="mt-3 text-center text-sm font-medium text-white/90">
         You&apos;ll get a push notification on {reminderDate}.
       </p>
 
       <div className="mt-12 flex justify-center">
-        <div className="relative">
-          <Bell className="h-10 w-10 text-amber-300 absolute -right-6 -top-2 animate-pulse" />
-          <Frog
-            width={160}
-            height={160}
-            indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
-          />
-        </div>
+        <Frog width={160} height={160} indices={step2Indices} />
       </div>
 
       <div className="mt-auto pt-8">
@@ -336,6 +356,7 @@ function Step3({
   onSelect: (p: PlanId) => void;
   onStart: () => void | Promise<void>;
 }) {
+  const step3Indices = React.useMemo(() => randomIndices(), []);
   return (
     <div className="flex h-full flex-col px-6 pb-8 pt-16">
       <h2 className="text-2xl font-black tracking-tight">
@@ -368,11 +389,7 @@ function Step3({
       </div>
 
       <div className="mt-8 flex justify-center">
-        <Frog
-          width={120}
-          height={120}
-          indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
-        />
+        <Frog width={120} height={120} indices={step3Indices} />
       </div>
 
       <div className="mt-auto space-y-2 pt-6 text-center">
@@ -384,6 +401,42 @@ function Step3({
         </PrimaryButton>
       </div>
     </div>
+  );
+}
+
+function FloatingSparkle({
+  delay,
+  left,
+  size,
+  duration,
+  spin,
+}: {
+  delay: number;
+  left: string;
+  size: number;
+  duration: number;
+  spin: number;
+}) {
+  return (
+    <motion.div
+      className="pointer-events-none absolute"
+      style={{ left, bottom: -size }}
+      initial={{ y: 0, opacity: 0, rotate: 0 }}
+      animate={{ y: -280, opacity: [0, 1, 1, 0], rotate: spin }}
+      transition={{
+        duration,
+        delay,
+        repeat: Infinity,
+        ease: 'linear',
+        times: [0, 0.15, 0.8, 1],
+      }}
+    >
+      <Sparkle
+        style={{ width: size, height: size }}
+        className="text-white/80"
+        fill="currentColor"
+      />
+    </motion.div>
   );
 }
 
