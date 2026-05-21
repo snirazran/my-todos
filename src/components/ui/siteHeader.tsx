@@ -589,9 +589,9 @@ function MobileSheet({
           animate={{ x: 0 }}
           exit={{ x: '-100%' }}
           transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-          className="fixed z-[101] inset-0 h-[100dvh] w-full overflow-y-auto bg-slate-100 dark:bg-background"
+          className="fixed z-[101] inset-0 h-[100dvh] w-full overflow-y-auto bg-slate-100 dark:bg-background md:bg-white dark:md:bg-background"
         >
-        <div className="mx-auto w-full md:max-w-xl md:border-x md:border-border/50 md:min-h-full md:bg-slate-100 dark:md:bg-background">
+        <div className="mx-auto w-full md:max-w-xl md:min-h-full md:bg-slate-100 md:border-x md:border-border/60 md:shadow-[0_0_0_6px_rgba(15,23,42,0.10)] dark:md:bg-background">
           {/* Top bar */}
           <div
             className="sticky top-0 z-10 bg-slate-100/80 backdrop-blur-xl dark:bg-background/80"
