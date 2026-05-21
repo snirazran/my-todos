@@ -10,6 +10,7 @@ const UserSchema = new Schema<UserDoc>(
     name: { type: String, required: true },
     frogName: { type: String, default: 'Cookie' },
     frogPronouns: { type: String },
+    birthday: { type: String },
     ageRange: { type: String },
     aboutGender: { type: String },
     usedBefore: { type: String },

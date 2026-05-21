@@ -357,6 +357,8 @@ import { signOut } from 'firebase/auth';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
+import { CommunityModal } from '@/components/ui/CommunityModal';
+import { ProfileModal } from '@/components/ui/ProfileModal';
 
 function RightActions({
   user,
@@ -510,6 +512,8 @@ function MobileMenuButton({
 type UserInfo = {
   name?: string | null;
   frogName?: string | null;
+  frogPronouns?: string | null;
+  birthday?: string | null;
   isPremium?: boolean;
 };
 
@@ -533,8 +537,10 @@ function MobileSheet({
   const [view, setView] = useState<'main' | 'preferences'>('main');
   const [toast, setToast] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [communityOpen, setCommunityOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, requestEnable, loading: notifLoading } = useNotificationStatus();
-  const { data: userInfo } = useSWR<UserInfo>(
+  const { data: userInfo, mutate: refreshUserInfo } = useSWR<UserInfo>(
     showAuth && user ? '/api/user' : null,
     userInfoFetcher,
     { revalidateOnFocus: false },
@@ -629,6 +635,8 @@ function MobileSheet({
                     onClose();
                   }}
                   onInviteFriends={() => setInviteOpen(true)}
+                  onOpenCommunity={() => setCommunityOpen(true)}
+                  onOpenProfile={() => setProfileOpen(true)}
                   onGoAdmin={() => {
                     router.push('/admin');
                     onClose();
@@ -654,6 +662,43 @@ function MobileSheet({
             )}
           </div>
           <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
+          <CommunityModal open={communityOpen} onClose={() => setCommunityOpen(false)} />
+          <ProfileModal
+            open={profileOpen}
+            onClose={() => setProfileOpen(false)}
+            data={{
+              petName: userInfo?.frogName ?? null,
+              petPronouns: userInfo?.frogPronouns ?? null,
+              yourName: userInfo?.name ?? user?.displayName ?? null,
+              birthday: userInfo?.birthday ?? null,
+              isGuest: !user,
+            }}
+            onCreateAccount={() => {
+              setProfileOpen(false);
+              onSignIn?.();
+            }}
+            onSave={async (field, value) => {
+              const fieldMap: Record<string, string> = {
+                petName: 'frogName',
+                petPronouns: 'frogPronouns',
+                yourName: 'name',
+                birthday: 'birthday',
+              };
+              const apiField = fieldMap[field];
+              if (!apiField) return;
+              try {
+                await fetch('/api/user', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ [apiField]: value }),
+                });
+                await refreshUserInfo();
+              } catch (err) {
+                console.error('Failed to save profile field', err);
+              }
+            }}
+            onDeleteData={() => flashSoon('Delete data')}
+          />
         </motion.div>
       )}
     </AnimatePresence>,
@@ -674,6 +719,8 @@ function MainView({
   onOpenPreferences,
   onOpenQuestFocus,
   onInviteFriends,
+  onOpenCommunity,
+  onOpenProfile,
   onGoAdmin,
   onSignOut,
   flashSoon,
@@ -690,6 +737,8 @@ function MainView({
   onOpenPreferences: () => void;
   onOpenQuestFocus: () => void;
   onInviteFriends: () => void;
+  onOpenCommunity: () => void;
+  onOpenProfile: () => void;
   onGoAdmin: () => void;
   onSignOut: () => void;
   flashSoon: (label: string) => void;
@@ -752,7 +801,7 @@ function MainView({
         <MenuRow
           icon={<Users className="w-5 h-5 text-violet-500" />}
           label="Join our frog community"
-          onClick={() => flashSoon('Frog community')}
+          onClick={onOpenCommunity}
         />
       </MenuSection>
 
@@ -773,7 +822,7 @@ function MainView({
         <MenuRow
           icon={<User className="w-5 h-5 text-sky-500" />}
           label="Profile"
-          onClick={() => flashSoon('Profile')}
+          onClick={onOpenProfile}
         />
         <MenuRow
           icon={<SlidersHorizontal className="w-5 h-5 text-emerald-500" />}
