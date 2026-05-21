@@ -356,6 +356,7 @@ import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useIsAdmin } from '@/hooks/useIsAdmin';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
+import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 
 function RightActions({
   user,
@@ -531,6 +532,7 @@ function MobileSheet({
   const router = useRouter();
   const [view, setView] = useState<'main' | 'preferences'>('main');
   const [toast, setToast] = useState<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
   const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, requestEnable, loading: notifLoading } = useNotificationStatus();
   const { data: userInfo } = useSWR<UserInfo>(
     showAuth && user ? '/api/user' : null,
@@ -622,6 +624,11 @@ function MobileSheet({
                   notifLoading={notifLoading}
                   onEnableNotifs={handleEnableNotifs}
                   onOpenPreferences={() => setView('preferences')}
+                  onOpenQuestFocus={() => {
+                    onOpenQuestOnboarding();
+                    onClose();
+                  }}
+                  onInviteFriends={() => setInviteOpen(true)}
                   onGoAdmin={() => {
                     router.push('/admin');
                     onClose();
@@ -646,6 +653,7 @@ function MobileSheet({
               />
             )}
           </div>
+          <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
         </motion.div>
       )}
     </AnimatePresence>,
@@ -664,6 +672,8 @@ function MainView({
   notifLoading,
   onEnableNotifs,
   onOpenPreferences,
+  onOpenQuestFocus,
+  onInviteFriends,
   onGoAdmin,
   onSignOut,
   flashSoon,
@@ -678,6 +688,8 @@ function MainView({
   notifLoading: boolean;
   onEnableNotifs: () => void;
   onOpenPreferences: () => void;
+  onOpenQuestFocus: () => void;
+  onInviteFriends: () => void;
   onGoAdmin: () => void;
   onSignOut: () => void;
   flashSoon: (label: string) => void;
@@ -705,6 +717,15 @@ function MainView({
         />
       )}
 
+      {/* Quest Focus promo */}
+      <PromoCard
+        icon={<Compass className="w-7 h-7 text-emerald-300" strokeWidth={2.5} />}
+        title="Quest Focus"
+        subtitle="Pick your focus areas for tailored quests."
+        actionLabel="Set up"
+        onAction={onOpenQuestFocus}
+      />
+
       {/* FrogTask Plus promo */}
       {!isPremium && (
         <PromoCard
@@ -726,7 +747,7 @@ function MainView({
         <MenuRow
           icon={<Mail className="w-5 h-5 text-rose-500" />}
           label="Invite friends"
-          onClick={() => flashSoon('Invite friends')}
+          onClick={onInviteFriends}
         />
         <MenuRow
           icon={<Users className="w-5 h-5 text-violet-500" />}
@@ -907,7 +928,12 @@ function PromoCard({
   disabled?: boolean;
 }) {
   return (
-    <div className="rounded-2xl bg-violet-500 dark:bg-violet-600 text-white px-4 py-4 flex items-center gap-3 shadow-sm">
+    <button
+      type="button"
+      onClick={onAction}
+      disabled={disabled}
+      className="w-full text-left rounded-2xl bg-violet-500 dark:bg-violet-600 text-white px-4 py-4 flex items-center gap-3 shadow-sm transition-transform active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
+    >
       <div className="flex items-center justify-center w-11 h-11 shrink-0">{icon}</div>
       <div className="flex-1 min-w-0">
         <p className="text-base font-black tracking-tight flex items-center gap-2">
@@ -920,14 +946,13 @@ function PromoCard({
         </p>
         <p className="text-xs font-medium text-white/90">{subtitle}</p>
       </div>
-      <button
-        onClick={onAction}
-        disabled={disabled}
-        className="bg-white text-violet-700 font-black text-xs rounded-xl px-3 py-2 shadow-sm shrink-0 active:scale-95 transition-transform disabled:opacity-70"
+      <span
+        aria-hidden
+        className="bg-white text-violet-700 font-black text-xs rounded-xl px-3 py-2 shadow-sm shrink-0"
       >
         {actionLabel}
-      </button>
-    </div>
+      </span>
+    </button>
   );
 }
 

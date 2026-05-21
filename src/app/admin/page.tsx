@@ -26,6 +26,7 @@ import {
   Upload,
   Bug,
   RefreshCcw,
+  UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -316,6 +317,13 @@ function AdminPageContent() {
               accent="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
               title="Quest Manager"
               description="Macro-categories, tag mappings, daily and category quests."
+            />
+            <ManagerLinkCard
+              href="/admin/invites"
+              icon={<UserPlus className="w-5 h-5" />}
+              accent="bg-rose-500/10 text-rose-600 dark:text-rose-400"
+              title="Invite Manager"
+              description="Reward tiers per friend invited and the gifts users can send."
             />
             <ManagerActionCard
               icon={<Paintbrush className="w-5 h-5" />}

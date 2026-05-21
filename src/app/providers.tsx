@@ -7,6 +7,7 @@ import { NotificationProvider } from '@/components/providers/NotificationProvide
 import { PushNotificationInit } from '@/components/providers/PushNotificationInit';
 import { GlobalTimer } from '@/components/providers/GlobalTimer';
 import { GlobalCalendarSync } from '@/components/ui/GoogleCalendarSync';
+import { ReferralClaimer } from '@/components/providers/ReferralClaimer';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -21,6 +22,7 @@ export default function Providers({ children }: { children: ReactNode }) {
           <GlobalTimer />
           <GlobalCalendarSync />
           <PushNotificationInit />
+          <ReferralClaimer />
           {children}
         </NotificationProvider>
       </SWRConfig>
