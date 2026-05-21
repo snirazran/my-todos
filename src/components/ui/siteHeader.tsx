@@ -23,6 +23,7 @@ import { clearAuthTokenCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
 import GoogleCalendarSync from '@/components/ui/GoogleCalendarSync';
 import { SkinRotationRow } from '@/components/ui/SkinRotation';
+import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import WeeklyWrapped from '@/components/ui/WeeklyWrapped';
@@ -538,6 +539,7 @@ function MobileSheet({
   const [view, setView] = useState<'main' | 'preferences' | 'community' | 'profile'>('main');
   const [toast, setToast] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
   const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, requestEnable, loading: notifLoading } = useNotificationStatus();
   const { data: userInfo, mutate: refreshUserInfo } = useSWR<UserInfo>(
     showAuth && user ? '/api/user' : null,
@@ -643,6 +645,7 @@ function MobileSheet({
                   onInviteFriends={() => setInviteOpen(true)}
                   onOpenCommunity={() => setView('community')}
                   onOpenProfile={() => setView('profile')}
+                  onOpenPlus={() => setPlusOpen(true)}
                   onGoAdmin={() => {
                     router.push('/admin');
                     onClose();
@@ -716,6 +719,7 @@ function MobileSheet({
           </div>
           </div>
           <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
+          <PlusUpgradeModal open={plusOpen} onClose={() => setPlusOpen(false)} />
         </motion.div>
       )}
     </AnimatePresence>,
@@ -738,6 +742,7 @@ function MainView({
   onInviteFriends,
   onOpenCommunity,
   onOpenProfile,
+  onOpenPlus,
   onGoAdmin,
   onSignOut,
   flashSoon,
@@ -756,6 +761,7 @@ function MainView({
   onInviteFriends: () => void;
   onOpenCommunity: () => void;
   onOpenProfile: () => void;
+  onOpenPlus: () => void;
   onGoAdmin: () => void;
   onSignOut: () => void;
   flashSoon: (label: string) => void;
@@ -804,7 +810,7 @@ function MainView({
           titleBadge="PLUS"
           subtitle="Customize the app to your needs"
           actionLabel="Try 7 days free"
-          onAction={() => flashSoon('FrogTask Plus')}
+          onAction={onOpenPlus}
         />
       )}
 
@@ -851,16 +857,9 @@ function MainView({
       {/* Subscriptions */}
       <MenuSection title="Subscriptions">
         <MenuRow
-          icon={<CreditCard className="w-5 h-5 text-violet-500" />}
-          label="FrogTask Plus — Monthly"
-          trailing={<span className="text-[11px] font-bold text-muted-foreground">$4.99</span>}
-          onClick={() => flashSoon('Monthly subscription')}
-        />
-        <MenuRow
-          icon={<Sparkles className="w-5 h-5 text-amber-500" />}
-          label="FrogTask Plus — Yearly"
-          trailing={<span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">Save 50%</span>}
-          onClick={() => flashSoon('Yearly subscription')}
+          icon={<Sparkles className="w-5 h-5 text-violet-500" />}
+          label="FrogTask Plus"
+          onClick={onOpenPlus}
         />
       </MenuSection>
 
