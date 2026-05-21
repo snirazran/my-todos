@@ -139,10 +139,10 @@ export function PlusUpgradeModal({
 function StepShell({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
-      initial={{ opacity: 0, x: 24 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: -24 }}
-      transition={{ duration: 0.25, ease: 'easeOut' }}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.18, ease: 'easeOut' }}
       className="relative flex min-h-full flex-1 flex-col"
     >
       {children}
@@ -344,7 +344,7 @@ function Step2({
       </p>
 
       <div className="mt-12 flex justify-center">
-        <Frog width={160} height={160} indices={step2Indices} />
+        <Frog width={240} height={240} indices={step2Indices} />
       </div>
 
       <div className="mt-auto pt-8">
@@ -396,7 +396,7 @@ function Step3({
       </div>
 
       <div className="mt-8 flex justify-center">
-        <Frog width={120} height={120} indices={step3Indices} />
+        <Frog width={200} height={200} indices={step3Indices} />
       </div>
 
       <div className="mt-auto space-y-2 pt-6 text-center">
