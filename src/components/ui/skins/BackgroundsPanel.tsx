@@ -61,22 +61,19 @@ export function BackgroundsPanel({
       onNotify?.({ msg: 'Sign in to use backgrounds!', type: 'error' });
       return;
     }
-    const isEquipped = equipped === item.id;
+    if (equipped === item.id) return;
     setBusyId(item.id);
     try {
       const res = await fetch('/api/backgrounds/equip', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: isEquipped ? null : item.id }),
+        body: JSON.stringify({ id: item.id }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || 'Failed to equip');
       }
-      onNotify?.({
-        msg: isEquipped ? `Unequipped ${item.name}` : `Equipped ${item.name}`,
-        type: 'success',
-      });
+      onNotify?.({ msg: `Equipped ${item.name}`, type: 'success' });
       refresh();
     } catch (err) {
       onNotify?.({
