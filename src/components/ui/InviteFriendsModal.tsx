@@ -155,10 +155,7 @@ export function InviteFriendsModal({
     <AnimatePresence>
       {open && (
         <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+          <div
             onClick={closeInvite}
             className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm"
           />
@@ -167,9 +164,9 @@ export function InviteFriendsModal({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-            className="fixed inset-0 z-[201] overflow-hidden bg-black/20 shadow-2xl"
+            className="pointer-events-none fixed inset-0 z-[201] flex md:items-center md:justify-center md:p-6"
           >
-            <div className="mx-auto flex h-full w-full flex-col overflow-hidden bg-background md:my-6 md:h-[calc(100dvh-3rem)] md:w-[min(100vw-3rem,56rem)] md:rounded-[32px]">
+            <div className="pointer-events-auto mx-auto flex h-full w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[calc(100dvh-3rem)] md:w-[min(100vw-3rem,32rem)] md:rounded-[32px] md:shadow-2xl">
               {step === 'overview' && (
                 <OverviewStep
                   config={config}
@@ -218,7 +215,7 @@ function OverviewStep({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="relative min-h-[44dvh] overflow-hidden bg-[#4f9149] px-6 pb-8 pt-6 text-center text-white sm:min-h-[48dvh]">
+      <div className="relative flex min-h-[44dvh] flex-col justify-end overflow-hidden bg-[#4f9149] px-6 pb-8 pt-6 text-center text-white sm:min-h-[48dvh] md:pb-3">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/invitefrog.png"
@@ -234,7 +231,7 @@ function OverviewStep({
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_48%,rgba(0,0,0,0.22)_72%,rgba(0,0,0,0.62)_100%)]" />
         <div className="absolute inset-x-0 bottom-0 h-[50%] bg-gradient-to-b from-transparent via-black/30 to-black/76" />
         <CloseButton onClose={onClose} className="left-4 top-4 text-white" />
-        <div className="relative z-10 mx-auto flex h-full min-h-[32dvh] max-w-xl flex-col items-center justify-end">
+        <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center">
           <h2 className="text-3xl font-black tracking-tight [text-shadow:0_2px_0_rgba(25,83,43,0.75),0_4px_14px_rgba(0,0,0,0.32)]">
             {config.headline}
           </h2>

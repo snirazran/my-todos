@@ -846,11 +846,6 @@ function MainView({
           label="Preferences"
           onClick={onOpenPreferences}
         />
-        <MenuRow
-          icon={<Pause className="w-5 h-5 text-orange-500" />}
-          label="Pause mode"
-          onClick={() => flashSoon('Pause mode')}
-        />
       </MenuSection>
 
       {/* Subscriptions */}
