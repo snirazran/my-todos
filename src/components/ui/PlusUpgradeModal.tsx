@@ -85,7 +85,7 @@ export function PlusUpgradeModal({
             transition={{ type: 'spring', damping: 30, stiffness: 280 }}
             className="pointer-events-none fixed inset-0 z-[301] flex md:items-center md:justify-center md:p-6"
           >
-            <div className="pointer-events-auto relative mx-auto flex h-full w-full flex-col overflow-hidden bg-[#6c6fce] text-white md:h-auto md:max-h-[calc(100dvh-3rem)] md:w-[min(100vw-3rem,28rem)] md:rounded-[32px] md:shadow-2xl">
+            <div className="pointer-events-auto relative mx-auto flex h-full w-full flex-col overflow-y-auto bg-[#6c6fce] text-white md:h-[min(720px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,28rem)] md:rounded-[32px] md:shadow-2xl">
               <button
                 type="button"
                 onClick={onClose}
@@ -143,7 +143,7 @@ function StepShell({ children }: { children: React.ReactNode }) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -24 }}
       transition={{ duration: 0.25, ease: 'easeOut' }}
-      className="relative flex h-full min-h-0 flex-1 flex-col"
+      className="relative flex min-h-full flex-1 flex-col"
     >
       {children}
     </motion.div>
@@ -178,17 +178,23 @@ function Step0({
   onContinue: () => void;
   onMaybeLater: () => void;
 }) {
-  const indices = React.useMemo(() => randomIndices(), []);
   return (
-    <div className="flex h-full flex-col px-6 pb-8 pt-16">
-      <div className="mx-auto mt-2 flex w-full max-w-md justify-center">
-        <Frog width={170} height={170} indices={indices} />
+    <div className="flex min-h-full flex-col pb-8">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <div className="relative -mt-px h-[40vh] min-h-[260px] w-full overflow-hidden md:h-56 md:min-h-0">
+        <img
+          src="/premium-cover.png"
+          alt=""
+          className="h-full w-full object-cover object-top"
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-b from-transparent to-[#6c6fce]" />
       </div>
-      <h2 className="mt-6 text-center text-2xl font-black tracking-tight">
+      <div className="flex flex-1 flex-col px-6 pb-6 md:pb-5">
+      <h2 className="mt-2 text-center text-xl font-black tracking-tight md:text-2xl">
         People with Plus are <span className="text-amber-300">2x better</span> at sticking
         with their goals!
       </h2>
-      <div className="mt-7 space-y-4 rounded-2xl bg-white/10 p-5">
+      <div className="mt-5 space-y-3 rounded-2xl bg-white/10 p-4 md:mt-6">
         <FeatureRow
           icon={<Unlock className="h-5 w-5 text-amber-300" />}
           title="Improve in all areas"
@@ -206,7 +212,7 @@ function Step0({
         />
       </div>
 
-      <div className="mt-auto space-y-3 pt-8">
+      <div className="mt-auto space-y-2 pt-6 md:pt-5">
         <PrimaryButton onClick={onContinue}>Try for $0.00</PrimaryButton>
         <button
           type="button"
@@ -215,6 +221,7 @@ function Step0({
         >
           Maybe later
         </button>
+      </div>
       </div>
     </div>
   );
@@ -246,8 +253,8 @@ const COMPARISON_ROWS: { label: string; free: boolean }[] = [
   { label: 'Unlimited quests', free: false },
   { label: 'Unlimited tags', free: false },
   { label: 'Double rewards', free: false },
-  { label: 'Plus-only skins', free: false },
-  { label: 'Plus-only backgrounds', free: false },
+  { label: 'Plus only skins', free: false },
+  { label: 'Plus only backgrounds', free: false },
 ];
 
 function randomIndices() {
@@ -262,7 +269,7 @@ function randomIndices() {
 
 function Step1({ onContinue }: { onContinue: () => void }) {
   return (
-    <div className="flex h-full flex-col px-6 pb-8 pt-16">
+    <div className="flex min-h-full flex-col px-6 pb-6 pt-16 md:pb-5 md:pt-12">
       <h2 className="text-center text-2xl font-black tracking-tight">Have more fun with Plus!</h2>
 
       <div className="relative mt-8">
@@ -327,7 +334,7 @@ function Step2({
 }) {
   const step2Indices = React.useMemo(() => randomIndices(), []);
   return (
-    <div className="flex h-full flex-col px-6 pb-8 pt-16">
+    <div className="flex min-h-full flex-col px-6 pb-6 pt-16 md:pb-5 md:pt-12">
       <h2 className="text-center text-2xl font-black tracking-tight">
         We&apos;ll remind you <span className="text-amber-300">2 days</span> before your
         trial ends
@@ -358,7 +365,7 @@ function Step3({
 }) {
   const step3Indices = React.useMemo(() => randomIndices(), []);
   return (
-    <div className="flex h-full flex-col px-6 pb-8 pt-16">
+    <div className="flex min-h-full flex-col px-6 pb-6 pt-16 md:pb-5 md:pt-12">
       <h2 className="text-2xl font-black tracking-tight">
         Choose a plan for after your free trial
       </h2>
