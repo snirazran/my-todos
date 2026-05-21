@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import path from 'path';
 import { readFile, stat } from 'fs/promises';
 import { existsSync } from 'fs';
-import { requireUserId } from '@/lib/auth';
+import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import {
   getManagedRiveAsset,
   MANAGED_RIVE_ASSETS,

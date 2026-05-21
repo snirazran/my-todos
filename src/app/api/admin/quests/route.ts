@@ -1,6 +1,6 @@
 import { v4 as uuid } from 'uuid';
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUserId } from '@/lib/auth';
+import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import QuestTemplateModel from '@/lib/models/QuestTemplate';
 import QuestCategoryModel from '@/lib/models/QuestCategory';

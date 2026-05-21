@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUserId } from '@/lib/auth';
+import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import CatalogItemModel from '@/lib/models/CatalogItem';
 import { CATALOG } from '@/lib/skins/catalog';

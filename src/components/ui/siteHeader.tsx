@@ -344,6 +344,7 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
+import { useIsAdmin } from '@/hooks/useIsAdmin';
 
 function RightActions({
   user,
@@ -364,6 +365,7 @@ function RightActions({
   const menuRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const { openQuestOnboarding } = useUIStore();
+  const { isAdmin } = useIsAdmin();
 
   // Close on click outside (desktop only — mobile has its own close via MobileSheet)
   useEffect(() => {
@@ -555,18 +557,20 @@ function RightActions({
                   <Compass className="h-[1.2rem] w-[1.2rem] text-emerald-500" />
                 </button>
 
-                <button
-                  onClick={() => {
-                    router.push('/admin');
-                    setIsOpen(false);
-                  }}
-                  className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
-                >
-                  <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
-                    Admin Settings
-                  </span>
-                  <Settings className="h-[1.2rem] w-[1.2rem] text-amber-500" />
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      router.push('/admin');
+                      setIsOpen(false);
+                    }}
+                    className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg bg-muted/50 hover:bg-muted transition-colors group"
+                  >
+                    <span className="text-[10px] uppercase font-black text-muted-foreground tracking-wider group-hover:text-foreground transition-colors">
+                      Admin Settings
+                    </span>
+                    <Settings className="h-[1.2rem] w-[1.2rem] text-amber-500" />
+                  </button>
+                )}
 
                 <GoogleCalendarSync />
 
@@ -598,6 +602,7 @@ function RightActions({
         onSignIn={onSignIn}
         onOpenQuestOnboarding={handleOpenQuestOnboarding}
         pathname={pathname}
+        isAdmin={isAdmin}
       />
     </div>
   );
@@ -631,6 +636,7 @@ function MobileSheet({
   setTheme,
   onOpenQuestOnboarding,
   pathname,
+  isAdmin,
 }: any) {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
@@ -740,18 +746,20 @@ function MobileSheet({
                   </>
                 )}
 
-                <button
-                  onClick={() => {
-                    router.push('/admin');
-                    onClose();
-                  }}
-                  className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
-                >
-                  <span className="font-bold text-sm group-hover:text-foreground transition-colors">
-                    Admin Settings
-                  </span>
-                  <Settings className="h-5 w-5 text-amber-500" />
-                </button>
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      router.push('/admin');
+                      onClose();
+                    }}
+                    className="w-full items-center justify-between flex p-4 rounded-xl border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors group"
+                  >
+                    <span className="font-bold text-sm group-hover:text-foreground transition-colors">
+                      Admin Settings
+                    </span>
+                    <Settings className="h-5 w-5 text-amber-500" />
+                  </button>
+                )}
 
                 {showAuth && (
                   <GoogleCalendarSync />

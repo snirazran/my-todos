@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireUserId } from '@/lib/auth';
+import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { getFullCatalog } from '@/lib/skins/getCatalog';

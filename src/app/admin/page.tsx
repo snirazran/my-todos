@@ -34,6 +34,7 @@ import { useUIStore } from '@/lib/uiStore';
 import { AdminCosmeticsPopup } from '@/components/ui/AdminCosmeticsPopup';
 import { AdminGiftManagerPopup } from '@/components/ui/AdminGiftManagerPopup';
 import { AdminRiveManagerPopup } from '@/components/ui/AdminRiveManagerPopup';
+import { AdminGuard } from '@/components/auth/AdminGuard';
 
 type Template = {
   id: string;
@@ -42,6 +43,14 @@ type Template = {
 };
 
 export default function AdminPage() {
+  return (
+    <AdminGuard>
+      <AdminPageContent />
+    </AdminGuard>
+  );
+}
+
+function AdminPageContent() {
   const router = useRouter();
   const { isDebugMode, setIsDebugMode } = useUIStore();
 

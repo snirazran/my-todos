@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/auth';
+import { requireAdmin as requireAuth } from '@/lib/adminAuth';
 import dbConnect from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 
