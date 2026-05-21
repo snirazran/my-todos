@@ -22,7 +22,14 @@ import { useUIStore } from '@/lib/uiStore';
 import { clearAuthTokenCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
 import GoogleCalendarSync from '@/components/ui/GoogleCalendarSync';
-import { SkinRotationRow } from '@/components/ui/SkinRotation';
+import {
+  SkinRotationRow,
+  SkinRotationDialog,
+  getRotationInterval,
+  setRotationInterval,
+  labelForInterval,
+  type RotationInterval,
+} from '@/components/ui/SkinRotation';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import useSWR, { mutate as swrMutate } from 'swr';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
@@ -349,7 +356,9 @@ import {
   CreditCard,
   HelpCircle,
   AlertTriangle,
+  CalendarRange,
   ChevronLeft,
+  Shuffle,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { useState, useRef, useEffect } from 'react';
@@ -580,13 +589,12 @@ function MobileSheet({
           animate={{ x: 0 }}
           exit={{ x: '-100%' }}
           transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-          className="fixed z-[101] inset-0 bg-background h-[100dvh] w-full overflow-y-auto"
-          style={{ backgroundColor: 'hsl(var(--background))' }}
+          className="fixed z-[101] inset-0 h-[100dvh] w-full overflow-y-auto bg-slate-100 dark:bg-background"
         >
-        <div className="mx-auto w-full md:max-w-xl md:border-x md:border-border/50 md:min-h-full md:bg-background">
+        <div className="mx-auto w-full md:max-w-xl md:border-x md:border-border/50 md:min-h-full md:bg-slate-100 dark:md:bg-background">
           {/* Top bar */}
           <div
-            className="sticky top-0 z-10 bg-background/80 backdrop-blur-xl"
+            className="sticky top-0 z-10 bg-slate-100/80 backdrop-blur-xl dark:bg-background/80"
             style={{ paddingTop: 'env(safe-area-inset-top)' }}
           >
             <div className="px-4 py-3 flex items-center justify-between">
@@ -698,6 +706,8 @@ function MobileSheet({
                     onClose();
                   }}
                   flashSoon={flashSoon}
+                  theme={theme}
+                  setTheme={setTheme}
                 />
               ) : (
                 <SignedOutView onSignIn={onSignIn} onClose={onClose} />
@@ -791,6 +801,8 @@ function MainView({
   onGoAdmin,
   onSignOut,
   flashSoon,
+  theme,
+  setTheme,
 }: {
   displayName: string;
   frogName: string;
@@ -798,6 +810,8 @@ function MainView({
   isAdmin: boolean;
   canEnableNotifs: boolean;
   notifsEnabled: boolean;
+  theme?: string;
+  setTheme: (t: string) => void;
   isNative: boolean;
   notifLoading: boolean;
   onEnableNotifs: () => void;
@@ -836,13 +850,12 @@ function MainView({
         />
       )}
 
-      {/* Quest Focus promo */}
-      <PromoCard
-        icon={<Compass className="w-7 h-7 text-emerald-300" strokeWidth={2.5} />}
-        title="Quest Focus"
-        subtitle="Pick your focus areas for tailored quests."
-        actionLabel="Set up"
-        onAction={onOpenQuestFocus}
+      {/* Quick action tiles */}
+      <QuickTilesGrid
+        theme={theme}
+        setTheme={setTheme}
+        onOpenQuestFocus={onOpenQuestFocus}
+        onOpenPreferences={onOpenPreferences}
       />
 
       {/* FrogTask Plus promo */}
@@ -1057,6 +1070,103 @@ function PromoCard({
         {actionLabel}
       </span>
     </button>
+  );
+}
+
+function QuickTile({
+  icon,
+  title,
+  subtitle,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle?: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-24 w-full items-center gap-3 rounded-2xl border border-border/50 bg-card px-4 py-3 text-left transition-all active:scale-[0.98] hover:bg-accent/50"
+    >
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center">{icon}</div>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-black leading-tight">{title}</p>
+        {subtitle && (
+          <p className="mt-0.5 truncate text-[11px] font-bold text-muted-foreground">
+            {subtitle}
+          </p>
+        )}
+      </div>
+    </button>
+  );
+}
+
+function QuickTilesGrid({
+  theme,
+  setTheme,
+  onOpenQuestFocus,
+  onOpenPreferences,
+}: {
+  theme?: string;
+  setTheme: (t: string) => void;
+  onOpenQuestFocus: () => void;
+  onOpenPreferences: () => void;
+}) {
+  const [rotation, setRotation] = useState<RotationInterval>('disabled');
+  const [rotationOpen, setRotationOpen] = useState(false);
+
+  useEffect(() => {
+    setRotation(getRotationInterval());
+    const handler = () => setRotation(getRotationInterval());
+    window.addEventListener('skin-rotation-change', handler);
+    return () => window.removeEventListener('skin-rotation-change', handler);
+  }, []);
+
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <QuickTile
+        icon={<Compass className="h-7 w-7 text-emerald-500" />}
+        title="Focus areas"
+        subtitle="Tailor your quests"
+        onClick={onOpenQuestFocus}
+      />
+      <QuickTile
+        icon={<Shuffle className="h-7 w-7 text-fuchsia-500" />}
+        title="Skin rotation"
+        subtitle={labelForInterval(rotation)}
+        onClick={() => setRotationOpen(true)}
+      />
+      <QuickTile
+        icon={<CalendarRange className="h-7 w-7 text-sky-500" />}
+        title="Google Calendar"
+        subtitle="Sync your events"
+        onClick={onOpenPreferences}
+      />
+      <QuickTile
+        icon={
+          theme === 'dark' ? (
+            <Moon className="h-7 w-7 text-violet-400" />
+          ) : (
+            <Sun className="h-7 w-7 text-amber-500" />
+          )
+        }
+        title="Color mode"
+        subtitle={theme === 'dark' ? 'Dark' : 'Light'}
+        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+      />
+      <SkinRotationDialog
+        open={rotationOpen}
+        currentValue={rotation}
+        onClose={() => setRotationOpen(false)}
+        onSelect={(v) => {
+          setRotationInterval(v);
+          setRotation(v);
+          setRotationOpen(false);
+        }}
+      />
+    </div>
   );
 }
 

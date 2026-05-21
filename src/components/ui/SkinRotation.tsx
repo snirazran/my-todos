@@ -34,14 +34,14 @@ export function getRotationInterval(): RotationInterval {
   return 'disabled';
 }
 
-function setRotationInterval(value: RotationInterval) {
+export function setRotationInterval(value: RotationInterval) {
   if (typeof window === 'undefined') return;
   if (value === 'disabled') window.localStorage.removeItem(STORAGE_KEY);
   else window.localStorage.setItem(STORAGE_KEY, value);
   window.dispatchEvent(new Event('skin-rotation-change'));
 }
 
-function labelForInterval(v: RotationInterval): string {
+export function labelForInterval(v: RotationInterval): string {
   return OPTIONS.find((o) => o.value === v)?.label ?? 'Disabled';
 }
 
@@ -85,7 +85,7 @@ export function SkinRotationRow() {
   );
 }
 
-function SkinRotationDialog({
+export function SkinRotationDialog({
   open,
   currentValue,
   onClose,
