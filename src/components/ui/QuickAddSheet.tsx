@@ -279,7 +279,7 @@ export default function QuickAddSheet({
                 exit={{ opacity: 0 }}
                 onClick={() => onOpenChange(false)}
                 transition={{ duration: 0.16, ease: 'easeOut' }}
-                className="fixed inset-0 z-[1399] bg-[linear-gradient(to_bottom,transparent_0%,transparent_18%,hsl(var(--primary)/0.18)_30%,hsl(var(--primary)/0.45)_42%,hsl(var(--primary)/0.75)_54%,hsl(var(--primary))_68%)] will-change-opacity"
+                className="fixed inset-0 z-[1399] bg-[linear-gradient(to_bottom,transparent_0%,transparent_8%,rgba(255,255,255,0.4)_18%,rgba(255,255,255,0.75)_28%,rgba(255,255,255,0.95)_38%,#ffffff_48%)] will-change-opacity"
               />
 
               <motion.div
@@ -308,7 +308,7 @@ export default function QuickAddSheet({
                     </button>
                   </div>
 
-                  <div className="flex max-h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover px-4 pb-2 pt-4 ring-1 ring-border/80 sm:max-h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]">
+                  <div className="flex max-h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover px-4 pb-2 pt-4 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:max-h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]">
                     <div dir="ltr" className="w-full pt-1">
                       <div className="mb-1 flex shrink-0 items-center gap-2">
                         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
@@ -326,7 +326,7 @@ export default function QuickAddSheet({
                             spellCheck={false}
                             autoComplete="off"
                             maxLength={45}
-                            className="h-12 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-lg font-medium text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 text-left"
+                            className="h-12 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-lg font-medium text-foreground ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 text-left"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
@@ -483,7 +483,7 @@ export default function QuickAddSheet({
                       duration: 0.28,
                       ease: [0.32, 0.72, 0, 1],
                     }}
-                    className="pointer-events-none relative min-h-0 overflow-hidden rounded-[28px]"
+                    className="pointer-events-none relative min-h-0 rounded-[28px] [clip-path:inset(0_-40px_-40px_-40px)]"
                   >
                     <AnimatePresence initial={false}>
                       {hasTaskText && (
@@ -504,14 +504,13 @@ export default function QuickAddSheet({
                             disabled={!hasTaskText || isSubmitting}
                             className={[
                               'group relative h-12 w-full rounded-[28px] text-[15px] font-black overflow-hidden transition-all',
-                              'bg-popover text-primary',
-                              'shadow-[0_5px_0_0_rgba(63,98,18,0.45)] ring-1 ring-primary/20',
-                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/35',
-                              '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_6px_0_0_rgba(63,98,18,0.45)] active:translate-y-1 active:shadow-none',
+                              'bg-[#4f9149] text-white',
+                              'shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40',
+                              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40',
+                              '[@media(hover:hover)]:hover:-translate-y-0.5 [@media(hover:hover)]:hover:shadow-[0_5px_0_0_#34631f] active:translate-y-1 active:shadow-none',
                               'disabled:opacity-50 disabled:grayscale disabled:pointer-events-none',
                             ].join(' ')}
                           >
-                            <span className="pointer-events-none absolute inset-0 rounded-[28px] bg-gradient-to-b from-white/35 to-transparent" />
                             <span className="relative z-10 flex items-center justify-center gap-2">
                               {isSubmitting ? (
                                 'Adding...'
@@ -540,7 +539,7 @@ export default function QuickAddSheet({
                           ease: [0.32, 0.72, 0, 1],
                         }}
                         className={[
-                          'absolute inset-0 h-full min-h-0 overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4',
+                          'absolute inset-0 h-full min-h-0 overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]',
                           showSuggestions ? 'pointer-events-auto' : 'pointer-events-none',
                         ].join(' ')}
                       >
