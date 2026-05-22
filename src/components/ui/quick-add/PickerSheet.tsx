@@ -211,20 +211,26 @@ export function PickerSheet(props: Props) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
             onClick={() => setActivePicker(null)}
-            className="fixed inset-0 z-[1500] bg-black/35"
+            className="fixed inset-0 z-[1500] bg-black/65"
           />
         )}
       </AnimatePresence>
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1501] flex justify-center sm:bottom-6">
+      <div
+        className={`pointer-events-none fixed inset-x-0 z-[1501] flex justify-center ${
+          displayPicker === 'date'
+            ? 'bottom-[45vh] sm:bottom-[50vh]'
+            : 'bottom-[35vh] sm:bottom-[38vh]'
+        }`}
+      >
       <AnimatePresence>
         {activePicker && displayPicker && (
           <motion.div
             key="picker-sheet"
-            initial={{ y: '120%' }}
+            initial={{ y: '150vh' }}
             animate={{ y: 0 }}
-            exit={{ y: '120%' }}
+            exit={{ y: '150vh' }}
             transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
-            className="pointer-events-auto min-h-[42dvh] w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:min-h-[360px] sm:max-w-[560px] sm:rounded-[28px] sm:pb-8 sm:shadow-2xl"
+            className="pointer-events-auto mx-4 w-full max-w-[560px] rounded-[28px] bg-background px-5 pb-6 pt-6 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70 sm:pb-8"
           >
         <div className="mx-auto w-full">
           <div className="relative mb-7 flex h-9 items-center justify-center">
@@ -565,16 +571,16 @@ function CalendarOverlay({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-[1502] bg-black/10"
+        className="fixed inset-0 z-[1502] bg-black/55"
       />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1503] flex justify-center sm:bottom-6">
+      <div className="pointer-events-none fixed inset-x-0 bottom-[35vh] z-[1503] flex justify-center sm:bottom-[38vh]">
       <motion.div
         dir="ltr"
-        initial={{ y: '120%' }}
+        initial={{ y: '150vh' }}
         animate={{ y: 0 }}
-        exit={{ y: '120%' }}
+        exit={{ y: '150vh' }}
         transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.28 }}
-        className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-5 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] ring-1 ring-border/70 sm:max-w-[520px] sm:rounded-[28px] sm:pb-6 sm:shadow-2xl"
+        className="pointer-events-auto mx-4 w-full max-w-[520px] rounded-[28px] bg-background px-5 pb-6 pt-5 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70"
       >
         <div className="mx-auto w-full">
           <div className="mb-4 flex items-center justify-between">
@@ -675,16 +681,16 @@ function ReminderOverlay({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-[1504] bg-black/10"
+        className="fixed inset-0 z-[1504] bg-black/55"
       />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1505] flex justify-center sm:bottom-6">
+      <div className="pointer-events-none fixed inset-x-0 bottom-[35vh] z-[1505] flex justify-center sm:bottom-[38vh]">
       <motion.div
         dir="ltr"
-        initial={{ y: '120%' }}
+        initial={{ y: '150vh' }}
         animate={{ y: 0 }}
-        exit={{ y: '120%' }}
+        exit={{ y: '150vh' }}
         transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.28 }}
-        className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-5 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] ring-1 ring-border/70 sm:max-w-[440px] sm:rounded-[28px] sm:pb-6 sm:shadow-2xl"
+        className="pointer-events-auto mx-4 w-full max-w-[440px] rounded-[28px] bg-background px-5 pb-6 pt-5 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70"
       >
         <div className="mx-auto w-full">
           <div className="relative mb-5 flex h-8 items-center justify-center">

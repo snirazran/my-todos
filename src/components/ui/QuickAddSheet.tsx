@@ -171,8 +171,8 @@ export default function QuickAddSheet({
   );
   const showSuggestions = suggestionsReady && !hasTaskText;
   const suggestionsPanelHeight = Math.min(
-    Math.max(availableSheetHeight - 420, 180),
-    420,
+    Math.max(availableSheetHeight - 320, 280),
+    560,
   );
 
   useEffect(() => {
@@ -279,7 +279,7 @@ export default function QuickAddSheet({
                 exit={{ opacity: 0 }}
                 onClick={() => onOpenChange(false)}
                 transition={{ duration: 0.16, ease: 'easeOut' }}
-                className="fixed inset-0 z-[1399] bg-[linear-gradient(to_bottom,transparent_0%,transparent_8%,rgba(255,255,255,0.4)_18%,rgba(255,255,255,0.75)_28%,rgba(255,255,255,0.95)_38%,#ffffff_48%)] will-change-opacity"
+                className="fixed inset-0 z-[1399] bg-black/80 will-change-opacity"
               />
 
               <motion.div
@@ -294,7 +294,7 @@ export default function QuickAddSheet({
                 style={{
                   contain: 'layout paint style',
                 }}
-                className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 py-2 pointer-events-none will-change-transform sm:px-6 sm:py-5"
+                className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 pb-[2vh] pt-2 pointer-events-none will-change-transform sm:px-6 sm:pb-[3vh]"
               >
                 <div className="pointer-events-auto mx-auto flex w-full max-w-[620px] flex-col pb-[env(safe-area-inset-bottom)]">
                   <div className="mb-2 flex shrink-0 justify-end px-3">
@@ -321,12 +321,12 @@ export default function QuickAddSheet({
                             onChange={(e) => setText(e.target.value)}
                             onFocus={() => setInputFocused(true)}
                             onBlur={() => setInputFocused(false)}
-                            placeholder="New task?"
+                            placeholder="Enter a new task..."
                             disabled={isSubmitting}
                             spellCheck={false}
                             autoComplete="off"
                             maxLength={45}
-                            className="h-12 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-lg font-medium text-foreground ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 text-left"
+                            className="h-12 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-lg font-medium text-foreground ring-2 ring-border shadow-[0_3px_0_0_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-primary/60 disabled:opacity-50 text-left"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
@@ -529,11 +529,12 @@ export default function QuickAddSheet({
                     {suggestionsReady && (
                       <motion.div
                         key="quick-add-suggestions"
-                        initial={{ opacity: 1, y: suggestionsPanelHeight + 24 }}
+                        initial={{ opacity: 0, y: suggestionsPanelHeight + 24 }}
                         animate={{
-                          opacity: 1,
+                          opacity: showSuggestions ? 1 : 0,
                           y: showSuggestions ? 0 : suggestionsPanelHeight + 24,
                         }}
+                        exit={{ opacity: 0 }}
                         transition={{
                           duration: 0.4,
                           ease: [0.32, 0.72, 0, 1],

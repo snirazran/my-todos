@@ -222,7 +222,7 @@ export function TagsView({
               </button>
             </div>
 
-            <div className="flex max-h-[220px] content-start items-start gap-2 overflow-y-auto px-1 py-1.5">
+            <div className="flex max-h-[220px] flex-wrap content-start items-start gap-2 overflow-y-auto px-1 py-1.5">
               {filteredTags.map((st) => {
                 const isSelected = selectedTagIds.includes(st.id);
                 return (

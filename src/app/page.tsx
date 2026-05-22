@@ -31,6 +31,7 @@ import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
+import { PageBackground } from '@/components/ui/PageBackground';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
@@ -696,32 +697,12 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen pb-20 overflow-x-hidden md:pb-8 bg-background">
+    <main className="min-h-screen pb-20 overflow-x-hidden md:pb-8">
       <div className="px-3 pt-12 pb-4 mx-auto max-w-4xl md:px-6">
         <Header router={router} />
 
         <div className="relative flex flex-col items-stretch gap-2 lg:gap-5">
           <div className="relative z-10 flex flex-col gap-2 lg:gap-4">
-            <picture
-              key={equippedBackground?.id ?? 'default-bg'}
-              aria-hidden
-              className="absolute -bottom-10 w-screen -translate-x-1/2 pointer-events-none left-1/2 -top-16 -z-10 md:-bottom-12"
-            >
-              {bgImages.webLarge && (
-                <source media="(min-width: 1920px)" srcSet={bgImages.webLarge} />
-              )}
-              {bgImages.web && (
-                <source media="(min-width: 1280px)" srcSet={bgImages.web} />
-              )}
-              {bgImages.tablet && (
-                <source media="(min-width: 768px)" srcSet={bgImages.tablet} />
-              )}
-              <img
-                src={bgImages.mobile}
-                alt=""
-                className="w-full h-full object-cover object-top"
-              />
-            </picture>
             <FrogDisplay
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
@@ -746,7 +727,7 @@ export default function Home() {
           </div>
 
           <div
-            className="relative z-20 -mx-3 -mt-2 flex flex-col gap-2 rounded-t-[24px] bg-background px-4 pt-6 before:absolute before:bottom-0 before:left-1/2 before:top-8 before:-z-10 before:w-screen before:-translate-x-1/2 before:bg-background md:mx-auto md:-mt-4 md:w-full md:max-w-xl md:px-6 lg:gap-4"
+            className="relative z-20 -mx-3 -mt-2 flex flex-col gap-2 rounded-t-[24px] bg-background px-4 pt-6 md:mx-auto md:-mt-4 md:w-full md:max-w-xl md:px-6 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
             <div className="flex flex-col gap-2 w-full">

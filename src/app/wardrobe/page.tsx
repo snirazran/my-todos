@@ -3,6 +3,7 @@
 import { useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
+import { PageBackground } from '@/components/ui/PageBackground';
 import { WardrobePageContent } from '@/components/ui/skins/WardrobePanel';
 import { useInventory } from '@/hooks/useInventory';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
@@ -51,29 +52,11 @@ export default function WardrobePage() {
   }, [data?.catalog, data?.wardrobe?.equipped]);
 
   return (
-    <main className="relative h-[100dvh] md:h-[calc(100vh-4rem)] overflow-hidden bg-background">
-      <picture
-        key={equippedBackground?.id ?? 'default-bg'}
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-[243px] md:h-[263px] z-0"
-      >
-        {bgImages.webLarge && (
-          <source media="(min-width: 1920px)" srcSet={bgImages.webLarge} />
-        )}
-        {bgImages.web && <source media="(min-width: 1280px)" srcSet={bgImages.web} />}
-        {bgImages.tablet && (
-          <source media="(min-width: 768px)" srcSet={bgImages.tablet} />
-        )}
-        <img
-          src={bgImages.mobile}
-          alt=""
-          className="h-full w-full object-cover object-bottom"
-        />
-      </picture>
+    <main className="relative h-[100dvh] md:h-[calc(100vh-4rem)] overflow-hidden">
       <div className="relative z-10 flex flex-col w-full h-full max-w-3xl gap-0 px-4 pt-0 pb-4 mx-auto md:px-6 md:pb-6 md:pt-4">
-        <section className="z-20 flex flex-col pointer-events-none shrink-0">
+        <section className="relative z-20 flex flex-col pointer-events-none shrink-0 min-h-[182px] md:min-h-[230px]">
           <div className="flex items-start justify-center">
-            <div className="origin-top scale-100 translate-y-5 pointer-events-none lg:translate-y-3 lg:scale-90">
+            <div className="relative z-50 -mb-6 transition-transform duration-500 origin-top scale-100 pointer-events-none translate-y-6 md:mb-6 md:scale-100 md:-translate-y-2 lg:-translate-y-4">
               <Frog
                 ref={frogRef}
                 mouthOpen={false}
@@ -84,7 +67,7 @@ export default function WardrobePage() {
           </div>
         </section>
 
-        <section className="relative z-10 -mx-4 mt-2 flex min-h-0 flex-1 flex-col rounded-t-[32px] bg-background px-4 pt-5 md:-mx-6 md:px-6 md:pt-6 lg:-mt-4">
+        <section className="relative z-10 -mx-4 mt-2 flex min-h-0 flex-1 flex-col rounded-t-[32px] bg-background px-4 pt-5 md:-mt-[72px] md:mx-[calc((100%-100vw)/2)] md:px-8 md:pt-6 lg:-mx-6 lg:-mt-[78px] lg:px-6">
           <WardrobePageContent
             defaultTab={defaultTab}
             onClose={() => router.push('/')}
