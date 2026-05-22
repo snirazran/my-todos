@@ -927,6 +927,7 @@ export const RewardTile = memo(function RewardTile({
   onClick,
   hydrateDelayMs = 0,
   paused = false,
+  hideBadge = false,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -936,6 +937,7 @@ export const RewardTile = memo(function RewardTile({
   onClick?: () => void;
   hydrateDelayMs?: number;
   paused?: boolean;
+  hideBadge?: boolean;
 }) {
   const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
     hydrateDelayMs,
@@ -1029,23 +1031,25 @@ export const RewardTile = memo(function RewardTile({
         />
       )}
 
-      <div
-        className={cn(
-          'absolute z-20 flex justify-center',
-          compact ? '-right-1 -top-1' : '-right-0.5 -top-0.5',
-        )}
-      >
-        <span
+      {!hideBadge && (
+        <div
           className={cn(
-            'flex items-center justify-center rounded-md border border-white/10 bg-black/50 font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm',
-            compact
-              ? 'min-w-5 px-1.5 py-0.5 text-[9px]'
-              : 'min-w-4 px-1 py-0.5 text-[8px]',
+            'absolute z-20 flex justify-center',
+            compact ? '-right-1 -top-1' : '-right-0.5 -top-0.5',
           )}
         >
-          {quantityLabel}
-        </span>
-      </div>
+          <span
+            className={cn(
+              'flex items-center justify-center rounded-md border border-white/10 bg-black/50 font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm',
+              compact
+                ? 'min-w-5 px-1.5 py-0.5 text-[9px]'
+                : 'min-w-4 px-1 py-0.5 text-[8px]',
+            )}
+          >
+            {quantityLabel}
+          </span>
+        </div>
+      )}
     </div>
   );
 });
@@ -1071,7 +1075,7 @@ function rewardLabel(
   return 'Reward';
 }
 
-function getRewardQuantityLabel(reward: QuestReward, _isPremium: boolean) {
+export function getRewardQuantityLabel(reward: QuestReward, _isPremium: boolean) {
   if (reward.type === 'FLIES') {
     if (reward.amountMode === 'random') {
       const min = Math.max(1, reward.minAmount ?? 1);

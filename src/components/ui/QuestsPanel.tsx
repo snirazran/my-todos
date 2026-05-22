@@ -19,6 +19,7 @@ import type {
 import {
   CategoryQuestPresentationCard,
   DailyQuestPresentationCard,
+  getRewardQuantityLabel,
   RewardTile,
   type QuestTagChip,
 } from './QuestCards';
@@ -48,10 +49,17 @@ type QuestsResponse = {
   unlockedAnimationIds: string[];
 };
 
+type SeasonImages = {
+  mobile: string;
+  tablet: string;
+  web: string;
+  webLarge: string;
+};
+
 type QuestSeasonView = {
   id: string;
   name: string;
-  coverImageUrl?: string;
+  images: SeasonImages;
   startsAt: string;
   endsAt: string;
   dailyTargetFlies: number;
@@ -66,6 +74,38 @@ type QuestSeasonView = {
     premiumRewards: QuestReward[];
   }>;
 };
+
+function SeasonCoverImage({
+  images,
+  alt,
+  className,
+}: {
+  images: SeasonImages;
+  alt: string;
+  className?: string;
+}) {
+  const fallback =
+    images.web || images.webLarge || images.tablet || images.mobile || '';
+  if (!fallback) return null;
+  return (
+    <picture>
+      {images.webLarge && (
+        <source media="(min-width: 1920px)" srcSet={images.webLarge} />
+      )}
+      {images.web && <source media="(min-width: 1280px)" srcSet={images.web} />}
+      {images.tablet && (
+        <source media="(min-width: 768px)" srcSet={images.tablet} />
+      )}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={images.mobile || fallback} alt={alt} className={className} />
+    </picture>
+  );
+}
+
+function hasSeasonCover(images?: SeasonImages | null) {
+  if (!images) return false;
+  return !!(images.mobile || images.tablet || images.web || images.webLarge);
+}
 
 type QuestRewardSummary = {
   fliesGranted?: number;
@@ -785,26 +825,45 @@ function QuestSeasonBanner({
       )}
     >
       <div className={cn('relative overflow-hidden', flush ? 'h-[430px] md:h-[360px]' : 'h-[390px]')}>
-        {season.coverImageUrl ? (
-          <img
-            src={season.coverImageUrl}
+        {hasSeasonCover(season.images) ? (
+          <SeasonCoverImage
+            images={season.images}
             alt={season.name}
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (
           <div className="absolute inset-0 h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
         )}
-        <div className="absolute inset-x-0 top-10 flex justify-center p-4">
-          <div className="flex flex-col items-center gap-2">
-            <span className="inline-flex h-8 items-center gap-2 rounded-full bg-white/95 px-3 text-sm font-black text-slate-900 shadow-sm">
-              <Clock className="h-4 w-4" />
+        <div className="absolute inset-x-0 top-24 flex justify-center p-4 md:top-12 lg:top-16 xl:top-20">
+          <div className="flex flex-col items-center gap-3 md:gap-2">
+            <span
+              className="inline-flex items-center gap-1.5 text-base uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.9)] sm:text-lg md:text-xl"
+              style={{
+                fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.95)',
+                paintOrder: 'stroke fill',
+              }}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                className="h-4 w-4"
+                fill="none"
+                stroke="rgb(15 23 42)"
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" fill="white" />
+                <polyline points="12 6 12 12 16 14" />
+              </svg>
               {timeLeft}
             </span>
             <h2
-              className="max-w-[20rem] text-center text-4xl font-black uppercase leading-none text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.9)] sm:text-5xl"
+              className="max-w-[20rem] text-center text-4xl uppercase leading-none tracking-wide text-white drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:text-5xl md:text-5xl"
               style={{
-                fontWeight: 1000,
-                WebkitTextStroke: '1px rgba(15, 23, 42, 0.85)',
+                fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                WebkitTextStroke: '3px rgba(15, 23, 42, 0.95)',
+                paintOrder: 'stroke fill',
               }}
             >
               {season.name}
@@ -828,7 +887,7 @@ function QuestSeasonBanner({
             </>
           ) : (
             <>
-              <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted/60">
+              <div className="relative flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-muted/60">
                 {previewReward ? (
                   <SeasonRewardPreview
                     reward={previewReward}
@@ -898,19 +957,32 @@ function SeasonRewardPreview({
   return (
     <div
       className={cn(
-        'relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-white',
+        'relative flex h-full w-full items-center justify-center rounded-2xl bg-white',
         className,
       )}
     >
-      <SeasonPrizeRays colorClass={raysClass} />
-      <RewardTile
-        reward={reward}
-        rewardCatalog={rewardCatalog}
-        isPremium={isPremium}
-        compact
-        paused={paused}
-        className="relative z-10 h-[72px] w-[72px] rounded-2xl border-0 bg-transparent shadow-none"
-      />
+      <div className="absolute inset-0 overflow-hidden rounded-2xl">
+        <SeasonPrizeRays colorClass={raysClass} />
+      </div>
+      <div
+        className="relative z-10 flex items-center justify-center"
+        style={{ transform: 'scale(1.6)' }}
+      >
+        <RewardTile
+          reward={reward}
+          rewardCatalog={rewardCatalog}
+          isPremium={isPremium}
+          compact
+          paused={paused}
+          hideBadge
+          className="rounded-2xl border-0 bg-transparent shadow-none"
+        />
+      </div>
+      <div className="pointer-events-none absolute right-1 top-1 z-20">
+        <span className="flex min-w-5 items-center justify-center rounded-md border border-white/10 bg-black/55 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+          {getRewardQuantityLabel(reward, isPremium)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -971,9 +1043,9 @@ function QuestSeasonEventOverlay({
     <div className="fixed inset-0 z-[1200] bg-background">
       <div className="h-full overflow-y-auto bg-background">
         <div className="relative h-[310px] overflow-hidden">
-          {season.coverImageUrl ? (
-            <img
-              src={season.coverImageUrl}
+          {hasSeasonCover(season.images) ? (
+            <SeasonCoverImage
+              images={season.images}
               alt={season.name}
               className="h-full w-full object-cover"
             />
@@ -989,12 +1061,13 @@ function QuestSeasonEventOverlay({
           >
             <X className="h-5 w-5" />
           </button>
-          <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center px-4">
+          <div className="pointer-events-none absolute inset-x-0 top-28 flex justify-center px-4">
             <h2
-              className="max-w-[20rem] text-center text-4xl font-black uppercase leading-none text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.55)]"
+              className="max-w-[20rem] text-center text-4xl uppercase leading-none tracking-wide text-white drop-shadow-[0_5px_0_rgba(15,23,42,0.6)] sm:text-5xl"
               style={{
-                fontWeight: 1000,
-                WebkitTextStroke: '1.25px rgba(15, 23, 42, 0.86)',
+                fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                WebkitTextStroke: '3px rgba(15, 23, 42, 0.95)',
+                paintOrder: 'stroke fill',
               }}
             >
               {season.name}

@@ -7,11 +7,35 @@ export type QuestSeasonDayReward = {
   premiumRewards: QuestRewards;
 };
 
+export type QuestSeasonImages = {
+  mobile: string;
+  tablet: string;
+  web: string;
+  webLarge: string;
+};
+
+export type QuestSeasonImageFile = {
+  storagePath: string;
+  contentType: string;
+  size?: number;
+  updatedAt?: Date;
+};
+
+export type QuestSeasonImageFiles = {
+  mobile?: QuestSeasonImageFile | null;
+  tablet?: QuestSeasonImageFile | null;
+  web?: QuestSeasonImageFile | null;
+  webLarge?: QuestSeasonImageFile | null;
+};
+
+export type QuestSeasonSizeKey = keyof QuestSeasonImages;
+
 export interface QuestSeasonDoc {
   _id?: mongoose.Types.ObjectId;
   seasonId: string;
   name: string;
-  coverImageUrl?: string;
+  images: QuestSeasonImages;
+  imageFiles?: QuestSeasonImageFiles;
   startsAt: Date;
   endsAt: Date;
   dailyTargetFlies: number;
@@ -25,7 +49,16 @@ const QuestSeasonSchema = new Schema<QuestSeasonDoc>(
   {
     seasonId: { type: String, required: true, unique: true, index: true },
     name: { type: String, required: true },
-    coverImageUrl: { type: String, default: undefined },
+    images: {
+      mobile: { type: String, default: '' },
+      tablet: { type: String, default: '' },
+      web: { type: String, default: '' },
+      webLarge: { type: String, default: '' },
+    },
+    imageFiles: {
+      type: Schema.Types.Mixed,
+      default: undefined,
+    },
     startsAt: { type: Date, required: true },
     endsAt: { type: Date, required: true },
     dailyTargetFlies: { type: Number, default: 3 },

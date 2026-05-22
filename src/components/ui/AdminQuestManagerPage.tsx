@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -62,10 +62,13 @@ type AdminQuestTemplate = {
   isActive: boolean;
 };
 
+type SeasonSizeKey = 'mobile' | 'tablet' | 'web' | 'webLarge';
+type SeasonImages = Record<SeasonSizeKey, string>;
+
 type AdminQuestSeason = {
   id: string;
   name: string;
-  coverImageUrl?: string;
+  images: SeasonImages;
   startsAt: string;
   endsAt: string;
   dailyTargetFlies: number;
@@ -77,6 +80,24 @@ type AdminQuestSeason = {
   }>;
   isActive: boolean;
 };
+
+const emptySeasonImages = (): SeasonImages => ({
+  mobile: '',
+  tablet: '',
+  web: '',
+  webLarge: '',
+});
+
+const SEASON_SIZE_FIELDS: {
+  key: SeasonSizeKey;
+  label: string;
+  hint: string;
+}[] = [
+  { key: 'mobile', label: 'Mobile', hint: 'default (<768px)' },
+  { key: 'tablet', label: 'Tablet', hint: '≥768px' },
+  { key: 'web', label: 'Web', hint: '≥1280px' },
+  { key: 'webLarge', label: 'Web Large', hint: '≥1920px' },
+];
 
 type MetaRewardItem = QuestRewardCatalogItem;
 type QuickAddSuggestionDraft = {
@@ -129,7 +150,7 @@ type FormState = {
 type SeasonFormState = {
   id?: string;
   name: string;
-  coverImageUrl?: string;
+  images: SeasonImages;
   startsAt: string;
   endsAt: string;
   dailyTargetFlies: number;
@@ -189,7 +210,7 @@ const emptySeasonForm = (): SeasonFormState => {
   const end = new Date(now.getTime() + 7 * 86_400_000);
   return {
     name: '',
-    coverImageUrl: undefined,
+    images: emptySeasonImages(),
     startsAt: toDateTimeLocalValue(now),
     endsAt: toDateTimeLocalValue(end),
     dailyTargetFlies: 3,
@@ -383,7 +404,6 @@ export function AdminQuestManagerPage() {
   const [conditionsPopupOpen, setConditionsPopupOpen] = useState(false);
   const [availabilityPopupOpen, setAvailabilityPopupOpen] = useState(false);
   const [coverFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
-  const [seasonFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
   const [categoryFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
   const [editingTitle, setEditingTitle] = useState(false);
   const [editingDesc, setEditingDesc] = useState(false);
@@ -754,7 +774,7 @@ export function AdminQuestManagerPage() {
     setSeasonForm({
       id: season.id,
       name: season.name,
-      coverImageUrl: season.coverImageUrl,
+      images: { ...emptySeasonImages(), ...(season.images ?? {}) },
       startsAt: isoToDateTimeLocalValue(season.startsAt),
       endsAt: isoToDateTimeLocalValue(season.endsAt),
       dailyTargetFlies: season.dailyTargetFlies,
@@ -769,6 +789,73 @@ export function AdminQuestManagerPage() {
     setResult(null);
     setConfirmAction(null);
     setView('season');
+  };
+
+  const uploadSeasonImage = async (size: SeasonSizeKey, file: File) => {
+    if (!seasonForm.id) {
+      setResult({
+        type: 'error',
+        message: 'Save the season first, then upload images.',
+      });
+      return;
+    }
+    setSaving(true);
+    setResult(null);
+    try {
+      const form = new FormData();
+      form.set('id', seasonForm.id);
+      form.set('size', size);
+      form.set('file', file);
+      const res = await fetch('/api/admin/quests/seasons/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: form,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setSeasonForm((prev) => ({
+        ...prev,
+        images: { ...prev.images, [size]: data.url },
+      }));
+      await loadData();
+      setResult({ type: 'success', message: `${size} image uploaded` });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Upload failed',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const removeSeasonImage = async (size: SeasonSizeKey) => {
+    if (!seasonForm.id) return;
+    setSaving(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/quests/seasons/upload', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ id: seasonForm.id, size }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Remove failed');
+      setSeasonForm((prev) => ({
+        ...prev,
+        images: { ...prev.images, [size]: '' },
+      }));
+      await loadData();
+      setResult({ type: 'success', message: `${size} image removed` });
+    } catch (error) {
+      setResult({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Remove failed',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const saveSeason = async () => {
@@ -1087,42 +1174,30 @@ export function AdminQuestManagerPage() {
 
         <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
           <div className="relative h-[260px] overflow-hidden">
-            {seasonForm.coverImageUrl ? (
-              <img
-                src={seasonForm.coverImageUrl}
-                alt="Season cover"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
-            )}
+            {(() => {
+              const preview =
+                seasonForm.images.web ||
+                seasonForm.images.webLarge ||
+                seasonForm.images.tablet ||
+                seasonForm.images.mobile;
+              return preview ? (
+                <img
+                  src={preview}
+                  alt="Season cover"
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
+              );
+            })()}
             <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent" />
-            <input
-              ref={(el) => {
-                seasonFileInputRef.current = el;
-              }}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={async (event) => {
-                const file = event.target.files?.[0];
-                if (!file) return;
-                const coverImageUrl = await readFileAsDataUrl(file);
-                setSeasonForm((prev) => ({ ...prev, coverImageUrl }));
-              }}
-            />
             <div className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 p-4">
               <span className="rounded-full border border-white/20 bg-black/35 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-white backdrop-blur-md">
                 {seasonForm.dayCount} days
               </span>
-              <button
-                type="button"
-                onClick={() => seasonFileInputRef.current?.click()}
-                className="flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-xs font-bold text-white/90 backdrop-blur-sm transition hover:bg-black/70"
-              >
-                <Camera className="h-3.5 w-3.5" />
-                {seasonForm.coverImageUrl ? 'Change' : 'Add photo'}
-              </button>
+              <span className="rounded-full bg-black/50 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.16em] text-white/80 backdrop-blur-sm">
+                Upload images below
+              </span>
             </div>
             <div className="absolute inset-x-0 bottom-0 z-10 p-5">
               <input
@@ -1207,6 +1282,28 @@ export function AdminQuestManagerPage() {
               />
               Active season
             </label>
+          </div>
+        </div>
+
+        <div className="rounded-[28px] border border-border/50 bg-card p-4 shadow-sm">
+          <div className="mb-4">
+            <h2 className="text-lg font-black text-foreground">Backgrounds</h2>
+            <p className="text-xs text-muted-foreground">
+              Upload an image per screen size. {seasonForm.id ? '' : 'Save the season first, then upload.'}
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {SEASON_SIZE_FIELDS.map((field) => (
+              <SeasonImageUploader
+                key={field.key}
+                label={field.label}
+                hint={field.hint}
+                value={seasonForm.images[field.key]}
+                disabled={!seasonForm.id || saving}
+                onPick={(file) => uploadSeasonImage(field.key, file)}
+                onRemove={() => removeSeasonImage(field.key)}
+              />
+            ))}
           </div>
         </div>
 
@@ -2567,6 +2664,78 @@ function RewardPickerDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SeasonImageUploader({
+  label,
+  hint,
+  value,
+  disabled,
+  onPick,
+  onRemove,
+}: {
+  label: string;
+  hint: string;
+  value: string;
+  disabled: boolean;
+  onPick: (file: File) => void;
+  onRemove: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  return (
+    <div className="rounded-2xl border border-border/60 bg-background/60 p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">
+          {label}
+        </span>
+        <span className="text-[10px] font-medium text-muted-foreground/70">
+          {hint}
+        </span>
+      </div>
+      <div className="flex items-stretch gap-2">
+        <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-[10px] text-muted-foreground">
+          {value ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={value} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <span className="opacity-60">empty</span>
+          )}
+        </div>
+        <div className="flex flex-1 flex-col gap-1.5">
+          <button
+            type="button"
+            disabled={disabled}
+            onClick={() => inputRef.current?.click()}
+            className="h-9 w-full rounded-xl bg-primary/10 px-3 text-xs font-black text-primary transition hover:bg-primary/20 disabled:opacity-60"
+          >
+            {value ? 'Replace' : 'Upload image'}
+          </button>
+          {value && (
+            <button
+              type="button"
+              disabled={disabled}
+              onClick={onRemove}
+              className="h-7 w-full rounded-lg bg-red-500/10 text-[11px] font-bold text-red-600 transition hover:bg-red-500/20 disabled:opacity-60 dark:text-red-400"
+            >
+              Remove
+            </button>
+          )}
+        </div>
+      </div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0];
+          if (file) onPick(file);
+          if (event.target) event.target.value = '';
+        }}
+      />
+    </div>
   );
 }
 

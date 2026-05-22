@@ -2,15 +2,30 @@ import { v4 as uuid } from 'uuid';
 import QuestSeasonModel, {
   type QuestSeasonDoc,
   type QuestSeasonDayReward,
+  type QuestSeasonImages,
 } from '@/lib/models/QuestSeason';
 import UserModel from '@/lib/models/User';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import type { QuestRewards } from '@/lib/quests/types';
 
+function emptySeasonImages(): QuestSeasonImages {
+  return { mobile: '', tablet: '', web: '', webLarge: '' };
+}
+
+function normalizeSeasonImages(input: unknown): QuestSeasonImages {
+  const src = (input ?? {}) as Partial<QuestSeasonImages>;
+  return {
+    mobile: typeof src.mobile === 'string' ? src.mobile : '',
+    tablet: typeof src.tablet === 'string' ? src.tablet : '',
+    web: typeof src.web === 'string' ? src.web : '',
+    webLarge: typeof src.webLarge === 'string' ? src.webLarge : '',
+  };
+}
+
 export type QuestSeasonView = {
   id: string;
   name: string;
-  coverImageUrl?: string;
+  images: QuestSeasonImages;
   startsAt: string;
   endsAt: string;
   dailyTargetFlies: number;
@@ -61,7 +76,7 @@ export function seasonToAdminView(doc: QuestSeasonDoc) {
   return {
     id: doc.seasonId,
     name: doc.name,
-    coverImageUrl: doc.coverImageUrl,
+    images: normalizeSeasonImages(doc.images),
     startsAt: doc.startsAt.toISOString(),
     endsAt: doc.endsAt.toISOString(),
     dailyTargetFlies: doc.dailyTargetFlies,
@@ -136,7 +151,7 @@ export async function getActiveQuestSeasonView(args: {
   return {
     id: season.seasonId,
     name: season.name,
-    coverImageUrl: season.coverImageUrl,
+    images: normalizeSeasonImages(season.images),
     startsAt: season.startsAt.toISOString(),
     endsAt: season.endsAt.toISOString(),
     dailyTargetFlies: season.dailyTargetFlies,
@@ -165,7 +180,7 @@ export function sanitizeSeasonRewards(input: unknown): QuestSeasonDayReward[] {
 
 export async function createQuestSeason(payload: {
   name: string;
-  coverImageUrl?: string;
+  images?: QuestSeasonImages;
   startsAt: Date;
   endsAt: Date;
   dailyTargetFlies: number;
@@ -175,6 +190,7 @@ export async function createQuestSeason(payload: {
   return QuestSeasonModel.create({
     seasonId: uuid(),
     ...payload,
+    images: payload.images ?? emptySeasonImages(),
   });
 }
 

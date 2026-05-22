@@ -88,11 +88,6 @@ function sanitizeBody(body: any) {
   const name = typeof body?.name === 'string' ? body.name.trim() : '';
   const startsAt = new Date(body?.startsAt);
   const endsAt = new Date(body?.endsAt);
-  const coverImageUrl =
-    typeof body?.coverImageUrl === 'string' &&
-    body.coverImageUrl.startsWith('data:image/')
-      ? body.coverImageUrl
-      : undefined;
   const dailyTargetFlies = Math.max(1, Math.floor(Number(body?.dailyTargetFlies) || 3));
   const dayCount = Math.max(1, Math.min(90, Math.floor(Number(body?.dayCount) || 1)));
   const rawDayRewards = sanitizeDayRewards(body?.dayRewards);
@@ -113,7 +108,6 @@ function sanitizeBody(body: any) {
   return {
     payload: {
       name,
-      coverImageUrl,
       startsAt,
       endsAt,
       dailyTargetFlies,
@@ -166,18 +160,9 @@ export async function PUT(req: NextRequest) {
     if ('error' in sanitized) return json({ error: sanitized.error }, 400);
 
     await connectMongo();
-    const updateSet = { ...sanitized.payload };
-    const unsetFields: Record<string, 1> = {};
-    if (!updateSet.coverImageUrl) {
-      delete updateSet.coverImageUrl;
-      unsetFields.coverImageUrl = 1;
-    }
     const season = await QuestSeasonModel.findOneAndUpdate(
       { seasonId },
-      {
-        $set: updateSet,
-        ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}),
-      },
+      { $set: sanitized.payload },
       { new: true },
     );
     if (!season) return json({ error: 'Season not found' }, 404);

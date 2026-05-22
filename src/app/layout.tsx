@@ -1,6 +1,6 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from 'next';
-import { Poppins } from 'next/font/google';
+import { Poppins, Luckiest_Guy } from 'next/font/google';
 import './globals.css';
 import Providers from '@/app/providers';
 import SiteHeader from '@/components/ui/siteHeader';
@@ -13,6 +13,13 @@ const poppins = Poppins({
   weight: ['300', '400', '500', '600', '700'],
   display: 'swap',
   variable: '--font-sans', // optional: lets Tailwind use it via font-sans
+});
+
+const luckiestGuy = Luckiest_Guy({
+  subsets: ['latin'],
+  weight: ['400'],
+  display: 'swap',
+  variable: '--font-display',
 });
 
 export const viewport: Viewport = {
@@ -46,7 +53,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" dir="ltr" className={`h-full ${poppins.variable}`}>
+    <html lang="en" dir="ltr" className={`h-full ${poppins.variable} ${luckiestGuy.variable}`}>
       <body
         className={[
           poppins.className,
