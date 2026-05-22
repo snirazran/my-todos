@@ -8,6 +8,7 @@ import {
   Clock,
   Compass,
   Gift,
+  Pencil,
   Plus,
   Sparkles,
   Tags,
@@ -161,6 +162,7 @@ function renderObjectiveLabel(
     linkedTags?: QuestTagChip[];
     categoryName?: string;
     categoryAccent?: string;
+    onPickTags?: () => void;
   },
 ) {
   if (block.tagMode !== 'focus_category_tags') {
@@ -182,13 +184,11 @@ function renderObjectiveLabel(
       ? 'Add'
       : 'Complete';
 
-  const prefix = `${actionLabel} ${targetLabel} ${subjectLabel} with`;
-
   const tags = context.linkedTags ?? [];
   if (tags.length > 0) {
     return (
       <>
-        <span>{prefix}</span>
+        <span>{`${actionLabel} ${targetLabel} ${subjectLabel} with`}</span>
         {tags.map((tag) => (
           <QuestTagPill key={tag.id} tag={tag} />
         ))}
@@ -197,21 +197,7 @@ function renderObjectiveLabel(
     );
   }
 
-  const fallback =
-    context.categoryName?.toLowerCase().trim() || 'focus';
-  return (
-    <>
-      <span>{prefix}</span>
-      <QuestTagPill
-        tag={{
-          id: `${block.id}-category-fallback`,
-          name: fallback,
-          color: context.categoryAccent ?? '#22c55e',
-        }}
-      />
-      <span>tags</span>
-    </>
-  );
+  return <span>{`${actionLabel} ${targetLabel} ${subjectLabel}`}</span>;
 }
 
 function getTaggedSubjectCopy(block: QuestCardLogicBlock) {
@@ -411,14 +397,28 @@ export function DailyQuestPresentationCard({
         ) : (
           <div className="h-[220px] w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
         )}
-        <div className="absolute inset-x-0 top-0 flex flex-wrap items-start justify-start gap-3 p-4">
-          <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
-            <CalendarDays className="w-3 h-3 shrink-0" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 via-black/25 to-transparent" />
+        <div className="absolute inset-x-0 top-0 flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
+          <span
+            className="inline-flex items-center gap-1.5 text-[13px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
+            style={{
+              fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+              WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
+              paintOrder: 'stroke fill',
+            }}
+          >
+            <CalendarDays className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
             <span className="leading-none">Daily</span>
           </span>
           {timeLeft ? (
-            <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
-              <Clock className="w-3 h-3 shrink-0" />
+            <span
+              className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white drop-shadow-[0_1.5px_0_rgba(15,23,42,0.85)]"
+              style={{
+                WebkitTextStroke: '0.6px rgba(15, 23, 42, 0.9)',
+                paintOrder: 'stroke fill',
+              }}
+            >
+              <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
               <span className="leading-none">{timeLeft}</span>
             </span>
           ) : null}
@@ -519,16 +519,29 @@ export function CategoryQuestPresentationCard({
             }}
           />
         )}
-        <div className="absolute inset-x-0 top-0 flex flex-wrap items-start justify-start gap-3 p-4">
-          <span className="inline-flex h-7 max-w-[calc(100%-2rem)] items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
-            <Compass className="w-3 h-3 shrink-0" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 via-black/25 to-transparent" />
+        <div className="absolute inset-x-0 top-0 flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
+          <span
+            className="inline-flex max-w-[calc(100%-5rem)] items-center gap-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white drop-shadow-[0_1.5px_0_rgba(15,23,42,0.85)]"
+            style={{
+              WebkitTextStroke: '0.6px rgba(15, 23, 42, 0.9)',
+              paintOrder: 'stroke fill',
+            }}
+          >
+            <Compass className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
             <span className="truncate leading-none">
               {category?.shortLabel || category?.name || 'Focus'}
             </span>
           </span>
           {timeLeft ? (
-            <span className="inline-flex h-7 items-center justify-center gap-1.5 rounded-full border border-white/20 bg-black/35 px-3 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white backdrop-blur-md">
-              <Clock className="w-3 h-3 shrink-0" />
+            <span
+              className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white drop-shadow-[0_1.5px_0_rgba(15,23,42,0.85)]"
+              style={{
+                WebkitTextStroke: '0.6px rgba(15, 23, 42, 0.9)',
+                paintOrder: 'stroke fill',
+              }}
+            >
+              <Clock className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
               <span className="leading-none">{timeLeft}</span>
             </span>
           ) : null}
@@ -568,6 +581,7 @@ export function CategoryQuestPresentationCard({
               linkedTags={linkedTags}
               categoryName={category?.shortLabel || category?.name}
               categoryAccent={category?.accent}
+              onPickTags={onEditTags}
             />
             {block.tagMode !== 'focus_category_tags' &&
             getTagScopeMessage(block) ? (
@@ -650,6 +664,7 @@ function ObjectiveRow({
   linkedTags,
   categoryName,
   categoryAccent,
+  onPickTags,
 }: {
   block: QuestCardLogicBlock;
   objectiveClaimed?: boolean;
@@ -664,6 +679,7 @@ function ObjectiveRow({
   linkedTags?: QuestTagChip[];
   categoryName?: string;
   categoryAccent?: string;
+  onPickTags?: () => void;
 }) {
   const safeTarget = Math.max(1, block.target);
   const objectiveComplete = block.progress >= safeTarget;
@@ -673,6 +689,9 @@ function ObjectiveRow({
     hasRewards && objectiveComplete && !objectiveClaimed;
 
   const stepDone = objectiveClaimed || (objectiveComplete && !hasRewards);
+  const needsTag =
+    block.tagMode === 'focus_category_tags' &&
+    (linkedTags?.length ?? 0) === 0;
 
   const renderActionSlot = () => {
     if (objectiveClaimable && onClaimObjective) {
@@ -713,7 +732,14 @@ function ObjectiveRow({
   const extraRewardCount = hasRewards ? block.rewards!.length - 1 : 0;
 
   return (
-    <div className={cn('py-3', !isLast && 'border-b border-border/20')}>
+    <div
+      className={cn(
+        'py-3 transition-opacity',
+        !isLast && 'border-b border-border/20',
+        needsTag && 'opacity-50 saturate-50',
+      )}
+      aria-disabled={needsTag || undefined}
+    >
       <div className="flex items-center gap-3">
         {firstReward ? (
           <div className="relative shrink-0">
@@ -748,6 +774,7 @@ function ObjectiveRow({
               linkedTags,
               categoryName,
               categoryAccent,
+              onPickTags,
             })}
           </p>
 
@@ -782,14 +809,14 @@ function ObjectiveRow({
 function QuestTagPill({ tag }: { tag: QuestTagChip }) {
   return (
     <span
-      className="inline-flex items-center justify-center rounded-xl border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em]"
+      className="relative inline-flex max-w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider shadow-sm"
       style={{
-        backgroundColor: `${tag.color}18`,
-        borderColor: `${tag.color}4d`,
+        backgroundColor: `${tag.color}20`,
+        borderColor: `${tag.color}40`,
         color: tag.color,
       }}
     >
-      {tag.name}
+      <span className="truncate">{tag.name}</span>
     </span>
   );
 }
@@ -818,9 +845,10 @@ function FocusQuestTagPanel({
           <button
             type="button"
             onClick={onEditTags}
-            className="rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            aria-label="Edit focus tags"
+            className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-primary"
           >
-            Edit
+            <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
           </button>
         ) : null}
       </div>
@@ -828,39 +856,30 @@ function FocusQuestTagPanel({
   }
 
   return (
-    <div className="relative mt-3 mb-1 overflow-hidden rounded-[22px] border-2 border-dashed border-primary/30 bg-gradient-to-br from-primary/8 via-primary/5 to-transparent p-3.5">
-      <Sparkles
-        className="pointer-events-none absolute right-3 top-3 h-3.5 w-3.5 text-primary/40"
-        aria-hidden
-      />
-      <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary ring-1 ring-inset ring-primary/20">
-          <Tags className="h-5 w-5" strokeWidth={2.5} />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-black leading-tight text-foreground">
-            Pick your {categoryName ? `${categoryName.toLowerCase()} ` : ''}tags
-          </p>
-          <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-            Tasks with these tags count toward this quest.
-          </p>
-        </div>
+    <div className="mt-3 mb-1 flex items-center gap-3 rounded-2xl border border-dashed border-primary/25 bg-primary/[0.04] px-3 py-2.5">
+      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
+        <Tags className="h-4 w-4" strokeWidth={2.5} />
       </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {onEditTags ? (
-          <button
-            type="button"
-            onClick={onEditTags}
-            className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-xs font-black uppercase tracking-[0.14em] text-primary-foreground shadow-[0_3px_0_rgba(15,23,42,0.18)] transition active:translate-y-0.5 active:shadow-none sm:w-auto"
-          >
-            <Plus className="h-3.5 w-3.5" strokeWidth={3} />
-            Pick tags
-          </button>
-        ) : (
-          <PreviewTagHint label="Saved focus tags" color={accent} />
-        )}
+      <div className="min-w-0 flex-1">
+        <p className="text-[13px] font-black leading-tight text-foreground">
+          Pick your {categoryName ? `${categoryName.toLowerCase()} ` : ''}tag
+        </p>
+        <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
+          Tasks with this tag count toward the quest.
+        </p>
       </div>
+      {onEditTags ? (
+        <button
+          type="button"
+          onClick={onEditTags}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-primary-foreground shadow-[0_2px_0_rgba(15,23,42,0.18)] transition active:translate-y-0.5 active:shadow-none"
+        >
+          <Plus className="h-3.5 w-3.5" strokeWidth={3} />
+          Pick a tag
+        </button>
+      ) : (
+        <PreviewTagHint label="Saved focus tags" color={accent} />
+      )}
     </div>
   );
 }

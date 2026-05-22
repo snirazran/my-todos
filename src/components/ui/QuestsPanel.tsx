@@ -620,99 +620,129 @@ export function QuestsPanel({
                           "flex flex-col gap-8",
                           data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 bg-background rounded-t-[24px] md:rounded-none md:bg-transparent"
                         )}>
-                        <div className="space-y-4">
-                          {(() => {
-                            const dailyQuests = data.dailyQuests ?? [];
-                            if (dailyQuests.length === 0) {
-                              return (
-                                <PanelCard>No active daily quests here.</PanelCard>
-                              );
-                            }
-                            if (dailyQuests.length === 1) {
-                              const quest = dailyQuests[0];
-                              return (
-                                <DailyQuestPresentationCard
-                                  quest={quest}
-                                  rewardCatalog={data.rewardCatalog}
-                                  isPremium={data.isPremium}
-                                  claimingObjectiveId={claimingObjectiveId}
-                                    onClaimObjective={(objectiveId) =>
-                                    handleClaimObjective(quest.id, objectiveId)
-                                  }
-                                  paused={carouselDragging}
-                                />
-                              );
-                            }
-                            return (
-                              <QuestCarousel
-                                activePage={dailyPage}
-                                onPageChange={setDailyPage}
-                                count={dailyQuests.length}
-                                onDragChange={setCarouselDragging}
-                              >
-                                {dailyQuests.map((quest) => (
-                                  <DailyQuestPresentationCard
-                                    key={quest.id}
-                                    quest={quest}
-                                    rewardCatalog={data.rewardCatalog}
-                                    isPremium={data.isPremium}
-                                    claimingObjectiveId={claimingObjectiveId}
-                                    onClaimObjective={(objectiveId) =>
-                                      handleClaimObjective(
-                                        quest.id,
-                                        objectiveId,
-                                      )
-                                    }
-                                    paused={carouselDragging}
-                                  />
+                        {(() => {
+                          const dailyQuests = data.dailyQuests ?? [];
+                          const renderDailyCard = (quest: DailyQuestProgressView) => (
+                            <DailyQuestPresentationCard
+                              key={quest.id}
+                              quest={quest}
+                              rewardCatalog={data.rewardCatalog}
+                              isPremium={data.isPremium}
+                              claimingObjectiveId={claimingObjectiveId}
+                              onClaimObjective={(objectiveId) =>
+                                handleClaimObjective(quest.id, objectiveId)
+                              }
+                              paused={carouselDragging}
+                            />
+                          );
+                          const renderFocusCard = (quest: CategoryQuestProgressView) => (
+                            <CategoryQuestPresentationCard
+                              key={quest.id}
+                              quest={quest}
+                              category={categoryMap[quest.categoryId]}
+                              rewardCatalog={data.rewardCatalog}
+                              isPremium={data.isPremium}
+                              claimingObjectiveId={claimingObjectiveId}
+                              linkedTags={
+                                (categoryTagMap.get(quest.categoryId) ?? [])
+                                  .map((tagId) => tagCatalog.get(tagId))
+                                  .filter(Boolean) as QuestTagChip[]
+                              }
+                              onEditTags={() =>
+                                setEditingFocusCategoryId(quest.categoryId)
+                              }
+                              onClaimObjective={(objectiveId) =>
+                                handleClaimObjective(quest.id, objectiveId)
+                              }
+                              paused={carouselDragging}
+                            />
+                          );
+
+                          const focusEmptyStates = (
+                            <>
+                              {!data.onboarding?.complete && (
+                                <PanelCard>
+                                  Finish your onboarding on the home page to unlock
+                                  quests for your focus areas.
+                                </PanelCard>
+                              )}
+                              {data.onboarding?.complete &&
+                                selectedCategories.length === 0 && (
+                                  <PanelCard>
+                                    Select at least one focus area to receive quests
+                                    here.
+                                  </PanelCard>
+                                )}
+                              {filteredCategoryQuests.length === 0 &&
+                                data.onboarding?.complete &&
+                                selectedCategories.length > 0 && (
+                                  <PanelCard>No active focus quests here.</PanelCard>
+                                )}
+                            </>
+                          );
+
+                          return (
+                            <>
+                              {/* Mobile: daily carousel then focus stack */}
+                              <div className="flex flex-col gap-8 md:hidden">
+                                <div className="space-y-4">
+                                  {dailyQuests.length === 0 ? (
+                                    <PanelCard>No active daily quests here.</PanelCard>
+                                  ) : dailyQuests.length === 1 ? (
+                                    renderDailyCard(dailyQuests[0])
+                                  ) : (
+                                    <QuestCarousel
+                                      activePage={dailyPage}
+                                      onPageChange={setDailyPage}
+                                      count={dailyQuests.length}
+                                      onDragChange={setCarouselDragging}
+                                    >
+                                      {dailyQuests.map(renderDailyCard)}
+                                    </QuestCarousel>
+                                  )}
+                                </div>
+                                <div className="space-y-4">
+                                  {focusEmptyStates}
+                                  {filteredCategoryQuests.map(renderFocusCard)}
+                                </div>
+                              </div>
+
+                              {/* Desktop: masonry-style 2-column layout, daily first */}
+                              <div className="hidden md:block md:columns-2 md:gap-4 [column-fill:balance]">
+                                {(dailyQuests.length === 0
+                                  ? [<PanelCard key="empty-daily">No active daily quests here.</PanelCard>]
+                                  : dailyQuests.map(renderDailyCard)
+                                ).map((node, i) => (
+                                  <div
+                                    key={`daily-cell-${i}`}
+                                    className="mb-4 break-inside-avoid"
+                                  >
+                                    {node}
+                                  </div>
                                 ))}
-                              </QuestCarousel>
-                            );
-                          })()}
-                        </div>
-                        <div className="space-y-4">
-                          {!data.onboarding?.complete && (
-                            <PanelCard>
-                              Finish your onboarding on the home page to unlock
-                              quests for your focus areas.
-                            </PanelCard>
-                          )}
-                          {data.onboarding?.complete &&
-                            selectedCategories.length === 0 && (
-                              <PanelCard>
-                                Select at least one focus area to receive quests
-                                here.
-                              </PanelCard>
-                            )}
-                          {filteredCategoryQuests.length === 0 ? (
-                            <PanelCard>No active focus quests here.</PanelCard>
-                          ) : (
-                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                              {filteredCategoryQuests.map((quest) => (
-                                <CategoryQuestPresentationCard
-                                  key={quest.id}
-                                  quest={quest}
-                                  category={categoryMap[quest.categoryId]}
-                                  rewardCatalog={data.rewardCatalog}
-                                  isPremium={data.isPremium}
-                                  claimingObjectiveId={claimingObjectiveId}
-                                  linkedTags={
-                                    (categoryTagMap.get(quest.categoryId) ?? [])
-                                      .map((tagId) => tagCatalog.get(tagId))
-                                      .filter(Boolean) as QuestTagChip[]
-                                  }
-                                  onEditTags={() =>
-                                    setEditingFocusCategoryId(quest.categoryId)
-                                  }
-                                  onClaimObjective={(objectiveId) =>
-                                    handleClaimObjective(quest.id, objectiveId)
-                                  }
-                                  paused={carouselDragging}
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                                {Array.isArray(focusEmptyStates.props.children) &&
+                                  focusEmptyStates.props.children
+                                    .filter(Boolean)
+                                    .map((child: React.ReactNode, i: number) => (
+                                      <div
+                                        key={`focus-empty-${i}`}
+                                        className="mb-4 break-inside-avoid"
+                                      >
+                                        {child}
+                                      </div>
+                                    ))}
+                                {filteredCategoryQuests.map((quest) => (
+                                  <div
+                                    key={`focus-cell-${quest.id}`}
+                                    className="mb-4 break-inside-avoid"
+                                  >
+                                    {renderFocusCard(quest)}
+                                  </div>
+                                ))}
+                              </div>
+                            </>
+                          );
+                        })()}
                         </div>
                       </div>
                     </div>
