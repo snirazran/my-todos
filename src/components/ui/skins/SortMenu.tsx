@@ -6,9 +6,22 @@ import { Button } from '@/components/ui/button';
 import { ArrowUpDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type SortOrder = 'rarity_asc' | 'rarity_desc' | 'price_asc' | 'price_desc';
+export type SortOrder =
+  | 'latest'
+  | 'rarity_asc'
+  | 'rarity_desc'
+  | 'price_asc'
+  | 'price_desc';
 
-export function SortMenu({ value, onChange }: { value: SortOrder; onChange: (v: SortOrder) => void }) {
+export function SortMenu({
+  value,
+  onChange,
+  showLatest = true,
+}: {
+  value: SortOrder;
+  onChange: (v: SortOrder) => void;
+  showLatest?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
@@ -37,10 +50,11 @@ export function SortMenu({ value, onChange }: { value: SortOrder; onChange: (v: 
   }, [open]);
 
   const options: { label: string; val: SortOrder }[] = [
-    { label: 'Rarity: High to Low', val: 'rarity_desc' },
+    ...(showLatest ? [{ label: 'Recently Added', val: 'latest' as SortOrder }] : []),
     { label: 'Rarity: Low to High', val: 'rarity_asc' },
-    { label: 'Price: High to Low', val: 'price_desc' },
+    { label: 'Rarity: High to Low', val: 'rarity_desc' },
     { label: 'Price: Low to High', val: 'price_asc' },
+    { label: 'Price: High to Low', val: 'price_desc' },
   ];
 
   return (

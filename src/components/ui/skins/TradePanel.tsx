@@ -107,7 +107,7 @@ export function TradePanel({
   unseenItems,
   onTradeSuccess,
   activeFilter = 'all',
-  sortBy = 'rarity_desc',
+  sortBy = 'rarity_asc',
   paused = false,
 }: TradePanelProps) {
   // --- State ---

@@ -204,7 +204,7 @@ export function FilterBar({
               }}
               title={opt.label}
               className={cn(
-                'relative flex-none flex items-center justify-center gap-2 px-4 py-3 rounded-2xl transition-all duration-200 border-[2px] shadow-sm select-none',
+                'relative flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 border-[2px] shadow-sm select-none',
                 'text-sm font-bold whitespace-nowrap',
                 isActive
                   ? 'bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/20 shadow-none'

@@ -116,6 +116,9 @@ function WardrobeManagerContent({
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
   useEffect(() => { setActiveTab(defaultTab); }, [defaultTab]);
+  useEffect(() => {
+    setSortBy(activeTab === 'inventory' ? 'latest' : 'rarity_asc');
+  }, [activeTab]);
   const [activeFilter, setActiveFilter] = useState<FilterCategory>('all');
   const [visitedCategories, setVisitedCategories] = useState<
     Set<FilterCategory>
@@ -123,7 +126,7 @@ function WardrobeManagerContent({
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [confirmingBuyId, setConfirmingBuyId] = useState<string | null>(null);
   const [equippingId, setEquippingId] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOrder>('rarity_desc');
+  const [sortBy, setSortBy] = useState<SortOrder>('latest');
   const [notif, setNotif] = useState<{
     msg: string;
     type: 'error' | 'success';
@@ -304,6 +307,17 @@ function WardrobeManagerContent({
       } else {
         result = result.filter((i) => i.slot === activeFilter);
       }
+    }
+    if (sortBy === 'latest') {
+      const unseenList = data?.wardrobe?.unseenItems ?? [];
+      const recencyIndex = new Map<string, number>();
+      unseenList.forEach((id, idx) => recencyIndex.set(id, idx));
+      return [...result].sort((a, b) => {
+        const aIdx = recencyIndex.has(a.id) ? recencyIndex.get(a.id)! : -1;
+        const bIdx = recencyIndex.has(b.id) ? recencyIndex.get(b.id)! : -1;
+        if (aIdx !== bIdx) return bIdx - aIdx;
+        return rarityRank[b.rarity] - rarityRank[a.rarity];
+      });
     }
     return result.sort((a, b) => {
       switch (sortBy) {
@@ -564,11 +578,11 @@ function WardrobeManagerContent({
           onValueChange={setActiveTab}
           className="flex flex-col h-full"
         >
-          <div className="relative px-4 pt-0 space-y-3 shrink-0 md:px-6 md:pt-5 md:space-y-4">
+          <div className="relative px-4 pt-0 space-y-2 shrink-0 md:px-6 md:pt-2 md:space-y-2">
             <div className="relative z-10 flex items-center justify-between gap-2 md:gap-4">
               <TabsList
                 className={cn(
-                  'flex-1 h-12 md:h-14 p-1 rounded-[20px] border border-border/50 shadow-sm flex items-center gap-1',
+                  'flex-1 h-10 md:h-11 p-1 rounded-[18px] border border-border/50 shadow-sm flex items-center gap-1',
                   embedded
                     ? 'bg-card/50 backdrop-blur-xl'
                     : isDesktop
@@ -609,7 +623,11 @@ function WardrobeManagerContent({
                 </TabsTrigger>
               </TabsList>
 
-              <SortMenu value={sortBy} onChange={setSortBy} />
+              <SortMenu
+                value={sortBy}
+                onChange={setSortBy}
+                showLatest={activeTab === 'inventory'}
+              />
             </div>
 
             <div className="relative z-10 w-full min-w-0">
@@ -684,7 +702,7 @@ function WardrobeManagerContent({
                   inventoryGrid.loadMore();
                 }
               }}
-              className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
+              className="absolute inset-0 overflow-y-auto rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
             >
               {activeTab === 'inventory' && activeFilter === 'background' ? (
                 <BackgroundsPanel
@@ -774,7 +792,7 @@ function WardrobeManagerContent({
                   shopGrid.loadMore();
                 }
               }}
-              className="absolute inset-0 overflow-y-auto p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
+              className="absolute inset-0 overflow-y-auto rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
             >
               {activeTab === 'shop' && activeFilter === 'background' ? (
                 <BackgroundsPanel
