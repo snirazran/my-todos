@@ -9,6 +9,8 @@ import {
   Compass,
   Gift,
   Plus,
+  Sparkles,
+  Tags,
   Trophy,
   X,
 } from 'lucide-react';
@@ -151,6 +153,65 @@ export function formatQuestObjective(block: QuestCardLogicBlock) {
       ? `${subjectLabel} with focus tags`
       : subjectLabel;
   return `${actionLabel} ${targetLabel} ${scopeLabel}`;
+}
+
+function renderObjectiveLabel(
+  block: QuestCardLogicBlock,
+  context: {
+    linkedTags?: QuestTagChip[];
+    categoryName?: string;
+    categoryAccent?: string;
+  },
+) {
+  if (block.tagMode !== 'focus_category_tags') {
+    return formatQuestObjective(block);
+  }
+
+  const targetLabel =
+    block.targetLabel ?? String(Math.max(0, block.target ?? 0));
+  const numericTarget = Math.max(0, block.target ?? 0);
+  const isMinutes = block.type === 'focus_minutes';
+  const subjectLabel = isMinutes
+    ? 'minutes on tasks'
+    : numericTarget === 1 && !targetLabel.includes('-')
+      ? 'task'
+      : 'tasks';
+  const actionLabel = isMinutes
+    ? 'Focus for'
+    : block.action === 'add'
+      ? 'Add'
+      : 'Complete';
+
+  const prefix = `${actionLabel} ${targetLabel} ${subjectLabel} with`;
+
+  const tags = context.linkedTags ?? [];
+  if (tags.length > 0) {
+    return (
+      <>
+        <span>{prefix}</span>
+        {tags.map((tag) => (
+          <QuestTagPill key={tag.id} tag={tag} />
+        ))}
+        <span>{tags.length > 1 ? 'tags' : 'tag'}</span>
+      </>
+    );
+  }
+
+  const fallback =
+    context.categoryName?.toLowerCase().trim() || 'focus';
+  return (
+    <>
+      <span>{prefix}</span>
+      <QuestTagPill
+        tag={{
+          id: `${block.id}-category-fallback`,
+          name: fallback,
+          color: context.categoryAccent ?? '#22c55e',
+        }}
+      />
+      <span>tags</span>
+    </>
+  );
 }
 
 function getTaggedSubjectCopy(block: QuestCardLogicBlock) {
@@ -480,6 +541,7 @@ export function CategoryQuestPresentationCard({
             linkedTags={linkedTags}
             accent={category?.accent ?? '#22c55e'}
             onEditTags={onEditTags}
+            categoryName={category?.shortLabel || category?.name}
           />
         )}
         {visibleLogic.map((block, i) => (
@@ -502,7 +564,10 @@ export function CategoryQuestPresentationCard({
                 onClaimObjective ? () => onClaimObjective(block.id) : undefined
               }
               isLast={i === visibleLogic.length - 1}
-            isFirst={i === 0}
+              isFirst={i === 0}
+              linkedTags={linkedTags}
+              categoryName={category?.shortLabel || category?.name}
+              categoryAccent={category?.accent}
             />
             {block.tagMode !== 'focus_category_tags' &&
             getTagScopeMessage(block) ? (
@@ -582,6 +647,9 @@ function ObjectiveRow({
   isLast,
   isFirst,
   paused = false,
+  linkedTags,
+  categoryName,
+  categoryAccent,
 }: {
   block: QuestCardLogicBlock;
   objectiveClaimed?: boolean;
@@ -593,6 +661,9 @@ function ObjectiveRow({
   isLast?: boolean;
   isFirst?: boolean;
   paused?: boolean;
+  linkedTags?: QuestTagChip[];
+  categoryName?: string;
+  categoryAccent?: string;
 }) {
   const safeTarget = Math.max(1, block.target);
   const objectiveComplete = block.progress >= safeTarget;
@@ -603,106 +674,106 @@ function ObjectiveRow({
 
   const stepDone = objectiveClaimed || (objectiveComplete && !hasRewards);
 
+  const renderActionSlot = () => {
+    if (objectiveClaimable && onClaimObjective) {
+      return (
+        <button
+          type="button"
+          onClick={onClaimObjective}
+          disabled={claimingObjective}
+          className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-500 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#059669] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#059669] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <span className="mr-[-0.15em]">
+            {claimingObjective ? 'Claiming...' : 'Claim'}
+          </span>
+        </button>
+      );
+    }
+    if (objectiveClaimed) {
+      return (
+        <div className="flex h-9 items-center gap-1.5 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3">
+          <Check className="w-3 h-3 text-emerald-500" />
+          <span className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-600/70 dark:text-emerald-400/70">
+            Claimed
+          </span>
+        </div>
+      );
+    }
+    return (
+      <div
+        className="inline-flex h-9 cursor-not-allowed items-center justify-center rounded-xl bg-muted px-4 text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/60 shadow-[0_3px_0_0_rgba(15,23,42,0.12)]"
+        aria-disabled
+      >
+        <span className="mr-[-0.15em]">Claim</span>
+      </div>
+    );
+  };
+
+  const firstReward = hasRewards ? block.rewards![0] : null;
+  const extraRewardCount = hasRewards ? block.rewards!.length - 1 : 0;
+
   return (
     <div className={cn('py-3', !isLast && 'border-b border-border/20')}>
-      <div className="min-w-0">
-        {/* Title row */}
-        <p
-          className={cn(
-            'text-sm md:text-base font-black leading-snug',
-            stepDone
-              ? 'text-emerald-600 line-through decoration-emerald-500/60 dark:text-emerald-400'
-              : 'text-foreground',
-          )}
-        >
-          {formatQuestObjective(block)}
-        </p>
-
-        {/* Progress bar with counter inside */}
-        <div className="relative h-7 mt-2 overflow-hidden rounded-full bg-muted">
-          <div className="absolute inset-1">
-            <div
-              className={cn(
-                'h-full min-w-6 rounded-full transition-all duration-500',
-                progressBarColor(
-                  pct,
-                  objectiveComplete,
-                  objectiveClaimed ?? false,
-                ),
-              )}
-              style={{ width: pct > 0 ? `${pct}%` : '1.5rem' }}
+      <div className="flex items-center gap-3">
+        {firstReward ? (
+          <div className="relative shrink-0">
+            <RewardTile
+              reward={firstReward}
+              rewardCatalog={rewardCatalog}
+              isPremium={isPremium ?? false}
+              compact
+              paused={paused}
+              className="h-16 w-16 rounded-2xl"
+              hydrateDelayMs={150}
+              onClick={() => onOpenRewards?.(block.rewards ?? [])}
             />
+            {extraRewardCount > 0 && (
+              <span className="pointer-events-none absolute -bottom-1 -right-1 z-30 flex h-5 min-w-[1.25rem] items-center justify-center rounded-md border border-white/10 bg-black/55 px-1 text-[9px] font-black uppercase tracking-wide text-white shadow-sm backdrop-blur-sm">
+                +{extraRewardCount}
+              </span>
+            )}
           </div>
-          <span className="absolute inset-0 flex items-center justify-center text-xs font-black tabular-nums text-foreground/70">
-            {Math.min(block.progress, safeTarget)}
-            {' / '}
-            {block.targetLabel ?? block.target}
-          </span>
-        </div>
+        ) : null}
 
-      {/* Reward row */}
-      {hasRewards && (
-        <div className="flex items-center gap-2 mt-2">
-          <div className="flex flex-wrap gap-1.5">
-            {block.rewards!.map((reward, index) => (
-              <RewardTile
-                key={`${reward.type}-${reward.itemId ?? reward.amount ?? index}`}
-                reward={reward}
-                rewardCatalog={rewardCatalog}
-                isPremium={isPremium ?? false}
-                compact
-                paused={paused}
-                className="h-16 w-16 rounded-2xl sm:h-20 sm:w-20 sm:rounded-[22px]"
-                hydrateDelayMs={150 + index * 55}
-                onClick={() => onOpenRewards?.(block.rewards ?? [])}
+        <div className="min-w-0 flex-1">
+          <p
+            className={cn(
+              'flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm font-black leading-snug md:text-base',
+              stepDone
+                ? 'text-emerald-600 line-through decoration-emerald-500/60 dark:text-emerald-400'
+                : 'text-foreground',
+            )}
+          >
+            {renderObjectiveLabel(block, {
+              linkedTags,
+              categoryName,
+              categoryAccent,
+            })}
+          </p>
+
+          <div className="relative mt-2 h-6 overflow-hidden rounded-full bg-muted">
+            <div className="absolute inset-1">
+              <div
+                className={cn(
+                  'h-full min-w-5 rounded-full transition-all duration-500',
+                  progressBarColor(
+                    pct,
+                    objectiveComplete,
+                    objectiveClaimed ?? false,
+                  ),
+                )}
+                style={{ width: pct > 0 ? `${pct}%` : '1.25rem' }}
               />
-            ))}
+            </div>
+            <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black tabular-nums text-foreground/70">
+              {Math.min(block.progress, safeTarget)}
+              {' / '}
+              {block.targetLabel ?? block.target}
+            </span>
           </div>
+        </div>
 
-          <div className="ml-auto shrink-0">
-            {(() => {
-              if (objectiveClaimable && onClaimObjective) {
-                return (
-                  <button
-                    type="button"
-                    onClick={onClaimObjective}
-                    disabled={claimingObjective}
-                    className="group relative inline-flex h-9 items-center justify-center overflow-hidden rounded-xl bg-emerald-500 px-5 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#059669] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#059669] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    <span className="mr-[-0.15em]">
-                      {claimingObjective ? 'Claiming...' : 'Claim'}
-                    </span>
-                  </button>
-                );
-              }
-              if (objectiveClaimed) {
-                return (
-                  <div className="flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 px-2.5 py-1.5">
-                    <Check className="w-3 h-3 text-emerald-500" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.12em] text-emerald-600/70 dark:text-emerald-400/70">
-                      Claimed
-                    </span>
-                  </div>
-                );
-              }
-              return (
-                <div className="flex items-center justify-center gap-1.5 rounded-xl bg-muted/50 px-3 py-1.5">
-                  <span className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/50 mr-[-0.15em]">
-                    In Progress
-                  </span>
-                </div>
-              );
-            })()}
-          </div>
-        </div>
-      )}
-      {!hasRewards && !objectiveComplete && (
-        <div className="flex items-center justify-center gap-1.5 mt-2 rounded-xl bg-muted/50 px-3 py-1.5 w-fit">
-          <span className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground/50 mr-[-0.15em]">
-            In Progress
-          </span>
-        </div>
-      )}
+        <div className="shrink-0">{renderActionSlot()}</div>
       </div>
     </div>
   );
@@ -727,10 +798,12 @@ function FocusQuestTagPanel({
   linkedTags,
   accent,
   onEditTags,
+  categoryName,
 }: {
   linkedTags: QuestTagChip[];
   accent: string;
   onEditTags?: () => void;
+  categoryName?: string;
 }) {
   if (linkedTags.length > 0) {
     return (
@@ -755,27 +828,34 @@ function FocusQuestTagPanel({
   }
 
   return (
-    <div className="px-3 py-3 mt-3 mb-1 border rounded-2xl border-primary/15 bg-primary/5">
+    <div className="relative mt-3 mb-1 overflow-hidden rounded-[22px] border-2 border-dashed border-primary/30 bg-gradient-to-br from-primary/8 via-primary/5 to-transparent p-3.5">
+      <Sparkles
+        className="pointer-events-none absolute right-3 top-3 h-3.5 w-3.5 text-primary/40"
+        aria-hidden
+      />
       <div className="flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-            Focus tags
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary ring-1 ring-inset ring-primary/20">
+          <Tags className="h-5 w-5" strokeWidth={2.5} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black leading-tight text-foreground">
+            Pick your {categoryName ? `${categoryName.toLowerCase()} ` : ''}tags
           </p>
           <p className="mt-0.5 text-xs font-medium text-muted-foreground">
-            Choose which tags count for this quest.
+            Tasks with these tags count toward this quest.
           </p>
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2 mt-3">
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         {onEditTags ? (
           <button
             type="button"
             onClick={onEditTags}
-            className="inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-primary transition hover:bg-primary/15"
+            className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-primary px-4 py-2.5 text-xs font-black uppercase tracking-[0.14em] text-primary-foreground shadow-[0_3px_0_rgba(15,23,42,0.18)] transition active:translate-y-0.5 active:shadow-none sm:w-auto"
           >
-            <Plus className="h-3.5 w-3.5" />
-            Select a tag to start
+            <Plus className="h-3.5 w-3.5" strokeWidth={3} />
+            Pick tags
           </button>
         ) : (
           <PreviewTagHint label="Saved focus tags" color={accent} />

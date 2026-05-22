@@ -617,7 +617,7 @@ export function QuestsPanel({
                           </div>
                         )}
                         <div className={cn(
-                          "flex flex-col gap-8 lg:grid lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] lg:items-start",
+                          "flex flex-col gap-8",
                           data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 bg-background rounded-t-[24px] md:rounded-none md:bg-transparent"
                         )}>
                         <div className="space-y-4">
@@ -687,7 +687,7 @@ export function QuestsPanel({
                           {filteredCategoryQuests.length === 0 ? (
                             <PanelCard>No active focus quests here.</PanelCard>
                           ) : (
-                            <div className="space-y-4">
+                            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                               {filteredCategoryQuests.map((quest) => (
                                 <CategoryQuestPresentationCard
                                   key={quest.id}

@@ -724,12 +724,72 @@ export async function syncQuestState(args: {
     selectedDailyTemplates = shuffle(dailyTemplates, rng).slice(0, 3);
   }
 
-  const eligibleTemplates = [...selectedDailyTemplates, ...categoryTemplates];
+  // Per-category rotation: each selected category has exactly one active quest.
+  // If the active quest's template is expired, rotate to a different template
+  // from the same category (or re-roll the same template if it's the only one).
+  const templatesByCategoryId = new Map<string, QuestTemplateDoc[]>();
+  for (const template of categoryTemplates) {
+    if (!template.categoryId) continue;
+    const arr = templatesByCategoryId.get(template.categoryId) ?? [];
+    arr.push(template);
+    templatesByCategoryId.set(template.categoryId, arr);
+  }
+
+  const existingByCategoryId = new Map<string, QuestDoc[]>();
+  for (const doc of allExistingDocs) {
+    if (doc.placement === 'category' && doc.categoryId) {
+      const arr = existingByCategoryId.get(doc.categoryId) ?? [];
+      arr.push(doc);
+      existingByCategoryId.set(doc.categoryId, arr);
+    }
+  }
+
+  const selectedCategoryTemplates: QuestTemplateDoc[] = [];
+  const categoryDocIdsToKeep = new Set<string>();
+  const nowMs = Date.now();
+
+  Array.from(templatesByCategoryId.entries()).forEach(
+    ([categoryId, templatesForCat]: [string, QuestTemplateDoc[]]) => {
+      if (templatesForCat.length === 0) return;
+      const existingDocs = existingByCategoryId.get(categoryId) ?? [];
+      const validTemplateIds = new Set(
+        templatesForCat.map((t: QuestTemplateDoc) => t.templateId),
+      );
+
+      const liveDoc = existingDocs.find((doc) => {
+        if (!validTemplateIds.has(doc.templateId)) return false;
+        return !doc.expiresAt || doc.expiresAt.getTime() > nowMs;
+      });
+
+      let chosenTemplate: QuestTemplateDoc;
+      if (liveDoc) {
+        chosenTemplate =
+          templatesForCat.find(
+            (t: QuestTemplateDoc) => t.templateId === liveDoc.templateId,
+          ) ?? templatesForCat[0];
+        categoryDocIdsToKeep.add(String(liveDoc._id));
+      } else {
+        const lastTemplateId = existingDocs[0]?.templateId;
+        const rotated =
+          lastTemplateId && templatesForCat.length > 1
+            ? templatesForCat.filter(
+                (t: QuestTemplateDoc) => t.templateId !== lastTemplateId,
+              )
+            : templatesForCat;
+        const pool = rotated.length > 0 ? rotated : templatesForCat;
+        const rng = createSeededRandom(
+          `${userId}:rotate:${categoryId}:${nowMs}`,
+        );
+        chosenTemplate = pool[Math.floor(rng() * pool.length)];
+      }
+
+      selectedCategoryTemplates.push(chosenTemplate);
+    },
+  );
+
+  const eligibleTemplates = [...selectedDailyTemplates, ...selectedCategoryTemplates];
   const eligibleDailyTemplateIds = new Set(
     selectedDailyTemplates.map((t) => t.templateId),
-  );
-  const eligibleCategoryTemplateIds = new Set(
-    categoryTemplates.map((t) => t.templateId),
   );
 
   // Find docs to delete in-memory and batch delete by IDs
@@ -738,7 +798,7 @@ export async function syncQuestState(args: {
       return !eligibleDailyTemplateIds.has(doc.templateId);
     }
     if (doc.placement === 'category') {
-      return !eligibleCategoryTemplateIds.has(doc.templateId);
+      return !categoryDocIdsToKeep.has(doc._id.toString());
     }
     // Delete stale daily docs from other days
     if (doc.placement === 'daily' && doc.windowKey !== todayKey) {
