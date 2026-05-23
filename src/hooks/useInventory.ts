@@ -15,6 +15,7 @@ type ApiData = {
     equipped: Partial<Record<WardrobeSlot, string | null>>;
     inventory: Record<string, number>;
     unseenItems?: string[];
+    inventoryHistory?: Record<string, string>;
     flies: number;
   };
   catalog: ItemDef[];

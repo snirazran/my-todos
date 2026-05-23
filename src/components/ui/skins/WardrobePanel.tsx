@@ -29,6 +29,7 @@ type ApiData = {
     equipped: Partial<Record<WardrobeSlot, string | null>>;
     inventory: Record<string, number>;
     unseenItems?: string[];
+    inventoryHistory?: Record<string, string>;
     flies: number;
   };
   catalog: ItemDef[];
@@ -309,13 +310,25 @@ function WardrobeManagerContent({
       }
     }
     if (sortBy === 'latest') {
+      const history = data?.wardrobe?.inventoryHistory ?? {};
       const unseenList = data?.wardrobe?.unseenItems ?? [];
-      const recencyIndex = new Map<string, number>();
-      unseenList.forEach((id, idx) => recencyIndex.set(id, idx));
+      const unseenOrder = new Map<string, number>();
+      unseenList.forEach((id, idx) => unseenOrder.set(id, idx));
+      const getTs = (id: string) => {
+        const iso = history[id];
+        if (iso) {
+          const t = new Date(iso).getTime();
+          if (Number.isFinite(t)) return t;
+        }
+        return -1;
+      };
       return [...result].sort((a, b) => {
-        const aIdx = recencyIndex.has(a.id) ? recencyIndex.get(a.id)! : -1;
-        const bIdx = recencyIndex.has(b.id) ? recencyIndex.get(b.id)! : -1;
-        if (aIdx !== bIdx) return bIdx - aIdx;
+        const aTs = getTs(a.id);
+        const bTs = getTs(b.id);
+        if (aTs !== bTs) return bTs - aTs;
+        const aUnseen = unseenOrder.has(a.id) ? unseenOrder.get(a.id)! : -1;
+        const bUnseen = unseenOrder.has(b.id) ? unseenOrder.get(b.id)! : -1;
+        if (aUnseen !== bUnseen) return bUnseen - aUnseen;
         return rarityRank[b.rarity] - rarityRank[a.rarity];
       });
     }
