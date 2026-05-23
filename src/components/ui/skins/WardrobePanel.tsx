@@ -323,12 +323,15 @@ function WardrobeManagerContent({
         return -1;
       };
       return [...result].sort((a, b) => {
+        const aNew = unseenOrder.has(a.id);
+        const bNew = unseenOrder.has(b.id);
+        if (aNew !== bNew) return aNew ? -1 : 1;
+        if (aNew && bNew) {
+          return unseenOrder.get(b.id)! - unseenOrder.get(a.id)!;
+        }
         const aTs = getTs(a.id);
         const bTs = getTs(b.id);
         if (aTs !== bTs) return bTs - aTs;
-        const aUnseen = unseenOrder.has(a.id) ? unseenOrder.get(a.id)! : -1;
-        const bUnseen = unseenOrder.has(b.id) ? unseenOrder.get(b.id)! : -1;
-        if (aUnseen !== bUnseen) return bUnseen - aUnseen;
         return rarityRank[b.rarity] - rarityRank[a.rarity];
       });
     }
