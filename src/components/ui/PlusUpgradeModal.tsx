@@ -198,12 +198,17 @@ function Step0({
         <FeatureRow
           icon={<Unlock className="h-5 w-5 text-amber-300" />}
           title="Improve in all areas"
-          subtitle="Unlimited tags and quests, focus on more areas and earn more rewards"
+          subtitle="Unlimited tags and quests, focus on more areas and earn more rewards!"
         />
         <FeatureRow
           icon={<span className="text-sm font-black text-amber-300">×2</span>}
           title="Double rewards"
-          subtitle="Earn double rewards from quests and tasks"
+          subtitle="Earn double rewards from quests and tasks!"
+        />
+        <FeatureRow
+          icon={<Sparkle className="h-5 w-5 text-amber-300" />}
+          title="Season plus rewards"
+          subtitle="Instantly unlock all Season Plus rewards!"
         />
         <FeatureRow
           icon={<Heart className="h-5 w-5 text-rose-300" fill="currentColor" />}
@@ -253,6 +258,7 @@ const COMPARISON_ROWS: { label: string; free: boolean }[] = [
   { label: 'Unlimited quests', free: false },
   { label: 'Unlimited tags', free: false },
   { label: 'Double rewards', free: false },
+  { label: 'Season plus rewards', free: false },
   { label: 'Plus only skins', free: false },
   { label: 'Plus only backgrounds', free: false },
 ];
