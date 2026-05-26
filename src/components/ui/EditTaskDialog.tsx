@@ -59,12 +59,12 @@ export function EditTaskDialog({
         <>
           <motion.div
             key="edit-task-backdrop"
-            initial={{ opacity: 0 }}
+            initial={{ opacity: 1 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
+            transition={{ duration: 0.15 }}
             onClick={onClose}
-            className="fixed inset-0 z-[1500] bg-black/35"
+            className="fixed inset-0 z-[1500] bg-black/80"
           />
           <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1501] flex justify-center sm:bottom-6">
             <motion.div

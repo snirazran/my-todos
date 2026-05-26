@@ -39,7 +39,7 @@ export function DeleteDialog({
 
   const dialogContent = (
     <div
-      className="fixed inset-0 z-[10001] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-4 pb-6 sm:pb-0"
+      className="fixed inset-0 z-[10001] flex items-end sm:items-center justify-center bg-black/80 px-4 pb-6 sm:pb-0"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
