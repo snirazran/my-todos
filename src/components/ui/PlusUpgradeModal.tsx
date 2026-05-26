@@ -76,14 +76,14 @@ export function PlusUpgradeModal({
         <>
           <div
             onClick={onClose}
-            className="fixed inset-0 z-[300] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[9998] bg-black/60 backdrop-blur-sm"
           />
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-            className="pointer-events-none fixed inset-0 z-[301] flex md:items-center md:justify-center md:p-6"
+            className="pointer-events-none fixed inset-0 z-[9999] flex md:items-center md:justify-center md:p-6"
           >
             <div className="pointer-events-auto relative mx-auto flex h-full w-full flex-col overflow-y-auto bg-[#6c6fce] text-white md:h-[min(720px,calc(100dvh-3rem))] md:w-[min(100vw-3rem,28rem)] md:rounded-[32px] md:shadow-2xl">
               <button

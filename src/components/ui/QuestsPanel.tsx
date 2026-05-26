@@ -30,6 +30,7 @@ import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
 import { AnimatedNumber } from './AnimatedNumber';
 import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
+import { PlusUpgradeModal } from './PlusUpgradeModal';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -211,6 +212,7 @@ export function QuestsPanel({
     null,
   );
   const [seasonEventOpen, setSeasonEventOpen] = useState(false);
+  const [plusOpen, setPlusOpen] = useState(false);
   const [claimingSeason, setClaimingSeason] = useState(false);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
   const [editingFocusCategoryId, setEditingFocusCategoryId] =
@@ -766,8 +768,10 @@ export function QuestsPanel({
                 claiming={claimingSeason}
                 onClose={() => setSeasonEventOpen(false)}
                 onClaim={handleClaimSeasonDay}
+                onUpgrade={() => setPlusOpen(true)}
                 paused={false}
               />
+              <PlusUpgradeModal open={plusOpen} onClose={() => setPlusOpen(false)} />
       </>
     );
   };
@@ -1041,6 +1045,7 @@ function QuestSeasonEventOverlay({
   claiming,
   onClose,
   onClaim,
+  onUpgrade,
   paused = false,
 }: {
   season: QuestSeasonView | null;
@@ -1050,9 +1055,34 @@ function QuestSeasonEventOverlay({
   claiming: boolean;
   onClose: () => void;
   onClaim: () => void;
+  onUpgrade?: () => void;
   paused?: boolean;
 }) {
   const timeLeft = useSeasonCountdown(season?.endsAt);
+  const timelineRef = useRef<HTMLDivElement | null>(null);
+  const currentDayRef = useRef<HTMLDivElement | null>(null);
+  const [greenLineHeight, setGreenLineHeight] = useState<string>('0px');
+
+  useEffect(() => {
+    if (!open) return;
+    const recompute = () => {
+      const container = timelineRef.current;
+      const target = currentDayRef.current;
+      if (!container || !target) return;
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const center = targetRect.top + targetRect.height / 2 - containerRect.top;
+      setGreenLineHeight(`${Math.max(0, center)}px`);
+    };
+    recompute();
+    const raf = window.requestAnimationFrame(recompute);
+    window.addEventListener('resize', recompute);
+    return () => {
+      window.cancelAnimationFrame(raf);
+      window.removeEventListener('resize', recompute);
+    };
+  }, [open, season?.currentDay, season?.dayCount]);
+
   if (!open || !season || typeof document === 'undefined') return null;
 
   const progress = Math.min(season.progressFlies, season.dailyTargetFlies);
@@ -1070,9 +1100,8 @@ function QuestSeasonEventOverlay({
   const goalReached = season.claimable || claimedToday;
 
   return createPortal(
-    <div className="fixed inset-0 z-[1200] bg-background">
-      <div className="h-full overflow-y-auto bg-background">
-        <div className="relative h-[310px] overflow-hidden">
+    <div className="fixed inset-0 z-[1200] flex flex-col bg-background">
+      <div className="relative h-[310px] shrink-0 overflow-hidden">
           {hasSeasonCover(season.images) ? (
             <SeasonCoverImage
               images={season.images}
@@ -1093,7 +1122,7 @@ function QuestSeasonEventOverlay({
           </button>
           <div className="pointer-events-none absolute inset-x-0 top-28 flex justify-center px-4">
             <h2
-              className="max-w-[20rem] text-center text-4xl uppercase leading-none tracking-wide text-white drop-shadow-[0_5px_0_rgba(15,23,42,0.6)] sm:text-5xl"
+              className="max-w-[20rem] text-center text-4xl uppercase leading-none tracking-wide text-white drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:text-5xl"
               style={{
                 fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
                 WebkitTextStroke: '3px rgba(15, 23, 42, 0.95)',
@@ -1103,18 +1132,36 @@ function QuestSeasonEventOverlay({
               {season.name}
             </h2>
           </div>
-          <div className="absolute bottom-9 left-5 inline-flex h-9 items-center gap-2 rounded-full border border-primary/35 bg-primary/90 pl-2.5 pr-3.5 text-primary-foreground ring-1 ring-white/20 backdrop-blur-md">
-            <Clock className="h-4 w-4" strokeWidth={2.8} />
-            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/70">
-              Ends in
-            </span>
-            <span className="text-sm font-black tabular-nums">
-              {timeLeft}
-            </span>
+          <div className="pointer-events-none absolute inset-x-0 bottom-9 mx-auto flex max-w-2xl items-center justify-between px-5">
+            <div className="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-full border border-primary/35 bg-primary/90 pl-2.5 pr-3.5 text-primary-foreground ring-1 ring-white/20 backdrop-blur-md">
+              <Clock className="h-4 w-4" strokeWidth={2.8} />
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/70">
+                Ends in
+              </span>
+              <span className="text-sm font-black tabular-nums">
+                {timeLeft}
+              </span>
+            </div>
+            {!isPremium && onUpgrade && (
+              <button
+                type="button"
+                onClick={onUpgrade}
+                className="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-full bg-violet-500 pl-2.5 pr-3 text-white shadow-sm ring-1 ring-white/20 transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] dark:bg-violet-600"
+              >
+                <Sparkles className="h-4 w-4 text-amber-300" strokeWidth={2.5} />
+                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/90">
+                  Unlock
+                </span>
+                <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-black leading-none tracking-[0.12em] text-violet-700">
+                  Plus
+                </span>
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="relative z-10 -mt-8 rounded-t-[32px] bg-background pt-5">
+        <div className="-mt-8 flex-1 overflow-y-auto bg-background rounded-t-[32px]">
+        <div className="relative z-10 mx-auto max-w-2xl bg-background pt-5">
           {goalReached ? (
             <div className="mx-4 overflow-hidden rounded-[24px] border border-primary/15 bg-card">
               <div className="flex items-center justify-between gap-3 px-5 py-2.5">
@@ -1161,7 +1208,7 @@ function QuestSeasonEventOverlay({
           )}
 
         <div className="px-4 pb-5 pt-5">
-          <div className="bg-transparent p-0 text-foreground">
+          <div className="text-foreground">
             <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2">
               <div className="flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-muted/35 px-4 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                 <Gift className="w-4 h-4" />
@@ -1170,31 +1217,21 @@ function QuestSeasonEventOverlay({
               <div className="w-10" />
               <button
                 type="button"
-                className="relative flex h-10 items-center justify-center gap-2 overflow-hidden rounded-xl border border-primary/35 bg-primary px-4 text-[11px] font-black uppercase tracking-[0.16em] text-primary-foreground ring-1 ring-white/15 transition hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0"
+                className="relative flex h-10 items-center justify-center gap-2 overflow-hidden rounded-xl bg-violet-500 px-4 text-[11px] font-black uppercase tracking-[0.16em] text-white shadow-sm transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] dark:bg-violet-600"
               >
-                <Sparkles className="w-4 h-4 text-amber-200" />
+                <Sparkles className="w-4 h-4 text-amber-300" strokeWidth={2.5} />
                 <span>Frog</span>
-                <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-black leading-none tracking-[0.12em] text-primary-foreground ring-1 ring-white/20">
+                <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-black leading-none tracking-[0.12em] text-violet-700">
                   Plus
                 </span>
               </button>
             </div>
 
-            <div className="relative mt-4 px-1 pb-1">
+            <div ref={timelineRef} className="relative mt-4 rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4">
               <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60" />
               <div
                 className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)]"
-                style={{
-                  height: `calc(${Math.min(
-                    100,
-                    Math.max(
-                      0,
-                      ((season.currentDay - 0.5) /
-                        Math.max(1, season.dayCount)) *
-                        100,
-                    ),
-                  )}%)`,
-                }}
+                style={{ height: greenLineHeight }}
               />
 
               <div className="relative z-10 flex flex-col gap-y-5">
@@ -1251,6 +1288,7 @@ function QuestSeasonEventOverlay({
                           <span className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-primary/20 animate-ping-ring" />
                         )}
                         <div
+                          ref={isCurrent ? currentDayRef : undefined}
                           className={cn(
                             'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.12)] ring-1 ring-primary/20',
                             isClaimed && !isCurrent

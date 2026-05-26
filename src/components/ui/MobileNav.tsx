@@ -1,7 +1,8 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Home, LayoutDashboard, ScrollText, Shirt, ShoppingBag, Repeat } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
+import Image from 'next/image';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
 import useSWR from 'swr';
@@ -35,17 +36,17 @@ export default function MobileNav() {
     {
       href: '/',
       label: 'Today',
-      icon: Home,
+      iconSrc: '/icons/Home.svg',
     },
     {
       href: '/planner',
       label: 'Planner',
-      icon: LayoutDashboard,
+      iconSrc: '/icons/Planner.svg',
       protected: true,
     },
     {
       label: 'Quests',
-      icon: ScrollText,
+      iconSrc: '/icons/Quests.svg',
       onClick: () => {
         if (!user) {
           router.push('/login');
@@ -57,7 +58,7 @@ export default function MobileNav() {
     },
     {
       label: 'Wardrobe',
-      icon: Shirt,
+      iconSrc: '/icons/Wardrobe.svg',
       onClick: () => {
         if (!user) {
           router.push('/login');
@@ -75,13 +76,16 @@ export default function MobileNav() {
         <div className="grid grid-cols-4 h-16">
           {navItems.map((item) => {
             const isActive = item.href ? pathname === item.href : item.isActive;
-            const Icon = item.icon;
 
             const content = (
               <>
                 <div className="relative">
-                  <Icon
-                    className={`w-6 h-6 mb-1 ${isActive ? 'fill-current/20' : ''}`}
+                  <Image
+                    src={item.iconSrc}
+                    alt={item.label}
+                    width={32}
+                    height={32}
+                    className={`w-8 h-8 mb-1 ${isActive ? 'opacity-100' : 'opacity-60'}`}
                   />
                   {item.label === 'Wardrobe' && inventoryBadge > 0 && (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
@@ -170,8 +174,8 @@ function WardrobePopup({
     {
       tab: 'inventory' as const,
       label: 'Inventory',
-      icon: Shirt,
-      color: 'text-primary bg-primary/10',
+      iconSrc: '/icons/Wardrobe.svg',
+      color: 'bg-primary/10',
     },
     {
       tab: 'shop' as const,
@@ -182,8 +186,8 @@ function WardrobePopup({
     {
       tab: 'trade' as const,
       label: 'Trade',
-      icon: Repeat,
-      color: 'text-amber-500 bg-amber-500/10',
+      iconSrc: '/icons/Repeat.svg',
+      color: 'bg-amber-500/10',
     },
   ];
 
@@ -217,7 +221,7 @@ function WardrobePopup({
             {/* Header */}
             <div className="flex items-center gap-3 px-5 pb-3">
               <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Shirt className="w-5 h-5 text-primary" />
+                <Image src="/icons/Wardrobe.svg" alt="Wardrobe" width={20} height={20} className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none mb-0.5">
@@ -231,16 +235,20 @@ function WardrobePopup({
 
             {/* Cards */}
             <div className="grid grid-cols-3 gap-3 px-4 pb-5">
-              {items.map(({ tab, label, icon: Icon, color }) => (
+              {items.map((item) => (
                 <button
-                  key={tab}
-                  onClick={() => onSelect(tab)}
+                  key={item.tab}
+                  onClick={() => onSelect(item.tab)}
                   className="flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-card border border-border/50 active:scale-95 transition-all"
                 >
-                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${color}`}>
-                    <Icon className="w-7 h-7" />
+                  <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${item.color}`}>
+                    {'iconSrc' in item && item.iconSrc ? (
+                      <Image src={item.iconSrc} alt={item.label} width={28} height={28} className="w-7 h-7" />
+                    ) : 'icon' in item && item.icon ? (
+                      (() => { const Icon = item.icon; return <Icon className="w-7 h-7" />; })()
+                    ) : null}
                   </div>
-                  <span className="text-sm font-bold text-foreground">{label}</span>
+                  <span className="text-sm font-bold text-foreground">{item.label}</span>
                 </button>
               ))}
             </div>

@@ -4,7 +4,6 @@ import {
   EllipsisVertical,
   CalendarCheck,
   CalendarClock,
-  RotateCcw,
   Repeat,
   Pencil,
   Filter,
@@ -551,18 +550,17 @@ const SortableTaskItem = React.forwardRef<
                     <AnimatePresence mode="popLayout">
                       {task.startTime && (
                         <motion.span
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
+                          initial={false}
                           exit={{ opacity: 0, scale: 0 }}
-                          className="inline-flex items-center gap-0.5 rounded-md border border-amber-100 bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal text-amber-600 shadow-sm transition-colors dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-400"
+                          className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal text-primary shadow-sm transition-colors"
                           key="task-time-tag"
                         >
-                          <Clock className="w-2 h-2" />
+                          <Clock className="w-2.5 h-2.5 shrink-0" />
                           <span>
                             {task.startTime}
                             {task.endTime && task.endTime !== task.startTime ? ` - ${task.endTime}` : ''}
                           </span>
-                          {task.reminder && <Bell className="w-2 h-2" />}
+                          {task.reminder && <Bell className="w-2.5 h-2.5 shrink-0 text-amber-500" />}
                         </motion.span>
                       )}
                       {task.tags?.map((tagId) => {
@@ -574,12 +572,11 @@ const SortableTaskItem = React.forwardRef<
 
                         return (
                           <motion.span
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
+                            initial={false}
                             exit={{ opacity: 0, scale: 0 }}
                             transition={{ duration: 0.2 }}
                             key={tagId}
-                            className={`inline-flex items-center rounded-md border px-1.5 py-0.5 text-[9px] font-black uppercase leading-none tracking-normal shadow-sm transition-colors ${
+                            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal shadow-sm transition-colors ${
                               !color
                                 ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
                                 : ''
@@ -616,7 +613,7 @@ const SortableTaskItem = React.forwardRef<
                     {task.text}
                   </motion.span>
                   {isWeekly && (
-                    <RotateCcw className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0" />
+                    <img src="/icons/Repeat.svg" alt="Repeating" className="w-5 h-5 flex-shrink-0" />
                   )}
                   {task.calendarEventId && (
                     <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />

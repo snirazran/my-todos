@@ -3,7 +3,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, CalendarClock, Tag, RotateCcw, Pencil, CalendarCheck, Check, Timer } from 'lucide-react';
+import { Trash2, CalendarClock, Tag, Pencil, CalendarCheck, Check, Timer } from 'lucide-react';
+import Image from 'next/image';
 
 interface TaskMenuProps {
   menu: { id: string; top: number; left: number } | null;
@@ -156,9 +157,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               }`}
             >
               <div className="flex items-center gap-2">
-                <RotateCcw className={`h-4 w-4 transition-colors ${
-                  isWeekly ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'
-                }`} />
+                <Image src="/icons/Repeat.svg" alt="Repeat" width={16} height={16} className="h-4 w-4" />
                 <span>Repeat Weekly</span>
               </div>
               {isWeekly && <Check className="h-3.5 w-3.5 text-primary" />}

@@ -734,7 +734,7 @@ export default function Home() {
               <div className="flex items-center justify-between px-2 md:px-0">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 ml-3 cursor-pointer group">
-                    <CalendarCheck className="w-5 h-5 text-primary" />
+                    <img src="/icons/Planner.svg" alt="" className="w-7 h-7" />
                     <span className="text-sm font-black tracking-tight lowercase text-foreground">
                       {openTaskCount}{' '}
                       {openTaskCount === 1 ? 'fly' : 'flies'}{' '}

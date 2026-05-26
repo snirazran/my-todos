@@ -211,7 +211,7 @@ export function PickerSheet(props: Props) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18, ease: 'easeOut' }}
             onClick={() => setActivePicker(null)}
-            className="fixed inset-0 z-[1500] bg-black/65"
+            className="fixed inset-0 z-[1500] bg-black/80"
           />
         )}
       </AnimatePresence>
@@ -571,7 +571,7 @@ function CalendarOverlay({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-[1502] bg-black/55"
+        className="fixed inset-0 z-[1502] bg-black/70"
       />
       <div className="pointer-events-none fixed inset-x-0 bottom-[35vh] z-[1503] flex justify-center sm:bottom-[38vh]">
       <motion.div
@@ -681,7 +681,7 @@ function ReminderOverlay({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-[1504] bg-black/55"
+        className="fixed inset-0 z-[1504] bg-black/70"
       />
       <div className="pointer-events-none fixed inset-x-0 bottom-[35vh] z-[1505] flex justify-center sm:bottom-[38vh]">
       <motion.div

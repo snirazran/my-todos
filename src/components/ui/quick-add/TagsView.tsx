@@ -9,7 +9,6 @@ import {
   Palette,
   Pencil,
   Plus,
-  Tag,
   X,
 } from 'lucide-react';
 import { TAG_COLORS, TAG_MAX_LENGTH } from './constants';
@@ -104,7 +103,7 @@ export function TagsView({
       <div>
         <div className="mb-3 flex items-center gap-2">
           <div className="relative flex-1">
-            <Tag className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+            <img src="/icons/Filter.svg" alt="" className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2" />
             <input
               ref={tagInputRef}
               value={tagInput}

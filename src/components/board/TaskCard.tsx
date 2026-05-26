@@ -2,13 +2,13 @@
 
 import React, { useRef, useCallback, useEffect } from 'react';
 import {
-  RotateCcw,
   CheckCircle2,
   Plus,
   CalendarDays,
   Clock,
   Bell,
 } from 'lucide-react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
@@ -296,22 +296,18 @@ export default function TaskCard({
                   : 'mb-2 flex flex-wrap items-center gap-1.5'
               }
             >
-              <AnimatePresence mode="popLayout">
+              <>
                 {task.startTime && (
-                  <motion.span
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0 }}
-                    className={`${chipClass} bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-100 dark:border-amber-500/20`}
-                    key="task-time-tag"
+                  <span
+                    className="isolate inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-[4px] text-[10px] leading-[1] font-bold uppercase tracking-normal text-primary shadow-sm"
                   >
-                    <Clock className="w-2.5 h-2.5" />
-                    <span>
+                    <Clock className="w-2.5 h-2.5 shrink-0" />
+                    <span className="leading-[1]">
                       {task.startTime}
                       {task.endTime && task.endTime !== task.startTime ? ` - ${task.endTime}` : ''}
                     </span>
-                    {task.reminder && <Bell className="w-2.5 h-2.5" />}
-                  </motion.span>
+                    {task.reminder && <Bell className="w-2.5 h-2.5 shrink-0 text-amber-500" />}
+                  </span>
                 )}
                 {task.tags?.map((tagId) => {
                   const tagDetails = getTagDetails(tagId);
@@ -321,13 +317,9 @@ export default function TaskCard({
                   const name = tagDetails.name;
 
                   return (
-                    <motion.span
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0 }}
-                      transition={{ duration: 0.2 }}
+                    <span
                       key={tagId}
-                      className={chipClass}
+                      className="isolate inline-flex items-center gap-1 rounded-md border px-1.5 py-[4px] text-[10px] leading-[1] font-bold uppercase tracking-normal shadow-sm"
                       style={
                         color
                           ? {
@@ -350,10 +342,10 @@ export default function TaskCard({
                       >
                         {name}
                       </span>
-                    </motion.span>
+                    </span>
                   );
                 })}
-              </AnimatePresence>
+              </>
             </div>
           )}
           <div
@@ -373,8 +365,12 @@ export default function TaskCard({
               </span>
               <div className="inline-flex items-center gap-1.5 shrink-0">
                 {isRepeating && (
-                  <RotateCcw
-                    className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400 flex-shrink-0"
+                  <Image
+                    src="/icons/Repeat.svg"
+                    alt="Repeating"
+                    width={14}
+                    height={14}
+                    className="w-3.5 h-3.5 flex-shrink-0"
                   />
                 )}
                 {task.calendarEventId && (

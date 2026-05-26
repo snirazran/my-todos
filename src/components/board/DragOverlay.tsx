@@ -1,6 +1,6 @@
 'use client';
 import Fly from '@/components/ui/fly';
-import { RotateCcw, CalendarDays, Clock, Bell } from 'lucide-react';
+import { CalendarDays, Clock, Bell } from 'lucide-react';
 
 export default function DragOverlay({
   x,
@@ -41,40 +41,41 @@ export default function DragOverlay({
       <div
         className={[
           'flex items-center gap-2 px-2 py-2 select-none rounded-[14px]',
-          'bg-card border-2 border-primary/20 shadow-2xl backdrop-blur-sm',
+          'bg-card border-2 border-primary/20 shadow-2xl',
         ].join(' ')}
         style={{
           minHeight: height,
-          transform: 'rotate(-2deg) scale(1.05)',
-          opacity: 0.95,
+          transform: 'rotate(-2deg)',
         }}
       >
         <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60">
-          <Fly size={32} y={-3} />
+          <span style={{ transform: 'rotate(2deg)' }}>
+            <Fly size={32} y={-3} />
+          </span>
         </span>
         <div className="flex-1 min-w-0 flex flex-col">
           {(tags && tags.length > 0 || startTime || reminder) && (
             <div className="mb-1 flex flex-wrap items-center gap-1">
               {startTime && (
-                <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-normal uppercase bg-amber-500 text-white shadow-sm border border-amber-400">
-                  <Clock className="w-2.5 h-2.5" />
-                  <span>
+                <span className="isolate inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-[4px] text-[10px] leading-[1] font-bold uppercase tracking-normal text-primary shadow-sm">
+                  <Clock className="w-2.5 h-2.5 shrink-0" />
+                  <span className="leading-[1]">
                     {startTime}
                     {endTime && endTime !== startTime ? ` - ${endTime}` : ''}
                   </span>
-                  {reminder && <Bell className="w-2.5 h-2.5" />}
+                  {reminder && <Bell className="w-2.5 h-2.5 shrink-0 text-amber-500" />}
                 </span>
               )}
               {tags?.map((tag) => (
                 <span
                   key={tag.id}
-                  className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-normal uppercase transition-colors border shadow-sm"
+                  className="isolate inline-flex items-center gap-1 rounded-md border px-1.5 py-[4px] text-[10px] leading-[1] font-bold uppercase tracking-normal shadow-sm"
                   style={
                     tag.color
                       ? {
-                          backgroundColor: tag.color,
-                          color: 'white',
-                          borderColor: 'rgba(255,255,255,0.2)',
+                          backgroundColor: `${tag.color}20`,
+                          color: tag.color,
+                          borderColor: `${tag.color}40`,
                         }
                       : undefined
                   }
@@ -91,7 +92,7 @@ export default function DragOverlay({
               </span>
               <div className="inline-flex items-center gap-1.5 shrink-0">
                 {taskType === 'weekly' && (
-                  <RotateCcw className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+                  <img src="/icons/Repeat.svg" alt="Repeating" className="w-5 h-5 flex-shrink-0" />
                 )}
                 {calendarEventId && (
                   <CalendarDays className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />

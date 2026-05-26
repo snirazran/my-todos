@@ -43,7 +43,10 @@
       "Bash(awk 'NR<329 || NR>631' /Users/snirazran/Fullstack/my-todos/src/components/ui/quick-add/PickerSheet.tsx)",
       "Bash(mv /tmp/PickerSheet.new /Users/snirazran/Fullstack/my-todos/src/components/ui/quick-add/PickerSheet.tsx)",
       "Bash(./node_modules/.bin/tsc --noEmit)",
-      "Bash(NODE_OPTIONS='' ./node_modules/.bin/tsc --noEmit)"
+      "Bash(NODE_OPTIONS='' ./node_modules/.bin/tsc --noEmit)",
+      "Bash(powershell -Command \"Get-Content src\\\\components\\\\ui\\\\QuestsPanel.tsx | Select-Object -Skip 1101 -First 270 | Out-String\")",
+      "Bash(powershell -Command \"\\(Get-Content src\\\\components\\\\ui\\\\QuestsPanel.tsx | Measure-Object -Line\\).Lines\")",
+      "Bash(powershell -Command \"Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Write-Host 'cleared'\")"
     ]
   }
 }

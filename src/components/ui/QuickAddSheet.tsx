@@ -5,11 +5,8 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Bell,
-  CalendarCheck,
   Clock,
   Plus,
-  RotateCcw,
-  Tag,
   X,
 } from 'lucide-react';
 import {
@@ -21,7 +18,7 @@ import {
   type DisplayDay,
 } from '@/components/board/helpers';
 import Fly from '@/components/ui/fly';
-import { PremiumLimitDialog } from './PremiumLimitDialog';
+import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
 import { SuggestionTabs } from './quick-add/SuggestionTabs';
 import { useTagManager } from './quick-add/useTagManager';
@@ -423,7 +420,7 @@ export default function QuickAddSheet({
                         >
                           <span className="grid h-full w-12 shrink-0 place-items-center">
                             <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
-                              <Tag className="h-3.5 w-3.5 stroke-[3]" />
+                              <img src="/icons/Filter.svg" alt="Tags" className="h-5 w-5" />
                             </span>
                           </span>
                           <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground">
@@ -441,7 +438,7 @@ export default function QuickAddSheet({
                           >
                             <span className="grid h-full w-12 shrink-0 place-items-center">
                               <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
-                                <CalendarCheck className="h-3.5 w-3.5 stroke-[3]" />
+                                <img src="/icons/Planner.svg" alt="Date" className="h-5 w-5" />
                               </span>
                             </span>
                             <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-extrabold text-muted-foreground">
@@ -460,8 +457,8 @@ export default function QuickAddSheet({
                             className="group flex h-10 w-full items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
                           >
                             <span className="grid h-full w-12 shrink-0 place-items-center">
-                              <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
-                                <RotateCcw className="h-3.5 w-3.5 stroke-[3]" />
+                              <span className={`grid h-7 w-7 place-items-center rounded-full ${repeatsOn ? 'bg-primary/10' : 'bg-muted'}`}>
+                                <img src="/icons/Repeat.svg" alt="Repeat" className={`h-5 w-5 ${repeatsOn ? '' : 'opacity-50 grayscale'}`} />
                               </span>
                             </span>
                             <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground">
@@ -628,7 +625,7 @@ export default function QuickAddSheet({
         document.body,
       )}
 
-      <PremiumLimitDialog
+      <PlusUpgradeModal
         open={showPremiumLimit}
         onClose={() => setShowPremiumLimit(false)}
       />

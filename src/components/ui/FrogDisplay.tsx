@@ -3,7 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { Shirt, ScrollText } from 'lucide-react';
+
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
 import { FrogSpeechBubble } from './FrogSpeechBubble';

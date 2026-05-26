@@ -7,10 +7,10 @@ import {
   Tag,
   CalendarClock,
   Clock,
-  RotateCcw,
   Trash2,
   X,
 } from 'lucide-react';
+import Image from 'next/image';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import Fly from '@/components/ui/fly';
@@ -19,7 +19,8 @@ import type { Task } from './helpers';
 type Action = {
   key: string;
   label: string;
-  icon: React.ElementType;
+  icon?: React.ElementType;
+  iconSrc?: string;
   onClick: () => void;
   destructive?: boolean;
   active?: boolean;
@@ -89,7 +90,7 @@ export default function TaskActionSheet({
     actions.push({
       key: 'repeat',
       label: 'Repeat weekly',
-      icon: RotateCcw,
+      iconSrc: '/icons/Repeat.svg',
       onClick: onToggleRepeat,
       active: isWeekly,
     });
@@ -173,11 +174,15 @@ export default function TaskActionSheet({
                     a.active ? 'ring-1 ring-primary/40 bg-primary/5' : ''
                   }`}
                 >
-                  <Icon
-                    className={`h-5 w-5 ${
-                      a.active ? 'text-primary' : 'text-muted-foreground'
-                    }`}
-                  />
+                  {a.iconSrc ? (
+                    <Image src={a.iconSrc} alt={a.label} width={20} height={20} className="h-5 w-5" />
+                  ) : Icon ? (
+                    <Icon
+                      className={`h-5 w-5 ${
+                        a.active ? 'text-primary' : 'text-muted-foreground'
+                      }`}
+                    />
+                  ) : null}
                   <span
                     className={`text-sm font-bold ${
                       a.active ? 'text-primary' : 'text-foreground'

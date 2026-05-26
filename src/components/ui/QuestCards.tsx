@@ -400,7 +400,7 @@ export function DailyQuestPresentationCard({
         <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 via-black/25 to-transparent" />
         <div className="absolute inset-x-0 top-0 flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
           <span
-            className="inline-flex items-center gap-1.5 text-[13px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
+            className="inline-flex items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
             style={{
               fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
               WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
@@ -412,9 +412,10 @@ export function DailyQuestPresentationCard({
           </span>
           {timeLeft ? (
             <span
-              className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white drop-shadow-[0_1.5px_0_rgba(15,23,42,0.85)]"
+              className="inline-flex shrink-0 items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
               style={{
-                WebkitTextStroke: '0.6px rgba(15, 23, 42, 0.9)',
+                fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
                 paintOrder: 'stroke fill',
               }}
             >
@@ -522,9 +523,10 @@ export function CategoryQuestPresentationCard({
         <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 via-black/25 to-transparent" />
         <div className="absolute inset-x-0 top-0 flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
           <span
-            className="inline-flex max-w-[calc(100%-5rem)] items-center gap-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white drop-shadow-[0_1.5px_0_rgba(15,23,42,0.85)]"
+            className="inline-flex max-w-[calc(100%-5rem)] items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
             style={{
-              WebkitTextStroke: '0.6px rgba(15, 23, 42, 0.9)',
+              fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+              WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
               paintOrder: 'stroke fill',
             }}
           >
@@ -535,9 +537,10 @@ export function CategoryQuestPresentationCard({
           </span>
           {timeLeft ? (
             <span
-              className="inline-flex shrink-0 items-center gap-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-white drop-shadow-[0_1.5px_0_rgba(15,23,42,0.85)]"
+              className="inline-flex shrink-0 items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
               style={{
-                WebkitTextStroke: '0.6px rgba(15, 23, 42, 0.9)',
+                fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
                 paintOrder: 'stroke fill',
               }}
             >
