@@ -147,6 +147,11 @@ const SortableTaskItem = React.forwardRef<
     const [isHovered, setIsHovered] = useState(false);
     const [swipeBlocked, setSwipeBlocked] = useState(false);
 
+    const bulletContent = React.useMemo(
+      () => renderBullet ? renderBullet(task, false, paused) : null,
+      [task.id, task.completed, paused, renderBullet],
+    );
+
     // Motion Values for Swipe
     const x = useMotionValue(0);
     const swipeThreshold = 60;
@@ -496,8 +501,8 @@ const SortableTaskItem = React.forwardRef<
                       exit={{ opacity: 0 }}
                       transition={{ duration: 0.18 }}
                     >
-                      {renderBullet ? (
-                        renderBullet(task, false, paused)
+                      {bulletContent ? (
+                        bulletContent
                       ) : (
                         <button
                           onClick={(e) => {
