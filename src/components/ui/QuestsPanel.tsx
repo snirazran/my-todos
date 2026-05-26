@@ -31,6 +31,7 @@ import Fly from './fly';
 import { AnimatedNumber } from './AnimatedNumber';
 import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
+import { useDraggableScroll } from '@/hooks/useDraggableScroll';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -1075,8 +1076,48 @@ function QuestSeasonEventOverlay({
 }) {
   const timeLeft = useSeasonCountdown(season?.endsAt);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const currentDayRef = useRef<HTMLDivElement | null>(null);
+  const futureDayRowRef = useRef<HTMLDivElement | null>(null);
   const [greenLineHeight, setGreenLineHeight] = useState<string>('0px');
+  const [greenLineWidth, setGreenLineWidth] = useState<string>('0px');
+
+  // Drag-to-scroll state
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const scrollLeftStart = useRef(0);
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    const scrollArea = scrollAreaRef.current;
+    if (!scrollArea || e.pointerType !== 'mouse') return;
+    
+    // Only drag if clicking the container or non-interactive parts
+    if ((e.target as HTMLElement).closest('button, a, .interactive-reward')) return;
+
+    isDragging.current = true;
+    startX.current = e.pageX - scrollArea.offsetLeft;
+    scrollLeftStart.current = scrollArea.scrollLeft;
+    
+    scrollArea.style.cursor = 'grabbing';
+    scrollArea.setPointerCapture(e.pointerId);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isDragging.current || !scrollAreaRef.current) return;
+    e.preventDefault();
+    const x = e.pageX - scrollAreaRef.current.offsetLeft;
+    const walk = (x - startX.current) * 1.5; // multiplier for speed
+    scrollAreaRef.current.scrollLeft = scrollLeftStart.current - walk;
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    if (scrollAreaRef.current) {
+      scrollAreaRef.current.style.cursor = 'grab';
+      scrollAreaRef.current.releasePointerCapture(e.pointerId);
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -1086,8 +1127,18 @@ function QuestSeasonEventOverlay({
       if (!container || !target) return;
       const containerRect = container.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
-      const center = targetRect.top + targetRect.height / 2 - containerRect.top;
-      setGreenLineHeight(`${Math.max(0, center)}px`);
+
+      const isHorizontal = window.innerWidth >= 768; // md breakpoint
+
+      if (isHorizontal) {
+        const center = targetRect.left + targetRect.width / 2 - containerRect.left;
+        setGreenLineWidth(`${Math.max(0, center)}px`);
+        setGreenLineHeight('4px'); // fixed height for horizontal line
+      } else {
+        const center = targetRect.top + targetRect.height / 2 - containerRect.top;
+        setGreenLineHeight(`${Math.max(0, center)}px`);
+        setGreenLineWidth('4px'); // fixed width for vertical line
+      }
     };
     recompute();
     const raf = window.requestAnimationFrame(recompute);
@@ -1096,6 +1147,62 @@ function QuestSeasonEventOverlay({
       window.cancelAnimationFrame(raf);
       window.removeEventListener('resize', recompute);
     };
+  }, [open, season?.currentDay, season?.dayCount]);
+
+  useEffect(() => {
+    if (!open || !season) return;
+
+    const scrollArea = scrollAreaRef.current;
+    if (!scrollArea) return;
+
+    const current = currentDayRef.current;
+    const future = futureDayRowRef.current;
+
+    const isHorizontal = window.innerWidth >= 768;
+
+    if (season.currentDay >= season.dayCount) {
+      // Last day: just scroll to it smoothly
+      setTimeout(() => {
+        current?.scrollIntoView({
+          block: isHorizontal ? 'nearest' : 'center',
+          inline: isHorizontal ? 'center' : 'nearest',
+          behavior: 'smooth',
+        });
+      }, 100);
+      return;
+    }
+
+    // Immediately jump to the future day row to start the "preview"
+    if (future) {
+      scrollArea.style.scrollBehavior = 'auto';
+      future.scrollIntoView({
+        block: isHorizontal ? 'nearest' : 'center',
+        inline: isHorizontal ? 'center' : 'nearest',
+        behavior: 'auto',
+      });
+    } else {
+      // Fallback to bottom/right if ref isn't ready
+      scrollArea.style.scrollBehavior = 'auto';
+      if (isHorizontal) {
+        scrollArea.scrollLeft = scrollArea.scrollWidth;
+      } else {
+        scrollArea.scrollTop = scrollArea.scrollHeight;
+      }
+    }
+
+    // Small delay before gliding back to current day
+    const timer = setTimeout(() => {
+      if (!current) return;
+      requestAnimationFrame(() => {
+        current.scrollIntoView({
+          block: isHorizontal ? 'nearest' : 'center',
+          inline: isHorizontal ? 'center' : 'nearest',
+          behavior: 'smooth',
+        });
+      });
+    }, 350);
+
+    return () => clearTimeout(timer);
   }, [open, season?.currentDay, season?.dayCount]);
 
   if (!open || !season || typeof document === 'undefined') return null;
@@ -1123,8 +1230,11 @@ function QuestSeasonEventOverlay({
     season.dayCount,
   );
 
+  // Track which day to start the scroll from (preview point)
+  const previewDay = Math.min(season.dayCount, season.currentDay + 10);
+
   return createPortal(
-    <div className="fixed inset-0 z-[1200] flex flex-col bg-background">
+    <div className="fixed inset-0 z-[1200] flex flex-col bg-background md:block md:overflow-y-auto md:overflow-x-hidden">
       <div className="relative h-[310px] shrink-0 overflow-hidden">
           {hasSeasonCover(season.images) ? (
             <SeasonCoverImage
@@ -1184,65 +1294,78 @@ function QuestSeasonEventOverlay({
           </div>
         </div>
 
-        <div className="-mt-8 flex-1 overflow-y-auto bg-background rounded-t-[32px]">
-        <div className="relative z-10 mx-auto max-w-2xl bg-background pt-5">
-          {goalReached ? (
-            <div className="mx-4 overflow-hidden rounded-[28px] bg-background p-3 ring-1 ring-border/50">
-              <div className="flex items-center gap-3">
-                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                  <Check className="h-8 w-8" strokeWidth={4} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-lg font-black leading-tight text-foreground">
-                    {season.claimable
-                      ? `Day ${season.currentDay} ready!`
-                      : `Day ${completedDay} completed`}
-                  </p>
-                  <p className="mt-0.5 truncate text-sm font-black leading-tight text-foreground">
-                    {seasonComplete
-                      ? 'Season complete'
-                      : season.claimable
-                        ? 'Claim to continue'
-                        : `Return tomorrow for Day ${nextSeasonDay}`}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={season.claimable ? onClaim : onClose}
-                  disabled={season.claimable && claiming}
-                  className="h-14 shrink-0 rounded-2xl bg-lime-600 px-6 text-sm font-black text-white shadow-[0_5px_0_#3f6212] transition active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-70"
-                >
-                  {season.claimable ? (claiming ? 'Claiming...' : 'Claim') : 'Done'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="mx-5 flex justify-center rounded-[24px] border border-border bg-card/95 px-3 py-3 shadow-lg shadow-black/10 backdrop-blur-md">
-              <div className="flex w-full max-w-md items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-                  <Fly size={36} y={-5} paused={paused} interactive={false} />
-                </div>
-                <div className="relative h-8 flex-1 overflow-hidden rounded-full border border-border/60 bg-muted">
-                  <div className="absolute inset-1">
-                    <div
-                      className="h-full min-w-7 rounded-full bg-amber-400 transition-all"
-                      style={{ width: pct > 0 ? `${pct}%` : '1.75rem' }}
-                    />
+        {/* Header section - Sticky on mobile, Fixed on web */}
+        <div className="sticky top-0 z-50 -mt-8 bg-transparent md:mt-0 md:border-b md:border-border/40 md:bg-muted/40 md:backdrop-blur-md">
+          <div className="mx-auto w-full max-w-2xl bg-background rounded-t-[32px] md:bg-transparent md:rounded-none">
+            <div className="px-4 pb-5 pt-1 md:py-4 md:pb-6">
+              {goalReached ? (
+                <div className="overflow-hidden rounded-[28px] bg-background p-3 ring-1 ring-border/50 max-w-2xl mx-auto md:bg-transparent md:ring-0 md:p-0 md:overflow-visible">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                      <Check className="h-8 w-8" strokeWidth={4} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-lg font-black leading-tight text-foreground">
+                        {season.currentDay >= season.dayCount && season.claimedToday
+                          ? "Season complete!"
+                          : season.claimable
+                            ? `Day ${season.currentDay} ready!`
+                            : `Day ${completedDay} completed`}
+                      </p>
+                      <p className="mt-0.5 truncate text-sm font-black leading-tight text-foreground text-muted-foreground">
+                        {seasonComplete
+                          ? 'All rewards claimed'
+                          : season.claimable
+                            ? 'Claim to continue'
+                            : `Return tomorrow for Day ${nextSeasonDay}`}
+                      </p>
+                    </div>
+                    <div className="pb-1.5 pr-1 md:pr-0 md:pb-2">
+                      <button
+                        type="button"
+                        onClick={season.claimable ? onClaim : onClose}
+                        disabled={season.claimable && claiming}
+                        className="h-14 shrink-0 rounded-2xl bg-lime-600 px-6 text-sm font-black text-white shadow-[0_5px_0_#3f6212] transition active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-70"
+                      >
+                        {season.claimable ? (claiming ? 'Claiming...' : 'Claim') : 'Done'}
+                      </button>
+                    </div>
                   </div>
-                  <span className="absolute inset-0 flex items-center justify-center text-sm font-black tabular-nums text-muted-foreground">
-                    {progress} / {season.dailyTargetFlies}
-                  </span>
                 </div>
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg font-black text-primary ring-1 ring-primary/20">
-                  {season.currentDay}
+              ) : (
+                <div className="flex justify-center rounded-[24px] border border-border bg-card/95 px-3 py-3 shadow-lg shadow-black/10 backdrop-blur-md max-w-2xl mx-auto md:bg-transparent md:border-0 md:shadow-none md:p-0 md:overflow-visible">
+                  <div className="flex w-full max-w-md items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center">
+                      <Fly size={36} y={-5} paused={paused} interactive={false} />
+                    </div>
+                    <div className="relative h-8 flex-1 overflow-hidden rounded-full border border-border/60 bg-muted">
+                      <div className="absolute inset-1">
+                        <div
+                          className="h-full min-w-7 rounded-full bg-amber-400 transition-all"
+                          style={{ width: pct > 0 ? `${pct}%` : '1.75rem' }}
+                        />
+                      </div>
+                      <span className="absolute inset-0 flex items-center justify-center text-sm font-black tabular-nums text-muted-foreground">
+                        {progress} / {season.dailyTargetFlies}
+                      </span>
+                    </div>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg font-black text-primary ring-1 ring-primary/20">
+                      {season.currentDay}
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
-          )}
+          </div>
+        </div>
 
-        <div className="px-4 pb-5 pt-5">
+        <div ref={scrollAreaRef} className="flex-1 select-none overflow-y-auto md:overflow-x-auto md:overflow-y-visible no-scrollbar cursor-grab active:cursor-grabbing [touch-action:pan-y]">
+          <div className="mx-auto min-h-full max-w-2xl bg-background md:mx-0 md:max-w-none md:min-w-full md:bg-transparent md:px-12 md:pt-0 md:pb-16 pointer-events-none md:pointer-events-auto">
+            <div className="relative z-10 mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none md:rounded-t-[48px] md:border-0">
+
+        <div className="px-4 pb-5 pt-5 md:-mt-6 md:pt-4">
           <div className="text-foreground">
-            <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2 md:hidden">
               <div className="flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-muted/35 px-4 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
                 <Gift className="w-4 h-4" />
                 <span>Free</span>
@@ -1260,30 +1383,44 @@ function QuestSeasonEventOverlay({
               </button>
             </div>
 
-            <div ref={timelineRef} className="relative mt-4 rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4">
-              <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60" />
+            <div ref={timelineRef} className="relative mt-4 rounded-[20px] border border-border/40 bg-muted/40 p-3 md:mt-0 md:border-0 md:bg-transparent md:p-0 md:py-12 md:pl-24 md:w-fit md:min-w-full">
+              <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60 md:left-24 md:right-0 md:top-1/2 md:h-2 md:w-auto md:-translate-y-1/2 md:translate-x-0" />
               <div
-                className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)]"
-                style={{ height: greenLineHeight }}
+                className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)] md:left-24 md:top-1/2 md:h-1 md:-translate-y-1/2 md:translate-x-0"
+                style={{ height: greenLineHeight, width: greenLineWidth }}
               />
 
-              <div className="relative z-10 flex flex-col gap-y-5">
+              <div className="relative z-10 flex flex-col gap-y-5 md:flex-row md:gap-x-12 md:gap-y-0">
+                <div className="hidden md:flex md:flex-col md:absolute md:left-0 md:top-12 md:bottom-12 md:w-24 md:shrink-0 md:font-black md:text-[11px] md:uppercase md:tracking-[0.2em] md:text-muted-foreground/50">
+                   <div className="flex flex-1 flex-col items-center justify-center md:mb-8">
+                     <Gift className="w-5 h-5 opacity-50 mb-1.5" />
+                     <span>Free</span>
+                   </div>
+                   <div className="md:h-14" aria-hidden="true" />
+                   <div className="flex flex-1 flex-col items-center justify-center md:mt-8">
+                     <Sparkles className="w-5 h-5 text-amber-500/50 mb-1.5" strokeWidth={2.5} />
+                     <span>Plus</span>
+                   </div>
+                </div>
                 {season.rewardsByDay.map((entry) => {
                   const isCurrent = entry.day === season.currentDay;
                   const isClaimed = season.claimedDays.includes(entry.day);
                   const freeReward = entry.freeRewards[0];
                   const premiumReward = entry.premiumRewards[0];
 
+                  const isPreviewStart = entry.day === previewDay;
+
                   return (
                     <div
                       key={entry.day}
+                      ref={isPreviewStart ? futureDayRowRef : undefined}
                       className={cn(
-                        'relative grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center rounded-2xl px-1 py-2 transition-all duration-300',
+                        'relative grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center rounded-2xl px-1 py-2 transition-all duration-300 md:flex md:flex-col md:w-[180px] md:shrink-0 md:px-0',
                         !isCurrent && 'hover:bg-muted/30',
                       )}
                     >
-                      <div className="flex w-full justify-center pr-2 sm:pr-3">
-                        <div className="w-full max-w-[170px]">
+                      <div className="flex w-full justify-center pr-2 sm:pr-3 md:pr-0 md:pb-8">
+                        <div className="w-full max-w-[170px] md:max-w-none">
                           {freeReward ? (
                             <SingleRewardCard
                               day={entry.day}
@@ -1316,9 +1453,9 @@ function QuestSeasonEventOverlay({
                         </div>
                       </div>
 
-                      <div className="relative z-20 flex justify-center">
+                      <div className="relative z-20 flex justify-center md:h-14 md:w-full md:items-center">
                         {isCurrent && (
-                          <span className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-primary/20 animate-ping-ring" />
+                          <span className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-primary/20 animate-ping-ring md:h-16 md:w-16" />
                         )}
                         <div
                           ref={isCurrent ? currentDayRef : undefined}
@@ -1338,8 +1475,8 @@ function QuestSeasonEventOverlay({
                         </div>
                       </div>
 
-                      <div className="flex w-full justify-center pl-2 sm:pl-3">
-                        <div className="w-full max-w-[170px]">
+                      <div className="flex w-full justify-center pl-2 sm:pl-3 md:pl-0 md:pt-8">
+                        <div className="w-full max-w-[170px] md:max-w-none">
                           {premiumReward ? (
                             <SingleRewardCard
                               day={entry.day}
@@ -1391,6 +1528,7 @@ function QuestSeasonEventOverlay({
 
           </div>
         </div>
+      </div>
       </div>
       </div>
     </div>,
