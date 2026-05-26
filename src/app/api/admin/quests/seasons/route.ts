@@ -5,6 +5,7 @@ import QuestSeasonModel from '@/lib/models/QuestSeason';
 import {
   buildDefaultSeasonRewards,
   createQuestSeason,
+  getSeasonDayCount,
   sanitizeSeasonRewards,
   seasonToAdminView,
 } from '@/lib/quests/seasons';
@@ -89,7 +90,13 @@ function sanitizeBody(body: any) {
   const startsAt = new Date(body?.startsAt);
   const endsAt = new Date(body?.endsAt);
   const dailyTargetFlies = Math.max(1, Math.floor(Number(body?.dailyTargetFlies) || 3));
-  const dayCount = Math.max(1, Math.min(90, Math.floor(Number(body?.dayCount) || 1)));
+
+  if (!name) return { error: 'Season name is required' };
+  if (!Number.isFinite(startsAt.getTime())) return { error: 'Start date is required' };
+  if (!Number.isFinite(endsAt.getTime())) return { error: 'End date is required' };
+  if (endsAt <= startsAt) return { error: 'End date must be after start date' };
+
+  const dayCount = getSeasonDayCount(startsAt, endsAt);
   const rawDayRewards = sanitizeDayRewards(body?.dayRewards);
   const fallbackDayRewards = buildDefaultSeasonRewards(dayCount);
   const dayRewards = Array.from({ length: dayCount }, (_, index) => {
@@ -99,11 +106,6 @@ function sanitizeBody(body: any) {
       fallbackDayRewards[index]
     );
   });
-
-  if (!name) return { error: 'Season name is required' };
-  if (!Number.isFinite(startsAt.getTime())) return { error: 'Start date is required' };
-  if (!Number.isFinite(endsAt.getTime())) return { error: 'End date is required' };
-  if (endsAt <= startsAt) return { error: 'End date must be after start date' };
 
   return {
     payload: {

@@ -87,7 +87,7 @@ export function seasonToAdminView(doc: QuestSeasonDoc) {
   };
 }
 
-function getDayCount(startsAt: Date, endsAt: Date) {
+export function getSeasonDayCount(startsAt: Date, endsAt: Date) {
   const durationMs = endsAt.getTime() - startsAt.getTime();
   return Math.max(1, Math.ceil(durationMs / 86_400_000));
 }
@@ -110,7 +110,7 @@ export function getCurrentSeasonDay(
     startDay === null || todayDay === null
       ? Math.floor((now.getTime() - startsAt.getTime()) / 86_400_000) + 1
       : todayDay - startDay + 1;
-  return Math.min(getDayCount(startsAt, endsAt), Math.max(1, raw));
+  return Math.min(getSeasonDayCount(startsAt, endsAt), Math.max(1, raw));
 }
 
 function getClaimedDays(user: any, seasonId: string) {
@@ -156,7 +156,7 @@ export async function getActiveQuestSeasonView(args: {
     endsAt: season.endsAt.toISOString(),
     dailyTargetFlies: season.dailyTargetFlies,
     currentDay,
-    dayCount: getDayCount(season.startsAt, season.endsAt),
+    dayCount: getSeasonDayCount(season.startsAt, season.endsAt),
     progressFlies,
     claimedDays,
     claimable:

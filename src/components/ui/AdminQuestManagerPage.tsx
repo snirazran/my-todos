@@ -208,18 +208,17 @@ const emptyForm = (): FormState => ({
 const emptySeasonForm = (): SeasonFormState => {
   const now = new Date();
   const end = new Date(now.getTime() + 7 * 86_400_000);
+  const startsAt = toDateTimeLocalValue(now);
+  const endsAt = toDateTimeLocalValue(end);
+  const dayCount = getSeasonDayCountFromLocalValues(startsAt, endsAt);
   return {
     name: '',
     images: emptySeasonImages(),
-    startsAt: toDateTimeLocalValue(now),
-    endsAt: toDateTimeLocalValue(end),
+    startsAt,
+    endsAt,
     dailyTargetFlies: 3,
-    dayCount: 7,
-    dayRewards: Array.from({ length: 7 }, (_, index) => ({
-      day: index + 1,
-      freeRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }],
-      premiumRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 100 }],
-    })),
+    dayCount,
+    dayRewards: buildSeasonDayRewards([], dayCount),
     isActive: true,
   };
 };
@@ -308,6 +307,42 @@ function isoToDateTimeLocalValue(value?: string) {
 function isoFromDateTimeLocalValue(value: string) {
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date.toISOString() : value;
+}
+
+function getSeasonDayCountFromLocalValues(startsAt: string, endsAt: string) {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  if (
+    !Number.isFinite(start.getTime()) ||
+    !Number.isFinite(end.getTime()) ||
+    end <= start
+  ) {
+    return 1;
+  }
+  return Math.max(1, Math.ceil((end.getTime() - start.getTime()) / 86_400_000));
+}
+
+function buildDefaultSeasonDayReward(
+  day: number,
+): SeasonFormState['dayRewards'][number] {
+  return {
+    day,
+    freeRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }],
+    premiumRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 100 }],
+  };
+}
+
+function buildSeasonDayRewards(
+  existingRewards: SeasonFormState['dayRewards'],
+  dayCount: number,
+) {
+  return Array.from({ length: dayCount }, (_, index) => {
+    const day = index + 1;
+    return (
+      existingRewards.find((entry) => entry.day === day) ??
+      buildDefaultSeasonDayReward(day)
+    );
+  });
 }
 
 function buildPreviewLogicBlock(block: QuestLogicBlock): QuestCardLogicBlock {
@@ -747,22 +782,18 @@ export function AdminQuestManagerPage() {
     setView('form');
   };
 
-  const setSeasonDayCount = (dayCount: number) => {
-    const nextCount = Math.max(1, Math.min(90, Math.floor(dayCount) || 1));
-    setSeasonForm((prev) => ({
-      ...prev,
-      dayCount: nextCount,
-      dayRewards: Array.from({ length: nextCount }, (_, index) => {
-        const day = index + 1;
-        return (
-          prev.dayRewards.find((entry) => entry.day === day) ?? {
-            day,
-            freeRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 50 }],
-            premiumRewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 100 }],
-          }
-        );
-      }),
-    }));
+  const setSeasonDateField = (field: 'startsAt' | 'endsAt', value: string) => {
+    setSeasonForm((prev) => {
+      const startsAt = field === 'startsAt' ? value : prev.startsAt;
+      const endsAt = field === 'endsAt' ? value : prev.endsAt;
+      const dayCount = getSeasonDayCountFromLocalValues(startsAt, endsAt);
+      return {
+        ...prev,
+        [field]: value,
+        dayCount,
+        dayRewards: buildSeasonDayRewards(prev.dayRewards, dayCount),
+      };
+    });
   };
 
   const startEditingSeason = (season?: AdminQuestSeason) => {
@@ -771,19 +802,27 @@ export function AdminQuestManagerPage() {
       setView('season');
       return;
     }
-    setSeasonForm({
-      id: season.id,
-      name: season.name,
-      images: { ...emptySeasonImages(), ...(season.images ?? {}) },
-      startsAt: isoToDateTimeLocalValue(season.startsAt),
-      endsAt: isoToDateTimeLocalValue(season.endsAt),
-      dailyTargetFlies: season.dailyTargetFlies,
-      dayCount: Math.max(1, season.dayRewards.length),
-      dayRewards: season.dayRewards.map((entry) => ({
+    const startsAt = isoToDateTimeLocalValue(season.startsAt);
+    const endsAt = isoToDateTimeLocalValue(season.endsAt);
+    const dayCount = getSeasonDayCountFromLocalValues(startsAt, endsAt);
+    const dayRewards = buildSeasonDayRewards(
+      season.dayRewards.map((entry) => ({
         day: entry.day,
         freeRewards: normalizeRewardList(entry.freeRewards ?? entry.rewards ?? []),
         premiumRewards: normalizeRewardList(entry.premiumRewards ?? []),
       })),
+      dayCount,
+    );
+
+    setSeasonForm({
+      id: season.id,
+      name: season.name,
+      images: { ...emptySeasonImages(), ...(season.images ?? {}) },
+      startsAt,
+      endsAt,
+      dailyTargetFlies: season.dailyTargetFlies,
+      dayCount,
+      dayRewards,
       isActive: season.isActive,
     });
     setResult(null);
@@ -1223,7 +1262,7 @@ export function AdminQuestManagerPage() {
                 type="datetime-local"
                 value={seasonForm.startsAt}
                 onChange={(event) =>
-                  setSeasonForm((prev) => ({ ...prev, startsAt: event.target.value }))
+                  setSeasonDateField('startsAt', event.target.value)
                 }
                 className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
               />
@@ -1236,7 +1275,7 @@ export function AdminQuestManagerPage() {
                 type="datetime-local"
                 value={seasonForm.endsAt}
                 onChange={(event) =>
-                  setSeasonForm((prev) => ({ ...prev, endsAt: event.target.value }))
+                  setSeasonDateField('endsAt', event.target.value)
                 }
                 className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
               />
@@ -1260,16 +1299,11 @@ export function AdminQuestManagerPage() {
             </label>
             <label className="grid gap-2">
               <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
-                Amount Of Days
+                Event Days
               </span>
-              <input
-                type="number"
-                min={1}
-                max={90}
-                value={seasonForm.dayCount}
-                onChange={(event) => setSeasonDayCount(Number(event.target.value))}
-                className="h-11 rounded-2xl border border-border bg-background px-4 text-sm"
-              />
+              <div className="flex h-11 items-center rounded-2xl border border-border bg-muted/40 px-4 text-sm font-bold text-foreground">
+                {seasonForm.dayCount}
+              </div>
             </label>
             <label className="flex items-center gap-2 rounded-2xl border border-border/50 bg-background/80 px-4 py-3 text-sm font-bold text-muted-foreground md:col-span-2">
               <input
