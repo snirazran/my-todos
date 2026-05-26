@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { FolderOpen, Sparkles, Clock } from 'lucide-react';
+import { FolderOpen, Sparkles, Clock, Bell } from 'lucide-react';
 import type {
   FocusCategoryTagMap,
   MacroCategoryId,
@@ -47,6 +47,7 @@ export type SuggestionPick = {
   startTime?: string;
   endTime?: string;
   reminder?: string;
+  backlogTaskId?: string;
 };
 
 type Props = {
@@ -137,6 +138,13 @@ export function SuggestionTabs({
     open ? '/api/tasks?view=board&day=-1' : null,
     fetcher,
   );
+
+  const { data: tagsData } = useSWR<{ tags: { id: string; name: string; color: string }[] }>(
+    open ? '/api/tags' : null,
+    fetcher,
+  );
+  const getTagDetails = (tagId: string) =>
+    tagsData?.tags?.find((t) => t.id === tagId);
 
   useEffect(() => {
     if (!open) {
@@ -323,22 +331,47 @@ export function SuggestionTabs({
                         startTime: t.startTime,
                         endTime: t.endTime,
                         reminder: t.reminder,
+                        backlogTaskId: t.id,
                       })
                     }
-                    className="group flex items-center gap-2.5 w-full rounded-xl border border-border/70 bg-muted/30 px-3 py-2 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/60 active:scale-[0.99]"
+                    className="group flex items-center gap-2.5 w-full rounded-xl border border-border/70 bg-muted/30 px-3 py-2.5 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/60 active:scale-[0.99]"
                   >
                     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
                       <Fly size={28} y={-3} paused />
                     </span>
-                    <span className="min-w-0 flex-1 text-[13px] font-bold text-foreground truncate">
-                      {t.text}
-                    </span>
-                    {t.startTime && (
-                      <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider text-primary">
-                        <Clock className="h-3 w-3" />
-                        {formatTimeDisplay(t.startTime)}
+                    <div className="min-w-0 flex-1 flex flex-col gap-1">
+                      {((t.tags && t.tags.length > 0) || t.startTime) && (
+                        <div className="flex flex-wrap gap-1">
+                          {t.startTime && (
+                            <span className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal text-primary shadow-sm">
+                              <Clock className="w-2.5 h-2.5 shrink-0" />
+                              <span>{formatTimeDisplay(t.startTime)}{t.endTime && t.endTime !== t.startTime ? ` - ${formatTimeDisplay(t.endTime)}` : ''}</span>
+                              {t.reminder && <Bell className="w-2.5 h-2.5 shrink-0 text-amber-500" />}
+                            </span>
+                          )}
+                          {t.tags?.map((tagId) => {
+                            const tag = getTagDetails(tagId);
+                            if (!tag) return null;
+                            return (
+                              <span
+                                key={tagId}
+                                className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal shadow-sm"
+                                style={{
+                                  backgroundColor: `${tag.color}20`,
+                                  color: tag.color,
+                                  borderColor: `${tag.color}40`,
+                                }}
+                              >
+                                {tag.name}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      )}
+                      <span className="text-[13px] font-bold text-foreground truncate">
+                        {t.text}
                       </span>
-                    )}
+                    </div>
                   </button>
                 ))}
               </div>

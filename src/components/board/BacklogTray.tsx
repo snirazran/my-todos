@@ -49,6 +49,7 @@ interface Props {
   showCompleted?: boolean;
   onShowCompletedChange?: (show: boolean) => void;
   hideDoTodayButton?: boolean;
+  backlogDayIndex?: number;
 }
 
 export default React.memo(function BacklogTray({
@@ -72,6 +73,7 @@ export default React.memo(function BacklogTray({
   showCompleted = true,
   onShowCompletedChange,
   hideDoTodayButton = false,
+  backlogDayIndex = 7,
 }: Props) {
   // Menu & Dialog State
   const [menu, setMenu] = useState<{
@@ -220,9 +222,9 @@ export default React.memo(function BacklogTray({
                   <div className="group relative">
                     <TaskCard
                       innerRef={(el) =>
-                        setCardRef(draggableIdFor(7, t.id), el)
+                        setCardRef(draggableIdFor(backlogDayIndex as any, t.id), el)
                       }
-                      dragId={draggableIdFor(7, t.id)}
+                      dragId={draggableIdFor(backlogDayIndex as any, t.id)}
                       task={t}
                       userTags={userTags}
                       menuOpen={menu?.id === t.id}
@@ -268,7 +270,7 @@ export default React.memo(function BacklogTray({
                           );
                         });
                         onGrab({
-                          day: 7,
+                          day: backlogDayIndex,
                           index: originalIndex,
                           taskId: t.id,
                           taskText: t.text,
@@ -277,7 +279,7 @@ export default React.memo(function BacklogTray({
                           clientY: payload.clientY,
                           pointerType: payload.pointerType,
                           rectGetter: () => {
-                            const id = draggableIdFor(7, t.id);
+                            const id = draggableIdFor(backlogDayIndex as any, t.id);
                             const el = document.querySelector(
                               `[data-card-id="${id}"]`,
                             );

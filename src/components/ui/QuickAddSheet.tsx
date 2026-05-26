@@ -59,6 +59,10 @@ export default function QuickAddSheet({
   const [mounted, setMounted] = useState(false);
   const [showPremiumLimit, setShowPremiumLimit] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
+  const [pickedBacklogTaskId, setPickedBacklogTaskId] = useState<string | null>(null);
+  const [pickedBacklogText, setPickedBacklogText] = useState<string | null>(null);
+  const [showSavedConfirm, setShowSavedConfirm] = useState(false);
+  const pendingSubmitRef = useRef<(() => Promise<void>) | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
 
@@ -138,6 +142,9 @@ export default function QuickAddSheet({
     setShowCalendarPicker(false);
     setAutoAddedTagIds([]);
     setInputFocused(false);
+    setPickedBacklogTaskId(null);
+    setPickedBacklogText(null);
+    setShowSavedConfirm(false);
 
     const initialDate = defaultDateKey ?? ymdLocal(new Date());
     setSelectedDateKey(initialDate);
@@ -228,7 +235,7 @@ export default function QuickAddSheet({
     setActivePicker(null);
   };
 
-  const handleSubmit = async () => {
+  const doSubmit = async (removeSavedTask: boolean) => {
     if (isSubmitting) return;
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -256,10 +263,29 @@ export default function QuickAddSheet({
         endTime: endTime || undefined,
         reminder: notifyEnabled ? reminder : undefined,
       });
+      if (removeSavedTask && pickedBacklogTaskId) {
+        fetch(`/api/tasks?view=board`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ day: -1, taskId: pickedBacklogTaskId }),
+        }).catch(console.error);
+      }
       onOpenChange(false);
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    if (!pickedBacklogTaskId) {
+      return doSubmit(false);
+    }
+    const textModified = text.trim() !== pickedBacklogText?.trim();
+    if (!textModified) {
+      return doSubmit(true);
+    }
+    pendingSubmitRef.current = () => doSubmit(false);
+    setShowSavedConfirm(true);
   };
 
   if (!mounted) return null;
@@ -572,6 +598,13 @@ export default function QuickAddSheet({
                               setNotifyEnabled(!!pick.reminder);
                               if (pick.reminder) setReminder(pick.reminder);
                             }
+                            if (pick.backlogTaskId) {
+                              setPickedBacklogTaskId(pick.backlogTaskId);
+                              setPickedBacklogText(pick.text);
+                            } else {
+                              setPickedBacklogTaskId(null);
+                              setPickedBacklogText(null);
+                            }
                             inputRef.current?.focus();
                           }}
                         />
@@ -629,6 +662,52 @@ export default function QuickAddSheet({
         open={showPremiumLimit}
         onClose={() => setShowPremiumLimit(false)}
       />
+
+      {mounted && showSavedConfirm && createPortal(
+        <div
+          className="fixed inset-0 z-[9998] bg-black/80 flex items-center justify-center p-4"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowSavedConfirm(false); }}
+        >
+          <div className="w-full max-w-[340px] rounded-2xl bg-background p-5 shadow-xl ring-1 ring-border/70">
+            <h3 className="mb-2 text-[16px] font-extrabold text-foreground">
+              Modified saved task
+            </h3>
+            <p className="mb-4 text-[13px] text-muted-foreground">
+              You changed the text. Add as a new task or replace the saved one?
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSavedConfirm(false);
+                  doSubmit(true);
+                }}
+                className="h-11 w-full rounded-xl bg-primary text-[13px] font-extrabold text-primary-foreground transition-colors hover:bg-primary/90"
+              >
+                Replace saved task
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSavedConfirm(false);
+                  doSubmit(false);
+                }}
+                className="h-11 w-full rounded-xl bg-muted text-[13px] font-extrabold text-foreground transition-colors hover:bg-muted/70"
+              >
+                Add as new task
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowSavedConfirm(false)}
+                className="h-10 w-full text-[12px] font-bold text-muted-foreground"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </>
   );
 }

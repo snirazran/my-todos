@@ -16,7 +16,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useUIStore } from '@/lib/uiStore';
 import { clearAuthTokenCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
-import GoogleCalendarSync from '@/components/ui/GoogleCalendarSync';
+import GoogleCalendarSync, { getCalendarSyncStatus } from '@/components/ui/GoogleCalendarSync';
 import {
   SkinRotationRow,
   SkinRotationDialog,
@@ -101,7 +101,7 @@ export default function SiteHeader() {
     {
       href: '/planner',
       label: 'Planner',
-      iconSrc: '/icons/Planner.svg',
+      iconSrc: '/icons/Date.svg',
       protected: true,
     },
     {
@@ -871,12 +871,12 @@ function MainView({
       {/* Community */}
       <MenuSection title="Community">
         <MenuRow
-          icon={<Image src="/icons/InviteFriends.svg" alt="Invite friends" width={20} height={20} className="w-5 h-5" />}
+          icon={<Image src="/icons/InviteFriends.svg" alt="Invite friends" width={40} height={40} className="w-10 h-10" />}
           label="Invite friends"
           onClick={onInviteFriends}
         />
         <MenuRow
-          icon={<Image src="/icons/Community.svg" alt="Community" width={20} height={20} className="w-5 h-5" />}
+          icon={<Image src="/icons/Community.svg" alt="Community" width={40} height={40} className="w-10 h-10" />}
           label="Join our frog community"
           onClick={onOpenCommunity}
         />
@@ -886,7 +886,7 @@ function MainView({
       <MenuSection title="Account">
         {isNative && (
           <MenuRow
-            icon={<Bell className="w-5 h-5 text-amber-500" />}
+            icon={<Bell className="w-7 h-7 text-amber-500" />}
             label="Notifications"
             trailing={
               <span className="text-[11px] font-bold text-muted-foreground">
@@ -897,12 +897,12 @@ function MainView({
           />
         )}
         <MenuRow
-          icon={<User className="w-5 h-5 text-sky-500" />}
+          icon={<User className="w-7 h-7 text-sky-500" />}
           label="Profile"
           onClick={onOpenProfile}
         />
         <MenuRow
-          icon={<SlidersHorizontal className="w-5 h-5 text-emerald-500" />}
+          icon={<SlidersHorizontal className="w-7 h-7 text-emerald-500" />}
           label="Preferences"
           onClick={onOpenPreferences}
         />
@@ -911,7 +911,7 @@ function MainView({
       {/* Subscriptions */}
       <MenuSection title="Subscriptions">
         <MenuRow
-          icon={<Sparkles className="w-5 h-5 text-violet-500" />}
+          icon={<Sparkles className="w-7 h-7 text-violet-500" />}
           label="FrogTask Plus"
           onClick={onOpenPlus}
         />
@@ -920,12 +920,12 @@ function MainView({
       {/* Support */}
       <MenuSection title="Support">
         <MenuRow
-          icon={<HelpCircle className="w-5 h-5 text-sky-500" />}
+          icon={<HelpCircle className="w-7 h-7 text-sky-500" />}
           label="Help center"
           onClick={onHelpCenter}
         />
         <MenuRow
-          icon={<AlertTriangle className="w-5 h-5 text-red-500" />}
+          icon={<AlertTriangle className="w-7 h-7 text-red-500" />}
           label="Report an issue"
           onClick={onReportIssue}
         />
@@ -935,7 +935,7 @@ function MainView({
       {isAdmin && (
         <MenuSection title="Admin">
           <MenuRow
-            icon={<Settings className="w-5 h-5 text-amber-500" />}
+            icon={<Settings className="w-7 h-7 text-amber-500" />}
             label="Admin Settings"
             onClick={onGoAdmin}
           />
@@ -946,7 +946,7 @@ function MainView({
         onClick={onSignOut}
         className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl font-bold bg-red-50 text-red-600 dark:bg-red-950/20 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
       >
-        <LogOut className="w-5 h-5" />
+        <LogOut className="w-7 h-7" />
         Sign Out
       </button>
     </div>
@@ -970,12 +970,8 @@ function PreferencesView({
           className="w-full flex items-center justify-between px-4 py-4 bg-card hover:bg-accent/50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
         >
           <span className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-muted/50 flex items-center justify-center">
-              {theme === 'dark' ? (
-                <Moon className="w-5 h-5 text-violet-400" />
-              ) : (
-                <Sun className="w-5 h-5 text-amber-500" />
-              )}
+            <div className="h-9 w-9 flex items-center justify-center">
+              <Image src="/icons/DarkMode.svg" alt="Color mode" width={40} height={40} className="w-10 h-10" />
             </div>
             <span className="font-bold text-sm">Color Mode</span>
           </span>
@@ -987,7 +983,7 @@ function PreferencesView({
 
       <MenuSection title="Quests">
         <MenuRow
-          icon={<Image src="/icons/Compass.svg" alt="Quest Focus" width={20} height={20} className="w-5 h-5" />}
+          icon={<Image src="/icons/Compass.svg" alt="Quest Focus" width={40} height={40} className="w-10 h-10" />}
           label="Quest Focus"
           onClick={onOpenQuestOnboarding}
         />
@@ -1110,6 +1106,7 @@ function QuickTilesGrid({
 }) {
   const [rotation, setRotation] = useState<RotationInterval>('disabled');
   const [rotationOpen, setRotationOpen] = useState(false);
+  const [gcalEnabled, setGcalEnabled] = useState(() => getCalendarSyncStatus().enabled);
 
   useEffect(() => {
     setRotation(getRotationInterval());
@@ -1118,28 +1115,34 @@ function QuickTilesGrid({
     return () => window.removeEventListener('skin-rotation-change', handler);
   }, []);
 
+  useEffect(() => {
+    const handler = () => setGcalEnabled(getCalendarSyncStatus().enabled);
+    window.addEventListener('gcal-status-change', handler);
+    return () => window.removeEventListener('gcal-status-change', handler);
+  }, []);
+
   return (
     <div className="grid grid-cols-2 gap-3">
       <QuickTile
-        icon={<Image src="/icons/Compass.svg" alt="Focus areas" width={28} height={28} className="h-7 w-7" />}
+        icon={<Image src="/icons/Compass.svg" alt="Focus areas" width={52} height={52} className="h-[52px] w-[52px]" />}
         title="Focus areas"
         subtitle="Tailor your quests"
         onClick={onOpenQuestFocus}
       />
       <QuickTile
-        icon={<Image src="/icons/Shuffle.svg" alt="Skin rotation" width={28} height={28} className="h-7 w-7" />}
+        icon={<Image src="/icons/Shuffle.svg" alt="Skin rotation" width={52} height={52} className="h-[52px] w-[52px]" />}
         title="Skin rotation"
         subtitle={labelForInterval(rotation)}
         onClick={() => setRotationOpen(true)}
       />
       <QuickTile
-        icon={<Image src="/icons/Date.svg" alt="Google Calendar" width={28} height={28} className="h-7 w-7" />}
+        icon={<Image src="/icons/GoogleCalendar.svg" alt="Google Calendar" width={32} height={32} className="h-8 w-8" />}
         title="Google Calendar"
-        subtitle="Sync your events"
-        onClick={onOpenPreferences}
+        subtitle={gcalEnabled ? 'Connected' : 'Sync your events'}
+        onClick={() => window.dispatchEvent(new Event('gcal-sync-trigger'))}
       />
       <QuickTile
-        icon={<Image src="/icons/DarkMode.svg" alt="Color mode" width={28} height={28} className="h-7 w-7" />}
+        icon={<Image src="/icons/DarkMode.svg" alt="Color mode" width={52} height={52} className="h-[52px] w-[52px]" />}
         title="Color mode"
         subtitle={theme === 'dark' ? 'Dark' : 'Light'}
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -1187,7 +1190,7 @@ function MenuRow({
       onClick={onClick}
       className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-accent/50 transition-colors text-left"
     >
-      <div className="h-9 w-9 rounded-full bg-muted/40 flex items-center justify-center shrink-0">
+      <div className="h-9 w-9 flex items-center justify-center shrink-0">
         {icon}
       </div>
       <span className="flex-1 text-sm font-bold truncate">{label}</span>

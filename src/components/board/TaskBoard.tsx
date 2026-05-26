@@ -733,6 +733,7 @@ export default function TaskBoard({
         tasks={backlog}
         onGrab={onGrab}
         setCardRef={setCardRef}
+        backlogDayIndex={BACKLOG_IDX}
         activeDragId={drag?.active ? drag.taskId : null}
         trayRef={backlogTrayRef}
         closeProgress={trayCloseProgress}

@@ -41,7 +41,7 @@ export default function MobileNav() {
     {
       href: '/planner',
       label: 'Planner',
-      iconSrc: '/icons/Planner.svg',
+      iconSrc: '/icons/Date.svg',
       protected: true,
     },
     {
@@ -73,19 +73,19 @@ export default function MobileNav() {
   return (
     <>
       <nav className="fixed bottom-0 left-0 z-50 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-4 h-[72px] py-1.5">
+        <div className="grid grid-cols-4 h-[76px] py-2.5">
           {navItems.map((item) => {
             const isActive = item.href ? pathname === item.href : item.isActive;
 
             const content = (
-              <div className={`flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-2xl transition-colors ${isActive ? 'bg-primary/10' : ''}`}>
+              <div className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-2xl transition-colors ${isActive ? 'bg-primary/10' : ''}`}>
                 <div className="relative">
                   <Image
                     src={item.iconSrc}
                     alt={item.label}
-                    width={32}
-                    height={32}
-                    className="w-8 h-8"
+                    width={36}
+                    height={36}
+                    className="w-9 h-9"
                   />
                   {item.label === 'Wardrobe' && inventoryBadge > 0 && (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
