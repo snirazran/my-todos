@@ -1,5 +1,7 @@
 'use client';
 
+import { useUIStore } from '@/lib/uiStore';
+
 type PageBackgroundImages = {
   mobile: string;
   tablet: string;
@@ -14,6 +16,10 @@ export function PageBackground({
   images: PageBackgroundImages;
   cacheKey?: string;
 }) {
+  const isLoadingScreenVisible = useUIStore((state) => state.isLoadingScreenVisible);
+
+  if (isLoadingScreenVisible) return null;
+
   return (
     <picture
       key={cacheKey ?? 'page-bg'}

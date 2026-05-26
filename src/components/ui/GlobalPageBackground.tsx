@@ -2,8 +2,10 @@
 
 import { useMemo } from 'react';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
+import { useUIStore } from '@/lib/uiStore';
 
 export function GlobalPageBackground() {
+  const isLoadingScreenVisible = useUIStore((state) => state.isLoadingScreenVisible);
   const { data } = useBackgrounds();
 
   const equippedBackground = useMemo(() => {
@@ -17,6 +19,8 @@ export function GlobalPageBackground() {
     web: equippedBackground?.images?.web || '/bg-web.png',
     webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.png',
   };
+
+  if (isLoadingScreenVisible) return null;
 
   return (
     <picture

@@ -9,11 +9,14 @@ import useSWR from 'swr';
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUIStore } from '@/lib/uiStore';
+import { cn } from '@/lib/utils';
 
 export default function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const isLoadingScreenVisible = useUIStore((state) => state.isLoadingScreenVisible);
   const { unseenCount, unseenContainerCount } = useInventory(!!user, true);
   const inventoryBadge = unseenCount + unseenContainerCount;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -30,7 +33,13 @@ export default function MobileNav() {
   const questClaimableCount = questsData?.claimableCount ?? 0;
   const questActiveCount = questsData?.activeCount ?? 0;
 
-  if (pathname === '/welcome' || pathname === '/login' || pathname === '/register' || pathname === '/onboarding' || pathname?.startsWith('/auth/')) return null;
+  if (
+    pathname === '/welcome' ||
+    pathname === '/login' ||
+    pathname === '/register' ||
+    pathname === '/onboarding' ||
+    pathname?.startsWith('/auth/')
+  ) return null;
 
   const navItems = [
     {
@@ -72,7 +81,13 @@ export default function MobileNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 z-50 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]">
+      <nav
+        className={cn(
+          'fixed bottom-0 left-0 z-50 w-full bg-background/90 backdrop-blur-lg md:hidden pb-[env(safe-area-inset-bottom)]',
+          isLoadingScreenVisible && 'pointer-events-none',
+        )}
+        aria-disabled={isLoadingScreenVisible}
+      >
         <div className="grid grid-cols-4 h-[76px] py-2.5">
           {navItems.map((item) => {
             const isActive = item.href ? pathname === item.href : item.isActive;

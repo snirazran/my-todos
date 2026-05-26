@@ -35,6 +35,7 @@ import { ChevronRight } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { CurrencyShop } from './shop/CurrencyShop';
+import { cn } from '@/lib/utils';
 
 const wardrobeItems = [
   { tab: 'inventory' as const, label: 'Inventory', iconSrc: '/icons/Wardrobe.svg', color: 'bg-primary/10' },
@@ -50,7 +51,8 @@ export default function SiteHeader() {
     isWeeklyWrappedOpen,
     openWeeklyWrapped,
     closeWeeklyWrapped,
-    isDebugMode
+    isDebugMode,
+    isLoadingScreenVisible,
   } = useUIStore();
   const { indices } = useWardrobeIndices(!!user);
   const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory(!!user, true);
@@ -134,7 +136,13 @@ export default function SiteHeader() {
     <>
       {(pathname === '/' || pathname === '/wardrobe') && (
         <>
-          <div className="fixed left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden">
+          <div
+            className={cn(
+              'fixed left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden',
+              isLoadingScreenVisible && 'pointer-events-none',
+            )}
+            aria-disabled={isLoadingScreenVisible}
+          >
             <RightActions
               user={user}
               loading={loading}
@@ -144,7 +152,13 @@ export default function SiteHeader() {
             />
           </div>
           {user && flyBalance !== undefined && (
-            <div className="fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] px-2 py-1 md:hidden">
+            <div
+              className={cn(
+                'fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] px-2 py-1 md:hidden',
+                isLoadingScreenVisible && 'pointer-events-none',
+              )}
+              aria-disabled={isLoadingScreenVisible}
+            >
               <FlyCounter
                 balance={flyBalance}
                 variant="mobile"
@@ -154,7 +168,13 @@ export default function SiteHeader() {
           )}
         </>
       )}
-      <header className="relative z-[90] hidden w-full h-16 border-b border-border/40 bg-background/95 backdrop-blur-xl md:block">
+      <header
+        className={cn(
+          'relative z-[90] hidden w-full h-16 border-b border-border/40 bg-background/95 backdrop-blur-xl md:block',
+          isLoadingScreenVisible && 'pointer-events-none',
+        )}
+        aria-disabled={isLoadingScreenVisible}
+      >
       <div className="flex items-center justify-between h-full gap-4 px-6 py-3 mx-auto max-w-7xl md:px-10">
         {/* ───────── Logo ───────── */}
         <Link

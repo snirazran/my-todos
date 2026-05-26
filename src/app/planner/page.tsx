@@ -354,7 +354,7 @@ export default function ManageTasksPage() {
   ]);
 
   if (loading) {
-    return <LoadingScreen message="Loading planner..." fullscreen />;
+    return <LoadingScreen fullscreen />;
   }
 
   return (

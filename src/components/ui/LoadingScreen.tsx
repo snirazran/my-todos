@@ -1,6 +1,8 @@
 'use client';
 
-import React from 'react';
+import Image from 'next/image';
+import { useLayoutEffect } from 'react';
+import { useUIStore } from '@/lib/uiStore';
 
 interface LoadingScreenProps {
   message?: string;
@@ -8,56 +10,76 @@ interface LoadingScreenProps {
   subtext?: string;
 }
 
-function ThemeMorphLoader() {
+function HomeLoaderIcon() {
   return (
-    <div className="relative flex items-center justify-center w-24 h-24">
-      {/* Static Shadow - Separated so it doesn't spin */}
-      <div className="absolute w-12 h-12 bg-primary/40 blur-xl rounded-full translate-y-2" />
-
-      {/* The Morphing Shape */}
-      <div className="relative w-12 h-12 bg-gradient-to-br from-primary via-emerald-500 to-primary rounded-xl animate-[morph-spin_2s_ease-in-out_infinite]" />
-
-      <style jsx>{`
-        @keyframes morph-spin {
-          0% {
-            border-radius: 12px; /* rounded-xl (Task Card shape) */
-            transform: rotate(0deg);
-          }
-          50% {
-            border-radius: 50%; /* Circle (Button/Avatar shape) */
-            transform: rotate(180deg) scale(0.75); /* Shrink slightly */
-          }
-          100% {
-            border-radius: 12px;
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
+    <div className="relative flex h-44 w-44 items-center justify-center">
+      <Image
+        src="/icons/Home.svg"
+        alt=""
+        width={168}
+        height={168}
+        priority
+        aria-hidden
+        className="relative h-[168px] w-[168px]"
+      />
     </div>
   );
 }
 
+function CurvedLoadingText({ message }: { message: string }) {
+  return (
+    <svg
+      aria-label={message}
+      role="img"
+      viewBox="0 0 220 34"
+      className="-mt-6 h-8 w-[220px] overflow-visible text-foreground"
+    >
+      <path id="loading-text-arc" d="M 36 12 Q 110 28 184 12" fill="none" />
+      <text
+        fill="currentColor"
+        fontSize="20"
+        fontWeight="800"
+        textAnchor="middle"
+        style={{
+          fontFamily:
+            '"Arial Rounded MT Bold", "Avenir Next Rounded", ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        }}
+      >
+        <textPath href="#loading-text-arc" startOffset="50%">
+          {message}
+        </textPath>
+      </text>
+    </svg>
+  );
+}
+
 export function LoadingScreen({
-  message = 'Loading...',
+  message = 'Frog Task',
   subtext = '',
   fullscreen = true,
 }: LoadingScreenProps) {
+  const setLoadingScreenVisible = useUIStore((state) => state.setLoadingScreenVisible);
+
+  useLayoutEffect(() => {
+    if (!fullscreen) return;
+
+    setLoadingScreenVisible(true);
+    return () => setLoadingScreenVisible(false);
+  }, [fullscreen, setLoadingScreenVisible]);
+
   return (
     <div
-      className={`relative overflow-hidden ${
-        fullscreen ? 'h-[calc(100dvh-var(--header-h))] flex items-center justify-center' : 'py-12 flex items-center justify-center'
+      className={`overflow-hidden ${
+        fullscreen ? 'fixed inset-0 z-40 flex items-center justify-center' : 'py-12 flex items-center justify-center'
       }`}
     >
-      {/* Cleaner, lighter background */}
-      <div className="absolute inset-0 bg-background/50" />
+      <div className="absolute inset-0 bg-background" />
       
-      <div className={`relative flex items-center justify-center w-full px-4 ${fullscreen ? '-translate-y-8 md:translate-y-0' : ''}`}>
-        <div className="flex flex-col items-center gap-4">
-          <ThemeMorphLoader />
+      <div className="relative flex w-full -translate-y-12 items-center justify-center px-4">
+        <div className="flex flex-col items-center gap-0">
+          <HomeLoaderIcon />
           <div className="text-center space-y-1">
-            <p className="text-lg font-bold text-foreground tracking-tight">
-              {message}
-            </p>
+            <CurvedLoadingText message={message} />
             {subtext ? (
               <p className="text-sm font-medium text-muted-foreground">
                 {subtext}

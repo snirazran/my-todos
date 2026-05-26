@@ -693,7 +693,7 @@ export default function Home() {
     ) : null;
 
   if (sessionLoading || (user && isLoading && tasks.length === 0)) {
-    return <LoadingScreen message="Loading your day..." />;
+    return <LoadingScreen />;
   }
 
   return (
