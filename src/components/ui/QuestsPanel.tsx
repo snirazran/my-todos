@@ -1325,22 +1325,16 @@ function QuestSeasonEventOverlay({
                           className={cn(
                             'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.12)] ring-1 ring-primary/20',
                             isClaimed && !isCurrent
-                              ? 'bg-primary/85'
+                              ? 'bg-primary'
                               : 'bg-primary',
                           )}
                         >
-                          {isClaimed && !isCurrent ? (
-                            <Check className="w-5 h-5 stroke-[4]" />
-                          ) : (
-                            <>
-                              <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-95">
-                                Day
-                              </span>
-                              <span className="text-lg font-black tabular-nums">
-                                {entry.day}
-                              </span>
-                            </>
-                          )}
+                          <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-95">
+                            Day
+                          </span>
+                          <span className="text-lg font-black tabular-nums">
+                            {entry.day}
+                          </span>
                         </div>
                       </div>
 

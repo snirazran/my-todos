@@ -136,7 +136,6 @@ export function SingleRewardCard({
         className={cn(
           'relative transition-all duration-300 w-full max-w-[192px] mx-auto scale-100',
           onClick && 'cursor-pointer',
-          muted && !forceFullOpacity && 'opacity-70',
         )}
       >
         <ItemCard
@@ -169,9 +168,6 @@ export function SingleRewardCard({
             ) : null
           }
         />
-        {muted && !forceFullOpacity && (
-          <div className="pointer-events-none absolute inset-0 rounded-2xl bg-background/20" />
-        )}
       </div>
 
       {/* Day Label - Hidden when layout handles it */}
