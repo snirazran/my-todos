@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { FolderOpen, CalendarRange, EllipsisVertical } from 'lucide-react';
+import { FolderOpen, Filter } from 'lucide-react';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
@@ -142,41 +142,31 @@ export default React.memo(function BacklogTray({
         ref={trayRef}
         isOpen={isOpen}
         onClose={onClose}
-        title="Saved Tasks"
+        title={`${filteredTasks.length} Saved Tasks`}
         icon={<FolderOpen size={24} strokeWidth={2.5} />}
         iconContainerClassName="bg-primary/10 text-primary"
         isDraggingAny={isDraggingAny}
         closeProgress={closeProgress}
-        headerActions={
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 relative">
-              <div className="flex items-center gap-2 text-[11px] font-bold text-muted-foreground uppercase tracking-widest opacity-70">
-                <CalendarRange size={12} strokeWidth={3} />
-                <span>
-                  {filteredTasks.length}{' '}
-                  {filteredTasks.length === 1 ? 'Task' : 'Tasks'} Saved
-                </span>
-              </div>
+        rightActions={
+          <div className="relative" ref={filterMenuRef}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowFilterMenu(!showFilterMenu);
+              }}
+              className={`flex items-center justify-center w-9 h-9 rounded-full transition-all active:scale-90 ${
+                showFilterMenu || isFiltered
+                  ? 'bg-primary/10 text-primary'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+              }`}
+            >
+              <Filter size={16} />
+              {isFiltered && (
+                <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
+              )}
+            </button>
 
-              <div className="relative" ref={filterMenuRef}>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowFilterMenu(!showFilterMenu);
-                  }}
-                  className={`flex items-center justify-center w-7 h-7 rounded-lg transition-all active:scale-90 ${
-                    showFilterMenu || isFiltered
-                      ? 'bg-primary/10 text-primary'
-                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-                  }`}
-                >
-                  <EllipsisVertical size={16} />
-                  {isFiltered && (
-                    <div className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-500 border-2 border-card shadow-sm" />
-                  )}
-                </button>
-
-                <FilterDropdown
+            <FilterDropdown
                   isOpen={showFilterMenu}
                   onClose={() => setShowFilterMenu(false)}
                   triggerRef={filterMenuRef}
@@ -189,8 +179,6 @@ export default React.memo(function BacklogTray({
                   showCompleted={showCompleted}
                   onShowCompletedChange={(show) => onShowCompletedChange?.(show)}
                 />
-              </div>
-            </div>
           </div>
         }
       >

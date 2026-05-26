@@ -12,6 +12,7 @@ interface SideOpenTrayProps {
   icon: React.ReactNode;
   children: React.ReactNode;
   headerActions?: React.ReactNode;
+  rightActions?: React.ReactNode;
   isDraggingAny?: boolean;
   closeProgress?: number;
   className?: string;
@@ -29,6 +30,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
       icon,
       children,
       headerActions,
+      rightActions,
       isDraggingAny = false,
       closeProgress = 0,
       className,
@@ -163,7 +165,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
                     {icon}
                   </div>
                   <div className="min-w-0">
-                    <h3 className="text-xl font-black tracking-tight text-foreground uppercase leading-none">
+                    <h3 className="text-xl font-black tracking-tight text-foreground leading-none">
                       {title}
                     </h3>
                     {subtitle && (
@@ -178,12 +180,15 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
                     )}
                   </div>
                 </div>
-                <button
-                  onClick={onClose}
-                  className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95 shrink-0"
-                >
-                  <X size={16} strokeWidth={2.5} />
-                </button>
+                <div className="flex items-center gap-2 shrink-0">
+                  {rightActions}
+                  <button
+                    onClick={onClose}
+                    className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95 shrink-0"
+                  >
+                    <X size={16} strokeWidth={2.5} />
+                  </button>
+                </div>
               </div>
 
               {/* Vertical Scroll Content */}
