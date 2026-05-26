@@ -209,7 +209,7 @@ export default function SiteHeader() {
               return (
                 <div key={item.label} className="relative" ref={wardrobeRef}>
                   <button onClick={item.onClick} className={buttonClass}>
-                    <Image src={item.iconSrc} alt={item.label} width={32} height={32} className={`w-8 h-8 ${isActive ? 'opacity-100' : 'opacity-60'}`} />
+                    <Image src={item.iconSrc} alt={item.label} width={32} height={32} className="w-8 h-8" />
                     <span className="hidden lg:inline">{item.label}</span>
                     {inventoryBadge > 0 && (
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ml-1">
@@ -267,7 +267,7 @@ export default function SiteHeader() {
                   onClick={item.onClick}
                   className={buttonClass}
                 >
-                  <Image src={item.iconSrc} alt={item.label} width={32} height={32} className={`w-8 h-8 ${isActive ? 'opacity-100' : 'opacity-60'}`} />
+                  <Image src={item.iconSrc} alt={item.label} width={32} height={32} className="w-8 h-8" />
                   <span className="hidden lg:inline">{item.label}</span>
                   {item.label === 'Quests' && questClaimableCount > 0 ? (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
@@ -289,7 +289,7 @@ export default function SiteHeader() {
                   onClick={() => router.push('/login')}
                   className={buttonClass}
                 >
-                  <Image src={item.iconSrc} alt={item.label} width={32} height={32} className="w-8 h-8 opacity-60" />
+                  <Image src={item.iconSrc} alt={item.label} width={32} height={32} className="w-8 h-8" />
                   <span className="hidden lg:inline">{item.label}</span>
                 </button>
               );
@@ -297,7 +297,7 @@ export default function SiteHeader() {
 
             return (
               <Link key={item.href} href={item.href!} className={buttonClass}>
-                <Image src={item.iconSrc} alt={item.label} width={32} height={32} className={`w-8 h-8 ${isActive ? 'opacity-100' : 'opacity-60'}`} />
+                <Image src={item.iconSrc} alt={item.label} width={32} height={32} className="w-8 h-8" />
                 <span className="hidden lg:inline">{item.label}</span>
               </Link>
             );

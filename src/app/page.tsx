@@ -1128,7 +1128,7 @@ export default function Home() {
           setQuickText('');
           setShowQuickAdd(true);
         }}
-        className="fixed right-6 z-[40] grid h-14 w-14 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30 shadow-lg backdrop-blur-sm transition-all hover:bg-primary/25 active:scale-95 sm:hidden"
+        className="fixed right-6 z-[40] grid h-14 w-14 place-items-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/30 shadow-lg backdrop-blur-sm transition-all hover:bg-primary/25 active:scale-95 md:hidden"
         style={{
           bottom: `calc(env(safe-area-inset-bottom) + ${
             notificationStackHeight > 0 ? 80 + notificationStackHeight : 88
