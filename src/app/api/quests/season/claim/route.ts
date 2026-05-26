@@ -5,9 +5,12 @@ import QuestSeasonModel from '@/lib/models/QuestSeason';
 import UserModel from '@/lib/models/User';
 import { getZonedToday } from '@/lib/utils';
 import {
-  getCurrentSeasonDay,
+  getCurrentUserSeasonDay,
+  getUserQuestSeasonState,
+  getSeasonDayCount,
   grantRewardsToUser,
   normalizeSeasonDayRewards,
+  pruneQuestSeasonProgress,
 } from '@/lib/quests/seasons';
 
 export async function POST(req: NextRequest) {
@@ -42,12 +45,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    const day = getCurrentSeasonDay(
-      season.startsAt,
-      season.endsAt,
-      timezone,
-      now,
-    );
     const today = getZonedToday(timezone);
     const progressFlies =
       user.wardrobe?.flyDaily?.date === today
@@ -60,16 +57,32 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const questsState = (user.quests && typeof user.quests === 'object'
-      ? user.quests
-      : {}) as any;
-    questsState.seasons = questsState.seasons ?? {};
-    const seasonState = questsState.seasons[season.seasonId] ?? {
-      claimedDays: [],
-    };
-    const claimedDays = Array.isArray(seasonState.claimedDays)
-      ? seasonState.claimedDays
-      : [];
+    const questsState = pruneQuestSeasonProgress(user.quests, season.seasonId);
+    const seasonState = getUserQuestSeasonState(
+      { quests: questsState },
+      season.seasonId,
+    );
+    const claimedDays = seasonState.claimedDays;
+    if (seasonState.lastClaimedYmd === today) {
+      return NextResponse.json(
+        { error: 'Season reward already claimed today' },
+        { status: 400 },
+      );
+    }
+    const dayCount = getSeasonDayCount(season.startsAt, season.endsAt);
+    const day = getCurrentUserSeasonDay(dayCount, claimedDays);
+    const completedSeasonDays = new Set(
+      claimedDays
+        .filter((claimedDay: unknown): claimedDay is number => typeof claimedDay === 'number')
+        .map((claimedDay: number) => Math.floor(claimedDay))
+        .filter((claimedDay: number) => claimedDay >= 1 && claimedDay <= dayCount),
+    );
+    if (completedSeasonDays.size >= dayCount) {
+      return NextResponse.json(
+        { error: 'Season is already complete' },
+        { status: 400 },
+      );
+    }
     if (claimedDays.includes(day)) {
       return NextResponse.json(
         { error: 'Season reward already claimed' },
@@ -99,6 +112,7 @@ export async function POST(req: NextRequest) {
     questsState.seasons[season.seasonId] = {
       ...seasonState,
       claimedDays: [...claimedDays, day],
+      lastClaimedYmd: today,
     };
     user.quests = questsState;
     user.markModified('quests');

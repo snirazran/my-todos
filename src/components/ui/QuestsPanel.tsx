@@ -68,6 +68,8 @@ type QuestSeasonView = {
   dayCount: number;
   progressFlies: number;
   claimedDays: number[];
+  claimedToday: boolean;
+  claimedTodayDay?: number;
   claimable: boolean;
   rewardsByDay: Array<{
     day: number;
@@ -847,7 +849,16 @@ function QuestSeasonBanner({
   const previewReward =
     currentReward?.freeRewards?.[0] ??
     currentReward?.premiumRewards?.[0];
-  const claimedToday = season.claimedDays.includes(season.currentDay);
+  const claimedToday = season.claimedToday;
+  const completedDay = season.claimedTodayDay ?? season.currentDay;
+  const completedSeasonDays = new Set(
+    season.claimedDays.filter((day) => day >= 1 && day <= season.dayCount),
+  );
+  const seasonComplete = completedSeasonDays.size >= season.dayCount;
+  const nextSeasonDay = Math.min(
+    claimedToday ? season.currentDay : season.currentDay + 1,
+    season.dayCount,
+  );
 
   return (
     <div
@@ -913,9 +924,13 @@ function QuestSeasonBanner({
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-base font-black leading-tight text-foreground">
-                  Yay, you claimed
+                  {seasonComplete
+                    ? 'Season complete!'
+                    : `Day ${completedDay} completed`}
                   <br />
-                  today&apos;s rewards!
+                  {seasonComplete
+                    ? 'All rewards claimed'
+                    : `Return tomorrow for Day ${nextSeasonDay}`}
                 </p>
               </div>
             </>
@@ -1096,8 +1111,17 @@ function QuestSeasonEventOverlay({
     ...currentFreeRewards,
     ...(isPremium ? currentPremiumRewards : []),
   ];
-  const claimedToday = season.claimedDays.includes(season.currentDay);
+  const claimedToday = season.claimedToday;
+  const completedDay = season.claimedTodayDay ?? season.currentDay;
   const goalReached = season.claimable || claimedToday;
+  const completedSeasonDays = new Set(
+    season.claimedDays.filter((day) => day >= 1 && day <= season.dayCount),
+  );
+  const seasonComplete = completedSeasonDays.size >= season.dayCount;
+  const nextSeasonDay = Math.min(
+    claimedToday ? season.currentDay : season.currentDay + 1,
+    season.dayCount,
+  );
 
   return createPortal(
     <div className="fixed inset-0 z-[1200] flex flex-col bg-background">
@@ -1163,24 +1187,33 @@ function QuestSeasonEventOverlay({
         <div className="-mt-8 flex-1 overflow-y-auto bg-background rounded-t-[32px]">
         <div className="relative z-10 mx-auto max-w-2xl bg-background pt-5">
           {goalReached ? (
-            <div className="mx-4 overflow-hidden rounded-[24px] border border-primary/15 bg-card">
-              <div className="flex items-center justify-between gap-3 px-5 py-2.5">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary ring-1 ring-primary/20">
-                    <Check className="h-4 w-4" strokeWidth={4} />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="truncate text-[15px] font-black leading-tight text-foreground">
-                      Day {season.currentDay} completed!
-                    </p>
-                    <p className="mt-0.5 truncate text-[11px] font-bold leading-tight text-muted-foreground">
-                      Day {season.currentDay + 1} opens tomorrow
-                    </p>
-                  </div>
+            <div className="mx-4 overflow-hidden rounded-[28px] bg-background p-3 ring-1 ring-border/50">
+              <div className="flex items-center gap-3">
+                <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                  <Check className="h-8 w-8" strokeWidth={4} />
                 </div>
-                <span className="shrink-0 rounded-full bg-primary px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-primary-foreground">
-                  Done
-                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-lg font-black leading-tight text-foreground">
+                    {season.claimable
+                      ? `Day ${season.currentDay} ready!`
+                      : `Day ${completedDay} completed`}
+                  </p>
+                  <p className="mt-0.5 truncate text-sm font-black leading-tight text-foreground">
+                    {seasonComplete
+                      ? 'Season complete'
+                      : season.claimable
+                        ? 'Claim to continue'
+                        : `Return tomorrow for Day ${nextSeasonDay}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={season.claimable ? onClaim : onClose}
+                  disabled={season.claimable && claiming}
+                  className="h-14 shrink-0 rounded-2xl bg-lime-600 px-6 text-sm font-black text-white shadow-[0_5px_0_#3f6212] transition active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-70"
+                >
+                  {season.claimable ? (claiming ? 'Claiming...' : 'Claim') : 'Done'}
+                </button>
               </div>
             </div>
           ) : (

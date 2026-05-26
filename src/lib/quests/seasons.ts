@@ -33,8 +33,15 @@ export type QuestSeasonView = {
   dayCount: number;
   progressFlies: number;
   claimedDays: number[];
+  claimedToday: boolean;
+  claimedTodayDay?: number;
   claimable: boolean;
   rewardsByDay: QuestSeasonDayReward[];
+};
+
+export type UserQuestSeasonState = {
+  claimedDays: number[];
+  lastClaimedYmd?: string;
 };
 
 export function normalizeSeasonDayRewards(
@@ -113,11 +120,47 @@ export function getCurrentSeasonDay(
   return Math.min(getSeasonDayCount(startsAt, endsAt), Math.max(1, raw));
 }
 
-function getClaimedDays(user: any, seasonId: string) {
-  const claimedDays = user?.quests?.seasons?.[seasonId]?.claimedDays;
-  return Array.isArray(claimedDays)
-    ? claimedDays.filter((day: unknown): day is number => typeof day === 'number')
-    : [];
+export function getCurrentUserSeasonDay(dayCount: number, claimedDays: number[]) {
+  const claimed = new Set(
+    claimedDays
+      .filter((day) => Number.isFinite(day) && day > 0)
+      .map((day) => Math.floor(day)),
+  );
+  for (let day = 1; day <= dayCount; day += 1) {
+    if (!claimed.has(day)) return day;
+  }
+  return dayCount;
+}
+
+export function getUserQuestSeasonState(
+  user: any,
+  seasonId: string,
+): UserQuestSeasonState {
+  const state = user?.quests?.seasons?.[seasonId];
+  const claimedDays = state?.claimedDays;
+  const lastClaimedYmd = state?.lastClaimedYmd;
+  return {
+    claimedDays: Array.isArray(claimedDays)
+      ? claimedDays.filter((day: unknown): day is number => typeof day === 'number')
+      : [],
+    lastClaimedYmd:
+      typeof lastClaimedYmd === 'string' && lastClaimedYmd
+        ? lastClaimedYmd
+        : undefined,
+  };
+}
+
+export function pruneQuestSeasonProgress(questsState: any, activeSeasonId: string) {
+  const nextState =
+    questsState && typeof questsState === 'object' ? questsState : {};
+  const seasons =
+    nextState.seasons && typeof nextState.seasons === 'object'
+      ? nextState.seasons
+      : {};
+  nextState.seasons = activeSeasonId in seasons
+    ? { [activeSeasonId]: seasons[activeSeasonId] }
+    : {};
+  return nextState;
 }
 
 export async function getActiveQuestSeasonView(args: {
@@ -139,14 +182,25 @@ export async function getActiveQuestSeasonView(args: {
   if (!season || !user) return null;
 
   const today = getZonedToday(args.timezone);
-  const currentDay = getCurrentSeasonDay(
-    season.startsAt,
-    season.endsAt,
-    args.timezone,
-  );
-  const claimedDays = getClaimedDays(user, season.seasonId);
+  const seasonState = getUserQuestSeasonState(user, season.seasonId);
+  const claimedDays = seasonState.claimedDays;
+  const dayCount = getSeasonDayCount(season.startsAt, season.endsAt);
+  const claimedToday = seasonState.lastClaimedYmd === today;
+  const claimedTodayDay = claimedToday
+    ? [...claimedDays]
+        .map((day) => Math.floor(day))
+        .filter((day) => day >= 1 && day <= dayCount)
+        .sort((a, b) => b - a)[0]
+    : undefined;
+  const currentDay = getCurrentUserSeasonDay(dayCount, claimedDays);
   const dailyFly = user.wardrobe?.flyDaily;
   const progressFlies = dailyFly?.date === today ? dailyFly.earned ?? 0 : 0;
+  const completedSeasonDays = new Set(
+    claimedDays
+      .map((day) => Math.floor(day))
+      .filter((day) => day >= 1 && day <= dayCount),
+  );
+  const seasonComplete = completedSeasonDays.size >= dayCount;
 
   return {
     id: season.seasonId,
@@ -156,10 +210,14 @@ export async function getActiveQuestSeasonView(args: {
     endsAt: season.endsAt.toISOString(),
     dailyTargetFlies: season.dailyTargetFlies,
     currentDay,
-    dayCount: getSeasonDayCount(season.startsAt, season.endsAt),
+    dayCount,
     progressFlies,
     claimedDays,
+    claimedToday,
+    claimedTodayDay,
     claimable:
+      !seasonComplete &&
+      !claimedToday &&
       progressFlies >= season.dailyTargetFlies &&
       !claimedDays.includes(currentDay),
     rewardsByDay: normalizeSeasonDayRewards(season.dayRewards),
