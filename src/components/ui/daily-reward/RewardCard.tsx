@@ -84,6 +84,7 @@ export function SingleRewardCard({
   const isLockedPremium = status === 'LOCKED_PREMIUM';
   const isMissed = status === 'MISSED';
   const isClaimed = status === 'CLAIMED';
+  const canUnlock = isLockedPremium && isToday && !!onClick;
 
   const itemDef = getRewardItemDef(rewardType, amount, itemId);
 
@@ -111,7 +112,7 @@ export function SingleRewardCard({
         Claim
       </Button>
     );
-  } else if (isLockedPremium && isToday) {
+  } else if (canUnlock) {
     customAction = (
       <Button
         onClick={(e) => {
@@ -122,28 +123,6 @@ export function SingleRewardCard({
       >
         Unlock
       </Button>
-    );
-  } else if (isMissed) {
-    customAction = (
-      <Button
-        disabled
-        variant="destructive"
-        className="w-full h-8 rounded-lg font-black uppercase tracking-wide opacity-80"
-      >
-        Missed
-      </Button>
-    );
-  } else if (isClaimed && isToday) {
-    customAction = (
-      <div className="w-full h-8 flex items-center justify-center rounded-lg bg-emerald-500 border border-emerald-600 text-white text-[10px] font-black uppercase tracking-wide px-1 shadow-sm text-center leading-tight">
-        Next gift tomorrow
-      </div>
-    );
-  } else if (isClaimed) {
-    customAction = (
-      <div className="w-full h-8 flex items-center justify-center rounded-lg bg-emerald-100/80 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/30 text-emerald-700 dark:text-emerald-400 text-[10px] font-black uppercase tracking-wide px-1 shadow-sm gap-1">
-        <Check className="w-3.5 h-3.5 stroke-[4]" /> Claimed
-      </div>
     );
   } else {
     customAction = <div className="h-8 w-full" />; // Reserve space equal to button height
@@ -178,14 +157,20 @@ export function SingleRewardCard({
           previewRootMargin={previewRootMargin}
           previewUnmountDelayMs={previewUnmountDelayMs}
           previewClassName="translate-y-[18%] scale-110"
+          previewTopLeftBadge={
+            isClaimed ? (
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md ring-2 ring-white">
+                <Check className="h-3.5 w-3.5" strokeWidth={4} />
+              </span>
+            ) : lockOverlay ? (
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white shadow-md ring-2 ring-white">
+                <Lock className="h-3.5 w-3.5" strokeWidth={3} />
+              </span>
+            ) : null
+          }
         />
         {muted && !forceFullOpacity && (
           <div className="pointer-events-none absolute inset-0 rounded-2xl bg-background/20" />
-        )}
-        {lockOverlay && (
-          <span className="pointer-events-none absolute right-2 top-2 z-10 flex h-7 w-7 items-center justify-center rounded-full bg-amber-500 text-white shadow-md ring-2 ring-white">
-            <Lock className="h-3.5 w-3.5" strokeWidth={3} />
-          </span>
         )}
       </div>
 
@@ -201,18 +186,7 @@ export function SingleRewardCard({
                 : 'text-muted-foreground/70',
           )}
         >
-          {isClaimed ? (
-            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/80 dark:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-500/30 shadow-sm">
-              <div className="flex items-center justify-center w-3.5 h-3.5 rounded-full bg-emerald-500 text-white">
-                <Check className="w-2.5 h-2.5 stroke-[4]" />
-              </div>
-              <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">
-                Claimed
-              </span>
-            </div>
-          ) : (
-            `Day ${day}`
-          )}
+          {`Day ${day}`}
         </span>
       )}
     </div>

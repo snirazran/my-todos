@@ -1374,7 +1374,9 @@ function QuestSeasonEventOverlay({
                               pausePreview={paused || !isCurrent}
                               onClick={
                                 !isPremium
-                                  ? undefined
+                                  ? isCurrent && season.claimable && !claimedToday
+                                    ? onUpgrade
+                                    : undefined
                                   : isCurrent &&
                                       season.claimable &&
                                       !claimedToday

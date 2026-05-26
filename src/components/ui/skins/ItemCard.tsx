@@ -107,6 +107,7 @@ function ItemCardComponent({
   previewRootMargin = '520px',
   previewUnmountDelayMs = 2400,
   previewClassName,
+  previewTopLeftBadge,
 }: {
   item: ItemDef;
   ownedCount: number;
@@ -131,6 +132,7 @@ function ItemCardComponent({
   previewRootMargin?: string;
   previewUnmountDelayMs?: number;
   previewClassName?: string;
+  previewTopLeftBadge?: React.ReactNode;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
@@ -315,6 +317,11 @@ function ItemCardComponent({
             x{ownedCount}
           </div>
         )}
+        {previewTopLeftBadge ? (
+          <div className="absolute left-1 top-1 z-20 md:left-1.5 md:top-1.5">
+            {previewTopLeftBadge}
+          </div>
+        ) : null}
       </div>
 
       {/* Actions */}
