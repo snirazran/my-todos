@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { TagsView } from './quick-add/TagsView';
 import { useTagManager } from './quick-add/useTagManager';
-import { PremiumLimitDialog } from './PremiumLimitDialog';
+import { PlusUpgradeModal } from './PlusUpgradeModal';
 
 interface Props {
   open: boolean;
@@ -157,7 +157,7 @@ export default function TagsPopup({
         document.body,
       )}
 
-      <PremiumLimitDialog
+      <PlusUpgradeModal
         open={showPremiumLimit}
         onClose={() => setShowPremiumLimit(false)}
       />

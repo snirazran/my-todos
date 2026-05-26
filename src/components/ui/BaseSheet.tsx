@@ -122,7 +122,7 @@ export function BaseSheet({
               }}
               style={{ willChange: 'transform' }}
               className={cn(
-                'pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[24px] border border-border/50 bg-card text-card-foreground shadow-lg will-change-transform sm:rounded-[34px] sm:shadow-2xl',
+                'pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[24px] border border-border/50 bg-card text-card-foreground shadow-lg sm:rounded-[34px] sm:shadow-2xl',
                 className,
               )}
             >
