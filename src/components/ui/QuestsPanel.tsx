@@ -1235,7 +1235,7 @@ function QuestSeasonEventOverlay({
 
   return createPortal(
     <div className="fixed inset-0 z-[1200] flex flex-col bg-background md:overflow-hidden">
-      <div className="relative h-[310px] shrink-0 overflow-hidden md:h-[220px] [@media(max-height:820px)]:md:h-[180px] [@media(max-height:720px)]:md:h-[140px]">
+      <div className="relative h-[230px] shrink-0 overflow-hidden md:h-[220px] [@media(max-height:820px)]:md:h-[180px] [@media(max-height:720px)]:md:h-[140px]">
           {hasSeasonCover(season.images) ? (
             <SeasonCoverImage
               images={season.images}
@@ -1254,9 +1254,9 @@ function QuestSeasonEventOverlay({
           >
             <X className="h-5 w-5" />
           </button>
-          <div className="pointer-events-none absolute inset-x-0 top-28 flex justify-center px-4 md:top-16 [@media(max-height:820px)]:md:top-10 [@media(max-height:720px)]:md:top-6">
+          <div className="pointer-events-none absolute inset-x-0 top-14 flex justify-center px-4 md:top-16 [@media(max-height:820px)]:md:top-10 [@media(max-height:720px)]:md:top-6">
             <h2
-              className="max-w-[20rem] text-center text-4xl uppercase leading-none tracking-wide text-white drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:text-5xl [@media(max-height:720px)]:md:text-3xl [@media(max-height:720px)]:md:drop-shadow-[0_3px_0_rgba(15,23,42,0.95)]"
+              className="max-w-[20rem] text-center text-3xl uppercase leading-none tracking-wide text-white drop-shadow-[0_4px_0_rgba(15,23,42,0.95)] sm:text-4xl md:text-4xl md:drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:md:text-5xl [@media(max-height:720px)]:md:text-3xl [@media(max-height:720px)]:md:drop-shadow-[0_3px_0_rgba(15,23,42,0.95)]"
               style={{
                 fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
                 WebkitTextStroke: '3px rgba(15, 23, 42, 0.95)',
@@ -1266,7 +1266,7 @@ function QuestSeasonEventOverlay({
               {season.name}
             </h2>
           </div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-9 mx-auto flex max-w-2xl items-center justify-between px-5">
+          <div className="pointer-events-none absolute inset-x-0 bottom-8 mx-auto flex max-w-2xl items-center justify-between px-5 md:bottom-9">
             <div className="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-full border border-primary/35 bg-primary/90 pl-2.5 pr-3.5 text-primary-foreground ring-1 ring-white/20 backdrop-blur-md">
               <Clock className="h-4 w-4" strokeWidth={2.8} />
               <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/70">
@@ -1295,24 +1295,24 @@ function QuestSeasonEventOverlay({
         </div>
 
         {/* Header section - Sticky on mobile, Fixed on web */}
-        <div className="sticky top-0 z-50 -mt-8 bg-transparent md:mt-0 md:shrink-0 md:border-b md:border-border/40 md:bg-muted/40 md:backdrop-blur-md">
+        <div className="sticky top-0 z-50 -mt-6 bg-transparent md:mt-0 md:shrink-0 md:border-b md:border-border/40 md:bg-muted/40 md:backdrop-blur-md">
           <div className="mx-auto w-full max-w-2xl bg-background rounded-t-[32px] md:bg-transparent md:rounded-none">
-            <div className="px-4 pb-5 pt-1 md:py-4 md:pb-6 [@media(max-height:820px)]:md:py-2 [@media(max-height:820px)]:md:pb-3">
+            <div className="px-4 pb-3 pt-1 md:py-2 md:pb-3 [@media(max-height:820px)]:md:py-1.5 [@media(max-height:820px)]:md:pb-2">
               {goalReached ? (
-                <div className="overflow-hidden rounded-[28px] bg-background p-3 max-w-2xl mx-auto md:bg-transparent md:ring-0 md:p-0 md:overflow-visible">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
-                      <Check className="h-8 w-8" strokeWidth={4} />
+                <div className="overflow-hidden rounded-[20px] bg-background p-2.5 max-w-md mx-auto md:bg-transparent md:ring-0 md:p-0 md:overflow-visible">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                      <Check className="h-5 w-5" strokeWidth={4} />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-lg font-black leading-tight text-foreground">
+                      <p className="truncate text-sm font-black leading-tight text-foreground">
                         {season.currentDay >= season.dayCount && season.claimedToday
                           ? "Season complete!"
                           : season.claimable
                             ? `Day ${season.currentDay} ready!`
                             : `Day ${completedDay} completed`}
                       </p>
-                      <p className="mt-0.5 truncate text-sm font-black leading-tight text-foreground text-muted-foreground">
+                      <p className="mt-0.5 truncate text-xs font-black leading-tight text-muted-foreground">
                         {seasonComplete
                           ? 'All rewards claimed'
                           : season.claimable
@@ -1320,36 +1320,34 @@ function QuestSeasonEventOverlay({
                             : `Return tomorrow for Day ${nextSeasonDay}`}
                       </p>
                     </div>
-                    <div className="pb-1.5 pr-1 md:pr-0 md:pb-2">
-                      <button
-                        type="button"
-                        onClick={season.claimable ? onClaim : onClose}
-                        disabled={season.claimable && claiming}
-                        className="h-14 shrink-0 rounded-2xl bg-lime-600 px-6 text-sm font-black text-white shadow-[0_5px_0_#3f6212] transition active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-70"
-                      >
-                        {season.claimable ? (claiming ? 'Claiming...' : 'Claim') : 'Done'}
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={season.claimable ? onClaim : onClose}
+                      disabled={season.claimable && claiming}
+                      className="h-10 shrink-0 rounded-xl bg-lime-600 px-4 text-xs font-black text-white shadow-[0_3px_0_#3f6212] transition active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-70"
+                    >
+                      {season.claimable ? (claiming ? 'Claiming...' : 'Claim') : 'Done'}
+                    </button>
                   </div>
                 </div>
               ) : (
-                <div className="flex justify-center px-3 py-3 max-w-2xl mx-auto md:bg-transparent md:border-0 md:shadow-none md:p-0 md:overflow-visible">
-                  <div className="flex w-full max-w-md items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-                      <Fly size={36} y={-5} paused={paused} interactive={false} />
+                <div className="flex justify-center px-1 py-1.5 max-w-2xl mx-auto md:px-3 md:py-3 md:bg-transparent md:border-0 md:shadow-none md:p-0 md:overflow-visible">
+                  <div className="flex w-full max-w-md items-center gap-2 md:gap-3">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center md:h-10 md:w-10">
+                      <Fly size={28} y={-4} paused={paused} interactive={false} />
                     </div>
-                    <div className="relative h-8 flex-1 overflow-hidden rounded-full border border-border/60 bg-muted">
+                    <div className="relative h-7 flex-1 overflow-hidden rounded-full border border-border/60 bg-muted md:h-8">
                       <div className="absolute inset-1">
                         <div
-                          className="h-full min-w-7 rounded-full bg-amber-400 transition-all"
-                          style={{ width: pct > 0 ? `${pct}%` : '1.75rem' }}
+                          className="h-full min-w-6 rounded-full bg-amber-400 transition-all md:min-w-7"
+                          style={{ width: pct > 0 ? `${pct}%` : '1.5rem' }}
                         />
                       </div>
-                      <span className="absolute inset-0 flex items-center justify-center text-sm font-black tabular-nums text-muted-foreground">
+                      <span className="absolute inset-0 flex items-center justify-center text-xs font-black tabular-nums text-muted-foreground md:text-sm">
                         {progress} / {season.dailyTargetFlies}
                       </span>
                     </div>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-lg font-black text-primary ring-1 ring-primary/20">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-base font-black text-primary ring-1 ring-primary/20 md:h-10 md:w-10 md:rounded-2xl md:text-lg">
                       {season.currentDay}
                     </div>
                   </div>
@@ -1383,7 +1381,7 @@ function QuestSeasonEventOverlay({
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className="flex-1 min-h-0 select-none overflow-y-auto md:overflow-x-auto md:overflow-y-hidden no-scrollbar cursor-grab active:cursor-grabbing [touch-action:pan-y] md:[touch-action:pan-x]"
+          className="relative flex-1 min-h-0 select-none overflow-y-auto md:overflow-x-auto md:overflow-y-hidden no-scrollbar cursor-grab active:cursor-grabbing [touch-action:pan-y] md:[touch-action:pan-x]"
         >
           <div className="mx-auto min-h-full max-w-2xl bg-background md:mx-0 md:h-full md:max-w-none md:min-w-full md:bg-transparent md:px-12 md:pt-0 md:pb-0 md:flex md:flex-col md:justify-center [@media(max-height:820px)]:md:px-8 [@media(max-height:720px)]:md:px-6">
             <div className="relative z-10 mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none md:rounded-t-[48px] md:border-0">
@@ -1409,6 +1407,8 @@ function QuestSeasonEventOverlay({
             </div>
 
             <div ref={timelineRef} className="relative mt-4 rounded-[20px] border border-border/40 bg-muted/40 p-3 md:mt-0 md:border-0 md:bg-transparent md:p-0 md:py-12 md:w-fit md:min-w-full [@media(max-height:820px)]:md:py-8 [@media(max-height:720px)]:md:py-5">
+              {/* Plus tier tint — scrolls with content */}
+              <div className="pointer-events-none absolute z-[1] right-0 top-0 bottom-0 w-[42%] rounded-r-[20px] bg-violet-500/[0.04] md:top-1/2 md:bottom-0 md:left-0 md:right-0 md:w-auto md:rounded-r-none md:rounded-b-[20px] md:bg-violet-500/[0.03]" />
               <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60 md:left-0 md:right-0 md:top-1/2 md:h-2 md:w-auto md:-translate-y-1/2 md:translate-x-0" />
               <div
                 className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)] md:left-0 md:top-1/2 md:h-1 md:-translate-y-1/2 md:translate-x-0"
