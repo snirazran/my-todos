@@ -1133,7 +1133,7 @@ function QuestSeasonEventOverlay({
       if (isHorizontal) {
         const center = targetRect.left + targetRect.width / 2 - containerRect.left;
         setGreenLineWidth(`${Math.max(0, center)}px`);
-        setGreenLineHeight('4px'); // fixed height for horizontal line
+        setGreenLineHeight('4px');
       } else {
         const center = targetRect.top + targetRect.height / 2 - containerRect.top;
         setGreenLineHeight(`${Math.max(0, center)}px`);
@@ -1234,8 +1234,8 @@ function QuestSeasonEventOverlay({
   const previewDay = Math.min(season.dayCount, season.currentDay + 10);
 
   return createPortal(
-    <div className="fixed inset-0 z-[1200] flex flex-col bg-background md:block md:overflow-y-auto md:overflow-x-hidden">
-      <div className="relative h-[310px] shrink-0 overflow-hidden">
+    <div className="fixed inset-0 z-[1200] flex flex-col bg-background md:overflow-hidden">
+      <div className="relative h-[310px] shrink-0 overflow-hidden md:h-[220px] [@media(max-height:820px)]:md:h-[180px] [@media(max-height:720px)]:md:h-[140px]">
           {hasSeasonCover(season.images) ? (
             <SeasonCoverImage
               images={season.images}
@@ -1254,9 +1254,9 @@ function QuestSeasonEventOverlay({
           >
             <X className="h-5 w-5" />
           </button>
-          <div className="pointer-events-none absolute inset-x-0 top-28 flex justify-center px-4">
+          <div className="pointer-events-none absolute inset-x-0 top-28 flex justify-center px-4 md:top-16 [@media(max-height:820px)]:md:top-10 [@media(max-height:720px)]:md:top-6">
             <h2
-              className="max-w-[20rem] text-center text-4xl uppercase leading-none tracking-wide text-white drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:text-5xl"
+              className="max-w-[20rem] text-center text-4xl uppercase leading-none tracking-wide text-white drop-shadow-[0_5px_0_rgba(15,23,42,0.95)] sm:text-5xl [@media(max-height:720px)]:md:text-3xl [@media(max-height:720px)]:md:drop-shadow-[0_3px_0_rgba(15,23,42,0.95)]"
               style={{
                 fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
                 WebkitTextStroke: '3px rgba(15, 23, 42, 0.95)',
@@ -1295,11 +1295,11 @@ function QuestSeasonEventOverlay({
         </div>
 
         {/* Header section - Sticky on mobile, Fixed on web */}
-        <div className="sticky top-0 z-50 -mt-8 bg-transparent md:mt-0 md:border-b md:border-border/40 md:bg-muted/40 md:backdrop-blur-md">
+        <div className="sticky top-0 z-50 -mt-8 bg-transparent md:mt-0 md:shrink-0 md:border-b md:border-border/40 md:bg-muted/40 md:backdrop-blur-md">
           <div className="mx-auto w-full max-w-2xl bg-background rounded-t-[32px] md:bg-transparent md:rounded-none">
-            <div className="px-4 pb-5 pt-1 md:py-4 md:pb-6">
+            <div className="px-4 pb-5 pt-1 md:py-4 md:pb-6 [@media(max-height:820px)]:md:py-2 [@media(max-height:820px)]:md:pb-3">
               {goalReached ? (
-                <div className="overflow-hidden rounded-[28px] bg-background p-3 ring-1 ring-border/50 max-w-2xl mx-auto md:bg-transparent md:ring-0 md:p-0 md:overflow-visible">
+                <div className="overflow-hidden rounded-[28px] bg-background p-3 max-w-2xl mx-auto md:bg-transparent md:ring-0 md:p-0 md:overflow-visible">
                   <div className="flex items-center gap-3">
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
                       <Check className="h-8 w-8" strokeWidth={4} />
@@ -1333,7 +1333,7 @@ function QuestSeasonEventOverlay({
                   </div>
                 </div>
               ) : (
-                <div className="flex justify-center rounded-[24px] border border-border bg-card/95 px-3 py-3 shadow-lg shadow-black/10 backdrop-blur-md max-w-2xl mx-auto md:bg-transparent md:border-0 md:shadow-none md:p-0 md:overflow-visible">
+                <div className="flex justify-center px-3 py-3 max-w-2xl mx-auto md:bg-transparent md:border-0 md:shadow-none md:p-0 md:overflow-visible">
                   <div className="flex w-full max-w-md items-center gap-3">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center">
                       <Fly size={36} y={-5} paused={paused} interactive={false} />
@@ -1359,11 +1359,36 @@ function QuestSeasonEventOverlay({
           </div>
         </div>
 
-        <div ref={scrollAreaRef} className="flex-1 select-none overflow-y-auto md:overflow-x-auto md:overflow-y-visible no-scrollbar cursor-grab active:cursor-grabbing [touch-action:pan-y]">
-          <div className="mx-auto min-h-full max-w-2xl bg-background md:mx-0 md:max-w-none md:min-w-full md:bg-transparent md:px-12 md:pt-0 md:pb-16 pointer-events-none md:pointer-events-auto">
+        <div className="relative flex flex-1 min-h-0 md:flex md:flex-1 md:min-h-0">
+        {/* Fixed sidebar for FREE / PLUS labels on web */}
+        <div className="hidden md:flex md:sticky md:top-0 md:left-0 md:w-20 md:shrink-0 md:self-stretch md:flex-col md:items-center md:justify-center md:bg-background md:border-r md:border-border/40 md:font-black md:text-[11px] md:uppercase md:tracking-[0.2em] md:text-muted-foreground/70 md:z-20">
+          <div className="flex flex-1 items-center justify-center">
+            <div className="flex flex-col items-center">
+              <Gift className="w-5 h-5 opacity-60 mb-1.5" />
+              <span>Free</span>
+            </div>
+          </div>
+          <div className="h-px w-10 bg-border/60" aria-hidden="true" />
+          <div className="flex flex-1 items-center justify-center">
+            <div className="flex flex-col items-center">
+              <Sparkles className="w-5 h-5 text-amber-500/60 mb-1.5" strokeWidth={2.5} />
+              <span>Plus</span>
+            </div>
+          </div>
+        </div>
+
+        <div
+          ref={scrollAreaRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerUp}
+          className="flex-1 min-h-0 select-none overflow-y-auto md:overflow-x-auto md:overflow-y-hidden no-scrollbar cursor-grab active:cursor-grabbing [touch-action:pan-y] md:[touch-action:pan-x]"
+        >
+          <div className="mx-auto min-h-full max-w-2xl bg-background md:mx-0 md:h-full md:max-w-none md:min-w-full md:bg-transparent md:px-12 md:pt-0 md:pb-0 md:flex md:flex-col md:justify-center [@media(max-height:820px)]:md:px-8 [@media(max-height:720px)]:md:px-6">
             <div className="relative z-10 mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none md:rounded-t-[48px] md:border-0">
 
-        <div className="px-4 pb-5 pt-5 md:-mt-6 md:pt-4">
+        <div className="px-4 pb-5 pt-5 md:pt-4">
           <div className="text-foreground">
             <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2 md:hidden">
               <div className="flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-muted/35 px-4 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
@@ -1383,25 +1408,14 @@ function QuestSeasonEventOverlay({
               </button>
             </div>
 
-            <div ref={timelineRef} className="relative mt-4 rounded-[20px] border border-border/40 bg-muted/40 p-3 md:mt-0 md:border-0 md:bg-transparent md:p-0 md:py-12 md:pl-24 md:w-fit md:min-w-full">
-              <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60 md:left-24 md:right-0 md:top-1/2 md:h-2 md:w-auto md:-translate-y-1/2 md:translate-x-0" />
+            <div ref={timelineRef} className="relative mt-4 rounded-[20px] border border-border/40 bg-muted/40 p-3 md:mt-0 md:border-0 md:bg-transparent md:p-0 md:py-12 md:w-fit md:min-w-full [@media(max-height:820px)]:md:py-8 [@media(max-height:720px)]:md:py-5">
+              <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60 md:left-0 md:right-0 md:top-1/2 md:h-2 md:w-auto md:-translate-y-1/2 md:translate-x-0" />
               <div
-                className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)] md:left-24 md:top-1/2 md:h-1 md:-translate-y-1/2 md:translate-x-0"
+                className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)] md:left-0 md:top-1/2 md:h-1 md:-translate-y-1/2 md:translate-x-0"
                 style={{ height: greenLineHeight, width: greenLineWidth }}
               />
 
-              <div className="relative z-10 flex flex-col gap-y-5 md:flex-row md:gap-x-12 md:gap-y-0">
-                <div className="hidden md:flex md:flex-col md:absolute md:left-0 md:top-12 md:bottom-12 md:w-24 md:shrink-0 md:font-black md:text-[11px] md:uppercase md:tracking-[0.2em] md:text-muted-foreground/50">
-                   <div className="flex flex-1 flex-col items-center justify-center md:mb-8">
-                     <Gift className="w-5 h-5 opacity-50 mb-1.5" />
-                     <span>Free</span>
-                   </div>
-                   <div className="md:h-14" aria-hidden="true" />
-                   <div className="flex flex-1 flex-col items-center justify-center md:mt-8">
-                     <Sparkles className="w-5 h-5 text-amber-500/50 mb-1.5" strokeWidth={2.5} />
-                     <span>Plus</span>
-                   </div>
-                </div>
+              <div className="relative z-10 flex flex-col gap-y-5 md:flex-row md:gap-x-12 md:gap-y-0 [@media(max-height:820px)]:md:gap-x-8 [@media(max-height:720px)]:md:gap-x-5">
                 {season.rewardsByDay.map((entry) => {
                   const isCurrent = entry.day === season.currentDay;
                   const isClaimed = season.claimedDays.includes(entry.day);
@@ -1415,11 +1429,11 @@ function QuestSeasonEventOverlay({
                       key={entry.day}
                       ref={isPreviewStart ? futureDayRowRef : undefined}
                       className={cn(
-                        'relative grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center rounded-2xl px-1 py-2 transition-all duration-300 md:flex md:flex-col md:w-[180px] md:shrink-0 md:px-0',
+                        'relative grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-center rounded-2xl px-1 py-2 transition-all duration-300 md:flex md:flex-col md:w-[180px] md:shrink-0 md:px-0 [@media(max-height:820px)]:md:w-[150px] [@media(max-height:720px)]:md:w-[124px] [@media(max-height:620px)]:md:w-[104px]',
                         !isCurrent && 'hover:bg-muted/30',
                       )}
                     >
-                      <div className="flex w-full justify-center pr-2 sm:pr-3 md:pr-0 md:pb-8">
+                      <div className="flex w-full justify-center pr-2 sm:pr-3 md:pr-0 md:pb-8 [@media(max-height:820px)]:md:pb-5 [@media(max-height:720px)]:md:pb-3">
                         <div className="w-full max-w-[170px] md:max-w-none">
                           {freeReward ? (
                             <SingleRewardCard
@@ -1453,29 +1467,29 @@ function QuestSeasonEventOverlay({
                         </div>
                       </div>
 
-                      <div className="relative z-20 flex justify-center md:h-14 md:w-full md:items-center">
+                      <div className="relative z-20 flex justify-center md:h-14 md:w-full md:items-center [@media(max-height:820px)]:md:h-10 [@media(max-height:720px)]:md:h-8">
                         {isCurrent && (
-                          <span className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-primary/20 animate-ping-ring md:h-16 md:w-16" />
+                          <span className="absolute left-1/2 top-1/2 h-14 w-14 -translate-x-1/2 -translate-y-1/2 rounded-[20px] bg-primary/20 animate-ping-ring md:h-16 md:w-16 [@media(max-height:820px)]:md:h-12 [@media(max-height:820px)]:md:w-12" />
                         )}
                         <div
                           ref={isCurrent ? currentDayRef : undefined}
                           className={cn(
-                            'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.12)] ring-1 ring-primary/20',
+                            'relative z-10 flex h-12 w-12 flex-col items-center justify-center rounded-[18px] leading-none text-primary-foreground shadow-[0_4px_0_rgba(0,0,0,0.12)] ring-1 ring-primary/20 [@media(max-height:820px)]:md:h-10 [@media(max-height:820px)]:md:w-10 [@media(max-height:820px)]:md:rounded-[14px] [@media(max-height:720px)]:md:h-8 [@media(max-height:720px)]:md:w-8 [@media(max-height:720px)]:md:rounded-xl',
                             isClaimed && !isCurrent
                               ? 'bg-primary'
                               : 'bg-primary',
                           )}
                         >
-                          <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-95">
+                          <span className="text-[9px] font-black uppercase tracking-[0.15em] opacity-95 [@media(max-height:720px)]:md:text-[7px]">
                             Day
                           </span>
-                          <span className="text-lg font-black tabular-nums">
+                          <span className="text-lg font-black tabular-nums [@media(max-height:820px)]:md:text-base [@media(max-height:720px)]:md:text-sm">
                             {entry.day}
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex w-full justify-center pl-2 sm:pl-3 md:pl-0 md:pt-8">
+                      <div className="flex w-full justify-center pl-2 sm:pl-3 md:pl-0 md:pt-8 [@media(max-height:820px)]:md:pt-5 [@media(max-height:720px)]:md:pt-3">
                         <div className="w-full max-w-[170px] md:max-w-none">
                           {premiumReward ? (
                             <SingleRewardCard
@@ -1528,6 +1542,7 @@ function QuestSeasonEventOverlay({
 
           </div>
         </div>
+      </div>
       </div>
       </div>
       </div>

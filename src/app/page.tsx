@@ -179,7 +179,7 @@ export default function Home() {
       !!activeMissedTasksData &&
       !dismissMissedReview &&
       !activeMissedTasksData.reviewedToday &&
-      activeMissedTasksData.items.length > 0;
+      (activeMissedTasksData.items?.length ?? 0) > 0;
 
   // Weekly Recap
   const [dismissRecap, setDismissRecap] = useState(false);

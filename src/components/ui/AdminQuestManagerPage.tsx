@@ -116,19 +116,14 @@ type AdminCategory = {
   accent: string;
   backgroundFrom: string;
   backgroundTo: string;
-  isBuiltIn: boolean;
   quickAddSuggestions: { text: string; emoji: string }[];
 };
 
 type CategoryFormState = {
   name: string;
-  shortLabel: string;
   description: string;
   onboardingSentence: string;
   coverImageUrl?: string;
-  accent: string;
-  backgroundFrom: string;
-  backgroundTo: string;
   quickAddSuggestions: QuickAddSuggestionDraft[];
 };
 
@@ -456,13 +451,9 @@ export function AdminQuestManagerPage() {
   const [editingCategory, setEditingCategory] = useState<AdminCategory | null>(null);
   const [categoryForm, setCategoryForm] = useState<CategoryFormState>({
     name: '',
-    shortLabel: '',
     description: '',
     onboardingSentence: '',
     coverImageUrl: undefined,
-    accent: '#6366f1',
-    backgroundFrom: '#1e1b4b',
-    backgroundTo: '#312e81',
     quickAddSuggestions: [],
   });
 
@@ -633,13 +624,9 @@ export function AdminQuestManagerPage() {
       cat
         ? {
             name: cat.name,
-            shortLabel: cat.shortLabel,
             description: cat.description,
             onboardingSentence: cat.onboardingSentence ?? '',
             coverImageUrl: cat.coverImageUrl,
-            accent: cat.accent,
-            backgroundFrom: cat.backgroundFrom,
-            backgroundTo: cat.backgroundTo,
             quickAddSuggestions: (cat.quickAddSuggestions ?? []).map((s) => ({
               id: crypto.randomUUID(),
               text: s.text,
@@ -648,13 +635,9 @@ export function AdminQuestManagerPage() {
           }
         : {
             name: '',
-            shortLabel: '',
             description: '',
             onboardingSentence: '',
             coverImageUrl: undefined,
-            accent: '#6366f1',
-            backgroundFrom: '#1e1b4b',
-            backgroundTo: '#312e81',
             quickAddSuggestions: [],
           },
     );
@@ -1804,10 +1787,6 @@ export function AdminQuestManagerPage() {
                 <input value={categoryForm.name} onChange={(e) => setCategoryForm((p) => ({ ...p, name: e.target.value }))} placeholder="e.g. Sport" className="h-11 rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary/30" />
               </label>
               <label className="grid gap-2">
-                <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Short Label</span>
-                <input value={categoryForm.shortLabel} onChange={(e) => setCategoryForm((p) => ({ ...p, shortLabel: e.target.value }))} placeholder="e.g. Move" className="h-11 rounded-2xl border border-border bg-background px-4 text-sm outline-none focus:border-primary/30" />
-              </label>
-              <label className="grid gap-2">
                 <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Description</span>
                 <textarea rows={3} value={categoryForm.description} onChange={(e) => setCategoryForm((p) => ({ ...p, description: e.target.value }))} placeholder="What this category is about." className="rounded-2xl border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary/30" />
               </label>
@@ -1823,29 +1802,6 @@ export function AdminQuestManagerPage() {
                   Shown as this area&apos;s label in the user onboarding flow. Falls back to the name if empty.
                 </span>
               </label>
-              <div className="grid grid-cols-3 gap-3">
-                <label className="grid gap-2">
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Accent</span>
-                  <div className="flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2">
-                    <input type="color" value={categoryForm.accent} onChange={(e) => setCategoryForm((p) => ({ ...p, accent: e.target.value }))} className="h-7 w-7 cursor-pointer rounded-lg border-0 bg-transparent p-0" />
-                    <span className="text-xs text-muted-foreground">{categoryForm.accent}</span>
-                  </div>
-                </label>
-                <label className="grid gap-2">
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">From</span>
-                  <div className="flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2">
-                    <input type="color" value={categoryForm.backgroundFrom} onChange={(e) => setCategoryForm((p) => ({ ...p, backgroundFrom: e.target.value }))} className="h-7 w-7 cursor-pointer rounded-lg border-0 bg-transparent p-0" />
-                    <span className="text-xs text-muted-foreground">{categoryForm.backgroundFrom}</span>
-                  </div>
-                </label>
-                <label className="grid gap-2">
-                  <span className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">To</span>
-                  <div className="flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2">
-                    <input type="color" value={categoryForm.backgroundTo} onChange={(e) => setCategoryForm((p) => ({ ...p, backgroundTo: e.target.value }))} className="h-7 w-7 cursor-pointer rounded-lg border-0 bg-transparent p-0" />
-                    <span className="text-xs text-muted-foreground">{categoryForm.backgroundTo}</span>
-                  </div>
-                </label>
-              </div>
               <div className="rounded-2xl border border-border/50 bg-background/70 p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">Category Photo</p>
