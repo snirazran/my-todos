@@ -32,6 +32,8 @@ import { AnimatedNumber } from './AnimatedNumber';
 import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
+import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
+import Frog, { type WardrobeSlot } from './frog';
 
 type QuestsResponse = {
   isPremium: boolean;
@@ -1081,6 +1083,13 @@ function QuestSeasonEventOverlay({
   const futureDayRowRef = useRef<HTMLDivElement | null>(null);
   const [greenLineHeight, setGreenLineHeight] = useState<string>('0px');
   const [greenLineWidth, setGreenLineWidth] = useState<string>('0px');
+  const [lockedPreview, setLockedPreview] = useState<{
+    day: number;
+    rewardType: 'FLIES' | 'ITEM' | 'BOX';
+    amount?: number;
+    itemId?: string;
+  } | null>(null);
+  const { indices: wardrobeIndices } = useWardrobeIndices(open && !isPremium);
 
   // Drag-to-scroll state
   const isDragging = useRef(false);
@@ -1385,9 +1394,10 @@ function QuestSeasonEventOverlay({
           <div className="flex flex-1 w-full items-center justify-center">
             <button
               type="button"
-              onClick={onUpgrade}
+              onClick={isPremium ? undefined : onUpgrade}
+              disabled={isPremium}
               aria-label="Frog Plus"
-              className="group relative isolate flex flex-col items-center gap-1.5 rounded-xl px-3 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+              className="group relative isolate flex flex-col items-center gap-1.5 rounded-xl px-3 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:hover:-translate-y-0.5 enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-default"
             >
               <span
                 aria-hidden
@@ -1420,9 +1430,10 @@ function QuestSeasonEventOverlay({
               <div className="w-10" />
               <button
                 type="button"
-                onClick={onUpgrade}
+                onClick={isPremium ? undefined : onUpgrade}
+                disabled={isPremium}
                 aria-label="Frog Plus"
-                className="group relative isolate flex h-10 items-center justify-center gap-2 rounded-xl pl-2 pr-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+                className="group relative isolate flex h-10 items-center justify-center gap-2 rounded-xl pl-2 pr-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform enabled:hover:-translate-y-0.5 enabled:active:translate-y-0 enabled:active:scale-[0.98] disabled:cursor-default"
               >
                 <span
                   aria-hidden
@@ -1521,7 +1532,9 @@ function QuestSeasonEventOverlay({
                       </div>
 
                       <div className="flex w-full justify-center pl-2 sm:pl-3 md:pl-0 md:pt-8 [@media(max-height:820px)]:md:pt-5 [@media(max-height:720px)]:md:pt-3">
-                        <div className="w-full max-w-[170px] md:max-w-none">
+                        <div
+                          className="relative w-full max-w-[170px] md:max-w-none"
+                        >
                           {premiumReward ? (
                             <SingleRewardCard
                               day={entry.day}
@@ -1550,7 +1563,9 @@ function QuestSeasonEventOverlay({
                               pausePreview={paused || !isCurrent}
                               onClick={
                                 !isPremium
-                                  ? isCurrent && season.claimable && !claimedToday
+                                  ? isCurrent &&
+                                    season.claimable &&
+                                    !claimedToday
                                     ? onUpgrade
                                     : undefined
                                   : isCurrent &&
@@ -1562,6 +1577,26 @@ function QuestSeasonEventOverlay({
                             />
                           ) : (
                             <div className="h-32 w-full rounded-2xl bg-white/5" />
+                          )}
+                          {!isPremium && premiumReward && (
+                            <button
+                              type="button"
+                              aria-label="Preview Plus reward"
+                              onClick={() =>
+                                setLockedPreview({
+                                  day: entry.day,
+                                  rewardType: premiumReward.type,
+                                  amount: premiumReward.amount,
+                                  itemId: premiumReward.itemId,
+                                })
+                              }
+                              className={cn(
+                                'absolute left-0 right-0 top-0 z-30 cursor-pointer rounded-2xl bg-transparent',
+                                isCurrent && season.claimable && !claimedToday
+                                  ? 'bottom-12'
+                                  : 'bottom-0',
+                              )}
+                            />
                           )}
                         </div>
                       </div>
@@ -1577,8 +1612,147 @@ function QuestSeasonEventOverlay({
       </div>
       </div>
       </div>
+      <AnimatePresence>
+        {lockedPreview && (
+          <LockedPlusPreview
+            key="locked-plus-preview"
+            day={lockedPreview.day}
+            rewardType={lockedPreview.rewardType}
+            amount={lockedPreview.amount}
+            itemId={lockedPreview.itemId}
+            rewardCatalog={rewardCatalog}
+            wardrobeIndices={wardrobeIndices}
+            onClose={() => setLockedPreview(null)}
+            onUpgrade={() => {
+              setLockedPreview(null);
+              onUpgrade?.();
+            }}
+          />
+        )}
+      </AnimatePresence>
     </div>,
     document.body,
+  );
+}
+
+function LockedPlusPreview({
+  day,
+  rewardType,
+  amount,
+  itemId,
+  rewardCatalog,
+  wardrobeIndices,
+  onClose,
+  onUpgrade,
+}: {
+  day: number;
+  rewardType: 'FLIES' | 'ITEM' | 'BOX';
+  amount?: number;
+  itemId?: string;
+  rewardCatalog: Record<string, ItemDef>;
+  wardrobeIndices: Partial<Record<string, number>>;
+  onClose: () => void;
+  onUpgrade?: () => void;
+}) {
+  const item = itemId ? rewardCatalog[itemId] : undefined;
+  const itemName =
+    rewardType === 'FLIES'
+      ? `${amount ?? 0} Flies`
+      : rewardType === 'BOX'
+        ? 'Mystery Box'
+        : item?.name ?? 'Plus Reward';
+
+  return (
+    <div
+      className="fixed inset-0 z-[1400] flex items-end justify-center bg-black/55 backdrop-blur-sm md:items-center md:px-5"
+      onClick={onClose}
+    >
+      <motion.div
+        onClick={(e) => e.stopPropagation()}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={{ top: 0, bottom: 0.8 }}
+        dragMomentum={false}
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 120 || info.velocity.y > 500) onClose();
+        }}
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+        className="relative w-full rounded-t-3xl bg-background px-5 pb-7 pt-3 shadow-[0_-20px_40px_-10px_rgba(0,0,0,0.35)] md:max-w-md md:rounded-3xl md:px-6 md:pb-7 md:pt-5"
+      >
+        <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted-foreground/30 md:hidden" />
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Close"
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-5 w-5" />
+        </button>
+
+        <div className="mt-2 flex items-center justify-center gap-2">
+          <div className="relative h-44 w-44 shrink-0 md:h-48 md:w-48">
+            <Frog
+              className="h-full w-full"
+              width={192}
+              height={192}
+              indices={wardrobeIndices as Partial<Record<WardrobeSlot, number>>}
+            />
+          </div>
+          <div className="w-[150px] shrink-0 md:w-[160px]">
+            <SingleRewardCard
+              day={day}
+              rewardType={rewardType}
+              amount={amount}
+              itemId={itemId}
+              status="LOCKED_PREMIUM"
+              isPremiumTier
+              hideDayLabel
+              hideDropRates
+              forceFullOpacity
+              lockOverlay
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 text-center">
+          <p className="text-xl font-black tracking-tight text-foreground">
+            {itemName}
+          </p>
+          <p className="mt-1 text-sm font-semibold text-muted-foreground">
+            Unlock on Day {day} with Plus
+          </p>
+        </div>
+
+        {onUpgrade && (
+          <button
+            type="button"
+            onClick={onUpgrade}
+            aria-label="Unlock Frog Plus"
+            className="group relative isolate mt-5 flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-4 text-emerald-950 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
+          >
+            <span
+              aria-hidden
+              className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+            />
+            <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
+            <img
+              src="/frogPlus.svg"
+              alt=""
+              className="-my-6 h-16 w-16 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]"
+            />
+            <span className="text-sm font-black uppercase tracking-[0.2em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+              FrogTask
+            </span>
+            <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
+              Plus
+            </span>
+          </button>
+        )}
+      </motion.div>
+    </div>
   );
 }
 
