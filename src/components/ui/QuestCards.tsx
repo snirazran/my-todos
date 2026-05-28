@@ -383,6 +383,8 @@ export function DailyQuestPresentationCard({
     (block) => !hiddenClaimedObjectiveIds.has(block.id),
   );
 
+  const isCompleted = visibleLogic.length === 0;
+
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
       <div className="relative overflow-hidden">
@@ -395,9 +397,36 @@ export function DailyQuestPresentationCard({
             className="h-[150px] w-full object-cover"
           />
         ) : (
-          <div className="h-[220px] w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
+          <div className="h-[150px] w-full bg-[linear-gradient(135deg,#0ea5e9_0%,#2563eb_55%,#0f172a_100%)]" />
         )}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 via-black/25 to-transparent" />
+        {isCompleted && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
+            <Check className="h-9 w-9 text-emerald-300 drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]" strokeWidth={3.5} />
+            <p className="text-base font-black tracking-tight drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]">
+              All daily objectives done!
+            </p>
+            {timeLeft ? (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/85 drop-shadow-[0_1px_0_rgba(0,0,0,0.4)]">
+                  Resets in
+                </span>
+                <span
+                  className="inline-flex items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
+                  style={{
+                    fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                    WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
+                    paintOrder: 'stroke fill',
+                    lineHeight: 1,
+                  }}
+                >
+                  <Clock className="h-4 w-4 shrink-0 translate-y-[1px]" strokeWidth={3} />
+                  <span className="leading-none">{timeLeft}</span>
+                </span>
+              </div>
+            ) : null}
+          </div>
+        )}
         <div className="absolute inset-x-0 top-0 flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
           <span
             className="inline-flex items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
@@ -410,7 +439,7 @@ export function DailyQuestPresentationCard({
             <CalendarDays className="h-3.5 w-3.5 shrink-0" strokeWidth={3} />
             <span className="leading-none">Daily</span>
           </span>
-          {timeLeft ? (
+          {timeLeft && !isCompleted ? (
             <span
               className="inline-flex shrink-0 items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
               style={{
@@ -426,32 +455,36 @@ export function DailyQuestPresentationCard({
         </div>
       </div>
 
+      {!isCompleted && (
       <div className="px-4 pt-1 pb-4">
-        {visibleLogic.map((block, i) => (
-          <ObjectiveRow
-            key={block.id}
-            block={block}
-            objectiveClaimed={claimedObjectiveIds.includes(block.id)}
-            claimingObjective={claimingObjectiveId === block.id}
-            isPremium={isPremium}
-            rewardCatalog={rewardCatalog}
-            paused={true}
-            onOpenRewards={(rewards) =>
-              setRewardPopup({
-                eyebrow: 'Objective',
-                title: 'Rewards',
-                rewards,
-              })
-            }
-            onClaimObjective={
-              onClaimObjective ? () => onClaimObjective(block.id) : undefined
-            }
-            isLast={i === visibleLogic.length - 1}
-            isFirst={i === 0}
-          />
-        ))}
+        {(
+          visibleLogic.map((block, i) => (
+            <ObjectiveRow
+              key={block.id}
+              block={block}
+              objectiveClaimed={claimedObjectiveIds.includes(block.id)}
+              claimingObjective={claimingObjectiveId === block.id}
+              isPremium={isPremium}
+              rewardCatalog={rewardCatalog}
+              paused={true}
+              onOpenRewards={(rewards) =>
+                setRewardPopup({
+                  eyebrow: 'Objective',
+                  title: 'Rewards',
+                  rewards,
+                })
+              }
+              onClaimObjective={
+                onClaimObjective ? () => onClaimObjective(block.id) : undefined
+              }
+              isLast={i === visibleLogic.length - 1}
+              isFirst={i === 0}
+            />
+          ))
+        )}
 
       </div>
+      )}
       <RewardDetailsPopup
         open={!!rewardPopup}
         eyebrow={rewardPopup?.eyebrow ?? ''}
@@ -500,6 +533,7 @@ export function CategoryQuestPresentationCard({
     (block) => block.tagMode === 'focus_category_tags',
   );
   const needsFocusTags = usesFocusTags && linkedTags.length === 0;
+  const isCompleted = visibleLogic.length === 0;
 
   return (
     <div className="overflow-hidden rounded-[28px] border border-border/50 bg-card shadow-sm">
@@ -521,6 +555,33 @@ export function CategoryQuestPresentationCard({
           />
         )}
         <div className="pointer-events-none absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-black/55 via-black/25 to-transparent" />
+        {isCompleted && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/55 px-4 text-center text-white">
+            <Check className="h-9 w-9 text-emerald-300 drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]" strokeWidth={3.5} />
+            <p className="text-base font-black tracking-tight drop-shadow-[0_2px_0_rgba(0,0,0,0.4)]">
+              Quest complete!
+            </p>
+            {timeLeft ? (
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[11px] font-bold uppercase tracking-[0.2em] text-white/85 drop-shadow-[0_1px_0_rgba(0,0,0,0.4)]">
+                  Refreshes in
+                </span>
+                <span
+                  className="inline-flex items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
+                  style={{
+                    fontFamily: 'var(--font-display), "Luckiest Guy", cursive',
+                    WebkitTextStroke: '1.5px rgba(15, 23, 42, 0.9)',
+                    paintOrder: 'stroke fill',
+                    lineHeight: 1,
+                  }}
+                >
+                  <Clock className="h-4 w-4 shrink-0 translate-y-[1px]" strokeWidth={3} />
+                  <span className="leading-none">{timeLeft}</span>
+                </span>
+              </div>
+            ) : null}
+          </div>
+        )}
         <div className="absolute inset-x-0 top-0 flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
           <span
             className="inline-flex max-w-[calc(100%-5rem)] items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
@@ -535,7 +596,7 @@ export function CategoryQuestPresentationCard({
               {category?.shortLabel || category?.name || 'Focus'}
             </span>
           </span>
-          {timeLeft ? (
+          {timeLeft && !isCompleted ? (
             <span
               className="inline-flex shrink-0 items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
               style={{
@@ -551,6 +612,7 @@ export function CategoryQuestPresentationCard({
         </div>
       </div>
 
+      {!isCompleted && (
       <div className="px-4 pt-1 pb-4 sm:px-5 sm:pb-5">
         {usesFocusTags && (
           <FocusQuestTagPanel
@@ -632,6 +694,7 @@ export function CategoryQuestPresentationCard({
         ))}
 
       </div>
+      )}
       <RewardDetailsPopup
         open={!!rewardPopup}
         eyebrow={rewardPopup?.eyebrow ?? ''}

@@ -106,14 +106,19 @@ export async function GET(req: Request) {
       }),
       getActiveQuestSeasonView({ userId, timezone }),
     ]);
-    // Count prizes ready to collect (claimable quests + completed objectives with unclaimed rewards)
-    const claimableCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
+    // Count prizes ready to collect. Quests no longer have an end-reward —
+    // only per-objective rewards are claimable, so count one per completed
+    // objective with unclaimed rewards.
+    const questClaimable = [...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
       (sum, quest) => {
         if (quest.claimed) return sum;
         let count = 0;
-        if (quest.claimable) count++;
         quest.logic.forEach((block) => {
-          if ((block.rewards?.length ?? 0) > 0 && block.progress >= block.target && !quest.claimedObjectiveIds.includes(block.id)) {
+          if (
+            (block.rewards?.length ?? 0) > 0 &&
+            block.progress >= block.target &&
+            !quest.claimedObjectiveIds.includes(block.id)
+          ) {
             count++;
           }
         });
@@ -121,6 +126,9 @@ export async function GET(req: Request) {
       },
       0,
     );
+    const seasonDailyClaimable =
+      activeSeason && activeSeason.claimable && !activeSeason.claimedToday ? 1 : 0;
+    const claimableCount = questClaimable + seasonDailyClaimable;
 
     // Count active quests the user can still work on (not claimed, not yet fully claimable)
     const activeCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].filter(

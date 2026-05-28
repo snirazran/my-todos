@@ -436,7 +436,6 @@ export function AdminQuestManagerPage() {
   const [coverFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
   const [categoryFileInputRef] = useState<{ current: HTMLInputElement | null }>({ current: null });
   const [editingTitle, setEditingTitle] = useState(false);
-  const [editingDesc, setEditingDesc] = useState(false);
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null);
 
@@ -1512,8 +1511,8 @@ export function AdminQuestManagerPage() {
             </div>
           </div>
 
-          {/* Title and description */}
-          <div className="absolute inset-x-0 bottom-0 z-10 p-4">
+          {/* Internal name (admin-only, not shown to users) */}
+          <div className="absolute inset-x-0 bottom-0 z-10 px-4 pb-3">
             {editingTitle ? (
               <input
                 autoFocus
@@ -1521,33 +1520,20 @@ export function AdminQuestManagerPage() {
                 onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
                 onBlur={() => setEditingTitle(false)}
                 onKeyDown={(e) => e.key === 'Enter' && setEditingTitle(false)}
-                placeholder="Quest title..."
-                className="w-full bg-transparent text-3xl font-black tracking-tight text-white placeholder-white/50 outline-none drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]"
+                placeholder="Internal name (admin only)"
+                className="w-full rounded-md bg-black/40 px-2 py-1 text-xs font-bold tracking-tight text-white placeholder-white/50 outline-none ring-1 ring-white/20 backdrop-blur-sm"
               />
             ) : (
-              <button type="button" onClick={() => setEditingTitle(true)} className="group/title flex w-full items-start gap-2 text-left">
-                <h3 className="text-3xl font-black tracking-tight text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.45)]">
-                  {form.name || <span className="text-white/50">Quest title...</span>}
-                </h3>
-                <Pencil className="mt-2 h-3.5 w-3.5 shrink-0 text-white/0 transition group-hover/title:text-white/70" />
-              </button>
-            )}
-            {editingDesc ? (
-              <input
-                autoFocus
-                value={form.description}
-                onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))}
-                onBlur={() => setEditingDesc(false)}
-                onKeyDown={(e) => e.key === 'Enter' && setEditingDesc(false)}
-                placeholder="Quest description..."
-                className="mt-1.5 w-full bg-transparent text-sm text-white/90 placeholder-white/40 outline-none drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]"
-              />
-            ) : (
-              <button type="button" onClick={() => setEditingDesc(true)} className="group/desc mt-1.5 flex w-full items-start gap-2 text-left">
-                <p className="text-sm text-white/90 drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]">
-                  {form.description || <span className="text-white/40">Quest description...</span>}
-                </p>
-                <Pencil className="mt-0.5 h-3 w-3 shrink-0 text-white/0 transition group-hover/desc:text-white/70" />
+              <button
+                type="button"
+                onClick={() => setEditingTitle(true)}
+                className="group/title inline-flex max-w-full items-center gap-1.5 rounded-md bg-black/35 px-2 py-1 text-left text-xs font-bold tracking-tight text-white/85 ring-1 ring-white/15 backdrop-blur-sm transition hover:bg-black/50"
+                title="Internal name — not shown to players"
+              >
+                <span className="truncate">
+                  {form.name || <span className="text-white/50">Internal name…</span>}
+                </span>
+                <Pencil className="h-3 w-3 shrink-0 text-white/60 transition group-hover/title:text-white" />
               </button>
             )}
           </div>
