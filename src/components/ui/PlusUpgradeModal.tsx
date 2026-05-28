@@ -296,7 +296,7 @@ function Step1({ onContinue }: { onContinue: () => void }) {
         </div>
 
         <div className="relative">
-          <div className="grid grid-cols-[1fr_5rem_5rem] items-end pb-3 text-sm font-black">
+          <div className="grid grid-cols-[1fr_5rem_5rem] items-center pb-3 text-sm font-black">
             <div />
             <div className="text-center text-white/90">Free</div>
             <div className="flex justify-center">
@@ -369,7 +369,6 @@ function Step3({
   onSelect: (p: PlanId) => void;
   onStart: () => void | Promise<void>;
 }) {
-  const step3Indices = React.useMemo(() => randomIndices(), []);
   return (
     <div className="flex min-h-full flex-col px-6 pb-6 pt-16 md:pb-5 md:pt-12">
       <h2 className="text-2xl font-black tracking-tight">
@@ -401,8 +400,13 @@ function Step3({
         />
       </div>
 
-      <div className="mt-8 flex justify-center">
-        <Frog width={200} height={200} indices={step3Indices} />
+      <div className="flex flex-1 items-center justify-center">
+        <img
+          src="/frogPlus.svg"
+          alt=""
+          aria-hidden
+          className="h-44 w-44 drop-shadow-[0_5px_0_rgba(0,0,0,0.3)]"
+        />
       </div>
 
       <div className="mt-auto space-y-2 pt-6 text-center">
