@@ -1662,6 +1662,14 @@ function LockedPlusPreview({
         ? 'Mystery Box'
         : item?.name ?? 'Plus Reward';
 
+  const { frogOnLeft, rotation } = useMemo(() => {
+    const tilts = [-9, -6, -4, 4, 6, 9];
+    return {
+      frogOnLeft: Math.random() < 0.5,
+      rotation: tilts[Math.floor(Math.random() * tilts.length)],
+    };
+  }, []);
+
   return (
     <div
       className="fixed inset-0 z-[1400] flex items-end justify-center bg-black/55 backdrop-blur-sm md:items-center md:px-5"
@@ -1692,8 +1700,13 @@ function LockedPlusPreview({
           <X className="h-5 w-5" />
         </button>
 
-        <div className="mt-2 flex items-center justify-center gap-2">
-          <div className="relative h-44 w-44 shrink-0 md:h-48 md:w-48">
+        <div className="mt-2 flex items-center justify-center">
+          <div
+            className={cn(
+              'relative z-10 h-44 w-44 shrink-0 md:h-48 md:w-48',
+              frogOnLeft ? '-mr-12 md:-mr-14' : 'order-2 -ml-12 md:-ml-14',
+            )}
+          >
             <Frog
               className="h-full w-full"
               width={192}
@@ -1701,7 +1714,13 @@ function LockedPlusPreview({
               indices={wardrobeIndices as Partial<Record<WardrobeSlot, number>>}
             />
           </div>
-          <div className="w-[150px] shrink-0 md:w-[160px]">
+          <div
+            className={cn(
+              'w-[150px] shrink-0 md:w-[160px]',
+              frogOnLeft ? '' : 'order-1',
+            )}
+            style={{ transform: `rotate(${rotation}deg)` }}
+          >
             <SingleRewardCard
               day={day}
               rewardType={rewardType}
@@ -1741,7 +1760,7 @@ function LockedPlusPreview({
             <img
               src="/frogPlus.svg"
               alt=""
-              className="-my-6 h-16 w-16 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]"
+              className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
             />
             <span className="text-sm font-black uppercase tracking-[0.2em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
               FrogTask
