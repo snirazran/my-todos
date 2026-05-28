@@ -1266,13 +1266,13 @@ function QuestSeasonEventOverlay({
               {season.name}
             </h2>
           </div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-8 mx-auto flex max-w-2xl items-center justify-between px-5 md:bottom-9">
-            <div className="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-full border border-primary/35 bg-primary/90 pl-2.5 pr-3.5 text-primary-foreground ring-1 ring-white/20 backdrop-blur-md">
-              <Clock className="h-4 w-4" strokeWidth={2.8} />
-              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/70">
+          <div className="pointer-events-none absolute inset-x-0 bottom-10 mx-auto flex max-w-2xl items-center justify-between gap-3 px-5 md:bottom-12">
+            <div className="pointer-events-auto inline-flex h-9 items-center gap-2 rounded-xl border border-white/15 bg-black/45 px-2.5 text-white shadow-[0_4px_14px_rgba(0,0,0,0.35)] backdrop-blur-md">
+              <Clock className="h-3.5 w-3.5 text-white/85" strokeWidth={2.6} />
+              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-white/65">
                 Ends in
               </span>
-              <span className="text-sm font-black tabular-nums">
+              <span className="text-[12px] font-black leading-none tabular-nums text-white">
                 {timeLeft}
               </span>
             </div>
@@ -1280,13 +1280,29 @@ function QuestSeasonEventOverlay({
               <button
                 type="button"
                 onClick={onUpgrade}
-                className="pointer-events-auto inline-flex h-9 items-center gap-1.5 rounded-full bg-violet-500 pl-2.5 pr-3 text-white shadow-sm ring-1 ring-white/20 transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] dark:bg-violet-600"
+                aria-label="Unlock Frog Plus"
+                className="group pointer-events-auto relative isolate inline-flex h-12 items-center gap-2.5 rounded-2xl pl-3 pr-2 text-emerald-950 shadow-[0_12px_32px_-6px_rgba(217,119,6,0.55)] ring-2 ring-amber-200/80 transition-transform duration-150 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_-6px_rgba(217,119,6,0.7)] active:translate-y-0 active:scale-[0.97]"
               >
-                <Sparkles className="h-4 w-4 text-amber-300" strokeWidth={2.5} />
-                <span className="text-[10px] font-black uppercase tracking-[0.16em] text-white/90">
+                <span
+                  aria-hidden
+                  className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+                />
+                <span
+                  aria-hidden
+                  className="animate-shimmer absolute inset-0 -z-10 overflow-hidden rounded-2xl bg-[linear-gradient(110deg,transparent_35%,rgba(255,255,255,0.7)_50%,transparent_65%)] bg-[length:200%_100%] mix-blend-overlay"
+                />
+                <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
+                <span className="-my-8 -ml-2 -translate-y-2 inline-flex">
+                  <img
+                    src="/frogPlus.svg"
+                    alt=""
+                    className="h-20 w-20 drop-shadow-[0_4px_0_rgba(31,98,28,0.35)] animate-wiggle [animation-duration:1.6s]"
+                  />
+                </span>
+                <span className="text-[12px] font-black uppercase tracking-[0.22em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
                   Unlock
                 </span>
-                <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-black leading-none tracking-[0.12em] text-violet-700">
+                <span className="ml-0.5 inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
                   Plus
                 </span>
               </button>
@@ -1359,19 +1375,28 @@ function QuestSeasonEventOverlay({
 
         <div className="relative flex flex-1 min-h-0 md:flex md:flex-1 md:min-h-0">
         {/* Fixed sidebar for FREE / PLUS labels on web */}
-        <div className="hidden md:flex md:sticky md:top-0 md:left-0 md:w-20 md:shrink-0 md:self-stretch md:flex-col md:items-center md:justify-center md:bg-background md:border-r md:border-border/40 md:font-black md:text-[11px] md:uppercase md:tracking-[0.2em] md:text-muted-foreground/70 md:z-20">
-          <div className="flex flex-1 items-center justify-center">
-            <div className="flex flex-col items-center">
-              <Gift className="w-5 h-5 opacity-60 mb-1.5" />
+        <div className="hidden md:flex md:sticky md:top-0 md:left-0 md:w-24 md:shrink-0 md:self-stretch md:flex-col md:items-center md:justify-center md:gap-3 md:bg-background md:border-r md:border-border/40 md:px-2 md:py-6 md:z-20">
+          <div className="flex flex-1 w-full items-center justify-center">
+            <div className="flex flex-col items-center rounded-xl border border-primary/25 bg-primary/10 px-3 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-primary">
               <span>Free</span>
             </div>
           </div>
           <div className="h-px w-10 bg-border/60" aria-hidden="true" />
-          <div className="flex flex-1 items-center justify-center">
-            <div className="flex flex-col items-center">
-              <Sparkles className="w-5 h-5 text-amber-500/60 mb-1.5" strokeWidth={2.5} />
-              <span>Plus</span>
-            </div>
+          <div className="flex flex-1 w-full items-center justify-center">
+            <button
+              type="button"
+              onClick={onUpgrade}
+              aria-label="Frog Plus"
+              className="group relative isolate flex flex-col items-center gap-1.5 rounded-xl px-3 py-3 text-[11px] font-black uppercase tracking-[0.2em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
+            >
+              <span
+                aria-hidden
+                className="absolute inset-0 -z-10 rounded-xl bg-[linear-gradient(150deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+              />
+              <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-xl bg-gradient-to-b from-white/45 to-transparent" />
+              <img src="/frogPlus.svg" alt="" className="h-12 w-12 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
+              <span className="drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">Plus</span>
+            </button>
           </div>
         </div>
 
@@ -1389,26 +1414,32 @@ function QuestSeasonEventOverlay({
         <div className="px-4 pb-5 pt-5 md:pt-4">
           <div className="text-foreground">
             <div className="grid h-12 grid-cols-[1fr_auto_1fr] items-center gap-2 md:hidden">
-              <div className="flex h-10 items-center justify-center gap-2 rounded-xl border border-border bg-muted/35 px-4 text-[11px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-                <Gift className="w-4 h-4" />
+              <div className="flex h-10 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 px-4 text-[11px] font-black uppercase tracking-[0.18em] text-primary">
                 <span>Free</span>
               </div>
               <div className="w-10" />
               <button
                 type="button"
-                className="relative flex h-10 items-center justify-center gap-2 overflow-hidden rounded-xl bg-violet-500 px-4 text-[11px] font-black uppercase tracking-[0.16em] text-white shadow-sm transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] dark:bg-violet-600"
+                onClick={onUpgrade}
+                aria-label="Frog Plus"
+                className="group relative isolate flex h-10 items-center justify-center gap-2 rounded-xl pl-2 pr-1.5 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-900 ring-2 ring-amber-200/80 transition-transform hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98]"
               >
-                <Sparkles className="w-4 h-4 text-amber-300" strokeWidth={2.5} />
-                <span>Frog</span>
-                <span className="rounded-md bg-white/90 px-1.5 py-0.5 text-[10px] font-black leading-none tracking-[0.12em] text-violet-700">
+                <span
+                  aria-hidden
+                  className="absolute inset-0 -z-10 rounded-xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+                />
+                <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-xl bg-gradient-to-b from-white/45 to-transparent" />
+                <span className="-my-6 -ml-2 -translate-y-1 inline-flex">
+                  <img src="/frogPlus.svg" alt="" className="h-16 w-16 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
+                </span>
+                <span className="drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">Frog</span>
+                <span className="ml-0.5 inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-1 text-[10px] font-black uppercase leading-none tracking-[0.16em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_3px_rgba(0,0,0,0.22)] ring-1 ring-emerald-900/40">
                   Plus
                 </span>
               </button>
             </div>
 
             <div ref={timelineRef} className="relative mt-4 rounded-[20px] border border-border/40 bg-muted/40 p-3 md:mt-0 md:border-0 md:bg-transparent md:p-0 md:py-12 md:w-fit md:min-w-full [@media(max-height:820px)]:md:py-8 [@media(max-height:720px)]:md:py-5">
-              {/* Plus tier tint — scrolls with content */}
-              <div className="pointer-events-none absolute z-[1] right-0 top-0 bottom-0 w-[42%] rounded-r-[20px] bg-violet-500/[0.04] md:top-1/2 md:bottom-0 md:left-0 md:right-0 md:w-auto md:rounded-r-none md:rounded-b-[20px] md:bg-violet-500/[0.03]" />
               <div className="absolute bottom-0 left-1/2 top-0 z-0 w-2 -translate-x-1/2 rounded-full bg-border/60 md:left-0 md:right-0 md:top-1/2 md:h-2 md:w-auto md:-translate-y-1/2 md:translate-x-0" />
               <div
                 className="absolute left-1/2 top-0 z-0 w-1 -translate-x-1/2 rounded-full bg-primary shadow-[0_0_14px_rgba(34,197,94,0.28)] md:left-0 md:top-1/2 md:h-1 md:-translate-y-1/2 md:translate-x-0"

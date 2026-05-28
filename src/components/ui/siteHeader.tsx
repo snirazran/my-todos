@@ -540,6 +540,7 @@ type UserInfo = {
   frogPronouns?: string | null;
   birthday?: string | null;
   isPremium?: boolean;
+  premiumUntil?: string | null;
 };
 
 const userInfoFetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -653,6 +654,7 @@ function MobileSheet({
                   displayName={displayName}
                   frogName={frogName}
                   isPremium={!!userInfo?.isPremium}
+                  premiumUntil={userInfo?.premiumUntil ?? null}
                   isAdmin={!!isAdmin}
                   canEnableNotifs={canEnableNotifs}
                   notifsEnabled={notifsEnabled}
@@ -798,6 +800,7 @@ function MainView({
   displayName,
   frogName,
   isPremium,
+  premiumUntil,
   isAdmin,
   canEnableNotifs,
   notifsEnabled,
@@ -821,6 +824,7 @@ function MainView({
   displayName: string;
   frogName: string;
   isPremium: boolean;
+  premiumUntil: string | null;
   isAdmin: boolean;
   canEnableNotifs: boolean;
   notifsEnabled: boolean;
@@ -841,6 +845,15 @@ function MainView({
   onSignOut: () => void;
   flashSoon: (label: string) => void;
 }) {
+  const [plusInfoOpen, setPlusInfoOpen] = useState(false);
+  const premiumUntilDate = premiumUntil ? new Date(premiumUntil) : null;
+  const premiumUntilLabel = premiumUntilDate
+    ? premiumUntilDate.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      })
+    : null;
   return (
     <div className="space-y-5">
       {/* User card */}
@@ -874,18 +887,40 @@ function MainView({
 
       {/* FrogTask Plus promo */}
       {!isPremium && (
-        <PromoCard
-          icon={
-            <span className="inline-flex items-center gap-1">
-              <Sparkles className="w-5 h-5 text-amber-300" strokeWidth={2.5} />
-            </span>
-          }
-          title="FrogTask Plus"
-          titleBadge="PLUS"
-          subtitle="Customize the app to your needs"
-          actionLabel="Try 7 days free"
-          onAction={onOpenPlus}
-        />
+        <button
+          type="button"
+          onClick={onOpenPlus}
+          aria-label="Unlock FrogTask Plus"
+          className="group relative isolate w-full text-left rounded-2xl px-4 py-4 flex items-center gap-3 text-emerald-950 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
+        >
+          <span
+            aria-hidden
+            className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+          />
+          <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
+          <span className="-my-4 -ml-1 shrink-0 inline-flex">
+            <img
+              src="/frogPlus.svg"
+              alt=""
+              className="w-16 h-16 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)] animate-wiggle [animation-duration:1.8s]"
+            />
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-base font-black tracking-tight flex items-center gap-2 text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+              FrogTask
+              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_3px_rgba(0,0,0,0.22)] ring-1 ring-emerald-900/40">
+                Plus
+              </span>
+            </p>
+            <p className="text-xs font-semibold text-emerald-900/75">Unlock unlimited tags &amp; quests!</p>
+          </div>
+          <span
+            aria-hidden
+            className="shrink-0 inline-flex items-center rounded-xl bg-gradient-to-b from-emerald-600 to-emerald-800 px-3 py-2 text-xs font-black uppercase tracking-[0.12em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40"
+          >
+            Try 7 days free
+          </span>
+        </button>
       )}
 
       {/* Community */}
@@ -931,11 +966,70 @@ function MainView({
       {/* Subscriptions */}
       <MenuSection title="Subscriptions">
         <MenuRow
-          icon={<Sparkles className="w-7 h-7 text-violet-500" />}
+          icon={<img src="/frogPlus.svg" alt="" className="w-9 h-9" />}
           label="FrogTask Plus"
-          onClick={onOpenPlus}
+          trailing={
+            isPremium ? (
+              <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[10px] font-black uppercase leading-none tracking-[0.16em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
+                Active
+              </span>
+            ) : undefined
+          }
+          onClick={isPremium ? () => setPlusInfoOpen(true) : onOpenPlus}
         />
       </MenuSection>
+
+      {plusInfoOpen && createPortal(
+        <div
+          className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/50 backdrop-blur-sm px-5"
+          onClick={() => setPlusInfoOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative isolate w-full max-w-sm rounded-3xl px-6 pt-7 pb-6 text-emerald-950 ring-2 ring-amber-200/80"
+          >
+            <span
+              aria-hidden
+              className="absolute inset-0 -z-10 rounded-3xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+            />
+            <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-3xl bg-gradient-to-b from-white/45 to-transparent" />
+            <button
+              type="button"
+              onClick={() => setPlusInfoOpen(false)}
+              aria-label="Close"
+              className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-emerald-900/15 text-emerald-900 hover:bg-emerald-900/25"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="flex flex-col items-center text-center">
+              <img src="/frogPlus.svg" alt="" className="h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)]" />
+              <p className="mt-2 text-lg font-black tracking-tight flex items-center gap-2">
+                FrogTask
+                <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 ring-1 ring-emerald-900/40">
+                  Plus
+                </span>
+              </p>
+              <p className="mt-1 text-sm font-bold text-emerald-900/85">
+                Your subscription is active 🎉
+              </p>
+              {premiumUntilLabel && (
+                <div className="mt-4 w-full rounded-xl bg-white/55 px-4 py-3 ring-1 ring-amber-300/60">
+                  <p className="text-[10px] font-black uppercase tracking-[0.18em] text-emerald-900/70">
+                    Renews / Expires
+                  </p>
+                  <p className="mt-0.5 text-base font-black tracking-tight text-emerald-950">
+                    {premiumUntilLabel}
+                  </p>
+                </div>
+              )}
+              <p className="mt-4 text-xs font-medium text-emerald-900/70">
+                Thanks for supporting FrogTask — you&apos;re helping us keep building 🐸
+              </p>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {/* Support */}
       <MenuSection title="Support">
