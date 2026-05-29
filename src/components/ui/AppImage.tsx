@@ -33,8 +33,7 @@ export function AppImage({
       alt={alt}
       loading={priority ? 'eager' : 'lazy'}
       decoding="async"
-      // @ts-expect-error fetchpriority is a valid DOM attribute not yet typed
-      fetchpriority={priority ? 'high' : undefined}
+      fetchPriority={priority ? 'high' : undefined}
       onLoad={(e) => {
         setLoaded(true);
         onLoad?.(e);
