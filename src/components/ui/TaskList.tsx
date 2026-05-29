@@ -17,6 +17,7 @@ import {
   Flame,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
+import { Icon } from '@/components/ui/Icon';
 import {
   AnimatePresence,
   motion,
@@ -618,7 +619,7 @@ const SortableTaskItem = React.forwardRef<
                     {task.text}
                   </motion.span>
                   {isWeekly && (
-                    <img src="/icons/Repeat.svg" alt="Repeating" className="w-5 h-5 flex-shrink-0" />
+                    <Icon name="repeat" label="Repeating" className="w-5 h-5 flex-shrink-0" />
                   )}
                   {task.calendarEventId && (
                     <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />

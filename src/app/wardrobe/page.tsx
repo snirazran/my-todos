@@ -22,10 +22,10 @@ export default function WardrobePage() {
     );
   }, [backgroundsData]);
   const bgImages = {
-    mobile: equippedBackground?.images?.mobile || '/bg-mobile.png',
-    tablet: equippedBackground?.images?.tablet || '/bg-tablet.png',
-    web: equippedBackground?.images?.web || '/bg-web.png',
-    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.png',
+    mobile: equippedBackground?.images?.mobile || '/bg-mobile.webp',
+    tablet: equippedBackground?.images?.tablet || '/bg-tablet.webp',
+    web: equippedBackground?.images?.web || '/bg-web.webp',
+    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.webp',
   };
   const defaultTab =
     (searchParams.get('tab') as 'inventory' | 'shop' | 'trade') || 'inventory';

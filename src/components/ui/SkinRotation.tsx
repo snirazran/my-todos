@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ChevronRight, Shuffle, X } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
+import { Icon } from '@/components/ui/Icon';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 
 const STORAGE_KEY = 'skinRotationInterval';
@@ -63,7 +64,7 @@ export function SkinRotationRow() {
         className="w-full flex items-center gap-3 px-4 py-3.5 transition-colors hover:bg-accent/50 text-left"
       >
         <div className="h-9 w-9 flex items-center justify-center shrink-0">
-          <img src="/icons/Shuffle.svg" alt="Skin rotation" className="w-10 h-10" />
+          <Icon name="shuffle" label="Skin rotation" className="w-10 h-10" />
         </div>
         <span className="flex-1 text-sm font-bold truncate">Skin &amp; Background rotation</span>
         <span className="text-[11px] font-bold text-muted-foreground">

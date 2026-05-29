@@ -10,7 +10,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import Image from 'next/image';
+import { Icon as AppIcon, type IconName } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import Fly from '@/components/ui/fly';
@@ -20,7 +20,7 @@ type Action = {
   key: string;
   label: string;
   icon?: React.ElementType;
-  iconSrc?: string;
+  iconName?: IconName;
   onClick: () => void;
   destructive?: boolean;
   active?: boolean;
@@ -90,7 +90,7 @@ export default function TaskActionSheet({
     actions.push({
       key: 'repeat',
       label: 'Repeat weekly',
-      iconSrc: '/icons/Repeat.svg',
+      iconName: 'repeat',
       onClick: onToggleRepeat,
       active: isWeekly,
     });
@@ -174,8 +174,8 @@ export default function TaskActionSheet({
                     a.active ? 'ring-1 ring-primary/40 bg-primary/5' : ''
                   }`}
                 >
-                  {a.iconSrc ? (
-                    <Image src={a.iconSrc} alt={a.label} width={20} height={20} className="h-5 w-5" />
+                  {a.iconName ? (
+                    <AppIcon name={a.iconName} label={a.label} className="h-5 w-5" />
                   ) : Icon ? (
                     <Icon
                       className={`h-5 w-5 ${

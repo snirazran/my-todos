@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CalendarCheck, Check } from 'lucide-react';
-import Image from 'next/image';
+import { Icon } from '@/components/ui/Icon';
 
 export type FilterType = 'all' | 'tasks';
 
@@ -133,7 +133,7 @@ export function FilterDropdown({
                           : 'hover:bg-accent text-muted-foreground hover:text-foreground'
                       }`}
                     >
-                      <Image src="/icons/Planner.svg" alt="All Items" width={18} height={18} className="w-[18px] h-[18px]" />
+                      <Icon name="planner" label="All Items" className="w-[18px] h-[18px]" />
                       All Items
                     </button>
                     <button

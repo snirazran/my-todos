@@ -46,7 +46,19 @@
       "Bash(NODE_OPTIONS='' ./node_modules/.bin/tsc --noEmit)",
       "Bash(powershell -Command \"Get-Content src\\\\components\\\\ui\\\\QuestsPanel.tsx | Select-Object -Skip 1101 -First 270 | Out-String\")",
       "Bash(powershell -Command \"\\(Get-Content src\\\\components\\\\ui\\\\QuestsPanel.tsx | Measure-Object -Line\\).Lines\")",
-      "Bash(powershell -Command \"Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Write-Host 'cleared'\")"
+      "Bash(powershell -Command \"Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue; Write-Host 'cleared'\")",
+      "Bash(sed -n '1,15p;38,135p' src/components/ui/siteHeader.tsx)",
+      "Bash(sed -n '225,325p' src/components/ui/siteHeader.tsx)",
+      "Bash(sed -n '1,20p' src/components/ui/MobileNav.tsx)",
+      "Bash(sed -n '44,75p' src/components/ui/MobileNav.tsx)",
+      "Bash(sed -n '185,250p' src/components/ui/MobileNav.tsx)",
+      "Bash(sed -n '735,739p' src/app/page.tsx)",
+      "Bash(sed -n '1,30p' src/components/ui/LoadingScreen.tsx)",
+      "Bash(sed -n '360,375p' src/components/board/TaskCard.tsx)",
+      "Bash(sed -n '1303,1310p' src/components/ui/QuestsPanel.tsx)",
+      "Bash(sed -n '1758,1766p' src/components/ui/QuestsPanel.tsx)",
+      "Bash(sed -n '182,192p' src/components/ui/PlusUpgradeModal.tsx)",
+      "Bash(sed -n '401,412p' src/components/ui/PlusUpgradeModal.tsx)"
     ]
   }
 }

@@ -14,10 +14,10 @@ export function GlobalPageBackground() {
   }, [data?.equipped, data?.catalog]);
 
   const images = {
-    mobile: equippedBackground?.images?.mobile || '/bg-mobile.png',
-    tablet: equippedBackground?.images?.tablet || '/bg-tablet.png',
-    web: equippedBackground?.images?.web || '/bg-web.png',
-    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.png',
+    mobile: equippedBackground?.images?.mobile || '/bg-mobile.webp',
+    tablet: equippedBackground?.images?.tablet || '/bg-tablet.webp',
+    web: equippedBackground?.images?.web || '/bg-web.webp',
+    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.webp',
   };
 
   if (isLoadingScreenVisible) return null;

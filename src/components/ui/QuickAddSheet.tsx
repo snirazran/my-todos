@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Icon } from '@/components/ui/Icon';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Bell,
@@ -446,7 +447,7 @@ export default function QuickAddSheet({
                         >
                           <span className="grid h-full w-12 shrink-0 place-items-center">
                             <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
-                              <img src="/icons/Filter.svg" alt="Tags" className="h-5 w-5" />
+                              <Icon name="filter" label="Tags" className="h-5 w-5" />
                             </span>
                           </span>
                           <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground">
@@ -464,7 +465,7 @@ export default function QuickAddSheet({
                           >
                             <span className="grid h-full w-12 shrink-0 place-items-center">
                               <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
-                                <img src="/icons/Planner.svg" alt="Date" className="h-5 w-5" />
+                                <Icon name="planner" label="Date" className="h-5 w-5" />
                               </span>
                             </span>
                             <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-extrabold text-muted-foreground">
@@ -484,7 +485,7 @@ export default function QuickAddSheet({
                           >
                             <span className="grid h-full w-12 shrink-0 place-items-center">
                               <span className={`grid h-7 w-7 place-items-center rounded-full ${repeatsOn ? 'bg-primary/10' : 'bg-muted'}`}>
-                                <img src="/icons/Repeat.svg" alt="Repeat" className={`h-5 w-5 ${repeatsOn ? '' : 'opacity-50 grayscale'}`} />
+                                <Icon name="repeat" label="Repeat" className={`h-5 w-5 ${repeatsOn ? '' : 'opacity-50 grayscale'}`} />
                               </span>
                             </span>
                             <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground">

@@ -55,6 +55,22 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" dir="ltr" className={`h-full ${poppins.variable} ${luckiestGuy.variable}`}>
+      <head>
+        {/* Preload the default page background so it paints without a flash.
+            Responsive: only the matching breakpoint is fetched. */}
+        <link
+          rel="preload"
+          as="image"
+          href="/bg-mobile.webp"
+          media="(max-width: 767px)"
+        />
+        <link
+          rel="preload"
+          as="image"
+          href="/bg-web.webp"
+          media="(min-width: 1280px)"
+        />
+      </head>
       <body
         className={[
           poppins.className,

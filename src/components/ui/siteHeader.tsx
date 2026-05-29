@@ -10,7 +10,7 @@ import {
   LogIn,
   LogOut,
 } from 'lucide-react';
-import Image from 'next/image';
+import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { useUIStore } from '@/lib/uiStore';
@@ -38,9 +38,9 @@ import { CurrencyShop } from './shop/CurrencyShop';
 import { cn } from '@/lib/utils';
 
 const wardrobeItems = [
-  { tab: 'inventory' as const, label: 'Inventory', iconSrc: '/icons/Wardrobe.svg', color: 'bg-primary/10' },
+  { tab: 'inventory' as const, label: 'Inventory', iconName: 'wardrobe' as const, color: 'bg-primary/10' },
   { tab: 'shop' as const, label: 'Shop', icon: ShoppingBag, color: 'text-violet-500 bg-violet-500/10' },
-  { tab: 'trade' as const, label: 'Trade', iconSrc: '/icons/Repeat.svg', color: 'bg-amber-500/10' },
+  { tab: 'trade' as const, label: 'Trade', iconName: 'repeat' as const, color: 'bg-amber-500/10' },
 ];
 
 export default function SiteHeader() {
@@ -98,17 +98,17 @@ export default function SiteHeader() {
     {
       href: '/',
       label: 'Today',
-      iconSrc: '/icons/Home.svg',
+      iconName: 'home' as const,
     },
     {
       href: '/planner',
       label: 'Planner',
-      iconSrc: '/icons/Date.svg',
+      iconName: 'date' as const,
       protected: true,
     },
     {
       label: 'Quests',
-      iconSrc: '/icons/Quests.svg',
+      iconName: 'quests' as const,
       onClick: () => {
         if (!user) {
           router.push('/login');
@@ -120,7 +120,7 @@ export default function SiteHeader() {
     },
     {
       label: 'Wardrobe',
-      iconSrc: '/icons/Wardrobe.svg',
+      iconName: 'wardrobe' as const,
       onClick: () => {
         if (!user) { router.push('/login'); return; }
         router.push('/wardrobe');
@@ -229,7 +229,7 @@ export default function SiteHeader() {
               return (
                 <div key={item.label} className="relative" ref={wardrobeRef}>
                   <button onClick={item.onClick} className={buttonClass}>
-                    <Image src={item.iconSrc} alt={item.label} width={32} height={32} className="w-8 h-8" />
+                    <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
                     <span className="hidden lg:inline">{item.label}</span>
                     {inventoryBadge > 0 && (
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ml-1">
@@ -262,8 +262,8 @@ export default function SiteHeader() {
                                 className="flex flex-col items-center gap-2 p-3 rounded-xl bg-muted/50 hover:bg-muted transition-all active:scale-95"
                               >
                                 <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${wItem.color}`}>
-                                  {'iconSrc' in wItem && wItem.iconSrc ? (
-                                    <Image src={wItem.iconSrc} alt={wItem.label} width={20} height={20} className="w-5 h-5" />
+                                  {'iconName' in wItem && wItem.iconName ? (
+                                    <Icon name={wItem.iconName} label={wItem.label} className="w-5 h-5" />
                                   ) : 'icon' in wItem && wItem.icon ? (
                                     (() => { const WIcon = wItem.icon; return <WIcon className="w-5 h-5" />; })()
                                   ) : null}
@@ -287,7 +287,7 @@ export default function SiteHeader() {
                   onClick={item.onClick}
                   className={buttonClass}
                 >
-                  <Image src={item.iconSrc} alt={item.label} width={32} height={32} className="w-8 h-8" />
+                  <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
                   <span className="hidden lg:inline">{item.label}</span>
                   {item.label === 'Quests' && questClaimableCount > 0 ? (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
@@ -309,7 +309,7 @@ export default function SiteHeader() {
                   onClick={() => router.push('/login')}
                   className={buttonClass}
                 >
-                  <Image src={item.iconSrc} alt={item.label} width={32} height={32} className="w-8 h-8" />
+                  <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
                   <span className="hidden lg:inline">{item.label}</span>
                 </button>
               );
@@ -317,7 +317,7 @@ export default function SiteHeader() {
 
             return (
               <Link key={item.href} href={item.href!} className={buttonClass}>
-                <Image src={item.iconSrc} alt={item.label} width={32} height={32} className="w-8 h-8" />
+                <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
                 <span className="hidden lg:inline">{item.label}</span>
               </Link>
             );
@@ -899,9 +899,8 @@ function MainView({
           />
           <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
           <span className="-my-4 -ml-1 shrink-0 inline-flex">
-            <img
-              src="/frogPlus.svg"
-              alt=""
+            <Icon
+              name="frogPlus"
               className="w-16 h-16 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)] animate-wiggle [animation-duration:1.8s]"
             />
           </span>
@@ -926,12 +925,12 @@ function MainView({
       {/* Community */}
       <MenuSection title="Community">
         <MenuRow
-          icon={<Image src="/icons/InviteFriends.svg" alt="Invite friends" width={40} height={40} className="w-10 h-10" />}
+          icon={<Icon name="inviteFriends" label="Invite friends" className="w-10 h-10" />}
           label="Invite friends"
           onClick={onInviteFriends}
         />
         <MenuRow
-          icon={<Image src="/icons/Community.svg" alt="Community" width={40} height={40} className="w-10 h-10" />}
+          icon={<Icon name="community" label="Community" className="w-10 h-10" />}
           label="Join our frog community"
           onClick={onOpenCommunity}
         />
@@ -966,7 +965,7 @@ function MainView({
       {/* Subscriptions */}
       <MenuSection title="Subscriptions">
         <MenuRow
-          icon={<img src="/frogPlus.svg" alt="" className="w-9 h-9" />}
+          icon={<Icon name="frogPlus" className="w-9 h-9" />}
           label="FrogTask Plus"
           trailing={
             isPremium ? (
@@ -1002,7 +1001,7 @@ function MainView({
               <X className="h-4 w-4" />
             </button>
             <div className="flex flex-col items-center text-center">
-              <img src="/frogPlus.svg" alt="" className="h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)]" />
+              <Icon name="frogPlus" className="h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)]" />
               <p className="mt-2 text-lg font-black tracking-tight flex items-center gap-2">
                 FrogTask
                 <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 ring-1 ring-emerald-900/40">
@@ -1085,7 +1084,7 @@ function PreferencesView({
         >
           <span className="flex items-center gap-3">
             <div className="h-9 w-9 flex items-center justify-center">
-              <Image src="/icons/DarkMode.svg" alt="Color mode" width={40} height={40} className="w-10 h-10" />
+              <Icon name="darkMode" label="Color mode" className="w-10 h-10" />
             </div>
             <span className="font-bold text-sm">Color Mode</span>
           </span>
@@ -1097,7 +1096,7 @@ function PreferencesView({
 
       <MenuSection title="Quests">
         <MenuRow
-          icon={<Image src="/icons/Compass.svg" alt="Quest Focus" width={40} height={40} className="w-10 h-10" />}
+          icon={<Icon name="compass" label="Quest Focus" className="w-10 h-10" />}
           label="Quest Focus"
           onClick={onOpenQuestOnboarding}
         />
@@ -1238,25 +1237,25 @@ function QuickTilesGrid({
   return (
     <div className="grid grid-cols-2 gap-3">
       <QuickTile
-        icon={<Image src="/icons/Compass.svg" alt="Focus areas" width={52} height={52} className="h-[52px] w-[52px]" />}
+        icon={<Icon name="compass" label="Focus areas" className="h-[52px] w-[52px]" />}
         title="Focus areas"
         subtitle="Tailor your quests"
         onClick={onOpenQuestFocus}
       />
       <QuickTile
-        icon={<Image src="/icons/Shuffle.svg" alt="Skin rotation" width={52} height={52} className="h-[52px] w-[52px]" />}
+        icon={<Icon name="shuffle" label="Skin rotation" className="h-[52px] w-[52px]" />}
         title="Skin rotation"
         subtitle={labelForInterval(rotation)}
         onClick={() => setRotationOpen(true)}
       />
       <QuickTile
-        icon={<Image src="/icons/GoogleCalendar.svg" alt="Google Calendar" width={32} height={32} className="h-8 w-8" />}
+        icon={<Icon name="googleCalendar" label="Google Calendar" className="h-8 w-8" />}
         title="Google Calendar"
         subtitle={gcalEnabled ? 'Connected' : 'Sync your events'}
         onClick={() => window.dispatchEvent(new Event('gcal-sync-trigger'))}
       />
       <QuickTile
-        icon={<Image src="/icons/DarkMode.svg" alt="Color mode" width={52} height={52} className="h-[52px] w-[52px]" />}
+        icon={<Icon name="darkMode" label="Color mode" className="h-[52px] w-[52px]" />}
         title="Color mode"
         subtitle={theme === 'dark' ? 'Dark' : 'Light'}
         onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}

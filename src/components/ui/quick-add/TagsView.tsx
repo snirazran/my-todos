@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { Icon } from '@/components/ui/Icon';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Check,
@@ -103,7 +104,7 @@ export function TagsView({
       <div>
         <div className="mb-3 flex items-center gap-2">
           <div className="relative flex-1">
-            <img src="/icons/Filter.svg" alt="" className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2" />
+            <Icon name="filter" className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2" />
             <input
               ref={tagInputRef}
               value={tagInput}

@@ -8,7 +8,7 @@ import {
   Clock,
   Bell,
 } from 'lucide-react';
-import Image from 'next/image';
+import { Icon } from '@/components/ui/Icon';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
@@ -365,13 +365,7 @@ export default function TaskCard({
               </span>
               <div className="inline-flex items-center gap-1.5 shrink-0">
                 {isRepeating && (
-                  <Image
-                    src="/icons/Repeat.svg"
-                    alt="Repeating"
-                    width={14}
-                    height={14}
-                    className="w-3.5 h-3.5 flex-shrink-0"
-                  />
+                  <Icon name="repeat" label="Repeating" className="w-3.5 h-3.5 flex-shrink-0" />
                 )}
                 {task.calendarEventId && (
                   <CalendarDays

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
+import { Icon } from '@/components/ui/Icon';
 import { Check, Clock, Gift, Lock, ScrollText, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TagsPopup from './TagsPopup';
@@ -1302,9 +1303,8 @@ function QuestSeasonEventOverlay({
                 />
                 <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
                 <span className="-my-8 -ml-2 -translate-y-2 inline-flex">
-                  <img
-                    src="/frogPlus.svg"
-                    alt=""
+                  <Icon
+                    name="frogPlus"
                     className="h-20 w-20 drop-shadow-[0_4px_0_rgba(31,98,28,0.35)] animate-wiggle [animation-duration:1.6s]"
                   />
                 </span>
@@ -1404,7 +1404,7 @@ function QuestSeasonEventOverlay({
                 className="absolute inset-0 -z-10 rounded-xl bg-[linear-gradient(150deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
               />
               <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-xl bg-gradient-to-b from-white/45 to-transparent" />
-              <img src="/frogPlus.svg" alt="" className="h-12 w-12 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
+              <Icon name="frogPlus" className="h-12 w-12 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
               <span className="drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">Plus</span>
             </button>
           </div>
@@ -1441,7 +1441,7 @@ function QuestSeasonEventOverlay({
                 />
                 <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-xl bg-gradient-to-b from-white/45 to-transparent" />
                 <span className="-my-6 -ml-2 -translate-y-1 inline-flex">
-                  <img src="/frogPlus.svg" alt="" className="h-16 w-16 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
+                  <Icon name="frogPlus" className="h-16 w-16 drop-shadow-[0_2px_0_rgba(31,98,28,0.35)]" />
                 </span>
                 <span className="drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">Frog</span>
                 <span className="ml-0.5 inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-1 text-[10px] font-black uppercase leading-none tracking-[0.16em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_3px_rgba(0,0,0,0.22)] ring-1 ring-emerald-900/40">
@@ -1757,9 +1757,8 @@ function LockedPlusPreview({
               className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
             />
             <span aria-hidden className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent" />
-            <img
-              src="/frogPlus.svg"
-              alt=""
+            <Icon
+              name="frogPlus"
               className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
             />
             <span className="text-sm font-black uppercase tracking-[0.2em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">

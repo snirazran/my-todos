@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Icon } from '@/components/ui/Icon';
 import { format } from 'date-fns';
 import {
   Calendar,
@@ -666,10 +667,10 @@ export default function Home() {
     );
   }, [backgroundsData]);
   const bgImages = {
-    mobile: equippedBackground?.images?.mobile || '/bg-mobile.png',
-    tablet: equippedBackground?.images?.tablet || '/bg-tablet.png',
-    web: equippedBackground?.images?.web || '/bg-web.png',
-    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.png',
+    mobile: equippedBackground?.images?.mobile || '/bg-mobile.webp',
+    tablet: equippedBackground?.images?.tablet || '/bg-tablet.webp',
+    web: equippedBackground?.images?.web || '/bg-web.webp',
+    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.webp',
   };
 
   const renderGuestPrompt = () =>
@@ -734,7 +735,7 @@ export default function Home() {
               <div className="flex items-center justify-between px-2 md:px-0">
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 ml-3 cursor-pointer group">
-                    <img src="/icons/Planner.svg" alt="" className="w-7 h-7" />
+                    <Icon name="planner" className="w-7 h-7" />
                     <span className="text-sm font-black tracking-tight lowercase text-foreground">
                       {openTaskCount}{' '}
                       {openTaskCount === 1 ? 'fly' : 'flies'}{' '}

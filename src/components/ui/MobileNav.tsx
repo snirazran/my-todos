@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter } from 'next/navigation';
 import { ShoppingBag } from 'lucide-react';
-import Image from 'next/image';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useInventory } from '@/hooks/useInventory';
 import useSWR from 'swr';
@@ -45,17 +45,17 @@ export default function MobileNav() {
     {
       href: '/',
       label: 'Today',
-      iconSrc: '/icons/Home.svg',
+      iconName: 'home' as const,
     },
     {
       href: '/planner',
       label: 'Planner',
-      iconSrc: '/icons/Date.svg',
+      iconName: 'date' as const,
       protected: true,
     },
     {
       label: 'Quests',
-      iconSrc: '/icons/Quests.svg',
+      iconName: 'quests' as const,
       onClick: () => {
         if (!user) {
           router.push('/login');
@@ -67,7 +67,7 @@ export default function MobileNav() {
     },
     {
       label: 'Wardrobe',
-      iconSrc: '/icons/Wardrobe.svg',
+      iconName: 'wardrobe' as const,
       onClick: () => {
         if (!user) {
           router.push('/login');
@@ -95,13 +95,7 @@ export default function MobileNav() {
             const content = (
               <div className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-2xl transition-colors ${isActive ? 'bg-primary/10' : ''}`}>
                 <div className="relative">
-                  <Image
-                    src={item.iconSrc}
-                    alt={item.label}
-                    width={36}
-                    height={36}
-                    className="w-9 h-9"
-                  />
+                  <Icon name={item.iconName} label={item.label} className="w-9 h-9" />
                   {item.label === 'Wardrobe' && inventoryBadge > 0 && (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
                       {inventoryBadge > 9 ? '9+' : inventoryBadge}
@@ -189,7 +183,7 @@ function WardrobePopup({
     {
       tab: 'inventory' as const,
       label: 'Inventory',
-      iconSrc: '/icons/Wardrobe.svg',
+      iconName: 'wardrobe' as const,
       color: 'bg-primary/10',
     },
     {
@@ -201,7 +195,7 @@ function WardrobePopup({
     {
       tab: 'trade' as const,
       label: 'Trade',
-      iconSrc: '/icons/Repeat.svg',
+      iconName: 'repeat' as const,
       color: 'bg-amber-500/10',
     },
   ];
@@ -236,7 +230,7 @@ function WardrobePopup({
             {/* Header */}
             <div className="flex items-center gap-3 px-5 pb-3">
               <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
-                <Image src="/icons/Wardrobe.svg" alt="Wardrobe" width={20} height={20} className="w-5 h-5" />
+                <Icon name="wardrobe" label="Wardrobe" className="w-5 h-5" />
               </div>
               <div>
                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none mb-0.5">
@@ -257,10 +251,10 @@ function WardrobePopup({
                   className="flex flex-col items-center gap-2.5 p-4 rounded-2xl bg-card border border-border/50 active:scale-95 transition-all"
                 >
                   <div className={`h-14 w-14 rounded-2xl flex items-center justify-center ${item.color}`}>
-                    {'iconSrc' in item && item.iconSrc ? (
-                      <Image src={item.iconSrc} alt={item.label} width={28} height={28} className="w-7 h-7" />
+                    {'iconName' in item && item.iconName ? (
+                      <Icon name={item.iconName} label={item.label} className="w-7 h-7" />
                     ) : 'icon' in item && item.icon ? (
-                      (() => { const Icon = item.icon; return <Icon className="w-7 h-7" />; })()
+                      (() => { const LucideIcon = item.icon; return <LucideIcon className="w-7 h-7" />; })()
                     ) : null}
                   </div>
                   <span className="text-sm font-bold text-foreground">{item.label}</span>

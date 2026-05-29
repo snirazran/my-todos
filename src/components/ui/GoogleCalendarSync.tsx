@@ -5,6 +5,7 @@ import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Icon } from '@/components/ui/Icon';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
 
@@ -50,7 +51,7 @@ export function GlobalCalendarSync() {
       if (syncData.created > 0) {
         showNotification(
           <div className="flex items-center gap-3 pr-2">
-            <img src="/icons/GoogleCalendar.svg" alt="Google Calendar" className="w-7 h-7 shrink-0" />
+            <Icon name="googleCalendar" label="Google Calendar" className="w-7 h-7 shrink-0" />
             <div className="flex flex-col leading-none">
               <span className="font-black text-base">
                 {syncData.created} event{syncData.created > 1 ? 's' : ''} synced
@@ -192,7 +193,7 @@ export default function GoogleCalendarSync() {
       if (data.created > 0) {
         showNotification(
           <div className="flex items-center gap-3 pr-2">
-            <img src="/icons/GoogleCalendar.svg" alt="Google Calendar" className="w-7 h-7 shrink-0" />
+            <Icon name="googleCalendar" label="Google Calendar" className="w-7 h-7 shrink-0" />
             <div className="flex flex-col leading-none">
               <span className="font-black text-base">
                 {data.created} event{data.created > 1 ? 's' : ''} synced
@@ -271,7 +272,7 @@ export default function GoogleCalendarSync() {
       className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent/50"
     >
       <div className="h-9 w-9 flex items-center justify-center shrink-0">
-        <img src="/icons/GoogleCalendar.svg" alt="Google Calendar" className="w-7 h-7" />
+        <Icon name="googleCalendar" label="Google Calendar" className="w-7 h-7" />
       </div>
       <span className="flex-1 text-sm font-bold truncate">Google Calendar sync</span>
       {syncing && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}

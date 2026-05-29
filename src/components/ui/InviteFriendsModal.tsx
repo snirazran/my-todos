@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AppImage } from '@/components/ui/AppImage';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Check,
@@ -216,16 +217,14 @@ function OverviewStep({
   return (
     <div className="flex h-full flex-col">
       <div className="relative flex min-h-[44dvh] flex-col justify-end overflow-hidden bg-[#4f9149] px-6 pb-8 pt-6 text-center text-white sm:min-h-[48dvh] md:pb-3">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/invitefrog.png"
-          alt=""
+        <AppImage
+          src="/invitefrog.webp"
+          priority
           className="absolute inset-0 h-full w-full object-cover object-[center_35%] md:object-[center_32%] md:opacity-100"
         />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/invitefrog.png"
-          alt=""
+        <AppImage
+          src="/invitefrog.webp"
+          priority
           className="absolute inset-0 hidden h-full w-full object-cover object-[center_32%] md:block"
         />
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_48%,rgba(0,0,0,0.22)_72%,rgba(0,0,0,0.62)_100%)]" />

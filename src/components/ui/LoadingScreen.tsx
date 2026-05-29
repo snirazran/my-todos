@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import { Icon } from '@/components/ui/Icon';
 import { useLayoutEffect } from 'react';
 import { useUIStore } from '@/lib/uiStore';
 
@@ -13,15 +13,7 @@ interface LoadingScreenProps {
 function HomeLoaderIcon() {
   return (
     <div className="relative flex h-44 w-44 items-center justify-center">
-      <Image
-        src="/icons/Home.svg"
-        alt=""
-        width={168}
-        height={168}
-        priority
-        aria-hidden
-        className="relative h-[168px] w-[168px]"
-      />
+      <Icon name="home" className="relative h-[168px] w-[168px]" />
     </div>
   );
 }

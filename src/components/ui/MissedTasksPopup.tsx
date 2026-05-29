@@ -283,7 +283,7 @@ export function MissedTasksPopup({
                   className="absolute top-0 -bottom-2 inset-x-0 -z-10 pointer-events-none"
                 >
                   <img
-                    src="/yesterday.png"
+                    src="/yesterday.webp"
                     alt=""
                     className="w-full h-full object-cover object-top"
                   />

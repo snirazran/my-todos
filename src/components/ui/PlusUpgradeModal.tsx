@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Icon } from '@/components/ui/Icon';
+import { AppImage } from '@/components/ui/AppImage';
 import { Bell, Check, Heart, Image as ImageIcon, Shirt, Sparkle, Sparkles, Tag, Unlock, X } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
@@ -180,11 +182,10 @@ function Step0({
 }) {
   return (
     <div className="flex min-h-full flex-col pb-8">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <div className="relative -mt-px h-[40vh] min-h-[260px] w-full overflow-hidden md:h-56 md:min-h-0">
-        <img
-          src="/premium-cover.png"
-          alt=""
+        <AppImage
+          src="/premium-cover.webp"
+          priority
           className="h-full w-full object-cover object-top"
         />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-b from-transparent to-[#6c6fce]" />
@@ -401,10 +402,8 @@ function Step3({
       </div>
 
       <div className="flex flex-1 items-center justify-center">
-        <img
-          src="/frogPlus.svg"
-          alt=""
-          aria-hidden
+        <Icon
+          name="frogPlus"
           className="h-44 w-44 drop-shadow-[0_5px_0_rgba(0,0,0,0.3)]"
         />
       </div>
