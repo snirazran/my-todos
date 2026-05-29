@@ -6,12 +6,20 @@ import type {
   QuestVisibilityCondition,
 } from '@/lib/quests/types';
 
+export type QuestCoverImageFile = {
+  storagePath: string;
+  contentType: string;
+  size?: number;
+  updatedAt?: Date;
+};
+
 export interface QuestTemplateDoc {
   _id?: mongoose.Types.ObjectId;
   templateId: string;
   name: string;
   description: string;
   coverImageUrl?: string;
+  coverImageFile?: QuestCoverImageFile | null;
   placement: QuestPlacement;
   categoryId?: MacroCategoryId;
   durationMinutes?: number;
@@ -28,6 +36,7 @@ const QuestTemplateSchema = new Schema<QuestTemplateDoc>(
     name: { type: String, required: true },
     description: { type: String, default: '' },
     coverImageUrl: { type: String, default: undefined },
+    coverImageFile: { type: Schema.Types.Mixed, default: undefined },
     placement: {
       type: String,
       enum: ['daily', 'category'],

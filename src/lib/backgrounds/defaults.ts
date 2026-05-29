@@ -19,10 +19,10 @@ export async function ensureDefaultBackground() {
     rarity: 'common',
     priceFlies: 0,
     images: {
-      mobile: '/bg-mobile.png',
-      tablet: '/bg-tablet.png',
-      web: '/bg-web.png',
-      webLarge: '/bg-web-large.png',
+      mobile: '/bg-mobile.webp',
+      tablet: '/bg-tablet.webp',
+      web: '/bg-web.webp',
+      webLarge: '/bg-web-large.webp',
     },
     hidden: false,
   });

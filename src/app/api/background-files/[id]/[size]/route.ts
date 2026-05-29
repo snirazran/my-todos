@@ -29,7 +29,7 @@ export async function GET(
   return new NextResponse(buffer, {
     headers: {
       'Content-Type': file.contentType || 'application/octet-stream',
-      'Cache-Control': 'public, max-age=300, stale-while-revalidate=60',
+      'Cache-Control': 'public, max-age=31536000, immutable',
     },
   });
 }

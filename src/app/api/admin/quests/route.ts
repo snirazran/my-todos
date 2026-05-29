@@ -5,6 +5,11 @@ import connectMongo from '@/lib/mongoose';
 import QuestTemplateModel from '@/lib/models/QuestTemplate';
 import QuestCategoryModel from '@/lib/models/QuestCategory';
 import { templateToView } from '@/lib/quests/engine';
+import {
+  isCoverDataUrl,
+  isCoverProxyUrl,
+  uploadCoverFromDataUrl,
+} from '@/lib/quests/coverStorage';
 import type {
   QuestAmountMode,
   QuestCountAction,
@@ -188,8 +193,12 @@ function sanitizeTemplateBody(body: any) {
     typeof body?.categoryId === 'string' && body.categoryId.trim()
       ? body.categoryId.trim()
       : undefined;
+  // Accept a freshly-uploaded data URL (new image) or our existing proxy URL
+  // (an edit that leaves the cover unchanged). Anything else clears the cover.
   const coverImageUrl =
-    typeof body?.coverImageUrl === 'string' && body.coverImageUrl.startsWith('data:image/')
+    typeof body?.coverImageUrl === 'string' &&
+    (body.coverImageUrl.startsWith('data:image/') ||
+      body.coverImageUrl.startsWith('/api/quests/cover'))
       ? body.coverImageUrl
       : undefined;
   const logic = Array.isArray(body?.logic)
@@ -272,9 +281,29 @@ export async function POST(req: NextRequest) {
     ) {
       return json({ error: 'A category quest needs a valid category' }, 400);
     }
+
+    const templateId = uuid();
+
+    // Upload a new cover to Firebase; store only the proxy URL + metadata.
+    let coverImageFile;
+    if (isCoverDataUrl(sanitized.payload.coverImageUrl)) {
+      const uploaded = await uploadCoverFromDataUrl(
+        'template',
+        templateId,
+        sanitized.payload.coverImageUrl,
+      );
+      if (uploaded) {
+        sanitized.payload.coverImageUrl = uploaded.url;
+        coverImageFile = uploaded.file;
+      }
+    } else {
+      delete sanitized.payload.coverImageUrl;
+    }
+
     const template = await QuestTemplateModel.create({
-      templateId: uuid(),
+      templateId,
       ...sanitized.payload,
+      ...(coverImageFile ? { coverImageFile } : {}),
     });
 
     return json({ ok: true, template: templateToView(template) });
@@ -304,14 +333,27 @@ export async function PUT(req: NextRequest) {
     ) {
       return json({ error: 'A category quest needs a valid category' }, 400);
     }
-    const updateSet = {
+    const updateSet: Record<string, unknown> = {
       ...sanitized.payload,
     };
     const unsetFields: Record<string, 1> = {};
 
-    if (!sanitized.payload.coverImageUrl) {
+    const cover = sanitized.payload.coverImageUrl;
+    if (isCoverDataUrl(cover)) {
+      // New image — upload to Firebase, store proxy URL + metadata.
+      const uploaded = await uploadCoverFromDataUrl('template', templateId, cover);
+      if (uploaded) {
+        updateSet.coverImageUrl = uploaded.url;
+        updateSet.coverImageFile = uploaded.file;
+      }
+    } else if (isCoverProxyUrl(cover)) {
+      // Unchanged — leave the stored cover fields exactly as they are.
+      delete updateSet.coverImageUrl;
+    } else {
+      // Cleared — drop the cover entirely.
       delete updateSet.coverImageUrl;
       unsetFields.coverImageUrl = 1;
+      unsetFields.coverImageFile = 1;
     }
 
     if (!sanitized.payload.categoryId) {

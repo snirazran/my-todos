@@ -4,9 +4,16 @@ import connectMongo from '@/lib/mongoose';
 import QuestCategoryModel, {
   type QuickAddSuggestionEntry,
 } from '@/lib/models/QuestCategory';
+import {
+  isCoverDataUrl,
+  isCoverProxyUrl,
+  uploadCoverFromDataUrl,
+} from '@/lib/quests/coverStorage';
 
 function sanitizeCoverImageUrl(value: unknown) {
-  return typeof value === 'string' && value.startsWith('data:image/')
+  // A new data URL, or our existing proxy URL (unchanged edit). Else cleared.
+  return typeof value === 'string' &&
+    (value.startsWith('data:image/') || value.startsWith('/api/quests/cover'))
     ? value
     : undefined;
 }
@@ -100,7 +107,7 @@ export async function POST(req: NextRequest) {
     await connectMongo();
     const body = await req.json();
     const { name, shortLabel, description, onboardingSentence, accent, backgroundFrom, backgroundTo } = body;
-    const coverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
+    const rawCoverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
     const quickAddSuggestions = sanitizeQuickAddSuggestions(body.quickAddSuggestions);
 
     if (!name?.trim()) {
@@ -108,6 +115,18 @@ export async function POST(req: NextRequest) {
     }
 
     const categoryId = crypto.randomUUID();
+
+    // Upload a new cover to Firebase; store only the proxy URL + metadata.
+    let coverImageUrl: string | undefined;
+    let coverImageFile;
+    if (isCoverDataUrl(rawCoverImageUrl)) {
+      const uploaded = await uploadCoverFromDataUrl('category', categoryId, rawCoverImageUrl);
+      if (uploaded) {
+        coverImageUrl = uploaded.url;
+        coverImageFile = uploaded.file;
+      }
+    }
+
     const category = await QuestCategoryModel.create({
       categoryId,
       name: name.trim(),
@@ -115,6 +134,7 @@ export async function POST(req: NextRequest) {
       description: description?.trim() ?? '',
       onboardingSentence: onboardingSentence?.trim() ?? '',
       ...(coverImageUrl ? { coverImageUrl } : {}),
+      ...(coverImageFile ? { coverImageFile } : {}),
       accent: accent ?? '#6366f1',
       backgroundFrom: backgroundFrom ?? '#1e1b4b',
       backgroundTo: backgroundTo ?? '#312e81',
@@ -149,13 +169,13 @@ export async function PUT(req: NextRequest) {
     await connectMongo();
     const body = await req.json();
     const { id, name, shortLabel, description, onboardingSentence, accent, backgroundFrom, backgroundTo } = body;
-    const coverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
+    const rawCoverImageUrl = sanitizeCoverImageUrl(body.coverImageUrl);
     const quickAddSuggestions = sanitizeQuickAddSuggestions(body.quickAddSuggestions);
 
     if (!id) return NextResponse.json({ error: 'Category id required' }, { status: 400 });
     if (!name?.trim()) return NextResponse.json({ error: 'Name required' }, { status: 400 });
 
-    const updateSet = {
+    const updateSet: Record<string, unknown> = {
       name: name.trim(),
       shortLabel: shortLabel?.trim() ?? '',
       description: description?.trim() ?? '',
@@ -165,14 +185,27 @@ export async function PUT(req: NextRequest) {
       backgroundTo: backgroundTo ?? '#312e81',
       isBuiltIn: false,
       quickAddSuggestions,
-      ...(coverImageUrl ? { coverImageUrl } : {}),
     };
+    const unsetFields: Record<string, 1> = {};
+
+    if (isCoverDataUrl(rawCoverImageUrl)) {
+      // New image — upload to Firebase, store proxy URL + metadata.
+      const uploaded = await uploadCoverFromDataUrl('category', id, rawCoverImageUrl);
+      if (uploaded) {
+        updateSet.coverImageUrl = uploaded.url;
+        updateSet.coverImageFile = uploaded.file;
+      }
+    } else if (!isCoverProxyUrl(rawCoverImageUrl)) {
+      // Cleared (proxy URL means unchanged — leave the stored cover alone).
+      unsetFields.coverImageUrl = 1;
+      unsetFields.coverImageFile = 1;
+    }
 
     const category = await QuestCategoryModel.findOneAndUpdate(
       { categoryId: id },
       {
         $set: updateSet,
-        ...(!coverImageUrl ? { $unset: { coverImageUrl: 1 } } : {}),
+        ...(Object.keys(unsetFields).length > 0 ? { $unset: unsetFields } : {}),
       },
       { new: true },
     );

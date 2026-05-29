@@ -5,6 +5,9 @@ export interface QuickAddSuggestionEntry {
   emoji: string;
 }
 
+export type { QuestCoverImageFile } from './QuestTemplate';
+import type { QuestCoverImageFile } from './QuestTemplate';
+
 export interface QuestCategoryDoc {
   _id?: mongoose.Types.ObjectId;
   categoryId: string;
@@ -13,6 +16,7 @@ export interface QuestCategoryDoc {
   description: string;
   onboardingSentence?: string;
   coverImageUrl?: string;
+  coverImageFile?: QuestCoverImageFile | null;
   accent: string;
   backgroundFrom: string;
   backgroundTo: string;
@@ -38,6 +42,7 @@ const QuestCategorySchema = new Schema<QuestCategoryDoc>(
     description: { type: String, default: '' },
     onboardingSentence: { type: String, default: '' },
     coverImageUrl: { type: String, default: undefined },
+    coverImageFile: { type: Schema.Types.Mixed, default: undefined },
     accent: { type: String, default: '#6366f1' },
     backgroundFrom: { type: String, default: '#1e1b4b' },
     backgroundTo: { type: String, default: '#312e81' },

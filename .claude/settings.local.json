@@ -58,7 +58,14 @@
       "Bash(sed -n '1303,1310p' src/components/ui/QuestsPanel.tsx)",
       "Bash(sed -n '1758,1766p' src/components/ui/QuestsPanel.tsx)",
       "Bash(sed -n '182,192p' src/components/ui/PlusUpgradeModal.tsx)",
-      "Bash(sed -n '401,412p' src/components/ui/PlusUpgradeModal.tsx)"
+      "Bash(sed -n '401,412p' src/components/ui/PlusUpgradeModal.tsx)",
+      "Bash(sed -n '18,30p' src/lib/backgrounds/defaults.ts)",
+      "Bash(sed -n '1,60p' src/app/api/admin/quests/seasons/upload/route.ts)",
+      "Bash(sed -n '1,70p' src/app/api/quests/cover/route.ts)",
+      "Bash(sed -n '1,30p' src/app/api/quests/route.ts)",
+      "Bash(sed -n '316,360p' src/app/api/admin/quests/route.ts)",
+      "Bash(sed -n '95,200p' src/app/api/admin/quests/categories/route.ts)",
+      "Bash(sed -n '1,60p' src/lib/models/QuestCategory.ts)"
     ]
   }
 }

@@ -5,6 +5,7 @@ import BackgroundModel, {
   type BackgroundSizeKey,
 } from '@/lib/models/Background';
 import { getAdminStorage } from '@/lib/firebaseAdmin';
+import { optimizeImage } from '@/lib/imageOptimize';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -65,10 +66,17 @@ export async function POST(req: NextRequest) {
     const bg = await BackgroundModel.findOne({ id });
     if (!bg) return json({ error: 'Background not found' }, 404);
 
-    const ext = extensionFor(contentType, file.name);
+    const rawBytes = Buffer.from(await file.arrayBuffer());
+
+    // Compress/resize to WebP at upload time so every user downloads a small
+    // file regardless of what was uploaded (a 10 MB PNG becomes ~150 KB).
+    const optimized = await optimizeImage(rawBytes, contentType, { sizeKey: size });
+    const bytes = optimized.buffer;
+    const storedContentType = optimized.contentType;
+
+    const ext = optimized.ext || extensionFor(contentType, file.name);
     const destPath = storagePathFor(id, size, ext);
 
-    const bytes = Buffer.from(await file.arrayBuffer());
     const bucket = getAdminStorage();
 
     // If there's an existing file for this size with a different path, delete it
@@ -81,7 +89,7 @@ export async function POST(req: NextRequest) {
     }
 
     await bucket.file(destPath).save(bytes, {
-      metadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
+      metadata: { contentType: storedContentType, cacheControl: 'public, max-age=31536000, immutable' },
     });
 
     const cacheBuster = Date.now();
@@ -89,7 +97,7 @@ export async function POST(req: NextRequest) {
 
     bg.set(`imageFiles.${size}`, {
       storagePath: destPath,
-      contentType,
+      contentType: storedContentType,
       size: bytes.byteLength,
       updatedAt: new Date(),
     });

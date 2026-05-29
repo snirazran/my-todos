@@ -5,6 +5,7 @@ import QuestSeasonModel, {
   type QuestSeasonSizeKey,
 } from '@/lib/models/QuestSeason';
 import { getAdminStorage } from '@/lib/firebaseAdmin';
+import { optimizeImage } from '@/lib/imageOptimize';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -64,10 +65,16 @@ export async function POST(req: NextRequest) {
     const season = await QuestSeasonModel.findOne({ seasonId: id });
     if (!season) return json({ error: 'Season not found' }, 404);
 
-    const ext = extensionFor(contentType, file.name);
+    const rawBytes = Buffer.from(await file.arrayBuffer());
+
+    // Compress/resize to WebP at upload time so every user downloads a small file.
+    const optimized = await optimizeImage(rawBytes, contentType, { sizeKey: size });
+    const bytes = optimized.buffer;
+    const storedContentType = optimized.contentType;
+
+    const ext = optimized.ext || extensionFor(contentType, file.name);
     const destPath = storagePathFor(id, size, ext);
 
-    const bytes = Buffer.from(await file.arrayBuffer());
     const bucket = getAdminStorage();
 
     const previous = season.imageFiles?.[size];
@@ -79,7 +86,7 @@ export async function POST(req: NextRequest) {
     }
 
     await bucket.file(destPath).save(bytes, {
-      metadata: { contentType, cacheControl: 'public, max-age=31536000, immutable' },
+      metadata: { contentType: storedContentType, cacheControl: 'public, max-age=31536000, immutable' },
     });
 
     const cacheBuster = Date.now();
@@ -87,7 +94,7 @@ export async function POST(req: NextRequest) {
 
     season.set(`imageFiles.${size}`, {
       storagePath: destPath,
-      contentType,
+      contentType: storedContentType,
       size: bytes.byteLength,
       updatedAt: new Date(),
     });
