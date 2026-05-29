@@ -9,9 +9,9 @@ const SIZES: BackgroundSizeKey[] = ['mobile', 'tablet', 'web', 'webLarge'];
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { id: string; size: string } },
+  { params }: { params: Promise<{ id: string; size: string }> },
 ) {
-  const { id, size } = params;
+  const { id, size } = await params;
   if (!SIZES.includes(size as BackgroundSizeKey)) {
     return NextResponse.json({ error: 'Invalid size' }, { status: 400 });
   }

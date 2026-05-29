@@ -13,6 +13,7 @@ import {
   type ConfirmationResult,
 } from 'firebase/auth';
 import { useSearchParams } from 'next/navigation';
+import { Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { SocialLogin } from '@capgo/capacitor-social-login';
 import { auth } from '@/lib/firebase';
@@ -52,7 +53,7 @@ const slide = {
 
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isUpgrade = searchParams?.get('upgrade') === '1';
@@ -531,6 +532,15 @@ export default function LoginPage() {
 
       <div id="recaptcha-container" />
     </main>
+  );
+}
+
+export default function LoginPage() {
+  // useSearchParams() requires a Suspense boundary during prerender (Next 16).
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
   );
 }
 

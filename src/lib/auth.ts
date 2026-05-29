@@ -2,7 +2,7 @@ import { cookies } from 'next/headers';
 import { getAdminAuth } from '@/lib/firebaseAdmin';
 
 export async function requireAuth() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const token = cookieStore.get('token')?.value;
 
   if (!token) {

@@ -65,7 +65,17 @@
       "Bash(sed -n '1,30p' src/app/api/quests/route.ts)",
       "Bash(sed -n '316,360p' src/app/api/admin/quests/route.ts)",
       "Bash(sed -n '95,200p' src/app/api/admin/quests/categories/route.ts)",
-      "Bash(sed -n '1,60p' src/lib/models/QuestCategory.ts)"
+      "Bash(sed -n '1,60p' src/lib/models/QuestCategory.ts)",
+      "Bash(npm view *)",
+      "Bash(npm install *)",
+      "Bash(echo \"=== EXIT: $? ===\")",
+      "Bash(sed -n '7,16p' \"src/app/api/tasks/[id]/frogodoro/route.ts\")",
+      "Bash(sed -n '12,17p' \"src/app/api/rive-files/[assetId]/route.ts\")",
+      "Bash(sed -n '7,14p' \"src/app/api/invite/[code]/route.ts\")",
+      "Bash(sed -n '10,16p' \"src/app/api/quest-season-files/[id]/[size]/route.ts\")",
+      "Bash(sed -n '10,16p' \"src/app/api/background-files/[id]/[size]/route.ts\")",
+      "Bash(sed -n '1,14p' src/components/ui/StatCard.tsx)",
+      "Bash(sed -n '205,212p' src/components/board/TaskBoard.tsx)"
     ]
   }
 }

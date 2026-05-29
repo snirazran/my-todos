@@ -11,9 +11,10 @@ const PUBLIC_DIR = path.join(process.cwd(), 'public');
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { assetId: string } },
+  { params }: { params: Promise<{ assetId: string }> },
 ) {
-  const asset = getManagedRiveAsset(params.assetId);
+  const { assetId } = await params;
+  const asset = getManagedRiveAsset(assetId);
   if (!asset) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   const backupName = new URL(req.url).searchParams.get('backup');

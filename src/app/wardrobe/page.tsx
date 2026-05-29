@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef } from 'react';
+import { Suspense, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { PageBackground } from '@/components/ui/PageBackground';
@@ -9,7 +9,7 @@ import { useInventory } from '@/hooks/useInventory';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
 
-export default function WardrobePage() {
+function WardrobePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const frogRef = useRef<FrogHandle>(null);
@@ -75,5 +75,14 @@ export default function WardrobePage() {
         </section>
       </div>
     </main>
+  );
+}
+
+export default function WardrobePage() {
+  // useSearchParams() requires a Suspense boundary during prerender (Next 16).
+  return (
+    <Suspense fallback={null}>
+      <WardrobePageInner />
+    </Suspense>
   );
 }

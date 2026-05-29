@@ -1,7 +1,7 @@
 import { useRef, useState, useEffect, RefObject } from 'react';
 
 export function useDraggableScroll(
-  ref: RefObject<HTMLElement>,
+  ref: RefObject<HTMLElement | null>,
   options: { direction?: 'horizontal' | 'vertical' | 'both' } = {
     direction: 'horizontal',
   },

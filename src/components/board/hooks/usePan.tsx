@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-export function usePan(scrollerRef: React.RefObject<HTMLDivElement>) {
+export function usePan(scrollerRef: React.RefObject<HTMLDivElement | null>) {
   const [panActive, setPanActive] = useState(false);
   const canPanRef = useRef(false);
   const panActiveRef = useRef(false);

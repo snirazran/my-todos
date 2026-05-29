@@ -6,11 +6,11 @@ import { syncQuestState } from '@/lib/quests/engine';
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
   try {
     const userId = await requireUserId();
-    const { id } = params; // This is the string `id` of the task, not the ObjectId
+    const { id } = await params; // This is the string `id` of the task, not the ObjectId
     const body = await req.json();
     const { settings, session, timezone = 'UTC' } = body;
 

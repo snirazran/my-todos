@@ -85,7 +85,7 @@ type Props = {
   setSelectedTagIds: React.Dispatch<React.SetStateAction<string[]>>;
   onPremiumLimit: () => void;
 
-  tagInputRef: React.RefObject<HTMLInputElement>;
+  tagInputRef: React.RefObject<HTMLInputElement | null>;
 };
 
 export function PickerSheet(props: Props) {

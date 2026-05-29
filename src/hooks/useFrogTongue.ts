@@ -23,7 +23,7 @@ export interface TongueRequest {
 }
 
 export interface UseFrogTongueOptions {
-  frogRef: React.RefObject<FrogHandle>;
+  frogRef: React.RefObject<FrogHandle | null>;
   frogBoxRef?: React.RefObject<HTMLDivElement | null>;
   flyRefs: React.MutableRefObject<Record<string, HTMLElement | null>>;
   scrollContainerRef?: React.RefObject<HTMLElement | null>;

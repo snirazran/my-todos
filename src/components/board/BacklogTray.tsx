@@ -34,7 +34,7 @@ interface Props {
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
   activeDragId: string | null;
-  trayRef?: React.RefObject<HTMLDivElement>;
+  trayRef?: React.RefObject<HTMLDivElement | null>;
   closeProgress?: number; // 0 = fully open, 1 = fully closed
   onRemove?: (id: string) => void;
   onEdit?: (id: string, newText: string) => void;

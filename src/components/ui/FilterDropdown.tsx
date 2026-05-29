@@ -12,7 +12,7 @@ interface Props {
   isOpen: boolean;
   onClose: () => void;
   // Positioning
-  triggerRef: React.RefObject<HTMLElement>;
+  triggerRef: React.RefObject<HTMLElement | null>;
   align?: 'left' | 'right';
   // Type Filter
   filter?: FilterType;

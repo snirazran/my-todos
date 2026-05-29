@@ -22,7 +22,7 @@ type Props = {
   setSelectedTagIds: React.Dispatch<React.SetStateAction<string[]>>;
   onPremiumLimit: () => void;
   onDone: () => void;
-  tagInputRef: React.RefObject<HTMLInputElement>;
+  tagInputRef: React.RefObject<HTMLInputElement | null>;
   /** Max tags the user can have selected. When provided, toggling additional tags is blocked. */
   maxSelectedTags?: number;
   /** Override the Done button label. */

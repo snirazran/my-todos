@@ -13,8 +13,8 @@ import { CurrencyShop } from '@/components/ui/shop/CurrencyShop';
 import { prefetchQuests } from './QuestsPanel';
 
 type Props = {
-  frogRef: React.RefObject<FrogHandle>;
-  frogBoxRef?: React.RefObject<HTMLDivElement>;
+  frogRef: React.RefObject<FrogHandle | null>;
+  frogBoxRef?: React.RefObject<HTMLDivElement | null>;
   mouthOpen?: boolean;
   mouthOffset?: { x?: number; y?: number };
   indices?: Partial<Record<WardrobeSlot, number>>;

@@ -6,11 +6,12 @@ import UserModel from '@/lib/models/User';
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { code: string } },
+  { params }: { params: Promise<{ code: string }> },
 ) {
   try {
+    const { code } = await params;
     await connectMongo();
-    const referral = await ReferralModel.findOne({ code: params.code }).lean();
+    const referral = await ReferralModel.findOne({ code }).lean();
     if (!referral) {
       return NextResponse.json({ error: 'Invite not found' }, { status: 404 });
     }

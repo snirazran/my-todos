@@ -6,7 +6,7 @@ export default function StatCard({
   value,
   label,
 }: {
-  icon: JSX.Element;
+  icon: React.JSX.Element;
   value: number | string;
   label: string;
 }) {

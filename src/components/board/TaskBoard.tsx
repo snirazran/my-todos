@@ -207,7 +207,7 @@ export default function TaskBoard({
   }, [pathname, cancelDrag]);
 
   const [pageIndex, setPageIndex] = useState<number>(activeIdx);
-  const recomputeCanPanRef = useRef<() => void>();
+  const recomputeCanPanRef = useRef<(() => void) | undefined>(undefined);
 
   // Backlog state
   const [backlogOpen, setBacklogOpen] = useState(false);

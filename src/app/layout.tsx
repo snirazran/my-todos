@@ -54,7 +54,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" dir="ltr" className={`h-full ${poppins.variable} ${luckiestGuy.variable}`}>
+    <html
+      lang="en"
+      dir="ltr"
+      // next-themes sets `class` + `color-scheme` on <html> via a pre-hydration
+      // script, so the server/client attributes never match. This suppresses the
+      // (shallow, one-level) hydration warning for exactly that case.
+      suppressHydrationWarning
+      className={`h-full ${poppins.variable} ${luckiestGuy.variable}`}
+    >
       <head>
         {/* Preload the default page background so it paints without a flash.
             Responsive: only the matching breakpoint is fetched. */}
