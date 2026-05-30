@@ -312,11 +312,27 @@ export function QuestsPanel({
       new Map(
         (data?.onboarding?.categoryTagMap ?? []).map((entry) => [
           entry.categoryId,
-          entry.tagIds.slice(0, 1),
+          entry.tagIds,
         ]),
       ),
     [data?.onboarding?.categoryTagMap],
   );
+  const tagAssignments = useMemo(() => {
+    const assignments: Record<
+      string,
+      { categoryId: string; categoryName: string }
+    > = {};
+    for (const entry of data?.onboarding?.categoryTagMap ?? []) {
+      const category = categoryMap[entry.categoryId];
+      for (const tagId of entry.tagIds) {
+        assignments[tagId] = {
+          categoryId: entry.categoryId,
+          categoryName: category?.shortLabel || category?.name || 'another focus area',
+        };
+      }
+    }
+    return assignments;
+  }, [categoryMap, data?.onboarding?.categoryTagMap]);
   const tagCatalog = useMemo(
     () =>
       new Map(
@@ -563,11 +579,16 @@ export function QuestsPanel({
 
   const handleSaveFocusTags = async (categoryId: string, newTags: string[]) => {
     if (!data) return;
-    const nextTags = newTags.slice(0, 1);
+    const nextTags = data.isPremium ? newTags : newTags.slice(0, 1);
+    const nextTagSet = new Set(nextTags);
 
-    const nextCategoryTagMap = (data.onboarding.categoryTagMap ?? []).filter(
-      (entry) => entry.categoryId !== categoryId,
-    );
+    const nextCategoryTagMap = (data.onboarding.categoryTagMap ?? [])
+      .filter((entry) => entry.categoryId !== categoryId)
+      .map((entry) => ({
+        ...entry,
+        tagIds: entry.tagIds.filter((tagId) => !nextTagSet.has(tagId)),
+      }))
+      .filter((entry) => entry.tagIds.length > 0);
 
     if (nextTags.length > 0) {
       nextCategoryTagMap.push({
@@ -829,9 +850,11 @@ export function QuestsPanel({
         taskId={editingFocusCategoryId}
         onClose={() => setEditingFocusCategoryId(null)}
         title={editingFocusCategory ? `Connect a tag to ${editingFocusCategory.name}` : "Connect a focus tag"}
-        description="Choose one tag to decide which tasks count toward this focus area."
+        description={data?.isPremium ? 'Choose tags to decide which tasks count toward this focus area.' : 'Choose one tag to decide which tasks count toward this focus area.'}
         initialTags={editingFocusCategoryId ? (categoryTagMap.get(editingFocusCategoryId) || []) : []}
-        maxSelectedTags={1}
+        maxSelectedTags={data?.isPremium ? undefined : 1}
+        currentFocusCategoryId={editingFocusCategoryId ?? undefined}
+        tagAssignments={tagAssignments}
         onSave={handleSaveFocusTags}
       />
     </>

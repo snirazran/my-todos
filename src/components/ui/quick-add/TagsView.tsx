@@ -25,6 +25,8 @@ type Props = {
   tagInputRef: React.RefObject<HTMLInputElement | null>;
   /** Max tags the user can have selected. When provided, toggling additional tags is blocked. */
   maxSelectedTags?: number;
+  onMaxSelectedTags?: () => void;
+  onBlockedTagToggle?: (tag: SavedTag) => boolean;
   /** Override the Done button label. */
   doneLabel?: string;
 };
@@ -37,12 +39,14 @@ export function TagsView({
   onDone,
   tagInputRef,
   maxSelectedTags,
+  onMaxSelectedTags,
+  onBlockedTagToggle,
   doneLabel = 'Done',
 }: Props) {
   const {
     savedTags,
     filteredTags,
-    isPremium,
+    tagLimit,
     tagInput,
     setTagInput,
     showColorPicker,
@@ -83,17 +87,15 @@ export function TagsView({
       return;
     }
     const isSelected = selectedTagIds.includes(st.id);
-    // If maxSelectedTags is set, swap-select rather than block.
     if (
       !isSelected &&
       maxSelectedTags !== undefined &&
       selectedTagIds.length >= maxSelectedTags
     ) {
-      if (maxSelectedTags === 1) {
-        setSelectedTagIds([st.id]);
-        return;
-      }
-      // For higher limits, just ignore additional adds.
+      onMaxSelectedTags?.();
+      return;
+    }
+    if (!isSelected && onBlockedTagToggle?.(st)) {
       return;
     }
     toggleTag(st);
@@ -202,7 +204,7 @@ export function TagsView({
           <>
             <div className="mb-2 flex items-center justify-between">
               <span className="text-[11px] font-extrabold uppercase tracking-wide text-muted-foreground">
-                Saved Tags ({savedTags.length}/{isPremium ? 50 : 3})
+                Saved Tags ({savedTags.length}/{tagLimit})
               </span>
               <button
                 type="button"

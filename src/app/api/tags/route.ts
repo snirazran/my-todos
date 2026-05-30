@@ -7,6 +7,9 @@ import { v4 as uuid } from 'uuid';
 
 export const dynamic = 'force-dynamic';
 
+const FREE_TAG_LIMIT = 6;
+const PREMIUM_TAG_LIMIT = 50;
+
 function normalizeUserTag(tag: any, index: number) {
   if (typeof tag === 'string') {
     const name = tag.trim();
@@ -61,8 +64,6 @@ export async function GET(req: NextRequest) {
     const isPremium = user?.premiumUntil
       ? new Date(user.premiumUntil) > now
       : false;
-    const freeLimit = 3;
-
     const tags = (user?.tags ?? [])
       .map((tag: any, index: number) => normalizeUserTag(tag, index))
       .filter(Boolean)
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
         name: tag.name,
         color: tag.color,
         key: tag._key ?? `${tag.id}-${index}`,
-        disabled: !isPremium && index >= freeLimit,
+        disabled: !isPremium && index >= FREE_TAG_LIMIT,
       }));
 
     return NextResponse.json({ tags, isPremium });
@@ -110,7 +111,7 @@ export async function POST(req: NextRequest) {
     const isPremium = user?.premiumUntil
       ? new Date(user.premiumUntil) > now
       : false;
-    const TAG_LIMIT = isPremium ? 50 : 3;
+    const TAG_LIMIT = isPremium ? PREMIUM_TAG_LIMIT : FREE_TAG_LIMIT;
 
     if (user?.tags && user.tags.length >= TAG_LIMIT) {
       return NextResponse.json(

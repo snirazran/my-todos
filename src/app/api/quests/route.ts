@@ -13,6 +13,8 @@ const templateCoverRef = (templateId: string) =>
 const categoryCoverRef = (categoryId: string) =>
   `/api/quests/cover?type=category&id=${encodeURIComponent(categoryId)}`;
 
+const FREE_TAG_LIMIT = 6;
+
 function withTemplateCover<T extends { templateId?: string; coverImageUrl?: string }>(
   quest: T,
   templatesWithCover: Set<string>,
@@ -37,7 +39,7 @@ function normalizeQuestTag(tag: any, index: number, isPremium: boolean) {
       name,
       color: '#22c55e',
       key: `${name}-${index}`,
-      disabled: !isPremium && index >= 3,
+      disabled: !isPremium && index >= FREE_TAG_LIMIT,
     };
   }
 
@@ -66,7 +68,7 @@ function normalizeQuestTag(tag: any, index: number, isPremium: boolean) {
     name,
     color,
     key: typeof tag._key === 'string' ? tag._key : `${id}-${index}`,
-    disabled: !isPremium && index >= 3,
+    disabled: !isPremium && index >= FREE_TAG_LIMIT,
   };
 }
 

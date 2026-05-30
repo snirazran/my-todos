@@ -7,7 +7,7 @@ export const PERIODS = ['AM', 'PM'] as const;
 
 export const TAG_MAX_LENGTH = 20;
 export const MAX_SAVED_TAGS = 50;
-export const FREE_TAG_LIMIT = 3;
+export const FREE_TAG_LIMIT = 6;
 export const PREMIUM_TAG_LIMIT = 50;
 
 export const TAG_COLORS = [
