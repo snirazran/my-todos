@@ -2,20 +2,22 @@
 
 import { memo, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
   CalendarDays,
   Check,
   Clock,
   Compass,
   Gift,
+  Lock,
   Pencil,
   Plus,
-  Sparkles,
   Tags,
   Trophy,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/utils';
 import type { ItemDef } from '@/lib/skins/catalog';
 import type {
@@ -508,6 +510,11 @@ export function CategoryQuestPresentationCard({
   linkedTags,
   onEditTags,
   onClaimObjective,
+  locked = false,
+  switchingFocus = false,
+  activeFocusName,
+  onActivateFocus,
+  onUpgrade,
   paused = false,
 }: BaseCardProps & {
   quest: QuestCardData & {
@@ -517,10 +524,20 @@ export function CategoryQuestPresentationCard({
   category?: MacroCategoryDefinition;
   linkedTags: QuestTagChip[];
   onEditTags?: () => void;
+  locked?: boolean;
+  switchingFocus?: boolean;
+  activeFocusName?: string;
+  onActivateFocus?: () => void;
+  onUpgrade?: () => void;
 }) {
   const heroImageUrl = category?.coverImageUrl ?? quest.coverImageUrl;
   const timeLeft = useCountdownLabel(quest.expiresAt);
   const [rewardPopup, setRewardPopup] = useState<RewardPopupState | null>(null);
+  const [showSwitch, setShowSwitch] = useState(false);
+  // Close the confirm once a switch finishes (switchingFocus flips back off).
+  useEffect(() => {
+    if (!switchingFocus) setShowSwitch(false);
+  }, [switchingFocus]);
   const claimedObjectiveIds = quest.claimedObjectiveIds ?? [];
   const hiddenClaimedObjectiveIds = useHiddenClaimedObjectives(
     quest.id,
@@ -582,6 +599,19 @@ export function CategoryQuestPresentationCard({
             ) : null}
           </div>
         )}
+        {locked && !isCompleted && (
+          <button
+            type="button"
+            onClick={() => setShowSwitch(true)}
+            className="group absolute inset-0 z-20 flex items-center justify-center bg-black/45 transition-colors [@media(hover:hover)]:hover:bg-black/55"
+            aria-label="Make this my focus"
+          >
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-[12px] font-black uppercase tracking-[0.12em] text-slate-900 shadow-[0_4px_0_0_rgba(15,23,42,0.25)] ring-1 ring-black/10 backdrop-blur-sm transition active:translate-y-[2px] active:shadow-none group-active:translate-y-[2px]">
+              <Lock className="h-4 w-4" strokeWidth={2.75} />
+              Make this my focus
+            </span>
+          </button>
+        )}
         <div className="absolute inset-x-0 top-0 flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
           <span
             className="inline-flex max-w-[calc(100%-5rem)] items-center gap-1.5 text-[15px] uppercase leading-none tracking-wide text-white drop-shadow-[0_2px_0_rgba(15,23,42,0.85)]"
@@ -610,18 +640,65 @@ export function CategoryQuestPresentationCard({
             </span>
           ) : null}
         </div>
+
+        {usesFocusTags && !locked && !isCompleted && linkedTags.length === 0 && (
+          <div className="absolute inset-x-0 bottom-0 z-10 p-2.5 sm:p-3">
+            <button
+              type="button"
+              onClick={onEditTags}
+              className="flex w-full items-center gap-2.5 rounded-2xl bg-black/55 px-3 py-2.5 text-left ring-1 ring-white/15 backdrop-blur-md transition active:scale-[0.99]"
+            >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
+                <Tags className="h-4 w-4" strokeWidth={2.5} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-[13px] font-black leading-tight text-white">
+                  Pick your{' '}
+                  {category?.shortLabel || category?.name
+                    ? `${(category?.shortLabel || category?.name)!.toLowerCase()} `
+                    : ''}
+                  tag
+                </span>
+                <span className="block text-[11px] font-medium text-white/70">
+                  Tasks with this tag count toward the quest.
+                </span>
+              </span>
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-primary-foreground shadow-[0_2px_0_rgba(15,23,42,0.18)]">
+                <Plus className="h-3.5 w-3.5" strokeWidth={3} />
+                Pick a tag
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {!isCompleted && (
-      <div className="px-4 pt-1 pb-4 sm:px-5 sm:pb-5">
-        {usesFocusTags && (
-          <FocusQuestTagPanel
-            linkedTags={linkedTags}
-            accent={category?.accent ?? '#22c55e'}
-            onEditTags={onEditTags}
-            categoryName={category?.shortLabel || category?.name}
-          />
+      <div className="px-4 pt-3 pb-4 sm:px-5 sm:pb-5">
+        {usesFocusTags && !locked && linkedTags.length > 0 && (
+          <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
+            <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
+              Focus tags
+            </span>
+            {linkedTags.map((tag) => (
+              <QuestTagPill key={tag.id} tag={tag} />
+            ))}
+            {onEditTags ? (
+              <button
+                type="button"
+                onClick={onEditTags}
+                aria-label="Edit focus tags"
+                className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-primary"
+              >
+                <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
+              </button>
+            ) : null}
+          </div>
         )}
+        <div
+          className={cn(
+            locked && 'pointer-events-none select-none opacity-50 saturate-50',
+          )}
+        >
         {visibleLogic.map((block, i) => (
           <div key={block.id}>
             <ObjectiveRow
@@ -639,7 +716,9 @@ export function CategoryQuestPresentationCard({
                 })
               }
               onClaimObjective={
-                onClaimObjective ? () => onClaimObjective(block.id) : undefined
+                locked || !onClaimObjective
+                  ? undefined
+                  : () => onClaimObjective(block.id)
               }
               isLast={i === visibleLogic.length - 1}
               isFirst={i === 0}
@@ -692,6 +771,7 @@ export function CategoryQuestPresentationCard({
             )}
           </div>
         ))}
+        </div>
 
       </div>
       )}
@@ -704,7 +784,142 @@ export function CategoryQuestPresentationCard({
         isPremium={isPremium}
         onClose={() => setRewardPopup(null)}
       />
+      <SwitchFocusConfirm
+        open={showSwitch}
+        categoryName={category?.shortLabel || category?.name}
+        currentFocusName={activeFocusName}
+        switching={switchingFocus}
+        onConfirm={() => onActivateFocus?.()}
+        onUpgrade={onUpgrade}
+        onClose={() => setShowSwitch(false)}
+      />
     </div>
+  );
+}
+
+function SwitchFocusConfirm({
+  open,
+  categoryName,
+  currentFocusName,
+  switching = false,
+  onConfirm,
+  onUpgrade,
+  onClose,
+}: {
+  open: boolean;
+  categoryName?: string;
+  currentFocusName?: string;
+  switching?: boolean;
+  onConfirm: () => void;
+  onUpgrade?: () => void;
+  onClose: () => void;
+}) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  if (!mounted) return null;
+
+  return createPortal(
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            key="switch-backdrop"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.18 }}
+            onClick={onClose}
+            className="fixed inset-0 z-[1200] bg-black/55"
+          />
+          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1201] flex justify-center sm:inset-0 sm:items-center sm:p-6">
+            <motion.div
+              key="switch-panel"
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
+              drag="y"
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.6 }}
+              onDragEnd={(_, info) => {
+                if (info.offset.y > 120 || info.velocity.y > 600) onClose();
+              }}
+              className="pointer-events-auto relative w-full rounded-t-[28px] border border-border bg-card px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 text-card-foreground shadow-2xl sm:max-w-[400px] sm:rounded-[24px] sm:px-6 sm:pb-6 sm:pt-6"
+            >
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-muted-foreground/25 sm:hidden" />
+              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500">
+                <Lock className="h-7 w-7" strokeWidth={2.5} />
+              </div>
+              <h3 className="text-center text-xl font-black text-foreground">
+                Switch your focus?
+              </h3>
+              <p className="mx-auto mt-1.5 max-w-[19rem] text-center text-[14px] leading-snug text-muted-foreground">
+                Switching to{' '}
+                <span className="font-bold text-foreground">
+                  {categoryName ?? 'this focus'}
+                </span>{' '}
+                resets your{' '}
+                <span className="font-bold text-foreground">
+                  {currentFocusName ?? 'current'}
+                </span>{' '}
+                progress.
+              </p>
+              <div className="mt-5 flex flex-col gap-4">
+                <button
+                  type="button"
+                  onClick={onConfirm}
+                  disabled={switching}
+                  className="h-12 w-full rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.18)] transition active:translate-y-[2px] active:shadow-none disabled:opacity-60"
+                >
+                  {switching ? 'Switching...' : 'Switch focus'}
+                </button>
+                {onUpgrade && (
+                  <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={onUpgrade}
+                    aria-label="Progress every quest with Frog Plus"
+                    className="group relative isolate flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-4 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
+                  >
+                    <span
+                      aria-hidden
+                      className="absolute inset-0 -z-10 rounded-2xl bg-[linear-gradient(125deg,#fde68a_0%,#fbbf24_45%,#f59e0b_75%,#d97706_100%)]"
+                    />
+                    <span
+                      aria-hidden
+                      className="absolute inset-x-0 top-0 -z-10 h-1/2 rounded-t-2xl bg-gradient-to-b from-white/45 to-transparent"
+                    />
+                    <Icon
+                      name="frogPlus"
+                      className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
+                    />
+                    <span className="text-sm font-black uppercase tracking-[0.08em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
+                      Unlock all quests with
+                    </span>
+                    <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
+                      Plus
+                    </span>
+                  </button>
+                  <p className="text-center text-[12px] font-medium text-muted-foreground">
+                    Progress every quest at once.
+                  </p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        </>
+      )}
+    </AnimatePresence>,
+    document.body,
   );
 }
 
@@ -896,69 +1111,6 @@ function QuestTagPill({ tag }: { tag: QuestTagChip }) {
     >
       <span className="truncate">{tag.name}</span>
     </span>
-  );
-}
-
-function FocusQuestTagPanel({
-  linkedTags,
-  accent,
-  onEditTags,
-  categoryName,
-}: {
-  linkedTags: QuestTagChip[];
-  accent: string;
-  onEditTags?: () => void;
-  categoryName?: string;
-}) {
-  if (linkedTags.length > 0) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 px-1 mt-3 mb-1">
-        <span className="text-[10px] font-black uppercase tracking-[0.16em] text-muted-foreground">
-          Focus tags
-        </span>
-        {linkedTags.map((tag) => (
-          <QuestTagPill key={tag.id} tag={tag} />
-        ))}
-        {onEditTags ? (
-          <button
-            type="button"
-            onClick={onEditTags}
-            aria-label="Edit focus tags"
-            className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground shadow-sm transition hover:border-primary/40 hover:text-primary"
-          >
-            <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
-          </button>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div className="mt-3 mb-1 flex items-center gap-3 rounded-2xl border border-dashed border-primary/25 bg-primary/[0.04] px-3 py-2.5">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-        <Tags className="h-4 w-4" strokeWidth={2.5} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-black leading-tight text-foreground">
-          Pick your {categoryName ? `${categoryName.toLowerCase()} ` : ''}tag
-        </p>
-        <p className="mt-0.5 text-[11px] font-medium text-muted-foreground">
-          Tasks with this tag count toward the quest.
-        </p>
-      </div>
-      {onEditTags ? (
-        <button
-          type="button"
-          onClick={onEditTags}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-primary-foreground shadow-[0_2px_0_rgba(15,23,42,0.18)] transition active:translate-y-0.5 active:shadow-none"
-        >
-          <Plus className="h-3.5 w-3.5" strokeWidth={3} />
-          Pick a tag
-        </button>
-      ) : (
-        <PreviewTagHint label="Saved focus tags" color={accent} />
-      )}
-    </div>
   );
 }
 

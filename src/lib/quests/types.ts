@@ -78,6 +78,9 @@ export type FocusProfile = {
   categoryTagMap: FocusCategoryTagMap[];
   suggestedContentCreatedAt?: Date | string | null;
   unlockedAnimationIds?: string[];
+  // Free users may only actively progress one focus quest at a time; this is
+  // the category they've chosen. Ignored for premium (all focuses are active).
+  activeFocusCategoryId?: MacroCategoryId | null;
 };
 
 export type QuestProgressView = {
@@ -97,6 +100,9 @@ export type QuestProgressView = {
   completed: boolean;
   claimable: boolean;
   claimed: boolean;
+  // Free users: a category quest that is not their active focus is locked
+  // (visible but not trackable/claimable). Always false for premium.
+  locked?: boolean;
   logic: ResolvedQuestLogicBlock[];
   claimedObjectiveIds: string[];
 };

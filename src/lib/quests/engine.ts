@@ -79,7 +79,23 @@ export function normalizeFocusProfile(user: UserDoc): FocusProfile {
     suggestedContentCreatedAt:
       user.focusProfile?.suggestedContentCreatedAt ?? null,
     unlockedAnimationIds: user.focusProfile?.unlockedAnimationIds ?? [],
+    activeFocusCategoryId: user.focusProfile?.activeFocusCategoryId ?? null,
   };
+}
+
+// The single focus category a free user is actively progressing. Premium users
+// progress every focus in parallel, so this returns null for them. Falls back
+// to the first selected category when no valid choice is stored.
+export function resolveActiveFocusCategoryId(
+  profile: FocusProfile,
+  isPremium: boolean,
+): string | null {
+  if (isPremium) return null;
+  const selected = profile.selectedCategoryIds ?? [];
+  if (selected.length === 0) return null;
+  const chosen = profile.activeFocusCategoryId;
+  if (chosen && selected.includes(chosen)) return chosen;
+  return selected[0];
 }
 
 function getUserTagId(tag: unknown) {
@@ -852,16 +868,29 @@ export async function syncQuestState(args: {
       .map((t) => t.templateId),
   );
 
+  const premium = isPremiumUser(user);
+  const activeFocusCategoryId = resolveActiveFocusCategoryId(profile, premium);
+  const gatedCategoryQuests: CategoryQuestProgressView[] = categoryQuests.map(
+    (quest) => ({
+      ...quest,
+      locked:
+        !premium &&
+        !!activeFocusCategoryId &&
+        quest.categoryId !== activeFocusCategoryId,
+    }),
+  );
+
   return {
     user,
     tasks,
     catalog,
-    isPremium: isPremiumUser(user),
+    isPremium: premium,
     focusProfile: profile,
+    activeFocusCategoryId,
     macroCategories: categories.map(categoryDocToDefinition),
     templatesWithCover,
     dailyQuests,
-    categoryQuests,
+    categoryQuests: gatedCategoryQuests,
     rewardCatalog: includeCatalog
       ? buildRewardCatalog(catalog, [
           ...dailyQuests.flatMap((quest) =>
@@ -920,6 +949,68 @@ export async function saveFocusProfile(args: {
   }
 
   return syncQuestState({ userId, timezone });
+}
+
+// Free users pick which single focus quest is active. Must be one of their
+// selected focus categories.
+export async function saveActiveFocusCategory(args: {
+  userId: string;
+  categoryId: string;
+}) {
+  const { userId, categoryId } = args;
+  await connectMongo();
+  const user = await UserModel.findById(userId);
+  if (!user) throw new Error('User not found');
+
+  const profile = normalizeFocusProfile(user.toObject());
+  if (!profile.selectedCategoryIds.includes(categoryId)) {
+    throw new Error('That category is not one of your focus areas');
+  }
+
+  // Switching costs you the progress on the focus you're leaving: re-anchor its
+  // quest so progress recomputes from now, and clear its completion/claims.
+  const previousActive = resolveActiveFocusCategoryId(profile, false);
+  if (previousActive && previousActive !== categoryId) {
+    const now = new Date();
+    const outgoing = await QuestModel.find({
+      userId,
+      placement: 'category',
+      categoryId: previousActive,
+    });
+    await Promise.all(
+      outgoing.map((quest) => {
+        const zeroedLogic = (quest.logic ?? []).map((block: any) => ({
+          ...block,
+          progress: 0,
+        }));
+        return QuestModel.updateOne(
+          { _id: quest._id },
+          {
+            $set: {
+              createdAt: now,
+              startedAt: null,
+              expiresAt: null,
+              progress: 0,
+              completedAt: null,
+              claimedAt: null,
+              claimedObjectiveIds: [],
+              logic: zeroedLogic,
+            },
+          },
+          { timestamps: false },
+        );
+      }),
+    );
+  }
+
+  user.focusProfile = {
+    ...((user.focusProfile as FocusProfile) ?? {}),
+    activeFocusCategoryId: categoryId,
+  };
+  user.markModified('focusProfile');
+  await user.save();
+
+  return { activeFocusCategoryId: categoryId };
 }
 
 export async function claimQuestReward(args: {
@@ -1021,6 +1112,20 @@ export async function claimObjectiveReward(args: {
   ]);
   if (!user) throw new Error('User not found');
   if (!quest) throw new Error('Quest not found');
+
+  // Free users can only claim from their active focus quest.
+  if (quest.placement === 'category') {
+    const premium = isPremiumUser(user.toObject());
+    const activeId = resolveActiveFocusCategoryId(
+      normalizeFocusProfile(user.toObject()),
+      premium,
+    );
+    if (!premium && activeId && quest.categoryId !== activeId) {
+      throw new Error(
+        'This focus quest is locked. Switch your active focus or upgrade to Premium.',
+      );
+    }
+  }
 
   const alreadyClaimed = (quest.claimedObjectiveIds ?? []).includes(objectiveId);
   if (alreadyClaimed) throw new Error('Objective reward already claimed');

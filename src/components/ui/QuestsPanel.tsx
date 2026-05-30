@@ -41,6 +41,7 @@ type QuestsResponse = {
   claimableCount: number;
   todoCount?: number;
   tags?: Array<{ id: string; name: string; color: string; key?: string }>;
+  activeFocusCategoryId?: MacroCategoryId | null;
   onboarding: {
     complete: boolean;
     selectedCategoryIds: MacroCategoryId[];
@@ -346,6 +347,7 @@ export function QuestsPanel({
       const bScore = getFocusQuestSortScore(b);
 
       return (
+        Number(a.locked ?? false) - Number(b.locked ?? false) ||
         bScore.claimable - aScore.claimable ||
         bScore.bestProgressRatio - aScore.bestProgressRatio ||
         aScore.nearestRemaining - bScore.nearestRemaining ||
@@ -516,6 +518,27 @@ export function QuestsPanel({
     }
   };
 
+  const [switchingFocusId, setSwitchingFocusId] = useState<string | null>(null);
+  const handleSetActiveFocus = async (categoryId: string) => {
+    if (switchingFocusId) return;
+    setSwitchingFocusId(categoryId);
+    setClaimMessage(null);
+    try {
+      const res = await fetch('/api/quests/active-focus', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ categoryId, timezone }),
+      });
+      const payload = await res.json();
+      if (!res.ok) throw new Error(payload.error || 'Could not switch focus');
+      await refreshQuestData();
+    } catch (err: any) {
+      setClaimMessage(err.message || 'Could not switch focus');
+    } finally {
+      setSwitchingFocusId(null);
+    }
+  };
+
   const handleClaimSeasonDay = async () => {
     const season = data?.activeSeason;
     if (!season || claimingSeason) return;
@@ -662,6 +685,19 @@ export function QuestsPanel({
                               onClaimObjective={(objectiveId) =>
                                 handleClaimObjective(quest.id, objectiveId)
                               }
+                              locked={quest.locked ?? false}
+                              switchingFocus={switchingFocusId === quest.categoryId}
+                              activeFocusName={
+                                data.activeFocusCategoryId
+                                  ? categoryMap[data.activeFocusCategoryId]
+                                      ?.shortLabel ||
+                                    categoryMap[data.activeFocusCategoryId]?.name
+                                  : undefined
+                              }
+                              onActivateFocus={() =>
+                                handleSetActiveFocus(quest.categoryId)
+                              }
+                              onUpgrade={() => setPlusOpen(true)}
                               paused={carouselDragging}
                             />
                           );

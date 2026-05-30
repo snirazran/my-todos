@@ -111,7 +111,7 @@ export async function GET(req: Request) {
     // objective with unclaimed rewards.
     const questClaimable = [...dashboard.dailyQuests, ...dashboard.categoryQuests].reduce(
       (sum, quest) => {
-        if (quest.claimed) return sum;
+        if (quest.claimed || quest.locked) return sum;
         let count = 0;
         quest.logic.forEach((block) => {
           if (
@@ -132,7 +132,7 @@ export async function GET(req: Request) {
 
     // Count active quests the user can still work on (not claimed, not yet fully claimable)
     const activeCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].filter(
-      (quest) => !quest.claimed && !quest.claimable,
+      (quest) => !quest.claimed && !quest.claimable && !quest.locked,
     ).length;
     const lightMacroCategories = dashboard.macroCategories.map(lightenCategory);
 
@@ -142,6 +142,7 @@ export async function GET(req: Request) {
           isPremium: dashboard.isPremium,
           claimableCount,
           activeCount,
+          activeFocusCategoryId: dashboard.activeFocusCategoryId,
           onboarding: {
             complete: !!dashboard.focusProfile.completedAt,
             selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
@@ -178,6 +179,7 @@ export async function GET(req: Request) {
         isPremium: dashboard.isPremium,
         claimableCount,
         activeCount,
+        activeFocusCategoryId: dashboard.activeFocusCategoryId,
         onboarding: {
           complete: !!dashboard.focusProfile.completedAt,
           selectedCategoryIds: dashboard.focusProfile.selectedCategoryIds,
