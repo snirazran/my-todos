@@ -708,12 +708,14 @@ export function CategoryQuestPresentationCard({
   );
 }
 
-function progressBarColor(pct: number, complete: boolean, claimed: boolean) {
-  if (claimed) return 'bg-emerald-400 dark:bg-emerald-500';
-  if (complete) return 'bg-emerald-500 dark:bg-emerald-400';
-  if (pct >= 80) return 'bg-emerald-500 dark:bg-emerald-400';
-  if (pct >= 50) return 'bg-amber-400 dark:bg-amber-500';
-  return 'bg-amber-400 dark:bg-amber-500';
+// Matches the season banner palette: amber while in progress, lime when done.
+function progressBarColor(complete: boolean, claimed: boolean) {
+  return claimed || complete ? 'bg-lime-600' : 'bg-amber-400';
+}
+
+// Dark label tone matching the bar hue, so the count reads on the fill.
+function progressTextColor(complete: boolean, claimed: boolean) {
+  return claimed || complete ? 'text-lime-950' : 'text-amber-950';
 }
 
 function ObjectiveRow({
@@ -766,7 +768,7 @@ function ObjectiveRow({
           type="button"
           onClick={onClaimObjective}
           disabled={claimingObjective}
-          className="inline-flex h-9 items-center justify-center rounded-xl bg-emerald-500 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#059669] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#059669] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex h-9 items-center justify-center rounded-xl bg-amber-500 px-4 text-[10px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all hover:translate-y-[-1px] hover:shadow-[0_4px_0_0_#b45309] active:translate-y-[2px] active:shadow-none disabled:cursor-not-allowed disabled:opacity-60"
         >
           <span className="mr-[-0.15em]">
             {claimingObjective ? 'Claiming...' : 'Claim'}
@@ -849,16 +851,26 @@ function ObjectiveRow({
               <div
                 className={cn(
                   'h-full min-w-5 rounded-full transition-all duration-500',
-                  progressBarColor(
-                    pct,
-                    objectiveComplete,
-                    objectiveClaimed ?? false,
-                  ),
+                  progressBarColor(objectiveComplete, objectiveClaimed ?? false),
                 )}
                 style={{ width: pct > 0 ? `${pct}%` : '1.25rem' }}
               />
             </div>
             <span className="absolute inset-0 flex items-center justify-center text-[11px] font-black tabular-nums text-foreground/70">
+              {Math.min(block.progress, safeTarget)}
+              {' / '}
+              {block.targetLabel ?? block.target}
+            </span>
+            {/* Same label clipped to the filled width, in a dark tone that reads
+                on the emerald/amber bar regardless of theme. */}
+            <span
+              aria-hidden
+              className={cn(
+                'absolute inset-0 flex items-center justify-center text-[11px] font-black tabular-nums',
+                progressTextColor(objectiveComplete, objectiveClaimed ?? false),
+              )}
+              style={{ clipPath: `inset(0 ${100 - pct}% 0 0)` }}
+            >
               {Math.min(block.progress, safeTarget)}
               {' / '}
               {block.targetLabel ?? block.target}
