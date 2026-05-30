@@ -66,6 +66,12 @@ export default function QuickAddSheet({
   const pendingSubmitRef = useRef<(() => Promise<void>) | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const [chipView, setChipView] = useState<{
+    tags: string[];
+    startTime: string;
+    endTime: string;
+    notify: boolean;
+  }>({ tags: [], startTime: '', endTime: '', notify: false });
 
   const tagManager = useTagManager({
     open,
@@ -175,10 +181,32 @@ export default function QuickAddSheet({
     sheetBaseHeight ?? viewportHeight ?? 900,
   );
   const showSuggestions = suggestionsReady && !hasTaskText;
-  const suggestionsPanelHeight = Math.min(
-    Math.max(availableSheetHeight - 320, 280),
-    560,
+  const hasChips = tags.length > 0 || Boolean(startTime);
+  const isShortScreen = availableSheetHeight < 700;
+  // Fixed sheet height: card sits at top (natural height), suggestions fill the
+  // rest (flex-1), so adding/removing chips never moves the close button.
+  const bottomGap = Math.round(availableSheetHeight * 0.02);
+  const sheetHeight = Math.max(
+    360,
+    Math.min(
+      availableSheetHeight - bottomGap - 12,
+      isShortScreen ? availableSheetHeight : 700,
+    ),
   );
+  const suggestionsOffset = isShortScreen ? 360 : 460;
+
+  // Keep last chip set rendered while the row collapses (tags empties instantly).
+  useEffect(() => {
+    if (hasChips) {
+      setChipView({ tags, startTime, endTime, notify: notifyEnabled });
+      return;
+    }
+    const t = window.setTimeout(
+      () => setChipView({ tags: [], startTime: '', endTime: '', notify: false }),
+      320,
+    );
+    return () => window.clearTimeout(t);
+  }, [hasChips, tags, startTime, endTime, notifyEnabled]);
 
   useEffect(() => {
     if (!open) {
@@ -320,7 +348,10 @@ export default function QuickAddSheet({
                 }}
                 className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 pb-[2vh] pt-2 pointer-events-none will-change-transform sm:px-6 sm:pb-[3vh]"
               >
-                <div className="pointer-events-auto mx-auto flex w-full max-w-[620px] flex-col pb-[env(safe-area-inset-bottom)]">
+                <div
+                  style={{ height: sheetHeight }}
+                  className="pointer-events-auto mx-auto flex w-full max-w-[620px] flex-col pb-[env(safe-area-inset-bottom)]"
+                >
                   <div className="mb-2 flex shrink-0 justify-end px-3">
                     <button
                       type="button"
@@ -332,7 +363,8 @@ export default function QuickAddSheet({
                     </button>
                   </div>
 
-                  <div className="flex max-h-[calc(100dvh_-_5rem_-_env(safe-area-inset-bottom))] flex-col overflow-hidden rounded-[28px] bg-popover px-4 pb-2 pt-4 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:max-h-[calc(100dvh_-_5.5rem_-_env(safe-area-inset-bottom))]">
+                  <div className="flex min-h-0 flex-1 flex-col gap-3">
+                  <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-4 pb-2 pt-4 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]">
                     <div dir="ltr" className="w-full pt-1">
                       <div className="mb-1 flex shrink-0 items-center gap-2">
                         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
@@ -372,10 +404,16 @@ export default function QuickAddSheet({
                         </div>
                       </div>
 
-                      {(tags.length > 0 || startTime) && (
-                        <div className="relative mb-1 mt-2 shrink-0 overflow-visible px-1">
-                          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-0.5 pt-1 px-1 -mx-1 mask-fade-right">
-                            {startTime && (
+                      <div
+                        className={`grid px-1 transition-[grid-template-rows,opacity] duration-[280ms] ease-[cubic-bezier(0.32,0.72,0,1)] ${
+                          hasChips
+                            ? 'grid-rows-[1fr] opacity-100'
+                            : 'grid-rows-[0fr] opacity-0'
+                        }`}
+                      >
+                        <div className="min-h-0 overflow-hidden">
+                          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 mask-fade-right">
+                            {chipView.startTime && (
                               <button
                                 type="button"
                                 onClick={() => {
@@ -387,16 +425,17 @@ export default function QuickAddSheet({
                               >
                                 <Clock className="w-3 h-3" />
                                 <span>
-                                  {formatTimeDisplay(startTime)}
-                                  {endTime && ` - ${formatTimeDisplay(endTime)}`}
+                                  {formatTimeDisplay(chipView.startTime)}
+                                  {chipView.endTime &&
+                                    ` - ${formatTimeDisplay(chipView.endTime)}`}
                                 </span>
-                                {notifyEnabled && (
+                                {chipView.notify && (
                                   <Bell className="w-3 h-3 text-amber-500" />
                                 )}
                                 <X className="w-3 h-3 opacity-50 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity" />
                               </button>
                             )}
-                            {tags.map((tagId) => {
+                            {chipView.tags.map((tagId) => {
                               const tag = tagManager.getTagDetails(tagId);
                               const color = tag?.color;
                               const name = tag?.name || 'Unknown';
@@ -435,7 +474,7 @@ export default function QuickAddSheet({
                             })}
                           </div>
                         </div>
-                      )}
+                      </div>
 
                       <div className="mb-0 mt-1 shrink-0 space-y-1">
                         <button
@@ -499,16 +538,7 @@ export default function QuickAddSheet({
 
                   </div>
 
-                  <motion.div
-                    key="quick-add-suggestions-slot"
-                    initial={{ height: suggestionsPanelHeight, marginTop: 12 }}
-                    animate={{ height: suggestionsPanelHeight, marginTop: 12 }}
-                    transition={{
-                      duration: 0.28,
-                      ease: [0.32, 0.72, 0, 1],
-                    }}
-                    className="pointer-events-none relative min-h-0 rounded-[28px] [clip-path:inset(0_-40px_-40px_-40px)]"
-                  >
+                  <div className="pointer-events-none relative min-h-0 flex-1 rounded-[28px] [clip-path:inset(0_-40px_-40px_-40px)]">
                     <AnimatePresence initial={false}>
                       {hasTaskText && (
                         <motion.div
@@ -553,10 +583,10 @@ export default function QuickAddSheet({
                     {suggestionsReady && (
                       <motion.div
                         key="quick-add-suggestions"
-                        initial={{ opacity: 0, y: suggestionsPanelHeight + 24 }}
+                        initial={{ opacity: 0, y: suggestionsOffset }}
                         animate={{
                           opacity: showSuggestions ? 1 : 0,
-                          y: showSuggestions ? 0 : suggestionsPanelHeight + 24,
+                          y: showSuggestions ? 0 : suggestionsOffset,
                         }}
                         exit={{ opacity: 0 }}
                         transition={{
@@ -611,7 +641,8 @@ export default function QuickAddSheet({
                         />
                       </motion.div>
                     )}
-                  </motion.div>
+                  </div>
+                  </div>
                 </div>
               </motion.div>
 

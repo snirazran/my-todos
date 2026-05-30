@@ -76,7 +76,8 @@
       "Bash(sed -n '10,16p' \"src/app/api/background-files/[id]/[size]/route.ts\")",
       "Bash(sed -n '1,14p' src/components/ui/StatCard.tsx)",
       "Bash(sed -n '205,212p' src/components/board/TaskBoard.tsx)",
-      "Bash(git merge *)"
+      "Bash(git merge *)",
+      "Bash(echo \"exit:$?\")"
     ]
   }
 }
