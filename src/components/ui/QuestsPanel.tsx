@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import useSWR, { preload } from 'swr';
 import { Icon } from '@/components/ui/Icon';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { Check, Clock, Gift, Lock, ScrollText, Sparkles, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import TagsPopup from './TagsPopup';
@@ -624,7 +625,9 @@ export function QuestsPanel({
                     description="Quests use your tasks, timer sessions, and tags."
                   />
                 ) : isLoading ? (
-                  <LoadingState />
+                  <div className="flex h-full items-center justify-center">
+                    <LoadingScreen fullscreen={false} />
+                  </div>
                 ) : error || !data ? (
                   <EmptyState
                     title="Could not load quests"
@@ -2041,19 +2044,6 @@ function FlyGainToastPill({ toast }: { toast: FlyGainToast | null }) {
       )}
     </AnimatePresence>,
     document.body,
-  );
-}
-
-function LoadingState() {
-  return (
-    <div className="grid gap-4 p-4 md:p-6">
-      {Array.from({ length: 4 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-40 animate-pulse rounded-[26px] border border-border/50 bg-muted/30"
-        />
-      ))}
-    </div>
   );
 }
 

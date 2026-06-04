@@ -3,9 +3,10 @@
 import { useEffect } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { QuestsPanel } from '@/components/ui/QuestsPanel';
+import { LoadingScreen } from '@/components/ui/LoadingScreen';
 
 export default function QuestsPage() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     const mainScroll = document.getElementById('main-scroll');
@@ -33,7 +34,13 @@ export default function QuestsPage() {
   return (
     <main className="h-[100dvh] overflow-hidden bg-background md:h-[calc(100vh-4rem)]">
       <div className="flex h-full w-full flex-col">
-        <QuestsPanel isGuest={!user} />
+        {loading ? (
+          <div className="flex h-full items-center justify-center">
+            <LoadingScreen fullscreen={false} />
+          </div>
+        ) : (
+          <QuestsPanel isGuest={!user} />
+        )}
       </div>
     </main>
   );
