@@ -430,7 +430,7 @@ export function TradePanel({
       </div>
 
       {/* --- CONTRACT (Side/Bottom Dock - Order 2) --- */}
-      <div className="fixed bottom-16 md:bottom-0 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto lg:self-start shrink-0 z-[60] order-2 lg:w-[320px] xl:w-[360px] bg-card lg:bg-card/40 border-t lg:border-t-0 lg:border lg:border-border/60 lg:rounded-2xl lg:shadow-sm border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
+      <div className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-0 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto lg:self-start shrink-0 z-[60] order-2 lg:w-[320px] xl:w-[360px] bg-card lg:bg-card/40 border-t lg:border-t-0 lg:border lg:border-border/60 lg:rounded-2xl lg:shadow-sm border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
         {/* Header (tap to expand/collapse on mobile) */}
         <button
           type="button"

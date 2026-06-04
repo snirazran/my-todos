@@ -176,9 +176,14 @@ export default function QuickAddSheet({
   const repeatsOn = repeat === 'weekly';
   const hasTaskText = text.trim().length > 0;
   const keyboardActive = inputFocused && keyboardInset > 0;
+  // When an overlay keyboard is up (keyboardInset > 0), the sheet must fit in
+  // the area ABOVE the keyboard, otherwise its lower content (the Add Task
+  // button) ends up hidden behind the keyboard once a tag chip grows the card.
   const availableSheetHeight = Math.max(
     320,
-    sheetBaseHeight ?? viewportHeight ?? 900,
+    keyboardInset > 0
+      ? (viewportHeight ?? sheetBaseHeight ?? 900)
+      : (sheetBaseHeight ?? viewportHeight ?? 900),
   );
   const showSuggestions = suggestionsReady && !hasTaskText;
   const hasChips = tags.length > 0 || Boolean(startTime);
@@ -345,6 +350,9 @@ export default function QuickAddSheet({
                 }}
                 style={{
                   contain: 'layout paint style',
+                  // Lift the whole sheet above an overlay keyboard so its bottom
+                  // (the Add Task button) is never covered.
+                  bottom: keyboardInset || undefined,
                 }}
                 className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 pb-[2vh] pt-2 pointer-events-none will-change-transform sm:px-6 sm:pb-[3vh]"
               >
