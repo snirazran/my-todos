@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarCheck, Check } from 'lucide-react';
+import { CalendarCheck, Check, Eye, EyeOff } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 
 export type FilterType = 'all' | 'tasks';
@@ -42,17 +42,25 @@ export function FilterDropdown({
   onTagsChange,
 }: Props) {
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(null);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.matchMedia('(max-width: 640px)').matches);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   useEffect(() => {
     if (isOpen && triggerRef.current) {
       const updatePosition = () => {
         if (!triggerRef.current) return;
         const rect = triggerRef.current.getBoundingClientRect();
-        
+
         setCoords({
           top: rect.bottom + 8,
-          left: align === 'right' 
-            ? rect.right - 200 
+          left: align === 'right'
+            ? rect.right - 200
             : rect.left
         });
       };
@@ -90,34 +98,44 @@ export function FilterDropdown({
               exit={{ opacity: 0, scale: 0.95, y: -10 }}
               transition={{ duration: 0.15, ease: 'easeOut' }}
               className="fixed overflow-hidden rounded-2xl border border-border bg-popover p-1.5 text-popover-foreground shadow-2xl ring-1 ring-black/5 backdrop-blur-xl min-w-[200px] max-w-[280px]"
-              style={{ 
-                top: coords.top, 
-                left: Math.max(10, Math.min(coords.left, typeof window !== 'undefined' ? window.innerWidth - 210 : coords.left)),
-                transformOrigin: align === 'right' ? 'top right' : 'top left' 
+              style={{
+                top: coords.top,
+                left: isMobile
+                  ? 12
+                  : Math.max(10, Math.min(coords.left, typeof window !== 'undefined' ? window.innerWidth - 210 : coords.left)),
+                width: isMobile ? 'calc(100vw - 24px)' : undefined,
+                maxWidth: isMobile ? 'none' : undefined,
+                transformOrigin: isMobile ? 'top center' : align === 'right' ? 'top right' : 'top left',
               }}
               onPointerDown={(e) => e.stopPropagation()} // Prevent closing when clicking inside the menu
             >
               <div className="flex flex-col gap-1">
-                {/* Header / Completed Toggle */}
-                <div className="flex items-center justify-between px-2.5 py-2 rounded-xl hover:bg-accent/50 transition-colors">
+                {/* Completed toggle — whole row is tappable, state shown as a pill */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onShowCompletedChange(!showCompleted);
+                  }}
+                  className="group flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left transition-colors hover:bg-accent/50"
+                >
                   <span className="text-sm font-bold text-foreground">
                     Show Completed
                   </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onShowCompletedChange(!showCompleted);
-                    }}
-                    className={`w-9 h-5 rounded-full relative transition-all duration-300 ease-in-out ${
-                      showCompleted ? 'bg-primary' : 'bg-muted-foreground/30'
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all group-active:scale-95 ${
+                      showCompleted
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-background text-muted-foreground group-hover:border-foreground/30 group-hover:text-foreground'
                     }`}
                   >
-                    <motion.span
-                      animate={{ x: showCompleted ? 16 : 0 }}
-                      className="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-background shadow-sm"
-                    />
-                  </button>
-                </div>
+                    {showCompleted ? (
+                      <Eye className="h-3.5 w-3.5" />
+                    ) : (
+                      <EyeOff className="h-3.5 w-3.5" />
+                    )}
+                    {showCompleted ? 'On' : 'Off'}
+                  </span>
+                </button>
 
                 {showTypeFilters && (
                   <>
@@ -172,7 +190,7 @@ export function FilterDropdown({
                         </button>
                       )}
                     </div>
-                    <div className="flex flex-wrap gap-1.5 p-1 max-h-[160px] overflow-y-auto no-scrollbar">
+                    <div className="flex flex-wrap gap-2 p-1 max-h-[200px] overflow-y-auto no-scrollbar">
                       {availableTags.map((tag) => {
                         const isSelected = selectedTags.includes(tag.id);
                         return (
@@ -185,32 +203,22 @@ export function FilterDropdown({
                                 : [...selectedTags, tag.id];
                               onTagsChange(next);
                             }}
-                            className={`
-                              relative inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200 border
-                              ${
-                                isSelected
-                                  ? 'ring-1 ring-offset-0 ring-primary border-transparent'
-                                  : 'bg-muted/40 border-transparent hover:bg-muted/70 text-muted-foreground'
-                              }
-                            `}
-                            style={
-                              isSelected && tag.color
-                                ? {
-                                    backgroundColor: `${tag.color}15`,
-                                    color: tag.color,
-                                    borderColor: tag.color,
-                                  }
-                                : isSelected
-                                ? {
-                                    backgroundColor: 'rgba(var(--primary), 0.1)',
-                                    color: 'hsl(var(--primary))',
-                                    borderColor: 'hsl(var(--primary))',
-                                  }
-                                : {}
-                            }
+                            className={`relative inline-flex max-w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-[11px] font-black uppercase tracking-wider shadow-sm transition-all [@media(hover:hover)]:hover:opacity-75 active:scale-95 ${
+                              isSelected
+                                ? 'ring-2 ring-offset-1 ring-offset-popover'
+                                : ''
+                            }`}
+                            style={{
+                              backgroundColor: `${tag.color}20`,
+                              color: tag.color,
+                              borderColor: `${tag.color}40`,
+                              ...(isSelected
+                                ? ({ ['--tw-ring-color' as string]: tag.color } as React.CSSProperties)
+                                : {}),
+                            }}
                           >
-                            {isSelected && <Check size={10} strokeWidth={3} />}
-                            {tag.name}
+                            {isSelected && <Check size={10} strokeWidth={3} className="shrink-0" />}
+                            <span className="truncate">{tag.name}</span>
                           </button>
                         );
                       })}
