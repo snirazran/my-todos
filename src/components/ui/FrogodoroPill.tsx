@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { Timer, Pause } from 'lucide-react';
+import { Pause } from 'lucide-react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { cn } from '@/lib/utils';
 
@@ -48,7 +48,7 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className={cn(
-        'pointer-events-auto w-full md:max-w-md md:mx-auto',
+        'pointer-events-auto w-full md:w-[380px] md:self-end',
         'flex items-center gap-3 px-4 py-3 rounded-[18px] border border-white/10 shadow-sm backdrop-blur-2xl',
         phaseAccent,
       )}
@@ -60,12 +60,33 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
       >
         <div className="relative flex h-7 w-7 items-center justify-center rounded-full bg-white/20 shrink-0">
           {isRunning ? (
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ repeat: Infinity, duration: 8, ease: 'linear' }}
-            >
-              <Timer className="w-4 h-4" />
-            </motion.div>
+            <span className="relative flex h-4 w-4 items-center justify-center">
+              {/* Static clock face */}
+              <svg
+                viewBox="0 0 24 24"
+                className="absolute inset-0 h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <circle cx="12" cy="12" r="9" />
+                {/* Top stem to keep the Timer silhouette */}
+                <line x1="10" y1="2" x2="14" y2="2" strokeLinecap="round" />
+              </svg>
+              {/* Only the hand spins */}
+              <motion.svg
+                viewBox="0 0 24 24"
+                className="absolute inset-0 h-4 w-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                animate={{ rotate: 360 }}
+                transition={{ repeat: Infinity, duration: 4, ease: 'linear' }}
+              >
+                <line x1="12" y1="12" x2="12" y2="6.5" />
+              </motion.svg>
+            </span>
           ) : (
             <Pause className="w-4 h-4 fill-current" />
           )}

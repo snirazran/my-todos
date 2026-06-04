@@ -377,7 +377,7 @@ export function SuggestionTabs({
               </div>
             )
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+            <div className="grid grid-cols-1 gap-1.5">
               {displayedSuggestions.map((s, i) => (
                 <button
                   key={`${activeTab}-${i}`}

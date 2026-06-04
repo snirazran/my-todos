@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import Frog from '@/components/ui/frog';
 import type { WardrobeSlot } from '@/components/ui/frog';
@@ -24,6 +24,7 @@ export function HungerWarningModal({
   return (
     <Dialog open={open} onOpenChange={(val) => !val && onAcknowledge()}>
       <DialogContent className="sm:max-w-[360px] border-none bg-transparent shadow-none p-0 outline-none">
+        <DialogTitle className="sr-only">I was Starving!</DialogTitle>
         <div className="relative flex flex-col items-center bg-card/95 backdrop-blur-2xl border border-border/60 rounded-[32px] p-6 shadow-2xl overflow-hidden ring-1 ring-black/5">
           {/* Header: Frog + Icon */}
           <div className="relative mb-4 mt-2 scale-110">

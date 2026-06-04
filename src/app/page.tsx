@@ -477,6 +477,32 @@ export default function Home() {
       : rawData;
   const doneCount = data.filter((t) => t.completed).length;
 
+  // Clear a dangling Frogodoro timer whose task no longer exists in the user's
+  // current lists (e.g. a regular task from a previous day that has rolled
+  // off). The timer state is persisted in localStorage and republished to the
+  // server on every load, so without this it keeps getting restored on login
+  // for a task the user can no longer see. Stopping it locally also triggers
+  // GlobalTimer to delete the server-side copy.
+  useEffect(() => {
+    if (!user || isLoading) return;
+    if (!frogTimerActive || !frogTaskId) return;
+    const taskStillExists =
+      tasks.some((t) => t.id === frogTaskId) ||
+      backlogTasks.some((t) => t.id === frogTaskId);
+    if (!taskStillExists) {
+      frogStopTimer();
+      setShowTimer(false);
+    }
+  }, [
+    user,
+    isLoading,
+    frogTimerActive,
+    frogTaskId,
+    tasks,
+    backlogTasks,
+    frogStopTimer,
+  ]);
+
   useEffect(() => {
     if (!frogodoroHydrated) return;
     // Ref is primed in the hydration effect above; null means not yet primed.
@@ -1036,7 +1062,7 @@ export default function Home() {
         onMutateToday={() => mutateToday()}
       />
 
-      {!showTimer && (
+      {!showTimer && !shouldShowMissedReview && (
         <FrogodoroPill
           onClick={() => {
             const t = tasks.find((t) => t.id === frogTaskId);
@@ -1183,7 +1209,7 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
   const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
 
   React.useEffect(() => {
-    setPortalTarget(document.getElementById('frog-bottom-stack-bottom'));
+    setPortalTarget(document.body);
   }, []);
 
   const handleSkip = React.useCallback(() => {
@@ -1205,16 +1231,22 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
 
       {portalTarget &&
         createPortal(
+          // Bottom-center on both, but lifted off the very bottom edge on web
+          // so it reads as a deliberate hint rather than a corner toast. The
+          // wrapper handles centering via flex so framer-motion's transform
+          // only drives the entrance (no conflict with a -translate-x utility).
+          <div
+            className="pointer-events-none fixed inset-x-0 z-[1300] flex justify-center px-3 bottom-[calc(env(safe-area-inset-bottom)+72px)] md:bottom-24 md:px-0"
+          >
           <motion.div
-            layout
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             className={`
-              pointer-events-none w-full md:max-w-md md:mx-auto
+              pointer-events-none w-full md:w-auto
               flex items-center gap-3 px-4 py-3 rounded-[18px] border
-              shadow-sm backdrop-blur-2xl transition-all duration-200
+              shadow-sm backdrop-blur-2xl transition-colors duration-200
               ${
                 active
                   ? 'bg-card/90 text-foreground border-primary/40'
@@ -1242,7 +1274,8 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
             >
               {active ? 'x2 speed' : 'Tap anywhere to speed up'}
             </span>
-          </motion.div>,
+          </motion.div>
+          </div>,
           portalTarget,
         )}
     </>

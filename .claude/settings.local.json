@@ -77,7 +77,8 @@
       "Bash(sed -n '1,14p' src/components/ui/StatCard.tsx)",
       "Bash(sed -n '205,212p' src/components/board/TaskBoard.tsx)",
       "Bash(git merge *)",
-      "Bash(echo \"exit:$?\")"
+      "Bash(echo \"exit:$?\")",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

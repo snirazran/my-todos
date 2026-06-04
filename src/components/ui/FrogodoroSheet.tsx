@@ -8,7 +8,6 @@ import {
   Pause,
   SkipForward,
   Settings2,
-  HelpCircle,
   X,
   Plus,
   Minus,
@@ -63,6 +62,7 @@ export default function FrogodoroSheet({
     timerActive,
     sessionStats,
     phaseElapsed: storeElapsed,
+    startedByPhase,
     setSettings,
     setTask,
     startTimer,
@@ -70,7 +70,6 @@ export default function FrogodoroSheet({
     stopTimer,
     switchPhase,
     completePhase,
-    setPhaseElapsed,
     updateSessionStats,
   } = useFrogodoroStore();
 
@@ -166,9 +165,10 @@ export default function FrogodoroSheet({
 
   const prevPhaseRef = useRef(phase);
   useEffect(() => {
+    // Don't force phaseElapsed to 0 here — the store sets it correctly when a
+    // phase is resumed (so its countdown picks up where it left off). The sync
+    // effect above mirrors storeElapsed into phaseTimeRef while paused.
     prevPhaseRef.current = phase;
-    phaseTimeRef.current = 0;
-    setPhaseElapsed(0);
   }, [phase]);
 
   const formatTime = (seconds: number) => {
@@ -240,12 +240,16 @@ export default function FrogodoroSheet({
 
   const handleTabSwitch = (newPhase: PomodoroPhase) => {
     if (newPhase === phase || isRunning) return;
-    if (selectedTaskId && liveElapsed > 0) {
+    // Only fold in the time not already counted for this phase. The phase's
+    // countdown is preserved across tab switches, so adding the full
+    // liveElapsed each time would inflate the stats on repeated switches.
+    const unsavedElapsed = Math.max(0, liveElapsed - storeElapsed);
+    if (selectedTaskId && unsavedElapsed > 0) {
       const updated = { ...sessionStats };
       if (phase === 'focus') {
-        updated.focusTime = sessionStats.focusTime + liveElapsed;
+        updated.focusTime = sessionStats.focusTime + unsavedElapsed;
       } else {
-        updated.breakTime = sessionStats.breakTime + liveElapsed;
+        updated.breakTime = sessionStats.breakTime + unsavedElapsed;
       }
       updateSessionStats(updated);
     }
@@ -325,7 +329,7 @@ export default function FrogodoroSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => onOpenChange(false)}
-            className="fixed inset-0 z-[999] bg-background/80 backdrop-blur-[2px]"
+            className="fixed inset-0 z-[999] bg-black/80"
           />
 
           <motion.div
@@ -340,7 +344,7 @@ export default function FrogodoroSheet({
             className="fixed left-0 right-0 z-[1000] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none bottom-0 will-change-transform"
           >
             <div className="pointer-events-auto mx-auto w-full max-w-[500px] pb-[env(safe-area-inset-bottom)]">
-              <div className="rounded-[28px] bg-popover/95 backdrop-blur-2xl ring-1 ring-border/80 shadow-[0_24px_48px_rgba(15,23,42,0.25)] overflow-hidden">
+              <div className="rounded-[28px] bg-popover/95 backdrop-blur-2xl shadow-[0_24px_48px_rgba(15,23,42,0.25)] overflow-hidden">
 
                 {/* Help Sub-View */}
                 <AnimatePresence mode="wait">
@@ -534,17 +538,27 @@ export default function FrogodoroSheet({
                     >
                       {/* Timer Card */}
                       <div className={`px-4 pt-5 pb-4 ${getPhaseColor()} relative overflow-hidden`}>
-                        {/* Close button */}
-                        <button
-                          onClick={() => onOpenChange(false)}
-                          className="absolute top-3 right-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                        {/* Top-right actions: help + close */}
+                        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
+                          <button
+                            onClick={() => setShowHelp(true)}
+                            aria-label="How it works"
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-black leading-none"
+                          >
+                            ?
+                          </button>
+                          <button
+                            onClick={() => onOpenChange(false)}
+                            aria-label="Close"
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
 
                         {/* Task name */}
                         {task && (
-                          <div className="mb-3 pr-10">
+                          <div className="mb-3 pr-20">
                             {task.tags && task.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1 mb-1">
                                 {task.tags.map((tagId) => {
@@ -600,9 +614,9 @@ export default function FrogodoroSheet({
                                     onClick={() => adjustCurrentDuration(-1)}
                                     disabled={duration <= control.min}
                                     aria-label="Decrease duration"
-                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                                   >
-                                    <Minus className="h-5 w-5" />
+                                    <Minus className="h-4 w-4" />
                                   </button>
                                 )}
 
@@ -616,9 +630,9 @@ export default function FrogodoroSheet({
                                     onClick={() => adjustCurrentDuration(1)}
                                     disabled={duration >= control.max}
                                     aria-label="Increase duration"
-                                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
+                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/20 text-white transition-all hover:bg-white/30 active:scale-95 disabled:cursor-not-allowed disabled:opacity-35"
                                   >
-                                    <Plus className="h-5 w-5" />
+                                    <Plus className="h-4 w-4" />
                                   </button>
                                 )}
                               </>
@@ -628,12 +642,8 @@ export default function FrogodoroSheet({
 
                         {/* Controls */}
                         <div className="flex items-center justify-center gap-3">
-                          <button
-                            onClick={() => setShowHelp(true)}
-                            className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-all"
-                          >
-                            <HelpCircle className="w-5 h-5 text-white/90" />
-                          </button>
+                          {/* Spacer balances the right-side button so START stays centered */}
+                          <div className="w-10 shrink-0" aria-hidden />
 
                           <button
                             onClick={toggleTimer}
@@ -646,7 +656,11 @@ export default function FrogodoroSheet({
                             ) : (
                               <Play className="w-5 h-5 mr-1.5 fill-current" />
                             )}
-                            {isRunning ? 'PAUSE' : 'START'}
+                            {isRunning
+                              ? 'PAUSE'
+                              : startedByPhase[phase]
+                                ? 'CONTINUE'
+                                : 'START'}
                           </button>
 
                           {isRunning ? (
@@ -675,7 +689,7 @@ export default function FrogodoroSheet({
 
                       {/* Stats Row */}
                       {hasStats && (
-                        <div className="flex items-center gap-2 px-4 py-3 flex-wrap border-t border-border/30">
+                        <div className="flex items-center justify-center gap-2 px-4 py-3 flex-wrap border-t border-border/30">
                           {(() => {
                             const db = task?.frogodoroSession;
                             const unsavedLiveElapsed = Math.max(0, liveElapsed - storeElapsed);
@@ -685,14 +699,14 @@ export default function FrogodoroSheet({
                             const breakTime = breakBaseTime + (phase === 'break' ? unsavedLiveElapsed : 0);
                             return (
                               <>
-                                {focusTime > 0 && (
+                                {(focusTime > 0 || (isRunning && phase === 'focus')) && (
                                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary/8 dark:bg-primary/15">
                                     <div className={`w-1.5 h-1.5 rounded-full bg-primary ${isRunning && phase === 'focus' ? 'animate-pulse' : ''}`} />
                                     <span className="text-[10px] font-bold text-primary/60 uppercase tracking-wider">Focus</span>
                                     <span className="text-[11px] font-black text-primary tabular-nums">{formatDuration(focusTime)}</span>
                                   </div>
                                 )}
-                                {breakTime > 0 && (
+                                {(breakTime > 0 || (isRunning && phase === 'break')) && (
                                   <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-sky-500/8 dark:bg-sky-500/15">
                                     <div className={`w-1.5 h-1.5 rounded-full bg-sky-500 ${isRunning && phase === 'break' ? 'animate-pulse' : ''}`} />
                                     <span className="text-[10px] font-bold text-sky-500/60 uppercase tracking-wider">Break</span>

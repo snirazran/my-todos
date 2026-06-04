@@ -258,6 +258,16 @@ export function GlobalTimer() {
         if (unsavedElapsed > 0) {
           saveProgress(selectedTaskId, phase, unsavedElapsed);
           setPhaseElapsed(elapsed);
+          // Fold the just-elapsed time into sessionStats synchronously so the
+          // stats display doesn't momentarily drop to 0 between resetting
+          // phaseElapsed and the async DB write landing (the first-pause
+          // flicker on a freshly opened task).
+          const store = useFrogodoroStore.getState();
+          const stats = store.sessionStats;
+          store.updateSessionStats({
+            focusTime: stats.focusTime + (phase === 'focus' ? unsavedElapsed : 0),
+            breakTime: stats.breakTime + (phase === 'break' ? unsavedElapsed : 0),
+          });
         }
       }
     }

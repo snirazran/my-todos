@@ -36,6 +36,7 @@ type Props = {
   deferInventorySummary?: boolean;
   paused?: boolean;
   showActionButtons?: boolean;
+  showSpeechBubble?: boolean;
 };
 
 export function FrogDisplay({
@@ -62,6 +63,7 @@ export function FrogDisplay({
   deferInventorySummary = false,
   paused = false,
   showActionButtons = true,
+  showSpeechBubble = true,
 }: Props) {
   const router = useRouter();
   const { unseenCount, unseenContainerCount } = useInventory(
@@ -162,7 +164,8 @@ export function FrogDisplay({
 
         {/* SPEECH BUBBLE - NOW INSIDE FROG'S CONTAINER */}
 
-        {typeof rate === 'number' &&
+        {showSpeechBubble &&
+          typeof rate === 'number' &&
           typeof done === 'number' &&
           typeof total === 'number' && (
             <FrogSpeechBubble

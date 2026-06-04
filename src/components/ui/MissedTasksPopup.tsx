@@ -225,7 +225,9 @@ export function MissedTasksPopup({
     return tags.find((tag) => tag.name === tagIdentifier);
   };
 
-  if (!show || status.items.length === 0) return null;
+  // Keep the sheet mounted when `show` flips to false so BaseSheet's
+  // AnimatePresence can play the slide-down exit instead of vanishing.
+  if (status.items.length === 0) return null;
 
   const isBusy = !!busyId || cinematic;
 
@@ -307,6 +309,7 @@ export function MissedTasksPopup({
                   questClaimableCount={questClaimableCount}
                   questActiveCount={questActiveCount}
                   paused={wardrobeOpen || isDragging}
+                  showSpeechBubble={false}
                 />
               </div>
               <div
@@ -562,11 +565,11 @@ function MissedCinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
         onTouchStart={handleSkip}
       />
 
-      <div className="fixed bottom-0 left-0 right-0 z-[1091] flex justify-center pointer-events-none px-3 pb-[calc(env(safe-area-inset-bottom)+24px)]">
+      <div className="fixed bottom-0 left-0 right-0 z-[1091] flex justify-center pointer-events-none px-3 pb-[calc(env(safe-area-inset-bottom)+24px)] md:pb-0 md:bottom-24">
         <div
           className={`
             flex items-center gap-2 rounded-full border px-3 py-2
-            shadow-sm backdrop-blur-2xl transition-all duration-200
+            shadow-sm backdrop-blur-2xl transition-colors duration-200
             ${active ? 'bg-card/90 border-primary/40' : 'bg-card/80 border-border/50'}
           `}
         >

@@ -160,7 +160,7 @@ export function NotificationProvider({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
                 transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                className={`pointer-events-auto w-full md:max-w-md md:mx-auto flex items-center gap-3 px-4 py-3 rounded-[18px] border shadow-sm backdrop-blur-2xl ${
+                className={`pointer-events-auto w-full md:w-[380px] md:self-end flex items-center gap-3 px-4 py-3 rounded-[18px] border shadow-sm backdrop-blur-2xl ${
                   isMoveToast
                     ? 'bg-card/90 text-foreground border-border/50'
                     : 'bg-popover/90 text-popover-foreground border-border'
