@@ -66,6 +66,8 @@ export default function QuickAddSheet({
   const pendingSubmitRef = useRef<(() => Promise<void>) | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const chipRowRef = useRef<HTMLDivElement>(null);
+  const [chipLift, setChipLift] = useState(0);
   const [chipView, setChipView] = useState<{
     tags: string[];
     startTime: string;
@@ -176,14 +178,9 @@ export default function QuickAddSheet({
   const repeatsOn = repeat === 'weekly';
   const hasTaskText = text.trim().length > 0;
   const keyboardActive = inputFocused && keyboardInset > 0;
-  // When an overlay keyboard is up (keyboardInset > 0), the sheet must fit in
-  // the area ABOVE the keyboard, otherwise its lower content (the Add Task
-  // button) ends up hidden behind the keyboard once a tag chip grows the card.
   const availableSheetHeight = Math.max(
     320,
-    keyboardInset > 0
-      ? (viewportHeight ?? sheetBaseHeight ?? 900)
-      : (sheetBaseHeight ?? viewportHeight ?? 900),
+    sheetBaseHeight ?? viewportHeight ?? 900,
   );
   const showSuggestions = suggestionsReady && !hasTaskText;
   const hasChips = tags.length > 0 || Boolean(startTime);
@@ -199,6 +196,21 @@ export default function QuickAddSheet({
     ),
   );
   const suggestionsOffset = isShortScreen ? 360 : 460;
+
+  // When the keyboard is up, a tag chip grows the card and would push the Add
+  // Task button down behind the keyboard. Lift the whole sheet up by exactly
+  // the chip row's height so the card growth is cancelled out and the button
+  // stays put — without resizing the suggestions area.
+  useEffect(() => {
+    if (!keyboardActive || !hasChips) {
+      setChipLift(0);
+      return;
+    }
+    const measure = () => setChipLift(chipRowRef.current?.offsetHeight ?? 0);
+    measure();
+    const id = window.requestAnimationFrame(measure);
+    return () => window.cancelAnimationFrame(id);
+  }, [keyboardActive, hasChips, chipView]);
 
   // Keep last chip set rendered while the row collapses (tags empties instantly).
   useEffect(() => {
@@ -350,9 +362,12 @@ export default function QuickAddSheet({
                 }}
                 style={{
                   contain: 'layout paint style',
-                  // Lift the whole sheet above an overlay keyboard so its bottom
-                  // (the Add Task button) is never covered.
-                  bottom: keyboardInset || undefined,
+                  // Offset the sheet upward by the chip row height so adding a
+                  // tag while the keyboard is open doesn't push the Add Task
+                  // button behind the keyboard. Transition matches the chip
+                  // row's expand animation so the button doesn't wiggle.
+                  bottom: chipLift || undefined,
+                  transition: 'bottom 280ms cubic-bezier(0.32,0.72,0,1)',
                 }}
                 className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 pb-[2vh] pt-2 pointer-events-none will-change-transform sm:px-6 sm:pb-[3vh]"
               >
@@ -420,7 +435,7 @@ export default function QuickAddSheet({
                         }`}
                       >
                         <div className="min-h-0 overflow-hidden">
-                          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 mask-fade-right">
+                          <div ref={chipRowRef} className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 mask-fade-right">
                             {chipView.startTime && (
                               <button
                                 type="button"
