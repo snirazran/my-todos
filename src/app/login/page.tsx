@@ -4,13 +4,9 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signInWithCredential,
-  signInWithPhoneNumber,
   linkWithPopup,
   linkWithCredential,
-  linkWithPhoneNumber,
-  RecaptchaVerifier,
   sendSignInLinkToEmail,
-  type ConfirmationResult,
 } from 'firebase/auth';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
@@ -20,17 +16,32 @@ import { auth } from '@/lib/firebase';
 import { setAuthTokenCookie } from '@/lib/authCookie';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
-import { Loader2, ArrowLeft, ArrowRight } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Loader2, ArrowLeft, ArrowRight, MailCheck } from 'lucide-react';
+import { motion, AnimatePresence, useAnimationControls } from 'framer-motion';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import Frog, { type FrogHandle } from '@/components/ui/frog';
+import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
+import { useNotification } from '@/components/providers/NotificationProvider';
 
-const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
+const Fly = dynamic(() => import('@/components/ui/fly'), { ssr: false });
 
-type Method = 'phone' | 'email';
-type Step = 'enter' | 'verify-phone' | 'email-sent';
+const FLY_PX = 40;
+const FLY_KEY = 'login-fly';
+const LOGIN_TONGUE_MS = 1040;
+const LOGIN_TONGUE_ORIGIN_Y = -9;
+const FLY_RESPAWN_DELAY_MS = 1500;
+const FLY_BUZZ_START = { x: -56, y: 0, rotate: -6 } as const;
+const FLY_BUZZ = {
+  x: [FLY_BUZZ_START.x, 56, -38, 48, FLY_BUZZ_START.x],
+  y: [FLY_BUZZ_START.y, -18, 6, -10, FLY_BUZZ_START.y],
+  rotate: [FLY_BUZZ_START.rotate, 6, -4, 8, FLY_BUZZ_START.rotate],
+  transition: { duration: 6, ease: 'easeInOut', repeat: Infinity },
+} as const;
+
+type Step = 'enter' | 'email-sent';
+type FlyState = 'buzzing' | 'hidden' | 'entering';
 
 const GOOGLE_ICON = (
   <svg
@@ -56,23 +67,69 @@ const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { showNotification } = useNotification();
   const isUpgrade = searchParams?.get('upgrade') === '1';
-  const [method, setMethod] = useState<Method>('phone');
   const [step, setStep] = useState<Step>('enter');
   const [dir, setDir] = useState(1);
 
-  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
 
-  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const phoneRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
-  const codeRef = useRef<HTMLInputElement>(null);
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
-  const confirmationRef = useRef<ConfirmationResult | null>(null);
+
+  // ── Frog tongue grab (mirrors the home task-list catch) ──
+  const frogRef = useRef<FrogHandle>(null);
+  const frogBoxRef = useRef<HTMLDivElement>(null);
+  const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const flyControls = useAnimationControls();
+  const flyRespawnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [flyState, setFlyState] = useState<FlyState>('buzzing');
+  const {
+    vp,
+    grab,
+    tipGroupEl,
+    tonguePathEl,
+    triggerTongue,
+    visuallyDone,
+  } = useFrogTongue({
+    frogRef,
+    frogBoxRef,
+    flyRefs,
+    trackMovingTarget: true,
+    durationMs: LOGIN_TONGUE_MS,
+    originYOffset: LOGIN_TONGUE_ORIGIN_Y,
+    keepTargetHiddenUntilPersist: true,
+  });
+
+  // Start or resume buzzing after the fly is rendered in its buzzing state.
+  useEffect(() => {
+    if (flyState === 'buzzing') {
+      void flyControls.start(FLY_BUZZ as any);
+    }
+  }, [flyControls, flyState]);
+
+  useEffect(() => {
+    return () => {
+      if (flyRespawnTimerRef.current) {
+        clearTimeout(flyRespawnTimerRef.current);
+      }
+    };
+  }, []);
+
+  const flyCaught = visuallyDone.has(FLY_KEY);
+
+  const respawnFlyAfterError = () => {
+    flyControls.stop();
+    setFlyState('hidden');
+    if (flyRespawnTimerRef.current) {
+      clearTimeout(flyRespawnTimerRef.current);
+    }
+    flyRespawnTimerRef.current = setTimeout(() => {
+      setFlyState('entering');
+      flyRespawnTimerRef.current = null;
+    }, FLY_RESPAWN_DELAY_MS);
+  };
 
   useEffect(() => {
     if (Capacitor.isNativePlatform()) {
@@ -88,36 +145,20 @@ function LoginPageInner() {
         },
       });
     }
-
-    return () => {
-      try {
-        recaptchaRef.current?.clear();
-      } catch {}
-      recaptchaRef.current = null;
-    };
   }, []);
 
-  const ensureRecaptcha = () => {
-    if (recaptchaRef.current) return recaptchaRef.current;
-    recaptchaRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-      size: 'invisible',
-    });
-    return recaptchaRef.current;
-  };
-
-  const finishSignIn = async (route = '/') => {
+  const prepareSignedInRoute = async (route = '/') => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user) throw new Error('Authentication did not complete');
     const token = await user.getIdToken();
     setAuthTokenCookie(token);
     const res = await fetch('/api/user', { method: 'POST' });
     const data = await res.json().catch(() => ({}));
-    router.push(data?.isNewUser ? '/onboarding' : route);
+    return data?.isNewUser ? '/onboarding' : route;
   };
 
   const handleGoogle = async () => {
     setLoading(true);
-    setError(null);
     try {
       const current = auth.currentUser;
       const shouldLink = isUpgrade && current?.isAnonymous;
@@ -145,7 +186,12 @@ function LoginPageInner() {
           await signInWithPopup(auth, provider);
         }
       }
-      await finishSignIn();
+      const route = await prepareSignedInRoute();
+      await triggerTongue({
+        key: FLY_KEY,
+        completed: false,
+        onPersist: () => router.push(route),
+      });
     } catch (err: any) {
       const map: Record<string, string> = {
         'auth/credential-already-in-use':
@@ -153,65 +199,9 @@ function LoginPageInner() {
         'auth/email-already-in-use':
           'That email is already linked to another account.',
       };
-      setError(map[err?.code ?? ''] ?? err?.message ?? 'Google sign-in failed');
-      setLoading(false);
-    }
-  };
-
-  const handleSendPhoneCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = phone.trim();
-    if (!trimmed.startsWith('+')) {
-      setError('Phone must start with country code (e.g. +1...)');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const verifier = ensureRecaptcha();
-      const current = auth.currentUser;
-      const confirmation =
-        isUpgrade && current?.isAnonymous
-          ? await linkWithPhoneNumber(current, trimmed, verifier)
-          : await signInWithPhoneNumber(auth, trimmed, verifier);
-      confirmationRef.current = confirmation;
-      setDir(1);
-      setStep('verify-phone');
-      setTimeout(() => codeRef.current?.focus(), 300);
-    } catch (err: any) {
-      const code = err?.code as string | undefined;
-      const map: Record<string, string> = {
-        'auth/invalid-phone-number': 'That phone number looks invalid',
-        'auth/too-many-requests': 'Too many attempts. Try again later.',
-        'auth/quota-exceeded': 'SMS quota exceeded. Try again later.',
-      };
-      setError(map[code ?? ''] ?? err?.message ?? 'Could not send code');
-      try {
-        recaptchaRef.current?.clear();
-      } catch {}
-      recaptchaRef.current = null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyPhoneCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!confirmationRef.current) {
-      setError('Verification expired — please request a new code');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      await confirmationRef.current.confirm(code.trim());
-      await finishSignIn();
-    } catch (err: any) {
-      const map: Record<string, string> = {
-        'auth/invalid-verification-code': 'Wrong code — try again',
-        'auth/code-expired': 'Code expired — request a new one',
-      };
-      setError(map[err?.code ?? ''] ?? err?.message ?? 'Verification failed');
+      showNotification(
+        map[err?.code ?? ''] ?? err?.message ?? 'Google sign-in failed',
+      );
       setLoading(false);
     }
   };
@@ -221,44 +211,119 @@ function LoginPageInner() {
     const trimmed = email.trim();
     if (!trimmed) return;
     setLoading(true);
-    setError(null);
-    try {
-      const origin =
-        typeof window !== 'undefined' ? window.location.origin : '';
-      await sendSignInLinkToEmail(auth, trimmed, {
-        url: `${origin}/auth/email-callback`,
-        handleCodeInApp: true,
-      });
-      window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, trimmed);
-      setDir(1);
-      setStep('email-sent');
-    } catch (err: any) {
-      setError(err?.message || 'Could not send email link');
-    } finally {
-      setLoading(false);
-    }
+
+    await triggerTongue({
+      key: FLY_KEY,
+      completed: false,
+      onPersist: async () => {
+        try {
+          const origin =
+            typeof window !== 'undefined' ? window.location.origin : '';
+          await sendSignInLinkToEmail(auth, trimmed, {
+            url: `${origin}/auth/email-callback`,
+            handleCodeInApp: true,
+          });
+          window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, trimmed);
+          setDir(1);
+          setStep('email-sent');
+        } catch (err: any) {
+          showNotification(err?.message || 'Could not send email link');
+          respawnFlyAfterError();
+        } finally {
+          setLoading(false);
+        }
+      },
+    });
   };
 
   const back = () => {
-    setError(null);
     setDir(-1);
     setStep('enter');
-    setCode('');
   };
 
   return (
-    <main className="fixed inset-0 flex items-center justify-center p-4 overflow-hidden bg-background">
-      <div className="relative z-10 flex flex-col items-center w-full max-w-sm -translate-y-8">
-        <div className="relative z-20 pointer-events-none -mb-9">
-          <Frog
-            width={200}
-            height={200}
-            indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
-          />
+    <main className="fixed inset-0 flex flex-col items-center justify-center overflow-hidden bg-background px-6 py-10">
+      {/* Back to welcome */}
+      <Link
+        href="/welcome"
+        aria-label="Back"
+        className="absolute left-5 top-[calc(1.25rem+env(safe-area-inset-top))] z-50 flex h-10 w-10 items-center justify-center rounded-full border border-border/60 bg-background text-muted-foreground transition hover:bg-muted"
+      >
+        <ArrowLeft className="h-4 w-4" />
+      </Link>
+
+      <div className="flex w-full max-w-sm origin-center flex-col items-center md:scale-110 xl:scale-125">
+        {/* Frogress wordmark — curved, matching the loading screen */}
+        <svg
+          aria-label="Frogress"
+          role="img"
+          viewBox="0 0 220 34"
+          className="mb-2 h-12 w-[300px] overflow-visible text-foreground"
+        >
+          <path id="login-brand-arc" d="M 36 22 Q 110 6 184 22" fill="none" />
+          <text
+            fill="currentColor"
+            fontSize="20"
+            fontWeight="800"
+            textAnchor="middle"
+            style={{
+              fontFamily:
+                '"Arial Rounded MT Bold", "Avenir Next Rounded", ui-rounded, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            }}
+          >
+            <textPath href="#login-brand-arc" startOffset="50%">
+              Frogress
+            </textPath>
+          </text>
+        </svg>
+
+        {/* Frog mascot — sits on top of the email input, fly buzzing above. No container. */}
+        <div className="pointer-events-none relative z-10 flex w-full translate-y-[11px] flex-col items-center">
+          {!flyCaught && flyState !== 'hidden' && (
+            <motion.div
+              aria-hidden
+              className="absolute left-1/2 z-10 -translate-x-1/2"
+              style={{ top: '-6%' }}
+              initial={
+                flyState === 'entering'
+                  ? { x: '55vw', y: -16, rotate: 12 }
+                  : false
+              }
+              animate={
+                flyState === 'entering'
+                  ? FLY_BUZZ_START
+                  : flyControls
+              }
+              transition={
+                flyState === 'entering'
+                  ? { duration: 0.75, ease: [0.22, 1, 0.36, 1] }
+                  : undefined
+              }
+              onAnimationComplete={() => {
+                if (flyState !== 'entering') return;
+                setFlyState('buzzing');
+              }}
+            >
+              <div
+                ref={(el) => {
+                  flyRefs.current[FLY_KEY] = el;
+                }}
+              >
+                <Fly size={38} interactive={false} />
+              </div>
+            </motion.div>
+          )}
+          <div ref={frogBoxRef}>
+            <Frog
+              ref={frogRef}
+              mouthOpen={!!grab}
+              indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
+            />
+          </div>
         </div>
 
         {isUpgrade && (
-          <div className="mb-3 w-full rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-center shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
+          <div className="mt-5 w-full rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-center shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10">
             <p className="text-sm font-black text-amber-900 dark:text-amber-200">
               You&apos;re in Guest Mode
             </p>
@@ -268,269 +333,156 @@ function LoginPageInner() {
           </div>
         )}
 
-        <div className="w-full overflow-hidden rounded-[32px] border border-border/50 bg-card/80 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.12)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.35)]">
-          <div className="px-6 pt-10 pb-2">
-            <AnimatePresence mode="wait" custom={dir}>
-              {step === 'enter' && (
-                <motion.div
-                  key="enter"
-                  custom={dir}
-                  variants={slide}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <div className="flex items-center gap-3 mb-5">
-                    <Link
-                      href="/welcome"
-                      className="flex items-center justify-center transition border rounded-full w-9 h-9 border-border/60 bg-background text-muted-foreground hover:bg-muted shrink-0"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                    </Link>
-                    <div>
-                      <h1 className="text-xl font-black leading-tight tracking-tight uppercase text-foreground">
-                        Welcome back!
-                      </h1>
-                      <p className="text-xs text-muted-foreground">
-                        {method === 'phone'
-                          ? "We'll text you a verification code"
-                          : "We'll email you a sign-in link"}
-                      </p>
-                    </div>
-                  </div>
-
-                  {method === 'phone' ? (
-                    <form onSubmit={handleSendPhoneCode} className="space-y-4">
-                      <div className="space-y-1.5">
-                        <Label
-                          htmlFor="phone"
-                          className="ml-1 text-xs font-bold uppercase text-muted-foreground"
-                        >
-                          Phone number
-                        </Label>
-                        <Input
-                          ref={phoneRef}
-                          id="phone"
-                          type="tel"
-                          inputMode="tel"
-                          placeholder="+1 555 123 4567"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="h-12 rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
-                          required
-                          autoFocus
-                        />
-                      </div>
-                      {error && <ErrorMsg>{error}</ErrorMsg>}
-                      <button
-                        type="submit"
-                        disabled={!phone.trim() || loading}
-                        className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <>
-                            Next <ArrowRight className="w-4 h-4" />
-                          </>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setError(null);
-                          setMethod('email');
-                          setTimeout(() => emailRef.current?.focus(), 50);
-                        }}
-                        className="block w-full mt-2 text-xs font-bold tracking-wide text-primary hover:underline"
-                      >
-                        Use email instead
-                      </button>
-                    </form>
-                  ) : (
-                    <form onSubmit={handleSendEmailLink} className="space-y-4">
-                      <div className="space-y-1.5">
-                        <Label
-                          htmlFor="email"
-                          className="ml-1 text-xs font-bold uppercase text-muted-foreground"
-                        >
-                          Email
-                        </Label>
-                        <Input
-                          ref={emailRef}
-                          id="email"
-                          type="email"
-                          placeholder="hello@example.com"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="h-12 rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30"
-                          required
-                          autoFocus
-                        />
-                      </div>
-                      {error && <ErrorMsg>{error}</ErrorMsg>}
-                      <button
-                        type="submit"
-                        disabled={!email.trim() || loading}
-                        className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {loading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          'Send sign-in link'
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setError(null);
-                          setMethod('phone');
-                          setTimeout(() => phoneRef.current?.focus(), 50);
-                        }}
-                        className="block w-full mt-2 text-xs font-bold tracking-wide text-primary hover:underline"
-                      >
-                        Use phone instead
-                      </button>
-                    </form>
-                  )}
-
-                  <div className="relative my-4">
-                    <div className="absolute inset-0 flex items-center">
-                      <span className="w-full border-t border-border/60" />
-                    </div>
-                    <div className="relative flex justify-center text-xs uppercase">
-                      <span className="px-2 font-bold tracking-widest bg-card text-muted-foreground">
-                        Or
-                      </span>
-                    </div>
-                  </div>
-
+        {/* Step content */}
+        <div className="w-full">
+          <AnimatePresence mode="wait" custom={dir}>
+            {step === 'enter' && (
+              <motion.div
+                key="enter"
+                custom={dir}
+                variants={slide}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+              >
+                <form onSubmit={handleSendEmailLink} className="space-y-3">
+                  <Input
+                    ref={emailRef}
+                    id="email"
+                    type="email"
+                    aria-label="Email"
+                    placeholder="hello@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="h-12 rounded-2xl border-border/60 bg-card/60 px-4 text-base focus-visible:ring-primary/30"
+                    required
+                    autoFocus
+                  />
                   <button
-                    onClick={handleGoogle}
-                    disabled={loading}
-                    className="flex items-center justify-center w-full h-12 gap-3 text-sm font-bold tracking-wide transition-all border rounded-2xl border-border bg-background hover:bg-muted/50"
+                    type="submit"
+                    disabled={!email.trim() || loading}
+                    className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {loading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      <>{GOOGLE_ICON} Continue with Google</>
+                      <>
+                        Send sign-in link <ArrowRight className="h-4 w-4" />
+                      </>
                     )}
                   </button>
-                </motion.div>
-              )}
+                </form>
 
-              {step === 'verify-phone' && (
-                <motion.div
-                  key="verify"
-                  custom={dir}
-                  variants={slide}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                >
-                  <div className="flex items-center gap-3 mb-5">
-                    <button
-                      onClick={back}
-                      className="flex items-center justify-center transition border rounded-full w-9 h-9 border-border/60 bg-background text-muted-foreground hover:bg-muted shrink-0"
-                    >
-                      <ArrowLeft className="w-4 h-4" />
-                    </button>
-                    <div>
-                      <h1 className="text-xl font-black leading-tight tracking-tight uppercase text-foreground">
-                        Enter the code
-                      </h1>
-                      <p className="text-xs text-muted-foreground truncate max-w-[220px]">
-                        Sent to {phone}
-                      </p>
-                    </div>
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border/60" />
                   </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 font-bold tracking-widest text-muted-foreground">
+                      Or
+                    </span>
+                  </div>
+                </div>
 
-                  <form onSubmit={handleVerifyPhoneCode} className="space-y-4">
-                    <div className="space-y-1.5">
-                      <Label
-                        htmlFor="code"
-                        className="ml-1 text-xs font-bold uppercase text-muted-foreground"
-                      >
-                        Verification code
-                      </Label>
-                      <Input
-                        ref={codeRef}
-                        id="code"
-                        type="text"
-                        inputMode="numeric"
-                        autoComplete="one-time-code"
-                        placeholder="123456"
-                        value={code}
-                        onChange={(e) =>
-                          setCode(e.target.value.replace(/\D/g, '').slice(0, 6))
-                        }
-                        className="h-12 rounded-xl border-border/60 bg-background/50 focus-visible:ring-primary/30 tracking-[0.5em] text-center font-bold"
-                        required
-                      />
-                    </div>
-                    {error && <ErrorMsg>{error}</ErrorMsg>}
-                    <button
-                      type="submit"
-                      disabled={code.length < 6 || loading}
-                      className="flex items-center justify-center gap-2 w-full h-12 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all shadow-lg shadow-primary/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        'Verify'
-                      )}
-                    </button>
-                  </form>
-                </motion.div>
-              )}
-
-              {step === 'email-sent' && (
-                <motion.div
-                  key="emailsent"
-                  custom={dir}
-                  variants={slide}
-                  initial="enter"
-                  animate="center"
-                  exit="exit"
-                  transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                  className="text-center py-6"
+                <button
+                  onClick={handleGoogle}
+                  disabled={loading}
+                  className="flex h-12 w-full items-center justify-center gap-3 rounded-2xl border border-border bg-card/60 text-sm font-bold tracking-wide transition-all hover:bg-muted/50 active:scale-[0.98]"
                 >
-                  <h1 className="text-2xl font-black tracking-tight text-foreground">
-                    Check your email
-                  </h1>
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    We sent a sign-in link to
-                    <br />
-                    <span className="font-bold text-foreground">{email}</span>
-                  </p>
-                  <button
-                    onClick={back}
-                    className="mt-6 text-xs font-bold tracking-wide text-primary hover:underline"
-                  >
-                    Use a different method
-                  </button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>{GOOGLE_ICON} Continue with Google</>
+                  )}
+                </button>
+              </motion.div>
+            )}
 
-          <div className="px-6 py-4 mt-3 text-center border-t bg-muted/30 border-border">
-            <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
-              No frog yet?{' '}
-              <Link
-                href="/welcome"
-                className="ml-1 text-primary hover:underline decoration-2 underline-offset-4"
+            {step === 'email-sent' && (
+              <motion.div
+                key="emailsent"
+                custom={dir}
+                variants={slide}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                className="flex flex-col items-center text-center"
               >
-                Hatch one
-              </Link>
-            </p>
-          </div>
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                  <MailCheck className="h-7 w-7" />
+                </div>
+                <h1 className="mt-4 text-xl font-black uppercase tracking-tight text-foreground">
+                  Check your email
+                </h1>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  We sent a sign-in link to
+                  <br />
+                  <span className="font-bold text-foreground">{email}</span>
+                </p>
+                <button
+                  onClick={back}
+                  className="mt-6 text-xs font-bold tracking-wide text-primary hover:underline"
+                >
+                  Use a different email
+                </button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+
+        <p className="mt-8 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+          No frog yet?{' '}
+          <Link
+            href="/welcome"
+            className="ml-1 text-primary decoration-2 underline-offset-4 hover:underline"
+          >
+            Adopt one
+          </Link>
+        </p>
       </div>
 
-      <div id="recaptcha-container" />
+      {/* Tongue overlay — driven directly by the RAF loop in useFrogTongue */}
+      {grab && (
+        <svg
+          key={grab.startAt}
+          className="pointer-events-none fixed inset-0 z-40"
+          width={vp.w}
+          height={vp.h}
+          viewBox={`0 0 ${vp.w} ${vp.h}`}
+          preserveAspectRatio="none"
+          style={{ width: vp.w, height: vp.h }}
+        >
+          <defs>
+            <linearGradient id="login-tongue-grad" x1="0" y1="0" x2="0" y2="1">
+              <stop stopColor="#ff6b6b" />
+              <stop offset="1" stopColor="#f43f5e" />
+            </linearGradient>
+          </defs>
+
+          <path
+            ref={tonguePathEl}
+            d="M0 0 L0 0"
+            fill="none"
+            stroke="url(#login-tongue-grad)"
+            strokeWidth={TONGUE_STROKE}
+            strokeLinecap="round"
+            vectorEffect="non-scaling-stroke"
+          />
+
+          <g ref={tipGroupEl} style={{ visibility: 'hidden' }}>
+            <circle r={10} fill="transparent" />
+            <image
+              href="/fly.svg"
+              x={-FLY_PX / 2}
+              y={-FLY_PX / 2}
+              width={FLY_PX}
+              height={FLY_PX}
+            />
+          </g>
+        </svg>
+      )}
     </main>
   );
 }
@@ -541,17 +493,5 @@ export default function LoginPage() {
     <Suspense fallback={null}>
       <LoginPageInner />
     </Suspense>
-  );
-}
-
-function ErrorMsg({ children }: { children: React.ReactNode }) {
-  return (
-    <motion.p
-      initial={{ opacity: 0, y: -4 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="text-[11px] font-black uppercase tracking-wider text-center text-destructive bg-destructive/10 border border-destructive/30 rounded-xl px-3 py-2"
-    >
-      {children}
-    </motion.p>
   );
 }

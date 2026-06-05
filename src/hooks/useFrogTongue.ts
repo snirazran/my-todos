@@ -27,6 +27,10 @@ export interface UseFrogTongueOptions {
   frogBoxRef?: React.RefObject<HTMLDivElement | null>;
   flyRefs: React.MutableRefObject<Record<string, HTMLElement | null>>;
   scrollContainerRef?: React.RefObject<HTMLElement | null>;
+  trackMovingTarget?: boolean;
+  durationMs?: number;
+  originYOffset?: number;
+  keepTargetHiddenUntilPersist?: boolean;
 }
 
 export function useFrogTongue({
@@ -34,6 +38,10 @@ export function useFrogTongue({
   frogBoxRef,
   flyRefs,
   scrollContainerRef,
+  trackMovingTarget = false,
+  durationMs = TONGUE_MS,
+  originYOffset = ORIGIN_Y_ADJ,
+  keepTargetHiddenUntilPersist = false,
 }: UseFrogTongueOptions) {
   const cooldownUntil = useRef(0);
   const animatingRef = useRef(false);
@@ -103,13 +111,13 @@ export function useFrogTongue({
     if (sc) {
       return {
         x: p.x,
-        y: p.y - sc.getBoundingClientRect().top + sc.scrollTop + ORIGIN_Y_ADJ,
+        y: p.y - sc.getBoundingClientRect().top + sc.scrollTop + originYOffset,
       };
     }
     const offX = window.pageXOffset || document.documentElement.scrollLeft;
     const offY = window.pageYOffset || document.documentElement.scrollTop;
-    return { x: p.x + offX, y: p.y + offY + ORIGIN_Y_ADJ };
-  }, [frogRef]);
+    return { x: p.x + offX, y: p.y + offY + originYOffset };
+  }, [frogRef, originYOffset]);
 
   const getFlyDoc = useCallback((el: HTMLElement) => {
     const r = el.getBoundingClientRect();
@@ -236,14 +244,15 @@ export function useFrogTongue({
     const scTop = sc ? sc.getBoundingClientRect().top : 0;
 
     /* Use grab.targetDoc directly – these coordinates were captured in
-       triggerTongue at the correct scroll position and are proven to
-       target the right element. DO NOT re-capture from the live DOM
-       element here; React re-renders between setGrab and this effect
-       can give stale/wrong getBoundingClientRect values. */
+       triggerTongue at the correct scroll position. Moving targets
+       explicitly opt in to live DOM tracking until impact. */
     const p0Doc = getMouthDoc();
-    const p2 = grab.targetDoc;
+    let p2Doc = grab.targetDoc;
 
-    const buildGeom = (p0: { x: number; y: number }) => {
+    const buildGeom = (
+      p0: { x: number; y: number },
+      p2: { x: number; y: number },
+    ) => {
       const p1 = { x: (p0.x + p2.x) / 2, y: p0.y - 120 };
       const tmp = document.createElementNS(
         'http://www.w3.org/2000/svg',
@@ -257,7 +266,7 @@ export function useFrogTongue({
       return { tmp, total, p1 };
     };
 
-    const { tmp, total, p1: p1Doc } = buildGeom(p0Doc);
+    let { tmp, total, p1: p1Doc } = buildGeom(p0Doc, p2Doc);
     geomRef.current = {
       total,
       getPointAtLength: (s: number) => tmp.getPointAtLength(s),
@@ -267,6 +276,7 @@ export function useFrogTongue({
 
     const pathNode = tonguePathEl.current;
     if (pathNode) {
+      pathNode.style.visibility = 'visible';
       pathNode.style.strokeDasharray = `0 ${total}`;
       pathNode.style.strokeDashoffset = '0';
     }
@@ -276,7 +286,7 @@ export function useFrogTongue({
       const offY = (sc ? sc.scrollTop : window.scrollY) - scTop;
       const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
       const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
-      const p2V = { x: p2.x - offX, y: p2.y - offY };
+      const p2V = { x: p2Doc.x - offX, y: p2Doc.y - offY };
       pathNode?.setAttribute(
         'd',
         `M ${p0V.x} ${p0V.y} Q ${p1V.x} ${p1V.y} ${p2V.x} ${p2V.y}`,
@@ -297,8 +307,19 @@ export function useFrogTongue({
       lastTickRef.current = realNow;
       const now = realNow + timeOffsetRef.current;
 
-      const tRaw = (now - grab.startAt) / TONGUE_MS;
+      const tRaw = (now - grab.startAt) / durationMs;
       const t = Math.max(0, Math.min(1, tRaw));
+
+      if (trackMovingTarget && t <= HIT_AT) {
+        const flyEl = flyRefs.current[grab.key];
+        if (flyEl?.isConnected) {
+          p2Doc = getFlyDoc(flyEl);
+          ({ tmp, total, p1: p1Doc } = buildGeom(p0Doc, p2Doc));
+          geomRef.current!.total = total;
+          geomRef.current!.getPointAtLength = (s: number) =>
+            tmp.getPointAtLength(s);
+        }
+      }
 
       const forward =
         t <= HIT_AT ? t / HIT_AT : 1 - (t - HIT_AT) / (1 - HIT_AT);
@@ -311,7 +332,7 @@ export function useFrogTongue({
       if (grab.follow) {
         if (now >= grab.camStartAt && t <= HIT_AT) {
           const seg =
-            (now - grab.camStartAt) / (TONGUE_MS * HIT_AT - CAM_START_DELAY);
+            (now - grab.camStartAt) / (durationMs * HIT_AT - CAM_START_DELAY);
           const clamped = Math.max(0, Math.min(1, seg));
           const eased = FOLLOW_EASE(clamped);
           paintScrollY =
@@ -329,7 +350,7 @@ export function useFrogTongue({
       const offY = paintScrollY - scTop;
       const p0V = { x: p0Doc.x - offX, y: p0Doc.y - offY };
       const p1V = { x: p1Doc.x - offX, y: p1Doc.y - offY };
-      const p2V = { x: p2.x - offX, y: p2.y - offY };
+      const p2V = { x: p2Doc.x - offX, y: p2Doc.y - offY };
 
       if (pathNode) {
         pathNode.setAttribute(
@@ -382,21 +403,32 @@ export function useFrogTongue({
         }
         if (pathNode) {
           pathNode.style.strokeDasharray = `0 ${total}`;
+          pathNode.style.visibility = 'hidden';
         }
 
-        Promise.resolve(grab.onPersist()).catch((error) => {
+        const persist = Promise.resolve(grab.onPersist()).catch((error) => {
           console.error('Failed to persist tongue action', error);
         });
-        setVisuallyDone((prev) => {
-          const s = new Set(prev);
-          s.delete(grab.key);
-          return s;
-        });
-        cooldownUntil.current = performance.now() + 220;
-        setTimeout(() => {
-          setCinematic(false);
-          setGrab(null);
-        }, 140);
+
+        const finishAnimation = () => {
+          setVisuallyDone((prev) => {
+            const s = new Set(prev);
+            s.delete(grab.key);
+            return s;
+          });
+          cooldownUntil.current = performance.now() + 220;
+          setTimeout(() => {
+            setCinematic(false);
+            setGrab(null);
+          }, 140);
+        };
+
+        if (keepTargetHiddenUntilPersist) {
+          void persist.finally(finishAnimation);
+        } else {
+          void persist;
+          finishAnimation();
+        }
       }
     };
 
@@ -411,9 +443,18 @@ export function useFrogTongue({
       }
       if (pathNode) {
         pathNode.style.strokeDasharray = `0 ${total}`;
+        pathNode.style.visibility = 'hidden';
       }
     };
-  }, [grab, getMouthDoc]);
+  }, [
+    durationMs,
+    flyRefs,
+    getFlyDoc,
+    getMouthDoc,
+    grab,
+    keepTargetHiddenUntilPersist,
+    trackMovingTarget,
+  ]);
 
   const speedUpTongue = useCallback(() => {
     speedRef.current = 2;

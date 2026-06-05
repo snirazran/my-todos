@@ -131,7 +131,7 @@ export default function SiteHeader() {
   ];
 
   // Desktop keeps a full header. Mobile only gets lightweight home-page controls.
-  if (pathname === '/onboarding' || pathname === '/welcome' || pathname?.startsWith('/auth/')) return null;
+  if (pathname === '/onboarding' || pathname === '/welcome' || pathname === '/login' || pathname?.startsWith('/auth/')) return null;
 
   return (
     <>
@@ -148,7 +148,10 @@ export default function SiteHeader() {
               user={user}
               loading={loading}
               onSignIn={() => router.push('/login')}
-              onSignOut={() => clearAuthTokenCookie()}
+              onSignOut={() => {
+                clearAuthTokenCookie();
+                router.replace('/login');
+              }}
               compactMobileHome
             />
           </div>
@@ -331,7 +334,10 @@ export default function SiteHeader() {
             user={user}
             loading={loading}
             onSignIn={() => router.push('/login')}
-            onSignOut={() => clearAuthTokenCookie()} // AuthContext handles state but manual cleanup helps
+            onSignOut={() => {
+              clearAuthTokenCookie();
+              router.replace('/login'); // send straight to login on logout
+            }}
           />
 
           {user && flyBalance !== undefined && (

@@ -89,7 +89,8 @@
       "Bash(pnpm patch-commit *)",
       "Bash(sed -i '364,492d' src/components/ui/skins/TradePanel.tsx)",
       "Bash(sed -n '360,372p' src/components/ui/skins/TradePanel.tsx)",
-      "Bash(echo \"exit=$?\")"
+      "Bash(echo \"exit=$?\")",
+      "Bash(rg -n \"h-13|h-12|h-14\" tailwind.config.*)"
     ]
   }
 }
