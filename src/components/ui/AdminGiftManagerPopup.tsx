@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -33,9 +33,18 @@ type GiftDrop = {
   item?: ItemDef;
 };
 
+type DropMode = 'item' | 'rarity';
+
+type RarityDrop = {
+  rarity: ItemDef['rarity'];
+  chance: number;
+};
+
 type GiftConfig = {
   gift: DbItem;
+  dropMode?: DropMode;
   drops: GiftDrop[];
+  rarityDrops?: RarityDrop[];
 };
 
 const RARITIES: ItemDef['rarity'][] = [
@@ -45,6 +54,15 @@ const RARITIES: ItemDef['rarity'][] = [
   'epic',
   'legendary',
 ];
+
+// Sensible starting weights when an admin first switches a gift to rarity mode.
+const DEFAULT_RARITY_CHANCES: Record<ItemDef['rarity'], string> = {
+  common: '60',
+  uncommon: '25',
+  rare: '10',
+  epic: '4',
+  legendary: '1',
+};
 
 const RARITY_TEXT: Record<ItemDef['rarity'], string> = {
   common: 'text-muted-foreground',
@@ -78,6 +96,10 @@ export function AdminGiftManagerPopup({
     hidden: false,
   });
   const [drops, setDrops] = useState<GiftDrop[]>([]);
+  const [dropMode, setDropMode] = useState<DropMode>('item');
+  const [rarityChances, setRarityChances] = useState<Record<string, string>>({
+    ...DEFAULT_RARITY_CHANCES,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -92,6 +114,14 @@ export function AdminGiftManagerPopup({
   const totalChance = useMemo(
     () => drops.reduce((sum, drop) => sum + Math.max(0, Number(drop.chance) || 0), 0),
     [drops],
+  );
+  const totalRarityChance = useMemo(
+    () =>
+      RARITIES.reduce(
+        (sum, rarity) => sum + Math.max(0, Number(rarityChances[rarity]) || 0),
+        0,
+      ),
+    [rarityChances],
   );
   const rewardCatalog = useMemo<Record<string, QuestRewardCatalogItem>>(
     () => Object.fromEntries(catalog.map((item) => [item.id, item])),
@@ -142,6 +172,15 @@ export function AdminGiftManagerPopup({
       hidden: !!config.gift.hidden,
     });
     setDrops(config.drops.map((drop) => ({ itemId: drop.itemId, chance: drop.chance, item: drop.item })));
+    setDropMode(config.dropMode === 'rarity' ? 'rarity' : 'item');
+    const nextRarity: Record<string, string> = { ...DEFAULT_RARITY_CHANCES };
+    if (config.rarityDrops && config.rarityDrops.length > 0) {
+      RARITIES.forEach((rarity) => (nextRarity[rarity] = '0'));
+      config.rarityDrops.forEach((entry) => {
+        nextRarity[entry.rarity] = String(entry.chance);
+      });
+    }
+    setRarityChances(nextRarity);
   };
 
   const startAdd = () => {
@@ -158,6 +197,8 @@ export function AdminGiftManagerPopup({
       hidden: false,
     });
     setDrops([]);
+    setDropMode('item');
+    setRarityChances({ ...DEFAULT_RARITY_CHANCES });
   };
 
   const selectGift = (config: GiftConfig) => {
@@ -200,6 +241,11 @@ export function AdminGiftManagerPopup({
     setDrops((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const updateRarityChance = (rarity: string, value: string) => {
+    setConfirmSave(false);
+    setRarityChances((prev) => ({ ...prev, [rarity]: value }));
+  };
+
   const saveGift = async () => {
     if (!form.name.trim()) return;
     if (!confirmSave) {
@@ -219,10 +265,15 @@ export function AdminGiftManagerPopup({
         rarity: form.rarity,
         priceFlies: Number(form.priceFlies) || 0,
         hidden: form.hidden,
+        dropMode,
         drops: drops.map((drop) => ({
           itemId: drop.itemId,
           chance: Number(drop.chance) || 0,
         })),
+        rarityDrops: RARITIES.map((rarity) => ({
+          rarity,
+          chance: Number(rarityChances[rarity]) || 0,
+        })).filter((entry) => entry.chance > 0),
       };
       const res = await fetch('/api/admin/gifts', {
         method: addingNew ? 'POST' : 'PUT',
@@ -283,6 +334,7 @@ export function AdminGiftManagerPopup({
 
   return createPortal(
     <AnimatePresence>
+      <Fragment key="gift-manager-popup">
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -483,21 +535,49 @@ export function AdminGiftManagerPopup({
                     </div>
 
                     <div className="rounded-3xl border border-border/50 bg-card p-4">
-                      <div className="mb-3 flex items-center justify-between gap-3">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <h3 className="text-sm font-black text-foreground">
                             Drops
                           </h3>
                           <p className="text-[11px] text-muted-foreground">
-                            Chances are weights. Current total: {totalChance.toLocaleString()}
+                            {dropMode === 'rarity'
+                              ? `Roll a rarity, then a random item of it. Total weight: ${totalRarityChance.toLocaleString()}`
+                              : `Chances are weights. Current total: ${totalChance.toLocaleString()}`}
                           </p>
                         </div>
-                        <Button onClick={addDrop} size="sm" variant="outline" className="gap-2">
-                          <Plus className="h-4 w-4" />
-                          Add Drop
-                        </Button>
+                        <div className="flex items-center gap-2">
+                          <div className="flex rounded-xl border border-border/60 bg-muted/30 p-0.5">
+                            {(['item', 'rarity'] as const).map((mode) => (
+                              <button
+                                key={mode}
+                                type="button"
+                                onClick={() => {
+                                  setConfirmSave(false);
+                                  setDropMode(mode);
+                                }}
+                                className={cn(
+                                  'rounded-lg px-3 py-1.5 text-[11px] font-black uppercase tracking-wide transition',
+                                  dropMode === mode
+                                    ? 'bg-primary text-primary-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground',
+                                )}
+                              >
+                                {mode === 'item' ? 'By Item' : 'By Rarity'}
+                              </button>
+                            ))}
+                          </div>
+                          {dropMode === 'item' && (
+                            <Button onClick={addDrop} size="sm" variant="outline" className="gap-2">
+                              <Plus className="h-4 w-4" />
+                              Add Drop
+                            </Button>
+                          )}
+                        </div>
                       </div>
 
+                      {dropMode === 'item' ? (
+                      <>
                       <div className="mb-4 rounded-2xl border border-border/50 bg-background/70 p-3">
                         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
                           <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -616,6 +696,42 @@ export function AdminGiftManagerPopup({
                           })
                         )}
                       </div>
+                      </>
+                      ) : (
+                        <div className="space-y-2">
+                          {RARITIES.map((rarity) => {
+                            const num = Number(rarityChances[rarity]) || 0;
+                            const pct =
+                              totalRarityChance > 0 ? (num / totalRarityChance) * 100 : 0;
+                            return (
+                              <div
+                                key={rarity}
+                                className="grid grid-cols-[minmax(0,1fr)_88px_56px] items-center gap-2 rounded-2xl border border-border/50 bg-background p-2"
+                              >
+                                <div className={cn('px-2 text-sm font-black uppercase', RARITY_TEXT[rarity])}>
+                                  {rarity}
+                                </div>
+                                <input
+                                  type="number"
+                                  min={0}
+                                  step="0.000001"
+                                  value={rarityChances[rarity] ?? '0'}
+                                  onChange={(e) => updateRarityChance(rarity, e.target.value)}
+                                  className="w-full rounded-xl border border-border bg-background px-2 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-primary/25"
+                                />
+                                <div className="text-center text-[11px] font-black text-muted-foreground">
+                                  {pct >= 1 ? pct.toFixed(1) : pct.toFixed(2)}%
+                                </div>
+                              </div>
+                            );
+                          })}
+                          <p className="px-1 pt-1 text-[11px] text-muted-foreground">
+                            On open, a rarity is rolled by these weights, then a random
+                            non-gift item of that rarity is awarded. Rarities with no items
+                            are skipped.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                     <Button
@@ -644,6 +760,7 @@ export function AdminGiftManagerPopup({
           </div>
         </motion.div>
       </div>
+      </Fragment>
     </AnimatePresence>,
     document.body,
   );

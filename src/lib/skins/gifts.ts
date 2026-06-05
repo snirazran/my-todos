@@ -4,8 +4,23 @@ import connectMongo from '@/lib/mongoose';
 import { CATALOG, type ItemDef } from './catalog';
 import { getFullCatalog, buildById } from './getCatalog';
 
+export type GiftDropMode = 'item' | 'rarity';
+
+export const GIFT_RARITIES: ItemDef['rarity'][] = [
+  'common',
+  'uncommon',
+  'rare',
+  'epic',
+  'legendary',
+];
+
 export type GiftDropEntry = {
   itemId: string;
+  chance: number;
+};
+
+export type GiftRarityDrop = {
+  rarity: ItemDef['rarity'];
   chance: number;
 };
 
@@ -15,7 +30,9 @@ export type GiftDropView = GiftDropEntry & {
 
 export type GiftConfigView = {
   gift: ItemDef;
+  dropMode: GiftDropMode;
   drops: GiftDropView[];
+  rarityDrops: GiftRarityDrop[];
 };
 
 const DEFAULT_RARITY_DROPS: Record<string, Partial<Record<ItemDef['rarity'], number>>> = {
@@ -140,14 +157,26 @@ export async function getGiftConfigs(includeHidden = false): Promise<GiftConfigV
   return catalog
     .filter((item) => item.slot === 'container')
     .sort((a, b) => a.riveIndex - b.riveIndex || a.name.localeCompare(b.name))
-    .map((gift) => ({
-      gift,
-      drops: (configMap.get(gift.id)?.drops ?? []).map((drop) => ({
-        itemId: drop.itemId,
-        chance: drop.chance,
-        item: byId[drop.itemId],
-      })),
-    }));
+    .map((gift) => {
+      const config = configMap.get(gift.id);
+      return {
+        gift,
+        dropMode: (config?.dropMode === 'rarity' ? 'rarity' : 'item') as GiftDropMode,
+        drops: (config?.drops ?? []).map((drop) => ({
+          itemId: drop.itemId,
+          chance: drop.chance,
+          item: byId[drop.itemId],
+        })),
+        rarityDrops: (config?.rarityDrops ?? [])
+          .filter((entry): entry is GiftRarityDrop =>
+            GIFT_RARITIES.includes(entry.rarity as ItemDef['rarity']),
+          )
+          .map((entry) => ({
+            rarity: entry.rarity as ItemDef['rarity'],
+            chance: entry.chance,
+          })),
+      };
+    });
 }
 
 export async function getGiftConfig(giftId: string): Promise<GiftConfigView | null> {
@@ -155,20 +184,73 @@ export async function getGiftConfig(giftId: string): Promise<GiftConfigView | nu
   return configs.find((config) => config.gift.id === giftId) ?? null;
 }
 
-export function pickGiftDrop(config: GiftConfigView): ItemDef | null {
+function weightedPick<T>(entries: { value: T; weight: number }[]): T | null {
+  const valid = entries.filter((e) => e.weight > 0);
+  if (valid.length === 0) return null;
+  const total = valid.reduce((sum, e) => sum + e.weight, 0);
+  if (total <= 0) return null;
+  let roll = Math.random() * total;
+  for (const e of valid) {
+    roll -= e.weight;
+    if (roll <= 0) return e.value;
+  }
+  return valid[valid.length - 1].value;
+}
+
+/**
+ * Pick a prize for a gift.
+ * - 'item' mode: weighted pick across the configured item drops.
+ * - 'rarity' mode: weighted pick of a rarity bucket, then a uniformly random
+ *   prize item of that rarity. `prizePool` (the catalog) is required for this.
+ */
+export function pickGiftDrop(
+  config: GiftConfigView,
+  prizePool?: ItemDef[],
+): ItemDef | null {
+  if (config.dropMode === 'rarity') {
+    const pool = (prizePool ?? []).filter((item) => item.slot !== 'container');
+    // Only consider rarities that actually have items available.
+    const candidates = config.rarityDrops
+      .filter((entry) => entry.chance > 0 && pool.some((i) => i.rarity === entry.rarity))
+      .map((entry) => ({ value: entry.rarity, weight: entry.chance }));
+    const rarity = weightedPick(candidates);
+    if (!rarity) return null;
+    const items = pool.filter((item) => item.rarity === rarity);
+    if (items.length === 0) return null;
+    return items[Math.floor(Math.random() * items.length)];
+  }
+
   const validDrops = config.drops.filter(
     (drop): drop is GiftDropView & { item: ItemDef } =>
       !!drop.item && drop.chance > 0 && drop.item.slot !== 'container',
   );
-  if (validDrops.length === 0) return null;
+  return weightedPick(validDrops.map((drop) => ({ value: drop.item, weight: drop.chance })));
+}
 
-  const total = validDrops.reduce((sum, drop) => sum + drop.chance, 0);
-  if (total <= 0) return null;
+/**
+ * Resolve a gift config into a concrete per-item drop list (for display).
+ * In 'rarity' mode each rarity weight is split evenly across every catalog
+ * item of that rarity, so callers see the true per-item probability.
+ */
+export function expandGiftDrops(
+  config: GiftConfigView,
+  prizePool: ItemDef[],
+): GiftDropView[] {
+  if (config.dropMode !== 'rarity') return config.drops;
 
-  let roll = Math.random() * total;
-  for (const drop of validDrops) {
-    roll -= drop.chance;
-    if (roll <= 0) return drop.item;
-  }
-  return validDrops[validDrops.length - 1].item;
+  const pool = prizePool.filter((item) => item.slot !== 'container');
+  const usable = config.rarityDrops.filter(
+    (entry) => entry.chance > 0 && pool.some((i) => i.rarity === entry.rarity),
+  );
+  const totalWeight = usable.reduce((sum, entry) => sum + entry.chance, 0);
+  if (totalWeight <= 0) return [];
+
+  const result: GiftDropView[] = [];
+  usable.forEach((entry) => {
+    const items = pool.filter((item) => item.rarity === entry.rarity);
+    if (items.length === 0) return;
+    const perItem = entry.chance / totalWeight / items.length;
+    items.forEach((item) => result.push({ itemId: item.id, chance: perItem, item }));
+  });
+  return result;
 }

@@ -816,8 +816,21 @@ function SwitchFocusConfirm({
   onClose: () => void;
 }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    const check = () =>
+      setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
   if (!mounted) return null;
+
+  // On desktop the panel is vertically centered, so a 100%-of-its-own-height
+  // slide doesn't clear the viewport. Use a viewport-relative offset there so
+  // it always slides fully off the bottom.
+  const offscreen = isDesktop ? '100vh' : '100%';
 
   return createPortal(
     <AnimatePresence>
@@ -835,9 +848,9 @@ function SwitchFocusConfirm({
           <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1201] flex justify-center sm:inset-0 sm:items-center sm:p-6">
             <motion.div
               key="switch-panel"
-              initial={{ y: '100%' }}
+              initial={{ y: offscreen }}
               animate={{ y: 0 }}
-              exit={{ y: '100%' }}
+              exit={{ y: offscreen }}
               transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
               drag="y"
               dragConstraints={{ top: 0, bottom: 0 }}

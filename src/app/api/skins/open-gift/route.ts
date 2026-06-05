@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     const giftConfig = await getGiftConfig(giftBoxId);
     if (!giftConfig) return json({ error: 'Gift is not configured' }, 400);
 
-    const prize = pickGiftDrop(giftConfig);
+    const prize = pickGiftDrop(giftConfig, fullCatalog);
     if (!prize) return json({ error: 'Gift has no available drops' }, 400);
 
     await connectMongo();

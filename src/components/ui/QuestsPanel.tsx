@@ -30,7 +30,7 @@ import { SingleRewardCard } from './daily-reward/RewardCard';
 import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
 import Fly from './fly';
-import { AnimatedNumber } from './AnimatedNumber';
+import { FlyCounter } from './FlyCounter';
 import { mutateInventoryCaches, useInventory } from '@/hooks/useInventory';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { useDraggableScroll } from '@/hooks/useDraggableScroll';
@@ -1734,8 +1734,29 @@ function LockedPlusPreview({
     };
   }, []);
 
+  // On desktop (md+) the panel is centered, so sliding by its own height won't
+  // clear the screen. Use a viewport-relative offset there so it always slides
+  // fully off the bottom on close.
+  const [isDesktop, setIsDesktop] = useState(
+    () =>
+      typeof window !== 'undefined' &&
+      window.matchMedia('(min-width: 768px)').matches,
+  );
+  useEffect(() => {
+    const check = () =>
+      setIsDesktop(window.matchMedia('(min-width: 768px)').matches);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+  const offscreen = isDesktop ? '100vh' : '100%';
+
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
       className="fixed inset-0 z-[1400] flex items-end justify-center bg-black/55 backdrop-blur-sm md:items-center md:px-5"
       onClick={onClose}
     >
@@ -1748,9 +1769,12 @@ function LockedPlusPreview({
         onDragEnd={(_, info) => {
           if (info.offset.y > 120 || info.velocity.y > 500) onClose();
         }}
-        initial={{ y: '100%' }}
+        initial={{ y: offscreen }}
         animate={{ y: 0 }}
-        exit={{ y: '100%' }}
+        exit={{
+          y: offscreen,
+          transition: { type: 'tween', duration: 0.3, ease: [0.32, 0.72, 0, 1] },
+        }}
         transition={{ type: 'spring', stiffness: 320, damping: 34 }}
         className="relative w-full rounded-t-3xl bg-background px-5 pb-7 pt-3 shadow-[0_-20px_40px_-10px_rgba(0,0,0,0.35)] md:max-w-md md:rounded-3xl md:px-6 md:pb-7 md:pt-5"
       >
@@ -1835,7 +1859,7 @@ function LockedPlusPreview({
           </button>
         )}
       </motion.div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -1980,73 +2004,37 @@ function QuestRewardRevealOverlay({
 }
 
 function FlyGainToastPill({ toast }: { toast: FlyGainToast | null }) {
-  const [displayValue, setDisplayValue] = useState(0);
-
-  useEffect(() => {
-    if (!toast) return;
-    setDisplayValue(toast.from);
-    const startTimer = window.setTimeout(() => {
-      setDisplayValue(toast.to);
-    }, 260);
-    return () => window.clearTimeout(startTimer);
-  }, [toast]);
-
   if (typeof document === 'undefined') return null;
 
   return createPortal(
     <AnimatePresence mode="wait">
-      {toast && (
-        <motion.div
-          key={toast.id}
-          className="pointer-events-none fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[10000] flex justify-center px-4"
-          initial={{ opacity: 0, y: -42, scale: 0.96 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -34, scale: 0.98 }}
-          transition={{
-            duration: 0.42,
-            ease: [0.32, 0.72, 0, 1],
-          }}
-        >
-          <motion.div
-            initial={{ boxShadow: '0 0 0 0 hsl(var(--primary) / 0)' }}
-            animate={{
-              boxShadow: [
-                '0 0 0 0 hsl(var(--primary) / 0)',
-                '0 0 0 10px hsl(var(--primary) / 0.18)',
-                '0 0 0 0 hsl(var(--primary) / 0)',
-              ],
-            }}
-            transition={{ delay: 0.26, duration: 0.58 }}
-            className="flex items-center gap-2 rounded-full border border-primary/25 bg-card/95 py-2 pl-2.5 pr-4 text-foreground shadow-xl shadow-black/15 ring-1 ring-white/25 backdrop-blur-xl"
-          >
-            <motion.div
-              animate={{
-                rotate: [0, -12, 13, -7, 0],
-                y: [0, -3, 0, -1, 0],
-              }}
-              transition={{
-                delay: 0.22,
-                duration: 0.62,
-                ease: [0.32, 0.72, 0, 1],
-              }}
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10"
-            >
-              <Fly size={31} y={-4} paused={false} interactive={false} />
-            </motion.div>
-            <div className="flex items-baseline gap-1.5">
-              <span className="rounded-full bg-primary px-2 py-1 text-xs font-black leading-none text-primary-foreground">
-                +{toast.amount}
-              </span>
-              <AnimatedNumber
-                value={displayValue}
-                className="text-lg font-black tabular-nums leading-none"
-              />
-            </div>
-          </motion.div>
-        </motion.div>
-      )}
+      {toast && <FlyGainPill key={toast.id} toast={toast} />}
     </AnimatePresence>,
     document.body,
+  );
+}
+
+// Shows the same FlyCounter used in the home header, sliding in at the top of
+// the event overlay. Mounts at `from` so the count-up + "+N" pulse fire when
+// the balance ticks to `to` (FlyCounter skips the bump on its first render).
+function FlyGainPill({ toast }: { toast: FlyGainToast }) {
+  const [value, setValue] = useState(toast.from);
+
+  useEffect(() => {
+    const startTimer = window.setTimeout(() => setValue(toast.to), 260);
+    return () => window.clearTimeout(startTimer);
+  }, [toast.to]);
+
+  return (
+    <motion.div
+      className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[10000] flex justify-center px-4"
+      initial={{ opacity: 0, y: -42, scale: 0.96 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -34, scale: 0.98 }}
+      transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
+    >
+      <FlyCounter balance={value} variant="desktop" />
+    </motion.div>
   );
 }
 

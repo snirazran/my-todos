@@ -13,6 +13,13 @@ type DropInput = {
   chance?: number;
 };
 
+type RarityDropInput = {
+  rarity?: string;
+  chance?: number;
+};
+
+const RARITIES = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+
 function slugify(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
@@ -25,6 +32,21 @@ function sanitizeDrops(drops: DropInput[] | undefined) {
     merged.set(drop.itemId, (merged.get(drop.itemId) ?? 0) + drop.chance);
   });
   return Array.from(merged.entries()).map(([itemId, chance]) => ({ itemId, chance }));
+}
+
+function sanitizeRarityDrops(drops: RarityDropInput[] | undefined) {
+  if (!Array.isArray(drops)) return [];
+  const merged = new Map<string, number>();
+  drops.forEach((drop) => {
+    if (!drop.rarity || !RARITIES.includes(drop.rarity)) return;
+    if (typeof drop.chance !== 'number' || drop.chance <= 0) return;
+    merged.set(drop.rarity, (merged.get(drop.rarity) ?? 0) + drop.chance);
+  });
+  return Array.from(merged.entries()).map(([rarity, chance]) => ({ rarity, chance }));
+}
+
+function normalizeDropMode(mode: unknown): 'item' | 'rarity' {
+  return mode === 'rarity' ? 'rarity' : 'item';
 }
 
 export async function GET() {
@@ -55,7 +77,9 @@ export async function POST(req: NextRequest) {
       riveIndex?: number;
       rarity?: string;
       priceFlies?: number;
+      dropMode?: string;
       drops?: DropInput[];
+      rarityDrops?: RarityDropInput[];
     };
     try {
       body = await req.json();
@@ -90,7 +114,9 @@ export async function POST(req: NextRequest) {
 
     await GiftDropConfigModel.create({
       giftId: id,
+      dropMode: normalizeDropMode(body.dropMode),
       drops: sanitizeDrops(body.drops),
+      rarityDrops: sanitizeRarityDrops(body.rarityDrops),
     });
 
     return json({ ok: true, gift });
@@ -110,7 +136,9 @@ export async function PUT(req: NextRequest) {
       rarity?: string;
       priceFlies?: number;
       hidden?: boolean;
+      dropMode?: string;
       drops?: DropInput[];
+      rarityDrops?: RarityDropInput[];
     };
     try {
       body = await req.json();
@@ -136,10 +164,16 @@ export async function PUT(req: NextRequest) {
     );
     if (!gift) return json({ error: 'Gift not found' }, 404);
 
-    if (Array.isArray(body.drops)) {
+    const configUpdate: Record<string, unknown> = {};
+    if (body.dropMode !== undefined) configUpdate.dropMode = normalizeDropMode(body.dropMode);
+    if (Array.isArray(body.drops)) configUpdate.drops = sanitizeDrops(body.drops);
+    if (Array.isArray(body.rarityDrops))
+      configUpdate.rarityDrops = sanitizeRarityDrops(body.rarityDrops);
+
+    if (Object.keys(configUpdate).length > 0) {
       await GiftDropConfigModel.findOneAndUpdate(
         { giftId: body.id },
-        { $set: { drops: sanitizeDrops(body.drops) } },
+        { $set: configUpdate },
         { new: true, upsert: true },
       );
     }
