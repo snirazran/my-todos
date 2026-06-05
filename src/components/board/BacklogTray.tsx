@@ -173,6 +173,7 @@ export default React.memo(function BacklogTray({
                   align="left"
                   filter={filter}
                   onFilterChange={onFilterChange}
+                  showTypeFilters={false}
                   availableTags={userTags}
                   selectedTags={selectedTags}
                   onTagsChange={(tags) => onTagsChange?.(tags)}

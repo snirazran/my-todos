@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { motion } from 'framer-motion';
 import { CalendarCheck, CalendarClock, CalendarPlus, CheckCircle2, FolderOpen, Loader2, RotateCcw, X } from 'lucide-react';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
 import { BaseSheet } from '@/components/ui/BaseSheet';
@@ -548,6 +550,13 @@ function MissedSectionHeader({
 
 function MissedCinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
   const [active, setActive] = React.useState(false);
+  const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
+
+  React.useEffect(() => {
+    // Render into the shared notification stack so the hint rises and stacks
+    // exactly like the fly toast / Frogodoro pill (same container + motion).
+    setPortalTarget(document.getElementById('frog-bottom-stack-bottom'));
+  }, []);
 
   const handleSkip = React.useCallback(() => {
     if (active) return;
@@ -565,36 +574,43 @@ function MissedCinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
         onTouchStart={handleSkip}
       />
 
-      <div className="fixed bottom-0 left-0 right-0 z-[1091] flex justify-center pointer-events-none px-3 pb-[calc(env(safe-area-inset-bottom)+24px)] md:pb-0 md:bottom-24">
-        <div
-          className={`
-            flex items-center gap-2 rounded-full border px-3 py-2
-            shadow-sm backdrop-blur-2xl transition-colors duration-200
-            ${active ? 'bg-card/90 border-primary/40' : 'bg-card/80 border-border/50'}
-          `}
-        >
-          <span
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/15 text-primary transition-colors duration-200"
-            aria-hidden
+      {portalTarget &&
+        createPortal(
+          <motion.div
+            layout
+            initial={{ opacity: 0, y: 20, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className={`pointer-events-none w-full md:w-[380px] md:self-end flex items-center gap-3 px-4 py-3 rounded-[18px] border shadow-sm backdrop-blur-2xl transition-colors duration-200 ${
+              active
+                ? 'bg-card/90 text-foreground border-primary/40'
+                : 'bg-card/90 text-foreground border-border/50'
+            }`}
           >
-            {active ? (
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
-                <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
-              </svg>
-            ) : (
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
-              </svg>
-            )}
-          </span>
-          <span
-            className={`text-[11px] font-semibold select-none whitespace-nowrap transition-colors duration-200 ${active ? 'text-primary' : 'text-muted-foreground'}`}
-          >
-            {active ? 'x2 speed' : 'Tap to speed'}
-          </span>
-        </div>
-      </div>
+            <span
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 shrink-0"
+              aria-hidden
+            >
+              {active ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M13 19V5l8 7-8 7z" fill="currentColor" />
+                  <path d="M3 19V5l8 7-8 7z" fill="currentColor" />
+                </svg>
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
+                </svg>
+              )}
+            </span>
+            <span
+              className={`flex-1 text-sm font-semibold select-none transition-colors duration-200 ${active ? 'text-primary' : 'text-foreground'}`}
+            >
+              {active ? 'x2 speed' : 'Tap to speed'}
+            </span>
+          </motion.div>,
+          portalTarget,
+        )}
     </>
   );
 }

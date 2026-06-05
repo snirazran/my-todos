@@ -83,7 +83,9 @@ export default function RootLayout({
         className={[
           poppins.className,
           'antialiased h-full bg-background flex flex-col',
-          '[padding-top:env(safe-area-inset-top)]',
+          // NOTE: no top safe-area padding here — pages draw their backgrounds
+          // edge-to-edge under the status bar and add the inset back to their
+          // own foreground content (see home/wardrobe/quests/planner tops).
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}
       >

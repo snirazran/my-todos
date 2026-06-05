@@ -53,7 +53,7 @@ function WardrobePageInner() {
 
   return (
     <main className="relative h-[100dvh] md:h-[calc(100vh-4rem)] overflow-hidden">
-      <div className="relative z-10 flex flex-col w-full h-full max-w-3xl gap-0 px-4 pt-0 pb-4 mx-auto md:px-6 md:pb-6 md:pt-4">
+      <div className="relative z-10 flex flex-col w-full h-full max-w-3xl gap-0 px-4 pt-[env(safe-area-inset-top)] pb-4 mx-auto md:px-6 md:pb-6 md:pt-4">
         <section className="relative z-20 flex flex-col pointer-events-none shrink-0 min-h-[182px] md:min-h-[230px]">
           <div className="flex items-start justify-center">
             <div className="relative z-50 -mb-6 transition-transform duration-500 origin-top scale-100 pointer-events-none translate-y-6 md:mb-6 md:scale-100 md:-translate-y-2 lg:-translate-y-4">

@@ -725,7 +725,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen pb-20 overflow-x-hidden md:pb-8">
-      <div className="px-3 pt-12 pb-4 mx-auto max-w-4xl md:px-6">
+      <div className="px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 mx-auto max-w-4xl md:px-6 md:pt-12">
         <Header router={router} />
 
         <div className="relative flex flex-col items-stretch gap-2 lg:gap-5">
@@ -1209,7 +1209,9 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
   const [portalTarget, setPortalTarget] = React.useState<HTMLElement | null>(null);
 
   React.useEffect(() => {
-    setPortalTarget(document.body);
+    // Render into the shared notification stack so the hint rises and stacks
+    // exactly like the fly toast / Frogodoro pill (same container + motion).
+    setPortalTarget(document.getElementById('frog-bottom-stack-bottom'));
   }, []);
 
   const handleSkip = React.useCallback(() => {
@@ -1231,28 +1233,17 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
 
       {portalTarget &&
         createPortal(
-          // Bottom-center on both, but lifted off the very bottom edge on web
-          // so it reads as a deliberate hint rather than a corner toast. The
-          // wrapper handles centering via flex so framer-motion's transform
-          // only drives the entrance (no conflict with a -translate-x utility).
-          <div
-            className="pointer-events-none fixed inset-x-0 z-[1300] flex justify-center px-3 bottom-[calc(env(safe-area-inset-bottom)+72px)] md:bottom-24 md:px-0"
-          >
           <motion.div
+            layout
             initial={{ opacity: 0, y: 20, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
             transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-            className={`
-              pointer-events-none w-full md:w-auto
-              flex items-center gap-3 px-4 py-3 rounded-[18px] border
-              shadow-sm backdrop-blur-2xl transition-colors duration-200
-              ${
-                active
-                  ? 'bg-card/90 text-foreground border-primary/40'
-                  : 'bg-card/90 text-foreground border-border/50'
-              }
-            `}
+            className={`pointer-events-none w-full md:w-[380px] md:self-end flex items-center gap-3 px-4 py-3 rounded-[18px] border shadow-sm backdrop-blur-2xl transition-colors duration-200 ${
+              active
+                ? 'bg-card/90 text-foreground border-primary/40'
+                : 'bg-card/90 text-foreground border-border/50'
+            }`}
           >
             <span
               className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/15 text-primary ring-1 ring-primary/25 shrink-0"
@@ -1274,8 +1265,7 @@ function CinematicOverlay({ onSkip }: Readonly<{ onSkip: () => void }>) {
             >
               {active ? 'x2 speed' : 'Tap anywhere to speed up'}
             </span>
-          </motion.div>
-          </div>,
+          </motion.div>,
           portalTarget,
         )}
     </>

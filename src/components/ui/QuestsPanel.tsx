@@ -650,7 +650,7 @@ export function QuestsPanel({
                         'no-scrollbar flex-1 min-h-0 overflow-y-auto overscroll-none [overflow-anchor:none]',
                         data.activeSeason
                           ? 'px-0 pt-0 md:px-0 md:pt-0 md:pb-8'
-                          : 'px-4 pt-4 md:px-8 md:pt-8 md:pb-8',
+                          : 'px-4 pt-[calc(1rem+env(safe-area-inset-top))] md:px-8 md:pt-8 md:pb-8',
                         'pb-[calc(5rem+env(safe-area-inset-bottom))]',
                       )}
                     >

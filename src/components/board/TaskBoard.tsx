@@ -579,7 +579,7 @@ export default function TaskBoard({
           scrollBehavior: snapSuppressed ? 'auto' : undefined,
         }}
       >
-        <div className="flex mx-auto gap-3 px-4 pt-36 md:pt-16 pb-[calc(100px+env(safe-area-inset-bottom))]">
+        <div className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-16 pb-[calc(100px+env(safe-area-inset-bottom))]">
           {windowDates.map((dk, i) => (
             <div
               key={dk}
@@ -658,7 +658,7 @@ export default function TaskBoard({
       </div>
 
       {/* Top header + dot strip (mobile + desktop) */}
-      <div className="absolute top-2 left-0 right-0 z-[60] flex flex-col items-center gap-2 pointer-events-none px-3">
+      <div className="absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-0 right-0 z-[60] flex flex-col items-center gap-2 pointer-events-none px-3">
         <div className="md:hidden">
           <PlannerHeader
             dateKey={activeDateKey}
