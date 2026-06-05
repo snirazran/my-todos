@@ -1,21 +1,16 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
-import {
-  RecaptchaVerifier,
-  linkWithPhoneNumber,
-  sendSignInLinkToEmail,
-  type ConfirmationResult,
-} from 'firebase/auth';
+import { sendSignInLinkToEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { setAuthTokenCookie } from '@/lib/authCookie';
 import { Input } from '@/components/ui/input';
+import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
+import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
-type Method = 'phone' | 'email';
-type Step = 'enter' | 'verify-phone' | 'email-sent';
+type Step = 'enter' | 'email-sent';
 
 const EMAIL_LINK_STORAGE_KEY = 'emailForSignIn';
 
@@ -26,198 +21,54 @@ const variants = {
 };
 
 export default function CreateAccountStep({ onNext }: OnboardingStepProps) {
-  const [method, setMethod] = useState<Method>('phone');
   const [step, setStep] = useState<Step>('enter');
-  const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const frogIndices = useMemo(() => randomFrogIndices(), []);
 
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
-  const confirmationRef = useRef<ConfirmationResult | null>(null);
-
-  useEffect(() => {
-    return () => {
-      try {
-        recaptchaRef.current?.clear();
-      } catch {}
-      recaptchaRef.current = null;
-    };
-  }, []);
-
-  const ensureRecaptcha = () => {
-    if (recaptchaRef.current) return recaptchaRef.current;
-    recaptchaRef.current = new RecaptchaVerifier(
-      auth,
-      'onboarding-recaptcha',
-      { size: 'invisible' },
-    );
-    return recaptchaRef.current;
-  };
-
-  const handleSendPhoneCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = phone.trim();
-    if (!trimmed.startsWith('+')) {
-      setError('Phone must start with country code (e.g. +1...)');
-      return;
-    }
-    const current = auth.currentUser;
-    if (!current) {
-      setError('Session expired. Refresh the page.');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const verifier = ensureRecaptcha();
-      const confirmation = await linkWithPhoneNumber(
-        current,
-        trimmed,
-        verifier,
-      );
-      confirmationRef.current = confirmation;
-      setStep('verify-phone');
-    } catch (err: any) {
-      const map: Record<string, string> = {
-        'auth/invalid-phone-number': 'That phone number looks invalid',
-        'auth/credential-already-in-use':
-          'That phone is already linked to another account',
-        'auth/too-many-requests': 'Too many attempts. Try again later.',
-      };
-      setError(map[err?.code ?? ''] ?? err?.message ?? 'Could not send code');
-      try {
-        recaptchaRef.current?.clear();
-      } catch {}
-      recaptchaRef.current = null;
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!confirmationRef.current) {
-      setError('Verification expired — request a new code');
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      await confirmationRef.current.confirm(code.trim());
-      const user = auth.currentUser;
-      if (user) {
-        const token = await user.getIdToken(true);
-        setAuthTokenCookie(token);
-        await fetch('/api/user', { method: 'POST' });
-      }
-      onNext();
-    } catch (err: any) {
-      const map: Record<string, string> = {
-        'auth/invalid-verification-code': 'Wrong code — try again',
-        'auth/code-expired': 'Code expired — request a new one',
-      };
-      setError(map[err?.code ?? ''] ?? err?.message ?? 'Verification failed');
-      setLoading(false);
-    }
-  };
-
-  const handleSendEmailLink = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendEmailLink = async (event: FormEvent) => {
+    event.preventDefault();
     const trimmed = email.trim();
     if (!trimmed) return;
+
     setLoading(true);
     setError(null);
     try {
-      const origin =
-        typeof window !== 'undefined' ? window.location.origin : '';
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
       await sendSignInLinkToEmail(auth, trimmed, {
         url: `${origin}/auth/email-callback`,
         handleCodeInApp: true,
       });
       window.localStorage.setItem(EMAIL_LINK_STORAGE_KEY, trimmed);
       setStep('email-sent');
-    } catch (err: any) {
-      setError(err?.message || 'Could not send email link');
+    } catch (sendError: unknown) {
+      setError(sendError instanceof Error ? sendError.message : 'Could not send email link');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="relative flex w-full flex-1 flex-col items-center pt-[278px] md:pt-[302px]">
+    <div className="relative flex w-full flex-1 flex-col">
       <button
         type="button"
         onClick={onNext}
-        className="absolute right-0 top-0 px-3 py-2 text-sm font-bold text-muted-foreground hover:text-foreground transition"
+        className="absolute right-0 top-2 z-40 rounded-full border-2 border-primary/40 bg-background px-4 py-2 text-sm font-black text-primary shadow-md transition hover:border-primary hover:bg-primary/10"
       >
-        Skip
+        Skip for now
       </button>
 
-      <div className="flex w-full max-w-sm flex-1 flex-col items-center">
-        <div className="text-6xl mb-2">🥚</div>
+      <OnboardingFrogHeader
+        indices={frogIndices}
+        title="Save your frog!"
+        subtitle="Create an account to sync across devices and track your progress."
+      />
 
-        <div className="flex h-10 items-center justify-center">
-          <h1 className="text-center text-lg font-black leading-5 tracking-tight text-foreground md:text-xl md:leading-6">
-            Almost ready to hatch!
-          </h1>
-        </div>
-        <div className="mt-1 flex h-10 items-start justify-center">
-          <p className="line-clamp-2 text-center text-base font-medium leading-5 text-muted-foreground md:text-lg md:leading-6">
-            Create an account to save your frog, sync across devices, and track your progress.
-          </p>
-        </div>
-
-        <div className="w-full mt-8">
+      <div className={`relative z-20 flex w-full flex-col items-center px-4 ${ONBOARDING_BODY_CLASS}`}>
+        <div className="w-full max-w-sm">
           <AnimatePresence mode="wait">
-            {step === 'enter' && method === 'phone' && (
-              <motion.form
-                key="phone"
-                variants={variants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.18 }}
-                onSubmit={handleSendPhoneCode}
-                className="space-y-3"
-              >
-                <Input
-                  type="tel"
-                  inputMode="tel"
-                  placeholder="Phone number (+1...)"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="h-14 rounded-2xl border-border/60 bg-muted/30 focus-visible:ring-primary/30 text-center"
-                  required
-                  autoFocus
-                />
-                {error && <ErrorMsg>{error}</ErrorMsg>}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError(null);
-                    setMethod('email');
-                  }}
-                  className="block mx-auto text-sm font-bold text-primary hover:underline"
-                >
-                  Use email instead
-                </button>
-                <button
-                  type="submit"
-                  disabled={!phone.trim() || loading}
-                  className="flex items-center justify-center w-full h-14 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
-                >
-                  {loading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    'Next'
-                  )}
-                </button>
-              </motion.form>
-            )}
-
-            {step === 'enter' && method === 'email' && (
+            {step === 'enter' ? (
               <motion.form
                 key="email"
                 variants={variants}
@@ -226,98 +77,31 @@ export default function CreateAccountStep({ onNext }: OnboardingStepProps) {
                 exit="exit"
                 transition={{ duration: 0.18 }}
                 onSubmit={handleSendEmailLink}
-                className="space-y-3"
+                className="space-y-4"
               >
                 <Input
                   type="email"
+                  inputMode="email"
+                  autoComplete="email"
                   placeholder="Email address"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-14 rounded-2xl border-border/60 bg-muted/30 focus-visible:ring-primary/30 text-center"
+                  onChange={(event) => setEmail(event.target.value)}
+                  className="h-14 rounded-2xl border-border/60 bg-muted/30 text-center focus-visible:ring-primary/30"
                   required
                   autoFocus
                 />
-                {error && <ErrorMsg>{error}</ErrorMsg>}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError(null);
-                    setMethod('phone');
-                  }}
-                  className="block mx-auto text-sm font-bold text-primary hover:underline"
-                >
-                  Use phone instead
-                </button>
+                {error ? <ErrorMsg>{error}</ErrorMsg> : null}
                 <button
                   type="submit"
                   disabled={!email.trim() || loading}
-                  className="flex items-center justify-center w-full h-14 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+                  className="flex h-14 w-full items-center justify-center rounded-2xl bg-primary text-sm font-black uppercase tracking-wider text-primary-foreground transition-all hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {loading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    'Send link'
-                  )}
+                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Send sign-in link'}
                 </button>
               </motion.form>
-            )}
-
-            {step === 'verify-phone' && (
-              <motion.form
-                key="verify"
-                variants={variants}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={{ duration: 0.18 }}
-                onSubmit={handleVerifyCode}
-                className="space-y-3"
-              >
-                <p className="text-xs text-center text-muted-foreground">
-                  Code sent to {phone}
-                </p>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="123456"
-                  value={code}
-                  onChange={(e) =>
-                    setCode(e.target.value.replace(/\D/g, '').slice(0, 6))
-                  }
-                  className="h-14 rounded-2xl border-border/60 bg-muted/30 focus-visible:ring-primary/30 text-center tracking-[0.5em] font-bold text-lg"
-                  required
-                  autoFocus
-                />
-                {error && <ErrorMsg>{error}</ErrorMsg>}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setError(null);
-                    setStep('enter');
-                    setCode('');
-                  }}
-                  className="block mx-auto text-sm font-bold text-primary hover:underline"
-                >
-                  Change number
-                </button>
-                <button
-                  type="submit"
-                  disabled={code.length < 6 || loading}
-                  className="flex items-center justify-center w-full h-14 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed mt-4"
-                >
-                  {loading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                  ) : (
-                    'Verify'
-                  )}
-                </button>
-              </motion.form>
-            )}
-
-            {step === 'email-sent' && (
+            ) : (
               <motion.div
-                key="emailsent"
+                key="email-sent"
                 variants={variants}
                 initial="enter"
                 animate="center"
@@ -325,19 +109,15 @@ export default function CreateAccountStep({ onNext }: OnboardingStepProps) {
                 transition={{ duration: 0.18 }}
                 className="text-center"
               >
-                <p className="text-sm text-foreground">
-                  Check your email at
-                </p>
-                <p className="text-sm font-bold text-foreground mt-1">
-                  {email}
-                </p>
-                <p className="text-xs text-muted-foreground mt-3">
+                <p className="text-sm text-foreground">Check your email at</p>
+                <p className="mt-1 text-sm font-bold text-foreground">{email}</p>
+                <p className="mt-3 text-xs text-muted-foreground">
                   Tap the link to finish. You can keep going meanwhile.
                 </p>
                 <button
                   type="button"
                   onClick={onNext}
-                  className="mt-6 h-12 px-8 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-wider text-sm"
+                  className="mt-6 h-12 rounded-2xl bg-primary px-8 text-sm font-black uppercase tracking-wider text-primary-foreground"
                 >
                   Continue
                 </button>
@@ -346,15 +126,13 @@ export default function CreateAccountStep({ onNext }: OnboardingStepProps) {
           </AnimatePresence>
         </div>
       </div>
-
-      <div id="onboarding-recaptcha" />
     </div>
   );
 }
 
-function ErrorMsg({ children }: { children: React.ReactNode }) {
+function ErrorMsg({ children }: { children: ReactNode }) {
   return (
-    <p className="text-[11px] font-black uppercase tracking-wider text-center text-destructive bg-destructive/10 border border-destructive/30 rounded-xl px-3 py-2">
+    <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-center text-[11px] font-black uppercase tracking-wider text-destructive">
       {children}
     </p>
   );
