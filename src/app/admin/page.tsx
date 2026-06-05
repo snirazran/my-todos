@@ -262,7 +262,7 @@ function AdminPageContent() {
     <div className="min-h-screen bg-background pb-16">
       {/* Hero */}
       <div className="relative overflow-hidden border-b border-border/50 bg-gradient-to-br from-amber-500/10 via-background to-orange-500/10">
-        <div className="max-w-5xl mx-auto px-6 md:px-12 py-8 md:py-10">
+        <div className="max-w-5xl mx-auto px-6 md:px-12 pb-8 md:pb-10 pt-[calc(2rem+env(safe-area-inset-top))] md:pt-10">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-4">
               <div className="p-3 rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400">

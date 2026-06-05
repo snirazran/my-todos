@@ -1321,7 +1321,7 @@ function QuestSeasonEventOverlay({
           <button
             type="button"
             onClick={onClose}
-            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground shadow-sm backdrop-blur-md"
+            className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] flex h-10 w-10 items-center justify-center rounded-full border border-border/50 bg-background/80 text-foreground shadow-sm backdrop-blur-md"
             aria-label="Close season event"
           >
             <X className="h-5 w-5" />
@@ -1411,7 +1411,7 @@ function QuestSeasonEventOverlay({
                       type="button"
                       onClick={season.claimable ? onClaim : onClose}
                       disabled={season.claimable && claiming}
-                      className="h-10 shrink-0 rounded-xl bg-lime-600 px-4 text-xs font-black text-white shadow-[0_3px_0_#3f6212] transition active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-70"
+                      className="h-10 min-w-[7rem] shrink-0 rounded-xl bg-lime-600 px-6 text-xs font-black text-white shadow-[0_3px_0_#3f6212] transition active:translate-y-1 active:shadow-none disabled:cursor-wait disabled:opacity-70"
                     >
                       {season.claimable ? (claiming ? 'Claiming...' : 'Claim') : 'Done'}
                     </button>
