@@ -4,12 +4,10 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
-import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
-
-const Frog = dynamic(() => import('@/components/ui/FrogOnDeck'), { ssr: false });
+import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
 async function enableNotifications() {
   if (Capacitor.isNativePlatform()) {
@@ -65,7 +63,11 @@ export default function NotificationStep({ selections, onNext, onBack, saving, d
         </svg>
       </button>
 
-      <div className="h-10" />
+      <OnboardingFrogHeader
+        indices={frogIndices}
+        title={`Get reminders from ${frogName}`}
+        subtitle="Stay on track with gentle reminders."
+      />
 
       <motion.div
         key="notifications"
@@ -74,9 +76,9 @@ export default function NotificationStep({ selections, onNext, onBack, saving, d
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: direction * -40 }}
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-col items-center px-4"
+        className={cn('flex flex-col items-center px-4', ONBOARDING_BODY_CLASS)}
       >
-        <div className="mt-8 flex w-[calc(100%+4rem)] max-w-[calc(100vw-1.5rem)] items-center gap-3 rounded-3xl bg-muted/70 px-4 py-3 shadow-sm">
+        <div className="flex w-[calc(100%+4rem)] max-w-[calc(100vw-1.5rem)] items-center gap-3 rounded-3xl bg-muted/70 px-4 py-3 shadow-sm">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-background shadow-sm">
             <img src="/48x48.png" alt="" className="h-10 w-10 rounded-xl" />
           </div>
@@ -89,22 +91,6 @@ export default function NotificationStep({ selections, onNext, onBack, saving, d
           </div>
         </div>
 
-        <div className="mt-14 hidden md:block">
-          <Frog
-            width={280}
-            height={280}
-            indices={frogIndices}
-            title={`Get reminders from ${frogName}`}
-          />
-        </div>
-        <div className="mt-14 block md:hidden">
-          <Frog
-            width={230}
-            height={230}
-            indices={frogIndices}
-            title={`Get reminders from ${frogName}`}
-          />
-        </div>
       </motion.div>
 
       <div className="flex-[8]" />

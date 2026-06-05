@@ -3,12 +3,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Shuffle, X } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
-
-const Frog = dynamic(() => import('@/components/ui/FrogOnDeck'), { ssr: false });
+import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
 const NAME_OPTIONS = [
   'Cookie',
@@ -83,30 +81,13 @@ export default function FrogNameStep({ selections, onSelect, onNext, onBack, sav
         </svg>
       </button>
 
-      <div className="h-10" />
+      <OnboardingFrogHeader
+        indices={frogIndices}
+        title="What do you want to name your frog?"
+        subtitle="You can change this later."
+      />
 
-      <div className="flex flex-col items-center px-4">
-        <div className="hidden md:block">
-          <Frog
-            width={280}
-            height={280}
-            indices={frogIndices}
-            title="What do you want to name your frog?"
-          />
-        </div>
-        <div className="block md:hidden">
-          <Frog
-            width={230}
-            height={230}
-            indices={frogIndices}
-            title="What do you want to name your frog?"
-          />
-        </div>
-
-        <p className="text-base md:text-lg font-medium text-muted-foreground text-center mt-4">
-          You can change this later.
-        </p>
-
+      <div className={cn('flex flex-col items-center px-4', ONBOARDING_BODY_CLASS)}>
         <motion.div
           key="frog-name"
           custom={direction}
@@ -114,7 +95,7 @@ export default function FrogNameStep({ selections, onSelect, onNext, onBack, sav
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: direction * -40 }}
           transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full mt-6 md:mt-8"
+          className="w-full"
         >
 
           <div className="relative w-full">

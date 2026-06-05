@@ -9,7 +9,6 @@ const UserSchema = new Schema<UserDoc>(
     _id: { type: String, required: true },
     name: { type: String, required: true },
     frogName: { type: String, default: 'Cookie' },
-    frogPronouns: { type: String },
     birthday: { type: String },
     ageRange: { type: String },
     aboutGender: { type: String },

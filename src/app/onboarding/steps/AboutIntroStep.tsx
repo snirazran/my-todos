@@ -2,22 +2,13 @@
 
 import { useMemo } from 'react';
 import { motion } from 'framer-motion';
-import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
-
-const Frog = dynamic(() => import('@/components/ui/FrogOnDeck'), { ssr: false });
-
-const PRONOUN_COPY: Record<string, string> = {
-  he: 'he',
-  she: 'she',
-  they: 'they',
-};
+import { OnboardingFrogHeader } from './OnboardingFrogHeader';
 
 export default function AboutIntroStep({ selections, onNext, onBack, saving, direction }: OnboardingStepProps) {
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
-  const pronoun = PRONOUN_COPY[selections.gender?.[0] ?? ''] ?? 'they';
   const frogIndices = useMemo(() => randomFrogIndices(), []);
 
   return (
@@ -31,7 +22,11 @@ export default function AboutIntroStep({ selections, onNext, onBack, saving, dir
         </svg>
       </button>
 
-      <div className="flex-[5]" />
+      <OnboardingFrogHeader
+        indices={frogIndices}
+        title="Let's learn a bit about you!"
+        subtitle={`${frogName} is curious about how to grow with you.`}
+      />
 
       <motion.div
         key="about-intro"
@@ -40,30 +35,8 @@ export default function AboutIntroStep({ selections, onNext, onBack, saving, dir
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: direction * -40 }}
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-col items-center px-4 text-center"
-      >
-        <div className="mb-3">
-          <div className="hidden md:block">
-            <Frog
-              width={280}
-              height={280}
-              indices={frogIndices}
-              title="Let's learn a bit about you!"
-            />
-          </div>
-          <div className="block md:hidden">
-            <Frog
-              width={230}
-              height={230}
-              indices={frogIndices}
-              title="Let's learn a bit about you!"
-            />
-          </div>
-        </div>
-        <p className="text-base md:text-lg font-medium leading-snug text-muted-foreground mb-3">
-          {frogName} is curious about how {pronoun} can grow with you.
-        </p>
-      </motion.div>
+        className="pt-[370px] md:pt-[398px]"
+      />
 
       <div className="flex-[8]" />
 

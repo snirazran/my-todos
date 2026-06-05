@@ -3,13 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
-import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
-
-const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
+import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
 export default function HumanNameStep({ selections, onSelect, onNext, onBack, saving, direction }: OnboardingStepProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -17,7 +14,6 @@ export default function HumanNameStep({ selections, onSelect, onNext, onBack, sa
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
   const humanName = selections.humanName?.[0] ?? '';
   const canContinue = humanName.trim().length > 0;
-  const greeting = `*RIBBIT* I like the name ${frogName}!\nWhat should I call you?`;
   const frogIndices = useMemo(() => randomFrogIndices(), []);
 
   useEffect(() => {
@@ -57,7 +53,12 @@ export default function HumanNameStep({ selections, onSelect, onNext, onBack, sa
         </svg>
       </button>
 
-      <div className="h-10" />
+      <OnboardingFrogHeader
+        indices={frogIndices}
+        title={`*RIBBIT* I like the name ${frogName}!`}
+        subtitle="What should I call you?"
+        speechBubbleMessage={`*RIBBIT* I like the name ${frogName}!\nWhat should I call you?`}
+      />
 
       <motion.div
         key="human-name"
@@ -66,36 +67,9 @@ export default function HumanNameStep({ selections, onSelect, onNext, onBack, sa
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: direction * -40 }}
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="flex flex-col items-center px-4"
+        className={cn('flex flex-col items-center px-4', ONBOARDING_BODY_CLASS)}
       >
-        <div className="relative w-full mt-[180px] md:mt-[220px]">
-          {/* Frog + speech bubble peeking over the input */}
-          <div className="absolute left-1/2 -translate-x-1/2 pointer-events-none z-10 bottom-full -mb-10">
-            <div className="relative">
-              <FrogSpeechBubble
-                rate={0}
-                done={0}
-                total={0}
-                fixedMessage={greeting}
-                className="!left-[calc(50%-9rem)] !top-4"
-              />
-              <div className="hidden md:block">
-                <Frog
-                  width={280}
-                  height={280}
-                  indices={frogIndices}
-                />
-              </div>
-              <div className="block md:hidden">
-                <Frog
-                  width={230}
-                  height={230}
-                  indices={frogIndices}
-                />
-              </div>
-            </div>
-          </div>
-
+        <div className="relative -mt-20 w-full">
           <input
             ref={inputRef}
             value={humanName}

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { OnboardingStepProps } from './steps/types';
-import GenderStep from './steps/GenderStep';
 import FrogNameStep from './steps/FrogNameStep';
 import HumanNameStep from './steps/HumanNameStep';
 import NotificationStep from './steps/NotificationStep';
@@ -12,8 +11,9 @@ import ProfileQuestionsStep from './steps/ProfileQuestionsStep';
 import CreateAccountStep from './steps/CreateAccountStep';
 import { auth } from '@/lib/firebase';
 import { clearAuthTokenCookie } from '@/lib/authCookie';
+import { GlobalPageBackground } from '@/components/ui/GlobalPageBackground';
 
-const STEP_IDS = ['gender', 'name', 'humanName', 'createAccount', 'notifications', 'aboutIntro', 'age'] as const;
+const STEP_IDS = ['name', 'humanName', 'createAccount', 'notifications', 'aboutIntro', 'age'] as const;
 
 function isMobileDevice() {
   const userAgent = navigator.userAgent || '';
@@ -50,6 +50,7 @@ export default function OnboardingPage() {
     setSelections((prev) => {
       const existing = prev[stepId] ?? [];
       if (optionId === '__clear__') {
+        if (!(stepId in prev)) return prev;
         const { [stepId]: _removed, ...rest } = prev;
         return rest;
       }
@@ -80,7 +81,6 @@ export default function OnboardingPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               frogName: selections.frogName?.[0]?.trim() || 'Cookie',
-              frogPronouns: selections.gender?.[0] ?? null,
               humanName: selections.humanName?.[0]?.trim() || null,
               ageRange: selections.age?.[0] ?? null,
               aboutGender: selections.aboutGender?.[0] ?? null,
@@ -141,9 +141,15 @@ export default function OnboardingPage() {
   };
 
   return (
-    <main className="fixed inset-0 flex flex-col items-center bg-background px-5 pt-4 overflow-y-auto">
-      <div className="relative z-10 w-full max-w-sm md:max-w-md lg:max-w-lg flex flex-col" style={{ minHeight: '100%' }}>
-        {currentId === 'gender' && <GenderStep {...stepProps} />}
+    <main className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto bg-background px-5 pt-4">
+      <div className="absolute inset-x-0 top-0 h-[312px] overflow-hidden md:h-[352px]">
+        <GlobalPageBackground />
+      </div>
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 top-[222px] z-[5] rounded-t-[24px] bg-background md:left-1/2 md:right-auto md:top-[278px] md:w-full md:max-w-lg md:-translate-x-1/2 md:rounded-[24px] lg:max-w-xl"
+      />
+      <div className="relative z-10 flex w-full max-w-none flex-col md:max-w-lg lg:max-w-xl" style={{ minHeight: '100%' }}>
         {currentId === 'name' && <FrogNameStep {...stepProps} />}
         {currentId === 'humanName' && <HumanNameStep {...stepProps} />}
         {currentId === 'createAccount' && <CreateAccountStep {...stepProps} />}

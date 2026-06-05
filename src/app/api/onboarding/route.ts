@@ -5,7 +5,6 @@ import { requireUserId } from '@/lib/auth';
 import UserModel from '@/lib/models/User';
 import connectMongo from '@/lib/mongoose';
 
-const VALID_PRONOUNS = new Set(['he', 'she', 'they']);
 const VALID_AGE_RANGES = new Set(['under-18', '18-24', '25-34', '35-44', '45-54', '55-64', '65-plus']);
 const VALID_ABOUT_GENDERS = new Set(['male', 'female', 'non-binary', 'prefer-not']);
 const VALID_USED_BEFORE = new Set(['first-time', 'starting-fresh']);
@@ -48,7 +47,6 @@ export async function POST(req: Request) {
   try {
     let body: {
       frogName?: unknown;
-      frogPronouns?: unknown;
       humanName?: unknown;
       ageRange?: unknown;
       aboutGender?: unknown;
@@ -65,10 +63,6 @@ export async function POST(req: Request) {
       typeof body.frogName === 'string' && body.frogName.trim()
         ? body.frogName.trim().slice(0, 24)
         : 'Cookie';
-    const frogPronouns =
-      typeof body.frogPronouns === 'string' && VALID_PRONOUNS.has(body.frogPronouns)
-        ? body.frogPronouns
-        : undefined;
     const humanName =
       typeof body.humanName === 'string' && body.humanName.trim()
         ? body.humanName.trim().slice(0, 40)
@@ -94,7 +88,6 @@ export async function POST(req: Request) {
         $set: {
           onboardingCompleted: true,
           frogName,
-          ...(frogPronouns ? { frogPronouns } : {}),
           ...(humanName ? { name: humanName } : {}),
           ...(ageRange ? { ageRange } : {}),
           ...(aboutGender ? { aboutGender } : {}),

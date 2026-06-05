@@ -148,7 +148,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
       },
       {
         q: 'How do I rename my frog?',
-        a: 'Open Profile from the menu to set your frog\'s name and pronouns.',
+        a: 'Open Profile from the menu to set your frog\'s name.',
       },
     ],
   },

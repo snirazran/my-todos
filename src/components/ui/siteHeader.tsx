@@ -544,7 +544,6 @@ function MobileMenuButton({
 type UserInfo = {
   name?: string | null;
   frogName?: string | null;
-  frogPronouns?: string | null;
   birthday?: string | null;
   isPremium?: boolean;
   premiumUntil?: string | null;
@@ -743,7 +742,6 @@ function MobileSheet({
               <ProfilePanel
                 data={{
                   petName: userInfo?.frogName ?? null,
-                  petPronouns: userInfo?.frogPronouns ?? null,
                   yourName: userInfo?.name ?? user?.displayName ?? null,
                   birthday: userInfo?.birthday ?? null,
                   isGuest: !user || !!user?.isAnonymous,
@@ -766,7 +764,6 @@ function MobileSheet({
                 onSave={async (field, value) => {
                   const fieldMap: Record<string, string> = {
                     petName: 'frogName',
-                    petPronouns: 'frogPronouns',
                     yourName: 'name',
                     birthday: 'birthday',
                   };

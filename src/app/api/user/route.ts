@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
     await connectMongo();
     
     const user = await UserModel.findById(uid)
-      .select('createdAt premiumUntil calendarSyncEnabled calendarAccessToken name frogName frogPronouns birthday')
+      .select('createdAt premiumUntil calendarSyncEnabled calendarAccessToken name frogName birthday')
       .lean();
 
     if (!user) {
@@ -49,7 +49,6 @@ export async function GET(req: NextRequest) {
       hasCalendarToken: !!user.calendarAccessToken,
       name: user.name ?? null,
       frogName: user.frogName ?? null,
-      frogPronouns: user.frogPronouns ?? null,
       birthday: user.birthday ?? null,
     });
   } catch (error) {
@@ -166,7 +165,7 @@ export async function PATCH(req: NextRequest) {
     await connectMongo();
 
     const body = await req.json();
-    const { calendarSyncEnabled, calendarAccessToken, name, frogName, frogPronouns, birthday } = body;
+    const { calendarSyncEnabled, calendarAccessToken, name, frogName, birthday } = body;
 
     const updates: any = {};
     if (typeof calendarSyncEnabled === 'boolean') {
@@ -182,10 +181,6 @@ export async function PATCH(req: NextRequest) {
     if (typeof frogName === 'string') {
       const trimmed = frogName.trim().slice(0, 24);
       if (trimmed) updates.frogName = trimmed;
-    }
-    if (typeof frogPronouns === 'string') {
-      const allowed = ['he', 'she', 'they'];
-      if (allowed.includes(frogPronouns)) updates.frogPronouns = frogPronouns;
     }
     if (typeof birthday === 'string') {
       const trimmed = birthday.trim();

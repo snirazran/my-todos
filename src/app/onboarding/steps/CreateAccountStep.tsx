@@ -146,7 +146,7 @@ export default function CreateAccountStep({ onNext }: OnboardingStepProps) {
   };
 
   return (
-    <div className="relative flex flex-col items-center w-full flex-1 pt-2">
+    <div className="relative flex w-full flex-1 flex-col items-center pt-[278px] md:pt-[302px]">
       <button
         type="button"
         onClick={onNext}
@@ -155,17 +155,19 @@ export default function CreateAccountStep({ onNext }: OnboardingStepProps) {
         Skip
       </button>
 
-      <div className="flex flex-col items-center flex-1 justify-center w-full max-w-sm">
+      <div className="flex w-full max-w-sm flex-1 flex-col items-center">
         <div className="text-6xl mb-2">🥚</div>
 
-        <h1 className="text-2xl font-black text-center text-foreground tracking-tight">
-          Almost ready to hatch!
-        </h1>
-        <p className="mt-2 text-sm text-center text-muted-foreground leading-relaxed">
-          Create an account to save your frog,
-          <br />
-          sync across devices, and track your progress.
-        </p>
+        <div className="flex h-10 items-center justify-center">
+          <h1 className="text-center text-lg font-black leading-5 tracking-tight text-foreground md:text-xl md:leading-6">
+            Almost ready to hatch!
+          </h1>
+        </div>
+        <div className="mt-1 flex h-10 items-start justify-center">
+          <p className="line-clamp-2 text-center text-base font-medium leading-5 text-muted-foreground md:text-lg md:leading-6">
+            Create an account to save your frog, sync across devices, and track your progress.
+          </p>
+        </div>
 
         <div className="w-full mt-8">
           <AnimatePresence mode="wait">

@@ -3,12 +3,10 @@
 import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Plus } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import { cn } from '@/lib/utils';
 import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
-
-const Frog = dynamic(() => import('@/components/ui/FrogOnDeck'), { ssr: false });
+import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
 const OPTIONS = [
   { id: 'morning', emoji: '🌅', label: 'Morning person' },
@@ -22,17 +20,14 @@ export default function TimeStep({ selections, onSelect, onNext, onBack, saving,
   const frogIndices = useMemo(() => randomFrogIndices(), []);
 
   return (
-    <>
-      <div className="flex justify-center" style={{ marginTop: -30, marginBottom: 10 }}>
-        <Frog
-          width={200}
-          height={200}
-          indices={frogIndices}
-          title="When are you most productive?"
-        />
-      </div>
+    <div className="relative flex flex-1 flex-col">
+      <OnboardingFrogHeader
+        indices={frogIndices}
+        title="When are you most productive?"
+        subtitle="We'll use this to suggest the best times for your tasks."
+      />
 
-      <div className="flex-1">
+      <div className={cn('flex-1', ONBOARDING_BODY_CLASS)}>
         <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key="time"
@@ -42,10 +37,6 @@ export default function TimeStep({ selections, onSelect, onNext, onBack, saving,
             exit={{ opacity: 0, x: direction * -40 }}
             transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
           >
-            <p className="text-sm font-medium text-muted-foreground text-center mt-4 mb-6">
-              We&apos;ll use this to suggest the best times for your tasks.
-            </p>
-
             <div className="flex flex-col gap-3">
               {OPTIONS.map((opt) => {
                 const isSelected = selected.includes(opt.id);
@@ -108,6 +99,6 @@ export default function TimeStep({ selections, onSelect, onNext, onBack, saving,
           {saving ? 'Setting up...' : "Let's go!"}
         </motion.button>
       </div>
-    </>
+    </div>
   );
 }

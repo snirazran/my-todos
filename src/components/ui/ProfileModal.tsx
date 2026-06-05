@@ -3,23 +3,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { AlertCircle, Check, ChevronRight, Heart, X } from 'lucide-react';
+import { AlertCircle, ChevronRight, X } from 'lucide-react';
 
-export type ProfileField = 'petName' | 'petPronouns' | 'yourName' | 'birthday';
+export type ProfileField = 'petName' | 'yourName' | 'birthday';
 
 export type ProfileData = {
   petName?: string | null;
-  petPronouns?: string | null;
   yourName?: string | null;
   birthday?: string | null;
   isGuest?: boolean;
 };
-
-const PRONOUN_OPTIONS = [
-  { value: 'he', label: 'he/him' },
-  { value: 'she', label: 'she/her' },
-  { value: 'they', label: 'they/them' },
-];
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -34,14 +27,6 @@ function formatBirthday(value?: string | null) {
   const day = parseInt(match[3], 10);
   if (monthIdx < 0 || monthIdx > 11) return value;
   return `${MONTHS[monthIdx]} ${day}`;
-}
-
-function formatPronouns(value?: string | null) {
-  if (!value) return 'Not set';
-  if (value === 'he' || value === 'he/him') return 'He/Him';
-  if (value === 'she' || value === 'she/her') return 'She/Her';
-  if (value === 'they' || value === 'they/them') return 'They/Them';
-  return value;
 }
 
 export function ProfilePanel({
@@ -66,7 +51,6 @@ export function ProfilePanel({
 
   const petRows: { key: ProfileField; label: string; value: string }[] = [
     { key: 'petName', label: 'Pet name', value: data.petName || 'Not set' },
-    { key: 'petPronouns', label: 'Pet pronouns', value: formatPronouns(data.petPronouns) },
   ];
 
   const youRows: { key: ProfileField; label: string; value: string }[] = [
@@ -128,13 +112,6 @@ export function ProfilePanel({
             maxLength={40}
             onClose={() => setEditing(null)}
             onSave={(value) => handleSave('yourName', value)}
-          />
-        )}
-        {editing === 'petPronouns' && (
-          <PronounsDialog
-            currentValue={data.petPronouns ?? null}
-            onClose={() => setEditing(null)}
-            onSave={(value) => handleSave('petPronouns', value)}
           />
         )}
         {editing === 'birthday' && (
@@ -303,73 +280,6 @@ function TextEditDialog({
       >
         {saving ? 'Saving…' : 'Done'}
       </button>
-    </DialogShell>
-  );
-}
-
-function PronounsDialog({
-  currentValue,
-  onClose,
-  onSave,
-}: {
-  currentValue: string | null;
-  onClose: () => void;
-  onSave: (value: string) => void | Promise<void>;
-}) {
-  const [selected, setSelected] = useState(currentValue ?? 'he');
-  const [saving, setSaving] = useState(false);
-
-  const submit = async (value: string) => {
-    if (saving) return;
-    setSelected(value);
-    setSaving(true);
-    try {
-      await onSave(value);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <DialogShell onClose={onClose}>
-      <h3 className="text-center text-lg font-black tracking-tight text-foreground">
-        Change Pet Pronouns
-      </h3>
-      <div className="mt-4 space-y-3">
-        {PRONOUN_OPTIONS.map((opt) => {
-          const isSelected = selected === opt.value;
-          return (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => submit(opt.value)}
-              disabled={saving}
-              className={`flex w-full items-center gap-3 rounded-2xl border-2 bg-white px-4 py-3 text-left transition-all ${
-                isSelected
-                  ? 'border-sky-400 text-foreground'
-                  : 'border-border/40 text-muted-foreground'
-              }`}
-            >
-              <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                  isSelected ? 'bg-sky-100' : 'bg-muted/40'
-                }`}
-              >
-                <Heart
-                  className={`h-4 w-4 ${isSelected ? 'text-sky-400' : 'text-muted-foreground/60'}`}
-                  fill="currentColor"
-                />
-              </span>
-              <span className="flex-1 text-base font-bold">{opt.label}</span>
-              {isSelected && (
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-400 text-white">
-                  <Check className="h-3.5 w-3.5 stroke-[3]" />
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
     </DialogShell>
   );
 }

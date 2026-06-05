@@ -12,6 +12,7 @@ interface FrogSpeechBubbleProps {
   clickedAt?: number;
   fixedMessage?: string;
   className?: string;
+  messageClassName?: string;
 }
 
 export function FrogSpeechBubble({
@@ -22,6 +23,7 @@ export function FrogSpeechBubble({
   clickedAt = 0,
   fixedMessage,
   className = '',
+  messageClassName = '',
 }: FrogSpeechBubbleProps & { isCatching?: boolean }) {
   const [message, setMessage] = useState('');
   const [isVisible, setIsVisible] = useState(false);
@@ -149,8 +151,13 @@ export function FrogSpeechBubble({
           className={`absolute top-1 left-[16%] z-[100] w-max min-w-[11rem] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 pointer-events-none ${className}`}
         >
           <div className="relative rounded-[18px] border border-border/50 bg-card px-3.5 py-3 shadow-sm">
-            <p className={`whitespace-nowrap text-center font-bold leading-none text-foreground ${textSizeClass}`}>
-              {displayMessage}
+            <p className={`whitespace-nowrap text-center font-bold leading-none text-foreground ${textSizeClass} ${messageClassName}`}>
+              {displayMessage.split('\n').map((line, index) => (
+                <React.Fragment key={`${line}-${index}`}>
+                  {index > 0 ? <br /> : null}
+                  {line}
+                </React.Fragment>
+              ))}
             </p>
 
             {/* Speech Bubble Arrow */}

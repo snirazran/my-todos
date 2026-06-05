@@ -1,16 +1,14 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import useSWR from 'swr';
 import { cn } from '@/lib/utils';
 import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 import type { MacroCategoryDefinition } from '@/lib/quests/types';
-
-const Frog = dynamic(() => import('@/components/ui/FrogOnDeck'), { ssr: false });
+import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
 type AboutOption = {
   id: string;
@@ -206,13 +204,6 @@ export default function ProfileQuestionsStep({
   const selectedValues = selections[currentQuestion.id] ?? [];
   const selected = selectedValues[0];
 
-  useEffect(() => {
-    if ((selections[currentQuestion.id] ?? []).length > 0) return;
-    onSelect(currentQuestion.id, '__clear__');
-    // Clear only when a question is entered, so no option starts selected.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentQuestion.id, selections]);
-
   const chooseOption = (id: string) => {
     if (currentQuestion.multiSelect) {
       onSelect(currentQuestion.id, id, true);
@@ -248,7 +239,14 @@ export default function ProfileQuestionsStep({
 
   return (
     <div className="flex-1 flex flex-col">
-      <div className="relative mt-12 h-10">
+      <OnboardingFrogHeader
+        indices={frogIndices}
+        title={currentQuestion.title}
+        subtitle={currentQuestion.subtitle}
+      />
+
+      <div className={cn('relative z-20 flex flex-col', ONBOARDING_BODY_CLASS)}>
+      <div className="relative h-10">
         <button
           onClick={handleBack}
           className="absolute left-[-1.25rem] top-0 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-muted/80 md:left-[-1.75rem]"
@@ -311,34 +309,10 @@ export default function ProfileQuestionsStep({
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
         className="mt-2 flex flex-col items-center"
       >
-        <div className="relative mb-3">
-          <div className="hidden md:block">
-            <Frog
-              width={260}
-              height={260}
-              indices={frogIndices}
-              title={currentQuestion.title}
-            />
-          </div>
-          <div className="block md:hidden">
-            <Frog
-              width={210}
-              height={210}
-              indices={frogIndices}
-              title={currentQuestion.title}
-            />
-          </div>
-        </div>
-        {currentQuestion.subtitle && (
-          <p className="text-center text-base md:text-lg font-medium text-muted-foreground mb-2">
-            {currentQuestion.subtitle}
-          </p>
-        )}
-
         <div
           className={cn(
             'flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] flex-col pb-6',
-            currentQuestion.subtitle ? 'mt-7 gap-2.5' : 'mt-12 gap-3',
+            'mt-7 gap-2.5',
           )}
         >
           {currentQuestion.options.map((option) => {
@@ -422,6 +396,7 @@ export default function ProfileQuestionsStep({
           </div>
         )}
       </motion.div>
+      </div>
     </div>
   );
 }

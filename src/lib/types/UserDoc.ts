@@ -61,7 +61,6 @@ export type UserDoc = {
   _id: string;
   name: string;
   frogName?: string;
-  frogPronouns?: string;
   birthday?: string;
   ageRange?: string;
   aboutGender?: string;
