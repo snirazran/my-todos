@@ -185,7 +185,7 @@ export async function POST(req: NextRequest) {
       await messaging.send({
         token,
         notification: {
-          title: 'FrogTask 🐸',
+          title: 'Frogress 🐸',
           body: messageBody,
         },
         data: { type: 'test_notification' },
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
         apns: {
           payload: {
             aps: {
-              alert: { title: 'FrogTask 🐸', body: messageBody },
+              alert: { title: 'Frogress 🐸', body: messageBody },
               badge: uncompleted.length,
               sound: 'default',
             },

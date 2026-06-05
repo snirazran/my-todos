@@ -7,7 +7,7 @@ export async function ensureInviteConfig(): Promise<InviteConfigDoc> {
   if (existing) return existing;
   return InviteConfigModel.create({
     key: 'singleton',
-    headline: 'Share FrogTask, get rewards!',
+    headline: 'Share Frogress, get rewards!',
     subheading: 'Invite a friend to gift them a skin and earn rewards for yourself!',
     rewards: [
       { tier: 1, label: '1st friend', description: '', itemId: null, flies: 100, imageUrl: '', rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 100 }] },
@@ -15,8 +15,8 @@ export async function ensureInviteConfig(): Promise<InviteConfigDoc> {
       { tier: 3, label: '3rd friend', description: '', itemId: null, flies: 500, imageUrl: '', rewards: [{ type: 'FLIES', amountMode: 'fixed', amount: 500 }] },
     ],
     giftOptions: [],
-    shareTitle: 'Come join me on FrogTask!',
-    shareMessage: 'I have a gift for you on FrogTask. Tap the link to claim it!',
+    shareTitle: 'Come join me on Frogress!',
+    shareMessage: 'I have a gift for you on Frogress. Tap the link to claim it!',
     updatedAt: new Date(),
   });
 }

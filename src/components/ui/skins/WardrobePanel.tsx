@@ -761,6 +761,7 @@ function WardrobeManagerContent({
                         actionLabel={null}
                         isNew={unseenInventorySet.has(item.id)}
                         deferPreview
+                        giftAnimation="box_shake"
                         pausePreview={
                           (item.slot !== 'container' && isDragging) ||
                           (item.slot !== 'container' &&

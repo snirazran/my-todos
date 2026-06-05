@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { mutate as swrMutate } from 'swr';
 
-const STORAGE_KEY = 'frogtask_referral_code';
+const STORAGE_KEY = 'frogress_referral_code';
 
 /**
  * Captures a ?ref=CODE from the URL and stores it in localStorage,

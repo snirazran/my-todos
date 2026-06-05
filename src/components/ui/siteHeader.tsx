@@ -35,6 +35,7 @@ import { ChevronRight } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { FlyCounter } from '@/components/ui/FlyCounter';
 import { CurrencyShop } from './shop/CurrencyShop';
+import { HelpCenterPanel, ContactPanel } from '@/components/ui/HelpCenter';
 import { cn } from '@/lib/utils';
 
 const wardrobeItems = [
@@ -182,7 +183,7 @@ export default function SiteHeader() {
           className="relative inline-flex items-center gap-2 group focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-lg shrink-0"
         >
           <span className="text-2xl font-black tracking-tighter text-transparent bg-gradient-to-r from-primary via-emerald-500 to-primary bg-clip-text transition-all group-hover:opacity-80">
-            FrogTask
+            Frogress
           </span>
           <Sparkles
             className="h-5 w-5 text-emerald-400 animate-[float_3s_ease-in-out_infinite]"
@@ -560,7 +561,11 @@ function MobileSheet({
 }: any) {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const [view, setView] = useState<'main' | 'preferences' | 'community' | 'profile'>('main');
+  const [view, setView] = useState<
+    'main' | 'preferences' | 'community' | 'profile' | 'helpCenter' | 'contact'
+  >('main');
+  const [contactTopic, setContactTopic] = useState<'question' | 'bug'>('question');
+  const [contactBack, setContactBack] = useState<'main' | 'helpCenter'>('main');
   const [toast, setToast] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
@@ -614,7 +619,13 @@ function MobileSheet({
           >
             <div className="px-4 py-3 flex items-center justify-between">
               <button
-                onClick={view !== 'main' ? () => setView('main') : onClose}
+                onClick={
+                  view === 'contact'
+                    ? () => setView(contactBack)
+                    : view !== 'main'
+                      ? () => setView('main')
+                      : onClose
+                }
                 className="p-2 -ml-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                 aria-label={view !== 'main' ? 'Back' : 'Close'}
               >
@@ -628,6 +639,12 @@ function MobileSheet({
               )}
               {view === 'profile' && (
                 <h2 className="text-base font-black tracking-tight">Profile</h2>
+              )}
+              {view === 'helpCenter' && (
+                <h2 className="text-base font-black tracking-tight">Help center</h2>
+              )}
+              {view === 'contact' && (
+                <h2 className="text-base font-black tracking-tight">Contact us</h2>
               )}
               <div className="w-10" aria-hidden />
             </div>
@@ -671,48 +688,11 @@ function MobileSheet({
                   onOpenProfile={() => setView('profile')}
                   onOpenPlus={() => setPlusOpen(true)}
                   onReportIssue={() => {
-                    const platform = typeof navigator !== 'undefined' ? navigator.platform : 'unknown';
-                    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : 'unknown';
-                    const timezone =
-                      typeof Intl !== 'undefined'
-                        ? Intl.DateTimeFormat().resolvedOptions().timeZone
-                        : 'unknown';
-                    const now = new Date().toISOString();
-                    const uid = user?.uid ?? 'guest';
-                    const lines = [
-                      'Please describe the issue and the steps you took to encounter it (screenshots are helpful too!)',
-                      '',
-                      '',
-                      '',
-                      '===============',
-                      'Error Metadata',
-                      '===============',
-                      `Account: ${uid}`,
-                      `Plus: ${userInfo?.isPremium ? 'Yes' : 'No'}`,
-                      `OS / Platform: ${platform}`,
-                      `User Agent: ${ua}`,
-                      `Timezone: ${timezone}`,
-                      `Reported At: ${now}`,
-                    ];
-                    const subject = encodeURIComponent('FrogTask — Report an issue');
-                    const body = encodeURIComponent(lines.join('\n'));
-                    window.location.href = `mailto:support@frogtask.com?subject=${subject}&body=${body}`;
+                    setContactTopic('bug');
+                    setContactBack('main');
+                    setView('contact');
                   }}
-                  onHelpCenter={() => {
-                    const uid = user?.uid ?? 'guest';
-                    const lines = [
-                      'Hi FrogTask team,',
-                      '',
-                      'I have a question:',
-                      '',
-                      '',
-                      '',
-                      `— Account: ${uid}`,
-                    ];
-                    const subject = encodeURIComponent('FrogTask — Help request');
-                    const body = encodeURIComponent(lines.join('\n'));
-                    window.location.href = `mailto:support@frogtask.com?subject=${subject}&body=${body}`;
-                  }}
+                  onHelpCenter={() => setView('helpCenter')}
                   onGoAdmin={() => {
                     router.push('/admin');
                     onClose();
@@ -739,6 +719,20 @@ function MobileSheet({
               />
             ) : view === 'community' ? (
               <CommunityPanel />
+            ) : view === 'helpCenter' ? (
+              <HelpCenterPanel
+                onContact={() => {
+                  setContactTopic('question');
+                  setContactBack('helpCenter');
+                  setView('contact');
+                }}
+              />
+            ) : view === 'contact' ? (
+              <ContactPanel
+                uid={user?.uid ?? 'guest'}
+                isPremium={!!userInfo?.isPremium}
+                defaultTopic={contactTopic}
+              />
             ) : (
               <ProfilePanel
                 data={{
@@ -885,12 +879,12 @@ function MainView({
         onOpenPreferences={onOpenPreferences}
       />
 
-      {/* FrogTask Plus promo */}
+      {/* Frogress Plus promo */}
       {!isPremium && (
         <button
           type="button"
           onClick={onOpenPlus}
-          aria-label="Unlock FrogTask Plus"
+          aria-label="Unlock Frogress Plus"
           className="group relative isolate w-full text-left rounded-2xl px-4 py-4 flex items-center gap-3 text-emerald-950 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
         >
           <span
@@ -906,7 +900,7 @@ function MainView({
           </span>
           <div className="flex-1 min-w-0">
             <p className="text-base font-black tracking-tight flex items-center gap-2 text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
-              FrogTask
+              Frogress
               <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_3px_rgba(0,0,0,0.22)] ring-1 ring-emerald-900/40">
                 Plus
               </span>
@@ -966,7 +960,7 @@ function MainView({
       <MenuSection title="Subscriptions">
         <MenuRow
           icon={<Icon name="frogPlus" className="w-9 h-9" />}
-          label="FrogTask Plus"
+          label="Frogress Plus"
           trailing={
             isPremium ? (
               <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1 text-[10px] font-black uppercase leading-none tracking-[0.16em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25)] ring-1 ring-emerald-900/40">
@@ -1003,7 +997,7 @@ function MainView({
             <div className="flex flex-col items-center text-center">
               <Icon name="frogPlus" className="h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.35)]" />
               <p className="mt-2 text-lg font-black tracking-tight flex items-center gap-2">
-                FrogTask
+                Frogress
                 <span className="inline-flex items-center rounded-md bg-gradient-to-b from-emerald-600 to-emerald-800 px-1.5 py-0.5 text-[10px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 ring-1 ring-emerald-900/40">
                   Plus
                 </span>
@@ -1022,7 +1016,7 @@ function MainView({
                 </div>
               )}
               <p className="mt-4 text-xs font-medium text-emerald-900/70">
-                Thanks for supporting FrogTask — you&apos;re helping us keep building 🐸
+                Thanks for supporting Frogress — you&apos;re helping us keep building 🐸
               </p>
             </div>
           </div>

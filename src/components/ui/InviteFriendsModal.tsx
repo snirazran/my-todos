@@ -105,8 +105,8 @@ export function InviteFriendsModal({
   const shareInviteUrl = React.useCallback(
     async (url: string) => {
       const shareData = {
-        title: config?.shareTitle || 'Come join me on FrogTask!',
-        text: config?.shareMessage || 'I have a gift for you on FrogTask. Tap the link to claim it!',
+        title: config?.shareTitle || 'Come join me on Frogress!',
+        text: config?.shareMessage || 'I have a gift for you on Frogress. Tap the link to claim it!',
         url,
       };
       try {

@@ -12,6 +12,7 @@ import {
   Lock,
   Pencil,
   Plus,
+  Repeat,
   Tags,
   Trophy,
   X,
@@ -604,11 +605,11 @@ export function CategoryQuestPresentationCard({
             type="button"
             onClick={() => setShowSwitch(true)}
             className="group absolute inset-0 z-20 flex items-center justify-center bg-black/45 transition-colors [@media(hover:hover)]:hover:bg-black/55"
-            aria-label="Make this my focus"
+            aria-label="Switch focus"
           >
             <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-[12px] font-black uppercase tracking-[0.12em] text-slate-900 shadow-[0_4px_0_0_rgba(15,23,42,0.25)] ring-1 ring-black/10 backdrop-blur-sm transition active:translate-y-[2px] active:shadow-none group-active:translate-y-[2px]">
-              <Lock className="h-4 w-4" strokeWidth={2.75} />
-              Make this my focus
+              <Repeat className="h-4 w-4" strokeWidth={2.75} />
+              Switch focus
             </span>
           </button>
         )}
@@ -856,7 +857,7 @@ function SwitchFocusConfirm({
               </button>
               <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-muted-foreground/25 sm:hidden" />
               <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500">
-                <Lock className="h-7 w-7" strokeWidth={2.5} />
+                <Repeat className="h-7 w-7" strokeWidth={2.5} />
               </div>
               <h3 className="text-center text-xl font-black text-foreground">
                 Switch your focus?
@@ -866,18 +867,18 @@ function SwitchFocusConfirm({
                 <span className="font-bold text-foreground">
                   {categoryName ?? 'this focus'}
                 </span>{' '}
-                resets your{' '}
+                quest resets your{' '}
                 <span className="font-bold text-foreground">
                   {currentFocusName ?? 'current'}
                 </span>{' '}
-                progress.
+                quest progress.
               </p>
               <div className="mt-5 flex flex-col gap-4">
                 <button
                   type="button"
                   onClick={onConfirm}
                   disabled={switching}
-                  className="h-12 w-full rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground shadow-[0_3px_0_0_rgba(15,23,42,0.18)] transition active:translate-y-[2px] active:shadow-none disabled:opacity-60"
+                  className="h-12 w-full rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground transition active:scale-[0.98] disabled:opacity-60"
                 >
                   {switching ? 'Switching...' : 'Switch focus'}
                 </button>
@@ -886,7 +887,7 @@ function SwitchFocusConfirm({
                   <button
                     type="button"
                     onClick={onUpgrade}
-                    aria-label="Progress every quest with Frog Plus"
+                    aria-label="Focus on all quests with Frog Plus"
                     className="group relative isolate flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-4 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
                   >
                     <span
@@ -902,14 +903,14 @@ function SwitchFocusConfirm({
                       className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
                     />
                     <span className="text-sm font-black uppercase tracking-[0.08em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
-                      Unlock all quests with
+                      Focus on all quests with
                     </span>
                     <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
                       Plus
                     </span>
                   </button>
                   <p className="text-center text-[12px] font-medium text-muted-foreground">
-                    Progress every quest at once.
+                    Advance every quest at once.
                   </p>
                   </div>
                 )}
@@ -1034,6 +1035,7 @@ function ObjectiveRow({
               paused={paused}
               className="h-16 w-16 rounded-2xl"
               hydrateDelayMs={150}
+              giftAnimation="box_shake"
               onClick={() => onOpenRewards?.(block.rewards ?? [])}
             />
             {extraRewardCount > 0 && (
@@ -1257,6 +1259,7 @@ export const RewardTile = memo(function RewardTile({
   hydrateDelayMs = 0,
   paused = false,
   hideBadge = false,
+  giftAnimation,
 }: {
   reward: QuestReward;
   rewardCatalog: Record<string, QuestRewardCatalogItem>;
@@ -1267,6 +1270,8 @@ export const RewardTile = memo(function RewardTile({
   hydrateDelayMs?: number;
   paused?: boolean;
   hideBadge?: boolean;
+  /** Optional gift-box animation override (e.g. 'box_shake'). */
+  giftAnimation?: string;
 }) {
   const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
     hydrateDelayMs,
@@ -1329,9 +1334,10 @@ export const RewardTile = memo(function RewardTile({
               compact
                 ? 'h-[118%] w-[118%] drop-shadow-lg'
                 : 'h-[120%] w-[120%]',
+              giftAnimation && '-translate-y-1.5',
             )}
           >
-            <GiftRive className="w-full h-full" color={item.riveIndex} paused={false} />
+            <GiftRive className="w-full h-full" color={item.riveIndex} paused={false} animation={giftAnimation} />
           </div>
         </div>
       ) : previewIndices && hasHydrated ? (

@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
         await messaging.send({
           token,
           notification: {
-            title: 'FrogTask 🐸',
+            title: 'Frogress 🐸',
             body: messageBody,
           },
           data: {
@@ -203,7 +203,7 @@ export async function GET(req: NextRequest) {
             payload: {
               aps: {
                 alert: {
-                  title: 'FrogTask 🐸',
+                  title: 'Frogress 🐸',
                   body: messageBody,
                 },
                 badge: uncompletedCount,

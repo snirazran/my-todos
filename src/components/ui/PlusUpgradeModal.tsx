@@ -214,7 +214,7 @@ function Step0({
         <FeatureRow
           icon={<Heart className="h-5 w-5 text-rose-300" fill="currentColor" />}
           title="Support our mission"
-          subtitle="Help us keep making FrogTask the best app we can!"
+          subtitle="Help us keep making Frogress the best app we can!"
         />
       </div>
 

@@ -56,17 +56,17 @@ const GiftOptionSchema = new Schema<InviteGiftOption>(
 const InviteConfigSchema = new Schema<InviteConfigDoc>(
   {
     key: { type: String, required: true, unique: true, default: 'singleton' },
-    headline: { type: String, default: 'Share FrogTask, get rewards!' },
+    headline: { type: String, default: 'Share Frogress, get rewards!' },
     subheading: {
       type: String,
       default: 'Invite a friend to gift them a skin and earn rewards for yourself!',
     },
     rewards: { type: [RewardSchema], default: [] },
     giftOptions: { type: [GiftOptionSchema], default: [] },
-    shareTitle: { type: String, default: 'Come join me on FrogTask!' },
+    shareTitle: { type: String, default: 'Come join me on Frogress!' },
     shareMessage: {
       type: String,
-      default: 'I have a gift for you on FrogTask. Tap the link to claim it!',
+      default: 'I have a gift for you on Frogress. Tap the link to claim it!',
     },
     updatedAt: { type: Date, default: Date.now },
   },

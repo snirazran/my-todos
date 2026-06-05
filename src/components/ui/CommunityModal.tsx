@@ -50,14 +50,14 @@ export function CommunityPanel() {
   const storeLink: CommunityLink | null = isIOS
     ? {
         key: 'appstore',
-        label: 'Rate FrogTask on App Store',
+        label: 'Rate Frogress on App Store',
         href: APP_STORE_URL,
         icon: <Smartphone className="h-5 w-5 text-amber-500" />,
       }
     : isAndroid
       ? {
           key: 'playstore',
-          label: 'Rate FrogTask on Play Store',
+          label: 'Rate Frogress on Play Store',
           href: PLAY_STORE_URL,
           icon: <Smartphone className="h-5 w-5 text-emerald-500" />,
         }

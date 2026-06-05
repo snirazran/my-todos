@@ -17,6 +17,13 @@ const getRewardItemDef = (
   }
 
   if (type === 'BOX') {
+    // Prefer the real catalog entry so the gift's rarity label and visual
+    // (riveIndex → 0 green/common, 1 blue/rare, 2 red/legendary) match the
+    // actual box being awarded. Fall back to a generic box only if unknown.
+    if (itemId && byId[itemId]) {
+      return byId[itemId];
+    }
+
     return {
       id: itemId || 'mystery_box',
       name: 'Mystery Box',
@@ -61,6 +68,7 @@ export function SingleRewardCard({
   hideDropRates,
   forceFullOpacity,
   lockOverlay,
+  giftAnimation,
 }: {
   day: number;
   rewardType: 'FLIES' | 'ITEM' | 'BOX';
@@ -79,6 +87,8 @@ export function SingleRewardCard({
   hideDropRates?: boolean;
   forceFullOpacity?: boolean;
   lockOverlay?: boolean;
+  /** Optional gift-box animation override (e.g. 'box_shake'). */
+  giftAnimation?: string;
 }) {
   const isReady = status === 'READY';
   const isLockedPremium = status === 'LOCKED_PREMIUM';
@@ -155,7 +165,14 @@ export function SingleRewardCard({
           previewDelayMs={previewDelayMs}
           previewRootMargin={previewRootMargin}
           previewUnmountDelayMs={previewUnmountDelayMs}
-          previewClassName="translate-y-[18%] scale-110"
+          giftAnimation={giftAnimation}
+          previewClassName={cn(
+            'scale-110',
+            // Only lift gift boxes; leave frog skins at their default position.
+            itemDef.slot === 'container'
+              ? '-translate-y-[12%]'
+              : 'translate-y-[18%]',
+          )}
           previewTopLeftBadge={
             isClaimed ? (
               <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white shadow-md ring-2 ring-white">

@@ -81,7 +81,14 @@
       "mcp__ide__getDiagnostics",
       "PowerShell(Test-NetConnection *)",
       "PowerShell(ssh -v -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10 -i \"$env:USERPROFILE\\\\.ssh\\\\hetzner_frog_task\" root@5.161.176.246 \"echo CONNECTED_OK\")",
-      "PowerShell(ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=45 -i \"$env:USERPROFILE\\\\.ssh\\\\hetzner_frog_task\" root@5.161.176.246 \"echo CONNECTED_OK\")"
+      "PowerShell(ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=45 -i \"$env:USERPROFILE\\\\.ssh\\\\hetzner_frog_task\" root@5.161.176.246 \"echo CONNECTED_OK\")",
+      "Bash(ls patches *)",
+      "Bash(ls package-lock.json pnpm-lock.yaml yarn.lock)",
+      "Bash(pnpm patch *)",
+      "Bash(tee /tmp/patchout.txt)",
+      "Bash(pnpm patch-commit *)",
+      "Bash(sed -i '364,492d' src/components/ui/skins/TradePanel.tsx)",
+      "Bash(sed -n '360,372p' src/components/ui/skins/TradePanel.tsx)"
     ]
   }
 }

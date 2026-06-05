@@ -34,8 +34,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'FrogTask',
-  description: 'FrogTask Todo List App',
+  title: 'Frogress',
+  description: 'Frogress Todo List App',
   icons: {
     icon: '/48x48.png',
     shortcut: '/48x48.png',

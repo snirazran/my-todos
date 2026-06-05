@@ -69,7 +69,7 @@ export default function WelcomePage() {
               className="text-[26px] font-black tracking-tight text-foreground leading-tight"
               style={{ letterSpacing: '-0.025em', paddingBottom: '2px' }}
             >
-              FrogTask
+              Frogress
             </span>
           </div>
         </div>

@@ -1,6 +1,6 @@
-# Gemini CLI Project Readme - Frog Task Todo List App
+# Gemini CLI Project Readme - Frogress Todo List App
 
-This document provides an overview of the "Frog Task Todo List App," a Next.js application designed to help users manage their daily tasks with an engaging, frog-themed interface, complete with customizable skins and interactive animations.
+This document provides an overview of the "Frogress Todo List App," a Next.js application designed to help users manage their daily tasks with an engaging, frog-themed interface, complete with customizable skins and interactive animations.
 
 ## Project Overview
 

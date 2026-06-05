@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Sparkles, AlertCircle, Plus, ArrowUp, ChevronDown } from 'lucide-react';
+import { Sparkles, AlertCircle, Plus, ArrowUp, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ItemDef, Rarity, rarityRank } from '@/lib/skins/catalog';
 import { Button } from '@/components/ui/button';
@@ -123,6 +123,9 @@ export function TradePanel({
   // Mobile-only collapse for the contract slot grid. Auto-expands when items are added,
   // auto-collapses when cleared. Desktop (lg+) ignores this and always shows the grid.
   const [isContractExpanded, setIsContractExpanded] = useState(false);
+  // On web (lg+) the contract renders outside the wardrobe card via a portal,
+  // docked to the right of the viewport. On mobile/tablet it stays inline.
+  const [isDesktop, setIsDesktop] = useState(false);
   const prevSelectedCountRef = useRef(0);
 
   useEffect(() => {
@@ -154,6 +157,14 @@ export function TradePanel({
       setGridInitialSize(query.matches ? 10 : 4);
       setGridBatchSize(query.matches ? 10 : 6);
     };
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px)');
+    const update = () => setIsDesktop(query.matches);
     update();
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
@@ -307,7 +318,7 @@ export function TradePanel({
 
   // --- Render ---
   return (
-    <div className="relative flex flex-col lg:flex-row lg:gap-4 w-full h-full overflow-y-auto lg:overflow-hidden bg-background">
+    <div className="relative flex flex-col w-full h-full overflow-y-auto lg:overflow-hidden bg-background">
       {/* --- RESULT OVERLAY --- */}
       {mounted && tradeResult && 
         createPortal(
@@ -350,7 +361,7 @@ export function TradePanel({
         )
       }
 
-      {/* --- INVENTORY (Main View - Order 1) --- */}
+      {/* --- INVENTORY (Main View) --- */}
       <div
         ref={inventoryScrollRef}
         onScroll={(event) => {
@@ -371,7 +382,7 @@ export function TradePanel({
             availableGrid.loadMore();
           }
         }}
-        className="flex-1 flex flex-col lg:h-full lg:min-h-0 lg:overflow-y-auto order-1 bg-background lg:bg-transparent"
+        className="flex-1 flex flex-col lg:min-h-0 lg:overflow-y-auto lg:overscroll-none order-2 bg-background lg:bg-muted/40 lg:rounded-[20px] lg:border lg:border-border/40"
       >
         {!availableItems.length && (
           <div className="flex items-center justify-end px-4 py-3 lg:px-6 lg:py-4 shrink-0">
@@ -381,14 +392,14 @@ export function TradePanel({
           </div>
         )}
 
-        <div className="px-4 pb-52 lg:pb-6 lg:px-6">
+        <div className="px-4 pb-52 lg:p-4 lg:pb-56">
           {availableItems.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 md:h-64 text-sm border-2 border-dashed text-muted-foreground border-border rounded-xl bg-muted/30">
               <p>Your wardrobe is empty (or filtered out).</p>
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-3 lg:grid-cols-2 gap-3 md:gap-4 pb-4">
+              <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
                 {availableGrid.visibleItems.map((item, index) => {
                   const owned = inventory[item.id] || 0;
                   const selected = selectedCounts[item.id] || 0;
@@ -429,20 +440,22 @@ export function TradePanel({
         </div>
       </div>
 
-      {/* --- CONTRACT (Side/Bottom Dock - Order 2) --- */}
-      <div className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-0 left-0 w-full pointer-events-none lg:static lg:pointer-events-auto lg:self-start shrink-0 z-[60] order-2 lg:w-[320px] xl:w-[360px] bg-card lg:bg-card/40 border-t lg:border-t-0 lg:border lg:border-border/60 lg:rounded-2xl lg:shadow-sm border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
-        {/* Header (tap to expand/collapse on mobile) */}
+      {/* --- CONTRACT (Mobile/tablet: inline fixed bottom dock. Web: portaled outside the card, docked to the right.) --- */}
+      {(() => {
+        const inner = (
+          <>
+        {/* Header (tap to expand/collapse) */}
         <button
           type="button"
           onClick={() => setIsContractExpanded((v) => !v)}
           aria-expanded={isContractExpanded}
-          className="flex items-center justify-between px-4 py-2 border-b border-border bg-muted/30 shrink-0 w-full text-left lg:cursor-default"
+          className="flex items-center justify-between px-4 py-2.5 border-b border-border bg-muted/30 shrink-0 w-full text-left"
         >
             <div className="flex items-center gap-2">
               <ChevronDown
                 size={16}
                 className={cn(
-                  'lg:hidden transition-transform duration-200 text-muted-foreground',
+                  'transition-transform duration-200 text-muted-foreground',
                   isContractExpanded ? '' : '-rotate-180',
                 )}
               />
@@ -468,14 +481,13 @@ export function TradePanel({
         </button>
 
         {/* Scrollable Content (Sidebar) or Fixed (Bottom Bar) */}
-        <div className="lg:p-4 flex flex-col pointer-events-auto w-full max-w-md mx-auto lg:max-w-none lg:mx-0">
-           {/* Slot grid + Trade Up controls (collapsible on mobile, always expanded on lg+) */}
+        <div className="flex flex-col pointer-events-auto w-full max-w-md mx-auto">
+           {/* Slot grid + Trade Up controls (collapsible on mobile) */}
            <div
              className={cn(
                'overflow-hidden transition-[max-height,opacity,padding] duration-300 ease-out',
-               'lg:max-h-none lg:opacity-100 lg:p-0',
                isContractExpanded
-                 ? 'max-h-[700px] opacity-100 p-2'
+                 ? 'max-h-[700px] opacity-100 p-2 lg:p-4'
                  : 'max-h-0 opacity-0 p-0',
              )}
            >
@@ -573,7 +585,22 @@ export function TradePanel({
            </div>
            </div>
         </div>
-      </div>
+          </>
+        );
+
+        return mounted && isDesktop
+          ? createPortal(
+              <div className="fixed z-[60] right-6 bottom-6 w-[340px] max-w-[calc(100vw-3rem)] bg-card border border-border/60 rounded-2xl shadow-2xl overflow-hidden flex flex-col pointer-events-auto">
+                {inner}
+              </div>,
+              document.body,
+            )
+          : (
+              <div className="fixed bottom-[calc(76px+env(safe-area-inset-bottom))] md:bottom-0 left-0 w-full pointer-events-none shrink-0 z-[60] bg-card border-t border-border shadow-[0_-4px_20px_-5px_rgba(0,0,0,0.1)] flex flex-col">
+                {inner}
+              </div>
+            );
+      })()}
     </div>
   );
 }

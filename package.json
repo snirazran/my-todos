@@ -77,5 +77,10 @@
     "tailwindcss": "^3.3.0",
     "tailwindcss-animate": "^1.0.7",
     "typescript": "^5"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "@rive-app/react-canvas-lite@4.28.1": "patches/@rive-app__react-canvas-lite@4.28.1.patch"
+    }
   }
 }

@@ -108,6 +108,7 @@ function ItemCardComponent({
   previewUnmountDelayMs = 2400,
   previewClassName,
   previewTopLeftBadge,
+  giftAnimation,
 }: {
   item: ItemDef;
   ownedCount: number;
@@ -133,6 +134,8 @@ function ItemCardComponent({
   previewUnmountDelayMs?: number;
   previewClassName?: string;
   previewTopLeftBadge?: React.ReactNode;
+  /** Optional gift-box animation override (e.g. 'box_shake'). */
+  giftAnimation?: string;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
@@ -293,10 +296,11 @@ function ItemCardComponent({
             <div
               className={cn(
                 'w-[110%] h-[110%] -translate-y-1 drop-shadow-xl',
+                giftAnimation && '-translate-y-2.5',
                 previewClassName,
               )}
             >
-              <GiftRive color={item.riveIndex} paused={pausePreview} />
+              <GiftRive color={item.riveIndex} paused={pausePreview} animation={giftAnimation} />
             </div>
           ) : (
             <Frog
@@ -326,7 +330,7 @@ function ItemCardComponent({
 
       {/* Actions */}
       <div className="w-full mx-auto mt-0 md:w-3/4">
-        {((mode === 'inventory' && item.slot === 'container') || mode === 'trade') && !customAction && (
+        {mode === 'trade' && !customAction && (
           <div
             className={cn(
               'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
@@ -335,11 +339,7 @@ function ItemCardComponent({
                 : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
             )}
           >
-            {actionLoading
-              ? '...'
-              : mode === 'trade'
-                ? isSelected ? 'SELECTED' : 'SELECT'
-                : 'OPEN'}
+            {actionLoading ? '...' : isSelected ? 'SELECTED' : 'SELECT'}
           </div>
         )}
 

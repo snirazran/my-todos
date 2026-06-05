@@ -286,7 +286,7 @@ export function GlobalTimer() {
       const m = Math.floor(remaining / 60).toString().padStart(2, '0');
       const s = (remaining % 60).toString().padStart(2, '0');
       const icon = phaseRef.current === 'focus' ? '🐸' : '☕';
-      document.title = `${icon} ${m}:${s} - FrogTask`;
+      document.title = `${icon} ${m}:${s} - Frogress`;
 
       tickTimer(remaining);
 
@@ -323,7 +323,7 @@ export function GlobalTimer() {
   // Reset tab title when timer stops
   useEffect(() => {
     if (!isRunning) {
-      document.title = 'FrogTask';
+      document.title = 'Frogress';
     }
   }, [isRunning]);
 

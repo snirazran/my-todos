@@ -1545,6 +1545,7 @@ function QuestSeasonEventOverlay({
                               rewardType={freeReward.type}
                               amount={freeReward.amount}
                               itemId={freeReward.itemId}
+                              giftAnimation="box_shake"
                               status={
                                 isClaimed
                                   ? 'CLAIMED'
@@ -1603,6 +1604,7 @@ function QuestSeasonEventOverlay({
                               rewardType={premiumReward.type}
                               amount={premiumReward.amount}
                               itemId={premiumReward.itemId}
+                              giftAnimation="box_shake"
                               status={
                                 !isPremium
                                   ? entry.day < season.currentDay
@@ -1794,6 +1796,7 @@ function LockedPlusPreview({
               hideDropRates
               forceFullOpacity
               lockOverlay
+              giftAnimation="box_shake"
             />
           </div>
         </div>
@@ -1824,7 +1827,7 @@ function LockedPlusPreview({
               className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
             />
             <span className="text-sm font-black uppercase tracking-[0.2em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
-              FrogTask
+              Frogress
             </span>
             <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
               Plus

@@ -1,7 +1,7 @@
 {
-  "name": "FrogTask",
-  "short_name": "FrogTask",
-  "description": "FrogTask Todo List App",
+  "name": "Frogress",
+  "short_name": "Frogress",
+  "description": "Frogress Todo List App",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

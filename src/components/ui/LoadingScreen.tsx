@@ -46,7 +46,7 @@ function CurvedLoadingText({ message }: { message: string }) {
 }
 
 export function LoadingScreen({
-  message = 'Frog Task',
+  message = 'Frogress',
   subtext = '',
   fullscreen = true,
 }: LoadingScreenProps) {

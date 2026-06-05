@@ -61,7 +61,7 @@ const ABOUT_QUESTIONS: AboutQuestion[] = [
   },
   {
     id: 'usedBefore',
-    title: 'Have you used FrogTask before?',
+    title: 'Have you used Frogress before?',
     sectionLabel: 'About You',
     sectionIndex: 0,
     options: [

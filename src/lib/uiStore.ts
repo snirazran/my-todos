@@ -55,7 +55,7 @@ export const useUIStore = create<UIState>()(
       setLoadingScreenVisible: (visible: boolean) => set({ isLoadingScreenVisible: visible }),
     }),
     {
-      name: 'frog-task-ui-storage',
+      name: 'frogress-ui-storage',
       partialize: (state) => ({ isDebugMode: state.isDebugMode }), // Only persist debug mode
     }
   )

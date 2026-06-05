@@ -37,6 +37,7 @@ export const GiftRive = React.memo(
     isMilestone = false,
     paused = false,
     color = 0,
+    animation,
   }: {
     width?: number;
     height?: number;
@@ -45,12 +46,22 @@ export const GiftRive = React.memo(
     isMilestone?: boolean;
     paused?: boolean;
     color?: number;
+    /** Play a specific animation (e.g. 'box_shake') instead of the default
+     *  State Machine. Color is still applied via the view-model binding. */
+    animation?: string;
   }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const riveUrl = useRiveAsset('/idle_gift.riv');
+    // When playing a raw animation (e.g. box_shake) the state machine's
+    // color logic is bypassed, so also play the matching color_* animation.
+    // Gift indices: 0 = common, 1 = rare, 2 = legendary.
+    const colorAnim =
+      color === 0 ? 'color_green' : color === 1 ? 'color_blue' : 'color_red';
     const { rive, RiveComponent } = useRive({
       src: riveUrl || undefined,
-      stateMachines: 'State Machine 1',
+      ...(animation
+        ? { animations: [animation, colorAnim] }
+        : { stateMachines: 'State Machine 1' }),
       autoplay: true,
       autoBind: true,
       layout: RIVE_LAYOUT,
