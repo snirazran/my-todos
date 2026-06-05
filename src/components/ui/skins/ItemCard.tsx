@@ -455,26 +455,68 @@ function PreviewSkeleton({
 
 /* ─── DROP RATES BUTTON + POPUP ─────────────────────── */
 
-const RARITY_COLORS: Record<Rarity, string> = {
-  common: 'bg-slate-400',
-  uncommon: 'bg-emerald-500',
-  rare: 'bg-sky-500',
-  epic: 'bg-violet-500',
-  legendary: 'bg-amber-500',
+const RARITY_ORDER: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
+
+const RARITY_LABEL: Record<Rarity, string> = {
+  common: 'Common',
+  uncommon: 'Uncommon',
+  rare: 'Rare',
+  epic: 'Epic',
+  legendary: 'Legendary',
 };
 
-const RARITY_TEXT: Record<Rarity, string> = {
-  common: 'text-slate-500 dark:text-slate-400',
-  uncommon: 'text-emerald-600 dark:text-emerald-400',
-  rare: 'text-sky-600 dark:text-sky-400',
-  epic: 'text-violet-600 dark:text-violet-400',
-  legendary: 'text-amber-600 dark:text-amber-400',
+// Gradient-tinted tile styling, matching the rarity look of the item cards.
+const RARITY_TILE: Record<Rarity, { gradient: string; border: string; text: string; dot: string }> = {
+  common: {
+    gradient: 'from-slate-100 to-slate-50 dark:from-slate-800/60 dark:to-slate-900/40',
+    border: 'border-slate-300/70 dark:border-slate-700',
+    text: 'text-slate-600 dark:text-slate-300',
+    dot: 'bg-slate-400',
+  },
+  uncommon: {
+    gradient: 'from-emerald-100 to-emerald-50 dark:from-emerald-900/40 dark:to-emerald-950/40',
+    border: 'border-emerald-400/70 dark:border-emerald-600/70',
+    text: 'text-emerald-700 dark:text-emerald-300',
+    dot: 'bg-emerald-500',
+  },
+  rare: {
+    gradient: 'from-sky-100 to-sky-50 dark:from-sky-900/40 dark:to-sky-950/40',
+    border: 'border-sky-400/70 dark:border-sky-600/70',
+    text: 'text-sky-700 dark:text-sky-300',
+    dot: 'bg-sky-500',
+  },
+  epic: {
+    gradient: 'from-violet-100 to-violet-50 dark:from-violet-900/40 dark:to-violet-950/40',
+    border: 'border-violet-400/70 dark:border-violet-600/70',
+    text: 'text-violet-700 dark:text-violet-300',
+    dot: 'bg-violet-500',
+  },
+  legendary: {
+    gradient: 'from-amber-100 to-amber-50 dark:from-amber-900/40 dark:to-amber-950/40',
+    border: 'border-amber-400/70 dark:border-amber-600/70',
+    text: 'text-amber-700 dark:text-amber-300',
+    dot: 'bg-amber-500',
+  },
 };
+
+const formatChance = (pct: number) =>
+  pct >= 1
+    ? `${Math.round(pct)}%`
+    : pct >= 0.01
+      ? `${pct.toFixed(2)}%`
+      : pct > 0
+        ? `${pct.toFixed(4)}%`
+        : '0%';
 
 type GiftDropRate = {
   itemId: string;
   chance: number;
   item?: ItemDef;
+};
+
+type GiftRarityDropRate = {
+  rarity: Rarity;
+  chance: number;
 };
 
 function DropRatesButton({ giftId, name }: { giftId: string; name: string }) {
@@ -521,6 +563,8 @@ function DropRatesPopup({
 }) {
   const [mounted, setMounted] = useState(false);
   const [drops, setDrops] = useState<GiftDropRate[]>([]);
+  const [rarityDrops, setRarityDrops] = useState<GiftRarityDropRate[]>([]);
+  const [dropMode, setDropMode] = useState<'item' | 'rarity'>('item');
   const [loading, setLoading] = useState(true);
   React.useEffect(() => setMounted(true), []);
 
@@ -531,10 +575,16 @@ function DropRatesPopup({
     fetch(`/api/skins/gift-drops?giftId=${encodeURIComponent(giftId)}`)
       .then((res) => res.json())
       .then((data) => {
-        if (!cancelled) setDrops(data.drops ?? []);
+        if (cancelled) return;
+        setDrops(data.drops ?? []);
+        setRarityDrops(data.rarityDrops ?? []);
+        setDropMode(data.dropMode === 'rarity' ? 'rarity' : 'item');
       })
       .catch(() => {
-        if (!cancelled) setDrops([]);
+        if (!cancelled) {
+          setDrops([]);
+          setRarityDrops([]);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -546,10 +596,27 @@ function DropRatesPopup({
 
   if (!mounted) return null;
 
-  const total = drops.reduce((sum, drop) => sum + Math.max(0, drop.chance), 0);
-  const entries = [...drops]
-    .filter((drop) => drop.chance > 0)
-    .sort((a, b) => b.chance - a.chance);
+  // Rarity mode: one row per rarity bucket (no per-item list).
+  const rarityTotal = rarityDrops.reduce((sum, d) => sum + Math.max(0, d.chance), 0);
+  const rarityRows = RARITY_ORDER.map((rarity) => {
+    const weight = rarityDrops.find((d) => d.rarity === rarity)?.chance ?? 0;
+    return { rarity, pct: rarityTotal > 0 ? (weight / rarityTotal) * 100 : 0, weight };
+  })
+    .filter((row) => row.weight > 0)
+    .sort((a, b) => b.pct - a.pct);
+
+  // Item mode: items grouped under their rarity, with a bucket total.
+  const itemTotal = drops.reduce((sum, d) => sum + Math.max(0, d.chance), 0);
+  const itemGroups = RARITY_ORDER.map((rarity) => {
+    const items = drops
+      .filter((d) => (d.item?.rarity ?? 'common') === rarity && d.chance > 0)
+      .sort((a, b) => b.chance - a.chance);
+    const bucket = items.reduce((sum, d) => sum + d.chance, 0);
+    return { rarity, items, pct: itemTotal > 0 ? (bucket / itemTotal) * 100 : 0 };
+  }).filter((group) => group.items.length > 0);
+
+  const isRarityMode = dropMode === 'rarity';
+  const hasContent = isRarityMode ? rarityRows.length > 0 : itemGroups.length > 0;
 
   return createPortal(
     <motion.div
@@ -576,56 +643,108 @@ function DropRatesPopup({
         transition={{ type: 'spring', stiffness: 400, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
-        className="relative w-full max-w-xs bg-card border border-border/60 rounded-3xl shadow-2xl overflow-hidden"
+        className="relative flex max-h-[80vh] w-full max-w-xs flex-col overflow-hidden rounded-3xl border border-border/60 bg-card shadow-2xl"
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <h3 className="text-sm font-black text-foreground tracking-tight">{name}</h3>
+        <div className="flex items-start justify-between gap-3 border-b border-border/40 px-5 pb-3 pt-5">
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-black tracking-tight text-foreground">{name}</h3>
+            <p className="mt-0.5 text-[11px] font-bold text-muted-foreground">
+              {isRarityMode ? 'Chance to win each rarity' : 'Drop rates'}
+            </p>
+          </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+            className="-mr-1 -mt-1 shrink-0 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           >
-            <X className="w-4 h-4" />
+            <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Rates */}
-        <div className="px-5 pb-5 space-y-2.5">
+        {/* Body */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {loading ? (
             <div className="flex items-center justify-center py-8 text-muted-foreground">
-              <Loader2 className="w-5 h-5 animate-spin" />
+              <Loader2 className="h-5 w-5 animate-spin" />
             </div>
-          ) : entries.length === 0 ? (
+          ) : !hasContent ? (
             <div className="rounded-2xl border border-border/50 bg-muted/30 p-4 text-center text-xs font-bold text-muted-foreground">
               No drops configured.
             </div>
-          ) : entries.map((drop) => {
-            const raw = total > 0 ? (drop.chance / total) * 100 : 0;
-            const label = raw >= 1 ? `${Math.round(raw)}%` : raw >= 0.01 ? `${raw.toFixed(2)}%` : raw > 0 ? `${raw.toFixed(4)}%` : '0%';
-            const barWidth = raw > 0 ? Math.max(raw, 2) : 0;
-            const rarity = drop.item?.rarity ?? 'common';
-            return (
-              <div key={drop.itemId} className="flex items-center gap-3">
-                <div className="flex items-center gap-2 w-28 min-w-0">
-                  <div className={cn('w-2 h-2 rounded-full shrink-0', RARITY_COLORS[rarity])} />
-                  <span className={cn('truncate text-xs font-bold', RARITY_TEXT[rarity])}>
-                    {drop.item?.name ?? drop.itemId}
-                  </span>
-                </div>
-                <div className="flex-1 h-2.5 bg-muted/60 rounded-full overflow-hidden">
+          ) : isRarityMode ? (
+            <div className="space-y-2">
+              {rarityRows.map((row, i) => {
+                const tile = RARITY_TILE[row.rarity];
+                return (
                   <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${barWidth}%` }}
-                    transition={{ duration: 0.5, ease: 'easeOut' }}
-                    className={cn('h-full rounded-full', RARITY_COLORS[rarity])}
-                  />
-                </div>
-                <span className="text-xs font-black text-muted-foreground tabular-nums w-14 text-right">
-                  {label}
-                </span>
-              </div>
-            );
-          })}
+                    key={row.rarity}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04, type: 'spring', stiffness: 400, damping: 28 }}
+                    className={cn(
+                      'flex items-center gap-3 rounded-2xl border bg-gradient-to-br px-4 py-3 shadow-sm',
+                      tile.border,
+                      tile.gradient,
+                    )}
+                  >
+                    <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', tile.dot)} />
+                    <span className={cn('text-sm font-black uppercase tracking-wide', tile.text)}>
+                      {RARITY_LABEL[row.rarity]}
+                    </span>
+                    <span className={cn('ml-auto text-lg font-black tabular-nums', tile.text)}>
+                      {formatChance(row.pct)}
+                    </span>
+                  </motion.div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              {itemGroups.map((group, i) => {
+                const tile = RARITY_TILE[group.rarity];
+                return (
+                  <motion.div
+                    key={group.rarity}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.04, type: 'spring', stiffness: 400, damping: 28 }}
+                    className={cn(
+                      'overflow-hidden rounded-2xl border bg-gradient-to-br shadow-sm',
+                      tile.border,
+                      tile.gradient,
+                    )}
+                  >
+                    {/* Rarity header */}
+                    <div className="flex items-center gap-2 px-4 pb-2 pt-2.5">
+                      <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', tile.dot)} />
+                      <span className={cn('text-sm font-black uppercase tracking-wide', tile.text)}>
+                        {RARITY_LABEL[group.rarity]}
+                      </span>
+                      <span className={cn('ml-auto text-base font-black tabular-nums', tile.text)}>
+                        {formatChance(group.pct)}
+                      </span>
+                    </div>
+                    {/* Items inside this rarity */}
+                    <div className="space-y-0.5 bg-background/55 px-4 py-2 dark:bg-background/30">
+                      {group.items.map((drop) => {
+                        const raw = itemTotal > 0 ? (drop.chance / itemTotal) * 100 : 0;
+                        return (
+                          <div key={drop.itemId} className="flex items-center justify-between gap-2">
+                            <span className="truncate text-xs font-bold text-foreground">
+                              {drop.item?.name ?? drop.itemId}
+                            </span>
+                            <span className="shrink-0 text-[11px] font-black tabular-nums text-muted-foreground">
+                              {formatChance(raw)}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </motion.div>
     </motion.div>,

@@ -19,5 +19,10 @@ export async function GET(req: NextRequest) {
     item: drop.item,
   }));
 
-  return json({ gift: config.gift, drops, dropMode: config.dropMode });
+  return json({
+    gift: config.gift,
+    drops,
+    dropMode: config.dropMode,
+    rarityDrops: config.rarityDrops,
+  });
 }
