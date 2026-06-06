@@ -11,7 +11,7 @@ import ProfileQuestionsStep from './steps/ProfileQuestionsStep';
 import CreateAccountStep from './steps/CreateAccountStep';
 import { auth } from '@/lib/firebase';
 import { clearAuthTokenCookie } from '@/lib/authCookie';
-import { GlobalPageBackground } from '@/components/ui/GlobalPageBackground';
+import { OnboardingBackground } from '@/components/ui/OnboardingBackground';
 
 const STEP_IDS = ['name', 'humanName', 'createAccount', 'notifications', 'aboutIntro', 'age'] as const;
 
@@ -143,7 +143,7 @@ export default function OnboardingPage() {
   return (
     <main className="fixed inset-0 isolate flex flex-col items-center overflow-y-auto bg-background px-5 pt-4">
       <div className="absolute inset-x-0 top-0 h-[312px] overflow-hidden md:h-[352px]">
-        <GlobalPageBackground />
+        <OnboardingBackground />
       </div>
       <div
         aria-hidden

@@ -11,6 +11,17 @@ const VALID_USED_BEFORE = new Set(['first-time', 'starting-fresh']);
 const MAX_ONBOARDING_KEYS = 100;
 const MAX_ONBOARDING_VALUES_PER_KEY = 20;
 const MAX_ONBOARDING_VALUE_LENGTH = 80;
+// Discontinued onboarding questions — never persist these again.
+// "Energy & Creativity": sleepDuration, wakeEase, dayActivity
+// "How's Life": overwhelmedFrequency, supportCircle, routineHappiness
+const DISCONTINUED_ONBOARDING_KEYS = new Set([
+  'sleepDuration',
+  'wakeEase',
+  'dayActivity',
+  'overwhelmedFrequency',
+  'supportCircle',
+  'routineHappiness',
+]);
 
 function sanitizeOnboardingResponses(value: unknown): Record<string, string[]> | undefined {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
@@ -20,7 +31,7 @@ function sanitizeOnboardingResponses(value: unknown): Record<string, string[]> |
 
   for (const [rawKey, rawValues] of entries.slice(0, MAX_ONBOARDING_KEYS)) {
     const key = rawKey.trim().slice(0, 64);
-    if (!key || !Array.isArray(rawValues)) continue;
+    if (!key || DISCONTINUED_ONBOARDING_KEYS.has(key) || !Array.isArray(rawValues)) continue;
 
     const values = rawValues
       .filter((item): item is string => typeof item === 'string')

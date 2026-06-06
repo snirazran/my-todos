@@ -24,8 +24,8 @@ export default function AboutIntroStep({ selections, onNext, onBack, saving, dir
 
       <OnboardingFrogHeader
         indices={frogIndices}
-        title="Let's learn a bit about you!"
-        subtitle={`${frogName} is curious about how to grow with you.`}
+        title="Let's hop into it!"
+        subtitle={`Tell ${frogName} a bit about you so you can grow together.`}
       />
 
       <motion.div

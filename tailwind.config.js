@@ -1,6 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   darkMode: ['class'],
+  // Only apply `hover:` styles on devices that actually support hover (desktop),
+  // so touch/mobile doesn't get stuck in a hover state after tapping.
+  future: {
+    hoverOnlyWhenSupported: true,
+  },
   content: [
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',

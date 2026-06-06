@@ -119,7 +119,7 @@ function LoginPageInner() {
 
   const flyCaught = visuallyDone.has(FLY_KEY);
 
-  const respawnFlyAfterError = () => {
+  const respawnFly = () => {
     flyControls.stop();
     setFlyState('hidden');
     if (flyRespawnTimerRef.current) {
@@ -190,7 +190,12 @@ function LoginPageInner() {
       await triggerTongue({
         key: FLY_KEY,
         completed: false,
-        onPersist: () => router.push(route),
+        onPersist: () => {
+          // Keep the fly hidden after the catch and let it re-enter with a
+          // delay (matches the error flow) instead of snapping back instantly.
+          respawnFly();
+          router.push(route);
+        },
       });
     } catch (err: any) {
       const map: Record<string, string> = {
@@ -228,7 +233,7 @@ function LoginPageInner() {
           setStep('email-sent');
         } catch (err: any) {
           showNotification(err?.message || 'Could not send email link');
-          respawnFlyAfterError();
+          respawnFly();
         } finally {
           setLoading(false);
         }

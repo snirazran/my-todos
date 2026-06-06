@@ -54,7 +54,7 @@ export default function CreateAccountStep({ onNext }: OnboardingStepProps) {
       <button
         type="button"
         onClick={onNext}
-        className="absolute right-0 top-2 z-40 rounded-full border-2 border-primary/40 bg-background px-4 py-2 text-sm font-black text-primary shadow-md transition hover:border-primary hover:bg-primary/10"
+        className="absolute right-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 rounded-full border-2 border-primary/40 bg-background px-4 py-2 text-sm font-black text-primary shadow-md transition hover:border-primary hover:bg-primary hover:text-primary-foreground"
       >
         Skip for now
       </button>

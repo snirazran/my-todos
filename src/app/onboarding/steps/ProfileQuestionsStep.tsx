@@ -8,11 +8,12 @@ import { cn } from '@/lib/utils';
 import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 import type { MacroCategoryDefinition } from '@/lib/quests/types';
-import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
+import { OnboardingFrogHeader } from './OnboardingFrogHeader';
 
 type AboutOption = {
   id: string;
   label: string;
+  description?: string;
   icon?: string;
   iconImageUrl?: string;
 };
@@ -22,7 +23,6 @@ type AboutQuestion = {
   title: string;
   subtitle?: string;
   sectionLabel: string;
-  sectionIndex: number;
   multiSelect?: boolean;
   options: AboutOption[];
   plainOption?: { id: string; label: string };
@@ -34,7 +34,6 @@ const ABOUT_QUESTIONS: AboutQuestion[] = [
     title: 'How old are you?',
     subtitle: 'This helps us personalize your experience',
     sectionLabel: 'About You',
-    sectionIndex: 0,
     options: [
       { id: 'under-18', label: 'Under 18' },
       { id: '18-24', label: '18-24' },
@@ -49,7 +48,6 @@ const ABOUT_QUESTIONS: AboutQuestion[] = [
     id: 'aboutGender',
     title: "What's your gender?",
     sectionLabel: 'About You',
-    sectionIndex: 0,
     options: [
       { id: 'male', label: 'Male' },
       { id: 'female', label: 'Female' },
@@ -61,79 +59,9 @@ const ABOUT_QUESTIONS: AboutQuestion[] = [
     id: 'usedBefore',
     title: 'Have you used Frogress before?',
     sectionLabel: 'About You',
-    sectionIndex: 0,
     options: [
       { id: 'first-time', label: 'No, this is my first time!', icon: '🍼' },
       { id: 'starting-fresh', label: "Yes, but I'm starting fresh", icon: '☕' },
-    ],
-  },
-  {
-    id: 'sleepDuration',
-    title: 'How long do you usually sleep at night?',
-    sectionLabel: 'Energy & Creativity',
-    sectionIndex: 1,
-    options: [
-      { id: 'less-than-5', label: 'Less than 5 hours', icon: '😴' },
-      { id: '5-7', label: '5-7 hours', icon: '🛏️' },
-      { id: '7-9', label: '7-9 hours', icon: '🌙' },
-      { id: 'more-than-9', label: 'More than 9 hours', icon: '☀️' },
-    ],
-  },
-  {
-    id: 'wakeEase',
-    title: 'How easy is it for you to get out of bed?',
-    sectionLabel: 'Energy & Creativity',
-    sectionIndex: 1,
-    options: [
-      { id: 'very-easy', label: 'Very easy, I get up pretty quickly', icon: '🐬' },
-      { id: 'sometimes-hard', label: 'Sometimes easy, some days can be hard', icon: '🧦' },
-      { id: 'hard', label: 'Hard, I often struggle to get out of bed', icon: '🧸' },
-    ],
-  },
-  {
-    id: 'dayActivity',
-    title: 'How active are you during the day?',
-    sectionLabel: 'Energy & Creativity',
-    sectionIndex: 1,
-    options: [
-      { id: 'on-the-move', label: "I'm on the move most of the day", icon: '🏃' },
-      { id: 'balanced', label: 'I balance being stationary with some movement', icon: '🚶' },
-      { id: 'not-active', label: "I don't move much and want to be more active", icon: '🪑' },
-      { id: 'limited-movement', label: 'I have conditions that limit my movement', icon: '🌻' },
-    ],
-  },
-  {
-    id: 'overwhelmedFrequency',
-    title: 'How often do you feel overwhelmed?',
-    sectionLabel: "How's Life",
-    sectionIndex: 2,
-    options: [
-      { id: 'several-times-week', label: 'I feel overwhelmed several times a week', icon: '😫' },
-      { id: 'few-stressful-days', label: 'I have a few stressful days each month', icon: '😕' },
-      { id: 'manage-well', label: 'I manage and overcome stress pretty well', icon: '😌' },
-    ],
-  },
-  {
-    id: 'supportCircle',
-    title: 'How many people can you lean on for support in tough times?',
-    sectionLabel: "How's Life",
-    sectionIndex: 2,
-    options: [
-      { id: 'three-or-more', label: '3 or more', icon: '🌳' },
-      { id: 'two', label: '2', icon: '🌿' },
-      { id: 'one', label: '1', icon: '🌱' },
-      { id: 'just-me', label: 'Just me', icon: '🍃' },
-    ],
-  },
-  {
-    id: 'routineHappiness',
-    title: 'How happy are you with your current routine?',
-    sectionLabel: "How's Life",
-    sectionIndex: 2,
-    options: [
-      { id: 'completely', label: 'Completely, I take care of myself well', icon: '🥳' },
-      { id: 'slightly', label: "Slightly, I'd like to see some improvements", icon: '😌' },
-      { id: 'not-at-all', label: 'Not at all, I expect to see a major change', icon: '😮' },
     ],
   },
 ];
@@ -170,12 +98,11 @@ export default function ProfileQuestionsStep({
       id: FOCUS_AREAS_QUESTION_ID,
       title: 'What areas would you like support with?',
       sectionLabel: 'Focus Areas',
-      sectionIndex: 3,
       multiSelect: true,
       options: focusAreaCategories.map((c) => ({
         id: c.id,
-        label: c.onboardingSentence?.trim() || c.name,
-        iconImageUrl: c.coverImageUrl,
+        label: c.name,
+        description: c.onboardingSentence?.trim() || undefined,
       })),
     }),
     [focusAreaCategories],
@@ -186,21 +113,13 @@ export default function ProfileQuestionsStep({
     [focusAreasQuestion],
   );
   const currentQuestion = displayedQuestions[questionIndex];
-  const totalStages = 5;
-  const milestoneCount = totalStages - 1;
-  const currentSection = currentQuestion.sectionIndex;
-  const sectionQuestionCount = displayedQuestions.filter(
-    (question) => question.sectionIndex === currentSection,
-  ).length;
-  const sectionQuestionOffset = displayedQuestions
-    .filter((question) => question.sectionIndex === currentSection)
-    .findIndex((question) => question.id === currentQuestion.id);
-  const baseProgress = currentSection / milestoneCount;
-  const sectionSpan = 1 / milestoneCount;
-  const sectionProgress = (sectionQuestionOffset / Math.max(sectionQuestionCount, 1)) * sectionSpan;
-  const totalProgress = baseProgress + sectionProgress;
-  const completedMilestones = Math.floor(totalProgress * milestoneCount + 0.0001);
-  const progressWidth = `${totalProgress * 100}%`;
+  // One milestone per question page: the bar advances (and a circle fills) each
+  // time you complete a question.
+  const milestoneCount = displayedQuestions.length;
+  const completedMilestones = questionIndex;
+  const totalProgress = milestoneCount > 0 ? questionIndex / milestoneCount : 0;
+  // Keep a sliver of green even at zero progress so the bar never looks empty.
+  const progressWidth = `${Math.max(totalProgress, 0.05) * 100}%`;
   const selectedValues = selections[currentQuestion.id] ?? [];
   const selected = selectedValues[0];
 
@@ -239,67 +158,72 @@ export default function ProfileQuestionsStep({
 
   return (
     <div className="flex-1 flex flex-col">
-      <OnboardingFrogHeader
-        indices={frogIndices}
-        title={currentQuestion.title}
-        subtitle={currentQuestion.subtitle}
-      />
-
-      <div className={cn('relative z-20 flex flex-col', ONBOARDING_BODY_CLASS)}>
-      <div className="relative h-10">
+      {/* Progress bar — pinned at the top, above the frog */}
+      <div className="absolute inset-x-0 top-[calc(0.5rem+env(safe-area-inset-top))] z-40 flex items-center gap-3 px-3">
         <button
           onClick={handleBack}
-          className="absolute left-[-1.25rem] top-0 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground transition hover:bg-muted/80 md:left-[-1.75rem]"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/90 text-muted-foreground shadow-md ring-1 ring-border/40 backdrop-blur transition hover:bg-background"
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M10 12L6 8L10 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
 
-        <div className="relative mx-auto h-10 w-[74%]">
-          <div className="absolute left-0 right-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-muted" />
-          <div className="absolute left-0 top-1/2 h-3 -translate-y-1/2" style={{ width: progressWidth }}>
+        <div className="relative h-10 flex-1 rounded-full bg-background/85 px-4 shadow-md ring-1 ring-border/40 backdrop-blur">
+          <div className="relative h-full">
+            <div className="absolute left-0 right-0 top-1/2 h-3 -translate-y-1/2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
             <motion.div
-              className="h-full w-full rounded-full bg-primary shadow-sm"
-              animate={{
-                filter: ['brightness(1)', 'brightness(1.08)', 'brightness(1)'],
-                boxShadow: [
-                  '0 1px 2px rgba(0,0,0,0.08)',
-                  '0 0 14px rgba(34,197,94,0.35)',
-                  '0 1px 2px rgba(0,0,0,0.08)',
-                ],
-              }}
-              transition={{
-                duration: 2.2,
-                ease: 'easeInOut',
-                repeat: Infinity,
-              }}
-            />
-          </div>
-          {Array.from({ length: Math.max(milestoneCount - 1, 0) }, (_, index) => {
-            const milestoneNumber = index + 1;
-            const isCompleted = milestoneNumber <= completedMilestones;
+              className="absolute left-0 top-1/2 h-3 -translate-y-1/2"
+              initial={false}
+              animate={{ width: progressWidth }}
+              transition={{ type: 'spring', stiffness: 140, damping: 22 }}
+            >
+              <motion.div
+                className="h-full w-full rounded-full bg-primary shadow-sm"
+                animate={{
+                  filter: ['brightness(1)', 'brightness(1.08)', 'brightness(1)'],
+                  boxShadow: [
+                    '0 1px 2px rgba(0,0,0,0.08)',
+                    '0 0 14px rgba(34,197,94,0.35)',
+                    '0 1px 2px rgba(0,0,0,0.08)',
+                  ],
+                }}
+                transition={{
+                  duration: 2.2,
+                  ease: 'easeInOut',
+                  repeat: Infinity,
+                }}
+              />
+            </motion.div>
+            {Array.from({ length: Math.max(milestoneCount - 1, 0) }, (_, index) => {
+              const milestoneNumber = index + 1;
+              const isCompleted = milestoneNumber <= completedMilestones;
 
-            return (
-              <div
-                key={milestoneNumber}
-                className={cn(
-                  'absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full transition-colors',
-                  isCompleted ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-transparent',
-                )}
-                style={{ left: `${(milestoneNumber / milestoneCount) * 100}%` }}
-              >
-                {isCompleted ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
-              </div>
-            );
-          })}
+              return (
+                <div
+                  key={milestoneNumber}
+                  className={cn(
+                    'absolute top-1/2 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full transition-colors',
+                    isCompleted ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-zinc-300 text-transparent dark:bg-zinc-600',
+                  )}
+                  style={{ left: `${(milestoneNumber / milestoneCount) * 100}%` }}
+                >
+                  {isCompleted ? <Check className="h-4 w-4" strokeWidth={3} /> : null}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      <p className="mt-4 text-center text-sm font-black uppercase tracking-[0.18em] text-muted-foreground">
-        {currentQuestion.sectionLabel}
-      </p>
+      <OnboardingFrogHeader
+        indices={frogIndices}
+        eyebrow={currentQuestion.sectionLabel}
+        title={currentQuestion.title}
+        subtitle={currentQuestion.subtitle}
+      />
 
+      <div className="relative z-20 flex flex-col pt-[356px] md:pt-[404px]">
       <motion.div
         key={currentQuestion.id}
         custom={direction}
@@ -307,12 +231,12 @@ export default function ProfileQuestionsStep({
         animate={{ opacity: 1, x: 0 }}
         exit={{ opacity: 0, x: direction * -40 }}
         transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-        className="mt-2 flex flex-col items-center"
+        className="flex flex-col items-center"
       >
         <div
           className={cn(
-            'flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] flex-col pb-6',
-            'mt-7 gap-2.5',
+            'flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] flex-col pb-6 md:mx-auto md:w-full md:max-w-md',
+            'mt-1 gap-2.5',
           )}
         >
           {currentQuestion.options.map((option) => {
@@ -320,6 +244,7 @@ export default function ProfileQuestionsStep({
               ? selectedValues.includes(option.id)
               : selected === option.id;
             const hasIcon = !!option.icon || !!option.iconImageUrl;
+            const hasDescription = !!option.description;
             return (
               <button
                 key={option.id}
@@ -327,37 +252,58 @@ export default function ProfileQuestionsStep({
                 onClick={() => chooseOption(option.id)}
                 disabled={saving}
                 className={cn(
-                  'h-[62px] rounded-3xl border-2 bg-background text-base font-black text-foreground shadow-sm transition-all duration-200 active:scale-[0.98] md:h-[68px] md:text-lg',
-                  hasIcon && 'flex items-center justify-start gap-4 px-5 text-left',
+                  'rounded-3xl border-2 bg-background text-base font-black text-foreground shadow-sm transition-all duration-200 active:scale-[0.98]',
+                  hasDescription
+                    ? 'flex flex-col items-center justify-center gap-1 px-5 py-4 text-center md:py-3.5'
+                    : 'h-[62px] md:h-[56px]',
+                  !hasDescription && hasIcon && 'flex items-center justify-start gap-4 px-5 text-left',
                   isSelected
                     ? 'border-primary/60 bg-primary/10 text-primary'
                     : 'border-border/50 hover:border-primary/30 hover:bg-muted/30',
                   saving && 'cursor-not-allowed opacity-70',
                 )}
               >
-                {option.iconImageUrl ? (
-                  <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
-                    <img
-                      src={option.iconImageUrl}
-                      alt=""
-                      className="h-full w-full object-cover"
-                    />
-                  </span>
-                ) : option.icon ? (
-                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-3xl leading-none">
-                    {option.icon}
-                  </span>
-                ) : null}
-                <span className="flex-1">{option.label}</span>
-                {currentQuestion.multiSelect && (
-                  <span
-                    className={cn(
-                      'flex h-11 w-11 items-center justify-center rounded-full text-3xl font-medium transition-colors',
-                      isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                {hasDescription ? (
+                  <>
+                    <span>{option.label}</span>
+                    {option.description ? (
+                      <span
+                        className={cn(
+                          'text-sm font-medium leading-snug',
+                          isSelected ? 'text-primary/75' : 'text-muted-foreground',
+                        )}
+                      >
+                        {option.description}
+                      </span>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    {option.iconImageUrl ? (
+                      <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-muted">
+                        <img
+                          src={option.iconImageUrl}
+                          alt=""
+                          className="h-full w-full object-cover"
+                        />
+                      </span>
+                    ) : option.icon ? (
+                      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-50 text-3xl leading-none">
+                        {option.icon}
+                      </span>
+                    ) : null}
+                    <span className="flex-1">{option.label}</span>
+                    {currentQuestion.multiSelect && (
+                      <span
+                        className={cn(
+                          'flex h-11 w-11 items-center justify-center rounded-full text-3xl font-medium transition-colors',
+                          isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                        )}
+                      >
+                        {isSelected ? '−' : '+'}
+                      </span>
                     )}
-                  >
-                    {isSelected ? '−' : '+'}
-                  </span>
+                  </>
                 )}
               </button>
             );
@@ -378,7 +324,7 @@ export default function ProfileQuestionsStep({
         </div>
 
         {currentQuestion.multiSelect && (
-          <div className="mt-3 flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] justify-center pb-6">
+          <div className="mt-3 flex w-[calc(100%+2rem)] max-w-[calc(100vw-2rem)] justify-center pb-6 md:mx-auto md:w-full md:max-w-md">
             <motion.button
               type="button"
               onClick={handleMultiSelectNext}
