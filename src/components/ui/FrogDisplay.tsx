@@ -141,8 +141,6 @@ export function FrogDisplay({
         open={shopOpen}
         onOpenChange={setShopOpen}
         balance={flyBalance ?? 0}
-        hunger={displayedHunger}
-        maxHunger={maxHunger ?? 100}
       />
 
       <div

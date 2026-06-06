@@ -198,8 +198,6 @@ export default function SiteHeader() {
           open={shopOpen}
           onOpenChange={setShopOpen}
           balance={flyBalance ?? 0}
-          hunger={100} // Dummy value for header shop
-          maxHunger={100}
         />
 
         {/* Global Modal rendering */}
@@ -341,7 +339,11 @@ export default function SiteHeader() {
           />
 
           {user && flyBalance !== undefined && (
-            <FlyCounter balance={flyBalance} variant="desktop" />
+            <FlyCounter
+              balance={flyBalance}
+              variant="desktop"
+              onClick={() => setShopOpen(true)}
+            />
           )}
         </div>
         <style jsx>{`

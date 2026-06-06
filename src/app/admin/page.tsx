@@ -544,11 +544,104 @@ function AdminPageContent() {
             </div>
           </div>
         </Section>
+
+        {/* Premium Status */}
+        <Section
+          title="Premium Status"
+          subtitle="Grant or revoke premium on your own account for testing."
+        >
+          <div className="rounded-3xl border border-border bg-card shadow-sm p-5 md:p-6">
+            <PremiumControls />
+          </div>
+        </Section>
       </div>
 
       <AdminCosmeticsPopup open={cosmeticsOpen} onClose={() => setCosmeticsOpen(false)} />
       <AdminGiftManagerPopup open={giftManagerOpen} onClose={() => setGiftManagerOpen(false)} />
       <AdminRiveManagerPopup open={riveManagerOpen} onClose={() => setRiveManagerOpen(false)} />
+    </div>
+  );
+}
+
+function PremiumControls() {
+  const [premiumUntil, setPremiumUntil] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/user')
+      .then((res) => res.json())
+      .then((data) => setPremiumUntil(data.premiumUntil))
+      .catch((err) => console.error('Failed to fetch user data', err));
+  }, []);
+
+  const handleUpdate = async (action: 'add' | 'remove', days?: number) => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/user/premium', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, days }),
+      });
+      const data = await res.json();
+      if (data.success) setPremiumUntil(data.premiumUntil);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const isPremium = premiumUntil && new Date(premiumUntil) > new Date();
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <span
+          className={`text-xs font-black uppercase tracking-wide px-2.5 py-1 rounded-lg ${
+            isPremium
+              ? 'bg-indigo-500 text-white'
+              : 'bg-muted text-muted-foreground'
+          }`}
+        >
+          {isPremium ? 'Premium Active' : 'Free Plan'}
+        </span>
+        {isPremium && (
+          <span className="text-[11px] font-medium text-muted-foreground">
+            Expires {new Date(premiumUntil!).toLocaleDateString()}
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          disabled={loading}
+          onClick={() => handleUpdate('add', 7)}
+          className="p-2.5 bg-muted/40 border border-border rounded-xl text-xs font-bold hover:bg-indigo-500/10 hover:border-indigo-500/50 transition-all disabled:opacity-50"
+        >
+          + 7 Days
+        </button>
+        <button
+          disabled={loading}
+          onClick={() => handleUpdate('add', 30)}
+          className="p-2.5 bg-muted/40 border border-border rounded-xl text-xs font-bold hover:bg-purple-500/10 hover:border-purple-500/50 transition-all disabled:opacity-50"
+        >
+          + 1 Month
+        </button>
+        <button
+          disabled={loading}
+          onClick={() => handleUpdate('add', 1 / 1440)}
+          className="p-2.5 bg-muted/40 border border-border rounded-xl text-xs font-bold hover:bg-yellow-500/10 hover:border-yellow-500/50 transition-all disabled:opacity-50"
+        >
+          + 1 Min (Test)
+        </button>
+        <button
+          disabled={loading}
+          onClick={() => handleUpdate('remove')}
+          className="col-span-2 p-2.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-xs font-bold hover:bg-red-500/20 hover:border-red-500/40 transition-all disabled:opacity-50"
+        >
+          Remove Premium
+        </button>
+      </div>
     </div>
   );
 }

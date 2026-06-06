@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
+import { Plus } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 
@@ -83,6 +84,14 @@ export function FlyCounter({ balance, variant = 'desktop', onClick }: Props) {
         value={balance}
         className="text-xs font-black tabular-nums text-foreground"
       />
+
+      {/* "+" affordance — perched on the top-right corner, half in/half out, to
+          show the counter can be tapped to buy more flies. */}
+      {onClick && (
+        <span className="absolute -right-0.5 -top-0.5 z-10 grid h-4 w-4 place-items-center rounded-full bg-primary text-primary-foreground shadow-sm ring-2 ring-background">
+          <Plus className="h-2.5 w-2.5 stroke-[3.5]" />
+        </span>
+      )}
 
       {/* Floating "+N" badge — drops below the counter so it stays visible
           even when the counter is anchored to the top of the viewport. */}

@@ -2,83 +2,45 @@
 
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Sparkles, ShieldCheck } from 'lucide-react';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
-import { GiftRive } from '@/components/ui/gift-box/GiftBox';
-import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
 
-const PACKS = [
-  {
-    id: 'handful',
-    name: 'Handful of Flies',
-    amount: 10,
-    price: '$0.99',
-    giftCount: 1,
-    bgGradient: 'bg-gradient-to-br from-emerald-500/20 to-emerald-900/40',
-    raysColor: 'text-emerald-500',
-    badgeClass: 'bg-emerald-500 text-white',
-    btnClass: 'bg-emerald-600 text-white border-emerald-800 hover:bg-emerald-500',
-  },
-  {
-    id: 'jar',
-    name: 'Jar of Flies',
-    amount: 50,
-    price: '$3.99',
-    giftCount: 3,
-    bgGradient: 'bg-gradient-to-br from-violet-500/20 to-purple-900/40',
-    raysColor: 'text-violet-500',
-    badge: 'Popular',
-    badgeClass: 'bg-violet-500 text-white',
-    btnClass: 'bg-violet-600 text-white border-violet-800 hover:bg-violet-500',
-  },
-  {
-    id: 'crate',
-    name: 'Crate of Flies',
-    amount: 100,
-    price: '$6.99',
-    giftCount: 5,
-    bgGradient: 'bg-gradient-to-br from-amber-500/20 to-amber-900/40',
-    raysColor: 'text-amber-500',
-    badge: 'Best Value',
-    badgeClass: 'bg-amber-500 text-amber-950',
-    btnClass: 'bg-amber-500 text-amber-950 border-amber-700 hover:bg-amber-400',
-  },
+type Pack = {
+  id: string;
+  amount: number;
+  price: string;
+  badge?: string;
+};
+
+const PACKS: Pack[] = [
+  { id: 'handful', amount: 10, price: '$0.99' },
+  { id: 'jar', amount: 50, price: '$3.99', badge: 'Popular' },
+  { id: 'crate', amount: 100, price: '$6.99', badge: 'Best Value' },
 ];
 
 interface CurrencyShopProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   balance: number;
-  hunger: number;
-  maxHunger: number;
 }
 
-export function CurrencyShop({
-  open,
-  onOpenChange,
-  balance,
-  hunger,
-  maxHunger,
-}: CurrencyShopProps) {
+export function CurrencyShop({ open, onOpenChange, balance }: CurrencyShopProps) {
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const dragControls = useDragControls();
 
   useEffect(() => {
     setMounted(true);
-    const checkDesktop = () => setIsDesktop(window.matchMedia("(min-width: 640px)").matches);
-    checkDesktop();
-    window.addEventListener('resize', checkDesktop);
-    return () => window.removeEventListener('resize', checkDesktop);
+    const check = () => setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
 
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    document.body.style.overflow = open ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
     };
@@ -86,301 +48,130 @@ export function CurrencyShop({
 
   if (!mounted) return null;
 
-  const hungerPercent =
-    typeof hunger === 'number' && typeof maxHunger === 'number' && maxHunger > 0
-      ? Math.max(0, Math.min(100, (hunger / maxHunger) * 100))
-      : 100;
-
-  const mobileVariants = {
-    initial: { y: '100%', opacity: 0, scale: 0.96 },
-    animate: { y: 0, opacity: 1, scale: 1 },
-    exit: { y: '100%', opacity: 0, scale: 0.96 }
-  };
-
-  const desktopVariants = {
-    initial: { opacity: 0, scale: 0.95, y: 0 },
-    animate: { opacity: 1, scale: 1, y: 0 },
-    exit: { opacity: 0, scale: 0.95, y: 0 }
-  };
-
   const onClose = () => onOpenChange(false);
 
   return createPortal(
     <AnimatePresence>
       {open && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[999] bg-black/60 backdrop-blur-md"
+            className="fixed inset-0 z-[999] bg-black/70 backdrop-blur-sm"
           />
 
-          {/* Sheet Container */}
-          <div className="fixed inset-0 z-[1000] flex items-end sm:items-center justify-center pointer-events-none p-0 sm:p-6">
+          <div className="pointer-events-none fixed inset-0 z-[1000] flex items-end justify-center p-0 sm:items-center sm:p-6">
             <motion.div
-              variants={isDesktop ? desktopVariants : mobileVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              drag={!isDesktop ? "y" : false}
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.5 }}
-              onDragEnd={(e, { offset, velocity }) => {
-                if (offset.y > 100 || velocity.y > 500) {
-                  onClose();
-                }
+              initial={isDesktop ? { opacity: 0, y: 20, scale: 0.98 } : { y: '100%' }}
+              animate={isDesktop ? { opacity: 1, y: 0, scale: 1 } : { y: 0 }}
+              exit={isDesktop ? { opacity: 0, y: 16, scale: 0.98 } : { y: '100%' }}
+              transition={{ type: 'spring', stiffness: 260, damping: 26 }}
+              drag={!isDesktop ? 'y' : false}
+              dragControls={dragControls}
+              dragListener={false}
+              dragElastic={{ top: 0, bottom: 0.45 }}
+              dragMomentum={false}
+              dragSnapToOrigin
+              onDragEnd={(_e, { offset, velocity }) => {
+                if (!isDesktop && (offset.y > 120 || velocity.y > 650)) onClose();
               }}
-              className="pointer-events-auto w-full sm:max-w-4xl h-[90vh] sm:h-auto sm:max-h-[85vh] flex flex-col bg-background/95 backdrop-blur-2xl rounded-t-[32px] sm:rounded-[40px] shadow-2xl border-t sm:border border-border/40 overflow-hidden relative"
+              className="pointer-events-auto relative flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-[32px] border border-border/60 bg-popover text-card-foreground shadow-[0_-8px_40px_rgba(15,23,42,0.18)] sm:max-h-[85vh] sm:max-w-2xl sm:rounded-[32px] sm:shadow-[0_24px_70px_rgba(15,23,42,0.22)]"
             >
-              {/* Drag Handle (Mobile Only) */}
               {!isDesktop && (
-                <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-muted-foreground/20 rounded-full z-50" />
+                <div
+                  className="absolute inset-x-0 top-0 z-20 h-9"
+                  onPointerDown={(e) => dragControls.start(e)}
+                />
+              )}
+              {!isDesktop && (
+                <div className="absolute left-1/2 top-3 z-20 h-1.5 w-12 -translate-x-1/2 rounded-full bg-foreground/15" />
               )}
 
-              {/* FIXED HEADER */}
-              <div className="flex-shrink-0 px-6 py-4 flex items-center justify-between border-b border-border/40 bg-background/20">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-xl bg-primary/10">
-                    <Sparkles className="w-5 h-5 text-primary fill-primary/20 animate-pulse" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-black tracking-tight text-foreground uppercase">
-                      Fly Shop
-                    </h2>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      <div className="flex items-center gap-1.5">
-                        <Fly size={20} y={-1} paused={false} />
-                        <span className="text-[10px] font-black text-muted-foreground tabular-nums">
-                          {balance}
-                        </span>
-                      </div>
-                      <div className="w-[1px] h-2 bg-border/60" />
-                      <div className="flex items-center gap-1.5">
-                        <span className={cn("w-1.5 h-1.5 rounded-full", 
-                          hungerPercent > 50 ? "bg-emerald-500" : "bg-amber-500"
-                        )} />
-                        <span className="text-[10px] font-black text-muted-foreground tabular-nums">
-                          {Math.round(hungerPercent)}% HUNGER
-                        </span>
-                      </div>
-                    </div>
+              {/* Header */}
+              <div className="flex shrink-0 items-center justify-between gap-4 px-6 pb-4 pt-8 sm:pt-7">
+                <div>
+                  <h2 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
+                    Fly Shop
+                  </h2>
+                  <div className="mt-1 flex items-center gap-1.5">
+                    <Fly size={18} y={-1} />
+                    <span className="text-[13px] font-extrabold tabular-nums text-muted-foreground">
+                      {balance} flies
+                    </span>
                   </div>
                 </div>
                 <button
                   onClick={onClose}
-                  className="p-2 bg-muted/50 hover:bg-red-500/10 hover:text-red-500 rounded-full transition-all text-muted-foreground active:scale-90"
+                  type="button"
+                  aria-label="Close"
+                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground ring-1 ring-border/70 transition-colors hover:bg-muted/70 hover:text-foreground"
                 >
-                  <X className="w-5 h-5" strokeWidth={3} />
+                  <X className="h-5 w-5 stroke-[2.5]" />
                 </button>
               </div>
 
-              {/* SCROLLABLE CONTENT */}
-              <div className="flex-1 overflow-y-auto p-4 md:p-8 scrollbar-hide">
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 max-w-5xl mx-auto">
+              {/* Packs */}
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6">
+                <div className="grid grid-cols-3 gap-2.5 pt-2 sm:gap-4">
                   {PACKS.map((pack) => {
-                    const isJar = pack.id === 'jar';
-                    const isCrate = pack.id === 'crate';
-
+                    const featured = pack.id === 'jar';
                     return (
                       <button
                         key={pack.id}
+                        type="button"
+                        onClick={() => {}}
                         className={cn(
-                          "group relative flex flex-col shrink-0 w-full p-2 rounded-[32px] border transition-all duration-300 active:scale-[0.98] overflow-hidden text-center",
-                          isCrate
-                            ? "bg-gradient-to-b from-amber-500/10 to-transparent border-amber-500/50 shadow-xl hover:shadow-2xl hover:border-amber-500"
-                            : isJar
-                              ? "bg-gradient-to-b from-violet-500/10 to-transparent border-violet-500/50 shadow-lg hover:shadow-xl hover:border-violet-500"
-                              : "bg-card border-border hover:border-emerald-500/40 hover:bg-muted/30 shadow-md"
+                          'group relative flex flex-col items-center gap-2.5 rounded-[20px] bg-card p-3 text-center transition-all hover:-translate-y-0.5 active:scale-[0.98] sm:gap-3 sm:rounded-[24px] sm:p-5',
+                          featured
+                            ? 'ring-2 ring-primary'
+                            : 'ring-1 ring-border/70 hover:ring-border',
                         )}
-                        onClick={() => { }}
                       >
-                        <div className="flex flex-col items-center justify-center w-full px-2 pt-3 pb-2 gap-1.5 h-14">
-                          {pack.badge && (
-                            <div className={cn(
-                              "px-2.5 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest shadow-sm whitespace-nowrap",
-                              pack.badgeClass
-                            )}>
-                              {pack.badge}
-                            </div>
-                          )}
-                          <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center line-clamp-1">
-                            {pack.name}
-                          </span>
-                        </div>
-
-                        {/* HERO VISUAL AREA */}
-                        <div className="relative w-full aspect-[4/3] flex flex-col items-center justify-center mb-4 mt-2 overflow-hidden rounded-[20px]">
-                          {/* 1. Base Gradient */}
-                          <div className={cn("absolute inset-0 opacity-100", pack.bgGradient)} />
-
-                          {/* 2. Kinetic Background (Universal Rays) */}
-                          <div className="absolute inset-[-50%] opacity-40 pointer-events-none">
-                            <RotatingRays colorClass={pack.raysColor} />
-                          </div>
-
-                          {/* 3. The Loot Cluster */}
-                          <div className="relative z-10 w-full h-full flex items-center justify-center gap-0">
-                            {/* Flies Group */}
-                            <div className="flex flex-col items-center gap-1 shrink-0 px-1">
-                              <div className="w-16 h-20 flex items-center justify-center relative filter drop-shadow-xl">
-                                <Fly size={50} y={-2} paused={false} />
-                              </div>
-                              <div className="flex flex-col items-center leading-tight">
-                                <span className="text-xl font-black text-foreground tabular-nums drop-shadow-sm">
-                                  {pack.amount}
-                                </span>
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-80">
-                                  Flies
-                                </span>
-                              </div>
-                            </div>
-
-                            {/* Gift Group */}
-                            {pack.giftCount > 0 && (
-                              <div className="flex flex-col items-center gap-1 shrink-0 px-1">
-                                <div className="w-16 h-20 flex items-center justify-center relative filter drop-shadow-xl -translate-y-3">
-                                  <GiftRive width={80} height={80} />
-                                </div>
-                                <div className="flex flex-col items-center leading-tight">
-                                  <span className="text-xl font-black text-rose-500 tabular-nums drop-shadow-sm">
-                                    +{pack.giftCount}
-                                  </span>
-                                  <span className="text-[10px] font-bold text-rose-500/80 uppercase tracking-widest opacity-90">
-                                    {pack.giftCount > 1 ? 'Gifts' : 'Gift'}
-                                  </span>
-                                </div>
-                              </div>
+                        {pack.badge && (
+                          <span
+                            className={cn(
+                              'absolute -top-2 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-widest shadow-sm sm:px-3 sm:py-1 sm:text-[9px]',
+                              featured
+                                ? 'bg-primary text-primary-foreground'
+                                : 'bg-amber-400 text-amber-950',
                             )}
-                          </div>
+                          >
+                            {pack.badge}
+                          </span>
+                        )}
+
+                        <div className="grid h-14 w-14 place-items-center rounded-full bg-muted/60 sm:h-20 sm:w-20">
+                          <Fly size={40} y={-2} />
                         </div>
 
-                        {/* Price Button */}
-                        <div className={cn(
-                          "w-full py-3.5 rounded-2xl font-black text-base uppercase tracking-widest transition-all mt-auto relative shadow-md border-b-4 active:border-b-0 active:translate-y-1 active:shadow-inner",
-                          pack.btnClass
-                        )}>
-                          <span className="relative z-10">{pack.price}</span>
+                        <div className="leading-none">
+                          <p className="text-2xl font-black tabular-nums text-foreground sm:text-3xl">
+                            {pack.amount}
+                          </p>
+                          <p className="mt-1 text-[9px] font-black uppercase tracking-widest text-muted-foreground sm:text-[10px]">
+                            Flies
+                          </p>
                         </div>
+
+                        <span className="mt-0.5 flex h-9 w-full items-center justify-center rounded-xl bg-[#4f9149] text-xs font-black tracking-wide text-white shadow-[0_4px_0_0_#34631f] transition-all group-hover:-translate-y-0.5 group-hover:shadow-[0_5px_0_0_#34631f] group-active:translate-y-1 group-active:shadow-none sm:h-11 sm:rounded-2xl sm:text-sm">
+                          {pack.price}
+                        </span>
                       </button>
                     );
                   })}
                 </div>
 
-                {/* Premium Management Section (Admin/Debug) */}
-                <div className="mt-8 p-4 bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-2xl border border-indigo-500/20">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-indigo-500 mb-3 flex items-center gap-2">
-                    <Sparkles className="w-4 h-4" />
-                    Premium Status
-                  </h3>
-                  
-                  <PremiumControls />
-                </div>
-
-                {/* Footer Info */}
-                <div className="mt-8 text-center space-y-2 pb-8">
-                  <div className="flex items-center justify-center gap-2 text-[10px] text-muted-foreground font-black uppercase tracking-widest">
-                    <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                    <span>Secure Store Payment</span>
-                  </div>
-                  <p className="text-[10px] text-muted-foreground/40 font-bold max-w-xs mx-auto">
-                    Purchases support development and keep the frog fed. Thank you for your support!
-                  </p>
-                </div>
+                <p className="mx-auto mt-7 max-w-xs text-center text-[11px] font-medium leading-relaxed text-muted-foreground/70">
+                  Purchases support development and keep your frog fed. Thank you! 🐸
+                </p>
               </div>
             </motion.div>
           </div>
         </>
       )}
     </AnimatePresence>,
-    document.body
-  );
-}
-
-function PremiumControls() {
-  const [premiumUntil, setPremiumUntil] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  // Fetch status on mount
-  useEffect(() => {
-    fetch('/api/user')
-      .then(res => res.json())
-      .then(data => {
-        setPremiumUntil(data.premiumUntil);
-      })
-      .catch(err => console.error("Failed to fetch user data", err));
-  }, []);
-
-  const handleUpdate = async (action: 'add' | 'remove', days?: number) => {
-    setLoading(true);
-    try {
-      const res = await fetch('/api/user/premium', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, days }),
-      });
-      const data = await res.json();
-      if (data.success) {
-         setPremiumUntil(data.premiumUntil);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const isPremium = premiumUntil && new Date(premiumUntil) > new Date();
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-         <span className={cn(
-           "text-xs font-bold px-2 py-1 rounded-lg border",
-           isPremium ? "bg-indigo-500 text-white border-indigo-600" : "bg-muted text-muted-foreground border-border"
-         )}>
-           {isPremium ? "PREMIUM ACTIVE" : "FREE PLAN"}
-         </span>
-         {isPremium && (
-           <span className="text-[10px] font-medium text-muted-foreground">
-             Expires: {new Date(premiumUntil!).toLocaleDateString()}
-           </span>
-         )}
-      </div>
-
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          disabled={loading}
-          onClick={() => handleUpdate('add', 7)}
-          className="p-2 bg-card border border-border rounded-xl text-[10px] font-bold hover:bg-indigo-500/10 hover:border-indigo-500/50 transition-all"
-        >
-          + 7 Days Free
-        </button>
-        <button
-           disabled={loading}
-           onClick={() => handleUpdate('add', 30)}
-           className="p-2 bg-card border border-border rounded-xl text-[10px] font-bold hover:bg-purple-500/10 hover:border-purple-500/50 transition-all"
-        >
-          + 1 Month
-        </button>
-        <button
-           disabled={loading}
-           onClick={() => handleUpdate('add', 1/1440)}
-           className="p-2 bg-card border border-border rounded-xl text-[10px] font-bold hover:bg-yellow-500/10 hover:border-yellow-500/50 transition-all"
-        >
-          + 1 Min (Test)
-        </button>
-        <button
-           disabled={loading}
-           onClick={() => handleUpdate('remove')}
-           className="col-span-2 p-2 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-[10px] font-bold hover:bg-red-500/20 hover:border-red-500/40 transition-all"
-        >
-          Remove Premium
-        </button>
-      </div>
-    </div>
+    document.body,
   );
 }
