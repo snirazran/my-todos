@@ -15,6 +15,10 @@ type Options = {
   selectedTags: string[];
   setSelectedTags: React.Dispatch<React.SetStateAction<string[]>>;
   onPremiumLimit: () => void;
+  /** Cap on how many tags can be selected at once (e.g. focus-area limit). */
+  maxSelectedTags?: number;
+  /** Called when a selection is blocked because the cap is reached. */
+  onMaxSelectedTags?: () => void;
 };
 
 export function useTagManager({
@@ -22,11 +26,18 @@ export function useTagManager({
   selectedTags,
   setSelectedTags,
   onPremiumLimit,
+  maxSelectedTags,
+  onMaxSelectedTags,
 }: Options) {
   const { data: tagsData } = useSWR(open ? '/api/tags' : null, fetcher);
   const savedTags: SavedTag[] = tagsData?.tags || [];
   const isPremium: boolean = !!tagsData?.isPremium;
   const tagLimit = isPremium ? PREMIUM_TAG_LIMIT : FREE_TAG_LIMIT;
+
+  // True when adding another selection would exceed the cap. Creating tags is
+  // still allowed (governed by tagLimit) — only auto-selecting is blocked.
+  const atSelectionLimit = () =>
+    maxSelectedTags !== undefined && selectedTags.length >= maxSelectedTags;
 
   const [tagInput, setTagInput] = useState('');
   const [showColorPicker, setShowColorPicker] = useState(false);
@@ -86,7 +97,11 @@ export function useTagManager({
       mutate('/api/tags');
 
       if (data.tag && !selectedTags.includes(data.tag.id)) {
-        setSelectedTags((prev) => [...prev, data.tag.id]);
+        if (atSelectionLimit()) {
+          onMaxSelectedTags?.();
+        } else {
+          setSelectedTags((prev) => [...prev, data.tag.id]);
+        }
       }
       setShowColorPicker(false);
       setTagInput('');
@@ -109,8 +124,17 @@ export function useTagManager({
     );
     if (existing) {
       if (!selectedTags.includes(existing.id)) {
+        if (atSelectionLimit()) {
+          onMaxSelectedTags?.();
+          return;
+        }
         setSelectedTags((prev) => [...prev, existing.id]);
       }
+      return;
+    }
+
+    if (atSelectionLimit()) {
+      onMaxSelectedTags?.();
       return;
     }
 
@@ -129,7 +153,11 @@ export function useTagManager({
       const data = await res.json();
       mutate('/api/tags');
       if (data.tag && !selectedTags.includes(data.tag.id)) {
-        setSelectedTags((prev) => [...prev, data.tag.id]);
+        if (atSelectionLimit()) {
+          onMaxSelectedTags?.();
+        } else {
+          setSelectedTags((prev) => [...prev, data.tag.id]);
+        }
       }
       setShowColorPicker(false);
       setTagInput('');
@@ -151,6 +179,10 @@ export function useTagManager({
 
     if (existing) {
       if (!selectedTags.includes(existing.id)) {
+        if (atSelectionLimit()) {
+          onMaxSelectedTags?.();
+          return;
+        }
         setSelectedTags((prev) => [...prev, existing.id]);
       }
       setTagInput('');

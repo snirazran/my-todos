@@ -80,13 +80,7 @@ export function TagsView({
     !tagInput.trim();
 
   const handleQuickCreate = () => {
-    if (
-      maxSelectedTags !== undefined &&
-      selectedTagIds.length >= maxSelectedTags
-    ) {
-      onMaxSelectedTags?.();
-      return;
-    }
+    // The hook enforces the selection cap (and surfaces onMaxSelectedTags).
     quickCreateTag(trimmedSuggestion);
   };
 

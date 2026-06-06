@@ -60,6 +60,8 @@ export default function TagsPopup({
     selectedTags,
     setSelectedTags,
     onPremiumLimit: () => setShowPremiumLimit(true),
+    maxSelectedTags,
+    onMaxSelectedTags: () => setShowFocusTagLimit(true),
   });
 
   // Cache last good props so the slide-down exit can still render content
