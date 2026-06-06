@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">daily-todo-tracker</string>
-    <string name="title_activity_main">daily-todo-tracker</string>
+    <string name="app_name">Frogress</string>
+    <string name="title_activity_main">Frogress</string>
     <string name="package_name">io.frog.tasks</string>
     <string name="custom_url_scheme">io.frog.tasks</string>
     <string name="server_client_id">324868480648-mcnp29sgs2r9ip4nsbfs82phhiuv4tos.apps.googleusercontent.com</string>

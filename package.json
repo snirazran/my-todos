@@ -1,5 +1,5 @@
 {
-  "name": "daily-todo-tracker",
+  "name": "frogress",
   "version": "0.1.0",
   "private": true,
   "packageManager": "pnpm@9.15.4",
@@ -11,6 +11,8 @@
     "optimize:images": "node scripts/optimize-images.mjs",
     "android": "npx cap run android",
     "open:android": "npx cap open android",
+    "ios": "npx cap run ios",
+    "open:ios": "npx cap open ios",
     "sync": "npx cap sync"
   },
   "dependencies": {
