@@ -341,7 +341,7 @@ export default function FrogodoroSheet({
               ease: [0.32, 0.72, 0, 1],
               duration: 0.4,
             }}
-            className="fixed left-0 right-0 z-[1000] px-4 py-6 sm:px-6 sm:py-5 pointer-events-none bottom-0 will-change-transform"
+            className="fixed left-0 right-0 z-[1000] px-4 pt-6 pb-24 sm:px-6 sm:py-5 pointer-events-none bottom-0 will-change-transform"
           >
             <div className="pointer-events-auto mx-auto w-full max-w-[500px] pb-[env(safe-area-inset-bottom)]">
               <div className="rounded-[28px] bg-popover/95 backdrop-blur-2xl shadow-[0_24px_48px_rgba(15,23,42,0.25)] overflow-hidden">
