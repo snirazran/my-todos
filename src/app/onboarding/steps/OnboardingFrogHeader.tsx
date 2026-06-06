@@ -19,17 +19,24 @@ type Props = {
 
 export const ONBOARDING_BODY_CLASS = 'pt-[370px] md:pt-[398px]';
 
-// Remember the last background so consecutive onboarding screens never repeat it.
-let lastBackgroundId: string | null = null;
+// Rotate through every background once before repeating: pick a random starting
+// point, then step sequentially through the catalog, wrapping around (and only
+// then showing a background that was already shown).
+let bgOrder: string[] | null = null;
+let bgCursor = 0;
 
-function rollBackgroundId(catalog: BackgroundItem[]): string | null {
+function nextBackgroundId(catalog: BackgroundItem[]): string | null {
   const pool = catalog.filter((b) => !b.hidden);
   if (pool.length === 0) return null;
-  let choices = pool.length > 1 ? pool.filter((b) => b.id !== lastBackgroundId) : pool;
-  if (choices.length === 0) choices = pool;
-  const pick = choices[Math.floor(Math.random() * choices.length)];
-  lastBackgroundId = pick.id;
-  return pick.id;
+
+  if (!bgOrder || bgOrder.length !== pool.length) {
+    // First use (or the catalog changed): seed the rotation at a random index.
+    bgOrder = pool.map((b) => b.id);
+    bgCursor = Math.floor(Math.random() * bgOrder.length);
+  } else {
+    bgCursor = (bgCursor + 1) % bgOrder.length;
+  }
+  return bgOrder[bgCursor];
 }
 
 export function OnboardingFrogHeader({ indices, eyebrow, title, subtitle, speechBubbleMessage }: Props) {
@@ -44,7 +51,7 @@ export function OnboardingFrogHeader({ indices, eyebrow, title, subtitle, speech
   useEffect(() => {
     if (!catalog || catalog.length === 0) return;
     if (rolledForRef.current === indices) return;
-    const id = rollBackgroundId(catalog);
+    const id = nextBackgroundId(catalog);
     if (id) {
       setBackgroundId(id);
       rolledForRef.current = indices;

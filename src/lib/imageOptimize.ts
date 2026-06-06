@@ -1,12 +1,15 @@
 import sharp from 'sharp';
 
 // Max width per logical size key. Aspect ratio is preserved; images are never
-// upscaled. Tuned for the header-strip backgrounds + quest art these serve.
+// upscaled (sharp `withoutEnlargement`). These match the per-size source widths
+// the admin uploads, so a correctly-sized source is only re-encoded to WebP and
+// keeps its full resolution — never downscaled (which previously made full-bleed
+// backgrounds look soft on retina screens).
 const MAX_WIDTH: Record<string, number> = {
-  mobile: 768,
-  tablet: 1200,
-  web: 1600,
-  webLarge: 2560,
+  mobile: 1536,
+  tablet: 2560,
+  web: 3840,
+  webLarge: 5120,
 };
 
 function extFromContentType(contentType: string): string {

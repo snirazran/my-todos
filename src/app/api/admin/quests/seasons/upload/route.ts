@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     const rawBytes = Buffer.from(await file.arrayBuffer());
 
     // Compress/resize to WebP at upload time so every user downloads a small file.
-    const optimized = await optimizeImage(rawBytes, contentType, { sizeKey: size });
+    const optimized = await optimizeImage(rawBytes, contentType, { sizeKey: size, quality: 85 });
     const bytes = optimized.buffer;
     const storedContentType = optimized.contentType;
 

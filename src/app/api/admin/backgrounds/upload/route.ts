@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     // Compress/resize to WebP at upload time so every user downloads a small
     // file regardless of what was uploaded (a 10 MB PNG becomes ~150 KB).
-    const optimized = await optimizeImage(rawBytes, contentType, { sizeKey: size });
+    const optimized = await optimizeImage(rawBytes, contentType, { sizeKey: size, quality: 85 });
     const bytes = optimized.buffer;
     const storedContentType = optimized.contentType;
 

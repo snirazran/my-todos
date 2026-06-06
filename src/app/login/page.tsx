@@ -357,7 +357,7 @@ function LoginPageInner() {
                     id="email"
                     type="email"
                     aria-label="Email"
-                    placeholder="hello@example.com"
+                    placeholder="Email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="h-12 rounded-2xl border-border/60 bg-card/60 px-4 text-base focus-visible:ring-primary/30"
@@ -373,7 +373,7 @@ function LoginPageInner() {
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <>
-                        Send sign-in link <ArrowRight className="h-4 w-4" />
+                        Login <ArrowRight className="h-4 w-4" />
                       </>
                     )}
                   </button>

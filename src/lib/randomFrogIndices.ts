@@ -16,8 +16,16 @@ const rand = (max: number) => Math.floor(Math.random() * (max + 1));
 
 const keyOf = (f: FrogIndices) => `${f.skin}-${f.hat}-${f.body}-${f.hand_item}`;
 
-// Remember the last outfit so two consecutive rolls never produce the same one.
-let lastFrogKey: string | null = null;
+const TOTAL_COMBOS =
+  (SLOT_MAX.skin + 1) *
+  (SLOT_MAX.hat + 1) *
+  (SLOT_MAX.body + 1) *
+  (SLOT_MAX.hand_item + 1);
+
+// Outfits already shown this session. We keep drawing fresh outfits until every
+// possible combination has been used, then refresh and start over — so an outfit
+// never repeats until all the others have appeared.
+const shownFrogKeys = new Set<string>();
 
 function rollFrogIndices(): FrogIndices {
   return {
@@ -29,10 +37,13 @@ function rollFrogIndices(): FrogIndices {
 }
 
 export function randomFrogIndices(): FrogIndices {
+  if (shownFrogKeys.size >= TOTAL_COMBOS) {
+    shownFrogKeys.clear();
+  }
   let next = rollFrogIndices();
-  for (let i = 0; i < 12 && keyOf(next) === lastFrogKey; i += 1) {
+  for (let i = 0; i < 500 && shownFrogKeys.has(keyOf(next)); i += 1) {
     next = rollFrogIndices();
   }
-  lastFrogKey = keyOf(next);
+  shownFrogKeys.add(keyOf(next));
   return next;
 }

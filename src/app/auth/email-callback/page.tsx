@@ -120,7 +120,7 @@ export default function EmailCallbackPage() {
                 required
                 value={emailInput}
                 onChange={(e) => setEmailInput(e.target.value)}
-                placeholder="hello@example.com"
+                placeholder="Email"
                 className="w-full h-12 px-4 rounded-xl border border-border/60 bg-background/50"
               />
               <button
