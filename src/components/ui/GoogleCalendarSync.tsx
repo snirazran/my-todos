@@ -267,9 +267,18 @@ export default function GoogleCalendarSync() {
   if (!loaded) return null;
 
   return (
-    <button
+    <div
+      role="button"
+      tabIndex={0}
+      aria-pressed={enabled}
       onClick={() => handleToggle(!enabled)}
-      className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent/50"
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleToggle(!enabled);
+        }
+      }}
+      className="w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-accent/50 cursor-pointer"
     >
       <div className="h-9 w-9 flex items-center justify-center shrink-0">
         <Icon name="googleCalendar" label="Google Calendar" className="w-7 h-7" />
@@ -281,6 +290,6 @@ export default function GoogleCalendarSync() {
         onCheckedChange={handleToggle}
         className="data-[state=checked]:bg-blue-500 pointer-events-none"
       />
-    </button>
+    </div>
   );
 }

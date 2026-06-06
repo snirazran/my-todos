@@ -239,7 +239,68 @@ export default function ProfileQuestionsStep({
             'mt-1 gap-2.5',
           )}
         >
-          {currentQuestion.options.map((option) => {
+          {currentQuestion.id === FOCUS_AREAS_QUESTION_ID ? (
+            <div className="grid grid-cols-2 gap-3">
+              {focusAreaCategories.map((category) => {
+                const isSelected = selectedValues.includes(category.id);
+                return (
+                  <button
+                    key={category.id}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => chooseOption(category.id)}
+                    disabled={saving}
+                    className={cn(
+                      'group relative aspect-[4/5] overflow-hidden rounded-[20px] text-left transition-all duration-200',
+                      isSelected
+                        ? 'ring-[3px] ring-primary'
+                        : 'ring-1 ring-border/60 hover:-translate-y-0.5 hover:ring-border active:scale-[0.98]',
+                      saving && 'cursor-not-allowed opacity-70',
+                    )}
+                  >
+                    {category.coverImageUrl ? (
+                      <img
+                        src={category.coverImageUrl}
+                        alt=""
+                        className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div
+                        className="absolute inset-0"
+                        style={{
+                          background: `linear-gradient(135deg, ${category.backgroundFrom}, ${category.backgroundTo})`,
+                        }}
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+
+                    <div
+                      className={cn(
+                        'absolute right-2 top-2 grid h-7 w-7 place-items-center rounded-full border-2 backdrop-blur-md transition-all',
+                        isSelected
+                          ? 'border-white bg-primary text-white'
+                          : 'border-white/70 bg-black/25 text-transparent',
+                      )}
+                      aria-hidden
+                    >
+                      <Check className="h-3.5 w-3.5 stroke-[3]" />
+                    </div>
+
+                    <div className="absolute inset-x-0 bottom-0 p-2.5">
+                      <p className="text-[8px] font-black uppercase tracking-[0.18em] text-white/70">
+                        {category.shortLabel || 'Focus'}
+                      </p>
+                      <h3 className="mt-0.5 text-sm font-black leading-tight tracking-tight text-white">
+                        {category.name}
+                      </h3>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              {currentQuestion.options.map((option) => {
             const isSelected = currentQuestion.multiSelect
               ? selectedValues.includes(option.id)
               : selected === option.id;
@@ -320,6 +381,8 @@ export default function ProfileQuestionsStep({
             >
               {currentQuestion.plainOption.label}
             </button>
+          )}
+            </>
           )}
         </div>
 

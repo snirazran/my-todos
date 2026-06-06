@@ -10,14 +10,12 @@ import type {
   MacroCategoryId,
 } from '@/lib/quests/types';
 import { cn } from '@/lib/utils';
-import { PremiumLimitDialog } from './PremiumLimitDialog';
 
 export function QuestOnboardingPopup({
   show,
   isCompleted = false,
   initialSelectedCategoryIds,
   categories,
-  isPremium,
   onCompleted,
   onClose,
 }: {
@@ -26,7 +24,7 @@ export function QuestOnboardingPopup({
   initialSelectedCategoryIds: MacroCategoryId[];
   initialCategoryTagMap?: FocusCategoryTagMap[];
   categories: MacroCategoryDefinition[];
-  isPremium: boolean;
+  isPremium?: boolean;
   onCompleted: () => void;
   onClose: () => void;
 }) {
@@ -37,9 +35,7 @@ export function QuestOnboardingPopup({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDesktop, setIsDesktop] = useState(false);
-  const [showPremiumLimit, setShowPremiumLimit] = useState(false);
   const dragControls = useDragControls();
-  const freeCategoryLimit = 3;
 
   useEffect(() => {
     setMounted(true);
@@ -67,11 +63,6 @@ export function QuestOnboardingPopup({
         return prev.filter((entry) => entry !== categoryId);
       }
 
-      if (!isPremium && prev.length >= freeCategoryLimit) {
-        setShowPremiumLimit(true);
-        return prev;
-      }
-
       setError(null);
       return [...prev, categoryId];
     });
@@ -79,10 +70,6 @@ export function QuestOnboardingPopup({
 
   const saveOnboarding = async () => {
     if (saving || selectedCategoryIds.length === 0) return;
-    if (!isPremium && selectedCategoryIds.length > freeCategoryLimit) {
-      setShowPremiumLimit(true);
-      return;
-    }
     setSaving(true);
     setError(null);
 
@@ -152,8 +139,14 @@ export function QuestOnboardingPopup({
               <div className="absolute left-1/2 top-3 z-20 h-1.5 w-12 -translate-x-1/2 rounded-full bg-foreground/15" />
             )}
 
-            {/* Header */}
-            <div className="flex shrink-0 items-start justify-between gap-4 px-6 pb-4 pt-8 sm:px-8 sm:pt-7">
+            {/* Header (doubles as the drag handle on mobile) */}
+            <div
+              className="flex shrink-0 items-start justify-between gap-4 px-6 pb-4 pt-8 sm:px-8 sm:pt-7"
+              style={!isDesktop ? { touchAction: 'none' } : undefined}
+              onPointerDown={(event) => {
+                if (!isDesktop) dragControls.start(event);
+              }}
+            >
               <div>
                 <h2 className="text-2xl font-black tracking-tight text-foreground sm:text-3xl">
                   {isCompleted ? 'Update your focus' : 'Shape your quests'}
@@ -165,6 +158,7 @@ export function QuestOnboardingPopup({
 
               <button
                 onClick={onClose}
+                onPointerDown={(event) => event.stopPropagation()}
                 type="button"
                 aria-label="Close"
                 className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground ring-1 ring-border/70 transition-colors hover:bg-muted/70 hover:text-foreground"
@@ -174,7 +168,7 @@ export function QuestOnboardingPopup({
             </div>
 
             {/* Categories */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 sm:px-8">
+            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-2 sm:px-8">
               <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-3">
                 {categories.map((category) => {
                   const selected = selectedCategoryIds.includes(category.id);
@@ -251,12 +245,6 @@ export function QuestOnboardingPopup({
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs font-bold text-muted-foreground">
                   {count} selected
-                  {!isPremium && (
-                    <span className="text-muted-foreground/60">
-                      {' '}
-                      · {freeCategoryLimit} max
-                    </span>
-                  )}
                 </p>
                 <div className="flex items-center gap-2">
                   <button
@@ -283,16 +271,6 @@ export function QuestOnboardingPopup({
             </div>
           </motion.div>
         </div>
-        <PremiumLimitDialog
-          open={showPremiumLimit}
-          onClose={() => setShowPremiumLimit(false)}
-          title="Focus Limit Reached"
-          description={
-            <>
-              Unlock unlimited focus categories with <b>Premium</b>.
-            </>
-          }
-        />
       </>
     </AnimatePresence>,
     document.body,

@@ -68,7 +68,7 @@ export function OnboardingFrogHeader({ indices, eyebrow, title, subtitle, speech
               done={0}
               total={0}
               fixedMessage={speechBubbleMessage}
-              className="!left-[calc(50%-7.5rem)] !top-4"
+              className="!top-4"
               messageClassName="!whitespace-pre-line !text-sm !leading-tight md:!text-base"
             />
           ) : null}
@@ -81,7 +81,7 @@ export function OnboardingFrogHeader({ indices, eyebrow, title, subtitle, speech
               done={0}
               total={0}
               fixedMessage={speechBubbleMessage}
-              className="!left-[calc(50%-7.5rem)] !top-4"
+              className="!top-4"
               messageClassName="!whitespace-pre-line !text-sm !leading-tight md:!text-base"
             />
           ) : null}

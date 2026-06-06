@@ -16,6 +16,24 @@ import { OnboardingBackground } from '@/components/ui/OnboardingBackground';
 
 const STEP_IDS = ['name', 'humanName', 'createAccount', 'notifications', 'aboutIntro', 'age'] as const;
 
+// Persist answers locally so the frog/human names (collected before sign-in)
+// survive the email magic-link round trip, which reloads onto a fresh
+// /onboarding. Without this they're lost and the account keeps its default name.
+const ONBOARDING_SELECTIONS_KEY = 'onboardingSelections';
+
+function loadStoredSelections(): Record<string, string[]> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(ONBOARDING_SELECTIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, string[]>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
 function isMobileDevice() {
   const userAgent = navigator.userAgent || '';
   const isMobileUserAgent = /Android|iPhone|iPad|iPod|IEMobile|Opera Mini/i.test(userAgent);
@@ -26,7 +44,9 @@ function isMobileDevice() {
 export default function OnboardingPage() {
   const router = useRouter();
   const [step, setStep] = useState(0);
-  const [selections, setSelections] = useState<Record<string, string[]>>({});
+  const [selections, setSelections] = useState<Record<string, string[]>>(
+    loadStoredSelections,
+  );
   const [saving, setSaving] = useState(false);
   const [direction, setDirection] = useState(1);
   const [showNotificationStep, setShowNotificationStep] = useState(false);
@@ -34,6 +54,18 @@ export default function OnboardingPage() {
   useEffect(() => {
     setShowNotificationStep(isMobileDevice());
   }, []);
+
+  // Keep the local copy in sync so it can be restored after the magic-link reload.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        ONBOARDING_SELECTIONS_KEY,
+        JSON.stringify(selections),
+      );
+    } catch {
+      // ignore storage failures (private mode, quota)
+    }
+  }, [selections]);
 
   const stepIds = useMemo(
     () =>
@@ -76,7 +108,7 @@ export default function OnboardingPage() {
       const focusAreaIds = selections.focusAreas ?? [];
       try {
         const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        await Promise.all([
+        const [onboardingRes] = await Promise.all([
           fetch('/api/onboarding', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -102,6 +134,16 @@ export default function OnboardingPage() {
               })
             : Promise.resolve(),
         ]);
+        // Only drop the local copy once the names are safely persisted; if the
+        // save failed (e.g. not yet authenticated), keep them for the retry after
+        // the magic-link sign-in.
+        if (onboardingRes.ok) {
+          try {
+            window.localStorage.removeItem(ONBOARDING_SELECTIONS_KEY);
+          } catch {
+            // ignore
+          }
+        }
       } catch {
         // best-effort
       } finally {

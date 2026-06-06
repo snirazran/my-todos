@@ -144,11 +144,15 @@ export function FrogSpeechBubble({
     <AnimatePresence>
       {shouldShow && displayMessage && (
         <motion.div
-          initial={{ opacity: 1, y: 10, scale: 0.9 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 5, scale: 0.9 }}
+          // Center on the frog with left-1/2 + a Framer-managed x:-50% (kept in
+          // every state so the pop transform can't drop it). No fixed width, so
+          // the bubble sizes to its content (w-max) and only breaks at the
+          // explicit newline — not by being squeezed to the frog's width.
+          initial={{ opacity: 1, y: 10, scale: 0.9, x: '-50%' }}
+          animate={{ opacity: 1, y: 0, scale: 1, x: '-50%' }}
+          exit={{ opacity: 0, y: 5, scale: 0.9, x: '-50%' }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-          className={`absolute top-1 left-[16%] z-[100] w-max min-w-[11rem] max-w-[calc(100vw-1.5rem)] -translate-x-1/2 pointer-events-none ${className}`}
+          className={`pointer-events-none absolute left-1/2 top-4 z-[100] w-max min-w-[11rem] max-w-[calc(100vw-1.5rem)] ${className}`}
         >
           <div className="relative rounded-[18px] border border-border/50 bg-card px-3.5 py-3 shadow-sm">
             <p className={`whitespace-nowrap text-center font-bold leading-none text-foreground ${textSizeClass} ${messageClassName}`}>
@@ -160,8 +164,8 @@ export function FrogSpeechBubble({
               ))}
             </p>
 
-            {/* Speech Bubble Arrow */}
-            <div className="absolute w-4 h-4 transform rotate-45 -translate-x-1/2 border-b border-r -bottom-2 left-1/2 bg-card border-border/50" />
+            {/* Arrow — centered under the bubble, which is centered over the frog. */}
+            <div className="absolute left-1/2 -bottom-2 h-4 w-4 -translate-x-1/2 rotate-45 border-b border-r border-border/50 bg-card" />
           </div>
         </motion.div>
       )}
