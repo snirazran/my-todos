@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { mutate } from 'swr';
 import { Icon } from '@/components/ui/Icon';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -95,6 +96,7 @@ export default function QuickAddSheet({
   const [autoAddedTagIds, setAutoAddedTagIds] = useState<string[]>([]);
   const [sheetBaseHeight, setSheetBaseHeight] = useState<number | null>(null);
   const [suggestionsReady, setSuggestionsReady] = useState(false);
+  const [hasSuggestionContent, setHasSuggestionContent] = useState(false);
 
   const calendar = useCalendarMonth(new Date());
   const { inset: keyboardInset, height: viewportHeight } = useKeyboardInset(open);
@@ -111,13 +113,9 @@ export default function QuickAddSheet({
   }, [activePicker]);
 
   useEffect(() => {
-    if (!open) {
-      setSuggestionsReady(false);
-      return;
-    }
-
-    const id = window.setTimeout(() => setSuggestionsReady(true), 180);
-    return () => window.clearTimeout(id);
+    // Render the saved area immediately so its height is reserved from the first
+    // frame — the whole sheet then rises as one motion instead of growing late.
+    setSuggestionsReady(open);
   }, [open]);
 
   useEffect(() => {
@@ -154,6 +152,7 @@ export default function QuickAddSheet({
     setPickedBacklogTaskId(null);
     setPickedBacklogText(null);
     setShowSavedConfirm(false);
+    setHasSuggestionContent(false);
 
     const initialDate = defaultDateKey ?? ymdLocal(new Date());
     setSelectedDateKey(initialDate);
@@ -182,20 +181,23 @@ export default function QuickAddSheet({
     320,
     sheetBaseHeight ?? viewportHeight ?? 900,
   );
-  const showSuggestions = suggestionsReady && !hasTaskText;
+  const showSuggestions = suggestionsReady && !hasTaskText && hasSuggestionContent;
   const hasChips = tags.length > 0 || Boolean(startTime);
   const isShortScreen = availableSheetHeight < 700;
-  // Fixed sheet height: card sits at top (natural height), suggestions fill the
-  // rest (flex-1), so adding/removing chips never moves the close button.
+  // The sheet hugs its content and sits at the bottom; this is just the cap so a
+  // long saved list can't grow past the screen (it scrolls internally instead).
   const bottomGap = Math.round(availableSheetHeight * 0.02);
-  const sheetHeight = Math.max(
+  const sheetMaxHeight = Math.max(
     360,
     Math.min(
       availableSheetHeight - bottomGap - 12,
-      isShortScreen ? availableSheetHeight : 700,
+      isShortScreen ? availableSheetHeight : 560,
     ),
   );
-  const suggestionsOffset = isShortScreen ? 360 : 460;
+  const suggestionsOffset = 360;
+  // Cap the saved list so it can't push the input card off-screen; below the cap
+  // it sizes to its content, above it scrolls inside.
+  const suggestionsMax = Math.min(420, Math.round(availableSheetHeight * 0.42));
 
   // When the keyboard is up, a tag chip grows the card and would push the Add
   // Task button down behind the keyboard. Lift the whole sheet up by exactly
@@ -310,11 +312,22 @@ export default function QuickAddSheet({
         reminder: notifyEnabled ? reminder : undefined,
       });
       if (removeSavedTask && pickedBacklogTaskId) {
+        const backlogKey = '/api/tasks?view=board&day=-1';
+        // Drop it from the SWR cache right away so it doesn't flicker back in
+        // (stale-while-revalidate) the next time the sheet opens.
+        mutate(
+          backlogKey,
+          (cur?: { id: string }[]) =>
+            cur?.filter((t) => t.id !== pickedBacklogTaskId),
+          { revalidate: false },
+        );
         fetch(`/api/tasks?view=board`, {
           method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ day: -1, taskId: pickedBacklogTaskId }),
-        }).catch(console.error);
+        })
+          .then(() => mutate(backlogKey))
+          .catch(console.error);
       }
       onOpenChange(false);
     } finally {
@@ -369,10 +382,10 @@ export default function QuickAddSheet({
                   bottom: chipLift || undefined,
                   transition: 'bottom 280ms cubic-bezier(0.32,0.72,0,1)',
                 }}
-                className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 pb-[2vh] pt-2 pointer-events-none will-change-transform sm:px-6 sm:pb-[3vh]"
+                className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 pb-[7vh] pt-2 pointer-events-none will-change-transform sm:px-6 sm:pb-[8vh]"
               >
                 <div
-                  style={{ height: sheetHeight }}
+                  style={{ maxHeight: sheetMaxHeight }}
                   className="pointer-events-auto mx-auto flex w-full max-w-[620px] flex-col pb-[env(safe-area-inset-bottom)]"
                 >
                   <div className="mb-2 flex shrink-0 justify-end px-3">
@@ -561,7 +574,10 @@ export default function QuickAddSheet({
 
                   </div>
 
-                  <div className="pointer-events-none relative min-h-0 flex-1 rounded-[28px] [clip-path:inset(0_-40px_-40px_-40px)]">
+                  <div
+                    style={{ minHeight: hasTaskText ? 56 : undefined }}
+                    className="pointer-events-none relative min-h-0 rounded-[28px] [clip-path:inset(0_-40px_-40px_-40px)]"
+                  >
                     <AnimatePresence initial={false}>
                       {hasTaskText && (
                         <motion.div
@@ -606,7 +622,7 @@ export default function QuickAddSheet({
                     {suggestionsReady && (
                       <motion.div
                         key="quick-add-suggestions"
-                        initial={{ opacity: 0, y: suggestionsOffset }}
+                        initial={{ opacity: 0, y: 0 }}
                         animate={{
                           opacity: showSuggestions ? 1 : 0,
                           y: showSuggestions ? 0 : suggestionsOffset,
@@ -616,8 +632,9 @@ export default function QuickAddSheet({
                           duration: 0.4,
                           ease: [0.32, 0.72, 0, 1],
                         }}
+                        style={{ maxHeight: suggestionsMax }}
                         className={[
-                          'absolute inset-0 h-full min-h-0 overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]',
+                          'relative flex min-h-0 flex-col overflow-hidden rounded-[28px] border border-border/80 bg-popover p-4 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]',
                           showSuggestions ? 'pointer-events-auto' : 'pointer-events-none',
                         ].join(' ')}
                       >
@@ -625,7 +642,8 @@ export default function QuickAddSheet({
                           open={open}
                           focusCategoryIds={focusCategoryIds}
                           categoryTagMap={categoryTagMap}
-                          className="mt-0 h-full min-h-0 border-t-0 pt-0"
+                          className="mt-0 min-h-0 border-t-0 pt-0"
+                          onContentChange={setHasSuggestionContent}
                           onPick={(pick) => {
                             setText(pick.text);
                             setTags((prev) => {
