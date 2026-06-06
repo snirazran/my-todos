@@ -97,6 +97,49 @@ export function useTagManager({
     }
   };
 
+  // One-tap create (used by the focus-category suggestion). Creates the tag with
+  // the default color and selects it — or just selects it if it already exists.
+  const quickCreateTag = async (name: string, color?: string) => {
+    if (isCreatingTag) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+
+    const existing = savedTags.find(
+      (t) => t.name.toLowerCase() === trimmed.toLowerCase(),
+    );
+    if (existing) {
+      if (!selectedTags.includes(existing.id)) {
+        setSelectedTags((prev) => [...prev, existing.id]);
+      }
+      return;
+    }
+
+    if (savedTags.length >= tagLimit) {
+      onPremiumLimit();
+      return;
+    }
+
+    setIsCreatingTag(true);
+    try {
+      const res = await fetch('/api/tags', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: trimmed, color: color ?? newTagColor }),
+      });
+      const data = await res.json();
+      mutate('/api/tags');
+      if (data.tag && !selectedTags.includes(data.tag.id)) {
+        setSelectedTags((prev) => [...prev, data.tag.id]);
+      }
+      setShowColorPicker(false);
+      setTagInput('');
+    } catch (e) {
+      console.error('Failed to save tag', e);
+    } finally {
+      setIsCreatingTag(false);
+    }
+  };
+
   const handleAddTag = () => {
     if (isCreatingTag) return;
     const trimmed = tagInput.trim();
@@ -160,6 +203,7 @@ export function useTagManager({
     isCreatingTag,
     handleAddTag,
     createAndSaveTag,
+    quickCreateTag,
     deleteSavedTag,
     removeTag,
     toggleTag,

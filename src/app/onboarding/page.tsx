@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { mutate } from 'swr';
 import type { OnboardingStepProps } from './steps/types';
 import FrogNameStep from './steps/FrogNameStep';
 import HumanNameStep from './steps/HumanNameStep';
@@ -104,6 +105,14 @@ export default function OnboardingPage() {
       } catch {
         // best-effort
       } finally {
+        // Drop any stale quests cache (e.g. a pre-onboarding `complete: false`)
+        // so the home page fetches fresh data instead of flashing the focus-areas
+        // popup before revalidating.
+        await mutate(
+          (key) => typeof key === 'string' && key.startsWith('/api/quests'),
+          undefined,
+          { revalidate: false },
+        );
         router.push('/');
       }
     }

@@ -24,6 +24,8 @@ interface Props {
   tagAssignments?: Record<string, { categoryId: string; categoryName: string }>;
   focusTagLimitTitle?: string;
   focusTagLimitDescription?: string;
+  /** Offer a one-tap chip to create/select a tag with this name. */
+  suggestedTagName?: string;
 }
 
 export default function TagsPopup({
@@ -40,6 +42,7 @@ export default function TagsPopup({
   tagAssignments,
   focusTagLimitTitle = 'Tag limit reached',
   focusTagLimitDescription = 'You can connect only one tag per focus area.',
+  suggestedTagName,
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -64,15 +67,18 @@ export default function TagsPopup({
   const lastTitleRef = useRef(title);
   const lastDescriptionRef = useRef(description);
   const lastTaskIdRef = useRef(taskId);
+  const lastSuggestedRef = useRef(suggestedTagName);
   useEffect(() => {
     if (open) {
       lastTitleRef.current = title;
       lastDescriptionRef.current = description;
       lastTaskIdRef.current = taskId;
+      lastSuggestedRef.current = suggestedTagName;
     }
-  }, [open, title, description, taskId]);
+  }, [open, title, description, taskId, suggestedTagName]);
   const displayTitle = open ? title : lastTitleRef.current;
   const displayDescription = open ? description : lastDescriptionRef.current;
+  const displaySuggested = open ? suggestedTagName : lastSuggestedRef.current;
 
   useEffect(() => {
     setMounted(true);
@@ -195,6 +201,7 @@ export default function TagsPopup({
                       onMaxSelectedTags={() => setShowFocusTagLimit(true)}
                       onBlockedTagToggle={handleBlockedTagToggle}
                       doneLabel={isSaving ? 'Saving...' : saveLabel}
+                      suggestedTagName={displaySuggested}
                     />
                   </div>
                 </motion.div>

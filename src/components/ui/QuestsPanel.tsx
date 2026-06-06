@@ -858,6 +858,7 @@ export function QuestsPanel({
         maxSelectedTags={data?.isPremium ? undefined : 1}
         currentFocusCategoryId={editingFocusCategoryId ?? undefined}
         tagAssignments={tagAssignments}
+        suggestedTagName={editingFocusCategory?.name}
         onSave={handleSaveFocusTags}
       />
     </>

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Icon } from '@/components/ui/Icon';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -29,6 +29,8 @@ type Props = {
   onBlockedTagToggle?: (tag: SavedTag) => boolean;
   /** Override the Done button label. */
   doneLabel?: string;
+  /** When set, offers a one-tap chip to create/select a tag with this name. */
+  suggestedTagName?: string;
 };
 
 export function TagsView({
@@ -42,6 +44,7 @@ export function TagsView({
   onMaxSelectedTags,
   onBlockedTagToggle,
   doneLabel = 'Done',
+  suggestedTagName,
 }: Props) {
   const {
     savedTags,
@@ -58,18 +61,34 @@ export function TagsView({
     isCreatingTag,
     handleAddTag,
     createAndSaveTag,
+    quickCreateTag,
     deleteSavedTag,
     toggleTag,
   } = tagManager;
 
-  const placeholder = useMemo(() => {
-    const suggestions = [
-      'work', 'home', 'urgent', 'errands', 'fitness', 'study', 'shopping',
-      'health', 'family', 'travel', 'ideas', 'reading', 'finance', 'hobby',
-      'meeting', 'project', 'personal', 'chores',
-    ];
-    return `${suggestions[Math.floor(Math.random() * suggestions.length)]}...`;
-  }, []);
+  const placeholder = 'Add a tag';
+
+  const trimmedSuggestion = (suggestedTagName ?? '').trim();
+  const suggestionExists = savedTags.some(
+    (t) => t.name.toLowerCase() === trimmedSuggestion.toLowerCase(),
+  );
+  const showSuggestion =
+    !!trimmedSuggestion &&
+    !suggestionExists &&
+    !showColorPicker &&
+    !manageTagsMode &&
+    !tagInput.trim();
+
+  const handleQuickCreate = () => {
+    if (
+      maxSelectedTags !== undefined &&
+      selectedTagIds.length >= maxSelectedTags
+    ) {
+      onMaxSelectedTags?.();
+      return;
+    }
+    quickCreateTag(trimmedSuggestion);
+  };
 
   const [pendingDelete, setPendingDelete] = useState<SavedTag | null>(null);
   const [portalReady, setPortalReady] = useState(false);
@@ -139,6 +158,20 @@ export function TagsView({
             )}
           </button>
         </div>
+
+        {showSuggestion && (
+          <button
+            type="button"
+            onClick={handleQuickCreate}
+            disabled={isCreatingTag}
+            className="mb-3 inline-flex max-w-full items-center gap-1.5 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 py-1.5 text-[12px] font-extrabold text-primary transition-colors [@media(hover:hover)]:hover:bg-primary/10 active:scale-95 disabled:opacity-50"
+          >
+            <Plus className="h-3.5 w-3.5 shrink-0 stroke-[3]" />
+            <span className="truncate">
+              {isCreatingTag ? 'Creating...' : `Create “${trimmedSuggestion}” tag`}
+            </span>
+          </button>
+        )}
 
         <AnimatePresence>
           {showColorPicker && (
