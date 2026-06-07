@@ -97,7 +97,8 @@
       "Read(//tmp/**)",
       "Bash(git mv *)",
       "Bash(break)",
-      "Bash(awk '/----- fresh -----/{f=1} f' /tmp/nextdev.log)"
+      "Bash(awk '/----- fresh -----/{f=1} f' /tmp/nextdev.log)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

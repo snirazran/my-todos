@@ -125,7 +125,7 @@ export default function WeeklyWrapped({
   onClose,
 }: {
   data: WeeklyRecapData;
-  indices: { skin: number; mood: number; hat: number; body: number; hand_item: number };
+  indices: { skin: number; mood?: number; hat: number; body: number; hand_item: number };
   onClose: () => void;
 }) {
   const [currentSlide, setCurrentSlide] = useState(0);
