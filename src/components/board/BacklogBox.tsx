@@ -2,7 +2,8 @@
 
 import React, { useEffect } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
-import { FolderOpen, ArrowDownToLine } from 'lucide-react';
+import { ArrowDownToLine } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 
 interface Props {
   count: number;
@@ -101,7 +102,7 @@ export default function BacklogBox({
            className="absolute inset-0 flex items-center justify-center"
            style={{ pointerEvents: 'none' }}
         >
-          <FolderOpen size={19} strokeWidth={2} className="text-muted-foreground group-hover:text-primary transition-colors" />
+          <Icon name="saved" className="h-5 w-5" />
         </motion.div>
 
         {/* Drag Over Glow Effect */}

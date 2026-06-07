@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, CalendarClock, Tag, Pencil, CalendarCheck, Check, Timer } from 'lucide-react';
+import { Trash2, Pencil, CalendarCheck, Check, Bell } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 
 interface TaskMenuProps {
@@ -100,7 +100,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               }}
               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <Tag className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <Icon name="filter" className="h-4 w-4" />
               Add Tags
             </button>
           )}
@@ -113,7 +113,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               }}
               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <Tag className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <Icon name="filter" className="h-4 w-4" />
               Add Tags
             </button>
           )}
@@ -126,7 +126,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               }}
               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <CalendarClock className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <Bell className="h-4 w-4 text-amber-500" />
               Notify
             </button>
           )}
@@ -139,7 +139,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               }}
               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <Timer className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <Icon name="clock" className="h-4 w-4" />
               Focus
             </button>
           )}
@@ -172,7 +172,7 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
               }}
               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
             >
-              <CalendarClock className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <Icon name="saved" className="h-4 w-4" />
               Do Later
             </button>
           )}

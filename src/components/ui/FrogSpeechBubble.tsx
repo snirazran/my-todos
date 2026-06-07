@@ -148,9 +148,10 @@ export function FrogSpeechBubble({
           // every state so the pop transform can't drop it). No fixed width, so
           // the bubble sizes to its content (w-max) and only breaks at the
           // explicit newline — not by being squeezed to the frog's width.
-          initial={{ opacity: 1, y: 10, scale: 0.9, x: '-50%' }}
-          animate={{ opacity: 1, y: 0, scale: 1, x: '-50%' }}
-          exit={{ opacity: 0, y: 5, scale: 0.9, x: '-50%' }}
+          // Centered on the frog (x: -50%) with a tiny rightward nudge.
+          initial={{ opacity: 1, y: 10, scale: 0.9, x: 'calc(-50% + 4px)' }}
+          animate={{ opacity: 1, y: 0, scale: 1, x: 'calc(-50% + 4px)' }}
+          exit={{ opacity: 0, y: 5, scale: 0.9, x: 'calc(-50% + 4px)' }}
           transition={{ type: 'spring', stiffness: 400, damping: 25 }}
           className={`pointer-events-none absolute left-1/2 top-4 z-[100] w-max min-w-[11rem] max-w-[calc(100vw-1.5rem)] ${className}`}
         >

@@ -4,9 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import {
   CheckCircle2,
   Pencil,
-  Tag,
-  CalendarClock,
-  Clock,
+  Bell,
   Trash2,
   X,
 } from 'lucide-react';
@@ -21,6 +19,7 @@ type Action = {
   label: string;
   icon?: React.ElementType;
   iconName?: IconName;
+  iconClassName?: string;
   onClick: () => void;
   destructive?: boolean;
   active?: boolean;
@@ -76,14 +75,15 @@ export default function TaskActionSheet({
     actions.push({
       key: 'tags',
       label: 'Add tags',
-      icon: Tag,
+      iconName: 'filter',
       onClick: onAddTags,
     });
   if (onSchedule)
     actions.push({
       key: 'schedule',
       label: 'Notify',
-      icon: Clock,
+      icon: Bell,
+      iconClassName: 'text-amber-500',
       onClick: onSchedule,
     });
   if (onToggleRepeat)
@@ -98,7 +98,7 @@ export default function TaskActionSheet({
     actions.push({
       key: 'doLater',
       label: 'Do later',
-      icon: CalendarClock,
+      iconName: 'saved',
       onClick: onDoLater,
     });
 
@@ -179,7 +179,8 @@ export default function TaskActionSheet({
                   ) : Icon ? (
                     <Icon
                       className={`h-5 w-5 ${
-                        a.active ? 'text-primary' : 'text-muted-foreground'
+                        a.iconClassName ??
+                        (a.active ? 'text-primary' : 'text-muted-foreground')
                       }`}
                     />
                   ) : null}

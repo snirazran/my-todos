@@ -11,6 +11,11 @@ const CAM_START_DELAY = 140;
 const ORIGIN_Y_ADJ = -5;
 export const TONGUE_STROKE = 8;
 export const HIT_AT = 0.5;
+// After the frog swallows a fly it plays the "love" mood (2) exactly once, then
+// returns to neutral (0). The single run is timed by Rive's own body-loop
+// boundary inside Frog.reactMoodOnce — no hardcoded duration.
+const MOOD_REACTION = 2;
+const MOOD_NEUTRAL = 0;
 const FOLLOW_EASE = (t: number) =>
   t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
@@ -405,6 +410,10 @@ export function useFrogTongue({
           pathNode.style.strokeDasharray = `0 ${total}`;
           pathNode.style.visibility = 'hidden';
         }
+
+        // Fly is now swallowed: play the love mood for exactly one run. Rive
+        // gates the swap on the body loop and reactMoodOnce reverts after it.
+        frogRef.current?.reactMoodOnce(MOOD_REACTION, MOOD_NEUTRAL);
 
         const persist = Promise.resolve(grab.onPersist()).catch((error) => {
           console.error('Failed to persist tongue action', error);

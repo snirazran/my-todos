@@ -7,7 +7,12 @@ import type { ItemDef } from '@/lib/skins/catalog';
 
 const CACHE_KEY = 'frog-wardrobe-indices';
 
-type Indices = { skin: number; mood: number; hat: number; body: number; hand_item: number };
+// NOTE: `mood` is deliberately NOT included here. The wardrobe never sets mood,
+// and because this object is rebuilt every render, including `mood: 0` made the
+// Frog's controlled-indices effect re-assert mood=0 on every render — which
+// clobbered transient mood reactions (e.g. the post-eat "questions" mood).
+// Leaving mood out lets those reactions be driven imperatively instead.
+type Indices = { skin: number; hat: number; body: number; hand_item: number };
 
 function getCachedIndices(): Indices | null {
   try {
@@ -45,12 +50,11 @@ export function useWardrobeIndices(enabled: boolean) {
   const indices: Indices = loaded
     ? {
         skin: getIndex(eq.skin),
-        mood: 0,
         hat: getIndex(eq.hat),
         body: getIndex(eq.body),
         hand_item: getIndex(eq.hand_item),
       }
-    : getCachedIndices() ?? { skin: 0, mood: 0, hat: 0, body: 0, hand_item: 0 };
+    : getCachedIndices() ?? { skin: 0, hat: 0, body: 0, hand_item: 0 };
 
   // Persist to localStorage when fresh data arrives
   useEffect(() => {

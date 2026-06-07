@@ -11,6 +11,7 @@ import {
   Layout,
   Fit,
   Alignment,
+  EventType,
   useRive,
   useStateMachineInput,
   useViewModel,
@@ -62,6 +63,12 @@ export interface FrogHandle {
   getBoxRect: () => DOMRect;
   /** Imperatively set a slot to a numeric index (Rive input value) */
   setSlotIndex: (slot: WardrobeSlot, index: number) => void;
+  /**
+   * Set `mood`, then revert to `resetTo` (default 0) after the body loop that
+   * swaps it in completes — so the reaction plays exactly one run, timed by
+   * Rive's own loop boundary rather than a hardcoded duration.
+   */
+  reactMoodOnce: (mood: number, resetTo?: number) => void;
 }
 
 interface FrogProps {
@@ -90,6 +97,7 @@ const Frog = memo(
     ref,
   ) {
     const wrapperRef = useRef<HTMLDivElement | null>(null);
+    const moodReactionCleanupRef = useRef<(() => void) | null>(null);
     const riveUrl = useRiveAsset('/frog_idle.riv');
 
     const { RiveComponent, rive } = useRive({
@@ -240,6 +248,9 @@ const Frog = memo(
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [rive, paused, setBoundSlotIndex]);
 
+    /* ---- tear down any in-flight mood reaction on unmount ---- */
+    useEffect(() => () => moodReactionCleanupRef.current?.(), []);
+
     /* ---- expose helpers to parent ---- */
     useImperativeHandle(ref, () => ({
       getMouthPoint() {
@@ -267,6 +278,50 @@ const Frog = memo(
       },
       setSlotIndex(slot, index) {
         setBoundSlotIndex(slot, index);
+      },
+      reactMoodOnce(mood, resetTo = 0) {
+        setBoundSlotIndex('mood', mood);
+        if (!rive) return;
+
+        // Cancel any in-flight reaction so a new eat restarts it cleanly.
+        moodReactionCleanupRef.current?.();
+
+        // ---- TEMP DIAGNOSTICS ----
+        // Log the real state-change / loop sequence after setting the mood so we
+        // can identify which transition is the reaction entering its state.
+        const t0 = performance.now();
+        console.log('[mood] set mood=', mood, '(t0)');
+        const onStateChange = (e: { data?: unknown }) => {
+          console.log(
+            '[mood] statechange @',
+            Math.round(performance.now() - t0),
+            'ms data=',
+            JSON.stringify(e?.data),
+          );
+        };
+        const onLoop = (e: { data?: unknown }) => {
+          console.log(
+            '[mood] loop @',
+            Math.round(performance.now() - t0),
+            'ms data=',
+            JSON.stringify(e?.data),
+          );
+        };
+        rive.on(EventType.StateChange, onStateChange);
+        rive.on(EventType.Loop, onLoop);
+        const timer = setTimeout(() => {
+          setBoundSlotIndex('mood', resetTo);
+          rive.off(EventType.StateChange, onStateChange);
+          rive.off(EventType.Loop, onLoop);
+          moodReactionCleanupRef.current = null;
+          console.log('[mood] diagnostic window ended -> reset to', resetTo);
+        }, 4000);
+        moodReactionCleanupRef.current = () => {
+          clearTimeout(timer);
+          rive.off(EventType.StateChange, onStateChange);
+          rive.off(EventType.Loop, onLoop);
+          moodReactionCleanupRef.current = null;
+        };
       },
     }));
 

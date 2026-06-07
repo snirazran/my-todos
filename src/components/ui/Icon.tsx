@@ -3,6 +3,7 @@ import type { FC, SVGProps } from 'react';
 // Inline SVG icons (via @svgr/webpack). They ship inside the JS bundle, so
 // there is no per-icon network request and no flash-in on first paint.
 // Original multicolor artwork is preserved.
+import Clock from '../../../public/icons/clock.svg';
 import Community from '../../../public/icons/Community.svg';
 import Compass from '../../../public/icons/Compass.svg';
 import DarkMode from '../../../public/icons/DarkMode.svg';
@@ -15,10 +16,12 @@ import InviteFriends from '../../../public/icons/InviteFriends.svg';
 import Planner from '../../../public/icons/Planner.svg';
 import Quests from '../../../public/icons/Quests.svg';
 import Repeat from '../../../public/icons/Repeat.svg';
+import Saved from '../../../public/icons/saved.svg';
 import Shuffle from '../../../public/icons/Shuffle.svg';
 import Wardrobe from '../../../public/icons/Wardrobe.svg';
 
 const ICONS = {
+  clock: Clock,
   community: Community,
   compass: Compass,
   darkMode: DarkMode,
@@ -31,6 +34,7 @@ const ICONS = {
   planner: Planner,
   quests: Quests,
   repeat: Repeat,
+  saved: Saved,
   shuffle: Shuffle,
   wardrobe: Wardrobe,
 } satisfies Record<string, FC<SVGProps<SVGSVGElement>>>;

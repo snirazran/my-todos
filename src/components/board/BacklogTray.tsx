@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { FolderOpen, Filter } from 'lucide-react';
+import { Filter } from 'lucide-react';
+import { Icon } from '@/components/ui/Icon';
 import { Task, draggableIdFor } from './helpers';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
@@ -143,7 +144,7 @@ export default React.memo(function BacklogTray({
         isOpen={isOpen}
         onClose={onClose}
         title={`${filteredTasks.length} Saved Tasks`}
-        icon={<FolderOpen size={24} strokeWidth={2.5} />}
+        icon={<Icon name="saved" className="h-6 w-6" />}
         iconContainerClassName="bg-primary/10 text-primary"
         isDraggingAny={isDraggingAny}
         closeProgress={closeProgress}
@@ -187,7 +188,7 @@ export default React.memo(function BacklogTray({
         <AnimatePresence mode="popLayout" initial={false}>
           {filteredTasks.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center gap-4 opacity-30 min-h-[300px]">
-              <FolderOpen size={64} strokeWidth={1} />
+              <Icon name="saved" className="h-16 w-16" />
               <p className="text-sm font-bold uppercase tracking-widest">
                 No saved tasks
               </p>

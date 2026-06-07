@@ -1800,7 +1800,12 @@ function LockedPlusPreview({
               className="h-full w-full"
               width={192}
               height={192}
-              indices={wardrobeIndices as Partial<Record<WardrobeSlot, number>>}
+              indices={
+                {
+                  ...wardrobeIndices,
+                  mood: 2,
+                } as Partial<Record<WardrobeSlot, number>>
+              }
             />
           </div>
           <div

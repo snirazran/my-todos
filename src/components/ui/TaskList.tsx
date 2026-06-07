@@ -12,7 +12,6 @@ import {
   CalendarDays,
   Clock,
   Bell,
-  Timer,
   Plus,
   Flame,
 } from 'lucide-react';
@@ -24,6 +23,7 @@ import {
   PanInfo,
   useMotionValue,
   useTransform,
+  useMotionTemplate,
   animate,
   useAnimation,
 } from 'framer-motion';
@@ -190,17 +190,15 @@ const SortableTaskItem = React.forwardRef<
     // Right Swipe (Positive X) -> Start Timer (Emerald)
     const timerActionOpacity = useTransform(x, [0, 25], [0, 1]);
     const timerActionScale = useTransform(x, [0, swipeThreshold], [0.8, 1.2]);
-    // Instant color snap at threshold
-    const timerActionColor = useTransform(
+    // Desaturated until the swipe passes the trigger threshold, then snaps to
+    // full color to signal "release to start timer" (mirrors the edit icon's
+    // gray -> blue snap on the other side).
+    const timerActionGray = useTransform(
       x,
       [swipeThreshold - 1, swipeThreshold],
-      ['#9ca3af', '#10b981'],
-    ); // Slate to Emerald
-    const timerActionTextColor = useTransform(
-      x,
-      [swipeThreshold - 1, swipeThreshold],
-      ['#ffffff', '#ffffff'],
+      [1, 0],
     );
+    const timerActionFilter = useMotionTemplate`grayscale(${timerActionGray})`;
     // Left Swipe (Negative X) -> Edit Sheet (Sky/Blue)
     const editActionOpacity = useTransform(x, [-25, 0], [1, 0]);
     const editActionScale = useTransform(x, [-swipeThreshold, 0], [1.2, 0.8]);
@@ -400,15 +398,14 @@ const SortableTaskItem = React.forwardRef<
           {/* Positioned on Left to be revealed by Right drag */}
           <div className="absolute inset-y-0 left-0 flex items-center pl-4">
             <motion.div
-              className="flex items-center justify-center w-8 h-8 rounded-full shadow-sm border border-transparent"
+              className="flex items-center justify-center w-8 h-8"
               style={{
                 opacity: timerActionOpacity,
                 scale: timerActionScale,
-                color: timerActionTextColor,
-                backgroundColor: timerActionColor,
+                filter: timerActionFilter,
               }}
             >
-              <Timer className="w-5 h-5" />
+              <Icon name="clock" className="w-8 h-8" />
             </motion.div>
           </div>
 
