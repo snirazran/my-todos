@@ -17,7 +17,11 @@ export async function middleware(req: NextRequest) {
   // BUT we need to be careful about public assets or api routes that don't need auth.
   // The config matcher handles specific paths.
 
-  if (!isAuth && !isAuthRoute) {
+  // Allow logged-out users to preview the home page via /?guest=1
+  const isGuestPreview =
+    req.nextUrl.pathname === '/' && req.nextUrl.searchParams.has('guest');
+
+  if (!isAuth && !isAuthRoute && !isGuestPreview) {
     // Check if it's a public path or asset not caught by matcher
     // For now, rely on config matcher to only run on protected routes.
     // But wait, matcher includes '/' which is home.
@@ -41,7 +45,7 @@ export async function middleware(req: NextRequest) {
 
 export const config = {
   // Be specific to avoid blocking static assets or other open routes
-  matcher: ['/manage-tasks/:path*', '/api/user/:path*', '/welcome', '/login', '/register', '/onboarding'],
+  matcher: ['/', '/manage-tasks/:path*', '/api/user/:path*', '/welcome', '/login', '/register', '/onboarding'],
   // Exclude public api routes if any? /api/auth is in isAuthRoute check.
   // Note: /api/skins usually requires auth but maybe we handle it in route?
   // Let's protect /api/skins as well if possible, or leave it to route handler.

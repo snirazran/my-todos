@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
@@ -14,7 +13,6 @@ export default function HumanNameStep({ selections, onSelect, onNext, onBack, sa
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
   const humanName = selections.humanName?.[0] ?? '';
   const canContinue = humanName.trim().length > 0;
-  const frogIndices = useMemo(() => randomFrogIndices(), []);
 
   useEffect(() => {
     inputRef.current?.focus({ preventScroll: true });
@@ -54,7 +52,7 @@ export default function HumanNameStep({ selections, onSelect, onNext, onBack, sa
       </button>
 
       <OnboardingFrogHeader
-        indices={frogIndices}
+        indices={{ skin: 0, hat: 0, body: 0, hand_item: 0, mood: 2 }}
         title={`*RIBBIT* I like the name ${frogName}!`}
         subtitle="What should I call you?"
         speechBubbleMessage={`*RIBBIT* I like the name ${frogName}!\nWhat should I call you?`}

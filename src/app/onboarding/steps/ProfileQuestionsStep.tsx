@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import useSWR from 'swr';
 import { cn } from '@/lib/utils';
-import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 import type { MacroCategoryDefinition } from '@/lib/quests/types';
 import { OnboardingFrogHeader } from './OnboardingFrogHeader';
@@ -79,7 +78,6 @@ export default function ProfileQuestionsStep({
   direction,
 }: OnboardingStepProps) {
   const [questionIndex, setQuestionIndex] = useState(0);
-  const frogIndices = useMemo(() => randomFrogIndices(), [questionIndex]);
 
   const tz =
     typeof window !== 'undefined'
@@ -217,7 +215,7 @@ export default function ProfileQuestionsStep({
       </div>
 
       <OnboardingFrogHeader
-        indices={frogIndices}
+        indices={{ skin: 0, hat: 0, body: 0, hand_item: 0, mood: 3 }}
         eyebrow={currentQuestion.sectionLabel}
         title={currentQuestion.title}
         subtitle={currentQuestion.subtitle}

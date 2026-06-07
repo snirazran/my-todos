@@ -1,12 +1,11 @@
 'use client';
 
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Loader2 } from 'lucide-react';
 import { sendSignInLinkToEmail } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { Input } from '@/components/ui/input';
-import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
@@ -25,7 +24,6 @@ export default function CreateAccountStep({ onNext }: OnboardingStepProps) {
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const frogIndices = useMemo(() => randomFrogIndices(), []);
 
   const handleSendEmailLink = async (event: FormEvent) => {
     event.preventDefault();
@@ -60,7 +58,6 @@ export default function CreateAccountStep({ onNext }: OnboardingStepProps) {
       </button>
 
       <OnboardingFrogHeader
-        indices={frogIndices}
         title="Save your frog!"
         subtitle="Create an account to sync across devices and track your progress."
       />

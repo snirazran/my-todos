@@ -1,10 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Shuffle, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
@@ -50,7 +49,6 @@ const getRandomName = (currentName?: string) => {
 };
 
 export default function FrogNameStep({ selections, onSelect, onNext, onBack, saving, direction }: OnboardingStepProps) {
-  const frogIndices = useMemo(() => randomFrogIndices(), []);
   const [initialName] = useState(() => getRandomName());
   const storedName = selections.frogName?.[0];
   const frogName = storedName ?? initialName;
@@ -82,7 +80,6 @@ export default function FrogNameStep({ selections, onSelect, onNext, onBack, sav
       </button>
 
       <OnboardingFrogHeader
-        indices={frogIndices}
         title="What do you want to name your frog?"
         subtitle="You can change this later."
       />

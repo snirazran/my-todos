@@ -1,10 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
@@ -17,12 +15,10 @@ const OPTIONS = [
 
 export default function TimeStep({ selections, onSelect, onNext, onBack, saving, direction }: OnboardingStepProps) {
   const selected = selections['time'] ?? [];
-  const frogIndices = useMemo(() => randomFrogIndices(), []);
 
   return (
     <div className="relative flex flex-1 flex-col">
       <OnboardingFrogHeader
-        indices={frogIndices}
         title="When are you most productive?"
         subtitle="We'll use this to suggest the best times for your tasks."
       />

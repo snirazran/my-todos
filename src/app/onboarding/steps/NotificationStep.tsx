@@ -1,11 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { cn } from '@/lib/utils';
-import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
@@ -36,7 +35,6 @@ async function enableNotifications() {
 }
 
 export default function NotificationStep({ selections, onNext, onBack, saving, direction }: OnboardingStepProps) {
-  const frogIndices = useMemo(() => randomFrogIndices(), []);
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
   const [requesting, setRequesting] = useState(false);
 
@@ -64,7 +62,6 @@ export default function NotificationStep({ selections, onNext, onBack, saving, d
       </button>
 
       <OnboardingFrogHeader
-        indices={frogIndices}
         title={`Get reminders from ${frogName}`}
         subtitle="Stay on track with gentle reminders."
       />

@@ -146,13 +146,14 @@ export function AdminRiveManagerPopup({
   return createPortal(
     <AnimatePresence>
       <motion.div
+        key="rive-manager-backdrop"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
         className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-md"
       />
-      <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
+      <div key="rive-manager-dialog" className="fixed inset-0 z-[1200] flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}

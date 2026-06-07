@@ -1,11 +1,9 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { FrogSpeechBubble } from '@/components/ui/FrogSpeechBubble';
 import type { WardrobeSlot } from '@/components/ui/frog';
-import { useBackgrounds, type BackgroundItem } from '@/hooks/useBackgrounds';
-import { useOnboardingBackgroundStore } from '@/lib/onboardingBackgroundStore';
 
 const Frog = dynamic(() => import('@/components/ui/frog'), { ssr: false });
 
@@ -19,45 +17,22 @@ type Props = {
 
 export const ONBOARDING_BODY_CLASS = 'pt-[370px] md:pt-[398px]';
 
-// Rotate through every background once before repeating: pick a random starting
-// point, then step sequentially through the catalog, wrapping around (and only
-// then showing a background that was already shown).
-let bgOrder: string[] | null = null;
-let bgCursor = 0;
+// Default to the bare frog (no hat/body/hand item) so every onboarding screen
+// shows the same plain frog instead of a random outfit.
+const DEFAULT_FROG_INDICES: Partial<Record<WardrobeSlot, number>> = {
+  skin: 0,
+  hat: 0,
+  body: 0,
+  hand_item: 0,
+};
 
-function nextBackgroundId(catalog: BackgroundItem[]): string | null {
-  const pool = catalog.filter((b) => !b.hidden);
-  if (pool.length === 0) return null;
-
-  if (!bgOrder || bgOrder.length !== pool.length) {
-    // First use (or the catalog changed): seed the rotation at a random index.
-    bgOrder = pool.map((b) => b.id);
-    bgCursor = Math.floor(Math.random() * bgOrder.length);
-  } else {
-    bgCursor = (bgCursor + 1) % bgOrder.length;
-  }
-  return bgOrder[bgCursor];
-}
-
-export function OnboardingFrogHeader({ indices, eyebrow, title, subtitle, speechBubbleMessage }: Props) {
-  // Pair a fresh, non-repeating background with each frog outfit. `indices` is a
-  // stable reference per screen, so this rolls once per look (as soon as the
-  // background catalog is available).
-  const { data } = useBackgrounds();
-  const catalog = data?.catalog;
-  const setBackgroundId = useOnboardingBackgroundStore((s) => s.setBackgroundId);
-  const rolledForRef = useRef<Props['indices'] | null>(null);
-
-  useEffect(() => {
-    if (!catalog || catalog.length === 0) return;
-    if (rolledForRef.current === indices) return;
-    const id = nextBackgroundId(catalog);
-    if (id) {
-      setBackgroundId(id);
-      rolledForRef.current = indices;
-    }
-  }, [indices, catalog, setBackgroundId]);
-
+export function OnboardingFrogHeader({
+  indices = DEFAULT_FROG_INDICES,
+  eyebrow,
+  title,
+  subtitle,
+  speechBubbleMessage,
+}: Props) {
   return (
     <>
       <div className="pointer-events-none absolute inset-x-0 top-4 z-30 flex justify-center md:top-8">

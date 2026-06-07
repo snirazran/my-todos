@@ -91,7 +91,12 @@
       "Bash(sed -n '360,372p' src/components/ui/skins/TradePanel.tsx)",
       "Bash(echo \"exit=$?\")",
       "Bash(rg -n \"h-13|h-12|h-14\" tailwind.config.*)",
-      "Bash(perl -0pi -e 's/\\\\n\\\\s*sectionIndex: \\\\d+,//g; s/\\\\n\\\\s*sectionIndex: number;//g' src/app/onboarding/steps/ProfileQuestionsStep.tsx)"
+      "Bash(perl -0pi -e 's/\\\\n\\\\s*sectionIndex: \\\\d+,//g; s/\\\\n\\\\s*sectionIndex: number;//g' src/app/onboarding/steps/ProfileQuestionsStep.tsx)",
+      "Bash(kill 2737 2744)",
+      "Bash(pnpm dev *)",
+      "Read(//tmp/**)",
+      "Bash(git mv *)",
+      "Bash(break)"
     ]
   }
 }

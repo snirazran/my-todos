@@ -1,10 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
@@ -17,12 +15,10 @@ const OPTIONS = [
 
 export default function GoalStep({ selections, onSelect, onNext, onBack, saving, direction }: OnboardingStepProps) {
   const selected = selections['goal'] ?? [];
-  const frogIndices = useMemo(() => randomFrogIndices(), []);
 
   return (
     <div className="relative flex flex-1 flex-col">
       <OnboardingFrogHeader
-        indices={frogIndices}
         title="What's your main goal?"
         subtitle="We'll tailor your experience around this."
       />

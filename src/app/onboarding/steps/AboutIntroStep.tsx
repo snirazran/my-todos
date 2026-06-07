@@ -1,15 +1,12 @@
 'use client';
 
-import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { randomFrogIndices } from '@/lib/randomFrogIndices';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader } from './OnboardingFrogHeader';
 
 export default function AboutIntroStep({ selections, onNext, onBack, saving, direction }: OnboardingStepProps) {
   const frogName = selections.frogName?.[0]?.trim() || 'Cookie';
-  const frogIndices = useMemo(() => randomFrogIndices(), []);
 
   return (
     <div className="flex-1 flex flex-col relative">
@@ -23,7 +20,6 @@ export default function AboutIntroStep({ selections, onNext, onBack, saving, dir
       </button>
 
       <OnboardingFrogHeader
-        indices={frogIndices}
         title="Let's hop into it!"
         subtitle={`Tell ${frogName} a bit about you so you can grow together.`}
       />
