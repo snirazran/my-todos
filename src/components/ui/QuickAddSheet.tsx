@@ -7,7 +7,6 @@ import { Icon } from '@/components/ui/Icon';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Bell,
-  Clock,
   Plus,
   X,
 } from 'lucide-react';
@@ -182,7 +181,8 @@ export default function QuickAddSheet({
     sheetBaseHeight ?? viewportHeight ?? 900,
   );
   const showSuggestions = suggestionsReady && !hasTaskText && hasSuggestionContent;
-  const hasChips = tags.length > 0 || Boolean(startTime);
+  // Time now lives in its own "Remind me" row, so only tag chips drive this.
+  const hasChips = tags.length > 0;
   const isShortScreen = availableSheetHeight < 700;
   // The sheet hugs its content and sits at the bottom; this is just the cap so a
   // long saved list can't grow past the screen (it scrolls internally instead).
@@ -451,28 +451,6 @@ export default function QuickAddSheet({
                       >
                         <div className="min-h-0 overflow-hidden">
                           <div ref={chipRowRef} className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 mask-fade-right">
-                            {chipView.startTime && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setStartTime('');
-                                  setEndTime('');
-                                  setNotifyEnabled(false);
-                                }}
-                                className="group shrink-0 relative inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-wider border border-primary/20 bg-primary/10 text-primary transition-all shadow-sm [@media(hover:hover)]:hover:opacity-75 active:scale-95"
-                              >
-                                <Clock className="w-3 h-3" />
-                                <span>
-                                  {formatTimeDisplay(chipView.startTime)}
-                                  {chipView.endTime &&
-                                    ` - ${formatTimeDisplay(chipView.endTime)}`}
-                                </span>
-                                {chipView.notify && (
-                                  <Bell className="w-3 h-3 text-amber-500" />
-                                )}
-                                <X className="w-3 h-3 opacity-50 [@media(hover:hover)]:group-hover:opacity-100 transition-opacity" />
-                              </button>
-                            )}
                             {chipView.tags.map((tagId) => {
                               const tag = tagManager.getTagDetails(tagId);
                               const color = tag?.color;
@@ -523,8 +501,8 @@ export default function QuickAddSheet({
                           className="group flex h-10 w-full items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
                         >
                           <span className="grid h-full w-12 shrink-0 place-items-center">
-                            <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
-                              <Icon name="filter" label="Tags" className="h-5 w-5" />
+                            <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary">
+                              <Icon name="filter" label="Tags" className="h-6 w-6" />
                             </span>
                           </span>
                           <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground">
@@ -541,18 +519,62 @@ export default function QuickAddSheet({
                             className="group flex h-10 w-full items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
                           >
                             <span className="grid h-full w-12 shrink-0 place-items-center">
-                              <span className="grid h-7 w-7 place-items-center rounded-full bg-primary/10 text-primary">
-                                <Icon name="planner" label="Date" className="h-5 w-5" />
+                              <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary">
+                                <Icon name="planner" label="Date" className="h-6 w-6" />
                               </span>
                             </span>
                             <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-extrabold text-muted-foreground">
                               <span className="truncate">{selectedDateLabel}</span>
-                              {notifyEnabled && (
-                                <Bell className="h-3.5 w-3.5 shrink-0 text-amber-500" />
-                              )}
                             </span>
                           </button>
                         )}
+
+                        {/* Remind me — dedicated time row */}
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          onClick={() => setShowReminderPicker(true)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setShowReminderPicker(true);
+                            }
+                          }}
+                          className="group flex h-10 w-full cursor-pointer items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
+                        >
+                          <span className="grid h-full w-12 shrink-0 place-items-center">
+                            <span className={`grid h-9 w-9 place-items-center rounded-full transition-colors ${notifyEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                              <Bell className="h-[18px] w-[18px] stroke-[2.5]" />
+                            </span>
+                          </span>
+                          <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-extrabold text-muted-foreground">
+                            <span>Remind me</span>
+                            {notifyEnabled && (
+                              <span className="text-primary">· {formatTimeDisplay(startTime || '09:00')}</span>
+                            )}
+                          </span>
+                          {notifyEnabled && (
+                            <span
+                              role="button"
+                              tabIndex={0}
+                              aria-label="Turn reminder off"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setNotifyEnabled(false);
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setNotifyEnabled(false);
+                                }
+                              }}
+                              className="mr-1 grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+                            >
+                              <X className="h-4 w-4" />
+                            </span>
+                          )}
+                        </div>
 
                         {!hideRepeatPicker && (
                           <button
@@ -561,8 +583,8 @@ export default function QuickAddSheet({
                             className="group flex h-10 w-full items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45"
                           >
                             <span className="grid h-full w-12 shrink-0 place-items-center">
-                              <span className={`grid h-7 w-7 place-items-center rounded-full ${repeatsOn ? 'bg-primary/10' : 'bg-muted'}`}>
-                                <Icon name="repeat" label="Repeat" className={`h-5 w-5 ${repeatsOn ? '' : 'opacity-50 grayscale'}`} />
+                              <span className={`grid h-9 w-9 place-items-center rounded-full ${repeatsOn ? 'bg-primary/10' : 'bg-muted'}`}>
+                                <Icon name="repeat" label="Repeat" className={`h-6 w-6 ${repeatsOn ? '' : 'opacity-50 grayscale'}`} />
                               </span>
                             </span>
                             <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground">

@@ -29,7 +29,7 @@ const itemBase =
 const itemDefault = `${itemBase} text-foreground hover:bg-accent`;
 const iconCls = 'h-4 w-4 shrink-0 sm:h-[22px] sm:w-[22px]';
 
-export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, onEdit, onDoToday, onSchedule, onStartTimer }: TaskMenuProps) {
+export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, onEdit, onDoToday, onSchedule }: TaskMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
   // Clamped position so the menu always stays fully within the viewport.
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
@@ -158,19 +158,6 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             >
               <Bell className={`${iconCls} text-amber-500`} />
               Notify
-            </button>
-          )}
-
-          {onStartTimer && !isDone && (
-            <button
-              onClick={() => {
-                onStartTimer();
-                onClose();
-              }}
-              className={itemDefault}
-            >
-              <Icon name="clock" className={iconCls} />
-              Focus
             </button>
           )}
 

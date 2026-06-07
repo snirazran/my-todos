@@ -645,10 +645,24 @@ const SortableTaskItem = React.forwardRef<
             </div>
             {/* Grab handle area for mobile if needed, or just edge drag */}
 
-            {/* Desktop Hover Menu (3 Dots) */}
+            {/* Desktop Hover Menu (Focus timer + 3 Dots) */}
             <div
-              className={`hidden md:group-hover:block absolute right-2 top-1/2 -translate-y-1/2 z-20 transition-opacity ${isDragging ? 'opacity-0' : 'opacity-100'}`}
+              className={`hidden md:group-hover:flex items-center gap-0.5 absolute right-2 top-1/2 -translate-y-1/2 z-20 transition-opacity ${isDragging ? 'opacity-0' : 'opacity-100'}`}
             >
+              {onStartTimer && !isDone && (
+                <button
+                  className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-accent/80 transition-colors"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.nativeEvent.stopImmediatePropagation();
+                    onStartTimer(task);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  title="Focus timer"
+                >
+                  <Icon name="clock" className="w-7 h-7" />
+                </button>
+              )}
               <button
                 className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
                 onClick={(e) => {

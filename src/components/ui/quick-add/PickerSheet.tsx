@@ -4,11 +4,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Bell,
   CalendarCheck,
   Check,
   ChevronDown,
-  Clock,
   Lock,
   Palette,
   Pencil,
@@ -24,13 +22,11 @@ import {
 import { TimeSliderColumn } from './TimeSliderColumn';
 import { TagsView } from './TagsView';
 import {
-  HOURS_12,
+  HOURS_24,
   MINUTES_60,
-  PERIODS,
 } from './constants';
 import {
   allDisplayDays,
-  formatTimeDisplay,
   pad,
   repeatModeFor,
   weekdayDisplayDays,
@@ -145,27 +141,9 @@ export function PickerSheet(props: Props) {
 
   const reminderTime = startTime || '09:00';
   const [reminderHour24, reminderMinute] = reminderTime.split(':').map(Number);
-  const reminderPeriod = reminderHour24 >= 12 ? 'PM' : 'AM';
-  const reminderHour12 = reminderHour24 % 12 || 12;
 
-  const setReminderTimeParts = (
-    hour12: number,
-    minute: number,
-    period: 'AM' | 'PM',
-  ) => {
-    const normalizedHour =
-      period === 'PM'
-        ? hour12 === 12
-          ? 12
-          : hour12 + 12
-        : hour12 === 12
-          ? 0
-          : hour12;
-    setStartTime(`${pad(normalizedHour)}:${pad(minute)}`);
-    setReminder('at_time');
-  };
-  const setReminderPreset = (time: string) => {
-    setStartTime(time);
+  const setReminderTimeParts = (hour24: number, minute: number) => {
+    setStartTime(`${pad(hour24)}:${pad(minute)}`);
     setReminder('at_time');
   };
   const saveReminderTime = () => {
@@ -176,10 +154,18 @@ export function PickerSheet(props: Props) {
     setShowReminderPicker(false);
   };
 
-  const openReminderPicker = (snapshot: { notifyEnabled: boolean; startTime: string }) => {
-    reminderSnapshotRef.current = snapshot;
-    setShowReminderPicker(true);
-  };
+  // Snapshot the reminder state when the time picker opens (from any entry
+  // point) so Cancel can revert; clear it when the picker closes.
+  useEffect(() => {
+    if (showReminderPicker) {
+      if (!reminderSnapshotRef.current) {
+        reminderSnapshotRef.current = { notifyEnabled, startTime };
+      }
+    } else {
+      reminderSnapshotRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showReminderPicker]);
 
   const cancelReminderPicker = () => {
     const snap = reminderSnapshotRef.current;
@@ -216,11 +202,7 @@ export function PickerSheet(props: Props) {
         )}
       </AnimatePresence>
       <div
-        className={`pointer-events-none fixed inset-x-0 z-[1501] flex justify-center ${
-          displayPicker === 'date'
-            ? 'bottom-[45vh] sm:bottom-[50vh]'
-            : 'bottom-[35vh] sm:bottom-[38vh]'
-        }`}
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[1501] flex items-end justify-center sm:pb-6"
       >
       <AnimatePresence>
         {activePicker && displayPicker && (
@@ -230,7 +212,7 @@ export function PickerSheet(props: Props) {
             animate={{ y: 0 }}
             exit={{ y: '150vh' }}
             transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
-            className="pointer-events-auto mx-4 w-full max-w-[560px] rounded-[28px] bg-background px-5 pb-6 pt-6 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70 sm:pb-8"
+            className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70 sm:mx-4 sm:max-w-[560px] sm:rounded-[28px] sm:pb-8"
           >
         <div className="mx-auto w-full">
           <div className="relative mb-7 flex h-9 items-center justify-center">
@@ -273,13 +255,6 @@ export function PickerSheet(props: Props) {
               selectedDateKey={selectedDateKey}
               selectSingleDay={selectSingleDay}
               openCalendar={() => setShowCalendarPicker(true)}
-              notifyEnabled={notifyEnabled}
-              setNotifyEnabled={setNotifyEnabled}
-              setStartTime={setStartTime}
-              setReminder={setReminder}
-              startTime={startTime}
-              openReminderPicker={openReminderPicker}
-              setShowReminderPicker={setShowReminderPicker}
             />
           )}
 
@@ -315,14 +290,11 @@ export function PickerSheet(props: Props) {
       </AnimatePresence>
 
       <AnimatePresence>
-        {activePicker === 'date' && showReminderPicker && (
+        {showReminderPicker && (
           <ReminderOverlay
-            reminderHour12={reminderHour12}
+            reminderHour24={reminderHour24}
             reminderMinute={reminderMinute}
-            reminderPeriod={reminderPeriod}
-            reminderTime={reminderTime}
             setReminderTimeParts={setReminderTimeParts}
-            setReminderPreset={setReminderPreset}
             saveReminderTime={saveReminderTime}
             onClose={cancelReminderPicker}
           />
@@ -344,13 +316,6 @@ function DateView({
   selectedDateKey,
   selectSingleDay,
   openCalendar,
-  notifyEnabled,
-  setNotifyEnabled,
-  startTime,
-  setStartTime,
-  setReminder,
-  openReminderPicker,
-  setShowReminderPicker,
 }: {
   isLater: boolean;
   selectedDay: DisplayDay;
@@ -361,34 +326,9 @@ function DateView({
   selectedDateKey: string;
   selectSingleDay: (day: DisplayDay) => void;
   openCalendar: () => void;
-  notifyEnabled: boolean;
-  setNotifyEnabled: (v: boolean) => void;
-  startTime: string;
-  setStartTime: (v: string) => void;
-  setReminder: (v: string) => void;
-  openReminderPicker: (snapshot: { notifyEnabled: boolean; startTime: string }) => void;
-  setShowReminderPicker: (v: boolean) => void;
 }) {
   const isCustomDate =
     selectedDateKey !== todayKey && selectedDateKey !== tomorrowKey && !isLater;
-
-  const toggleRemind = () => {
-    if (notifyEnabled) {
-      setNotifyEnabled(false);
-      setStartTime('');
-      setReminder('at_time');
-      setShowReminderPicker(false);
-      return;
-    }
-    // Only open the picker. Don't enable the reminder or seed a time yet —
-    // saveReminderTime commits notifyEnabled=true (and falls back to 09:00
-    // if the user never moved the slider). Cancel restores via snapshot.
-    openReminderPicker({ notifyEnabled: false, startTime });
-  };
-
-  const editReminderTime = () => {
-    openReminderPicker({ notifyEnabled, startTime });
-  };
 
   return (
     <div className="space-y-5">
@@ -424,71 +364,6 @@ function DateView({
         >
           On a date...
         </button>
-      </div>
-
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={toggleRemind}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            toggleRemind();
-          }
-        }}
-        aria-pressed={notifyEnabled}
-        className={`flex h-16 w-full cursor-pointer items-center gap-3.5 rounded-2xl border px-4 text-left transition-all ${
-          notifyEnabled
-            ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
-            : 'border-border bg-background hover:border-primary/40 hover:bg-primary/5'
-        }`}
-      >
-        <span
-          className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors ${
-            notifyEnabled
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-amber-100 text-amber-500'
-          }`}
-        >
-          <Bell
-            className={`h-4 w-4 stroke-[3] ${notifyEnabled ? '' : 'fill-current'}`}
-          />
-        </span>
-
-        <span className="min-w-0 flex-1">
-          <span
-            className={`block text-[14px] font-extrabold ${
-              notifyEnabled ? 'text-primary' : 'text-foreground'
-            }`}
-          >
-            Remind me
-          </span>
-          <span className="block text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            {notifyEnabled ? 'Tap again to turn off' : 'Off'}
-          </span>
-        </span>
-
-        {notifyEnabled && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              editReminderTime();
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                e.stopPropagation();
-                editReminderTime();
-              }
-            }}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-primary px-3 text-[12px] font-extrabold text-primary-foreground transition-transform active:scale-95"
-          >
-            <Clock className="h-3.5 w-3.5 stroke-[3]" />
-            {formatTimeDisplay(startTime || '09:00')}
-          </span>
-        )}
       </div>
     </div>
   );
@@ -573,14 +448,14 @@ function CalendarOverlay({
         onClick={onClose}
         className="fixed inset-0 z-[1502] bg-black/70"
       />
-      <div className="pointer-events-none fixed inset-x-0 bottom-[35vh] z-[1503] flex justify-center sm:bottom-[38vh]">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1503] flex items-end justify-center sm:pb-6">
       <motion.div
         dir="ltr"
         initial={{ y: '150vh' }}
         animate={{ y: 0 }}
         exit={{ y: '150vh' }}
         transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.28 }}
-        className="pointer-events-auto mx-4 w-full max-w-[520px] rounded-[28px] bg-background px-5 pb-6 pt-5 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70"
+        className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70 sm:mx-4 sm:max-w-[520px] sm:rounded-[28px] sm:pb-6"
       >
         <div className="mx-auto w-full">
           <div className="mb-4 flex items-center justify-between">
@@ -656,21 +531,15 @@ function CalendarOverlay({
 /* ─── Reminder time overlay ─────────────────────────────────────────────── */
 
 function ReminderOverlay({
-  reminderHour12,
+  reminderHour24,
   reminderMinute,
-  reminderPeriod,
-  reminderTime,
   setReminderTimeParts,
-  setReminderPreset,
   saveReminderTime,
   onClose,
 }: {
-  reminderHour12: number;
+  reminderHour24: number;
   reminderMinute: number;
-  reminderPeriod: 'AM' | 'PM';
-  reminderTime: string;
-  setReminderTimeParts: (h: number, m: number, p: 'AM' | 'PM') => void;
-  setReminderPreset: (time: string) => void;
+  setReminderTimeParts: (h: number, m: number) => void;
   saveReminderTime: () => void;
   onClose: () => void;
 }) {
@@ -683,14 +552,14 @@ function ReminderOverlay({
         onClick={onClose}
         className="fixed inset-0 z-[1504] bg-black/70"
       />
-      <div className="pointer-events-none fixed inset-x-0 bottom-[35vh] z-[1505] flex justify-center sm:bottom-[38vh]">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1505] flex items-end justify-center sm:pb-6">
       <motion.div
         dir="ltr"
         initial={{ y: '150vh' }}
         animate={{ y: 0 }}
         exit={{ y: '150vh' }}
         transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.28 }}
-        className="pointer-events-auto mx-4 w-full max-w-[440px] rounded-[28px] bg-background px-5 pb-6 pt-5 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70"
+        className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70 sm:mx-4 sm:max-w-[440px] sm:rounded-[28px] sm:pb-6"
       >
         <div className="mx-auto w-full">
           <div className="relative mb-5 flex h-8 items-center justify-center">
@@ -705,60 +574,33 @@ function ReminderOverlay({
             <h3 className="text-[16px] font-extrabold text-foreground">Time</h3>
           </div>
 
-          <div className="relative mx-auto mb-5 grid max-w-[300px] grid-cols-3 items-center text-center">
-            <div className="pointer-events-none absolute -inset-x-1 top-1/2 z-0 h-11 -translate-y-1/2 rounded-2xl bg-primary/10 ring-1 ring-primary/25" />
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-background to-transparent" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-background to-transparent" />
+          <div className="mb-5">
+            <div className="mx-auto mb-2 grid max-w-[220px] grid-cols-2 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
+              <span>Hour</span>
+              <span>Minute</span>
+            </div>
+            <div className="relative mx-auto grid max-w-[220px] grid-cols-2 items-center text-center">
+              <div className="pointer-events-none absolute -inset-x-1 top-1/2 z-0 h-12 -translate-y-1/2 rounded-2xl bg-primary/10 ring-1 ring-primary/25" />
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-background to-transparent" />
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-background to-transparent" />
+              {/* Colon separator so it reads as a real time */}
+              <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-[60%] text-[26px] font-black leading-none text-primary">
+                :
+              </span>
 
-            <TimeSliderColumn
-              items={HOURS_12}
-              value={reminderHour12}
-              onChange={(hour) =>
-                setReminderTimeParts(hour, reminderMinute, reminderPeriod)
-              }
-            />
-            <TimeSliderColumn
-              items={MINUTES_60}
-              value={reminderMinute}
-              onChange={(minute) =>
-                setReminderTimeParts(reminderHour12, minute, reminderPeriod)
-              }
-              formatLabel={pad}
-            />
-            <TimeSliderColumn
-              items={[...PERIODS]}
-              value={reminderPeriod}
-              onChange={(period) =>
-                setReminderTimeParts(reminderHour12, reminderMinute, period)
-              }
-            />
-          </div>
-
-          <div className="mb-4 grid grid-cols-3 gap-2">
-            {[
-              { label: 'Morning', time: '09:00' },
-              { label: 'Afternoon', time: '13:00' },
-              { label: 'Evening', time: '20:00' },
-            ].map((preset) => {
-              const active = reminderTime === preset.time;
-              return (
-                <button
-                  key={preset.label}
-                  type="button"
-                  onClick={() => setReminderPreset(preset.time)}
-                  className={`rounded-xl border px-2 py-2.5 text-center transition-all ${
-                    active
-                      ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
-                      : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
-                  }`}
-                >
-                  <div className="text-[13px] font-extrabold">{preset.label}</div>
-                  <div className="mt-0.5 text-[11px] font-bold opacity-70">
-                    {formatTimeDisplay(preset.time).replace(' ', '').toLowerCase()}
-                  </div>
-                </button>
-              );
-            })}
+              <TimeSliderColumn
+                items={HOURS_24}
+                value={reminderHour24}
+                onChange={(hour) => setReminderTimeParts(hour, reminderMinute)}
+                formatLabel={pad}
+              />
+              <TimeSliderColumn
+                items={MINUTES_60}
+                value={reminderMinute}
+                onChange={(minute) => setReminderTimeParts(reminderHour24, minute)}
+                formatLabel={pad}
+              />
+            </div>
           </div>
 
           <button

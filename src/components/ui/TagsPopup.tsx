@@ -95,7 +95,13 @@ export default function TagsPopup({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialKey, maxSelectedTags]);
 
-  const handleDone = async () => {
+  const handleDone = async (extraTagId?: string) => {
+    // A tag created via the Done button arrives as extraTagId — merge it so the
+    // save uses the new selection without waiting on the async state update.
+    const merged =
+      extraTagId && !selectedTags.includes(extraTagId)
+        ? [...selectedTags, extraTagId]
+        : selectedTags;
     const activeTaskId = taskId ?? lastTaskIdRef.current;
     if (!activeTaskId || isSaving) {
       onClose();
@@ -103,7 +109,7 @@ export default function TagsPopup({
     }
     setIsSaving(true);
     try {
-      await onSave(activeTaskId, selectedTags.slice(0, maxSelectedTags));
+      await onSave(activeTaskId, merged.slice(0, maxSelectedTags));
       onClose();
     } finally {
       setIsSaving(false);
@@ -168,7 +174,7 @@ export default function TagsPopup({
                     ease: [0.32, 0.72, 0, 1],
                     duration: 0.32,
                   }}
-                  className="pointer-events-auto min-h-[42dvh] w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:min-h-[360px] sm:max-w-[560px] sm:rounded-[28px] sm:pb-8 sm:shadow-2xl"
+                  className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:max-w-[560px] sm:rounded-[28px] sm:pb-8 sm:shadow-2xl"
                 >
                   <div className="mx-auto w-full">
                     {/* Header */}

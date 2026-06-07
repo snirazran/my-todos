@@ -75,14 +75,14 @@ export function useTagManager({
     );
   };
 
-  const createAndSaveTag = async () => {
-    if (isCreatingTag) return;
+  const createAndSaveTag = async (): Promise<string | undefined> => {
+    if (isCreatingTag) return undefined;
     const trimmed = tagInput.trim();
-    if (!trimmed) return;
+    if (!trimmed) return undefined;
 
     if (savedTags.length >= tagLimit) {
       onPremiumLimit();
-      return;
+      return undefined;
     }
 
     setIsCreatingTag(true);
@@ -96,17 +96,21 @@ export function useTagManager({
 
       mutate('/api/tags');
 
+      let selectedId: string | undefined;
       if (data.tag && !selectedTags.includes(data.tag.id)) {
         if (atSelectionLimit()) {
           onMaxSelectedTags?.();
         } else {
           setSelectedTags((prev) => [...prev, data.tag.id]);
+          selectedId = data.tag.id;
         }
       }
       setShowColorPicker(false);
       setTagInput('');
+      return selectedId;
     } catch (e) {
       console.error('Failed to save tag', e);
+      return undefined;
     } finally {
       setIsCreatingTag(false);
     }

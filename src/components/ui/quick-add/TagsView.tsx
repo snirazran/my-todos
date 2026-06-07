@@ -21,7 +21,7 @@ type Props = {
   selectedTagIds: string[];
   setSelectedTagIds: React.Dispatch<React.SetStateAction<string[]>>;
   onPremiumLimit: () => void;
-  onDone: () => void;
+  onDone: (extraTagId?: string) => void;
   tagInputRef: React.RefObject<HTMLInputElement | null>;
   /** Max tags the user can have selected. When provided, toggling additional tags is blocked. */
   maxSelectedTags?: number;
@@ -209,19 +209,6 @@ export function TagsView({
                     />
                   ))}
                 </div>
-                <button
-                  type="button"
-                  onClick={createAndSaveTag}
-                  disabled={isCreatingTag}
-                  className="h-11 w-full rounded-2xl border text-sm font-extrabold transition-colors active:scale-[0.985] disabled:opacity-50"
-                  style={{
-                    backgroundColor: `${newTagColor}18`,
-                    borderColor: `${newTagColor}40`,
-                    color: newTagColor,
-                  }}
-                >
-                  {isCreatingTag ? 'Saving...' : 'Save Tag'}
-                </button>
               </div>
             </motion.div>
           )}
@@ -302,11 +289,21 @@ export function TagsView({
 
       <button
         type="button"
-        onClick={onDone}
-        className="h-12 w-full rounded-2xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-transform active:scale-[0.985]"
+        onClick={async () => {
+          // If the user is mid-creation (color picker open with a name typed),
+          // create + select that tag first, then finish.
+          if (showColorPicker && tagInput.trim()) {
+            const newId = await createAndSaveTag();
+            onDone(newId);
+          } else {
+            onDone();
+          }
+        }}
+        disabled={isCreatingTag}
+        className="h-12 w-full rounded-2xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-transform active:scale-[0.985] disabled:opacity-50"
       >
-        {doneLabel}
-        {selectedTagIds.length > 0
+        {isCreatingTag ? 'Saving...' : doneLabel}
+        {!isCreatingTag && selectedTagIds.length > 0
           ? ` (${selectedTagIds.length} tag${selectedTagIds.length === 1 ? '' : 's'})`
           : ''}
       </button>

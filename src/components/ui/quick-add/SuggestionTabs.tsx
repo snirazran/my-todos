@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { FolderOpen, Clock, Bell } from 'lucide-react';
+import { Clock, Bell, Plus } from 'lucide-react';
+import { Icon as AppIcon } from '@/components/ui/Icon';
 import type {
   FocusCategoryTagMap,
   MacroCategoryId,
@@ -87,9 +88,14 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
         className,
       )}
     >
-      <div className="flex shrink-0 items-center gap-1.5 px-1 pb-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-        <FolderOpen className="h-3 w-3" />
-        <span>Saved</span>
+      <div className="flex shrink-0 items-center justify-between px-1 pb-2.5">
+        <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-muted-foreground">
+          <AppIcon name="saved" className="h-3.5 w-3.5" />
+          <span>Saved</span>
+        </div>
+        <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-black tabular-nums text-muted-foreground">
+          {backlog.length}
+        </span>
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -115,12 +121,15 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                     backlogTaskId: t.id,
                   })
                 }
-                className="group flex items-center gap-2.5 w-full rounded-xl border border-border/70 bg-muted/30 px-3 py-2.5 text-left transition-colors [@media(hover:hover)]:hover:bg-muted/60 active:scale-[0.99]"
+                className="group flex items-center gap-3 w-full rounded-2xl border border-border/60 bg-card px-3 py-2.5 text-left transition-all [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:bg-primary/5 active:scale-[0.99]"
               >
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
                   <Fly size={28} y={-3} paused />
                 </span>
                 <div className="min-w-0 flex-1 flex flex-col gap-1">
+                  <span className="text-[13px] font-bold text-foreground truncate">
+                    {t.text}
+                  </span>
                   {((t.tags && t.tags.length > 0) || t.startTime) && (
                     <div className="flex flex-wrap gap-1">
                       {t.startTime && (
@@ -149,10 +158,13 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                       })}
                     </div>
                   )}
-                  <span className="text-[13px] font-bold text-foreground truncate">
-                    {t.text}
-                  </span>
                 </div>
+                <span
+                  aria-hidden
+                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors [@media(hover:hover)]:group-hover:bg-primary [@media(hover:hover)]:group-hover:text-primary-foreground"
+                >
+                  <Plus className="h-4 w-4 stroke-[3]" />
+                </span>
               </button>
             ))}
           </div>
