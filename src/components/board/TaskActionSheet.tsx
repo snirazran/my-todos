@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import {
+  Check,
   CheckCircle2,
   Pencil,
   Bell,
@@ -97,7 +98,7 @@ export default function TaskActionSheet({
   if (onDoLater && !isCompleted)
     actions.push({
       key: 'doLater',
-      label: 'Do later',
+      label: 'Save for later',
       iconName: 'saved',
       onClick: onDoLater,
     });
@@ -127,74 +128,92 @@ export default function TaskActionSheet({
           ref={overscrollDrag.bind}
           className="flex flex-1 min-h-0 flex-col overflow-y-auto overscroll-none"
         >
-          {/* Header */}
-          <div className="px-5 pt-4 pb-3 flex items-center justify-between">
+          {/* Identity */}
+          <div className="relative flex flex-col items-center px-5 pt-2 pb-5 text-center">
             <button
               onClick={close}
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground hover:bg-muted"
+              className="absolute right-4 top-1 flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
               aria-label="Close"
             >
               <X size={18} />
             </button>
-
-            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/60 ring-1 ring-border/60">
               {isCompleted ? (
-                <CheckCircle2 className="h-7 w-7 text-green-500" />
+                <CheckCircle2 className="h-8 w-8 text-green-500" />
               ) : (
-                <Fly size={36} y={-3} />
+                <Fly size={44} y={-3} />
               )}
             </div>
-
-            {onDelete ? (
-              <button
-                onClick={run(onDelete)}
-                className="flex h-9 w-9 items-center justify-center rounded-full bg-red-100/70 dark:bg-red-500/15 text-red-600 hover:bg-red-200/70 dark:hover:bg-red-500/25"
-                aria-label="Delete"
-              >
-                <Trash2 size={18} />
-              </button>
-            ) : (
-              <span className="h-9 w-9" />
-            )}
+            <h2 className="mt-3 max-w-full truncate px-2 text-lg font-black tracking-tight text-foreground">
+              {displayTask.text}
+            </h2>
           </div>
 
-          <h2 className="px-5 pb-4 text-center text-lg font-black tracking-tight text-foreground">
-            {displayTask.text}
-          </h2>
-
-          {/* Actions */}
-          <div className="px-3 pb-[calc(env(safe-area-inset-bottom)+16px)] space-y-2">
-            {actions.map((a) => {
-              const Icon = a.icon;
-              return (
-                <button
-                  key={a.key}
-                  onClick={run(a.onClick)}
-                  className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl bg-card border border-border/50 hover:bg-accent/60 transition-colors ${
-                    a.active ? 'ring-1 ring-primary/40 bg-primary/5' : ''
-                  }`}
-                >
-                  {a.iconName ? (
-                    <AppIcon name={a.iconName} label={a.label} className="h-5 w-5" />
-                  ) : Icon ? (
-                    <Icon
-                      className={`h-5 w-5 ${
-                        a.iconClassName ??
-                        (a.active ? 'text-primary' : 'text-muted-foreground')
-                      }`}
-                    />
-                  ) : null}
-                  <span
-                    className={`text-sm font-bold ${
-                      a.active ? 'text-primary' : 'text-foreground'
+          {/* Actions — grouped list */}
+          <div className="px-4">
+            <div className="divide-y divide-border/50 overflow-hidden rounded-3xl border border-border/50 bg-card">
+              {actions.map((a) => {
+                const Icon = a.icon;
+                return (
+                  <button
+                    key={a.key}
+                    onClick={run(a.onClick)}
+                    className={`flex w-full items-center gap-3.5 px-3.5 py-3 text-left transition-colors active:bg-accent/70 ${
+                      a.active ? 'bg-primary/5' : 'hover:bg-accent/50'
                     }`}
                   >
-                    {a.label}
-                  </span>
-                </button>
-              );
-            })}
+                    <span
+                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-full ${
+                        a.active ? 'bg-primary/15' : 'bg-muted'
+                      }`}
+                    >
+                      {a.iconName ? (
+                        <AppIcon
+                          name={a.iconName}
+                          label={a.label}
+                          className="h-5 w-5"
+                        />
+                      ) : Icon ? (
+                        <Icon
+                          className={`h-5 w-5 ${
+                            a.iconClassName ??
+                            (a.active ? 'text-primary' : 'text-foreground/80')
+                          }`}
+                        />
+                      ) : null}
+                    </span>
+                    <span
+                      className={`flex-1 text-[15px] font-bold ${
+                        a.active ? 'text-primary' : 'text-foreground'
+                      }`}
+                    >
+                      {a.label}
+                    </span>
+                    {a.active && <Check className="h-5 w-5 text-primary" />}
+                  </button>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Delete — separated destructive action */}
+          {onDelete && (
+            <div className="px-4 pt-3">
+              <button
+                onClick={run(onDelete)}
+                className="flex w-full items-center gap-3.5 rounded-3xl border border-border/50 bg-card px-3.5 py-3 text-left transition-colors hover:bg-red-50/60 active:bg-red-50 dark:hover:bg-red-500/10 dark:active:bg-red-500/15"
+              >
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-red-100/80 dark:bg-red-500/15">
+                  <Trash2 className="h-5 w-5 text-red-600 dark:text-red-400" />
+                </span>
+                <span className="flex-1 text-[15px] font-bold text-red-600 dark:text-red-400">
+                  Delete task
+                </span>
+              </button>
+            </div>
+          )}
+
+          <div className="pb-[calc(env(safe-area-inset-bottom)+16px)]" />
         </div>
         );
       }}

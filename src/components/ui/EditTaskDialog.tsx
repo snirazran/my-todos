@@ -77,7 +77,7 @@ export function EditTaskDialog({
                 ease: [0.32, 0.72, 0, 1],
                 duration: 0.32,
               }}
-              className="pointer-events-auto flex min-h-[42dvh] w-full flex-col rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:min-h-[360px] sm:max-w-[440px] sm:rounded-[28px] sm:pb-8 sm:shadow-2xl"
+              className="pointer-events-auto flex w-full flex-col rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:max-w-[440px] sm:rounded-[28px] sm:pb-8 sm:shadow-2xl"
             >
               <div className="mx-auto flex w-full flex-1 flex-col">
                 {/* Header */}
@@ -140,7 +140,7 @@ export function EditTaskDialog({
                   type="button"
                   onClick={handleSave}
                   disabled={busy || !text.trim()}
-                  className="mt-auto flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985] disabled:opacity-50"
+                  className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985] disabled:opacity-50"
                 >
                   {busy ? (
                     'Saving...'

@@ -138,7 +138,7 @@ export function TimeSliderColumn<T extends string | number>({
       ref={ref}
       onScroll={handleScroll}
       onMouseDown={handleMouseDown}
-      className="relative z-10 h-[176px] overflow-y-auto overscroll-contain no-scrollbar snap-y snap-mandatory select-none"
+      className="relative z-10 h-[176px] overflow-y-auto overflow-x-hidden overscroll-contain no-scrollbar snap-y snap-mandatory select-none"
       style={{
         paddingTop: TIME_SLIDER_PAD,
         paddingBottom: TIME_SLIDER_PAD,

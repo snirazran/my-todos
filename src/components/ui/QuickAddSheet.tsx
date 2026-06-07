@@ -382,11 +382,13 @@ export default function QuickAddSheet({
                   bottom: chipLift || undefined,
                   transition: 'bottom 280ms cubic-bezier(0.32,0.72,0,1)',
                 }}
-                className="fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 pb-[7vh] pt-2 pointer-events-none will-change-transform sm:px-6 sm:pb-[8vh]"
+                className={`fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 pt-2 pointer-events-none will-change-transform sm:px-6 ${
+                  keyboardActive ? 'pb-[7vh] sm:pb-[8vh]' : 'pb-4 sm:pb-6'
+                }`}
               >
                 <div
                   style={{ maxHeight: sheetMaxHeight }}
-                  className="pointer-events-auto mx-auto flex w-full max-w-[620px] flex-col pb-[env(safe-area-inset-bottom)]"
+                  className="pointer-events-auto mx-auto flex w-full max-w-[500px] flex-col pb-[env(safe-area-inset-bottom)]"
                 >
                   <div className="mb-2 flex shrink-0 justify-end px-3">
                     <button

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, Pencil, CalendarCheck, Check, Bell } from 'lucide-react';
@@ -22,8 +22,17 @@ interface TaskMenuProps {
   onStartTimer?: () => void;
 }
 
+// Shared styling. Scales up on `sm:` (web/desktop) for a more comfortable,
+// web-friendly menu with larger, more visible icons; stays compact on mobile.
+const itemBase =
+  'group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium transition-colors sm:gap-3 sm:rounded-lg sm:px-3 sm:py-2.5 sm:text-[15px]';
+const itemDefault = `${itemBase} text-foreground hover:bg-accent`;
+const iconCls = 'h-4 w-4 shrink-0 sm:h-[22px] sm:w-[22px]';
+
 export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, onAddTags, addTagsPosition = 'second', onToggleRepeat, isWeekly, onEdit, onDoToday, onSchedule, onStartTimer }: TaskMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  // Clamped position so the menu always stays fully within the viewport.
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   // We portal to document.body
   // Ensure document is available (client-side)
@@ -44,6 +53,27 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
       window.removeEventListener('scroll', handleScroll, { capture: true });
     };
   }, [menu, onClose]);
+
+  // Keep the menu within the viewport: measure after it mounts and nudge it
+  // back from any edge it would overflow. Runs before paint to avoid a flash.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useLayoutEffect(() => {
+    if (!menu) {
+      setPos(null);
+      return;
+    }
+    const el = menuRef.current;
+    if (!el) return;
+    const margin = 8;
+    // offsetWidth/Height ignore the entry scale transform, giving true size.
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const left = Math.max(margin, Math.min(menu.left, vw - w - margin));
+    const top = Math.max(margin, Math.min(menu.top, vh - h - margin));
+    setPos({ top, left });
+  }, [menu]);
 
   return createPortal(
     <AnimatePresence>
@@ -74,8 +104,8 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: -4 }}
             transition={{ duration: 0.15, ease: 'easeOut' }}
-            className="fixed z-[9999] min-w-[160px] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5 ring-1 ring-black/5 backdrop-blur-sm"
-            style={{ top: menu.top, left: menu.left }}
+            className="fixed z-[9999] min-w-[160px] overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-lg shadow-black/5 ring-1 ring-black/5 backdrop-blur-sm sm:min-w-[220px] sm:rounded-2xl sm:p-1.5"
+            style={{ top: pos?.top ?? menu.top, left: pos?.left ?? menu.left, maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}
             onClick={(e) => e.stopPropagation()}
           >
 
@@ -85,9 +115,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                    onEdit(menu.id);
                    onClose();
                }}
-               className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+               className={itemDefault}
              >
-               <Pencil className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+               <Pencil className={`${iconCls} text-muted-foreground group-hover:text-primary transition-colors`} />
                Edit Task
              </button>
           )}
@@ -98,9 +128,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                   onAddTags(menu.id);
                   onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className={itemDefault}
             >
-              <Icon name="filter" className="h-4 w-4" />
+              <Icon name="filter" className={iconCls} />
               Add Tags
             </button>
           )}
@@ -111,9 +141,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                   onAddTags(menu.id);
                   onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className={itemDefault}
             >
-              <Icon name="filter" className="h-4 w-4" />
+              <Icon name="filter" className={iconCls} />
               Add Tags
             </button>
           )}
@@ -124,9 +154,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                 onSchedule(menu.id);
                 onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className={itemDefault}
             >
-              <Bell className="h-4 w-4 text-amber-500" />
+              <Bell className={`${iconCls} text-amber-500`} />
               Notify
             </button>
           )}
@@ -137,9 +167,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                 onStartTimer();
                 onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className={itemDefault}
             >
-              <Icon name="clock" className="h-4 w-4" />
+              <Icon name="clock" className={iconCls} />
               Focus
             </button>
           )}
@@ -150,17 +180,17 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                   onToggleRepeat();
                   onClose();
               }}
-              className={`group flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm font-medium transition-colors ${
-                isWeekly 
-                  ? 'bg-primary/10 text-primary hover:bg-primary/20' 
+              className={`${itemBase} justify-between ${
+                isWeekly
+                  ? 'bg-primary/10 text-primary hover:bg-primary/20'
                   : 'text-foreground hover:bg-accent'
               }`}
             >
-              <div className="flex items-center gap-2">
-                <Icon name="repeat" label="Repeat" className="h-4 w-4" />
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Icon name="repeat" label="Repeat" className={iconCls} />
                 <span>Repeat Weekly</span>
               </div>
-              {isWeekly && <Check className="h-3.5 w-3.5 text-primary" />}
+              {isWeekly && <Check className="h-3.5 w-3.5 shrink-0 text-primary sm:h-4 sm:w-4" />}
             </button>
           )}
 
@@ -170,10 +200,10 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                 onDoLater();
                 onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className={itemDefault}
             >
-              <Icon name="saved" className="h-4 w-4" />
-              Do Later
+              <Icon name="saved" className={iconCls} />
+              Save for Later
             </button>
           )}
 
@@ -183,9 +213,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                   onDoToday();
                   onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className={itemDefault}
             >
-              <CalendarCheck className="h-4 w-4 text-muted-foreground group-hover:text-green-600 transition-colors" />
+              <CalendarCheck className={`${iconCls} text-muted-foreground group-hover:text-green-600 transition-colors`} />
               Do Today
             </button>
           )}
@@ -196,9 +226,9 @@ export default function TaskMenu({ menu, onClose, onDelete, onDoLater, isDone, o
                   onDelete();
                   onClose();
               }}
-              className="group flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-900/20"
+              className={`${itemBase} text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20`}
             >
-              <Trash2 className="h-4 w-4 text-red-500 group-hover:text-red-600 transition-colors" />
+              <Trash2 className={`${iconCls} text-red-500 group-hover:text-red-600 transition-colors`} />
               Delete Task
             </button>
           )}

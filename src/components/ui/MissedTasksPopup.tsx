@@ -416,7 +416,7 @@ export function MissedTasksPopup({
                                 className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border/60 bg-card px-3 text-[10px] font-black uppercase tracking-[0.08em] text-muted-foreground shadow-sm transition-all hover:bg-muted hover:text-foreground active:scale-95 disabled:opacity-50"
                               >
                                 <FolderOpen className="h-3.5 w-3.5" />
-                                Do Later
+                                Save for Later
                               </button>
                               <button
                                 type="button"

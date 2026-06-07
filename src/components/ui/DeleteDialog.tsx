@@ -30,16 +30,31 @@ export function DeleteDialog({
   if (!open) return null;
   if (typeof document === 'undefined') return null;
 
-  const typeLabel =
+  const title =
     variant === 'weekly'
-      ? 'Repeating task'
+      ? 'Delete repeating task?'
       : variant === 'backlog'
-        ? 'Backlog item'
-        : 'Task';
+        ? 'Remove from backlog?'
+        : 'Delete task?';
+
+  const description = itemLabel ? (
+    <>
+      <span className="font-semibold text-slate-700 dark:text-slate-200">
+        &ldquo;{itemLabel}&rdquo;
+      </span>{' '}
+      {variant === 'weekly'
+        ? 'is a repeating task. Choose how to remove it.'
+        : variant === 'backlog'
+          ? 'will be removed from your backlog. You can re-add it anytime.'
+          : `will be deleted from ${dayLabel}. This cannot be undone.`}
+    </>
+  ) : (
+    'What would you like to do?'
+  );
 
   const dialogContent = (
     <div
-      className="fixed inset-0 z-[10001] flex items-end sm:items-center justify-center bg-black/80 px-4 pb-6 sm:pb-0"
+      className="fixed inset-0 z-[10001] flex items-end sm:items-center justify-center bg-slate-950/70 backdrop-blur-sm px-4 pb-6 sm:pb-0"
       role="dialog"
       aria-modal="true"
       onMouseDown={(e) => {
@@ -53,93 +68,63 @@ export function DeleteDialog({
       }}
     >
       <div
-        className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200/80 dark:border-slate-800 overflow-hidden"
+        className="w-[440px] max-w-full rounded-2xl bg-white/95 dark:bg-slate-900/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)] border border-slate-200/80 dark:border-slate-800/70 backdrop-blur-xl"
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between px-5 pt-5 pb-3">
-          <div className="flex-1 min-w-0 pr-3">
-            <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-              {typeLabel}
-            </p>
-            <h4 className="text-base font-bold text-slate-900 dark:text-white leading-snug truncate">
-              {itemLabel ? `"${itemLabel}"` : 'What would you like to do?'}
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300">
+            <Trash2 className="w-[18px] h-[18px]" />
+          </div>
+          <div className="flex-1 min-w-0 space-y-1">
+            <h4 className="text-lg font-semibold text-slate-900 dark:text-white leading-snug">
+              {title}
             </h4>
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+              {description}
+            </p>
           </div>
           <button
-            className="flex-shrink-0 p-1.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            className="flex-shrink-0 p-2 -mr-1 -mt-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-rose-300/70"
             onClick={onClose}
             aria-label="Close"
+            title="Close"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="px-4 pb-4 space-y-2">
+        <div className="mt-6 space-y-2.5">
           {variant === 'weekly' && (
-            <>
-              <button
-                className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all text-left disabled:opacity-50 border border-slate-200/60 dark:border-slate-700/50 active:scale-[0.98]"
-                onClick={onDeleteToday}
-                disabled={busy}
-              >
-                <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center">
-                  <EyeOff className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">
-                    Skip {dayLabel}
-                  </p>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    Hides it this week, still repeats next {dayLabel}
-                  </p>
-                </div>
-              </button>
-
-              <button
-                className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all text-left disabled:opacity-50 border border-rose-200/60 dark:border-rose-800/40 active:scale-[0.98]"
-                onClick={onDeleteAll}
-                disabled={busy}
-              >
-                <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-                  <Repeat className="w-4 h-4" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">
-                    Stop repeating
-                  </p>
-                  <p className="text-xs text-rose-500/80 dark:text-rose-400/70 mt-0.5">
-                    Deletes it from all weeks permanently
-                  </p>
-                </div>
-              </button>
-            </>
-          )}
-
-          {(variant === 'regular' || variant === 'backlog') && (
             <button
-              className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-all text-left disabled:opacity-50 border border-rose-200/60 dark:border-rose-800/40 active:scale-[0.98]"
-              onClick={onDeleteToday ?? onDeleteAll}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-100 dark:bg-slate-800 py-3 text-[15px] font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700 active:scale-[0.98] transition-all disabled:opacity-50"
+              onClick={onDeleteToday}
               disabled={busy}
             >
-              <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-rose-100 dark:bg-rose-900/50 text-rose-600 dark:text-rose-400 flex items-center justify-center">
-                <Trash2 className="w-4 h-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">
-                  {variant === 'backlog'
-                    ? 'Remove from backlog'
-                    : `Delete from ${dayLabel}`}
-                </p>
-                <p className="text-xs text-rose-500/80 dark:text-rose-400/70 mt-0.5">
-                  {variant === 'backlog'
-                    ? 'You can re-add it anytime'
-                    : 'This cannot be undone'}
-                </p>
-              </div>
+              <EyeOff className="w-4 h-4" />
+              Skip {dayLabel}
             </button>
           )}
+
+          <button
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-rose-500 to-red-500 py-3 text-[15px] font-bold text-white shadow-sm shadow-red-500/20 hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-50"
+            onClick={
+              variant === 'weekly' ? onDeleteAll : (onDeleteToday ?? onDeleteAll)
+            }
+            disabled={busy}
+          >
+            {variant === 'weekly' ? (
+              <Repeat className="w-4 h-4" />
+            ) : (
+              <Trash2 className="w-4 h-4" />
+            )}
+            {variant === 'weekly'
+              ? 'Stop repeating'
+              : variant === 'backlog'
+                ? 'Remove from backlog'
+                : `Delete from ${dayLabel}`}
+          </button>
 
           <button
             className="w-full py-2.5 rounded-xl text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"

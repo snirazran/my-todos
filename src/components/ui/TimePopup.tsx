@@ -6,14 +6,10 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Bell, X } from 'lucide-react';
 import { TimeSliderColumn } from './quick-add/TimeSliderColumn';
 import {
-  HOURS_12,
+  HOURS_24,
   MINUTES_60,
-  PERIODS,
 } from './quick-add/constants';
-import {
-  formatTimeDisplay,
-  pad,
-} from './quick-add/utils';
+import { pad } from './quick-add/utils';
 
 interface Props {
   open: boolean;
@@ -42,7 +38,7 @@ export function TimePopup({
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [startTime, setStartTime] = useState(initialStartTime || DEFAULT_TIME);
-  const [notifyEnabled, setNotifyEnabled] = useState(!!initialReminder);
+  const [notifyEnabled, setNotifyEnabled] = useState(true);
 
   // Cache the last good task name so the slide-down exit animation still
   // shows the right label after the parent clears its state.
@@ -57,23 +53,15 @@ export function TimePopup({
   useEffect(() => {
     if (!open) return;
     setStartTime(initialStartTime || DEFAULT_TIME);
-    setNotifyEnabled(!!initialReminder);
+    setNotifyEnabled(true);
   }, [open, initialStartTime, initialReminder]);
 
   if (!mounted) return null;
 
   const [hour24, minute] = startTime.split(':').map(Number);
-  const period = hour24 >= 12 ? 'PM' : 'AM';
-  const hour12 = hour24 % 12 || 12;
 
-  const setTimeParts = (
-    h: number,
-    m: number,
-    p: 'AM' | 'PM',
-  ) => {
-    const normalized =
-      p === 'PM' ? (h === 12 ? 12 : h + 12) : h === 12 ? 0 : h;
-    setStartTime(`${pad(normalized)}:${pad(m)}`);
+  const setTimeParts = (h: number, m: number) => {
+    setStartTime(`${pad(h)}:${pad(m)}`);
   };
 
   const handleSave = async () => {
@@ -132,101 +120,74 @@ export function TimePopup({
                   </p>
                 )}
 
-                {/* Wheel */}
-                <div className="relative mx-auto mb-5 grid max-w-[300px] grid-cols-3 items-center text-center">
-                  <div className="pointer-events-none absolute -inset-x-1 top-1/2 z-0 h-11 -translate-y-1/2 rounded-2xl bg-primary/10 ring-1 ring-primary/25" />
-                  <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-background to-transparent" />
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-background to-transparent" />
+                {/* Time wheel */}
+                <div className="mb-5">
+                  <div className="mx-auto mb-2 grid max-w-[220px] grid-cols-2 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
+                    <span>Hour</span>
+                    <span>Minute</span>
+                  </div>
+                  <div className="relative mx-auto grid max-w-[220px] grid-cols-2 items-center text-center">
+                    <div className="pointer-events-none absolute -inset-x-1 top-1/2 z-0 h-12 -translate-y-1/2 rounded-2xl bg-primary/10 ring-1 ring-primary/25" />
+                    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-background to-transparent" />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-background to-transparent" />
+                    {/* Colon separator so it reads as a real time */}
+                    <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-[60%] text-[26px] font-black leading-none text-primary">
+                      :
+                    </span>
 
-                  <TimeSliderColumn
-                    items={HOURS_12}
-                    value={hour12}
-                    onChange={(h) => setTimeParts(h, minute, period)}
-                  />
-                  <TimeSliderColumn
-                    items={MINUTES_60}
-                    value={minute}
-                    onChange={(m) => setTimeParts(hour12, m, period)}
-                    formatLabel={pad}
-                  />
-                  <TimeSliderColumn
-                    items={[...PERIODS]}
-                    value={period}
-                    onChange={(p) => setTimeParts(hour12, minute, p)}
-                  />
+                    <TimeSliderColumn
+                      items={HOURS_24}
+                      value={hour24}
+                      onChange={(h) => setTimeParts(h, minute)}
+                      formatLabel={pad}
+                    />
+                    <TimeSliderColumn
+                      items={MINUTES_60}
+                      value={minute}
+                      onChange={(m) => setTimeParts(hour24, m)}
+                      formatLabel={pad}
+                    />
+                  </div>
                 </div>
 
-                {/* Presets */}
-                <div className="mb-4 grid grid-cols-3 gap-2">
-                  {[
-                    { label: 'Morning', time: '09:00' },
-                    { label: 'Afternoon', time: '13:00' },
-                    { label: 'Evening', time: '20:00' },
-                  ].map((preset) => {
-                    const active = startTime === preset.time;
-                    return (
-                      <button
-                        key={preset.label}
-                        type="button"
-                        onClick={() => setStartTime(preset.time)}
-                        className={`rounded-xl border px-2 py-2.5 text-center transition-all ${
-                          active
-                            ? 'border-primary bg-primary/10 text-primary ring-2 ring-primary/30'
-                            : 'border-border bg-background text-foreground hover:border-primary/40 hover:bg-primary/5 hover:text-primary'
-                        }`}
-                      >
-                        <div className="text-[13px] font-extrabold">
-                          {preset.label}
-                        </div>
-                        <div className="mt-0.5 text-[11px] font-bold opacity-70">
-                          {formatTimeDisplay(preset.time)
-                            .replace(' ', '')
-                            .toLowerCase()}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Notify toggle */}
-                <div
-                  role="button"
-                  tabIndex={0}
+                {/* Notify toggle — clean switch row */}
+                <button
+                  type="button"
                   onClick={() => setNotifyEnabled((v) => !v)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      setNotifyEnabled((v) => !v);
-                    }
-                  }}
                   aria-pressed={notifyEnabled}
-                  className={`mb-4 flex h-14 w-full cursor-pointer items-center gap-3 rounded-2xl border px-4 text-left transition-all ${
-                    notifyEnabled
-                      ? 'border-primary bg-primary/10 ring-2 ring-primary/30'
-                      : 'border-border bg-background hover:border-primary/40 hover:bg-primary/5'
-                  }`}
+                  className="mb-3 flex w-full items-center gap-3 rounded-2xl bg-muted/50 px-4 py-3 text-left transition-colors hover:bg-muted/70"
                 >
                   <span
-                    className={`grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors ${
+                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors ${
                       notifyEnabled
                         ? 'bg-primary text-primary-foreground'
-                        : 'bg-amber-100 text-amber-500'
+                        : 'bg-muted text-muted-foreground'
                     }`}
                   >
-                    <Bell
-                      className={`h-4 w-4 stroke-[3] ${
-                        notifyEnabled ? '' : 'fill-current'
+                    <Bell className="h-[18px] w-[18px] stroke-[2.5]" />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[14px] font-extrabold text-foreground">
+                      Remind me
+                    </span>
+                    <span className="block truncate text-[12px] font-medium text-muted-foreground">
+                      {notifyEnabled
+                        ? `Notifies you at ${pad(hour24)}:${pad(minute)}`
+                        : 'Reminder off'}
+                    </span>
+                  </span>
+                  <span
+                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
+                      notifyEnabled ? 'bg-primary' : 'bg-muted-foreground/30'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                        notifyEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
                       }`}
                     />
                   </span>
-                  <span
-                    className={`text-[14px] font-extrabold ${
-                      notifyEnabled ? 'text-primary' : 'text-foreground'
-                    }`}
-                  >
-                    Remind me
-                  </span>
-                </div>
+                </button>
 
                 {/* Save */}
                 <button
