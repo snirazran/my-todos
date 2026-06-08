@@ -3,6 +3,7 @@ import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useSheetOverscrollDrag } from './useSheetOverscrollDrag';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 
 interface SideOpenTrayProps {
   isOpen: boolean;
@@ -42,6 +43,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
     const [isDesktop, setIsDesktop] = useState(false);
     const dragControls = useDragControls();
     const overscrollDrag = useSheetOverscrollDrag();
+    useRegisterOpenSheet(isOpen);
 
     useEffect(() => {
       const checkDesktop = () => {

@@ -119,14 +119,16 @@ export function MissedTasksPopup({
   const taskItems = items;
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const dismiss = async () => {
-    await fetch('/api/missed-tasks', {
+  const dismiss = () => {
+    // Close immediately so the slide-down is smooth; persist in the background.
+    // Awaiting the network call first left the sheet snapping back to origin
+    // until the request resolved, then sliding down (a visible stutter).
+    onClose();
+    void fetch('/api/missed-tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'dismiss', timezone }),
-    });
-    onClose();
-    void onStatusChanged();
+    }).then(() => onStatusChanged());
   };
 
   const removeItem = async (id: string) => {

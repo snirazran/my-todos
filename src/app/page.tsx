@@ -22,6 +22,7 @@ import BacklogTray from '@/components/board/BacklogTray';
 import { useAuth } from '@/components/auth/AuthContext';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { useUIStore } from '@/lib/uiStore';
+import { useSheetStore } from '@/lib/sheetStore';
 import { type FrogHandle } from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import TaskList from '@/components/ui/TaskList';
@@ -392,13 +393,16 @@ export default function Home() {
     scrollContainerRef: mainScrollRef,
   });
 
+  // Any sheet/popup open (BaseSheet popups + bespoke sheets register here).
+  const anySheetOpen = useSheetStore((s) => s.count > 0);
   const isAnyPanelOpen =
     isWardrobeOpen ||
     isQuestOnboardingOpen ||
     shouldShowMissedReview ||
     showQuickAdd ||
     showTimer ||
-    isBacklogOpen;
+    isBacklogOpen ||
+    anySheetOpen;
 
   // Sync cinematic state with UI store
   useEffect(() => {

@@ -19,6 +19,7 @@ import {
   type DisplayDay,
 } from '@/components/board/helpers';
 import Fly from '@/components/ui/fly';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
 import { PickerSheet } from './quick-add/PickerSheet';
 import { SuggestionTabs } from './quick-add/SuggestionTabs';
@@ -60,6 +61,7 @@ export default function QuickAddSheet({
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const dragControls = useDragControls();
+  useRegisterOpenSheet(open);
   const [showPremiumLimit, setShowPremiumLimit] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [pickedBacklogTaskId, setPickedBacklogTaskId] = useState<string | null>(null);

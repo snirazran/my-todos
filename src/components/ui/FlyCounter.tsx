@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useAnimationControls } from 'framer-motion';
 import { Plus } from 'lucide-react';
 import Fly from '@/components/ui/fly';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
+import { useSheetStore } from '@/lib/sheetStore';
 
 type Variant = 'mobile' | 'desktop';
 
@@ -12,11 +13,23 @@ interface Props {
   balance: number;
   variant?: Variant;
   onClick?: () => void;
+  /** Force-pause the fly Rive regardless of sheet state. */
+  paused?: boolean;
 }
 
 let nextBumpId = 0;
 
-export function FlyCounter({ balance, variant = 'desktop', onClick }: Props) {
+export function FlyCounter({
+  balance,
+  variant = 'desktop',
+  onClick,
+  paused = false,
+}: Props) {
+  // Pause the fly while any sheet/popup is open (read here, in the leaf, rather
+  // than in the layout-level header — subscribing in the header trips Next's
+  // dev HMR/PPR refresh loop).
+  const anySheetOpen = useSheetStore((s) => s.count > 0);
+  const flyPaused = paused || anySheetOpen;
   const prevRef = useRef(balance);
   // Skip the very first run so initial load / login doesn't trigger the
   // bump animation — only real increments after mount should fire it.
@@ -77,7 +90,7 @@ export function FlyCounter({ balance, variant = 'desktop', onClick }: Props) {
         animate={flyControls}
         className="flex items-center"
       >
-        <Fly size={flySize} paused={false} y={flyY} />
+        <Fly size={flySize} paused={flyPaused} y={flyY} />
       </motion.div>
 
       <AnimatedNumber

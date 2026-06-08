@@ -98,7 +98,8 @@
       "Bash(git mv *)",
       "Bash(break)",
       "Bash(awk '/----- fresh -----/{f=1} f' /tmp/nextdev.log)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(kill 9445)"
     ]
   }
 }

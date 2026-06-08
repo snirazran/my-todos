@@ -12,6 +12,7 @@ import {
 } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 
 export interface BaseSheetRenderProps {
   isDesktop: boolean;
@@ -108,6 +109,9 @@ export function BaseSheet({
       document.body.style.overflow = '';
     };
   }, [open]);
+
+  // While open, register globally so background Rives (frog, flies) pause.
+  useRegisterOpenSheet(open);
 
   if (!mounted) return null;
 

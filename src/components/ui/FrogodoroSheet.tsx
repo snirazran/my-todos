@@ -20,6 +20,7 @@ import {
   DEFAULT_SETTINGS,
 } from '@/lib/frogodoroStore';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { playTimerSound, unlockAudio, type TimerSound } from '@/lib/timerSounds';
 
 interface Task {
@@ -50,6 +51,7 @@ export default function FrogodoroSheet({
   tags: userTags = [],
   onMutateToday,
 }: Props) {
+  useRegisterOpenSheet(open);
   const [mounted, setMounted] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
