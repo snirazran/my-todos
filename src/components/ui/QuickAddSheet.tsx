@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { mutate } from 'swr';
 import { Icon } from '@/components/ui/Icon';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import {
   Bell,
   Plus,
@@ -58,6 +58,8 @@ export default function QuickAddSheet({
   const [tags, setTags] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+  const dragControls = useDragControls();
   const [showPremiumLimit, setShowPremiumLimit] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [pickedBacklogTaskId, setPickedBacklogTaskId] = useState<string | null>(null);
@@ -102,6 +104,11 @@ export default function QuickAddSheet({
 
   useEffect(() => {
     setMounted(true);
+    const check = () =>
+      setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
 
   useEffect(() => {
@@ -371,7 +378,18 @@ export default function QuickAddSheet({
                 transition={{
                   type: 'tween',
                   ease: [0.32, 0.72, 0, 1],
-                  duration: 0.32,
+                  duration: 0.4,
+                }}
+                drag={!isDesktop ? 'y' : false}
+                dragControls={dragControls}
+                dragListener={false}
+                dragConstraints={{ top: 0, bottom: 0 }}
+                dragElastic={{ top: 0, bottom: 0.6 }}
+                dragMomentum={false}
+                onDragEnd={(_e, { offset, velocity }) => {
+                  if (offset.y + velocity.y * 0.15 > 130 || velocity.y > 800) {
+                    onOpenChange(false);
+                  }
                 }}
                 style={{
                   contain: 'layout paint style',
@@ -390,19 +408,16 @@ export default function QuickAddSheet({
                   style={{ maxHeight: sheetMaxHeight }}
                   className="pointer-events-auto mx-auto flex w-full max-w-[500px] flex-col pb-[env(safe-area-inset-bottom)]"
                 >
-                  <div className="mb-2 flex shrink-0 justify-end px-3">
-                    <button
-                      type="button"
-                      aria-label="Close"
-                      onClick={() => onOpenChange(false)}
-                      className="grid h-10 w-10 place-items-center rounded-full bg-popover text-foreground shadow-sm ring-1 ring-border/70 transition-colors [@media(hover:hover)]:hover:bg-muted"
-                    >
-                      <X className="h-5 w-5 stroke-[3]" />
-                    </button>
-                  </div>
-
                   <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-4 pb-2 pt-4 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]">
+                  <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-4 pb-2 pt-2 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]">
+                    {!isDesktop && (
+                      <div
+                        onPointerDown={(e) => dragControls.start(e)}
+                        className="-mx-4 -mt-2 mb-1 flex h-6 items-center justify-center touch-none cursor-grab active:cursor-grabbing"
+                      >
+                        <div className="h-1.5 w-10 rounded-full bg-muted-foreground/25" />
+                      </div>
+                    )}
                     <div dir="ltr" className="w-full pt-1">
                       <div className="mb-1 flex shrink-0 items-center gap-2">
                         <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">

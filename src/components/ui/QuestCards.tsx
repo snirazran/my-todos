@@ -31,6 +31,7 @@ import Fly from './fly';
 import Frog from './frog';
 import { GiftRive } from './gift-box/GiftBox';
 import { ItemCard } from './skins/ItemCard';
+import { BaseSheet } from '@/components/ui/BaseSheet';
 
 export type QuestRewardCatalogItem = Pick<
   ItemDef,
@@ -815,61 +816,27 @@ function SwitchFocusConfirm({
   onUpgrade?: () => void;
   onClose: () => void;
 }) {
-  const [mounted, setMounted] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
-  useEffect(() => {
-    setMounted(true);
-    const check = () =>
-      setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
-  }, []);
-  if (!mounted) return null;
-
-  // On desktop the panel is vertically centered, so a 100%-of-its-own-height
-  // slide doesn't clear the viewport. Use a viewport-relative offset there so
-  // it always slides fully off the bottom.
-  const offscreen = isDesktop ? '100vh' : '100%';
-
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            key="switch-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
+  return (
+    <BaseSheet
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      zIndex={1200}
+      className="sm:max-w-[400px]"
+    >
+      {({ bindScroll }) => (
+        <div
+          ref={bindScroll}
+          className="relative overflow-y-auto overscroll-none px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-1 text-card-foreground sm:px-6 sm:pb-6 sm:pt-3"
+        >
+          <button
+            type="button"
             onClick={onClose}
-            className="fixed inset-0 z-[1200] bg-black/55"
-          />
-          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1201] flex justify-center sm:inset-0 sm:items-center sm:p-6">
-            <motion.div
-              key="switch-panel"
-              initial={{ y: offscreen }}
-              animate={{ y: 0 }}
-              exit={{ y: offscreen }}
-              transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
-              drag="y"
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.6 }}
-              onDragEnd={(_, info) => {
-                if (info.offset.y > 120 || info.velocity.y > 600) onClose();
-              }}
-              className="pointer-events-auto relative w-full rounded-t-[28px] border border-border bg-card px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 text-card-foreground shadow-2xl sm:max-w-[400px] sm:rounded-[24px] sm:px-6 sm:pb-6 sm:pt-6"
-            >
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close"
-                className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-muted-foreground/25 sm:hidden" />
-              <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500">
+            aria-label="Close"
+            className="absolute right-4 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <X className="h-4 w-4" />
+          </button>
+          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500">
                 <Repeat className="h-7 w-7" strokeWidth={2.5} />
               </div>
               <h3 className="text-center text-xl font-black text-foreground">
@@ -928,12 +895,9 @@ function SwitchFocusConfirm({
                   </div>
                 )}
               </div>
-            </motion.div>
-          </div>
-        </>
+        </div>
       )}
-    </AnimatePresence>,
-    document.body,
+    </BaseSheet>
   );
 }
 

@@ -12,7 +12,6 @@ import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { cn } from '@/lib/utils';
-import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import type { Task } from '@/hooks/useTaskData';
 
 const FLY_PX = 24;
@@ -86,7 +85,6 @@ export function MissedTasksPopup({
     visuallyDone,
     speedUpTongue,
   } = useFrogTongue({ frogRef, frogBoxRef, flyRefs, scrollContainerRef });
-  const overscrollDrag = useSheetOverscrollDrag();
 
   useEffect(() => {
     if (!show) return;
@@ -243,8 +241,7 @@ export function MissedTasksPopup({
         className="h-[92vh] sm:h-[88vh] sm:max-w-[620px] bg-background"
         zIndex={1070}
       >
-        {({ isDesktop, dragControls, isDragging }) => {
-          overscrollDrag.setContext(dragControls, !isDesktop);
+        {({ isDesktop, dragControls, isDragging, bindScroll }) => {
           return (
           <div ref={sheetRef} className="relative flex h-full flex-col">
             <div
@@ -276,7 +273,7 @@ export function MissedTasksPopup({
             <div
               ref={(el) => {
                 scrollContainerRef.current = el;
-                overscrollDrag.bind(el);
+                bindScroll(el);
               }}
               className="flex-1 min-h-0 overflow-y-auto pb-24 overscroll-none"
               style={{ pointerEvents: cinematic ? 'none' : 'auto' }}

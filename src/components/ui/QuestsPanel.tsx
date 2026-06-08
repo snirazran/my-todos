@@ -1765,10 +1765,11 @@ function LockedPlusPreview({
         onClick={(e) => e.stopPropagation()}
         drag="y"
         dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={{ top: 0, bottom: 0.8 }}
+        dragElastic={{ top: 0, bottom: 0.6 }}
         dragMomentum={false}
         onDragEnd={(_, info) => {
-          if (info.offset.y > 120 || info.velocity.y > 500) onClose();
+          if (info.offset.y + info.velocity.y * 0.15 > 130 || info.velocity.y > 800)
+            onClose();
         }}
         initial={{ y: offscreen }}
         animate={{ y: 0 }}
@@ -1776,7 +1777,7 @@ function LockedPlusPreview({
           y: offscreen,
           transition: { type: 'tween', duration: 0.3, ease: [0.32, 0.72, 0, 1] },
         }}
-        transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+        transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.4 }}
         className="relative w-full rounded-t-3xl bg-background px-5 pb-7 pt-3 shadow-[0_-20px_40px_-10px_rgba(0,0,0,0.35)] md:max-w-md md:rounded-3xl md:px-6 md:pb-7 md:pt-5"
       >
         <div className="mx-auto mb-2 h-1.5 w-12 rounded-full bg-muted-foreground/30 md:hidden" />

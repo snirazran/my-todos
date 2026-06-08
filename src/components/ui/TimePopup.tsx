@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
 import { Bell, X } from 'lucide-react';
+import { BaseSheet } from '@/components/ui/BaseSheet';
 import { TimeSliderColumn } from './quick-add/TimeSliderColumn';
 import {
   HOURS_24,
@@ -72,32 +71,15 @@ export function TimePopup({
     });
   };
 
-  return createPortal(
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            key="time-popup-backdrop"
-            initial={{ opacity: 1 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
-            onClick={onClose}
-            className="fixed inset-0 z-[1500] bg-black/80"
-          />
-          <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1501] flex justify-center sm:bottom-6">
-            <motion.div
-              key="time-popup-sheet"
-              initial={{ y: '120%' }}
-              animate={{ y: 0 }}
-              exit={{ y: '120%' }}
-              transition={{
-                type: 'tween',
-                ease: [0.32, 0.72, 0, 1],
-                duration: 0.32,
-              }}
-              className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-5 shadow-[0_-18px_42px_rgba(15,23,42,0.18)] ring-1 ring-border/70 sm:max-w-[440px] sm:rounded-[28px] sm:pb-6 sm:shadow-2xl"
-            >
+  return (
+    <BaseSheet
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      zIndex={1500}
+      className="bg-background ring-1 ring-border/70 sm:max-w-[440px]"
+    >
+      {() => (
+        <div className="w-full px-5 pb-[calc(env(safe-area-inset-bottom)+22px)] pt-1 sm:pb-6">
               <div className="mx-auto w-full">
                 {/* Header */}
                 <div className="relative mb-5 flex h-8 items-center justify-center">
@@ -199,11 +181,8 @@ export function TimePopup({
                   {busy ? 'Saving...' : 'Save'}
                 </button>
               </div>
-            </motion.div>
-          </div>
-        </>
+        </div>
       )}
-    </AnimatePresence>,
-    document.body,
+    </BaseSheet>
   );
 }

@@ -398,14 +398,14 @@ const SortableTaskItem = React.forwardRef<
           {/* Positioned on Left to be revealed by Right drag */}
           <div className="absolute inset-y-0 left-0 flex items-center pl-4">
             <motion.div
-              className="flex items-center justify-center w-8 h-8"
+              className="flex items-center justify-center w-10 h-10"
               style={{
                 opacity: timerActionOpacity,
                 scale: timerActionScale,
                 filter: timerActionFilter,
               }}
             >
-              <Icon name="clock" className="w-8 h-8" />
+              <Icon name="clock" className="w-10 h-10" />
             </motion.div>
           </div>
 

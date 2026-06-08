@@ -1,10 +1,9 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
 import { Lock, X } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
+import { BaseSheet } from '@/components/ui/BaseSheet';
 import { TagsView } from './quick-add/TagsView';
 import { useTagManager } from './quick-add/useTagManager';
 import { PlusUpgradeModal } from './PlusUpgradeModal';
@@ -151,74 +150,54 @@ export default function TagsPopup({
 
   return (
     <>
-      {createPortal(
-        <AnimatePresence>
-          {open && (
-            <>
-              <motion.div
-                key="tags-popup-backdrop"
-                initial={{ opacity: 1 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0, transition: { duration: 0 } }}
+      <BaseSheet
+        open={open}
+        onOpenChange={(v) => !v && onClose()}
+        zIndex={1500}
+        className="bg-background ring-1 ring-border/70 sm:max-w-[560px] max-h-[92vh]"
+      >
+        {({ bindScroll }) => (
+          <div
+            ref={bindScroll}
+            className="mx-auto w-full overflow-y-auto overscroll-none px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-1 sm:pb-8"
+          >
+            {/* Header */}
+            <div className="relative mb-5 flex h-9 items-center justify-center">
+              <button
+                type="button"
                 onClick={onClose}
-                className="fixed inset-0 z-[1500] bg-black/80"
-              />
-              <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1501] flex justify-center sm:bottom-6">
-                <motion.div
-                  key="tags-popup-sheet"
-                  initial={{ y: '120%' }}
-                  animate={{ y: 0 }}
-                  exit={{ y: '120%' }}
-                  transition={{
-                    type: 'tween',
-                    ease: [0.32, 0.72, 0, 1],
-                    duration: 0.32,
-                  }}
-                  className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+32px)] pt-6 shadow-[0_-20px_45px_rgba(15,23,42,0.22)] ring-1 ring-border/70 sm:max-w-[560px] sm:rounded-[28px] sm:pb-8 sm:shadow-2xl"
-                >
-                  <div className="mx-auto w-full">
-                    {/* Header */}
-                    <div className="relative mb-5 flex h-9 items-center justify-center">
-                      <button
-                        type="button"
-                        onClick={onClose}
-                        className="absolute left-0 grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
-                        aria-label="Close picker"
-                      >
-                        <X className="h-5 w-5 stroke-[3]" />
-                      </button>
-                      <h2 className="text-[18px] font-extrabold text-muted-foreground">
-                        {displayTitle}
-                      </h2>
-                    </div>
+                className="absolute left-0 grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Close picker"
+              >
+                <X className="h-5 w-5 stroke-[3]" />
+              </button>
+              <h2 className="text-[18px] font-extrabold text-muted-foreground">
+                {displayTitle}
+              </h2>
+            </div>
 
-                    {displayDescription && (
-                      <p className="mb-3 text-center text-[13px] font-semibold text-muted-foreground">
-                        {displayDescription}
-                      </p>
-                    )}
+            {displayDescription && (
+              <p className="mb-3 text-center text-[13px] font-semibold text-muted-foreground">
+                {displayDescription}
+              </p>
+            )}
 
-                    <TagsView
-                      tagManager={tagManager}
-                      selectedTagIds={selectedTags}
-                      setSelectedTagIds={setSelectedTags}
-                      onPremiumLimit={() => setShowPremiumLimit(true)}
-                      onDone={handleDone}
-                      tagInputRef={tagInputRef}
-                      maxSelectedTags={maxSelectedTags}
-                      onMaxSelectedTags={() => setShowFocusTagLimit(true)}
-                      onBlockedTagToggle={handleBlockedTagToggle}
-                      doneLabel={isSaving ? 'Saving...' : saveLabel}
-                      suggestedTagName={displaySuggested}
-                    />
-                  </div>
-                </motion.div>
-              </div>
-            </>
-          )}
-        </AnimatePresence>,
-        document.body,
-      )}
+            <TagsView
+              tagManager={tagManager}
+              selectedTagIds={selectedTags}
+              setSelectedTagIds={setSelectedTags}
+              onPremiumLimit={() => setShowPremiumLimit(true)}
+              onDone={handleDone}
+              tagInputRef={tagInputRef}
+              maxSelectedTags={maxSelectedTags}
+              onMaxSelectedTags={() => setShowFocusTagLimit(true)}
+              onBlockedTagToggle={handleBlockedTagToggle}
+              doneLabel={isSaving ? 'Saving...' : saveLabel}
+              suggestedTagName={displaySuggested}
+            />
+          </div>
+        )}
+      </BaseSheet>
 
       <PlusUpgradeModal
         open={showPremiumLimit}
@@ -258,42 +237,26 @@ function FocusTagLimitDialog({
   onClose: () => void;
   onUpgrade: () => void;
 }) {
-  if (!open || typeof document === 'undefined') return null;
-
-  return createPortal(
-    <AnimatePresence>
-      <motion.div
-        key="focus-tag-limit-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-[1600] bg-black/55"
-      />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1601] flex justify-center sm:inset-0 sm:items-center sm:p-6">
-        <motion.div
-          key="focus-tag-limit-panel"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
-          drag="y"
-          dragConstraints={{ top: 0, bottom: 0 }}
-          dragElastic={{ top: 0, bottom: 0.6 }}
-          onDragEnd={(_, info) => {
-            if (info.offset.y > 120 || info.velocity.y > 600) onClose();
-          }}
-          className="pointer-events-auto relative max-h-[calc(100dvh-1rem)] w-full overflow-y-auto rounded-t-[28px] border border-border bg-card px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 text-card-foreground shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:max-w-[400px] sm:rounded-[24px] sm:px-6 sm:pb-6 sm:pt-6"
+  return (
+    <BaseSheet
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      zIndex={1600}
+      className="sm:max-w-[400px] max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-3rem)]"
+    >
+      {({ bindScroll }) => (
+        <div
+          ref={bindScroll}
+          className="relative overflow-y-auto overscroll-none px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-1 text-card-foreground sm:px-6 sm:pb-6 sm:pt-3"
         >
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            className="absolute right-4 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
-          <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-muted-foreground/25 sm:hidden" />
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500">
             <Lock className="h-7 w-7" strokeWidth={2.5} />
           </div>
@@ -337,10 +300,9 @@ function FocusTagLimitDialog({
               </span>
             </button>
           </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>,
-    document.body,
+        </div>
+      )}
+    </BaseSheet>
   );
 }
 
@@ -357,42 +319,28 @@ function SwitchTagFocusDialog({
   onClose: () => void;
   onConfirm: () => void;
 }) {
-  if (!open || !tag || typeof document === 'undefined') return null;
+  if (!tag) return null;
 
-  return createPortal(
-    <AnimatePresence>
-      <motion.div
-        key="switch-tag-backdrop"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-[1610] bg-black/55"
-      />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1611] flex justify-center sm:inset-0 sm:items-center sm:p-6">
-        <motion.div
-          key="switch-tag-panel"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
-          drag="y"
-          dragConstraints={{ top: 0, bottom: 0 }}
-          dragElastic={{ top: 0, bottom: 0.6 }}
-          onDragEnd={(_, info) => {
-            if (info.offset.y > 120 || info.velocity.y > 600) onClose();
-          }}
-          className="pointer-events-auto relative max-h-[calc(100dvh-1rem)] w-full overflow-y-auto rounded-t-[28px] border border-border bg-card px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3 text-card-foreground shadow-2xl sm:max-h-[calc(100dvh-3rem)] sm:max-w-[400px] sm:rounded-[24px] sm:px-6 sm:pb-6 sm:pt-6"
+  return (
+    <BaseSheet
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      zIndex={1610}
+      className="sm:max-w-[400px] max-h-[calc(100dvh-1rem)] sm:max-h-[calc(100dvh-3rem)]"
+    >
+      {({ bindScroll }) => (
+        <div
+          ref={bindScroll}
+          className="relative overflow-y-auto overscroll-none px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-1 text-card-foreground sm:px-6 sm:pb-6 sm:pt-3"
         >
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            className="absolute right-4 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <X className="h-4 w-4" />
           </button>
-          <div className="mx-auto mb-4 h-1.5 w-10 rounded-full bg-muted-foreground/25 sm:hidden" />
           <div
             className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-sm"
             style={{ backgroundColor: tag.color }}
@@ -426,9 +374,8 @@ function SwitchTagFocusDialog({
               Switch
             </button>
           </div>
-        </motion.div>
-      </div>
-    </AnimatePresence>,
-    document.body,
+        </div>
+      )}
+    </BaseSheet>
   );
 }

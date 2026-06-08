@@ -15,7 +15,6 @@ import confetti from 'canvas-confetti';
 import { motion, type DragControls } from 'framer-motion';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { BaseSheet } from '@/components/ui/BaseSheet';
-import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
 import { TradePanel } from './TradePanel';
@@ -52,7 +51,7 @@ export function WardrobePanel({
       className="h-[90vh] sm:h-[90vh] sm:max-w-[95vw] lg:max-w-[1200px] select-none bg-background"
       zIndex={1100}
     >
-      {({ isDesktop, dragControls, isDragging }) => (
+      {({ isDesktop, dragControls, isDragging, bindScroll }) => (
         <WardrobeManagerContent
           open={open}
           defaultTab={defaultTab}
@@ -61,6 +60,7 @@ export function WardrobePanel({
           isDesktop={isDesktop}
           isDragging={isDragging}
           dragControls={dragControls}
+          bindScroll={bindScroll}
         />
       )}
     </BaseSheet>
@@ -96,6 +96,7 @@ function WardrobeManagerContent({
   isDesktop,
   isDragging,
   dragControls,
+  bindScroll,
 }: {
   open: boolean;
   onClose: () => void;
@@ -104,6 +105,7 @@ function WardrobeManagerContent({
   isDesktop: boolean;
   isDragging: boolean;
   dragControls?: DragControls;
+  bindScroll?: (el: HTMLElement | null) => void;
 }) {
   const { user } = useAuth();
   const {
@@ -142,14 +144,8 @@ function WardrobeManagerContent({
   // --- Sell Dialog Logic ---
   const [itemToSell, setItemToSell] = useState<ItemDef | null>(null);
 
-  const overscrollDrag = useSheetOverscrollDrag();
   const inventoryScrollRef = React.useRef<HTMLDivElement | null>(null);
   const shopScrollRef = React.useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    if (!dragControls) return;
-    overscrollDrag.setContext(dragControls, !embedded && !isDesktop);
-  }, [dragControls, embedded, isDesktop, overscrollDrag]);
 
   const unseenInventorySet = useMemo(
     () => new Set(data?.wardrobe?.unseenItems ?? []),
@@ -695,7 +691,7 @@ function WardrobeManagerContent({
               value="inventory"
               ref={(node) => {
                 inventoryScrollRef.current = node;
-                overscrollDrag.bind(node);
+                bindScroll?.(node);
               }}
               onScroll={(event) => {
                 setInventoryHasScrolled(true);
@@ -786,7 +782,7 @@ function WardrobeManagerContent({
               value="shop"
               ref={(node) => {
                 shopScrollRef.current = node;
-                overscrollDrag.bind(node);
+                bindScroll?.(node);
               }}
               onScroll={(event) => {
                 setShopHasScrolled(true);

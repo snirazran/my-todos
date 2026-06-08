@@ -2,7 +2,7 @@
 
 import { X, EyeOff, Trash2, Repeat } from 'lucide-react';
 import React from 'react';
-import { createPortal } from 'react-dom';
+import { BaseSheet } from '@/components/ui/BaseSheet';
 
 type Variant = 'regular' | 'weekly' | 'backlog';
 
@@ -27,7 +27,6 @@ export function DeleteDialog({
   onDeleteToday,
   onDeleteAll,
 }: Props) {
-  if (!open) return null;
   if (typeof document === 'undefined') return null;
 
   const title =
@@ -52,27 +51,16 @@ export function DeleteDialog({
     'What would you like to do?'
   );
 
-  const dialogContent = (
-    <div
-      className="fixed inset-0 z-[10001] flex items-end sm:items-center justify-center bg-slate-950/70 backdrop-blur-sm px-4 pb-6 sm:pb-0"
-      role="dialog"
-      aria-modal="true"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
-      onPointerDown={(e) => {
-        if (e.target === e.currentTarget) onClose();
-      }}
+  return (
+    <BaseSheet
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      zIndex={10000}
+      backdropClassName="bg-slate-950/70 backdrop-blur-sm"
+      className="bg-white/95 dark:bg-slate-900/90 sm:max-w-[440px]"
     >
-      <div
-        className="w-[440px] max-w-full rounded-2xl bg-white/95 dark:bg-slate-900/90 p-5 shadow-[0_24px_60px_rgba(15,23,42,0.22)] border border-slate-200/80 dark:border-slate-800/70 backdrop-blur-xl"
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-        onPointerDown={(e) => e.stopPropagation()}
-      >
+      {() => (
+      <div className="px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-1 sm:pb-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300">
             <Trash2 className="w-[18px] h-[18px]" />
@@ -134,8 +122,7 @@ export function DeleteDialog({
           </button>
         </div>
       </div>
-    </div>
+      )}
+    </BaseSheet>
   );
-
-  return createPortal(dialogContent, document.body);
 }

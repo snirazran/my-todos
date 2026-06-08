@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { Icon as AppIcon, type IconName } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
-import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import Fly from '@/components/ui/fly';
 import type { Task } from './helpers';
 
@@ -53,7 +52,6 @@ export default function TaskActionSheet({
   onDoLater?: () => void;
   onDelete?: () => void;
 }) {
-  const overscrollDrag = useSheetOverscrollDrag();
   // Keep the last task around so the slide-down exit animation can still
   // render content after the parent clears `task` on close.
   const lastTaskRef = useRef<Task | null>(task);
@@ -115,17 +113,11 @@ export default function TaskActionSheet({
       onOpenChange={onOpenChange}
       className="sm:max-w-md max-h-[92vh]"
       zIndex={1400}
-      mobileTransition={{
-        type: 'tween',
-        ease: [0.32, 0.72, 0, 1],
-        duration: 0.32,
-      }}
     >
-      {({ isDesktop, dragControls }) => {
-        overscrollDrag.setContext(dragControls, !isDesktop);
+      {({ isDesktop, bindScroll }) => {
         return (
         <div
-          ref={overscrollDrag.bind}
+          ref={bindScroll}
           className="flex flex-1 min-h-0 flex-col overflow-y-auto overscroll-none"
         >
           {/* Identity */}

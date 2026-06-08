@@ -1,9 +1,8 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import { Check, X } from 'lucide-react';
+import { BaseSheet } from '@/components/ui/BaseSheet';
 import type {
   FocusCategoryTagMap,
   MacroCategoryDefinition,
@@ -34,26 +33,15 @@ export function QuestOnboardingPopup({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isDesktop, setIsDesktop] = useState(false);
-  const dragControls = useDragControls();
 
   useEffect(() => {
     setMounted(true);
-    const check = () =>
-      setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
-    check();
-    window.addEventListener('resize', check);
-    return () => window.removeEventListener('resize', check);
   }, []);
 
   useEffect(() => {
     if (!show) return;
     setSelectedCategoryIds(initialSelectedCategoryIds);
     setError(null);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [initialSelectedCategoryIds, show]);
 
   const toggleCategory = (categoryId: MacroCategoryId) => {
@@ -97,51 +85,23 @@ export function QuestOnboardingPopup({
     }
   };
 
-  if (!mounted || !show) return null;
+  if (!mounted) return null;
 
   const count = selectedCategoryIds.length;
 
-  return createPortal(
-    <AnimatePresence>
-      <>
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 z-[1200] bg-black/70 backdrop-blur-sm"
-        />
-        <div className="fixed inset-0 z-[1201] flex items-end justify-center p-0 sm:items-center sm:p-6">
-          <motion.div
-            initial={isDesktop ? { opacity: 0, y: 20, scale: 0.98 } : { y: '100%' }}
-            animate={isDesktop ? { opacity: 1, y: 0, scale: 1 } : { y: 0 }}
-            exit={isDesktop ? { opacity: 0, y: 16, scale: 0.98 } : { y: '100%' }}
-            transition={{ type: 'spring', stiffness: 260, damping: 26 }}
-            onClick={(event) => event.stopPropagation()}
-            drag={!isDesktop ? 'y' : false}
-            dragControls={dragControls}
-            dragListener={false}
-            dragElastic={{ top: 0, bottom: 0.45 }}
-            dragMomentum={false}
-            dragSnapToOrigin
-            onDragEnd={(_event, { offset, velocity }) => {
-              if (!isDesktop && (offset.y > 120 || velocity.y > 650)) onClose();
-            }}
-            className="relative flex h-[90vh] w-full flex-col overflow-hidden rounded-t-[32px] border border-border/60 bg-popover text-card-foreground shadow-[0_-8px_40px_rgba(15,23,42,0.18)] sm:h-auto sm:max-h-[85vh] sm:max-w-3xl sm:rounded-[32px] sm:shadow-[0_24px_70px_rgba(15,23,42,0.22)]"
-          >
-            {!isDesktop && (
-              <div
-                className="absolute inset-x-0 top-0 z-20 h-9"
-                onPointerDown={(event) => dragControls.start(event)}
-              />
-            )}
-            {!isDesktop && (
-              <div className="absolute left-1/2 top-3 z-20 h-1.5 w-12 -translate-x-1/2 rounded-full bg-foreground/15" />
-            )}
-
+  return (
+    <BaseSheet
+      open={show}
+      onOpenChange={(v) => !v && onClose()}
+      zIndex={1200}
+      backdropClassName="backdrop-blur-sm"
+      className="h-[90vh] bg-popover sm:h-auto sm:max-h-[85vh] sm:max-w-3xl"
+    >
+      {({ isDesktop, dragControls, bindScroll }) => (
+        <>
             {/* Header (doubles as the drag handle on mobile) */}
             <div
-              className="flex shrink-0 items-start justify-between gap-4 px-6 pb-4 pt-8 sm:px-8 sm:pt-7"
+              className="flex shrink-0 items-start justify-between gap-4 px-6 pb-4 pt-2 sm:px-8 sm:pt-7"
               style={!isDesktop ? { touchAction: 'none' } : undefined}
               onPointerDown={(event) => {
                 if (!isDesktop) dragControls.start(event);
@@ -168,7 +128,10 @@ export function QuestOnboardingPopup({
             </div>
 
             {/* Categories */}
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-6 pt-2 sm:px-8">
+            <div
+              ref={bindScroll}
+              className="min-h-0 flex-1 overflow-y-auto overscroll-none px-6 pb-6 pt-2 sm:px-8"
+            >
               <div className="grid grid-cols-2 gap-3.5 sm:gap-4 lg:grid-cols-3">
                 {categories.map((category) => {
                   const selected = selectedCategoryIds.includes(category.id);
@@ -269,10 +232,8 @@ export function QuestOnboardingPopup({
                 </div>
               </div>
             </div>
-          </motion.div>
-        </div>
-      </>
-    </AnimatePresence>,
-    document.body,
+        </>
+      )}
+    </BaseSheet>
   );
 }

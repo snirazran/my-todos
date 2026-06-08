@@ -1,8 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { BaseSheet } from '@/components/ui/BaseSheet';
 import {
   CalendarCheck,
   Check,
@@ -188,33 +187,17 @@ export function PickerSheet(props: Props) {
 
   return (
     <>
-      <AnimatePresence>
-        {activePicker && (
-          <motion.div
-            key="picker-backdrop"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18, ease: 'easeOut' }}
-            onClick={() => setActivePicker(null)}
-            className="fixed inset-0 z-[1500] bg-black/80"
-          />
-        )}
-      </AnimatePresence>
-      <div
-        className="pointer-events-none fixed inset-x-0 bottom-0 z-[1501] flex items-end justify-center sm:pb-6"
+      <BaseSheet
+        open={!!activePicker}
+        onOpenChange={(v) => !v && setActivePicker(null)}
+        zIndex={1500}
+        className="bg-background ring-1 ring-border/70 sm:mx-4 sm:max-w-[560px] max-h-[90vh]"
       >
-      <AnimatePresence>
-        {activePicker && displayPicker && (
-          <motion.div
-            key="picker-sheet"
-            initial={{ y: '150vh' }}
-            animate={{ y: 0 }}
-            exit={{ y: '150vh' }}
-            transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.32 }}
-            className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-6 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70 sm:mx-4 sm:max-w-[560px] sm:rounded-[28px] sm:pb-8"
-          >
-        <div className="mx-auto w-full">
+        {({ bindScroll }) => (
+        <div
+          ref={bindScroll}
+          className="mx-auto w-full overflow-y-auto overscroll-none px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-8"
+        >
           <div className="relative mb-7 flex h-9 items-center justify-center">
             <button
               type="button"
@@ -270,36 +253,28 @@ export function PickerSheet(props: Props) {
             />
           )}
         </div>
-          </motion.div>
         )}
-      </AnimatePresence>
-      </div>
+      </BaseSheet>
 
-      <AnimatePresence>
-        {activePicker === 'date' && showCalendarPicker && (
-          <CalendarOverlay
-            calendarMonthLabel={calendarMonthLabel}
-            calendarCells={calendarCells}
-            shiftCalendarMonth={shiftCalendarMonth}
-            todayKey={todayKey}
-            selectedDateKey={selectedDateKey}
-            selectCalendarDate={selectCalendarDate}
-            onClose={() => setShowCalendarPicker(false)}
-          />
-        )}
-      </AnimatePresence>
+      <CalendarOverlay
+        open={activePicker === 'date' && showCalendarPicker}
+        calendarMonthLabel={calendarMonthLabel}
+        calendarCells={calendarCells}
+        shiftCalendarMonth={shiftCalendarMonth}
+        todayKey={todayKey}
+        selectedDateKey={selectedDateKey}
+        selectCalendarDate={selectCalendarDate}
+        onClose={() => setShowCalendarPicker(false)}
+      />
 
-      <AnimatePresence>
-        {showReminderPicker && (
-          <ReminderOverlay
-            reminderHour24={reminderHour24}
-            reminderMinute={reminderMinute}
-            setReminderTimeParts={setReminderTimeParts}
-            saveReminderTime={saveReminderTime}
-            onClose={cancelReminderPicker}
-          />
-        )}
-      </AnimatePresence>
+      <ReminderOverlay
+        open={showReminderPicker}
+        reminderHour24={reminderHour24}
+        reminderMinute={reminderMinute}
+        setReminderTimeParts={setReminderTimeParts}
+        saveReminderTime={saveReminderTime}
+        onClose={cancelReminderPicker}
+      />
     </>
   );
 }
@@ -423,6 +398,7 @@ function RepeatView({
 /* ─── Calendar overlay ──────────────────────────────────────────────────── */
 
 function CalendarOverlay({
+  open,
   calendarMonthLabel,
   calendarCells,
   shiftCalendarMonth,
@@ -431,6 +407,7 @@ function CalendarOverlay({
   selectCalendarDate,
   onClose,
 }: {
+  open: boolean;
   calendarMonthLabel: string;
   calendarCells: Array<Date | null>;
   shiftCalendarMonth: (delta: number) => void;
@@ -440,24 +417,14 @@ function CalendarOverlay({
   onClose: () => void;
 }) {
   return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-[1502] bg-black/70"
-      />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1503] flex items-end justify-center sm:pb-6">
-      <motion.div
-        dir="ltr"
-        initial={{ y: '150vh' }}
-        animate={{ y: 0 }}
-        exit={{ y: '150vh' }}
-        transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.28 }}
-        className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70 sm:mx-4 sm:max-w-[520px] sm:rounded-[28px] sm:pb-6"
-      >
-        <div className="mx-auto w-full">
+    <BaseSheet
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      zIndex={1502}
+      className="bg-background ring-1 ring-border/70 sm:mx-4 sm:max-w-[520px]"
+    >
+      {() => (
+        <div dir="ltr" className="mx-auto w-full px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-[17px] font-extrabold text-foreground">
               {calendarMonthLabel}
@@ -522,21 +489,22 @@ function CalendarOverlay({
             })}
           </div>
         </div>
-      </motion.div>
-      </div>
-    </>
+      )}
+    </BaseSheet>
   );
 }
 
 /* ─── Reminder time overlay ─────────────────────────────────────────────── */
 
 function ReminderOverlay({
+  open,
   reminderHour24,
   reminderMinute,
   setReminderTimeParts,
   saveReminderTime,
   onClose,
 }: {
+  open: boolean;
   reminderHour24: number;
   reminderMinute: number;
   setReminderTimeParts: (h: number, m: number) => void;
@@ -544,24 +512,14 @@ function ReminderOverlay({
   onClose: () => void;
 }) {
   return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 z-[1504] bg-black/70"
-      />
-      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1505] flex items-end justify-center sm:pb-6">
-      <motion.div
-        dir="ltr"
-        initial={{ y: '150vh' }}
-        animate={{ y: 0 }}
-        exit={{ y: '150vh' }}
-        transition={{ type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.28 }}
-        className="pointer-events-auto w-full rounded-t-[28px] bg-background px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-5 shadow-[0_20px_45px_rgba(15,23,42,0.32)] ring-1 ring-border/70 sm:mx-4 sm:max-w-[440px] sm:rounded-[28px] sm:pb-6"
-      >
-        <div className="mx-auto w-full">
+    <BaseSheet
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      zIndex={1504}
+      className="bg-background ring-1 ring-border/70 sm:mx-4 sm:max-w-[440px]"
+    >
+      {() => (
+        <div dir="ltr" className="mx-auto w-full px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6">
           <div className="relative mb-5 flex h-8 items-center justify-center">
             <button
               type="button"
@@ -611,8 +569,7 @@ function ReminderOverlay({
             Save
           </button>
         </div>
-      </motion.div>
-      </div>
-    </>
+      )}
+    </BaseSheet>
   );
 }

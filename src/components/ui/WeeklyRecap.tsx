@@ -20,7 +20,6 @@ import {
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import { BaseSheet } from '@/components/ui/BaseSheet';
-import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import { cn } from '@/lib/utils';
 import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
 import type { RecapInsightsResponse } from '@/app/api/weekly-recap/insights/route';
@@ -151,7 +150,6 @@ export default function WeeklyRecap({
   const [aiLoading, setAiLoading] = useState(false);
   const [open, setOpen] = useState(true);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-  const overscrollDrag = useSheetOverscrollDrag();
   const hasFetched = useRef(false);
 
   const rating = getWeekRating(data.completionRate);
@@ -192,11 +190,10 @@ export default function WeeklyRecap({
 
   return (
     <BaseSheet open={open} onOpenChange={handleClose} className="max-h-[92vh] sm:max-w-lg" zIndex={1080}>
-      {({ isDesktop, dragControls, isDragging }) => {
-        overscrollDrag.setContext(dragControls, !isDesktop);
+      {({ isDesktop, dragControls, isDragging, bindScroll }) => {
         return (
           <div
-            ref={(el) => { scrollRef.current = el; overscrollDrag.bind(el); }}
+            ref={(el) => { scrollRef.current = el; bindScroll(el); }}
             className="overflow-y-auto overscroll-contain px-5 pb-10"
           >
             {/* ── Close button ── */}

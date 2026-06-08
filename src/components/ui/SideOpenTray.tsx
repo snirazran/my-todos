@@ -125,13 +125,14 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
               dragElastic={{ top: 0, bottom: 0.6 }}
               dragMomentum={false}
               onDragEnd={(e, { offset, velocity }) => {
-                if (offset.y > 120 || velocity.y > 400) {
+                // Velocity-projected dismiss — matches BaseSheet feel.
+                if (offset.y + velocity.y * 0.15 > 130 || velocity.y > 800) {
                   onClose();
                 }
               }}
               transition={isDesktop
                 ? { type: 'tween', duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }
-                : { type: 'tween', duration: 0.15, ease: [0.25, 0.1, 0.25, 1] }
+                : { type: 'tween', duration: 0.4, ease: [0.32, 0.72, 0, 1] }
               }
               className={cn(
                 "fixed z-[90] flex flex-col bg-card border-r border-border/50 shadow-2xl overflow-hidden",

@@ -13,12 +13,13 @@ import {
   Minus,
   Square,
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import {
   useFrogodoroStore,
   PomodoroPhase,
   DEFAULT_SETTINGS,
 } from '@/lib/frogodoroStore';
+import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import { playTimerSound, unlockAudio, type TimerSound } from '@/lib/timerSounds';
 
 interface Task {
@@ -50,8 +51,11 @@ export default function FrogodoroSheet({
   onMutateToday,
 }: Props) {
   const [mounted, setMounted] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const dragControls = useDragControls();
+  const overscroll = useSheetOverscrollDrag();
 
   const {
     settings,
@@ -77,7 +81,16 @@ export default function FrogodoroSheet({
 
   useEffect(() => {
     setMounted(true);
+    const check = () =>
+      setIsDesktop(window.matchMedia('(min-width: 640px)').matches);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
   }, []);
+
+  useEffect(() => {
+    overscroll.setContext(dragControls, open && !isDesktop);
+  }, [overscroll, dragControls, open, isDesktop]);
 
   // Unlock AudioContext on first interaction
   useEffect(() => {
@@ -341,10 +354,31 @@ export default function FrogodoroSheet({
               ease: [0.32, 0.72, 0, 1],
               duration: 0.4,
             }}
+            drag={!isDesktop ? 'y' : false}
+            dragControls={dragControls}
+            dragListener={false}
+            dragConstraints={{ top: 0, bottom: 0 }}
+            dragElastic={{ top: 0, bottom: 0.6 }}
+            dragMomentum={false}
+            onDragEnd={(_e, { offset, velocity }) => {
+              if (offset.y + velocity.y * 0.15 > 130 || velocity.y > 800) {
+                onOpenChange(false);
+              }
+            }}
             className="fixed left-0 right-0 bottom-0 z-[1000] pointer-events-none will-change-transform px-3 pb-4 sm:px-6 sm:pb-6"
           >
             <div className="pointer-events-auto mx-auto w-full max-w-[500px] pb-[env(safe-area-inset-bottom)]">
-              <div className="rounded-[28px] bg-popover/95 backdrop-blur-2xl shadow-[0_24px_48px_rgba(15,23,42,0.25)] overflow-hidden">
+              <div className="relative rounded-[28px] bg-popover/95 backdrop-blur-2xl shadow-[0_24px_48px_rgba(15,23,42,0.25)] overflow-hidden">
+                {/* Drag handle – mobile only. Overlaid so the timer view's
+                    colour reaches the rounded top edge (no white strip). */}
+                {!isDesktop && (
+                  <div
+                    className="absolute inset-x-0 top-0 z-20 flex h-7 items-center justify-center touch-none cursor-grab active:cursor-grabbing"
+                    onPointerDown={(e) => dragControls.start(e)}
+                  >
+                    <div className="h-1.5 w-12 rounded-full bg-white/60" />
+                  </div>
+                )}
 
                 {/* Help Sub-View */}
                 <AnimatePresence mode="wait">
@@ -400,7 +434,8 @@ export default function FrogodoroSheet({
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: 40 }}
                       transition={{ duration: 0.2 }}
-                      className="p-5 max-h-[70vh] overflow-y-auto no-scrollbar"
+                      ref={overscroll.bind}
+                      className="p-5 max-h-[70vh] overflow-y-auto overscroll-none no-scrollbar"
                     >
                       <div className="mb-5 flex items-center justify-between">
                         <h3 className="text-lg font-black text-foreground">Timer Settings</h3>
