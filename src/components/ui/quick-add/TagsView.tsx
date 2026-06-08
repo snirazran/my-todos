@@ -68,6 +68,10 @@ export function TagsView({
 
   const placeholder = 'Add a tag';
 
+  // True while the user is typing a brand-new tag (colour picker auto-opened by
+  // the input's onChange). Drives the bottom button's "Create" label/action.
+  const isCreatingNewTag = showColorPicker && !!tagInput.trim();
+
   const trimmedSuggestion = (suggestedTagName ?? '').trim();
   const suggestionExists = savedTags.some(
     (t) => t.name.toLowerCase() === trimmedSuggestion.toLowerCase(),
@@ -124,8 +128,16 @@ export function TagsView({
               ref={tagInputRef}
               value={tagInput}
               onChange={(e) => {
-                setTagInput(e.target.value);
-                setShowColorPicker(false);
+                const value = e.target.value;
+                setTagInput(value);
+                // As soon as the text is a brand-new tag (no saved tag matches
+                // it), open the colour picker so the bottom button becomes
+                // "Create". Close it again while empty or while it matches.
+                const trimmed = value.trim().toLowerCase();
+                const matchesExisting = savedTags.some((st) =>
+                  st.name.toLowerCase().includes(trimmed),
+                );
+                setShowColorPicker(!!trimmed && !matchesExisting);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -290,11 +302,10 @@ export function TagsView({
       <button
         type="button"
         onClick={async () => {
-          // If the user is mid-creation (color picker open with a name typed),
-          // create + select that tag first, then finish.
-          if (showColorPicker && tagInput.trim()) {
-            const newId = await createAndSaveTag();
-            onDone(newId);
+          // Writing a brand-new tag → the button creates + selects it (with the
+          // chosen colour) and stays open so the user can keep going / press Done.
+          if (isCreatingNewTag) {
+            await createAndSaveTag();
           } else {
             onDone();
           }
@@ -302,10 +313,15 @@ export function TagsView({
         disabled={isCreatingTag}
         className="h-12 w-full rounded-2xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-transform active:scale-[0.985] disabled:opacity-50"
       >
-        {isCreatingTag ? 'Saving...' : doneLabel}
-        {!isCreatingTag && selectedTagIds.length > 0
-          ? ` (${selectedTagIds.length} tag${selectedTagIds.length === 1 ? '' : 's'})`
-          : ''}
+        {isCreatingTag
+          ? 'Saving...'
+          : isCreatingNewTag
+            ? `Create “${tagInput.trim()}”`
+            : `${doneLabel}${
+                selectedTagIds.length > 0
+                  ? ` (${selectedTagIds.length} tag${selectedTagIds.length === 1 ? '' : 's'})`
+                  : ''
+              }`}
       </button>
 
       {portalReady &&
