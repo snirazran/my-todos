@@ -147,6 +147,9 @@ const SortableTaskItem = React.forwardRef<
     const [isDesktop, setIsDesktop] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
     const [swipeBlocked, setSwipeBlocked] = useState(false);
+    // Axis framer locked the swipe to ('x' once a horizontal swipe is committed).
+    // Used to block native vertical scroll for the rest of the gesture.
+    const lockedAxisRef = React.useRef<'x' | 'y' | null>(null);
 
     const bulletContent = React.useMemo(
       () => renderBullet ? renderBullet(task, false, paused) : null,
@@ -162,6 +165,21 @@ const SortableTaskItem = React.forwardRef<
       checkDesktop();
       window.addEventListener('resize', checkDesktop);
       return () => window.removeEventListener('resize', checkDesktop);
+    }, []);
+
+    // Once a horizontal swipe is locked, block the browser's native vertical
+    // scroll for the rest of the gesture. framer's drag='x' sets
+    // touch-action:pan-y, which otherwise lets a vertical move scroll the list
+    // and release the swipe mid-motion (inconsistently). A non-passive
+    // touchmove preventDefault makes it deterministic.
+    useEffect(() => {
+      const el = containerRef.current;
+      if (!el) return;
+      const onTouchMove = (e: TouchEvent) => {
+        if (lockedAxisRef.current === 'x') e.preventDefault();
+      };
+      el.addEventListener('touchmove', onTouchMove, { passive: false });
+      return () => el.removeEventListener('touchmove', onTouchMove);
     }, []);
 
     const {
@@ -289,9 +307,11 @@ const SortableTaskItem = React.forwardRef<
     const handleDragStart = () => {
       isDraggingRef.current = true;
       setIsSwiping(true);
+      lockedAxisRef.current = null;
     };
 
     const handleDragEnd = (_: any, info: PanInfo) => {
+      lockedAxisRef.current = null;
       // Small delay to prevent click triggering immediately after swipe
       setTimeout(() => {
         isDraggingRef.current = false;
@@ -428,6 +448,9 @@ const SortableTaskItem = React.forwardRef<
             drag={isDesktop || isDragging || swipeBlocked ? false : 'x'} // Disable swipe if sorting/dragging
             dragListener={!isDragging && !isDragDisabled} // Also ensure disabled listener logic matches
             dragDirectionLock={true} // Lock direction to prevent accidental diagonal swipes
+            onDirectionLock={(axis) => {
+              lockedAxisRef.current = axis;
+            }}
             dragConstraints={{ left: -70, right: 70 }}
             dragElastic={0}
             dragMomentum={false}
