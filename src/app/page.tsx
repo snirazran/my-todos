@@ -106,6 +106,7 @@ export default function Home() {
     moveTaskToToday,
     deleteTask,
     deleteBacklogTask,
+    deleteTaskSeries,
     reorderTasks,
     editTask,
     scheduleTask,
@@ -114,6 +115,10 @@ export default function Home() {
     pendingToBacklog,
     pendingToToday,
     toggleRepeat,
+    updateTaskDetails,
+    setTaskRepeat,
+    updateTaskTags,
+    duplicateTask,
     tags,
   } = useTaskData();
 
@@ -758,15 +763,15 @@ export default function Home() {
           </div>
 
           <div
-            className="relative z-20 -mx-3 -mt-2 flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-6 md:mx-auto md:-mt-4 md:w-full md:max-w-xl md:px-6 lg:gap-4"
+            className="relative z-20 -mx-3 -mt-2 flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-6 md:mx-auto md:-mt-4 md:w-full md:max-w-2xl md:px-8 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
             <div className="flex flex-col gap-2 w-full">
               <div className="flex items-center justify-between px-2 md:px-0">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 ml-3 cursor-pointer group">
-                    <Icon name="planner" className="w-7 h-7" />
-                    <span className="text-sm font-black tracking-tight lowercase text-foreground">
+                  <div className="flex items-center gap-2 ml-3 cursor-pointer group md:gap-2.5">
+                    <Icon name="planner" className="w-7 h-7 md:w-8 md:h-8" />
+                    <span className="text-sm font-black tracking-tight lowercase text-foreground md:text-base">
                       {openTaskCount}{' '}
                       {openTaskCount === 1 ? 'fly' : 'flies'}{' '}
                       left for today!
@@ -782,7 +787,7 @@ export default function Home() {
                       setIsHeaderMenuOpen(!isHeaderMenuOpen);
                     }}
                     className={cn(
-                      'flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all',
+                      'flex items-center gap-2 px-3 py-1.5 rounded-full text-[11px] font-bold transition-all md:text-[13px] md:px-4 md:py-2',
                       isHeaderMenuOpen ||
                         selectedTags.length > 0 ||
                         showCompleted
@@ -790,7 +795,7 @@ export default function Home() {
                         : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
                     )}
                   >
-                    <Filter className="w-3.5 h-3.5" />
+                    <Filter className="w-3.5 h-3.5 md:w-4 md:h-4" />
                     <span>Filter</span>
                     {(selectedTags.length > 0 || showCompleted) && (
                       <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
@@ -823,11 +828,11 @@ export default function Home() {
                         ref={(el) => {
                           flyRefs.current[task.id] = el;
                         }}
-                        className="flex items-center justify-center w-10 h-10 border rounded-full bg-muted border-muted-foreground/10 shrink-0"
+                        className="flex items-center justify-center w-11 h-11 border rounded-full bg-muted border-muted-foreground/10 shrink-0 md:h-12 md:w-12"
                       >
                         <Fly
                           onClick={() => null}
-                          size={36}
+                          size={40}
                           y={-3}
                           x={0}
                           paused={isPaused}
@@ -851,18 +856,13 @@ export default function Home() {
                     }
                     deleteTask(id);
                   }}
-                  onDeleteFromWeek={async (taskId) => {
+                  onDeleteFromWeek={(taskId) => {
                     if (!user) {
                       router.push('/login');
                       return;
                     }
-                    const dow = new Date().getDay();
-                    await fetch('/api/tasks?view=board', {
-                      method: 'DELETE',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ day: dow, taskId }),
-                    });
-                    deleteTask(taskId);
+                    // Delete the whole repeat series (group or weekly).
+                    deleteTaskSeries(taskId);
                   }}
                   onDoLater={(id) => {
                     if (!user) {
@@ -882,19 +882,19 @@ export default function Home() {
                     }
                     toggleRepeat(id);
                   }}
-                  onEditTask={(id, text) => {
+                  onEditTask={(id, text, scope) => {
                     if (!user) {
                       router.push('/login');
                       return;
                     }
-                    editTask(id, text, false);
+                    editTask(id, text, false, scope);
                   }}
-                  onScheduleTask={(id, data) => {
+                  onScheduleTask={(id, data, scope) => {
                     if (!user) {
                       router.push('/login');
                       return;
                     }
-                    return scheduleTask(id, data);
+                    return scheduleTask(id, data, scope);
                   }}
                   onStartTimer={(t) => {
                     if (!user) {
@@ -903,6 +903,34 @@ export default function Home() {
                     }
                     setTimerTask(t as Task);
                     setShowTimer(true);
+                  }}
+                  onUpdateDetails={(id, details) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    updateTaskDetails(id, details);
+                  }}
+                  onSetRepeat={(id, mode, dayOfWeek) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    setTaskRepeat(id, mode, dayOfWeek);
+                  }}
+                  onUpdateTags={(id, t, scope) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    updateTaskTags(id, t, scope);
+                  }}
+                  onDuplicate={(id, when) => {
+                    if (!user) {
+                      router.push('/login');
+                      return;
+                    }
+                    duplicateTask(id, when);
                   }}
                   isGuest={!user}
                   tags={tags}

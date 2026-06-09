@@ -172,7 +172,7 @@ export default function DayColumn({
       <div
         ref={listRef}
         className={[
-          'flex-1 px-2 pt-2 overflow-y-auto transition-colors rounded-xl',
+          'flex-1 px-1 pt-2 overflow-y-auto transition-colors rounded-xl',
           'no-scrollbar touch-auto overscroll-y-contain',
           'pb-[env(safe-area-inset-bottom)]',
         ].join(' ')}

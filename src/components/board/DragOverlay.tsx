@@ -1,7 +1,7 @@
 'use client';
 import Fly from '@/components/ui/fly';
 import { Icon } from '@/components/ui/Icon';
-import { CalendarDays, Clock, Bell } from 'lucide-react';
+import { CalendarDays, Clock, Bell, EllipsisVertical } from 'lucide-react';
 
 export default function DragOverlay({
   x,
@@ -41,7 +41,7 @@ export default function DragOverlay({
     >
       <div
         className={[
-          'flex items-center gap-2 px-2 py-2 select-none rounded-[14px]',
+          'flex items-center gap-1.5 px-2.5 py-2 select-none rounded-[14px]',
           'bg-card border-2 border-primary/20 shadow-2xl',
         ].join(' ')}
         style={{
@@ -49,10 +49,11 @@ export default function DragOverlay({
           transform: 'rotate(-2deg)',
         }}
       >
-        <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60">
-          <span style={{ transform: 'rotate(2deg)' }}>
-            <Fly size={32} y={-3} />
-          </span>
+        <span
+          aria-hidden
+          className="-ml-0.5 flex shrink-0 items-center justify-center self-stretch text-muted-foreground/30"
+        >
+          <EllipsisVertical className="h-4 w-4" />
         </span>
         <div className="flex-1 min-w-0 flex flex-col">
           {(tags && tags.length > 0 || startTime || reminder) && (
@@ -88,17 +89,15 @@ export default function DragOverlay({
           )}
           <div className="text-sm font-semibold leading-snug text-foreground whitespace-pre-wrap break-words">
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+              <span className="min-w-0 whitespace-pre-wrap break-words">
                 {text}
               </span>
-              <div className="inline-flex items-center gap-1.5 shrink-0">
-                {taskType === 'weekly' && (
-                  <Icon name="repeat" label="Repeating" className="w-5 h-5 flex-shrink-0" />
-                )}
-                {calendarEventId && (
-                  <CalendarDays className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                )}
-              </div>
+              {taskType === 'weekly' && (
+                <Icon name="repeat" label="Repeating" className="w-5 h-5 flex-shrink-0" />
+              )}
+              {calendarEventId && (
+                <CalendarDays className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+              )}
             </div>
           </div>
           {frogodoroSession && ((frogodoroSession.focusTime ?? 0) > 0 || (frogodoroSession.breakTime ?? 0) > 0) && (() => {
@@ -123,6 +122,12 @@ export default function DragOverlay({
             );
           })()}
         </div>
+
+        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center">
+          <span style={{ transform: 'rotate(2deg)' }}>
+            <Fly size={36} y={-3} />
+          </span>
+        </span>
       </div>
     </div>
   );

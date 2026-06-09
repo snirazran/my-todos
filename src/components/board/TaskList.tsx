@@ -4,7 +4,9 @@ import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
-import TaskActionSheet from './TaskActionSheet';
+import TaskDetailSheet from './TaskDetailSheet';
+import { EditScopeDialog } from './EditScopeDialog';
+import type { RepeatMode } from '@/components/ui/quick-add/utils';
 import {
   Task,
   draggableIdFor,
@@ -19,6 +21,8 @@ import TagsPopup from '@/components/ui/TagsPopup';
 import Fly from '@/components/ui/fly';
 import { Plus, LayoutList, ListTodo, Repeat } from 'lucide-react';
 import { TimePopup } from '@/components/ui/TimePopup';
+import { useNotification } from '@/components/providers/NotificationProvider';
+import { useFrogodoroStore } from '@/lib/frogodoroStore';
 
 export default React.memo(function TaskList({
   day,
@@ -38,6 +42,8 @@ export default React.memo(function TaskList({
   onEditTask,
   onDoLater,
   onScheduleTask,
+  onStartTimer,
+  onPatchTask,
   isToday = false,
   filter = 'all',
   selectedTags = [],
@@ -91,6 +97,14 @@ export default React.memo(function TaskList({
     taskId: string,
     data: { startTime: string; endTime: string; reminder: string },
   ) => Promise<void> | void;
+  onStartTimer?: (task: Task) => void;
+  /** Optimistically patch a task (and its group when scope='all') in the planner's local state. */
+  onPatchTask?: (
+    taskId: string,
+    patch: Partial<Task>,
+    scope?: 'one' | 'all',
+    groupId?: string,
+  ) => void;
   isToday?: boolean;
   filter?: 'all' | 'tasks';
   selectedTags?: string[];
@@ -122,7 +136,161 @@ export default React.memo(function TaskList({
   const [scheduleDialog, setScheduleDialog] = useState<{ task: Task } | null>(
     null,
   );
-  const [actionSheet, setActionSheet] = useState<{ task: Task } | null>(null);
+  // Store only the id so the open sheet always reflects the latest task data
+  // after a board refresh (repeat/tags/notify/name edits update live).
+  const [actionSheetId, setActionSheetId] = useState<string | null>(null);
+  const [pendingScope, setPendingScope] = useState<{
+    run: (scope: 'one' | 'all') => void;
+  } | null>(null);
+
+  const tz =
+    typeof window !== 'undefined'
+      ? Intl.DateTimeFormat().resolvedOptions().timeZone
+      : 'UTC';
+  const todayYmdStr = () => ymdLocal(new Date());
+
+  // Ask "this / all repeats" before applying when the task is part of a group.
+  const maybeScoped = (
+    isGrouped: boolean,
+    run: (scope: 'one' | 'all') => void,
+  ) => {
+    if (isGrouped) setPendingScope({ run });
+    else run('one');
+  };
+
+  // The live task for the open detail sheet (re-derived as items refresh).
+  const sheetTask = actionSheetId
+    ? items.find((t) => t.id === actionSheetId) ?? null
+    : null;
+
+  // Planner mutations go straight to the API and refresh via the board event.
+  const refresh = () => window.dispatchEvent(new Event('board-refresh'));
+  const { showNotification } = useNotification();
+
+  const groupIdOf = (taskId: string) =>
+    items.find((t) => t.id === taskId)?.repeatGroupId;
+
+  // When completing the task that owns the active focus timer, flush its
+  // unsaved time and stop it (mirrors the home page behaviour).
+  const stopTimerIfActive = (taskId: string) => {
+    const s = useFrogodoroStore.getState();
+    if (s.selectedTaskId !== taskId || !s.timerActive) return;
+    const phaseDuration =
+      s.phase === 'focus'
+        ? s.settings.focusDuration * 60
+        : s.settings.breakDuration * 60;
+    const unsaved = Math.max(0, phaseDuration - s.timeLeft - s.phaseElapsed);
+    if (unsaved > 0) {
+      fetch(`/api/tasks/${taskId}/frogodoro`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session: {
+            date: todayYmdStr(),
+            focusTime: s.phase === 'focus' ? unsaved : 0,
+            breakTime: s.phase === 'break' ? unsaved : 0,
+          },
+          timezone: tz,
+        }),
+      })
+        .then(refresh)
+        .catch(() => {});
+    }
+    s.stopTimer();
+  };
+
+  const toggleComplete = (t: Task) => {
+    const completing = !t.completed;
+    if (completing) stopTimerIfActive(t.id);
+    onPatchTask?.(t.id, { completed: completing });
+    fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: todayYmdStr(),
+        taskId: t.id,
+        completed: completing,
+      }),
+    })
+      .then((r) => r.json().catch(() => ({})))
+      .then((json) => {
+        refresh();
+        if (completing && json?.flyStatus) {
+          if (json.flyStatus.justHitLimit) {
+            showNotification(
+              <div className="flex items-center gap-3 pr-1">
+                <Fly size={28} y={-4} />
+                <span className="font-bold text-red-500">
+                  Daily Target Reached!
+                </span>
+              </div>,
+            );
+          } else if (!json.flyStatus.limitHit) {
+            showNotification(
+              <div className="flex items-center gap-3 pr-2">
+                <Fly size={28} y={-4} />
+                <div className="flex flex-col leading-none">
+                  <span className="font-black text-base">
+                    +1 Fly Collected!
+                  </span>
+                  <span className="text-[10px] text-muted-foreground font-bold mt-0.5 uppercase tracking-wider">
+                    Keep it up!
+                  </span>
+                </div>
+              </div>,
+            );
+          }
+        }
+      })
+      .catch(refresh);
+  };
+
+  const setRepeatDirect = (
+    taskId: string,
+    mode: RepeatMode,
+    dayOfWeek?: number,
+  ) => {
+    onPatchTask?.(taskId, {
+      repeatMode: mode,
+      type: mode === 'none' ? 'regular' : 'weekly',
+    });
+    fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        taskId,
+        date: todayYmdStr(),
+        setRepeat: { mode, dayOfWeek },
+        timezone: tz,
+      }),
+    }).then(refresh);
+  };
+
+  const updateDetails = (
+    taskId: string,
+    details: { notes?: string; checklist?: { id: string; text: string; done: boolean }[] },
+  ) => {
+    onPatchTask?.(taskId, details);
+    fetch('/api/tasks', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ taskId, details, timezone: tz }),
+    }).then(refresh);
+  };
+
+  const duplicate = (taskId: string, when: 'today' | 'tomorrow') => {
+    const d = new Date();
+    if (when === 'tomorrow') d.setDate(d.getDate() + 1);
+    fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        duplicateFrom: taskId,
+        date: ymdLocal(d),
+        timezone: tz,
+      }),
+    }).then(refresh);
+  };
 
   const placeholderAt =
     isDragging && targetDay === day && targetIndex != null ? targetIndex : null;
@@ -195,12 +363,40 @@ export default React.memo(function TaskList({
     }
   };
 
-  const handleTagSave = async (taskId: string, newTags: string[]) => {
+  // Delete the whole repeat series — the linked group (daily/weekdays) or a
+  // lone weekly task across all weeks.
+  const handleDeleteSeries = async () => {
+    if (!dialog || busy) return;
+    setBusy(true);
+    try {
+      await fetch('/api/tasks', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: dialog.task.id,
+          deleteSeries: true,
+          timezone: tz,
+        }),
+      });
+      refresh();
+    } finally {
+      setBusy(false);
+      setDialog(null);
+      setMenu(null);
+    }
+  };
+
+  const handleTagSave = async (
+    taskId: string,
+    newTags: string[],
+    scope: 'one' | 'all' = 'one',
+  ) => {
+    onPatchTask?.(taskId, { tags: newTags }, scope, groupIdOf(taskId));
     try {
       await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, tags: newTags }),
+        body: JSON.stringify({ taskId, tags: newTags, scope }),
       });
 
       window.dispatchEvent(new Event('tags-updated'));
@@ -222,7 +418,7 @@ export default React.memo(function TaskList({
   const renderPlaceholder = (k: string) => (
     <div
       key={k}
-      className="h-10 my-1.5 border-2 border-dashed rounded-[14px] border-primary/50 bg-primary/10"
+      className="h-[56px] mb-1.5 border-2 border-dashed rounded-[14px] border-primary/50 bg-primary/10"
     />
   );
 
@@ -365,7 +561,8 @@ export default React.memo(function TaskList({
             userTags={userTags}
             isAnyDragging={isAnyDragging}
             compact
-            onTap={() => setActionSheet({ task: t })}
+            onTap={() => setActionSheetId(t.id)}
+            onToggleComplete={!isFuture ? () => toggleComplete(t) : undefined}
             disableDrag={disableDrag}
           />
         </div>,
@@ -443,44 +640,79 @@ export default React.memo(function TaskList({
         taskId={tagPopup.taskId}
         initialTags={items.find((t) => t.id === tagPopup.taskId)?.tags}
         onClose={() => setTagPopup({ open: false, taskId: null })}
-        onSave={handleTagSave}
+        onSave={(taskId, newTags) => {
+          const t = items.find((x) => x.id === taskId);
+          maybeScoped(!!t?.repeatGroupId, (scope) =>
+            handleTagSave(taskId, newTags, scope),
+          );
+        }}
       />
 
-      {onScheduleTask && (
-        <TimePopup
-          open={!!scheduleDialog}
-          taskName={scheduleDialog?.task.text ?? ''}
-          initialStartTime={scheduleDialog?.task.startTime || ''}
-          initialReminder={scheduleDialog?.task.reminder || ''}
-          onClose={() => setScheduleDialog(null)}
-          onSave={async (data) => {
-            if (!scheduleDialog) return;
-            await onScheduleTask(scheduleDialog.task.id, data);
-            setScheduleDialog(null);
-          }}
-        />
-      )}
+      <TimePopup
+        open={!!scheduleDialog}
+        taskName={scheduleDialog?.task.text ?? ''}
+        initialStartTime={scheduleDialog?.task.startTime || ''}
+        initialReminder={scheduleDialog?.task.reminder || ''}
+        onClose={() => setScheduleDialog(null)}
+        onSave={async (data) => {
+          if (!scheduleDialog) return;
+          const t = scheduleDialog.task;
+          setScheduleDialog(null);
+          maybeScoped(!!t.repeatGroupId, (scope) => {
+            onPatchTask?.(
+              t.id,
+              {
+                startTime: data.startTime || undefined,
+                endTime: data.endTime || undefined,
+                reminder: data.reminder || undefined,
+              },
+              scope,
+              t.repeatGroupId,
+            );
+            fetch('/api/tasks', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                taskId: t.id,
+                schedule: data,
+                scope,
+                timezone: tz,
+              }),
+            }).then(refresh);
+          });
+        }}
+      />
 
-      {onEditTask && (
-        <EditTaskDialog
-          open={dialog?.kind === 'edit'}
-          initialText={dialog?.task.text ?? ''}
-          busy={busy}
-          onClose={() => setDialog(null)}
-          onSave={async (newText) => {
-            if (!dialog) return;
-            setBusy(true);
-            await onEditTask(dialog.day, dialog.task.id, newText);
-            setBusy(false);
-            setDialog(null);
-          }}
-        />
-      )}
+      <EditTaskDialog
+        open={dialog?.kind === 'edit'}
+        initialText={dialog?.task.text ?? ''}
+        busy={busy}
+        onClose={() => setDialog(null)}
+        onSave={async (newText) => {
+          if (!dialog) return;
+          const t = dialog.task;
+          setDialog(null);
+          maybeScoped(!!t.repeatGroupId, (scope) => {
+            onPatchTask?.(t.id, { text: newText }, scope, t.repeatGroupId);
+            fetch('/api/tasks', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                taskId: t.id,
+                text: newText,
+                scope,
+                timezone: tz,
+              }),
+            }).then(refresh);
+          });
+        }}
+      />
 
       <DeleteDialog
         open={!!dialog && dialog.kind !== 'edit'}
         variant={dialogVariant}
         itemLabel={dialog?.task.text}
+        repeatMode={dialog?.task.repeatMode}
         dayLabel={
           dialog && dialog.day < 7
             ? labelForDisplayDay(
@@ -496,73 +728,76 @@ export default React.memo(function TaskList({
         }
         onDeleteAll={
           dialogVariant === 'weekly'
-            ? handleDeleteAll
+            ? handleDeleteSeries
             : dialogVariant === 'backlog'
               ? handleDeleteToday
               : undefined
         }
       />
 
-      <TaskActionSheet
-        open={!!actionSheet}
+      <TaskDetailSheet
+        open={!!sheetTask}
         onOpenChange={(o) => {
-          if (!o) setActionSheet(null);
+          if (!o) setActionSheetId(null);
         }}
-        task={actionSheet?.task ?? null}
-        isCompleted={!!actionSheet?.task.completed}
-        isWeekly={actionSheet?.task.type === 'weekly'}
+        task={(sheetTask ?? null) as any}
+        tags={userTags}
+        isCompleted={!!sheetTask?.completed}
+        isWeekly={sheetTask?.type === 'weekly'}
         onComplete={
-          actionSheet && !isFuture
-            ? () => {
-                // Toggle completion via the same path used by the fly icon (PUT /api/tasks).
-                const t = actionSheet.task;
-                const today = new Date();
-                today.setHours(0, 0, 0, 0);
-                const dateStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
-                fetch('/api/tasks', {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    date: dateStr,
-                    taskId: t.id,
-                    completed: !t.completed,
-                  }),
-                }).then(() => window.dispatchEvent(new Event('board-refresh')));
-              }
+          sheetTask && !isFuture
+            ? () => toggleComplete(sheetTask)
+            : undefined
+        }
+        onStartTimer={
+          sheetTask && isToday && onStartTimer
+            ? () => onStartTimer(sheetTask)
             : undefined
         }
         onEdit={
-          actionSheet && onEditTask
-            ? () => setDialog({ task: actionSheet.task, day, kind: 'edit' })
+          sheetTask
+            ? () => setDialog({ task: sheetTask, day, kind: 'edit' })
             : undefined
         }
         onAddTags={
-          actionSheet
-            ? () => setTagPopup({ open: true, taskId: actionSheet.task.id })
+          sheetTask
+            ? () => setTagPopup({ open: true, taskId: sheetTask.id })
             : undefined
         }
         onSchedule={
-          actionSheet && onScheduleTask
-            ? () => setScheduleDialog({ task: actionSheet.task })
-            : undefined
+          sheetTask ? () => setScheduleDialog({ task: sheetTask }) : undefined
         }
-        onToggleRepeat={
-          actionSheet && onToggleRepeat
-            ? () => onToggleRepeat(actionSheet.task.id, day)
+        onSetRepeat={
+          sheetTask
+            ? (mode, dow) => setRepeatDirect(sheetTask.id, mode, dow)
             : undefined
         }
         onDoLater={
-          actionSheet && onDoLater
-            ? () => onDoLater(day, actionSheet.task.id)
+          sheetTask && onDoLater
+            ? () => onDoLater(day, sheetTask.id)
             : undefined
         }
         onDelete={
-          actionSheet
-            ? () => setDialog({ task: actionSheet.task, day })
+          sheetTask ? () => setDialog({ task: sheetTask, day }) : undefined
+        }
+        onUpdateDetails={
+          sheetTask
+            ? (details) => updateDetails(sheetTask.id, details)
             : undefined
+        }
+        onDuplicate={
+          sheetTask ? (when) => duplicate(sheetTask.id, when) : undefined
         }
       />
 
+      <EditScopeDialog
+        open={!!pendingScope}
+        onClose={() => setPendingScope(null)}
+        onChoose={(scope) => {
+          pendingScope?.run(scope);
+          setPendingScope(null);
+        }}
+      />
     </>
   );
 });

@@ -1,6 +1,6 @@
 // app/layout.tsx
 import type { Metadata, Viewport } from 'next';
-import { Poppins, Luckiest_Guy } from 'next/font/google';
+import { Poppins, Luckiest_Guy, Heebo } from 'next/font/google';
 import './globals.css';
 import Providers from '@/app/providers';
 import SiteHeader from '@/components/ui/siteHeader';
@@ -14,6 +14,9 @@ const poppins = Poppins({
   weight: ['300', '400', '500', '600', '700'],
   display: 'swap',
   variable: '--font-sans', // optional: lets Tailwind use it via font-sans
+  // Drop the metric-adjusted Arial fallback next/font normally appends — Arial
+  // has Hebrew glyphs and would catch Hebrew text before it reaches Heebo.
+  adjustFontFallback: false,
 });
 
 const luckiestGuy = Luckiest_Guy({
@@ -21,6 +24,15 @@ const luckiestGuy = Luckiest_Guy({
   weight: ['400'],
   display: 'swap',
   variable: '--font-display',
+});
+
+// Hebrew default — Poppins has no Hebrew glyphs, so Heebo sits next in the font
+// stack and the browser falls back to it for Hebrew text while Latin stays Poppins.
+const heebo = Heebo({
+  subsets: ['hebrew', 'latin'],
+  weight: ['300', '400', '500', '600', '700'],
+  display: 'swap',
+  variable: '--font-hebrew',
 });
 
 export const viewport: Viewport = {
@@ -61,7 +73,7 @@ export default function RootLayout({
       // script, so the server/client attributes never match. This suppresses the
       // (shallow, one-level) hydration warning for exactly that case.
       suppressHydrationWarning
-      className={`h-full ${poppins.variable} ${luckiestGuy.variable}`}
+      className={`h-full ${poppins.variable} ${luckiestGuy.variable} ${heebo.variable}`}
     >
       <head>
         {/* Preload the default page background so it paints without a flash.
@@ -81,8 +93,7 @@ export default function RootLayout({
       </head>
       <body
         className={[
-          poppins.className,
-          'antialiased h-full bg-background flex flex-col',
+          'font-sans antialiased h-full bg-background flex flex-col',
           // NOTE: no top safe-area padding here — pages draw their backgrounds
           // edge-to-edge under the status bar and add the inset back to their
           // own foreground content (see home/wardrobe/quests/planner tops).

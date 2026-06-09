@@ -13,6 +13,10 @@ export interface TaskDoc {
   completed?: boolean;
   completedDates?: string[]; // YYYY-MM-DD entries where the task was completed
   suppressedDates?: string[]; // YYYY-MM-DD entries hidden for that date
+  notes?: string; // free-text notes shown in the task detail card
+  checklist?: { id: string; text: string; done: boolean }[]; // Trello-like sub-items
+  repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly'; // chosen repeat option
+  repeatGroupId?: string; // links daily/weekdays sibling tasks together
   dayOfWeek?: Weekday;
   date?: string;
   weekStart?: string;
@@ -50,6 +54,19 @@ const TaskSchema = new Schema<TaskDoc>(
     completed: { type: Boolean, default: false },
     completedDates: { type: [String], default: [] },
     suppressedDates: { type: [String], default: [] },
+    notes: { type: String },
+    repeatMode: { type: String, enum: ['none', 'daily', 'weekdays', 'weekly'] },
+    repeatGroupId: { type: String, index: true },
+    checklist: {
+      type: [
+        {
+          id: { type: String, required: true },
+          text: { type: String, default: '' },
+          done: { type: Boolean, default: false },
+        },
+      ],
+      default: undefined,
+    },
     dayOfWeek: { type: Number, min: 0, max: 6 },
     date: { type: String },
     weekStart: { type: String },

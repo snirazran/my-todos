@@ -398,6 +398,60 @@ export async function POST(req: NextRequest) {
   await connectMongo();
   const body = await req.json();
   const tz = body.timezone || 'UTC';
+
+  // Duplicate an existing task onto a target date (used for completed tasks).
+  if (body.duplicateFrom && body.date) {
+    const src = await TaskModel.findOne({
+      userId: uid,
+      id: body.duplicateFrom,
+    }).lean<TaskDoc>();
+    if (!src)
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    const dupDate = String(body.date);
+    const weekday = dowFromYMD(dupDate);
+    const dupNow = new Date();
+    const dupId = uuid();
+    const dupOrder = await nextOrderForDay(uid, weekday as Weekday, dupDate);
+    const created = await TaskModel.create({
+      userId: uid,
+      type: 'regular',
+      id: dupId,
+      text: src.text,
+      order: dupOrder,
+      date: dupDate,
+      completed: false,
+      createdAt: dupNow,
+      updatedAt: dupNow,
+      tags: src.tags ?? [],
+      notes: src.notes,
+      checklist: src.checklist,
+      startTime: src.startTime,
+      endTime: src.endTime,
+      reminder: src.reminder,
+    });
+    void syncGamification(uid, tz);
+    return NextResponse.json({
+      ok: true,
+      id: dupId,
+      tasks: [
+        {
+          id: created.id,
+          text: created.text,
+          order: created.order,
+          completed: false,
+          type: 'regular',
+          tags: created.tags || [],
+          notes: created.notes ?? '',
+          checklist: created.checklist ?? [],
+          date: created.date,
+          startTime: created.startTime,
+          endTime: created.endTime,
+          reminder: created.reminder,
+        },
+      ],
+    });
+  }
+
   const text = String(body?.text ?? '').trim();
   const rawDays: number[] = Array.isArray(body?.days) ? body.days : [];
   const tags: string[] = Array.isArray(body?.tags) ? body.tags.map(String) : [];
@@ -440,6 +494,14 @@ export async function POST(req: NextRequest) {
         { error: 'Repeating tasks target weekdays 0..6' },
         { status: 400 },
       );
+    // Multi-day repeats (daily / weekdays) become a linked group so later
+    // edits/deletes can apply to the whole series.
+    const isMulti = days.length > 1;
+    const repeatGroupId = isMulti ? uuid() : undefined;
+    const isWeekdaysSet =
+      days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d));
+    const repeatMode: 'daily' | 'weekdays' | 'weekly' =
+      days.length === 7 ? 'daily' : isWeekdaysSet ? 'weekdays' : 'weekly';
     for (const d of days) {
       const dayOfWeek: Weekday = d as Weekday;
       const id = uuid();
@@ -457,6 +519,8 @@ export async function POST(req: NextRequest) {
         startTime,
         endTime,
         reminder,
+        repeatMode,
+        repeatGroupId,
       });
       createdIds.push(id);
       createdTasks.push({
@@ -470,6 +534,8 @@ export async function POST(req: NextRequest) {
         startTime: task.startTime,
         endTime: task.endTime,
         reminder: task.reminder,
+        repeatMode,
+        repeatGroupId,
       });
     }
     void syncGamification(uid, tz);
@@ -677,16 +743,147 @@ export async function PUT(req: NextRequest) {
   }
 
   const { date, taskId, completed, tags, toggleType, order, text } = body ?? {};
-  // Handle schedule update (startTime, endTime, reminder) — before general validation
+
+  // Apply a Mongo update to just this task, or to its whole repeat group when
+  // the client asked for scope:'all' (recurring-task "this / all repeats").
+  const scopeApply = async (update: Record<string, unknown>) => {
+    if (body.scope === 'all' && taskId) {
+      const d = await TaskModel.findOne(
+        { userId: uid, id: taskId },
+        { repeatGroupId: 1 },
+      ).lean<{ repeatGroupId?: string }>();
+      if (d?.repeatGroupId) {
+        await TaskModel.updateMany(
+          { userId: uid, repeatGroupId: d.repeatGroupId },
+          update,
+        );
+        return;
+      }
+    }
+    await TaskModel.updateOne({ userId: uid, id: taskId }, update);
+  };
+
+  // Handle schedule update (startTime, endTime, reminder) — before general
+  // validation. Empty values clear the field so the reminder can be removed.
   if (body.schedule !== undefined && taskId) {
+    const set: Record<string, unknown> = {};
+    const unset: Record<string, unknown> = {};
+    const apply = (key: string, value: unknown) => {
+      if (value === undefined) return;
+      if (value) set[key] = value;
+      else unset[key] = 1;
+    };
+    apply('startTime', body.schedule.startTime);
+    apply('endTime', body.schedule.endTime);
+    apply('reminder', body.schedule.reminder);
+
     const update: Record<string, unknown> = {};
-    if (body.schedule.startTime !== undefined) update.startTime = body.schedule.startTime || undefined;
-    if (body.schedule.endTime !== undefined) update.endTime = body.schedule.endTime || undefined;
-    if (body.schedule.reminder !== undefined) update.reminder = body.schedule.reminder || undefined;
-    await TaskModel.updateOne(
-      { userId: uid, id: taskId },
-      { $set: update },
-    );
+    if (Object.keys(set).length) update.$set = set;
+    if (Object.keys(unset).length) update.$unset = unset;
+    if (Object.keys(update).length) await scopeApply(update);
+    await syncGamification(uid, tz);
+    return NextResponse.json({ ok: true });
+  }
+
+  // Handle detail update (notes + checklist) — the Trello-like task card
+  if (body.details !== undefined && taskId) {
+    const update: Record<string, unknown> = {};
+    if (typeof body.details.notes === 'string')
+      update.notes = body.details.notes;
+    if (Array.isArray(body.details.checklist)) {
+      update.checklist = body.details.checklist
+        .filter((it: unknown): it is Record<string, unknown> => !!it && typeof it === 'object')
+        .map((it: Record<string, unknown>) => ({
+          id: String(it.id ?? ''),
+          text: String(it.text ?? ''),
+          done: Boolean(it.done),
+        }));
+    }
+    await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: update });
+    return NextResponse.json({ ok: true });
+  }
+
+  // Handle explicit repeat change from the task detail card, using the same
+  // modes as QuickAdd. daily/weekdays expand into linked sibling weekly tasks
+  // (a repeat group) so a task can appear on multiple days.
+  if (body.setRepeat !== undefined && taskId) {
+    const mode: 'none' | 'daily' | 'weekdays' | 'weekly' =
+      body.setRepeat.mode ?? (body.setRepeat.weekly ? 'weekly' : 'none');
+    const doc = await TaskModel.findOne({
+      userId: uid,
+      id: taskId,
+    }).lean<TaskDoc>();
+    if (!doc)
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+
+    // Drop any sibling tasks created by a previous daily/weekdays choice.
+    if (doc.repeatGroupId) {
+      await TaskModel.deleteMany({
+        userId: uid,
+        repeatGroupId: doc.repeatGroupId,
+        id: { $ne: taskId },
+      });
+    }
+
+    if (mode === 'none') {
+      const targetDate =
+        date ||
+        new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        {
+          $set: { type: 'regular', date: targetDate, completed: false, repeatMode: 'none' },
+          $unset: { dayOfWeek: 1, weekStart: 1, completedDates: 1, repeatGroupId: 1 },
+        },
+      );
+    } else {
+      const requested = Number(body.setRepeat.dayOfWeek);
+      const dow = isWeekday(requested) ? requested : new Date().getDay();
+      const isMulti = mode === 'daily' || mode === 'weekdays';
+      // Weekdays must land on Mon–Fri.
+      const weeklyDay = (mode === 'weekdays' && (dow === 0 || dow === 6) ? 1 : dow) as Weekday;
+      const groupId = isMulti ? doc.repeatGroupId || uuid() : undefined;
+
+      const set: Record<string, unknown> = {
+        type: 'weekly',
+        dayOfWeek: weeklyDay,
+        repeatMode: mode,
+      };
+      const unset: Record<string, unknown> = { date: 1, weekStart: 1, completed: 1 };
+      if (isMulti) set.repeatGroupId = groupId;
+      else unset.repeatGroupId = 1;
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        { $set: set, $unset: unset },
+      );
+
+      if (isMulti) {
+        const allDays = mode === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
+        const { weekDates } = getRollingWeekDatesZoned(tz);
+        const now = new Date();
+        for (const d of allDays.filter((day) => day !== weeklyDay)) {
+          const order = await nextOrderForDay(uid, d as Weekday, weekDates[d]);
+          await TaskModel.create({
+            userId: uid,
+            type: 'weekly',
+            id: uuid(),
+            text: doc.text,
+            order,
+            dayOfWeek: d as Weekday,
+            createdAt: now,
+            updatedAt: now,
+            tags: doc.tags ?? [],
+            notes: doc.notes,
+            checklist: doc.checklist,
+            repeatMode: mode,
+            repeatGroupId: groupId,
+            startTime: doc.startTime,
+            endTime: doc.endTime,
+            reminder: doc.reminder,
+          });
+        }
+      }
+    }
     await syncGamification(uid, tz);
     return NextResponse.json({ ok: true });
   }
@@ -739,16 +936,13 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ ok: true });
   }
   if (Array.isArray(tags)) {
-    await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: { tags } });
+    await scopeApply({ $set: { tags } });
     await syncGamification(uid, tz);
     return NextResponse.json({ ok: true });
   }
   // New: Handle text update
   if (typeof body.text === 'string' && body.text.trim()) {
-    await TaskModel.updateOne(
-      { userId: uid, id: taskId },
-      { $set: { text: body.text } },
-    );
+    await scopeApply({ $set: { text: body.text } });
     await syncGamification(uid, tz);
     return NextResponse.json({ ok: true });
   }
@@ -800,6 +994,36 @@ export async function DELETE(req: NextRequest) {
   await connectMongo();
   const body = await req.json();
   const tz = body.timezone || 'UTC';
+
+  // Delete a whole repeat series: the linked group (daily/weekdays), or a lone
+  // weekly task across all weeks.
+  if (body.deleteSeries && body.taskId) {
+    const doc = await TaskModel.findOne(
+      { userId: uid, id: body.taskId },
+      { repeatGroupId: 1, type: 1 },
+    ).lean<TaskDoc>();
+    if (doc?.repeatGroupId) {
+      await TaskModel.deleteMany({
+        userId: uid,
+        repeatGroupId: doc.repeatGroupId,
+      });
+    } else {
+      await TaskModel.updateOne(
+        { userId: uid, id: body.taskId },
+        { $set: { deletedAt: new Date() } },
+      );
+      const today = getZonedToday(tz);
+      await TaskModel.deleteMany({
+        userId: uid,
+        type: 'regular',
+        id: body.taskId,
+        date: { $gte: today },
+      });
+    }
+    await syncGamification(uid, tz);
+    return NextResponse.json({ ok: true });
+  }
+
   if (body && Object.prototype.hasOwnProperty.call(body, 'day'))
     return handleBoardDelete(uid, body, tz);
   if (body && Object.prototype.hasOwnProperty.call(body, 'dateKey')) {
@@ -896,6 +1120,11 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       type: t.type,
       origin: t.type as Origin,
       tags: t.tags ?? [],
+      notes: t.notes ?? '',
+      checklist: t.checklist ?? [],
+      repeatMode: t.repeatMode,
+      repeatGroupId: t.repeatGroupId,
+      dayOfWeek: t.dayOfWeek,
       completedDates: t.completedDates ?? [],
       frogodoroSettings: t.frogodoroSettings,
       frogodoroSession: t.frogodoroSessions?.find((s) => s.date === date) ?? null,
@@ -941,6 +1170,10 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           type: t.type,
           completed: !!t.completed,
           tags: t.tags ?? [],
+          notes: t.notes ?? '',
+          checklist: t.checklist ?? [],
+          repeatMode: t.repeatMode,
+          repeatGroupId: t.repeatGroupId,
           frogodoroSettings: t.frogodoroSettings,
           calendarEventId: t.calendarEventId,
           startTime: t.startTime,
@@ -1128,6 +1361,11 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         type: doc.type,
         completed: !!doc.completed,
         tags: doc.tags ?? [],
+        notes: doc.notes ?? '',
+        checklist: doc.checklist ?? [],
+        repeatMode: doc.repeatMode,
+        repeatGroupId: doc.repeatGroupId,
+        dayOfWeek: doc.dayOfWeek,
         frogodoroSettings: doc.frogodoroSettings,
         calendarEventId: doc.calendarEventId,
         startTime: doc.startTime,
@@ -1147,6 +1385,11 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         completed:
           (doc.completedDates ?? []).includes(doc.date) || !!doc.completed,
         tags: doc.tags ?? [],
+        notes: doc.notes ?? '',
+        checklist: doc.checklist ?? [],
+        repeatMode: doc.repeatMode,
+        repeatGroupId: doc.repeatGroupId,
+        dayOfWeek: doc.dayOfWeek,
         frogodoroSession:
           doc.frogodoroSessions?.find((s) => s.date === doc.date) ?? null,
         calendarEventId: doc.calendarEventId,
@@ -1168,6 +1411,11 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           type: doc.type,
           completed: (doc.completedDates ?? []).includes(d),
           tags: doc.tags ?? [],
+          notes: doc.notes ?? '',
+          checklist: doc.checklist ?? [],
+          repeatMode: doc.repeatMode,
+          repeatGroupId: doc.repeatGroupId,
+          dayOfWeek: doc.dayOfWeek,
           frogodoroSession:
             doc.frogodoroSessions?.find((s) => s.date === d) ?? null,
           calendarEventId: doc.calendarEventId,

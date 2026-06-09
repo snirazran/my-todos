@@ -8,6 +8,11 @@ export type Task = {
   type?: 'weekly' | 'regular' | 'backlog';
   completed?: boolean;
   tags?: string[];
+  notes?: string;
+  checklist?: { id: string; text: string; done: boolean }[];
+  repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly';
+  repeatGroupId?: string;
+  dayOfWeek?: number;
   completedDates?: string[];
   frogodoroSession?: {
     date: string;

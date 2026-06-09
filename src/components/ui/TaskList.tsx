@@ -56,7 +56,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { AddTaskButton } from '@/components/ui/AddTaskButton';
 import TaskMenu from '../board/TaskMenu';
-import TaskActionSheet from '../board/TaskActionSheet';
+import TaskDetailSheet from '../board/TaskDetailSheet';
+import { EditScopeDialog } from '../board/EditScopeDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
@@ -71,6 +72,11 @@ interface Task {
   origin?: 'regular' | 'weekly' | 'backlog';
   kind?: 'regular' | 'weekly' | 'backlog';
   tags?: string[];
+  notes?: string;
+  checklist?: { id: string; text: string; done: boolean }[];
+  repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly';
+  repeatGroupId?: string;
+  dayOfWeek?: number;
   frogodoroSession?: {
     date: string;
     focusTime: number;
@@ -106,6 +112,7 @@ interface SortableTaskItemProps {
   isGlowActive?: boolean;
   isSortDragging?: boolean;
   onStartTimer?: (task: Task) => void;
+  onOpenDetail?: (task: Task) => void;
   paused?: boolean;
 }
 
@@ -130,6 +137,7 @@ const SortableTaskItem = React.forwardRef<
       isGlowActive,
       isSortDragging,
       onStartTimer,
+      onOpenDetail,
       paused = false,
     },
     ref,
@@ -357,7 +365,9 @@ const SortableTaskItem = React.forwardRef<
         setIsOpen(false);
         return;
       }
-      handleTaskToggle(task);
+      // Clicking the row body opens the detail card; only the fly/circle on the
+      // right toggles completion.
+      onOpenDetail?.(task);
     };
 
     const style = {
@@ -478,8 +488,8 @@ const SortableTaskItem = React.forwardRef<
                 : { type: 'spring', stiffness: 600, damping: 28, mass: 1 }
             }
             className={`
-              relative flex w-full items-start gap-1.5 px-2 py-2
-              transition-colors duration-200 rounded-xl 
+              relative flex w-full items-center gap-1 px-2.5 py-2.5 md:gap-1 md:px-3.5 md:py-3.5
+              transition-colors duration-200 rounded-xl
               bg-card
               border border-border/50 shadow-none
               ${isOpen || isSwiping ? 'bg-card' : 'bg-card'}
@@ -507,70 +517,18 @@ const SortableTaskItem = React.forwardRef<
               />
             )}
 
+            {/* Grab handle (left) — 3-dot drag affordance, hugging the edge */}
             <div
-              className={`relative z-10 flex items-center flex-1 min-w-0 gap-2 pl-1.5 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
+              aria-hidden
+              className={`relative z-10 -ml-1 flex-shrink-0 flex items-center justify-center self-stretch transition-colors cursor-grab active:cursor-grabbing ${isDone ? 'text-muted-foreground/20' : 'text-muted-foreground/30 md:group-hover:text-muted-foreground/50'}`}
             >
-              {/* Bullet */}
-              <div className="relative flex-shrink-0 w-10 h-10">
-                <AnimatePresence initial={false}>
-                  {!isDone ? (
-                    <motion.div
-                      key="fly"
-                      className="absolute inset-0"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.18 }}
-                    >
-                      {bulletContent ? (
-                        bulletContent
-                      ) : (
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (
-                              isExitingLater ||
-                              isSwiping ||
-                              isDraggingRef.current ||
-                              hasActionTriggeredRef.current
-                            )
-                              return;
-                            handleTaskToggle(task, true);
-                          }}
-                          className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 md:hover:text-primary"
-                        >
-                          <Circle className="w-8 h-8" />
-                        </button>
-                      )}
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="check"
-                      className="absolute inset-0"
-                      initial={{ opacity: 0, scale: 0.6 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.6 }}
-                      transition={{
-                        type: 'spring',
-                        stiffness: 400,
-                        damping: 25,
-                      }}
-                    >
-                      <button
-                        className="flex items-center justify-center w-full h-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleTaskToggle(task, false);
-                        }}
-                      >
-                        <CheckCircle2 className="text-green-500 w-8 h-8 drop-shadow-sm" />
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+              <EllipsisVertical className="h-4 w-4 md:h-[18px] md:w-[18px]" />
+            </div>
 
-              <div className="flex-1 min-w-0">
+            {/* Content — clicking the row toggles completion */}
+            <div
+              className={`relative z-10 min-w-0 flex-1 transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
+            >
                 {( (task.tags && task.tags.length > 0) || task.startTime ) && (
                   <div className="flex flex-wrap gap-1 mb-1">
                     <AnimatePresence mode="popLayout">
@@ -578,7 +536,7 @@ const SortableTaskItem = React.forwardRef<
                         <motion.span
                           initial={false}
                           exit={{ opacity: 0, scale: 0 }}
-                          className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal text-primary shadow-sm transition-colors"
+                          className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase md:text-[11px] tracking-normal text-primary shadow-sm transition-colors"
                           key="task-time-tag"
                         >
                           <Clock className="w-2.5 h-2.5 shrink-0" />
@@ -602,7 +560,7 @@ const SortableTaskItem = React.forwardRef<
                             exit={{ opacity: 0, scale: 0 }}
                             transition={{ duration: 0.2 }}
                             key={tagId}
-                            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal shadow-sm transition-colors ${
+                            className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase md:text-[11px] tracking-normal shadow-sm transition-colors ${
                               !color
                                 ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-200 border-indigo-100 dark:border-indigo-800/50'
                                 : ''
@@ -626,7 +584,7 @@ const SortableTaskItem = React.forwardRef<
                 )}
                 <span className="flex flex-wrap items-center gap-1.5">
                   <motion.span
-                    className={`text-sm font-semibold leading-snug break-words transition-colors duration-200 ${
+                    className={`text-[15px] font-semibold leading-snug break-words transition-colors duration-200 md:text-[17px] ${
                       isDone
                         ? 'text-muted-foreground line-through'
                         : 'text-foreground'
@@ -664,40 +622,89 @@ const SortableTaskItem = React.forwardRef<
                     ); })()}
                   </div>
                 )}
-              </div>
             </div>
-            {/* Grab handle area for mobile if needed, or just edge drag */}
 
-            {/* Desktop Hover Menu (Focus timer + 3 Dots) */}
+            {/* Completion indicator (right) — only this toggles completion */}
             <div
-              className={`hidden md:group-hover:flex items-center gap-0.5 absolute right-2 top-1/2 -translate-y-1/2 z-20 transition-opacity ${isDragging ? 'opacity-0' : 'opacity-100'}`}
-            >
-              {onStartTimer && !isDone && (
-                <button
-                  className="p-2 rounded-lg text-muted-foreground hover:text-primary hover:bg-accent/80 transition-colors"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    e.nativeEvent.stopImmediatePropagation();
-                    onStartTimer(task);
-                  }}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  title="Focus timer"
-                >
-                  <Icon name="clock" className="w-7 h-7" />
-                </button>
-              )}
-              <button
-                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
-                onClick={(e) => {
+              role="button"
+              tabIndex={0}
+              aria-label={isDone ? 'Mark not done' : 'Mark done'}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (
+                  isExitingLater ||
+                  isSwiping ||
+                  isDraggingRef.current ||
+                  hasActionTriggeredRef.current
+                )
+                  return;
+                handleTaskToggle(task);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
                   e.stopPropagation();
-                  e.nativeEvent.stopImmediatePropagation();
-                  onMenuOpen(e, task);
-                }}
-                onPointerDown={(e) => e.stopPropagation()}
-                title="Options"
-              >
-                <EllipsisVertical className="w-5 h-5" />
-              </button>
+                  handleTaskToggle(task);
+                }
+              }}
+              className={`relative z-10 flex-shrink-0 w-11 h-11 md:w-12 md:h-12 cursor-pointer transition-opacity duration-200 ${isDone && !isDragging ? 'opacity-60' : 'opacity-100'}`}
+            >
+              <AnimatePresence initial={false}>
+                {!isDone ? (
+                  <motion.div
+                    key="fly"
+                    className="absolute inset-0"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18 }}
+                  >
+                    {bulletContent ? (
+                      bulletContent
+                    ) : (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (
+                            isExitingLater ||
+                            isSwiping ||
+                            isDraggingRef.current ||
+                            hasActionTriggeredRef.current
+                          )
+                            return;
+                          handleTaskToggle(task, true);
+                        }}
+                        className="flex items-center justify-center w-full h-full transition-colors text-muted-foreground/50 md:hover:text-primary"
+                      >
+                        <Circle className="w-9 h-9 md:w-10 md:h-10" />
+                      </button>
+                    )}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="check"
+                    className="absolute inset-0"
+                    initial={{ opacity: 0, scale: 0.6 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.6 }}
+                    transition={{
+                      type: 'spring',
+                      stiffness: 400,
+                      damping: 25,
+                    }}
+                  >
+                    <button
+                      className="flex items-center justify-center w-full h-full"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTaskToggle(task, false);
+                      }}
+                    >
+                      <CheckCircle2 className="text-green-500 w-9 h-9 drop-shadow-sm md:w-10 md:h-10" />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </motion.div>
         </motion.div>
@@ -722,6 +729,10 @@ export default function TaskList({
   onEditTask,
   onScheduleTask,
   onStartTimer,
+  onUpdateDetails,
+  onSetRepeat,
+  onUpdateTags,
+  onDuplicate,
   pendingToToday,
   tags,
   showCompleted,
@@ -750,9 +761,32 @@ export default function TaskList({
   onDoLater?: (taskId: string) => Promise<void> | void;
   onReorder?: (tasks: Task[]) => void;
   onToggleRepeat?: (taskId: string) => Promise<void> | void;
-  onEditTask?: (taskId: string, newText: string) => Promise<void> | void;
-  onScheduleTask?: (taskId: string, data: { startTime: string; endTime: string; reminder: string }) => Promise<void> | void;
+  onEditTask?: (
+    taskId: string,
+    newText: string,
+    scope?: 'one' | 'all',
+  ) => Promise<void> | void;
+  onScheduleTask?: (
+    taskId: string,
+    data: { startTime: string; endTime: string; reminder: string },
+    scope?: 'one' | 'all',
+  ) => Promise<void> | void;
   onStartTimer?: (task: { id: string; text: string; completed: boolean; tags?: string[]; frogodoroSession?: Task['frogodoroSession']; frogodoroSettings?: Record<string, unknown> }) => void;
+  onUpdateDetails?: (
+    taskId: string,
+    details: { notes?: string; checklist?: { id: string; text: string; done: boolean }[] },
+  ) => void;
+  onSetRepeat?: (
+    taskId: string,
+    mode: 'none' | 'daily' | 'weekdays' | 'weekly',
+    dayOfWeek?: number,
+  ) => void;
+  onUpdateTags?: (
+    taskId: string,
+    tags: string[],
+    scope?: 'one' | 'all',
+  ) => void;
+  onDuplicate?: (taskId: string, when: 'today' | 'tomorrow') => void;
   pendingToToday?: number;
   tags?: { id: string; name: string; color: string }[];
   showCompleted: boolean;
@@ -794,6 +828,20 @@ export default function TaskList({
   } | null>(null);
 
   const [actionSheetId, setActionSheetId] = useState<string | null>(null);
+  // When editing a field on a repeating task we ask "this / all repeats" first.
+  const [pendingScope, setPendingScope] = useState<{
+    run: (scope: 'one' | 'all') => void;
+  } | null>(null);
+
+  // Run a scoped edit immediately for a one-off task, or ask first when the
+  // task belongs to a repeat group.
+  const maybeScoped = (
+    isGrouped: boolean,
+    run: (scope: 'one' | 'all') => void,
+  ) => {
+    if (isGrouped) setPendingScope({ run });
+    else run('one');
+  };
   const [scheduleDialog, setScheduleDialog] = useState<{
     task: Task;
   } | null>(null);
@@ -898,12 +946,16 @@ export default function TaskList({
     };
   }, [tasks]); // Added tasks dependency to find task
 
-  const handleTagSave = async (taskId: string, newTags: string[]) => {
+  const handleTagSave = async (
+    taskId: string,
+    newTags: string[],
+    scope: 'one' | 'all' = 'one',
+  ) => {
     try {
       await fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, tags: newTags }),
+        body: JSON.stringify({ taskId, tags: newTags, scope }),
       });
 
       window.dispatchEvent(new Event('tags-updated'));
@@ -1184,7 +1236,7 @@ export default function TaskList({
   };
   return (
     <>
-      <div dir="ltr" className="w-full px-4 pt-0 pb-3 overflow-visible">
+      <div dir="ltr" className="w-full px-1.5 pt-0 pb-3 overflow-visible md:px-4">
         <div className="flex flex-row items-center justify-end mb-2 gap-3 relative">
           {/* Header Menu Removed - Moved to Page */}
         </div>
@@ -1210,10 +1262,10 @@ export default function TaskList({
                   className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group disabled:pointer-events-none"
                   disabled={quickAddOpen}
                 >
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
-                    <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
+                  <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
+                    <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors md:w-6 md:h-6" strokeWidth={2.5} />
                   </div>
-                  <p className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                  <p className="text-[15px] font-semibold text-muted-foreground group-hover:text-foreground transition-colors md:text-[17px]">
                     Add your first task
                   </p>
                 </button>
@@ -1237,10 +1289,10 @@ export default function TaskList({
                   className="w-full flex items-center gap-1.5 px-2 py-2 border border-dashed border-muted-foreground/20 bg-muted/5 hover:bg-muted/10 rounded-xl transition-all cursor-pointer group disabled:pointer-events-none"
                   disabled={quickAddOpen}
                 >
-                  <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
-                    <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
+                  <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
+                    <Plus className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors md:w-6 md:h-6" strokeWidth={2.5} />
                   </div>
-                  <p className="text-sm font-semibold text-muted-foreground group-hover:text-foreground transition-colors">
+                  <p className="text-[15px] font-semibold text-muted-foreground group-hover:text-foreground transition-colors md:text-[17px]">
                     {selectedTags.length > 0
                       ? 'No tasks match your filters'
                       : 'Add another task'}
@@ -1299,6 +1351,7 @@ export default function TaskList({
                                 : undefined
                             }
                             onStartTimer={onStartTimer ? (t) => onStartTimer(t) : undefined}
+                            onOpenDetail={(t) => setActionSheetId(t.id)}
                             paused={paused}
                           />
                         );
@@ -1312,15 +1365,15 @@ export default function TaskList({
                   <button
                     onClick={() => onAddRequested('', null, { preselectToday: true })}
                     disabled={quickAddOpen}
-                    className="group relative flex w-full items-center px-2 py-2 rounded-xl border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-0"
+                    className="group relative flex w-full items-center gap-1 px-2.5 py-2.5 rounded-xl border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-0 md:px-3.5 md:py-3.5"
                   >
-                    <div className="flex items-center flex-1 min-w-0 gap-2 pl-1.5">
-                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-muted border border-muted-foreground/10 shrink-0">
-                        <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors" strokeWidth={2.5} />
-                      </div>
-                      <span className="text-sm font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors">
-                        Add a task
-                      </span>
+                    {/* Spacer matching the task grip column so the label lines up with task text */}
+                    <span aria-hidden className="flex-shrink-0 w-2.5 md:w-3" />
+                    <span className="flex-1 min-w-0 text-left text-[15px] font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors md:text-[17px]">
+                      Add a task
+                    </span>
+                    <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
+                      <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors md:h-6 md:w-6" strokeWidth={2.5} />
                     </div>
                   </button>
                 </div>
@@ -1363,6 +1416,7 @@ export default function TaskList({
                               isGlowActive={false}
                               disableLayout={true}
                               isSortDragging={isAnyDragging}
+                              onOpenDetail={(t) => setActionSheetId(t.id)}
                             />
                           );
                         })}
@@ -1497,7 +1551,14 @@ export default function TaskList({
         taskId={tagPopup.taskId}
         initialTags={tasks.find((t) => t.id === tagPopup.taskId)?.tags}
         onClose={() => setTagPopup({ open: false, taskId: null })}
-        onSave={handleTagSave}
+        onSave={(taskId, newTags) => {
+          const t = tasks.find((x) => x.id === taskId);
+          const save = (scope: 'one' | 'all') =>
+            onUpdateTags
+              ? onUpdateTags(taskId, newTags, scope)
+              : handleTagSave(taskId, newTags, scope);
+          maybeScoped(!!t?.repeatGroupId, save);
+        }}
       />
 
       {(() => {
@@ -1507,7 +1568,7 @@ export default function TaskList({
         const close = () => setActionSheetId(null);
         if (!sheetTask) {
           return (
-            <TaskActionSheet
+            <TaskDetailSheet
               open={false}
               onOpenChange={(o) => !o && close()}
               task={null}
@@ -1521,13 +1582,17 @@ export default function TaskList({
         const isCompletedTask =
           !!sheetTask.completed || vSet.has(sheetTask.id);
         return (
-          <TaskActionSheet
+          <TaskDetailSheet
             open={!!actionSheetId}
             onOpenChange={(o) => !o && close()}
             task={sheetTask as any}
+            tags={userTags}
             isCompleted={isCompletedTask}
             isWeekly={isWeekly}
             onComplete={() => toggle(sheetTask.id)}
+            onStartTimer={
+              onStartTimer ? () => onStartTimer(sheetTask as any) : undefined
+            }
             onEdit={
               onEditTask
                 ? () =>
@@ -1547,9 +1612,10 @@ export default function TaskList({
                 ? () => setScheduleDialog({ task: sheetTask as any })
                 : undefined
             }
-            onToggleRepeat={
-              onToggleRepeat
-                ? () => onToggleRepeat(sheetTask.id)
+            onSetRepeat={
+              onSetRepeat
+                ? (mode, dayOfWeek) =>
+                    onSetRepeat(sheetTask.id, mode, dayOfWeek)
                 : undefined
             }
             onDoLater={
@@ -1570,6 +1636,14 @@ export default function TaskList({
                   | 'backlog',
               })
             }
+            onUpdateDetails={
+              onUpdateDetails
+                ? (details) => onUpdateDetails(sheetTask.id, details)
+                : undefined
+            }
+            onDuplicate={
+              onDuplicate ? (when) => onDuplicate(sheetTask.id, when) : undefined
+            }
           />
         );
       })()}
@@ -1582,10 +1656,11 @@ export default function TaskList({
           onClose={() => setDialog(null)}
           onSave={async (newText) => {
             if (!dialog) return;
-            setBusy(true);
-            await onEditTask(dialog.task.id, newText);
-            setBusy(false);
+            const t = dialog.task;
             setDialog(null);
+            maybeScoped(!!t.repeatGroupId, (scope) =>
+              onEditTask(t.id, newText, scope),
+            );
           }}
         />
       )}
@@ -1600,18 +1675,29 @@ export default function TaskList({
           onClose={() => setScheduleDialog(null)}
           onSave={async (data) => {
             if (!scheduleDialog) return;
-            setBusy(true);
-            await onScheduleTask(scheduleDialog.task.id, data);
-            setBusy(false);
+            const t = scheduleDialog.task;
             setScheduleDialog(null);
+            maybeScoped(!!t.repeatGroupId, (scope) =>
+              onScheduleTask(t.id, data, scope),
+            );
           }}
         />
       )}
+
+      <EditScopeDialog
+        open={!!pendingScope}
+        onClose={() => setPendingScope(null)}
+        onChoose={(scope) => {
+          pendingScope?.run(scope);
+          setPendingScope(null);
+        }}
+      />
 
       <DeleteDialog
         open={!!dialog && dialog.kind !== 'edit'}
         variant={dialogVariant === 'edit' ? 'regular' : dialogVariant}
         itemLabel={dialog?.task.text}
+        repeatMode={dialog?.task.repeatMode}
         busy={busy}
         onClose={() => setDialog(null)}
         onDeleteToday={

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bell, X } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { TimeSliderColumn } from './quick-add/TimeSliderColumn';
@@ -37,23 +37,15 @@ export function TimePopup({
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [startTime, setStartTime] = useState(initialStartTime || DEFAULT_TIME);
-  const [notifyEnabled, setNotifyEnabled] = useState(true);
-
-  // Cache the last good task name so the slide-down exit animation still
-  // shows the right label after the parent clears its state.
-  const lastTaskNameRef = useRef(taskName);
-  useEffect(() => {
-    if (open && taskName) lastTaskNameRef.current = taskName;
-  }, [open, taskName]);
-  const displayTaskName = open ? taskName : lastTaskNameRef.current;
+  // Opening Notify means you want a reminder, so the picker is always ready.
+  const hasExisting = !!initialReminder;
 
   useEffect(() => setMounted(true), []);
 
   useEffect(() => {
     if (!open) return;
     setStartTime(initialStartTime || DEFAULT_TIME);
-    setNotifyEnabled(true);
-  }, [open, initialStartTime, initialReminder]);
+  }, [open, initialStartTime]);
 
   if (!mounted) return null;
 
@@ -64,11 +56,11 @@ export function TimePopup({
   };
 
   const handleSave = async () => {
-    await onSave({
-      startTime,
-      endTime: '',
-      reminder: notifyEnabled ? 'at_time' : '',
-    });
+    await onSave({ startTime, endTime: '', reminder: 'at_time' });
+  };
+
+  const handleRemove = async () => {
+    await onSave({ startTime: '', endTime: '', reminder: '' });
   };
 
   return (
@@ -96,11 +88,16 @@ export function TimePopup({
                   </h3>
                 </div>
 
-                {displayTaskName && (
-                  <p className="mb-4 truncate text-center text-[12px] font-bold uppercase tracking-wider text-muted-foreground">
-                    {displayTaskName}
-                  </p>
-                )}
+                {/* Reminder summary */}
+                <div className="mb-4 flex items-center justify-center gap-2 text-[13px] font-bold text-muted-foreground">
+                  <Bell className="h-4 w-4 text-primary" />
+                  <span>
+                    Notifies you at{' '}
+                    <span className="text-primary">
+                      {pad(hour24)}:{pad(minute)}
+                    </span>
+                  </span>
+                </div>
 
                 {/* Time wheel */}
                 <div className="mb-5">
@@ -132,45 +129,6 @@ export function TimePopup({
                   </div>
                 </div>
 
-                {/* Notify toggle — clean switch row */}
-                <button
-                  type="button"
-                  onClick={() => setNotifyEnabled((v) => !v)}
-                  aria-pressed={notifyEnabled}
-                  className="mb-3 flex w-full items-center gap-3 rounded-2xl bg-muted/50 px-4 py-3 text-left transition-colors hover:bg-muted/70"
-                >
-                  <span
-                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-full transition-colors ${
-                      notifyEnabled
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-muted-foreground'
-                    }`}
-                  >
-                    <Bell className="h-[18px] w-[18px] stroke-[2.5]" />
-                  </span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[14px] font-extrabold text-foreground">
-                      Remind me
-                    </span>
-                    <span className="block truncate text-[12px] font-medium text-muted-foreground">
-                      {notifyEnabled
-                        ? `Notifies you at ${pad(hour24)}:${pad(minute)}`
-                        : 'Reminder off'}
-                    </span>
-                  </span>
-                  <span
-                    className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                      notifyEnabled ? 'bg-primary' : 'bg-muted-foreground/30'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                        notifyEnabled ? 'translate-x-[22px]' : 'translate-x-0.5'
-                      }`}
-                    />
-                  </span>
-                </button>
-
                 {/* Save */}
                 <button
                   type="button"
@@ -178,8 +136,20 @@ export function TimePopup({
                   disabled={busy || !startTime}
                   className="h-11 w-full rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985] disabled:opacity-50"
                 >
-                  {busy ? 'Saving...' : 'Save'}
+                  {busy ? 'Saving...' : 'Save reminder'}
                 </button>
+
+                {/* Remove — only meaningful when a reminder already exists */}
+                {hasExisting && (
+                  <button
+                    type="button"
+                    onClick={handleRemove}
+                    disabled={busy}
+                    className="mt-2 h-10 w-full rounded-xl text-[13px] font-bold text-rose-500 transition-colors hover:bg-rose-500/10 disabled:opacity-50"
+                  >
+                    Remove reminder
+                  </button>
+                )}
               </div>
         </div>
       )}

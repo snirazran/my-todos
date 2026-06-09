@@ -102,7 +102,7 @@ export default function BacklogBox({
            className="absolute inset-0 flex items-center justify-center"
            style={{ pointerEvents: 'none' }}
         >
-          <Icon name="saved" className="h-5 w-5" />
+          <Icon name="saved" className="h-8 w-8" />
         </motion.div>
 
         {/* Drag Over Glow Effect */}

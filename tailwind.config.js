@@ -13,6 +13,18 @@ module.exports = {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        // Heebo follows Poppins so Hebrew text (which Poppins lacks) renders in
+        // Heebo while Latin stays Poppins.
+        sans: [
+          'var(--font-sans)',
+          'var(--font-hebrew)',
+          'ui-sans-serif',
+          'system-ui',
+          'sans-serif',
+        ],
+        display: ['var(--font-display)', 'cursive'],
+      },
       borderRadius: {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',

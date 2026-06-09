@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
 import useSWR from 'swr';
@@ -21,8 +27,12 @@ import MonthCalendar from './MonthCalendar';
 import { useDragManager } from './hooks/useDragManager';
 import { usePan } from './hooks/usePan';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
+import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
+import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import BacklogBox from './BacklogBox';
 import BacklogTray from './BacklogTray';
+import { useNotification } from '@/components/providers/NotificationProvider';
+import { useFrogodoroStore } from '@/lib/frogodoroStore';
 
 type RepeatChoice = 'this-week' | 'weekly';
 
@@ -49,9 +59,7 @@ export default function TaskBoard({
 }: {
   windowDates: string[];
   tasksByDate: Record<string, Task[]>;
-  setTasksByDate: React.Dispatch<
-    React.SetStateAction<Record<string, Task[]>>
-  >;
+  setTasksByDate: React.Dispatch<React.SetStateAction<Record<string, Task[]>>>;
   backlog: Task[];
   setBacklog: React.Dispatch<React.SetStateAction<Task[]>>;
   saveDate: (dateKey: string, tasks: Task[]) => Promise<void>;
@@ -133,7 +141,7 @@ export default function TaskBoard({
     (i: number): Task[] => {
       if (i === BACKLOG_IDX) return backlog;
       const d = windowDates[i];
-      return d ? tasksByDate[d] ?? [] : [];
+      return d ? (tasksByDate[d] ?? []) : [];
     },
     [BACKLOG_IDX, backlog, tasksByDate, windowDates],
   );
@@ -175,12 +183,9 @@ export default function TaskBoard({
     (i: number) => columnFilters[i] || 'all',
     [columnFilters],
   );
-  const setFilter = useCallback(
-    (i: number, f: 'all' | 'tasks') => {
-      setColumnFilters((prev) => ({ ...prev, [i]: f }));
-    },
-    [],
-  );
+  const setFilter = useCallback((i: number, f: 'all' | 'tasks') => {
+    setColumnFilters((prev) => ({ ...prev, [i]: f }));
+  }, []);
   const getSelectedTags = useCallback(
     (i: number) => columnTags[i] || [],
     [columnTags],
@@ -217,16 +222,19 @@ export default function TaskBoard({
   const [backlogProximity, setBacklogProximity] = useState(0);
   const [trayCloseProgress, setTrayCloseProgress] = useState(0);
 
-  const centerColumnSmooth = useCallback((i: number) => {
-    const s = scrollerRef.current;
-    const col = (document.querySelectorAll('[data-col="true"]')[i] ??
-      null) as HTMLElement | null;
-    if (!s || !col) return;
-    s.scrollTo({
-      left: col.offsetLeft - (s.clientWidth - col.clientWidth) / 2,
-      behavior: 'smooth',
-    });
-  }, [scrollerRef]);
+  const centerColumnSmooth = useCallback(
+    (i: number) => {
+      const s = scrollerRef.current;
+      const col = (document.querySelectorAll('[data-col="true"]')[i] ??
+        null) as HTMLElement | null;
+      if (!s || !col) return;
+      s.scrollTo({
+        left: col.offsetLeft - (s.clientWidth - col.clientWidth) / 2,
+        behavior: 'smooth',
+      });
+    },
+    [scrollerRef],
+  );
 
   // Mount: scroll to today's column instantly
   const didInitialCenter = useRef(false);
@@ -273,7 +281,14 @@ export default function TaskBoard({
     };
     s.addEventListener('scroll', handler, { passive: true });
     return () => s.removeEventListener('scroll', handler);
-  }, [N, windowDates, activeDateKey, setActiveDateKey, onExtendWindow, scrollerRef]);
+  }, [
+    N,
+    windowDates,
+    activeDateKey,
+    setActiveDateKey,
+    onExtendWindow,
+    scrollerRef,
+  ]);
 
   const { panActive, startPanIfEligible, onPanMove, endPan, recomputeCanPan } =
     usePan(scrollerRef);
@@ -283,6 +298,56 @@ export default function TaskBoard({
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickText, setQuickText] = useState('');
+  const [showTimer, setShowTimer] = useState(false);
+  const [timerTask, setTimerTask] = useState<Task | null>(null);
+  const { stackHeight: notificationStackHeight } = useNotification();
+  const frogTaskId = useFrogodoroStore((s) => s.selectedTaskId);
+
+  const findTaskById = useCallback(
+    (id: string | null | undefined): Task | null => {
+      if (!id) return null;
+      for (const list of Object.values(tasksByDate)) {
+        const found = list.find((t) => t.id === id);
+        if (found) return found;
+      }
+      return backlog.find((t) => t.id === id) ?? null;
+    },
+    [tasksByDate, backlog],
+  );
+
+  // Optimistically patch a task (and its repeat group when scope='all') across
+  // the planner's local state, so detail-card edits feel instant.
+  const patchTask = useCallback(
+    (
+      taskId: string,
+      patch: Partial<Task>,
+      scope: 'one' | 'all' = 'one',
+      groupId?: string,
+    ) => {
+      const match = (t: Task) =>
+        scope === 'all' && groupId
+          ? t.repeatGroupId === groupId
+          : t.id === taskId;
+      setTasksByDate((prev) => {
+        let changed = false;
+        const next: Record<string, Task[]> = {};
+        for (const k in prev) {
+          next[k] = prev[k].map((t) => {
+            if (match(t)) {
+              changed = true;
+              return { ...t, ...patch };
+            }
+            return t;
+          });
+        }
+        return changed ? next : prev;
+      });
+      setBacklog((prev) =>
+        prev.map((t) => (match(t) ? { ...t, ...patch } : t)),
+      );
+    },
+    [setTasksByDate, setBacklog],
+  );
   const [initialDateKey, setInitialDateKey] = useState<string | undefined>(
     undefined,
   );
@@ -407,7 +472,14 @@ export default function TaskBoard({
         return { ...prev, [dk]: list };
       });
     },
-    [BACKLOG_IDX, setBacklog, saveBacklog, windowDates, setTasksByDate, saveDate],
+    [
+      BACKLOG_IDX,
+      setBacklog,
+      saveBacklog,
+      windowDates,
+      setTasksByDate,
+      saveDate,
+    ],
   );
 
   const handleDoLater = useCallback(
@@ -434,7 +506,14 @@ export default function TaskBoard({
         });
       }
     },
-    [BACKLOG_IDX, windowDates, setTasksByDate, saveDate, setBacklog, saveBacklog],
+    [
+      BACKLOG_IDX,
+      windowDates,
+      setTasksByDate,
+      saveDate,
+      setBacklog,
+      saveBacklog,
+    ],
   );
 
   const onDrop = useCallback(() => {
@@ -632,15 +711,19 @@ export default function TaskBoard({
                   userTags={userTags}
                   onToggleRepeat={
                     onToggleRepeat
-                      ? (taskId: string) =>
-                          onToggleRepeat(taskId, dk)
-                      : undefined as any
+                      ? (taskId: string) => onToggleRepeat(taskId, dk)
+                      : (undefined as any)
                   }
                   onEditTask={async (_d, taskId, newText) =>
                     handleEditTask(i, taskId, newText)
                   }
                   onDoLater={async (_d, taskId) => handleDoLater(i, taskId)}
                   onScheduleTask={onScheduleTask}
+                  onStartTimer={(t) => {
+                    setTimerTask(t);
+                    setShowTimer(true);
+                  }}
+                  onPatchTask={patchTask}
                   isAnyDragging={!!drag?.active}
                   isToday={dk === todayKey}
                   filter={getFilter(i)}
@@ -714,7 +797,14 @@ export default function TaskBoard({
       />
 
       {/* Bottom toolbar (Backlog) */}
-      <div className="fixed bottom-0 left-0 right-0 z-[40] px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px)] md:pb-[calc(env(safe-area-inset-bottom)+100px)] pointer-events-none">
+      <div
+        style={{
+          // Lift above the notification stack like the home FAB does.
+          ['--stack' as string]: `${notificationStackHeight}px`,
+          transition: 'padding 200ms ease',
+        }}
+        className="fixed bottom-0 left-0 right-0 z-[40] px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+100px+var(--stack))] pointer-events-none"
+      >
         <div className="pointer-events-auto mx-auto w-full max-w-[300px] md:max-w-[400px] relative min-h-[48px] md:min-h-[56px] flex items-center justify-center">
           <BacklogBox
             count={backlog.length}
@@ -740,9 +830,7 @@ export default function TaskBoard({
         onRemove={(id) => removeFromBacklog(id)}
         userTags={userTags}
         onEdit={(id, newText) => handleEditTask(BACKLOG_IDX, id, newText)}
-        onToggleRepeat={(id) =>
-          onToggleRepeat && onToggleRepeat(id, todayKey)
-        }
+        onToggleRepeat={(id) => onToggleRepeat && onToggleRepeat(id, todayKey)}
         onDoToday={async (id) => {
           // Move from backlog to today
           let moved: Task | undefined;
@@ -774,6 +862,25 @@ export default function TaskBoard({
         onShowCompletedChange={(show) => setShowCompleted(BACKLOG_IDX, show)}
       />
 
+      <FrogodoroSheet
+        open={showTimer}
+        onOpenChange={setShowTimer}
+        task={timerTask as any}
+        tags={userTags}
+        onMutateToday={() => window.dispatchEvent(new Event('board-refresh'))}
+      />
+
+      {!showTimer && (
+        <FrogodoroPill
+          onClick={() => {
+            const t = findTaskById(frogTaskId);
+            if (t) setTimerTask(t);
+            setShowTimer(true);
+          }}
+          taskName={findTaskById(frogTaskId)?.text}
+        />
+      )}
+
       <QuickAddSheet
         open={showQuickAdd}
         onOpenChange={setShowQuickAdd}
@@ -802,7 +909,12 @@ export default function TaskBoard({
           reminder,
         }) => {
           if (!onQuickAdd) {
-            onRequestAdd(initialDateKey ?? null, text, null, repeat as RepeatChoice);
+            onRequestAdd(
+              initialDateKey ?? null,
+              text,
+              null,
+              repeat as RepeatChoice,
+            );
             setShowQuickAdd(false);
             return;
           }
@@ -813,11 +925,22 @@ export default function TaskBoard({
           const anchorDate = parseYmd(anchor);
           const anchorDow = anchorDate.getDay();
           const dates: string[] = exactDates ?? [];
-          if (repeat === 'this-week' && !exactDates) {
+          // Anchor the selected weekdays to actual calendar dates for both
+          // one-off (this-week) and repeating (weekly) adds, so the API can
+          // derive the weekdays and create the repeating tasks.
+          if (!exactDates) {
             for (const d of days) {
               if (d === -1) continue;
-              const offset = ((d - anchorDow) + 7) % 7;
-              dates.push(ymd(new Date(anchorDate.getFullYear(), anchorDate.getMonth(), anchorDate.getDate() + offset)));
+              const offset = (d - anchorDow + 7) % 7;
+              dates.push(
+                ymd(
+                  new Date(
+                    anchorDate.getFullYear(),
+                    anchorDate.getMonth(),
+                    anchorDate.getDate() + offset,
+                  ),
+                ),
+              );
             }
           }
           await onQuickAdd({

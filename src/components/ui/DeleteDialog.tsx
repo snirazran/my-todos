@@ -11,6 +11,7 @@ interface Props {
   variant: Variant;
   itemLabel?: string;
   dayLabel?: string;
+  repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly';
   busy?: boolean;
   onClose: () => void;
   onDeleteToday?: () => void;
@@ -22,6 +23,7 @@ export function DeleteDialog({
   variant,
   itemLabel,
   dayLabel = 'today',
+  repeatMode,
   busy,
   onClose,
   onDeleteToday,
@@ -60,7 +62,7 @@ export function DeleteDialog({
       className="bg-white/95 dark:bg-slate-900/90 sm:max-w-[440px]"
     >
       {() => (
-      <div className="px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-1 sm:pb-5">
+      <div className="px-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-1 sm:pb-5 sm:pt-5">
         <div className="flex items-start gap-3">
           <div className="mt-0.5 h-9 w-9 flex-shrink-0 flex items-center justify-center rounded-full bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-300">
             <Trash2 className="w-[18px] h-[18px]" />
@@ -108,7 +110,9 @@ export function DeleteDialog({
               <Trash2 className="w-4 h-4" />
             )}
             {variant === 'weekly'
-              ? 'Stop repeating'
+              ? repeatMode === 'daily' || repeatMode === 'weekdays'
+                ? 'Delete all repeats'
+                : 'Stop repeating'
               : variant === 'backlog'
                 ? 'Remove from backlog'
                 : `Delete from ${dayLabel}`}

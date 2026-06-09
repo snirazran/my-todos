@@ -7,6 +7,7 @@ import {
   CalendarDays,
   Clock,
   Bell,
+  EllipsisVertical,
 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -36,6 +37,7 @@ export default function TaskCard({
   hideDoTodayButton,
   compact = false,
   onTap,
+  onToggleComplete,
   disableDrag = false,
 }: {
   dragId: string;
@@ -55,6 +57,8 @@ export default function TaskCard({
   compact?: boolean;
   /** Fired when user releases the press before the long-press timer fires (and didn't drag). */
   onTap?: () => void;
+  /** Toggle completion — fired by tapping the fly/check on the right. */
+  onToggleComplete?: () => void;
   /** Disable initiating drag (e.g., past-date columns). Tap still works. */
   disableDrag?: boolean;
 }) {
@@ -131,11 +135,14 @@ export default function TaskCard({
 
   const handlePointerDown = useCallback(
     (e: PointerEvent) => {
-      if (task.completed) return;
       if (e.button !== 0 || !e.isPrimary) return;
 
       const target = e.target as HTMLElement;
       if (target.closest('button, a, input, textarea, [role="button"]')) return;
+
+      // Completed cards can still be tapped (to open the detail card) but
+      // never dragged.
+      const canDrag = !task.completed && !disableDrag;
 
       pointerIdRef.current = e.pointerId;
       longPressFiredRef.current = false;
@@ -155,9 +162,9 @@ export default function TaskCard({
         });
       }
 
-      // If drag is disabled (e.g. past dates), skip the grab timer.
-      // We still listen for pointermove/pointerup so onTap can fire.
-      if (disableDrag) return;
+      // If drag is disabled (past dates) or the task is completed, skip the
+      // grab timer. We still listen for pointermove/pointerup so onTap fires.
+      if (!canDrag) return;
 
       const delay =
         e.pointerType === 'mouse' ? MOUSE_HOLD_DURATION : LONG_PRESS_DURATION;
@@ -247,42 +254,13 @@ export default function TaskCard({
       role="listitem"
       aria-grabbed={false}
     >
-      <motion.div
-        className={[
-          'flex w-full',
-          compact ? 'items-center gap-2' : 'items-start gap-3',
-        ].join(' ')}
-      >
+      <motion.div className="flex w-full items-center gap-1.5">
+        {/* Grab handle (left) — 3-dot drag hint */}
         <div
-          className={[
-            'shrink-0 text-muted-foreground group-hover:text-primary transition-colors relative h-10 w-10',
-            compact
-              ? 'flex items-center justify-center rounded-full bg-muted/50 ring-1 ring-border/60'
-              : 'place-items-center mt-0.5',
-            task.completed ? 'opacity-60' : '',
-          ].join(' ')}
+          aria-hidden
+          className="-ml-0.5 flex shrink-0 items-center justify-center self-stretch text-muted-foreground/30"
         >
-          <div
-            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
-              task.completed ? 'opacity-0 pointer-events-none' : 'opacity-100'
-            }`}
-          >
-            <Fly
-              size={compact ? 36 : 40}
-              paused={task.completed}
-              y={compact ? -3 : -4}
-            />
-          </div>
-
-          <div
-            className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
-              task.completed ? 'opacity-100' : 'opacity-0 pointer-events-none'
-            }`}
-          >
-            <CheckCircle2
-              className={`${compact ? 'w-8 h-8' : 'w-9 h-9'} text-green-500`}
-            />
-          </div>
+          <EllipsisVertical className="h-4 w-4" />
         </div>
 
         <div
@@ -360,19 +338,15 @@ export default function TaskCard({
             }`}
           >
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              <span className="min-w-0 flex-1 whitespace-pre-wrap break-words">
+              <span className="min-w-0 whitespace-pre-wrap break-words">
                 {task.text}
               </span>
-              <div className="inline-flex items-center gap-1.5 shrink-0">
-                {isRepeating && (
-                  <Icon name="repeat" label="Repeating" className="w-3.5 h-3.5 flex-shrink-0" />
-                )}
-                {task.calendarEventId && (
-                  <CalendarDays
-                    className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0"
-                  />
-                )}
-              </div>
+              {isRepeating && (
+                <Icon name="repeat" label="Repeating" className="w-5 h-5 flex-shrink-0" />
+              )}
+              {task.calendarEventId && (
+                <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+              )}
             </div>
           </div>
 
@@ -396,7 +370,7 @@ export default function TaskCard({
           )}
         </div>
 
-        <div className="shrink-0 flex items-center gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity focus-within:opacity-100 pt-0.5">
+        <div className="shrink-0 flex items-center gap-1.5">
           {onDoToday && !hideDoTodayButton && (
             <button
               onClick={(e) => {
@@ -410,6 +384,35 @@ export default function TaskCard({
               <Plus className="w-4 h-4" />
             </button>
           )}
+
+          {/* Completion indicator (right) — tap to toggle */}
+          <button
+            type="button"
+            disabled={!onToggleComplete}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onToggleComplete && !isAnyDragging) onToggleComplete();
+            }}
+            aria-label={task.completed ? 'Mark not done' : 'Mark done'}
+            className={`relative h-10 w-10 shrink-0 rounded-full transition-colors ${
+              onToggleComplete ? 'cursor-pointer' : 'cursor-default'
+            }`}
+          >
+            <span
+              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+                task.completed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+              }`}
+            >
+              <Fly size={36} paused={task.completed} y={-3} />
+            </span>
+            <span
+              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+                task.completed ? 'opacity-100' : 'opacity-0 pointer-events-none'
+              }`}
+            >
+              <CheckCircle2 className="h-8 w-8 text-green-500" />
+            </span>
+          </button>
         </div>
       </motion.div>
     </div>

@@ -8,6 +8,12 @@ import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import Fly from '@/components/ui/fly';
 
 // --- Types ---
+export interface ChecklistItem {
+  id: string;
+  text: string;
+  done: boolean;
+}
+
 export interface Task {
   id: string;
   text: string;
@@ -17,6 +23,10 @@ export interface Task {
   origin?: 'regular' | 'weekly' | 'backlog';
   kind?: 'regular' | 'weekly' | 'backlog';
   tags?: string[];
+  notes?: string;
+  checklist?: ChecklistItem[];
+  repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly';
+  repeatGroupId?: string;
   date?: string;
   completedDates?: string[];
   frogodoroSettings?: {
@@ -624,6 +634,81 @@ export function useTaskData({
   );
 
   /**
+   * Duplicate a task onto today or tomorrow as a fresh, uncompleted task.
+   */
+  const duplicateTask = useCallback(
+    async (taskId: string, when: 'today' | 'tomorrow') => {
+      const d = new Date();
+      if (when === 'tomorrow') d.setDate(d.getDate() + 1);
+      const dateKey = format(d, 'yyyy-MM-dd');
+      try {
+        const res = await fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ duplicateFrom: taskId, date: dateKey, timezone: tz }),
+        });
+        const data = await res.json();
+        if (when === 'today' && data?.tasks?.[0] && todayData) {
+          mutateToday(
+            { ...todayData, tasks: sortTasks([...todayData.tasks, data.tasks[0]]) },
+            { revalidate: false },
+          );
+        }
+      } catch (e) {
+        console.error('Duplicate failed', e);
+      } finally {
+        mutateToday();
+        if (includeBacklog) mutateBacklog();
+      }
+    },
+    [todayData, mutateToday, mutateBacklog, tz, includeBacklog, sortTasks],
+  );
+
+  /**
+   * Delete an entire repeat series — the linked group (daily/weekdays) or a
+   * lone weekly task across all weeks.
+   */
+  const deleteTaskSeries = useCallback(
+    async (taskId: string) => {
+      const prevToday = todayData;
+      const prevBacklog = backlogData;
+      const groupId =
+        todayData?.tasks.find((t) => t.id === taskId)?.repeatGroupId ??
+        (Array.isArray(backlogData)
+          ? backlogData.find((t) => t.id === taskId)?.repeatGroupId
+          : undefined);
+      const matches = (t: Task) =>
+        groupId ? t.repeatGroupId === groupId : t.id === taskId;
+
+      if (todayData) {
+        mutateToday(
+          { ...todayData, tasks: todayData.tasks.filter((t) => !matches(t)) },
+          { revalidate: false },
+        );
+      }
+      if (Array.isArray(backlogData)) {
+        mutateBacklog(backlogData.filter((t) => !matches(t)), {
+          revalidate: false,
+        });
+      }
+
+      try {
+        await fetch('/api/tasks', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, deleteSeries: true, timezone: tz }),
+        });
+        cancelNotification(taskId);
+      } catch (e) {
+        console.error('Delete series failed', e);
+        if (prevToday) mutateToday(prevToday, { revalidate: false });
+        if (prevBacklog) mutateBacklog(prevBacklog, { revalidate: false });
+      }
+    },
+    [todayData, backlogData, mutateToday, mutateBacklog, tz, cancelNotification],
+  );
+
+  /**
    * Delete Task (Backlog)
    */
   const deleteBacklogTask = useCallback(
@@ -763,19 +848,32 @@ export function useTaskData({
    * Edit Task Text
    */
   const editTask = useCallback(
-    async (taskId: string, newText: string, isBacklog: boolean) => {
+    async (
+      taskId: string,
+      newText: string,
+      isBacklog: boolean,
+      scope: 'one' | 'all' = 'one',
+    ) => {
       const prevToday = todayData;
       const prevBacklog = backlogData;
+
+      const groupId =
+        todayData?.tasks.find((t) => t.id === taskId)?.repeatGroupId ??
+        (Array.isArray(backlogData)
+          ? backlogData.find((t) => t.id === taskId)?.repeatGroupId
+          : undefined);
+      const matches = (t: Task) =>
+        scope === 'all' && groupId ? t.repeatGroupId === groupId : t.id === taskId;
 
       // Optimistic Update
       if (isBacklog && backlogData) {
         const updated = backlogData.map((t) =>
-          t.id === taskId ? { ...t, text: newText } : t,
+          matches(t) ? { ...t, text: newText } : t,
         );
         mutateBacklog(updated, { revalidate: false });
       } else if (!isBacklog && todayData) {
         const updated = todayData.tasks.map((t) =>
-          t.id === taskId ? { ...t, text: newText } : t,
+          matches(t) ? { ...t, text: newText } : t,
         );
         mutateToday({ ...todayData, tasks: updated }, { revalidate: false });
       }
@@ -784,7 +882,7 @@ export function useTaskData({
         await fetch('/api/tasks', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId, text: newText, timezone: tz }),
+          body: JSON.stringify({ taskId, text: newText, scope, timezone: tz }),
         });
       } catch (e) {
         console.error('Edit failed', e);
@@ -799,13 +897,21 @@ export function useTaskData({
   );
 
   const scheduleTask = useCallback(
-    async (taskId: string, data: { startTime: string; endTime: string; reminder: string }) => {
+    async (
+      taskId: string,
+      data: { startTime: string; endTime: string; reminder: string },
+      scope: 'one' | 'all' = 'one',
+    ) => {
       const prevToday = todayData;
+
+      const groupId = todayData?.tasks.find((t) => t.id === taskId)?.repeatGroupId;
+      const matches = (t: Task) =>
+        scope === 'all' && groupId ? t.repeatGroupId === groupId : t.id === taskId;
 
       // Optimistic update
       if (todayData) {
         const updated = todayData.tasks.map((t) => {
-          if (t.id === taskId) {
+          if (matches(t)) {
             return {
               ...t,
               startTime: data.startTime || undefined,
@@ -822,7 +928,7 @@ export function useTaskData({
         await fetch('/api/tasks', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ taskId, schedule: data, timezone: tz }),
+          body: JSON.stringify({ taskId, schedule: data, scope, timezone: tz }),
         });
 
         // Scheduled task reminders are sent by the server cron so they work
@@ -834,6 +940,155 @@ export function useTaskData({
       }
     },
     [todayData, mutateToday, tz, cancelNotification],
+  );
+
+  /**
+   * Update task details (notes + checklist) — the Trello-like card.
+   * Optimistically patches whichever list holds the task, then persists.
+   */
+  const updateTaskDetails = useCallback(
+    async (
+      taskId: string,
+      details: { notes?: string; checklist?: ChecklistItem[] },
+    ) => {
+      const prevToday = todayData;
+      const prevBacklog = backlogData;
+
+      const patch = (t: Task): Task =>
+        t.id === taskId
+          ? {
+              ...t,
+              ...(details.notes !== undefined ? { notes: details.notes } : {}),
+              ...(details.checklist !== undefined
+                ? { checklist: details.checklist }
+                : {}),
+            }
+          : t;
+
+      if (todayData?.tasks.some((t) => t.id === taskId)) {
+        mutateToday(
+          { ...todayData, tasks: todayData.tasks.map(patch) },
+          { revalidate: false },
+        );
+      }
+      if (Array.isArray(backlogData) && backlogData.some((t) => t.id === taskId)) {
+        mutateBacklog(backlogData.map(patch), { revalidate: false });
+      }
+
+      try {
+        await fetch('/api/tasks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, details, timezone: tz }),
+        });
+      } catch (e) {
+        console.error('Update task details failed', e);
+        if (prevToday) mutateToday(prevToday, { revalidate: false });
+        if (prevBacklog) mutateBacklog(prevBacklog, { revalidate: false });
+      }
+    },
+    [todayData, backlogData, mutateToday, mutateBacklog, tz],
+  );
+
+  /**
+   * Set a task's repeat schedule from the detail card, using the same modes as
+   * QuickAdd (none / daily / weekdays / weekly). A single task can only live on
+   * one weekday, so daily/weekdays additionally create sibling weekly tasks for
+   * the other days (mirroring how QuickAdd creates a repeating task).
+   */
+  const setTaskRepeat = useCallback(
+    async (
+      taskId: string,
+      mode: 'none' | 'daily' | 'weekdays' | 'weekly',
+      dayOfWeek?: number,
+    ) => {
+      // Optimistically reflect the chosen mode so the picker/chip updates
+      // instantly; the server then expands daily/weekdays into siblings.
+      const optimisticType = mode === 'none' ? 'regular' : 'weekly';
+      if (todayData?.tasks.some((t) => t.id === taskId)) {
+        mutateToday(
+          {
+            ...todayData,
+            tasks: todayData.tasks.map((t) =>
+              t.id === taskId
+                ? ({ ...t, repeatMode: mode, type: optimisticType } as Task)
+                : t,
+            ),
+            weeklyIds:
+              mode === 'none'
+                ? (todayData.weeklyIds ?? []).filter((id) => id !== taskId)
+                : Array.from(
+                    new Set([...(todayData.weeklyIds ?? []), taskId]),
+                  ),
+          },
+          { revalidate: false },
+        );
+      }
+
+      try {
+        await fetch('/api/tasks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId,
+            date: dateStr,
+            setRepeat: { mode, dayOfWeek },
+            timezone: tz,
+          }),
+        });
+      } catch (e) {
+        console.error('Set repeat failed', e);
+      } finally {
+        mutateToday();
+        if (includeBacklog) mutateBacklog();
+      }
+    },
+    [todayData, mutateToday, mutateBacklog, dateStr, tz, includeBacklog],
+  );
+
+  /**
+   * Update a task's tags optimistically (and across its repeat group when
+   * scope is 'all'), then persist.
+   */
+  const updateTaskTags = useCallback(
+    async (taskId: string, tags: string[], scope: 'one' | 'all' = 'one') => {
+      const prevToday = todayData;
+      const prevBacklog = backlogData;
+
+      const groupId =
+        todayData?.tasks.find((t) => t.id === taskId)?.repeatGroupId ??
+        (Array.isArray(backlogData)
+          ? backlogData.find((t) => t.id === taskId)?.repeatGroupId
+          : undefined);
+      const matches = (t: Task) =>
+        scope === 'all' && groupId ? t.repeatGroupId === groupId : t.id === taskId;
+
+      if (todayData?.tasks.some(matches)) {
+        mutateToday(
+          { ...todayData, tasks: todayData.tasks.map((t) => (matches(t) ? { ...t, tags } : t)) },
+          { revalidate: false },
+        );
+      }
+      if (Array.isArray(backlogData) && backlogData.some(matches)) {
+        mutateBacklog(
+          backlogData.map((t) => (matches(t) ? { ...t, tags } : t)),
+          { revalidate: false },
+        );
+      }
+
+      try {
+        await fetch('/api/tasks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ taskId, tags, scope, timezone: tz }),
+        });
+      } catch (e) {
+        console.error('Update tags failed', e);
+        if (prevToday) mutateToday(prevToday, { revalidate: false });
+        if (prevBacklog) mutateBacklog(prevBacklog, { revalidate: false });
+      }
+    },
+    [todayData, backlogData, mutateToday, mutateBacklog, tz],
   );
 
   const { data: tagsData, mutate: mutateTags } = useSWR<{
@@ -867,5 +1122,10 @@ export function useTaskData({
     editTask,
     scheduleTask,
     toggleRepeat,
+    updateTaskDetails,
+    setTaskRepeat,
+    updateTaskTags,
+    deleteTaskSeries,
+    duplicateTask,
   };
 }
