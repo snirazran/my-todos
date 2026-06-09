@@ -12,6 +12,7 @@ export type Task = {
   checklist?: { id: string; text: string; done: boolean }[];
   repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly';
   repeatGroupId?: string;
+  repeatStartDate?: string;
   dayOfWeek?: number;
   completedDates?: string[];
   frogodoroSession?: {

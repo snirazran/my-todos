@@ -44,6 +44,7 @@ export default React.memo(function TaskList({
   onScheduleTask,
   onStartTimer,
   onPatchTask,
+  dateKey,
   isToday = false,
   filter = 'all',
   selectedTags = [],
@@ -105,6 +106,7 @@ export default React.memo(function TaskList({
     scope?: 'one' | 'all',
     groupId?: string,
   ) => void;
+  dateKey?: string;
   isToday?: boolean;
   filter?: 'all' | 'tasks';
   selectedTags?: string[];
@@ -259,7 +261,7 @@ export default React.memo(function TaskList({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         taskId,
-        date: todayYmdStr(),
+        date: dateKey ?? todayYmdStr(),
         setRepeat: { mode, dayOfWeek },
         timezone: tz,
       }),
@@ -740,7 +742,15 @@ export default React.memo(function TaskList({
         onOpenChange={(o) => {
           if (!o) setActionSheetId(null);
         }}
-        task={(sheetTask ?? null) as any}
+        task={
+          sheetTask
+            ? ({
+                ...sheetTask,
+                dayOfWeek:
+                  day < 7 ? apiDayFromDisplay(day, daysOrder) : sheetTask.dayOfWeek,
+              } as any)
+            : null
+        }
         tags={userTags}
         isCompleted={!!sheetTask?.completed}
         isWeekly={sheetTask?.type === 'weekly'}
@@ -773,8 +783,13 @@ export default React.memo(function TaskList({
             : undefined
         }
         onDoLater={
-          sheetTask && onDoLater
+          sheetTask && onDoLater && sheetTask.type !== 'weekly'
             ? () => onDoLater(day, sheetTask.id)
+            : undefined
+        }
+        onSkipToday={
+          sheetTask?.type === 'weekly'
+            ? () => removeTask(day, sheetTask.id)
             : undefined
         }
         onDelete={

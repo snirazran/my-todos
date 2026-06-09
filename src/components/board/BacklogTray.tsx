@@ -146,6 +146,7 @@ export default React.memo(function BacklogTray({
         title={`${filteredTasks.length} Saved Tasks`}
         icon={<Icon name="saved" className="h-6 w-6" />}
         iconContainerClassName="bg-primary/10 text-primary"
+        className="md:w-[500px]"
         isDraggingAny={isDraggingAny}
         closeProgress={closeProgress}
         rightActions={

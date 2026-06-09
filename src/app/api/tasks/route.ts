@@ -85,6 +85,12 @@ function dowFromYMD(ymd: string) {
   return new Date(`${ymd}T12:00:00Z`).getUTCDay() as Weekday;
 }
 
+function repeatStartForDoc(task: TaskDoc, tz: string) {
+  if (task.repeatStartDate) return task.repeatStartDate;
+  if (task.type !== 'weekly') return undefined;
+  return getZonedYMD(new Date(task.createdAt), tz);
+}
+
 function isBoardMode(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   return (
@@ -502,8 +508,11 @@ export async function POST(req: NextRequest) {
       days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d));
     const repeatMode: 'daily' | 'weekdays' | 'weekly' =
       days.length === 7 ? 'daily' : isWeekdaysSet ? 'weekdays' : 'weekly';
+    const explicitStartDate =
+      explicitDates.length > 0 ? explicitDates.slice().sort()[0] : undefined;
     for (const d of days) {
       const dayOfWeek: Weekday = d as Weekday;
+      const repeatStartDate = explicitStartDate ?? weekDates[dayOfWeek];
       const id = uuid();
       const order = await nextOrderForDay(uid, dayOfWeek, weekDates[dayOfWeek]);
       const task = await TaskModel.create({
@@ -521,6 +530,7 @@ export async function POST(req: NextRequest) {
         reminder,
         repeatMode,
         repeatGroupId,
+        repeatStartDate,
       });
       createdIds.push(id);
       createdTasks.push({
@@ -536,6 +546,7 @@ export async function POST(req: NextRequest) {
         reminder: task.reminder,
         repeatMode,
         repeatGroupId,
+        repeatStartDate,
       });
     }
     void syncGamification(uid, tz);
@@ -833,7 +844,13 @@ export async function PUT(req: NextRequest) {
         { userId: uid, id: taskId },
         {
           $set: { type: 'regular', date: targetDate, completed: false, repeatMode: 'none' },
-          $unset: { dayOfWeek: 1, weekStart: 1, completedDates: 1, repeatGroupId: 1 },
+          $unset: {
+            dayOfWeek: 1,
+            weekStart: 1,
+            completedDates: 1,
+            repeatGroupId: 1,
+            repeatStartDate: 1,
+          },
         },
       );
     } else {
@@ -843,11 +860,16 @@ export async function PUT(req: NextRequest) {
       // Weekdays must land on Mon–Fri.
       const weeklyDay = (mode === 'weekdays' && (dow === 0 || dow === 6) ? 1 : dow) as Weekday;
       const groupId = isMulti ? doc.repeatGroupId || uuid() : undefined;
+      const repeatStartDate =
+        typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+          ? date
+          : doc.date || getZonedToday(tz);
 
       const set: Record<string, unknown> = {
         type: 'weekly',
         dayOfWeek: weeklyDay,
         repeatMode: mode,
+        repeatStartDate,
       };
       const unset: Record<string, unknown> = { date: 1, weekStart: 1, completed: 1 };
       if (isMulti) set.repeatGroupId = groupId;
@@ -877,6 +899,7 @@ export async function PUT(req: NextRequest) {
             checklist: doc.checklist,
             repeatMode: mode,
             repeatGroupId: groupId,
+            repeatStartDate,
             startTime: doc.startTime,
             endTime: doc.endTime,
             reminder: doc.reminder,
@@ -915,7 +938,12 @@ export async function PUT(req: NextRequest) {
         { userId: uid, id: taskId },
         {
           $set: { type: 'regular', date, completed: isCompletedToday },
-          $unset: { dayOfWeek: 1, suppressedDates: 1, completedDates: 1 },
+          $unset: {
+            dayOfWeek: 1,
+            suppressedDates: 1,
+            completedDates: 1,
+            repeatStartDate: 1,
+          },
         },
       );
     } else {
@@ -927,6 +955,7 @@ export async function PUT(req: NextRequest) {
             type: 'weekly',
             dayOfWeek: dow,
             completedDates: doc.completed ? [date] : [],
+            repeatStartDate: date,
           },
           $unset: { date: 1, weekStart: 1, completed: 1 },
         },
@@ -1103,11 +1132,19 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
     .sort({ order: 1 })
     .lean<TaskDoc[]>()
     .exec();
-  const weeklyIdsForUI = new Set(
-    tasks.filter((t: TaskDoc) => t.type === 'weekly').map((t: TaskDoc) => t.id),
-  );
   const filtered = tasks.filter(
-    (t: TaskDoc) => !(t.suppressedDates ?? []).includes(date),
+    (t: TaskDoc) => {
+      const repeatStart = repeatStartForDoc(t, tz);
+      return (
+        !(t.suppressedDates ?? []).includes(date) &&
+        !(repeatStart && date < repeatStart)
+      );
+    },
+  );
+  const weeklyIdsForUI = new Set(
+    filtered
+      .filter((t: TaskDoc) => t.type === 'weekly')
+      .map((t: TaskDoc) => t.id),
   );
   const output = filtered
     .map((t: TaskDoc) => ({
@@ -1124,6 +1161,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       checklist: t.checklist ?? [],
       repeatMode: t.repeatMode,
       repeatGroupId: t.repeatGroupId,
+      repeatStartDate: repeatStartForDoc(t, tz),
       dayOfWeek: t.dayOfWeek,
       completedDates: t.completedDates ?? [],
       frogodoroSettings: t.frogodoroSettings,
@@ -1200,7 +1238,15 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       .lean<TaskDoc[]>()
       .exec();
     const out = docs
-      .filter((t: TaskDoc) => !(t.suppressedDates ?? []).includes(weekDates[dayNum]))
+      .filter(
+        (t: TaskDoc) => {
+          const repeatStart = repeatStartForDoc(t, tz);
+          return (
+            !(t.suppressedDates ?? []).includes(weekDates[dayNum]) &&
+            !(repeatStart && weekDates[dayNum] < repeatStart)
+          );
+        },
+      )
       .map((t: TaskDoc) => ({
         id: t.id,
         text: t.text,
@@ -1215,6 +1261,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         startTime: t.startTime,
         endTime: t.endTime,
         reminder: t.reminder,
+        repeatStartDate: repeatStartForDoc(t, tz),
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return NextResponse.json(out);
@@ -1274,6 +1321,8 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
     if (day === undefined) continue;
 
     const date = weekDates[day];
+    const repeatStart = repeatStartForDoc(doc, tz);
+    if (repeatStart && date < repeatStart) continue;
     if ((doc.suppressedDates ?? []).includes(date)) continue;
 
     week[day].push({
@@ -1285,6 +1334,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         (doc.completedDates ?? []).includes(date) ||
         (!!doc.completed && doc.type === 'regular'),
       tags: doc.tags ?? [],
+      repeatStartDate: repeatStart,
       frogodoroSession:
         doc.frogodoroSessions?.find((session) => session.date === date) ??
         null,
@@ -1401,8 +1451,10 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
     }
     if (doc.type === 'weekly' && typeof doc.dayOfWeek === 'number') {
       // expand into every matching date in the window
+      const repeatStart = repeatStartForDoc(doc, tz);
       for (const d of dates) {
         if (dowFromYMD(d) !== doc.dayOfWeek) continue;
+        if (repeatStart && d < repeatStart) continue;
         if ((doc.suppressedDates ?? []).includes(d)) continue;
         byDate[d].push({
           id: doc.id,
@@ -1415,6 +1467,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           checklist: doc.checklist ?? [],
           repeatMode: doc.repeatMode,
           repeatGroupId: doc.repeatGroupId,
+          repeatStartDate: repeatStart,
           dayOfWeek: doc.dayOfWeek,
           frogodoroSession:
             doc.frogodoroSessions?.find((s) => s.date === d) ?? null,

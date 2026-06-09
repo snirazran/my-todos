@@ -17,6 +17,7 @@ export interface TaskDoc {
   checklist?: { id: string; text: string; done: boolean }[]; // Trello-like sub-items
   repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly'; // chosen repeat option
   repeatGroupId?: string; // links daily/weekdays sibling tasks together
+  repeatStartDate?: string; // YYYY-MM-DD first date this repeat should appear
   dayOfWeek?: Weekday;
   date?: string;
   weekStart?: string;
@@ -57,6 +58,7 @@ const TaskSchema = new Schema<TaskDoc>(
     notes: { type: String },
     repeatMode: { type: String, enum: ['none', 'daily', 'weekdays', 'weekly'] },
     repeatGroupId: { type: String, index: true },
+    repeatStartDate: { type: String },
     checklist: {
       type: [
         {

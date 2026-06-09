@@ -9,6 +9,7 @@ interface Props {
   count: number;
   isDragOver: boolean;
   isDragging: boolean;
+  isDesktop: boolean;
   proximity: number; // 0 to 1
   onClick: () => void;
   forwardRef: React.Ref<HTMLButtonElement>;
@@ -18,10 +19,19 @@ export default function BacklogBox({
   count,
   isDragOver,
   isDragging,
+  isDesktop,
   proximity,
   onClick,
   forwardRef,
 }: Props) {
+  const idleSize = isDesktop ? 64 : 48;
+  const dropHeight = isDesktop ? 96 : 72;
+  const dropRadius = isDesktop ? 26 : 22;
+  const idleRadius = isDesktop ? 18 : 14;
+  const countBadgeClass = isDesktop
+    ? 'min-w-6 h-6 px-1 text-[11px]'
+    : 'w-5 h-5 text-[10px]';
+
   // Smooth out the proximity value to prevent jitter
   const smoothProx = useSpring(proximity, {
     stiffness: 100,
@@ -38,7 +48,7 @@ export default function BacklogBox({
       className="relative flex pointer-events-auto origin-left shrink-0"
       initial={false}
       animate={{
-        width: isDragging ? '100%' : '48px',
+        width: isDragging ? '100%' : `${idleSize}px`,
       }}
       transition={{
         type: 'spring',
@@ -53,8 +63,8 @@ export default function BacklogBox({
         initial={false}
         animate={{
           width: '100%', // Button always fills wrapper
-          height: isDragging ? '72px' : '48px',
-          borderRadius: isDragging ? 22 : 14,
+          height: isDragging ? `${dropHeight}px` : `${idleSize}px`,
+          borderRadius: isDragging ? dropRadius : idleRadius,
         }}
         transition={{
           type: 'spring',
@@ -85,8 +95,13 @@ export default function BacklogBox({
           className="absolute inset-0 flex flex-col items-center justify-center gap-1"
           style={{ pointerEvents: 'none' }}
         >
-          <ArrowDownToLine size={22} className={isDragOver ? 'animate-bounce' : ''} />
-          <span className="text-xs font-bold whitespace-nowrap">
+          <ArrowDownToLine
+            size={isDesktop ? 28 : 22}
+            className={isDragOver ? 'animate-bounce' : ''}
+          />
+          <span
+            className={`${isDesktop ? 'text-sm' : 'text-xs'} font-black whitespace-nowrap`}
+          >
             {isDragOver ? 'Drop to save' : 'Save for later'}
           </span>
         </motion.div>
@@ -102,7 +117,7 @@ export default function BacklogBox({
            className="absolute inset-0 flex items-center justify-center"
            style={{ pointerEvents: 'none' }}
         >
-          <Icon name="saved" className="h-8 w-8" />
+          <Icon name="saved" className={isDesktop ? 'h-10 w-10' : 'h-8 w-8'} />
         </motion.div>
 
         {/* Drag Over Glow Effect */}
@@ -123,7 +138,7 @@ export default function BacklogBox({
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            className="absolute -top-2.5 -right-2.5 z-10 flex items-center justify-center w-5 h-5 text-[10px] font-black text-primary-foreground bg-primary rounded-full shadow-sm ring-2 ring-background pointer-events-none"
+            className={`absolute -top-2.5 -right-2.5 z-10 flex ${countBadgeClass} items-center justify-center font-black text-primary-foreground bg-primary rounded-full shadow-sm ring-2 ring-background pointer-events-none`}
           >
             {count}
           </motion.div>

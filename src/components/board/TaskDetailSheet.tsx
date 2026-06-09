@@ -6,6 +6,7 @@ import {
   CalendarPlus,
   Check,
   CheckCircle2,
+  EyeOff,
   Pencil,
   Plus,
   Repeat,
@@ -50,6 +51,7 @@ interface TaskDetailSheetProps {
   onComplete?: () => void;
   onStartTimer?: () => void;
   onDoLater?: () => void;
+  onSkipToday?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
   onSetRepeat?: (mode: RepeatMode, dayOfWeek?: number) => void;
@@ -78,6 +80,7 @@ export default function TaskDetailSheet({
   onComplete,
   onStartTimer,
   onDoLater,
+  onSkipToday,
   onEdit,
   onDelete,
   onSetRepeat,
@@ -180,6 +183,7 @@ export default function TaskDetailSheet({
         : repeatMode === 'weekly'
           ? `Every ${DAY_NAMES[repeatDay]}`
           : 'Does not repeat';
+  const isRepeating = repeatMode !== 'none' || isWeekly;
 
   return (
     <>
@@ -353,7 +357,13 @@ export default function TaskDetailSheet({
                 </div>
               )}
 
-              {onDoLater && !isCompleted ? (
+              {isRepeating && onSkipToday ? (
+                <PlainAction
+                  label="Skip"
+                  onClick={runAndClose(onSkipToday)}
+                  icon={<EyeOff className="h-10 w-10 text-muted-foreground" />}
+                />
+              ) : onDoLater && !isCompleted ? (
                 <PlainAction
                   label="Save for later"
                   onClick={runAndClose(onDoLater)}

@@ -411,7 +411,7 @@ export default function QuickAddSheet({
                   className="pointer-events-auto mx-auto flex w-full max-w-[500px] flex-col pb-[env(safe-area-inset-bottom)] sm:max-w-[620px]"
                 >
                   <div className="flex min-h-0 flex-1 flex-col gap-3">
-                  <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-4 pb-2 pt-2 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)]">
+                  <div className="flex flex-none flex-col overflow-hidden rounded-[28px] bg-popover px-4 pb-2 pt-2 ring-1 ring-border/80 shadow-[0_3px_0_0_rgba(0,0,0,0.18)] sm:pt-5">
                     {!isDesktop && (
                       <div
                         onPointerDown={(e) => dragControls.start(e)}

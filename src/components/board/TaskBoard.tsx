@@ -9,6 +9,7 @@ import React, {
 } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
+import { CalendarCheck } from 'lucide-react';
 import useSWR from 'swr';
 import {
   Task,
@@ -221,6 +222,7 @@ export default function TaskBoard({
   const [isDragOverBacklog, setIsDragOverBacklog] = useState(false);
   const [backlogProximity, setBacklogProximity] = useState(0);
   const [trayCloseProgress, setTrayCloseProgress] = useState(0);
+  const [todayInView, setTodayInView] = useState(true);
 
   const centerColumnSmooth = useCallback(
     (i: number) => {
@@ -235,6 +237,28 @@ export default function TaskBoard({
     },
     [scrollerRef],
   );
+
+  const updateTodayVisibility = useCallback(() => {
+    const s = scrollerRef.current;
+    if (!s) return;
+
+    const col = document.querySelector<HTMLElement>(
+      `[data-date-key="${todayKey}"]`,
+    );
+    if (!col) {
+      setTodayInView(false);
+      return;
+    }
+
+    const scrollerRect = s.getBoundingClientRect();
+    const colRect = col.getBoundingClientRect();
+    const inset = 24;
+    const isVisible =
+      colRect.right > scrollerRect.left + inset &&
+      colRect.left < scrollerRect.right - inset;
+
+    setTodayInView((prev) => (prev === isVisible ? prev : isVisible));
+  }, [scrollerRef, todayKey]);
 
   // Mount: scroll to today's column instantly
   const didInitialCenter = useRef(false);
@@ -252,7 +276,29 @@ export default function TaskBoard({
     setPageIndex(activeIdx);
     didInitialCenter.current = true;
     recomputeCanPanRef.current?.();
-  }, [activeIdx, scrollerRef]);
+    updateTodayVisibility();
+  }, [activeIdx, scrollerRef, updateTodayVisibility]);
+
+  useEffect(() => {
+    const s = scrollerRef.current;
+    if (!s) return;
+
+    let frame = 0;
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(updateTodayVisibility);
+    };
+
+    schedule();
+    s.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('resize', schedule);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      s.removeEventListener('scroll', schedule);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [scrollerRef, updateTodayVisibility, windowDates.length]);
 
   // Track which column is centered on scroll
   useEffect(() => {
@@ -606,6 +652,25 @@ export default function TaskBoard({
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  const goToToday = useCallback(() => {
+    const i = windowDates.indexOf(todayKey);
+    if (i >= 0) {
+      setActiveDateKey(todayKey);
+      setPageIndex(i);
+      centerColumnSmooth(i);
+      return;
+    }
+
+    onExtendWindow?.(cmpYmd(todayKey, activeDateKey) < 0 ? 'past' : 'future');
+  }, [
+    activeDateKey,
+    centerColumnSmooth,
+    onExtendWindow,
+    setActiveDateKey,
+    todayKey,
+    windowDates,
+  ]);
+
   // Visible 7 dots centered on the live pageIndex (tracks scroll for smooth transitions).
   const visibleDateDots = useMemo(() => {
     if (windowDates.length === 0) return [];
@@ -664,6 +729,7 @@ export default function TaskBoard({
               key={dk}
               ref={setSlideRef(i)}
               data-col="true"
+              data-date-key={dk}
               className="shrink-0 snap-center w-[88vw] sm:w-[360px] md:w-[330px] lg:w-[310px] xl:w-[292px] h-full"
             >
               <DayColumn
@@ -724,6 +790,7 @@ export default function TaskBoard({
                     setShowTimer(true);
                   }}
                   onPatchTask={patchTask}
+                  dateKey={dk}
                   isAnyDragging={!!drag?.active}
                   isToday={dk === todayKey}
                   filter={getFilter(i)}
@@ -750,13 +817,28 @@ export default function TaskBoard({
             variant="mobile"
           />
         </div>
-        <div className="hidden md:block">
+        <div className="hidden md:flex items-center gap-2 pointer-events-auto">
           <PlannerHeader
             dateKey={activeDateKey}
             expanded={calendarOpen}
             onToggle={() => setCalendarOpen((v) => !v)}
             variant="desktop"
           />
+          {!calendarOpen && !drag?.active && !todayInView && !isMobile && (
+            <motion.button
+              type="button"
+              onClick={goToToday}
+              aria-label="Go back to today"
+              title="Go back to today"
+              initial={{ opacity: 0, y: -4, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 360, damping: 28 }}
+              className="flex items-center gap-2 rounded-2xl border border-primary/25 bg-card/80 px-3 py-2 text-sm font-black text-primary backdrop-blur-xl hover:bg-card/95 active:scale-95"
+            >
+              <CalendarCheck className="h-4 w-4" />
+              <span>Today</span>
+            </motion.button>
+          )}
         </div>
         {!calendarOpen && (
           <div className="md:hidden pointer-events-auto w-full px-2 py-1.5 rounded-2xl bg-card/40 backdrop-blur-xl">
@@ -803,13 +885,14 @@ export default function TaskBoard({
           ['--stack' as string]: `${notificationStackHeight}px`,
           transition: 'padding 200ms ease',
         }}
-        className="fixed bottom-0 left-0 right-0 z-[40] px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+100px+var(--stack))] pointer-events-none"
+        className="fixed bottom-0 left-0 right-0 z-[40] px-3 md:px-4 pb-[calc(env(safe-area-inset-bottom)+84px+var(--stack))] md:pb-[calc(env(safe-area-inset-bottom)+92px+var(--stack))] pointer-events-none"
       >
-        <div className="pointer-events-auto mx-auto w-full max-w-[300px] md:max-w-[400px] relative min-h-[48px] md:min-h-[56px] flex items-center justify-center">
+        <div className="pointer-events-auto mx-auto w-full max-w-[300px] md:max-w-[480px] relative min-h-[48px] md:min-h-[72px] flex items-center justify-center">
           <BacklogBox
             count={backlog.length}
             isDragOver={isDragOverBacklog}
             isDragging={!!drag?.active}
+            isDesktop={!isMobile}
             proximity={backlogProximity}
             onClick={() => setBacklogOpen(true)}
             forwardRef={backlogBoxRef}
