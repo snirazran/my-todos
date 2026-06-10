@@ -895,8 +895,8 @@ export async function PUT(req: NextRequest) {
             createdAt: now,
             updatedAt: now,
             tags: doc.tags ?? [],
-            notes: doc.notes,
-            checklist: doc.checklist,
+            // Notes & checklist are intentionally NOT copied to sibling repeats —
+            // they belong to the original task instance, not the whole series.
             repeatMode: mode,
             repeatGroupId: groupId,
             repeatStartDate,

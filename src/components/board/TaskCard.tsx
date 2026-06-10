@@ -8,6 +8,8 @@ import {
   Clock,
   Bell,
   EllipsisVertical,
+  Pen,
+  ListChecks,
 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -346,6 +348,37 @@ export default function TaskCard({
               )}
               {task.calendarEventId && (
                 <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+              )}
+              {(task.notes?.trim() ||
+                (task.checklist && task.checklist.length > 0)) && (
+                <span className="inline-flex flex-shrink-0 items-center gap-1.5 no-underline">
+                  {task.notes?.trim() && (
+                    <Pen
+                      aria-label="Has notes"
+                      className="h-4 w-4 text-muted-foreground/70"
+                    />
+                  )}
+                  {task.checklist &&
+                    task.checklist.length > 0 &&
+                    (() => {
+                      const done = task.checklist.filter((c) => c.done).length;
+                      const total = task.checklist.length;
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1 ${
+                            done === total
+                              ? 'text-primary'
+                              : 'text-muted-foreground/70'
+                          }`}
+                        >
+                          <ListChecks className="h-4 w-4" />
+                          <span className="text-[11px] font-bold tabular-nums no-underline">
+                            {done}/{total}
+                          </span>
+                        </span>
+                      );
+                    })()}
+                </span>
               )}
             </div>
           </div>

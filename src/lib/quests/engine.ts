@@ -1013,6 +1013,63 @@ export async function saveActiveFocusCategory(args: {
   return { activeFocusCategoryId: categoryId };
 }
 
+// When a free user fully finishes (claims) their active focus quest, advance the
+// active focus to the next selected category that still has an available quest,
+// so they keep progressing without manually switching. Mutates
+// `user.focusProfile` in place; the caller is responsible for saving the user.
+// Unlike a manual switch, this does NOT zero any progress. Returns the new
+// category id, or null if nothing changed.
+async function advanceActiveFocusAfterFinish(args: {
+  user: InstanceType<typeof UserModel>;
+  finishedCategoryId?: string | null;
+}): Promise<string | null> {
+  const { user, finishedCategoryId } = args;
+  if (!finishedCategoryId) return null;
+  // Premium users progress every focus in parallel — no single active focus.
+  if (isPremiumUser(user.toObject())) return null;
+
+  const profile = normalizeFocusProfile(user.toObject());
+  const currentActive = resolveActiveFocusCategoryId(profile, false);
+  // Only advance when the finished quest is the one they were actively progressing.
+  if (!currentActive || currentActive !== finishedCategoryId) return null;
+
+  const candidates = (profile.selectedCategoryIds ?? []).filter(
+    (id) => id !== currentActive,
+  );
+  if (candidates.length === 0) return null;
+
+  const quests = await QuestModel.find({
+    userId: String(user._id),
+    placement: 'category',
+    categoryId: { $in: candidates },
+  }).lean<QuestDoc[]>();
+
+  // A focus quest is "available" if it still has a reward to earn, or an
+  // objective in progress.
+  const isAvailable = (quest: QuestDoc) => {
+    const claimed = new Set(quest.claimedObjectiveIds ?? []);
+    return (quest.logic ?? []).some((block: any) =>
+      block.rewards?.length
+        ? !claimed.has(block.id)
+        : block.progress < block.target,
+    );
+  };
+
+  // Keep the user's own selection order so the next focus is predictable.
+  const nextCategoryId =
+    candidates.find((id) =>
+      quests.some((quest) => quest.categoryId === id && isAvailable(quest)),
+    ) ?? null;
+  if (!nextCategoryId) return null;
+
+  user.focusProfile = {
+    ...((user.focusProfile as FocusProfile) ?? {}),
+    activeFocusCategoryId: nextCategoryId,
+  };
+  user.markModified('focusProfile');
+  return nextCategoryId;
+}
+
 export async function claimQuestReward(args: {
   userId: string;
   claimType: 'daily' | 'category';
@@ -1090,6 +1147,14 @@ export async function claimQuestReward(args: {
 
   quest.claimedAt = new Date();
   user.markModified('wardrobe');
+
+  // Claiming the whole quest finishes it — advance a free user's active focus.
+  if (quest.placement === 'category') {
+    await advanceActiveFocusAfterFinish({
+      user,
+      finishedCategoryId: quest.categoryId,
+    });
+  }
 
   // Save quest and user in parallel
   await Promise.all([quest.save(), user.save()]);
@@ -1171,6 +1236,23 @@ export async function claimObjectiveReward(args: {
   quest.claimedObjectiveIds = [...(quest.claimedObjectiveIds ?? []), objectiveId];
   quest.markModified('claimedObjectiveIds');
   user.markModified('wardrobe');
+
+  // If this was the last objective — i.e. every reward objective is now complete
+  // and claimed — the focus quest is finished, so advance a free user's active
+  // focus to the next available category.
+  if (quest.placement === 'category') {
+    const claimed = new Set(quest.claimedObjectiveIds);
+    const rewardBlocks = (quest.logic ?? []).filter((b) => b.rewards?.length);
+    const finished =
+      rewardBlocks.length > 0 &&
+      rewardBlocks.every((b) => b.progress >= b.target && claimed.has(b.id));
+    if (finished) {
+      await advanceActiveFocusAfterFinish({
+        user,
+        finishedCategoryId: quest.categoryId,
+      });
+    }
+  }
 
   // Save quest and user in parallel
   await Promise.all([quest.save(), user.save()]);

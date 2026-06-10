@@ -917,7 +917,7 @@ export default function TaskBoard({
         <div
           ref={isPast ? pastZoneRef : futureZoneRef}
           data-edge-zone={side}
-          className="shrink-0 self-start flex h-[clamp(260px,calc(100svh-360px),560px)] w-[52vw] sm:w-[200px] md:w-[185px]"
+          className="shrink-0 self-start flex h-[clamp(220px,calc(100svh-430px),480px)] w-[52vw] sm:w-[200px] md:w-[185px]"
         >
           <motion.div
             initial={{ opacity: 0 }}

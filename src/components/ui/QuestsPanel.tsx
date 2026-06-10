@@ -16,6 +16,7 @@ import type {
   FocusCategoryTagMap,
   MacroCategoryDefinition,
   MacroCategoryId,
+  QuestProgressView,
   QuestReward,
 } from '@/lib/quests/types';
 import {
@@ -166,6 +167,35 @@ function createFlyRewardItem(amount: number): ItemDef {
     riveIndex: 0,
     icon: '',
   };
+}
+
+// A quest is "finished" when every objective is done — i.e. claimed (for
+// reward objectives) or simply complete (for objectives with no reward). This
+// mirrors the card's own "all objectives done" state (see ObjectiveRow's
+// `stepDone`), so the sort matches what the user sees.
+function isQuestFinished(quest: QuestProgressView): boolean {
+  if (quest.logic.length === 0) return quest.claimed;
+  return quest.logic.every((block) => {
+    const complete = block.progress >= Math.max(1, block.target);
+    const hasRewards = (block.rewards?.length ?? 0) > 0;
+    const claimed = quest.claimedObjectiveIds.includes(block.id);
+    return claimed || (complete && !hasRewards);
+  });
+}
+
+function isQuestExpired(quest: QuestProgressView): boolean {
+  return (
+    !!quest.expiresAt && new Date(quest.expiresAt).getTime() <= Date.now()
+  );
+}
+
+// "Retired" quests render at the bottom: finished ones, and out-of-date (expired)
+// ones that have nothing left to claim. A completed-but-unclaimed quest stays up
+// top so the user can still collect it.
+function isQuestRetired(quest: QuestProgressView): boolean {
+  return (
+    isQuestFinished(quest) || (isQuestExpired(quest) && !quest.claimable)
+  );
 }
 
 function getFocusQuestSortScore(quest: CategoryQuestProgressView) {
@@ -364,6 +394,7 @@ export function QuestsPanel({
       const bScore = getFocusQuestSortScore(b);
 
       return (
+        Number(isQuestRetired(a)) - Number(isQuestRetired(b)) ||
         Number(a.locked ?? false) - Number(b.locked ?? false) ||
         bScore.claimable - aScore.claimable ||
         bScore.bestProgressRatio - aScore.bestProgressRatio ||
@@ -676,7 +707,13 @@ export function QuestsPanel({
                           data.activeSeason && "relative z-10 -mt-8 pt-8 px-4 md:mx-auto md:mt-6 md:w-full md:max-w-6xl md:px-8 md:pt-0 bg-background rounded-t-[24px] md:rounded-none md:bg-transparent"
                         )}>
                         {(() => {
-                          const dailyQuests = data.dailyQuests ?? [];
+                          // Finished / out-of-date daily quests sink to the
+                          // bottom; otherwise the engine's order is preserved
+                          // (stable sort).
+                          const dailyQuests = [...(data.dailyQuests ?? [])].sort(
+                            (a, b) =>
+                              Number(isQuestRetired(a)) - Number(isQuestRetired(b)),
+                          );
                           const renderDailyCard = (quest: DailyQuestProgressView) => (
                             <DailyQuestPresentationCard
                               key={quest.id}

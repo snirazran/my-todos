@@ -10,10 +10,10 @@ import {
   ChevronUp,
   EyeOff,
   ListChecks,
+  Pen,
   Pencil,
   Plus,
   Repeat,
-  StickyNote,
   Tag,
   Trash2,
   X,
@@ -449,7 +449,7 @@ export default function TaskDetailSheet({
                   className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-muted/30 px-3.5 py-3 text-left transition-colors hover:bg-muted/50"
                 >
                   <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-card text-muted-foreground ring-1 ring-border">
-                    <StickyNote className="h-[18px] w-[18px]" />
+                    <Pen className="h-[18px] w-[18px]" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13px] font-bold text-foreground">
