@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import {
+  Bell,
   CalendarCheck,
   Check,
   ChevronDown,
@@ -479,7 +480,18 @@ function ReminderOverlay({
             >
               <X className="h-4 w-4 stroke-[3]" />
             </button>
-            <h3 className="text-[16px] font-extrabold text-foreground">Time</h3>
+            <h3 className="text-[16px] font-extrabold text-foreground">Notify</h3>
+          </div>
+
+          {/* Reminder summary */}
+          <div className="mb-4 flex items-center justify-center gap-2 text-[13px] font-bold text-muted-foreground">
+            <Bell className="h-4 w-4 text-primary" />
+            <span>
+              Notifies you at{' '}
+              <span className="text-primary">
+                {pad(reminderHour24)}:{pad(reminderMinute)}
+              </span>
+            </span>
           </div>
 
           <div className="mb-5">
@@ -516,7 +528,7 @@ function ReminderOverlay({
             onClick={saveReminderTime}
             className="h-11 w-full rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
           >
-            Save
+            Save reminder
           </button>
         </div>
       )}

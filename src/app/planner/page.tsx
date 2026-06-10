@@ -18,9 +18,9 @@ type DateRangeResponse = {
   accountCreatedAt: string | null;
 };
 
-const INITIAL_PAST = 14;
-const INITIAL_FUTURE = 30;
-const EXTEND_STEP = 30;
+const INITIAL_PAST = 7;
+const INITIAL_FUTURE = 7;
+const EXTEND_STEP = 7;
 
 export default function ManageTasksPage() {
   const today = todayYmd();
@@ -134,6 +134,57 @@ export default function ManageTasksPage() {
       }
     },
     [accountCreatedAt, fetchRange, windowStart, windowEnd],
+  );
+
+  // Jump to an arbitrary date: rebuild the window centered on it (±7) and fetch
+  // fresh. Used for far calendar navigation, "Today" when off-window, and after
+  // moving a task to a specific date.
+  const jumpToDate = useCallback(
+    async (target: string) => {
+      const minBound = accountCreatedAt ?? '1970-01-01';
+      let start = addDays(target, -INITIAL_PAST);
+      if (cmpYmd(start, minBound) < 0) start = minBound;
+      const end = addDays(target, INITIAL_FUTURE);
+      try {
+        await fetchRange(start, end);
+        setWindowStart(start);
+        setWindowEnd(end);
+        setActiveDateKey(target);
+      } catch (e) {
+        console.error('jumpToDate failed', e);
+      }
+    },
+    [accountCreatedAt, fetchRange],
+  );
+
+  // Move a single task to any date (possibly outside the loaded window) via the
+  // atomic move API, then re-center the board on the destination.
+  const moveTaskToDate = useCallback(
+    async (taskId: string, fromDateKey: string, targetKey: string) => {
+      // Optimistically remove from source column.
+      setTasksByDate((prev) => {
+        if (!prev[fromDateKey]) return prev;
+        return {
+          ...prev,
+          [fromDateKey]: prev[fromDateKey].filter((t) => t.id !== taskId),
+        };
+      });
+      try {
+        await fetch('/api/tasks', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId,
+            move: { type: 'regular', date: targetKey },
+            timezone: tz,
+          }),
+        });
+      } catch (e) {
+        console.error('moveTaskToDate failed', e);
+      }
+      await jumpToDate(targetKey);
+    },
+    [tz, jumpToDate],
   );
 
   // Save tasks for a specific date (full reorder for that column)
@@ -379,6 +430,8 @@ export default function ManageTasksPage() {
           setActiveDateKey={setActiveDateKey}
           accountCreatedAt={accountCreatedAt}
           onExtendWindow={onExtendWindow}
+          onJumpToDate={jumpToDate}
+          onMoveTaskToDate={moveTaskToDate}
           onToggleRepeat={onToggleRepeat}
           onScheduleTask={onScheduleTask}
         />

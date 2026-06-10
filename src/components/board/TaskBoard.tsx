@@ -9,7 +9,12 @@ import React, {
 } from 'react';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
-import { CalendarCheck } from 'lucide-react';
+import {
+  CalendarCheck,
+  CalendarPlus,
+  ChevronsLeft,
+  ChevronsRight,
+} from 'lucide-react';
 import useSWR from 'swr';
 import {
   Task,
@@ -18,6 +23,7 @@ import {
   ymd,
   parseYmd,
   cmpYmd,
+  addDays,
 } from './helpers';
 import DayColumn from './DayColumn';
 import TaskList from './TaskList';
@@ -54,6 +60,8 @@ export default function TaskBoard({
   setActiveDateKey,
   accountCreatedAt,
   onExtendWindow,
+  onJumpToDate,
+  onMoveTaskToDate,
   onToggleRepeat,
   onScheduleTask,
   onEditTask,
@@ -87,6 +95,12 @@ export default function TaskBoard({
   setActiveDateKey: (d: string) => void;
   accountCreatedAt?: string | null;
   onExtendWindow?: (direction: 'past' | 'future') => void;
+  onJumpToDate?: (target: string) => void | Promise<void>;
+  onMoveTaskToDate?: (
+    taskId: string,
+    fromDateKey: string,
+    targetKey: string,
+  ) => void | Promise<void>;
   onToggleRepeat?: (taskId: string, dateKey: string) => Promise<void> | void;
   onScheduleTask?: (
     taskId: string,
@@ -215,6 +229,93 @@ export default function TaskBoard({
   const [pageIndex, setPageIndex] = useState<number>(activeIdx);
   const recomputeCanPanRef = useRef<(() => void) | undefined>(undefined);
 
+  // Edge "Move to a specific date" drop zones (shown while dragging)
+  const pastZoneRef = useRef<HTMLDivElement>(null);
+  const futureZoneRef = useRef<HTMLDivElement>(null);
+  const [dateZoneActive, setDateZoneActive] = useState(false);
+  const [moveCalendarOpen, setMoveCalendarOpen] = useState(false);
+  const [pendingMove, setPendingMove] = useState<{
+    taskId: string;
+    fromDateKey: string;
+  } | null>(null);
+
+  // Whether the past edge can still load more (bounded by account creation).
+  const canLoadPast = useMemo(() => {
+    const minBound = accountCreatedAt ?? '1970-01-01';
+    return windowDates.length > 0 && cmpYmd(windowDates[0], minBound) > 0;
+  }, [windowDates, accountCreatedAt]);
+
+  // Elastic edge "pull": how far past the first/last day the user has scrolled.
+  // Drives the Load-more expansion and arms a load-on-release gesture (mobile).
+  const PULL_ARM = 0.82; // fraction of PULL_FULL needed to trigger a load
+  const [edgePull, setEdgePull] = useState<{
+    side: 'past' | 'future' | null;
+    amount: number;
+  }>({ side: null, amount: 0 });
+  const edgePullRef = useRef(edgePull);
+  edgePullRef.current = edgePull;
+  const pullArmedRef = useRef(false);
+  // After an edge load, smooth-center this date once it enters the window.
+  const pendingCenterKeyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const key = pendingCenterKeyRef.current;
+    if (!key) return;
+    const i = windowDates.indexOf(key);
+    if (i < 0) return;
+    pendingCenterKeyRef.current = null;
+    requestAnimationFrame(() => centerColumnSmooth(i));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [windowDates]);
+
+  // Load 7 more days on an edge and glide one day in that direction. Used by
+  // both the "Load more" click (web) and the pull-to-load release (mobile).
+  const pastAnchorRef = useRef<{ key: string; offsetLeft: number } | null>(null);
+  const triggerEdgeLoad = useCallback(
+    (side: 'past' | 'future') => {
+      const target =
+        side === 'future'
+          ? addDays(windowDates[windowDates.length - 1], 1)
+          : addDays(windowDates[0], -1);
+      pendingCenterKeyRef.current = target;
+      if (side === 'past') {
+        // Anchor the current column across the prepend so the follow-up glide
+        // to the previous day starts from the right place (no jump).
+        const dk = windowDates[pageIndex];
+        const col = document.querySelector<HTMLElement>(
+          `[data-date-key="${dk}"]`,
+        );
+        if (col) pastAnchorRef.current = { key: dk, offsetLeft: col.offsetLeft };
+      }
+      onExtendWindow?.(side);
+    },
+    [windowDates, pageIndex, onExtendWindow],
+  );
+
+  // After the window start changes (past prepend), restore scroll position so
+  // the anchored column stays under the same viewport offset.
+  const prevWindowStartRef = useRef(windowDates[0]);
+  React.useLayoutEffect(() => {
+    const start = windowDates[0];
+    if (start === prevWindowStartRef.current) return;
+    prevWindowStartRef.current = start;
+    const anchor = pastAnchorRef.current;
+    const s = scrollerRef.current;
+    if (!anchor || !s) return;
+    const col = document.querySelector<HTMLElement>(
+      `[data-date-key="${anchor.key}"]`,
+    );
+    if (col) {
+      // Instant correction (bypass the scroller's smooth behavior) so the
+      // anchor doesn't visibly slide; the follow-up glide handles the motion.
+      const prev = s.style.scrollBehavior;
+      s.style.scrollBehavior = 'auto';
+      s.scrollLeft += col.offsetLeft - anchor.offsetLeft;
+      s.style.scrollBehavior = prev;
+    }
+    pastAnchorRef.current = null;
+  }, [windowDates, scrollerRef]);
+
   // Backlog state
   const [backlogOpen, setBacklogOpen] = useState(false);
   const backlogBoxRef = useRef<HTMLButtonElement>(null);
@@ -279,6 +380,39 @@ export default function TaskBoard({
     updateTodayVisibility();
   }, [activeIdx, scrollerRef, updateTodayVisibility]);
 
+  // After a full-window rebuild (jumpToDate / move-to-date / far calendar jump),
+  // both bounds change and the old scroll position is meaningless — re-center on
+  // the active date. Incremental extends (one bound changes) are skipped.
+  const prevBoundsRef = useRef({
+    start: windowDates[0],
+    end: windowDates[windowDates.length - 1],
+  });
+  useEffect(() => {
+    const start = windowDates[0];
+    const end = windowDates[windowDates.length - 1];
+    const prev = prevBoundsRef.current;
+    const bothChanged = start !== prev.start && end !== prev.end;
+    prevBoundsRef.current = { start, end };
+    if (!bothChanged) return;
+    const i = windowDates.indexOf(activeDateKey);
+    if (i < 0) return;
+    setPageIndex(i);
+    const s = scrollerRef.current;
+    if (!s) return;
+    requestAnimationFrame(() => {
+      const col = document.querySelector<HTMLElement>(
+        `[data-date-key="${activeDateKey}"]`,
+      );
+      if (col) {
+        s.scrollTo({
+          left: col.offsetLeft - (s.clientWidth - col.clientWidth) / 2,
+          // @ts-ignore
+          behavior: 'instant',
+        });
+      }
+    });
+  }, [windowDates, activeDateKey, scrollerRef]);
+
   useEffect(() => {
     const s = scrollerRef.current;
     if (!s) return;
@@ -317,11 +451,23 @@ export default function TaskBoard({
         setPageIndex(idx);
         const dk = windowDates[idx];
         if (dk && dk !== activeDateKey) setActiveDateKey(dk);
+      }
 
-        // Edge-trigger window expansion
-        if (onExtendWindow) {
-          if (idx <= 3) onExtendWindow('past');
-          else if (idx >= N - 4) onExtendWindow('future');
+      // Elastic edge pull: how far the viewport extends past the first/last day.
+      const first = cols[0];
+      const last = cols[cols.length - 1];
+      if (first && last && !drag?.active) {
+        const PULL_FULL = 110;
+        const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+        const futureExtra =
+          s.scrollLeft + s.clientWidth - (last.offsetLeft + last.clientWidth);
+        const pastExtra = first.offsetLeft - s.scrollLeft;
+        if (futureExtra > 2) {
+          setEdgePull({ side: 'future', amount: clamp01(futureExtra / PULL_FULL) });
+        } else if (pastExtra > 2 && canLoadPast) {
+          setEdgePull({ side: 'past', amount: clamp01(pastExtra / PULL_FULL) });
+        } else {
+          setEdgePull((prev) => (prev.side ? { side: null, amount: 0 } : prev));
         }
       }
     };
@@ -332,9 +478,37 @@ export default function TaskBoard({
     windowDates,
     activeDateKey,
     setActiveDateKey,
-    onExtendWindow,
     scrollerRef,
+    drag?.active,
+    canLoadPast,
   ]);
+
+  // Load-on-release: when the user lifts after pulling an edge past the arm
+  // threshold, load 7 more days on that side and glide to the next day.
+  useEffect(() => {
+    const s = scrollerRef.current;
+    if (!s) return;
+    const onRelease = (e: Event) => {
+      // Touch-only: ignore mouse so the web edge stays a plain click.
+      if (e instanceof PointerEvent && e.pointerType === 'mouse') return;
+      const { side, amount } = edgePullRef.current;
+      if (!side || amount < PULL_ARM || pullArmedRef.current) return;
+      if (side === 'past' && !canLoadPast) return;
+      pullArmedRef.current = true;
+      setEdgePull({ side: null, amount: 0 });
+      triggerEdgeLoad(side);
+      // Allow the next gesture once state has settled.
+      requestAnimationFrame(() => {
+        pullArmedRef.current = false;
+      });
+    };
+    s.addEventListener('touchend', onRelease, { passive: true });
+    s.addEventListener('pointerup', onRelease, { passive: true });
+    return () => {
+      s.removeEventListener('touchend', onRelease);
+      s.removeEventListener('pointerup', onRelease);
+    };
+  }, [scrollerRef, canLoadPast, triggerEdgeLoad]);
 
   const { panActive, startPanIfEligible, onPanMove, endPan, recomputeCanPan } =
     usePan(scrollerRef);
@@ -458,6 +632,25 @@ export default function TaskBoard({
     setBacklogProximity(prox);
   }, [drag?.x, drag?.y, drag?.active, backlogOpen, drag?.fromDay, BACKLOG_IDX]);
 
+  // "Move to a specific date" edge-zone hover detection.
+  useEffect(() => {
+    if (!drag?.active) {
+      setDateZoneActive(false);
+      return;
+    }
+    const over = (el: HTMLElement | null) => {
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return (
+        drag.x >= r.left &&
+        drag.x <= r.right &&
+        drag.y >= r.top &&
+        drag.y <= r.bottom
+      );
+    };
+    setDateZoneActive(over(pastZoneRef.current) || over(futureZoneRef.current));
+  }, [drag?.x, drag?.y, drag?.active]);
+
   const commitDragReorder = useCallback(
     (toDay: number, toIndex: number) => {
       if (!drag) return;
@@ -565,6 +758,19 @@ export default function TaskBoard({
   const onDrop = useCallback(() => {
     if (!drag) return;
 
+    // Dropped on a "Move to a specific date" edge zone: defer to the calendar.
+    if (dateZoneActive && !isDragOverBacklog) {
+      const fromKey =
+        drag.fromDay !== BACKLOG_IDX ? windowDates[drag.fromDay] : '';
+      setPendingMove({ taskId: drag.taskId, fromDateKey: fromKey ?? '' });
+      setMoveCalendarOpen(true);
+      endDrag();
+      setDateZoneActive(false);
+      setIsDragOverBacklog(false);
+      setTrayCloseProgress(0);
+      return;
+    }
+
     let finalToDay = (targetDay ?? drag.fromDay) as number;
     let finalToIndex = targetIndex ?? drag.fromIndex;
 
@@ -621,6 +827,7 @@ export default function TaskBoard({
     targetDay,
     targetIndex,
     isDragOverBacklog,
+    dateZoneActive,
     BACKLOG_IDX,
     N,
     windowDates,
@@ -661,11 +868,10 @@ export default function TaskBoard({
       return;
     }
 
-    onExtendWindow?.(cmpYmd(todayKey, activeDateKey) < 0 ? 'past' : 'future');
+    onJumpToDate?.(todayKey);
   }, [
-    activeDateKey,
     centerColumnSmooth,
-    onExtendWindow,
+    onJumpToDate,
     setActiveDateKey,
     todayKey,
     windowDates,
@@ -700,6 +906,109 @@ export default function TaskBoard({
     [windowDates, isMobile],
   );
 
+  // Edge slot: a "Move to a specific date" drop zone while dragging, otherwise a
+  // "Load more" button that loads 7 more days on that side.
+  const renderEdge = (side: 'past' | 'future') => {
+    const isPast = side === 'past';
+
+    // While dragging a task: an animated "Move to a specific date" drop zone.
+    if (drag?.active) {
+      return (
+        <div
+          ref={isPast ? pastZoneRef : futureZoneRef}
+          data-edge-zone={side}
+          className="shrink-0 self-start flex h-[clamp(260px,calc(100svh-360px),560px)] w-[52vw] sm:w-[200px] md:w-[185px]"
+        >
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{
+              scale: dateZoneActive ? 1.02 : 1,
+              opacity: 1,
+            }}
+            transition={{ type: 'spring', stiffness: 380, damping: 26 }}
+            className={[
+              'flex h-full w-full flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-5 py-8 text-center transition-colors duration-200',
+              dateZoneActive
+                ? 'border-primary bg-primary/20 text-primary shadow-lg shadow-primary/20'
+                : 'border-primary/40 bg-card/40 text-muted-foreground',
+            ].join(' ')}
+          >
+            <motion.div
+              animate={
+                dateZoneActive
+                  ? { y: [0, -5, 0], scale: 1.1 }
+                  : { y: 0, scale: 1 }
+              }
+              transition={
+                dateZoneActive
+                  ? { y: { repeat: Infinity, duration: 1 }, scale: { duration: 0.2 } }
+                  : { duration: 0.2 }
+              }
+            >
+              <CalendarPlus className="h-9 w-9" />
+            </motion.div>
+            <span className="text-base font-black leading-relaxed">
+              {dateZoneActive ? 'Release to pick a date' : 'Drop to pick a date'}
+            </span>
+            <span className="text-xs font-medium leading-relaxed opacity-70">
+              Move this task to a specific day
+            </span>
+          </motion.div>
+        </div>
+      );
+    }
+
+    if (isPast && !canLoadPast) return null;
+
+    // Not dragging: a "Load more" affordance. On touch it elastically scales as
+    // you slide toward it and loads on release; on web it's a plain click.
+    const pull = edgePull.side === side ? edgePull.amount : 0;
+    const armed = pull >= PULL_ARM;
+    const Chevron = isPast ? ChevronsLeft : ChevronsRight;
+    const label = !isMobile
+      ? 'Click to load'
+      : armed
+        ? 'Release to load'
+        : 'Load more';
+    return (
+      <div className="shrink-0 self-center flex items-center justify-center w-[52vw] sm:w-[200px] md:w-[185px]">
+        <button
+          type="button"
+          onClick={() => triggerEdgeLoad(side)}
+          style={{
+            transform: `scale(${1 + pull * 0.14})`,
+            transition: pull > 0 ? 'transform 60ms linear' : 'transform 260ms ease',
+          }}
+          className="group flex flex-col items-center gap-3 outline-none"
+        >
+          {/* Solid pill — clearly a button, fully filled, no ring */}
+          <motion.span
+            animate={{
+              scale: armed ? 1.06 : 1,
+              boxShadow: armed
+                ? '0 10px 28px -6px hsl(var(--primary) / 0.55)'
+                : '0 6px 16px -8px hsl(var(--primary) / 0.45)',
+            }}
+            transition={{ type: 'spring', stiffness: 320, damping: 22 }}
+            className="grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground transition-transform group-hover:scale-105 group-active:scale-95"
+          >
+            <Chevron className="h-5 w-5" strokeWidth={2.75} />
+          </motion.span>
+
+          {/* Label */}
+          <span className="flex flex-col items-center gap-0.5 leading-none">
+            <span className="text-[13px] font-black tracking-tight text-primary">
+              {label}
+            </span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
+              +7 days
+            </span>
+          </span>
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="relative w-full h-full">
       {/* SCROLLER */}
@@ -724,6 +1033,7 @@ export default function TaskBoard({
         }}
       >
         <div className="flex mx-auto gap-3 px-4 pt-[calc(9rem+env(safe-area-inset-top))] md:pt-16 pb-[calc(100px+env(safe-area-inset-bottom))]">
+          {renderEdge('past')}
           {windowDates.map((dk, i) => (
             <div
               key={dk}
@@ -804,11 +1114,16 @@ export default function TaskBoard({
               </DayColumn>
             </div>
           ))}
+          {renderEdge('future')}
         </div>
       </div>
 
       {/* Top header + dot strip (mobile + desktop) */}
-      <div className="absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-0 right-0 z-[60] flex flex-col items-center gap-2 pointer-events-none px-3">
+      <div
+        className={`absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-0 right-0 z-[60] flex flex-col items-center gap-2 pointer-events-none px-3 ${
+          moveCalendarOpen ? 'hidden' : ''
+        }`}
+      >
         <div className="md:hidden">
           <PlannerHeader
             dateKey={activeDateKey}
@@ -833,10 +1148,10 @@ export default function TaskBoard({
               initial={{ opacity: 0, y: -4, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               transition={{ type: 'spring', stiffness: 360, damping: 28 }}
-              className="flex items-center gap-2 rounded-2xl border border-primary/25 bg-card/80 px-3 py-2 text-sm font-black text-primary backdrop-blur-xl hover:bg-card/95 active:scale-95"
+              className="flex items-center gap-2 rounded-2xl bg-primary px-3 py-2 text-sm font-black text-primary-foreground hover:brightness-105 active:scale-95"
             >
               <CalendarCheck className="h-4 w-4" />
-              <span>Today</span>
+              <span>Jump to today</span>
             </motion.button>
           )}
         </div>
@@ -867,15 +1182,45 @@ export default function TaskBoard({
           )
         }
         onSelect={(d) => {
-          setActiveDateKey(d);
           const i = windowDates.indexOf(d);
-          if (i >= 0) centerColumnSmooth(i);
-          else if (onExtendWindow) {
-            // jump outside the window — caller will rebuild
-            onExtendWindow(cmpYmd(d, todayKey) < 0 ? 'past' : 'future');
+          if (i >= 0) {
+            setActiveDateKey(d);
+            centerColumnSmooth(i);
+          } else {
+            // jump outside the window — rebuild centered on the picked date
+            onJumpToDate?.(d);
           }
         }}
         onClose={() => setCalendarOpen(false)}
+      />
+
+      {/* Move-to-date calendar (opened by dropping a task on an edge zone) */}
+      <MonthCalendar
+        open={moveCalendarOpen}
+        selectedDate={todayKey}
+        minDate={todayKey}
+        heading={(() => {
+          const t = pendingMove ? findTaskById(pendingMove.taskId)?.text : '';
+          return t ? `Pick a day to move “${t}”` : 'Pick a day to move this task';
+        })()}
+        hasTasksOn={
+          new Set(
+            Object.entries(tasksByDate)
+              .filter(([, list]) => (list?.length ?? 0) > 0)
+              .map(([d]) => d),
+          )
+        }
+        onSelect={(d) => {
+          if (pendingMove) {
+            onMoveTaskToDate?.(pendingMove.taskId, pendingMove.fromDateKey, d);
+          }
+          setPendingMove(null);
+          setMoveCalendarOpen(false);
+        }}
+        onClose={() => {
+          setPendingMove(null);
+          setMoveCalendarOpen(false);
+        }}
       />
 
       {/* Bottom toolbar (Backlog) */}

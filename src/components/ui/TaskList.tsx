@@ -870,6 +870,25 @@ export default function TaskList({
     bottom: number;
   } | null>(null);
   const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+  const [showScrollHint, setShowScrollHint] = useState(false);
+
+  React.useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const update = () => {
+      const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+      // Only meaningful on web where the list has a capped height and scrolls
+      setShowScrollHint(remaining > 8);
+    };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => {
+      el.removeEventListener('scroll', update);
+      ro.disconnect();
+    };
+  }, [tasks, showCompleted, selectedTags]);
 
   React.useEffect(() => {
     if (isAnyDragging) {
@@ -1242,6 +1261,7 @@ export default function TaskList({
         </div>
 
         <div className="w-full rounded-[18px] bg-card/40 border border-border/50 shadow-sm overflow-hidden">
+        <div className="relative">
         <div
           className={`p-1.5 pb-0 space-y-0 md:overflow-y-auto overflow-y-visible md:max-h-[600px] no-scrollbar ${exitAction ? 'overflow-x-visible' : 'overflow-x-hidden'}`}
           ref={scrollContainerRef}
@@ -1360,24 +1380,6 @@ export default function TaskList({
                   </SortableContext>
                 </div>
 
-                {/* Inline Add Task Button */}
-                <div className="mt-1.5 mb-1">
-                  <button
-                    onClick={() => onAddRequested('', null, { preselectToday: true })}
-                    disabled={quickAddOpen}
-                    className="group relative flex w-full items-center gap-1 px-2.5 py-2.5 rounded-xl border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-0 md:px-3.5 md:py-3.5"
-                  >
-                    {/* Spacer matching the task grip column so the label lines up with task text */}
-                    <span aria-hidden className="flex-shrink-0 w-2.5 md:w-3" />
-                    <span className="flex-1 min-w-0 text-left text-[15px] font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors md:text-[17px]">
-                      Add a task
-                    </span>
-                    <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
-                      <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors md:h-6 md:w-6" strokeWidth={2.5} />
-                    </div>
-                  </button>
-                </div>
-
                 {/* Completed Tasks Section */}
                 {showCompleted && completedTasks.length > 0 && (
                   <>
@@ -1430,6 +1432,38 @@ export default function TaskList({
 
           {/* Show Finished Toggle (Removed from bottom) */}
         </div>
+
+        {/* Scroll hint — fade + chevron shown on web when more tasks lie below the fold */}
+        <div
+          aria-hidden
+          className={`pointer-events-none absolute inset-x-0 bottom-0 z-30 hidden md:flex items-end justify-center h-7 bg-gradient-to-t from-card via-card/80 to-transparent transition-opacity duration-200 ${
+            showScrollHint ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <ChevronDown className="mb-0.5 h-4 w-4 text-muted-foreground/60 animate-bounce" strokeWidth={2.5} />
+        </div>
+        </div>
+
+        {/* Pinned Add Task footer — always visible regardless of list length */}
+        {(exitAction ||
+          (tasks.length > 0 && sortedVisibleTasks.length > 0)) && (
+          <div className="p-1.5 pt-0 bg-card/40">
+            <button
+              onClick={() => onAddRequested('', null, { preselectToday: true })}
+              disabled={quickAddOpen}
+              className="group relative flex w-full items-center gap-1 px-2.5 py-2.5 rounded-xl border border-dashed border-muted-foreground/20 bg-muted/5 cursor-pointer hover:bg-muted/10 transition-all active:scale-[0.99] disabled:pointer-events-none disabled:opacity-0 md:px-3.5 md:py-3.5"
+            >
+              {/* Spacer matching the task grip column so the label lines up with task text */}
+              <span aria-hidden className="flex-shrink-0 w-2.5 md:w-3" />
+              <span className="flex-1 min-w-0 text-left text-[15px] font-semibold leading-snug text-muted-foreground group-hover:text-foreground transition-colors md:text-[17px]">
+                Add a task
+              </span>
+              <div className="flex items-center justify-center w-11 h-11 rounded-full bg-muted border border-muted-foreground/10 shrink-0 md:w-12 md:h-12">
+                <Plus className="h-5 w-5 text-muted-foreground group-hover:text-primary transition-colors md:h-6 md:w-6" strokeWidth={2.5} />
+              </div>
+            </button>
+          </div>
+        )}
         </div>
       </div>
 

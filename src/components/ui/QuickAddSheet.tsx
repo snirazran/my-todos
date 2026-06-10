@@ -565,7 +565,7 @@ export default function QuickAddSheet({
                             </span>
                           </span>
                           <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-extrabold text-muted-foreground sm:text-[15px]">
-                            <span>Remind me</span>
+                            <span>Notify</span>
                             {notifyEnabled && (
                               <span className="text-primary">· {formatTimeDisplay(startTime || '09:00')}</span>
                             )}

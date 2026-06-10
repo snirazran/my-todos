@@ -21,11 +21,11 @@ export default function PlannerHeader({
       <button
         type="button"
         onClick={onToggle}
-        className="pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-2xl bg-card/60 backdrop-blur-xl text-foreground border border-border/50 hover:bg-card/80 transition-colors"
+        className="pointer-events-auto flex items-center gap-2 px-3 py-2 rounded-2xl bg-secondary text-secondary-foreground hover:bg-secondary/80 transition-colors"
       >
         <CalendarDays size={16} className="opacity-80" />
         <span className="text-sm font-semibold tracking-tight">
-          {expanded ? 'Close calendar' : 'Open calendar'}
+          {expanded ? 'Close' : 'Jump to date'}
         </span>
         {expanded ? (
           <ChevronUp size={16} className="opacity-70" />

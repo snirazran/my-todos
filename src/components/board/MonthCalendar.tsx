@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarCheck } from 'lucide-react';
 import {
   ymd,
   parseYmd,
@@ -20,6 +20,7 @@ export default function MonthCalendar({
   selectedDate,
   minDate,
   hasTasksOn,
+  heading,
   onSelect,
   onClose,
 }: {
@@ -28,6 +29,8 @@ export default function MonthCalendar({
   minDate?: string | null;
   /** Optional set of YYYY-MM-DD that have tasks (to render a dot under the number). */
   hasTasksOn?: Set<string>;
+  /** Optional instruction shown at the top (e.g. when picking a date to move a task to). */
+  heading?: string;
   onSelect: (dateKey: string) => void;
   onClose: () => void;
 }) {
@@ -88,7 +91,7 @@ export default function MonthCalendar({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[54] bg-black/0 pointer-events-auto"
+            className="fixed inset-0 z-[54] bg-black/50 pointer-events-auto"
           />
         <motion.div
           key="cal"
@@ -99,6 +102,12 @@ export default function MonthCalendar({
           className="absolute left-0 right-0 top-0 z-[55] px-3 pt-14 pointer-events-none"
         >
           <div className="mx-auto w-[min(96vw,560px)] rounded-3xl bg-primary text-primary-foreground p-4 md:p-5 shadow-2xl pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+            {heading && (
+              <div className="mb-3 flex items-center justify-center gap-2 rounded-2xl bg-white/15 px-3 py-2 text-center text-[13px] font-bold leading-snug">
+                <CalendarCheck size={15} className="shrink-0" />
+                <span>{heading}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between mb-2">
               <button
                 onClick={goPrev}
@@ -157,6 +166,19 @@ export default function MonthCalendar({
                 );
               })}
             </div>
+
+            {selectedDate !== today && (
+              <button
+                onClick={() => {
+                  onSelect(today);
+                  onClose();
+                }}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/15 py-2.5 text-sm font-black tracking-tight hover:bg-white/25 transition-colors active:scale-[0.98]"
+              >
+                <CalendarCheck size={16} />
+                Jump back to today
+              </button>
+            )}
           </div>
         </motion.div>
         </>
