@@ -91,7 +91,7 @@ export default function MonthCalendar({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[54] bg-black/50 pointer-events-auto"
+            className="fixed inset-0 z-[95] bg-black/50 pointer-events-auto"
           />
         <motion.div
           key="cal"
@@ -99,7 +99,7 @@ export default function MonthCalendar({
           animate={{ y: 0 }}
           exit={{ y: -8, opacity: 0 }}
           transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-          className="absolute left-0 right-0 top-0 z-[55] px-3 pt-14 pointer-events-none"
+          className="absolute left-0 right-0 top-0 z-[96] px-3 pt-14 pointer-events-none"
         >
           <div className="mx-auto w-[min(96vw,560px)] rounded-3xl bg-primary text-primary-foreground p-4 md:p-5 shadow-2xl pointer-events-auto" onClick={(e) => e.stopPropagation()}>
             {heading && (

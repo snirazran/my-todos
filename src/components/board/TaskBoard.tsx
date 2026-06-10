@@ -983,12 +983,7 @@ export default function TaskBoard({
         >
           {/* Solid pill — clearly a button, fully filled, no ring */}
           <motion.span
-            animate={{
-              scale: armed ? 1.06 : 1,
-              boxShadow: armed
-                ? '0 10px 28px -6px hsl(var(--primary) / 0.55)'
-                : '0 6px 16px -8px hsl(var(--primary) / 0.45)',
-            }}
+            animate={{ scale: armed ? 1.06 : 1 }}
             transition={{ type: 'spring', stiffness: 320, damping: 22 }}
             className="grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground transition-transform group-hover:scale-105 group-active:scale-95"
           >
@@ -1120,9 +1115,9 @@ export default function TaskBoard({
 
       {/* Top header + dot strip (mobile + desktop) */}
       <div
-        className={`absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-0 right-0 z-[60] flex flex-col items-center gap-2 pointer-events-none px-3 ${
-          moveCalendarOpen ? 'hidden' : ''
-        }`}
+        className={`absolute top-[calc(0.5rem+env(safe-area-inset-top))] left-0 right-0 flex flex-col items-center gap-2 pointer-events-none px-3 ${
+          calendarOpen ? 'z-[97]' : 'z-[60]'
+        } ${moveCalendarOpen ? 'hidden' : ''}`}
       >
         <div className="md:hidden">
           <PlannerHeader

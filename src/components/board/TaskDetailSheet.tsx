@@ -6,10 +6,14 @@ import {
   CalendarPlus,
   Check,
   CheckCircle2,
+  ChevronRight,
+  ChevronUp,
   EyeOff,
+  ListChecks,
   Pencil,
   Plus,
   Repeat,
+  StickyNote,
   Tag,
   Trash2,
   X,
@@ -100,8 +104,13 @@ export default function TaskDetailSheet({
   const [notes, setNotes] = useState('');
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [newItem, setNewItem] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [tab, setTab] = useState<'notes' | 'checklist'>('notes');
+  const [expanded, setExpanded] = useState(false);
   const [showRepeat, setShowRepeat] = useState(false);
+
+  const notesRef = useRef<HTMLTextAreaElement>(null);
+  const newItemRef = useRef<HTMLInputElement>(null);
 
   // Seed local state only when a *different* task opens — not on every task
   // object change. Otherwise persisting a checklist edit re-runs this and snaps
@@ -111,11 +120,24 @@ export default function TaskDetailSheet({
       setNotes(task.notes ?? '');
       setChecklist(task.checklist ?? []);
       setNewItem('');
+      setEditingId(null);
       setTab('notes');
+      setExpanded(false);
       setShowRepeat(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task?.id]);
+
+  // When the editor opens (or the active tab changes while open), focus the
+  // relevant field so the user can start typing immediately.
+  useEffect(() => {
+    if (!expanded) return;
+    const t = setTimeout(() => {
+      if (tab === 'notes') notesRef.current?.focus();
+      else newItemRef.current?.focus();
+    }, 60);
+    return () => clearTimeout(t);
+  }, [expanded, tab]);
 
   const tagDetails = useMemo(() => {
     const byId = new Map(tags.map((t) => [t.id, t] as const));
@@ -136,6 +158,16 @@ export default function TaskDetailSheet({
 
   const commitNotes = () => {
     if ((displayTask.notes ?? '') !== notes) persist({ notes });
+  };
+
+  const openEditor = (which: 'notes' | 'checklist') => {
+    setTab(which);
+    setExpanded(true);
+  };
+
+  const collapseEditor = () => {
+    commitNotes();
+    setExpanded(false);
   };
 
   const setAndPersistChecklist = (next: ChecklistItem[]) => {
@@ -407,39 +439,115 @@ export default function TaskDetailSheet({
               )}
             </div>
 
-            {/* Notes / Checklist — tabbed so they share one intuitive space */}
-            <div className="mt-5 px-5">
-              <div className="flex rounded-full bg-muted p-1">
-                <TabButton
-                  active={tab === 'notes'}
-                  onClick={() => setTab('notes')}
+            {/* Notes / Checklist — compact previews that expand into a
+                comfortable editor only when the user chooses to. */}
+            {!expanded ? (
+              <div className="mt-5 space-y-2 px-5">
+                {/* Notes preview */}
+                <button
+                  onClick={() => openEditor('notes')}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-muted/30 px-3.5 py-3 text-left transition-colors hover:bg-muted/50"
                 >
-                  Notes
-                </TabButton>
-                <TabButton
-                  active={tab === 'checklist'}
-                  onClick={() => setTab('checklist')}
-                >
-                  Checklist
-                  {checklist.length > 0 && (
-                    <span className="ml-1 tabular-nums opacity-70">
-                      {doneCount}/{checklist.length}
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-card text-muted-foreground ring-1 ring-border">
+                    <StickyNote className="h-[18px] w-[18px]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-bold text-foreground">
+                      Notes
                     </span>
-                  )}
-                </TabButton>
+                    <span
+                      className={`block truncate text-[12px] ${
+                        notes.trim()
+                          ? 'text-muted-foreground'
+                          : 'text-muted-foreground/60'
+                      }`}
+                    >
+                      {notes.trim() || 'Add notes, links, or details…'}
+                    </span>
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                </button>
+
+                {/* Checklist preview */}
+                <button
+                  onClick={() => openEditor('checklist')}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-border/60 bg-muted/30 px-3.5 py-3 text-left transition-colors hover:bg-muted/50"
+                >
+                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-card text-muted-foreground ring-1 ring-border">
+                    <ListChecks className="h-[18px] w-[18px]" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="text-[13px] font-bold text-foreground">
+                        Checklist
+                      </span>
+                      {checklist.length > 0 && (
+                        <span className="shrink-0 text-[12px] font-bold tabular-nums text-muted-foreground">
+                          {doneCount}/{checklist.length}
+                        </span>
+                      )}
+                    </span>
+                    {checklist.length > 0 ? (
+                      <span className="mt-1.5 block h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <span
+                          className="block h-full rounded-full bg-primary transition-[width] duration-300"
+                          style={{
+                            width: `${(doneCount / checklist.length) * 100}%`,
+                          }}
+                        />
+                      </span>
+                    ) : (
+                      <span className="block text-[12px] text-muted-foreground/60">
+                        Break this task into steps…
+                      </span>
+                    )}
+                  </span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground/50" />
+                </button>
+              </div>
+            ) : (
+            <div className="mt-5 px-5">
+              <div className="flex items-center gap-2">
+                <div className="flex flex-1 rounded-full bg-muted p-1">
+                  <TabButton
+                    active={tab === 'notes'}
+                    onClick={() => setTab('notes')}
+                  >
+                    Notes
+                  </TabButton>
+                  <TabButton
+                    active={tab === 'checklist'}
+                    onClick={() => setTab('checklist')}
+                  >
+                    Checklist
+                    {checklist.length > 0 && (
+                      <span className="ml-1 tabular-nums opacity-70">
+                        {doneCount}/{checklist.length}
+                      </span>
+                    )}
+                  </TabButton>
+                </div>
+                <button
+                  onClick={collapseEditor}
+                  aria-label="Collapse"
+                  title="Collapse"
+                  className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <ChevronUp className="h-[18px] w-[18px]" />
+                </button>
               </div>
 
               <div className="mt-3">
                 {tab === 'notes' ? (
                   <div>
                     <textarea
+                      ref={notesRef}
                       value={notes}
                       onChange={(e) => setNotes(e.target.value.slice(0, NOTES_MAX))}
                       onBlur={commitNotes}
                       placeholder="Add notes, links, or details…"
-                      rows={4}
                       maxLength={NOTES_MAX}
-                      className="w-full resize-none rounded-2xl border border-border/60 bg-muted/30 px-3.5 py-3 text-[14px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                      className="block min-h-[clamp(280px,42vh,440px)] w-full resize-none rounded-2xl border border-border/60 bg-muted/30 px-4 py-3.5 text-[16px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:text-[15px]"
                     />
                     {notes.length > NOTES_MAX - 100 && (
                       <p className="mt-1 text-right text-[11px] font-bold tabular-nums text-muted-foreground">
@@ -448,86 +556,146 @@ export default function TaskDetailSheet({
                     )}
                   </div>
                 ) : (
-                  <div>
+                  <div className="min-h-[clamp(280px,42vh,440px)]">
                     {checklist.length > 0 && (
-                      <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                        <div
-                          className="h-full rounded-full bg-primary transition-[width] duration-300"
-                          style={{
-                            width: `${(doneCount / checklist.length) * 100}%`,
-                          }}
-                        />
+                      <div className="mb-3 flex items-center gap-2.5">
+                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-primary transition-[width] duration-300"
+                            style={{
+                              width: `${(doneCount / checklist.length) * 100}%`,
+                            }}
+                          />
+                        </div>
+                        <span className="shrink-0 text-[12px] font-bold tabular-nums text-muted-foreground">
+                          {doneCount}/{checklist.length}
+                        </span>
                       </div>
                     )}
 
-                    <div className="space-y-0.5">
-                      {checklist.map((it) => (
-                        <div
-                          key={it.id}
-                          className="group flex items-center gap-2.5 rounded-xl px-1.5 py-1 hover:bg-muted/40"
-                        >
-                          <button
-                            onClick={() => toggleItem(it.id)}
-                            aria-label={it.done ? 'Mark not done' : 'Mark done'}
-                            className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border transition-colors ${
-                              it.done
-                                ? 'border-primary bg-primary text-primary-foreground'
-                                : 'border-muted-foreground/40 text-transparent'
-                            }`}
+                    <div className="space-y-2">
+                      {checklist.map((it) => {
+                        const isEditing = editingId === it.id;
+                        return (
+                          <div
+                            key={it.id}
+                            className="group flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/30 px-3 py-2.5 transition-colors focus-within:border-primary/40 focus-within:bg-card hover:bg-muted/50"
                           >
-                            <Check className="h-3.5 w-3.5" strokeWidth={3} />
-                          </button>
+                            <button
+                              onClick={() => toggleItem(it.id)}
+                              aria-label={it.done ? 'Mark not done' : 'Mark done'}
+                              className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 transition-colors ${
+                                it.done
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-muted-foreground/40 text-transparent hover:border-primary/60'
+                              }`}
+                            >
+                              <Check className="h-4 w-4" strokeWidth={3} />
+                            </button>
+
+                            {isEditing ? (
+                              <input
+                                autoFocus
+                                value={it.text}
+                                maxLength={ITEM_MAX}
+                                onChange={(e) => editItem(it.id, e.target.value)}
+                                onBlur={() => {
+                                  persist({ checklist });
+                                  setEditingId(null);
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter' || e.key === 'Escape') {
+                                    e.preventDefault();
+                                    e.currentTarget.blur();
+                                  }
+                                }}
+                                className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground focus:outline-none sm:text-[15px]"
+                              />
+                            ) : (
+                              <button
+                                onClick={() => toggleItem(it.id)}
+                                className={`min-w-0 flex-1 truncate text-left text-[16px] transition-colors sm:text-[15px] ${
+                                  it.done
+                                    ? 'text-muted-foreground line-through'
+                                    : 'text-foreground'
+                                }`}
+                              >
+                                {it.text || (
+                                  <span className="text-muted-foreground/50">
+                                    Untitled step
+                                  </span>
+                                )}
+                              </button>
+                            )}
+
+                            {!isEditing && (
+                              <button
+                                onClick={() => setEditingId(it.id)}
+                                aria-label="Edit item"
+                                className="shrink-0 rounded-lg p-1.5 text-muted-foreground/50 transition-opacity hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100"
+                              >
+                                <Pencil className="h-[15px] w-[15px]" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => removeItem(it.id)}
+                              aria-label="Remove item"
+                              className="shrink-0 rounded-lg p-1.5 text-muted-foreground/50 transition-opacity hover:text-rose-500 sm:opacity-0 sm:group-hover:opacity-100"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        );
+                      })}
+
+                      {checklist.length < MAX_ITEMS && (
+                        <div className="flex items-center gap-3 rounded-2xl border-2 border-dashed border-border/60 px-3 py-2.5 transition-colors focus-within:border-primary/50">
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-lg border-2 border-dashed border-muted-foreground/40 text-muted-foreground">
+                            <Plus className="h-4 w-4" strokeWidth={2.5} />
+                          </span>
                           <input
-                            value={it.text}
+                            ref={newItemRef}
+                            value={newItem}
                             maxLength={ITEM_MAX}
-                            onChange={(e) => editItem(it.id, e.target.value)}
-                            onBlur={() => persist({ checklist })}
-                            className={`min-w-0 flex-1 bg-transparent text-[14px] focus:outline-none ${
-                              it.done
-                                ? 'text-muted-foreground line-through'
-                                : 'text-foreground'
-                            }`}
+                            onChange={(e) => setNewItem(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                addItem();
+                              }
+                            }}
+                            onBlur={addItem}
+                            placeholder="Add an item…"
+                            className="min-w-0 flex-1 bg-transparent text-[16px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none sm:text-[15px]"
                           />
-                          <button
-                            onClick={() => removeItem(it.id)}
-                            aria-label="Remove item"
-                            className="shrink-0 rounded-md p-1 text-muted-foreground/50 opacity-0 transition-opacity hover:text-rose-500 group-hover:opacity-100"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                          {newItem.trim() && (
+                            <button
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={addItem}
+                              className="shrink-0 rounded-lg bg-primary px-3 py-1 text-[13px] font-black text-primary-foreground transition-transform active:scale-95"
+                            >
+                              Add
+                            </button>
+                          )}
                         </div>
-                      ))}
+                      )}
                     </div>
 
-                    {checklist.length >= MAX_ITEMS ? (
-                      <p className="mt-1.5 px-1.5 text-[11px] font-bold text-muted-foreground">
+                    {checklist.length === 0 && (
+                      <p className="mt-3 text-center text-[12px] text-muted-foreground/60">
+                        Break this task into small, checkable steps.
+                      </p>
+                    )}
+                    {checklist.length >= MAX_ITEMS && (
+                      <p className="mt-2 px-1 text-[11px] font-bold text-muted-foreground">
                         Maximum {MAX_ITEMS} items reached.
                       </p>
-                    ) : (
-                      <div className="mt-1 flex items-center gap-2.5 rounded-xl px-1.5 py-1">
-                        <span className="grid h-5 w-5 shrink-0 place-items-center rounded-md border border-dashed border-muted-foreground/40 text-muted-foreground">
-                          <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                        </span>
-                        <input
-                          value={newItem}
-                          maxLength={ITEM_MAX}
-                          onChange={(e) => setNewItem(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              addItem();
-                            }
-                          }}
-                          onBlur={addItem}
-                          placeholder="Add an item…"
-                          className="min-w-0 flex-1 bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
-                        />
-                      </div>
                     )}
                   </div>
                 )}
               </div>
             </div>
+            )}
               </>
             )}
 
