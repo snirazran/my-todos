@@ -1659,6 +1659,8 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         type: doc.type,
         completed: !!doc.completed,
         tags: doc.tags ?? [],
+        notes: doc.notes ?? '',
+        checklist: doc.checklist ?? [],
         frogodoroSettings: doc.frogodoroSettings,
         calendarEventId: doc.calendarEventId,
         startTime: doc.startTime,
@@ -1995,7 +1997,7 @@ async function handleBoardPut(
     });
     const docs: TaskDoc[] = await TaskModel.find(
       { userId: uid, id: { $in: ids } },
-      { id: 1, text: 1, type: 1, tags: 1, calendarEventId: 1, startTime: 1, endTime: 1, reminder: 1 },
+      { id: 1, text: 1, type: 1, tags: 1, notes: 1, checklist: 1, calendarEventId: 1, startTime: 1, endTime: 1, reminder: 1 },
     )
       .lean<TaskDoc[]>()
       .exec();
@@ -2013,6 +2015,8 @@ async function handleBoardPut(
     );
     const textById = new Map<string, string>();
     const tagsById = new Map<string, string[]>();
+    const notesById = new Map<string, string | undefined>();
+    const checklistById = new Map<string, TaskDoc['checklist']>();
     const calIdById = new Map<string, string | undefined>();
     const startById = new Map<string, string | undefined>();
     const endById = new Map<string, string | undefined>();
@@ -2021,6 +2025,8 @@ async function handleBoardPut(
     for (const d of docs) {
       textById.set(d.id, d.text ?? '');
       tagsById.set(d.id, d.tags ?? []);
+      notesById.set(d.id, d.notes);
+      checklistById.set(d.id, d.checklist);
       calIdById.set(d.id, d.calendarEventId);
       startById.set(d.id, d.startTime);
       endById.set(d.id, d.endTime);
@@ -2036,6 +2042,8 @@ async function handleBoardPut(
               order: i + 1,
               text: textById.get(id) ?? textFromReq.get(id) ?? '',
               tags: tagsFromReq.get(id) ?? tagsById.get(id) ?? [],
+              notes: notesById.get(id) ?? '',
+              checklist: checklistById.get(id) ?? [],
               weekStart,
               updatedAt: now,
               calendarEventId: t?.calendarEventId ?? calIdById.get(id),
@@ -2078,13 +2086,15 @@ async function handleBoardPut(
 
   const docs: TaskDoc[] = await TaskModel.find(
     { userId: uid, id: { $in: ids } },
-    { id: 1, type: 1, text: 1, tags: 1, calendarEventId: 1, startTime: 1, endTime: 1, reminder: 1 },
+    { id: 1, type: 1, text: 1, tags: 1, notes: 1, checklist: 1, calendarEventId: 1, startTime: 1, endTime: 1, reminder: 1 },
   )
     .lean<TaskDoc[]>()
     .exec();
   const typeById = new Map(docs.map((d) => [d.id, d.type]));
   const textById = new Map(docs.map((d) => [d.id, d.text]));
   const tagsById = new Map(docs.map((d) => [d.id, d.tags ?? []]));
+  const notesById = new Map(docs.map((d) => [d.id, d.notes]));
+  const checklistById = new Map(docs.map((d) => [d.id, d.checklist]));
   const calIdById = new Map(docs.map((d) => [d.id, d.calendarEventId]));
   const startById = new Map(docs.map((d) => [d.id, d.startTime]));
   const endById = new Map(docs.map((d) => [d.id, d.endTime]));
@@ -2095,6 +2105,8 @@ async function handleBoardPut(
       const ttype = typeById.get(t.id);
       const textFromReq = t.text ?? textById.get(t.id) ?? '';
       const tags = t.tags ?? tagsById.get(t.id) ?? [];
+      const notes = notesById.get(t.id) ?? '';
+      const checklist = checklistById.get(t.id) ?? [];
 
       // Use request values if they exist, otherwise fallback to DB values
       const calendarEventId = t.calendarEventId ?? calIdById.get(t.id);
@@ -2137,6 +2149,8 @@ async function handleBoardPut(
               $set: {
                 text: textFromReq,
                 tags,
+                notes,
+                checklist,
                 date: weekDates[weekday],
                 order: i + 1,
                 completed: false,
@@ -2157,6 +2171,8 @@ async function handleBoardPut(
           $set: {
             text: textFromReq,
             tags,
+            notes,
+            checklist,
             date: weekDates[weekday],
             order: i + 1,
             completed: false,
@@ -2213,6 +2229,8 @@ async function handleBoardPutByDate(
       type: 1,
       text: 1,
       tags: 1,
+      notes: 1,
+      checklist: 1,
       calendarEventId: 1,
       startTime: 1,
       endTime: 1,
@@ -2224,6 +2242,8 @@ async function handleBoardPutByDate(
   const typeById = new Map(docs.map((d) => [d.id, d.type]));
   const textById = new Map(docs.map((d) => [d.id, d.text]));
   const tagsById = new Map(docs.map((d) => [d.id, d.tags ?? []]));
+  const notesById = new Map(docs.map((d) => [d.id, d.notes]));
+  const checklistById = new Map(docs.map((d) => [d.id, d.checklist]));
   const weekday = dowFromYMD(dateKey);
   const { weekStart } = getRollingWeekDatesZoned(tz);
 
@@ -2232,6 +2252,8 @@ async function handleBoardPutByDate(
       const ttype = typeById.get(t.id);
       const textFromReq = t.text ?? textById.get(t.id) ?? '';
       const tags = t.tags ?? tagsById.get(t.id) ?? [];
+      const notes = notesById.get(t.id) ?? '';
+      const checklist = checklistById.get(t.id) ?? [];
       if (ttype === 'weekly') {
         // Convert to a one-off regular on this date so order persists
         return TaskModel.updateOne(
@@ -2262,6 +2284,8 @@ async function handleBoardPutByDate(
               $set: {
                 text: textFromReq,
                 tags,
+                notes,
+                checklist,
                 date: dateKey,
                 order: i + 1,
                 completed: false,
@@ -2279,6 +2303,8 @@ async function handleBoardPutByDate(
           $set: {
             text: textFromReq,
             tags,
+            notes,
+            checklist,
             date: dateKey,
             order: i + 1,
             updatedAt: now,

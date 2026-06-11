@@ -75,35 +75,42 @@ export function TaskRepeatPopup({
         open={open}
         onOpenChange={(v) => !v && onClose()}
         zIndex={1500}
-        className="sm:max-w-[400px]"
+        className="sm:max-w-[400px] max-h-[90vh]"
       >
-        {() => (
-          <div className="px-5 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-2 sm:pt-5">
-            <h3 className="mb-1 text-center text-[17px] font-black text-foreground">
-              Repeat
-            </h3>
-            <p className="mb-4 text-center text-[12px] font-medium text-muted-foreground">
-              Choose when this task comes back.
-            </p>
-
-            <RepeatView
-              currentMode={mode}
-              setRepeatMode={setRepeatMode}
-              repeatDayLabel={repeatDayLabel}
-              monthlyLabel={monthlyLabel}
-              endDate={endDate}
-              onPickEndDate={() => setShowCalendar(true)}
-              onClearEndDate={() => setEndDate(null)}
-              customRule={rule}
-              onOpenCustom={() => setShowCustom(true)}
-            />
-
-            <button
-              onClick={commit}
-              className="mt-4 h-11 w-full rounded-xl bg-primary text-[14px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
+        {({ bindScroll }) => (
+          <div className="flex min-h-0 flex-1 flex-col">
+            <div
+              ref={bindScroll}
+              className="min-h-0 flex-1 overflow-y-auto overscroll-none px-5 pt-2 sm:pt-5"
             >
-              Done
-            </button>
+              <h3 className="mb-1 text-center text-[17px] font-black text-foreground">
+                Repeat
+              </h3>
+              <p className="mb-4 text-center text-[12px] font-medium text-muted-foreground">
+                Choose when this task comes back.
+              </p>
+
+              <RepeatView
+                currentMode={mode}
+                setRepeatMode={setRepeatMode}
+                repeatDayLabel={repeatDayLabel}
+                monthlyLabel={monthlyLabel}
+                endDate={endDate}
+                onPickEndDate={() => setShowCalendar(true)}
+                onClearEndDate={() => setEndDate(null)}
+                customRule={rule}
+                onOpenCustom={() => setShowCustom(true)}
+              />
+            </div>
+
+            <div className="shrink-0 border-t border-border/50 bg-card px-5 pb-[calc(env(safe-area-inset-bottom)+20px)] pt-3">
+              <button
+                onClick={commit}
+                className="h-11 w-full rounded-xl bg-primary text-[14px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
+              >
+                Done
+              </button>
+            </div>
           </div>
         )}
       </BaseSheet>

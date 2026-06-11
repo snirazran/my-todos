@@ -228,7 +228,7 @@ export function PickerSheet(props: Props) {
         {({ bindScroll }) => (
         <div
           ref={bindScroll}
-          className="mx-auto w-full overflow-y-auto overscroll-none px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-8"
+          className="mx-auto min-h-0 w-full flex-1 overflow-y-auto overscroll-none px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-8"
         >
           <div className="relative mb-7 flex h-9 items-center justify-center">
             <button

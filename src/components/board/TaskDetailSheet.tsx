@@ -23,7 +23,11 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 import Fly from '@/components/ui/fly';
 import type { ChecklistItem } from '@/hooks/useTaskData';
 import type { RepeatMode, RepeatRule } from '@/components/ui/quick-add/utils';
-import { monthlyRepeatLabel } from '@/components/ui/quick-add/utils';
+import {
+  monthlyRepeatLabel,
+  customRepeatLabel,
+  formatEndDateLabel,
+} from '@/components/ui/quick-add/utils';
 import { parseYmd, todayYmd } from '@/components/board/helpers';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 
@@ -213,15 +217,27 @@ export default function TaskDetailSheet({
         ? 'Weekdays'
         : repeatMode === 'weekly'
           ? DAY_NAMES[repeatDay]
-          : 'Repeat';
-  const repeatLabel =
+          : repeatMode === 'monthly'
+            ? 'Monthly'
+            : repeatMode === 'custom'
+              ? 'Custom'
+              : 'Repeat';
+  const repeatBaseLabel =
     repeatMode === 'daily'
       ? 'Every day'
       : repeatMode === 'weekdays'
         ? 'Every weekday'
         : repeatMode === 'weekly'
           ? `Every ${DAY_NAMES[repeatDay]}`
-          : 'Does not repeat';
+          : repeatMode === 'monthly'
+            ? monthlyRepeatLabel(monthlyAnchorYmd ?? todayYmd())
+            : repeatMode === 'custom' && displayTask.repeatRule
+              ? customRepeatLabel(displayTask.repeatRule)
+              : 'Does not repeat';
+  const repeatLabel =
+    repeatMode !== 'none' && displayTask.repeatEndDate
+      ? `${repeatBaseLabel} · until ${formatEndDateLabel(displayTask.repeatEndDate)}`
+      : repeatBaseLabel;
   const isRepeating = repeatMode !== 'none' || isWeekly;
 
   return (
