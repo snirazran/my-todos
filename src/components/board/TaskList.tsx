@@ -23,6 +23,7 @@ import { Plus, LayoutList, ListTodo, Repeat, CalendarClock } from 'lucide-react'
 import { TimePopup } from '@/components/ui/TimePopup';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { useLeftTongue } from './LeftTongue';
 
 export default React.memo(function TaskList({
   day,
@@ -170,6 +171,7 @@ export default React.memo(function TaskList({
   // Planner mutations go straight to the API and refresh via the board event.
   const refresh = () => window.dispatchEvent(new Event('board-refresh'));
   const { showNotification } = useNotification();
+  const { triggerTongue } = useLeftTongue();
 
   const groupIdOf = (taskId: string) =>
     items.find((t) => t.id === taskId)?.repeatGroupId;
@@ -224,19 +226,21 @@ export default React.memo(function TaskList({
   const toggleComplete = (t: Task) => {
     const completing = !t.completed;
     if (completing) stopTimerIfActive(t.id);
-    onPatchTask?.(t.id, { completed: completing });
-    fetch('/api/tasks', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        date: todayYmdStr(),
-        taskId: t.id,
-        completed: completing,
-      }),
-    })
-      .then((r) => r.json().catch(() => ({})))
-      .then((json) => {
-        refresh();
+
+    const persist = () => {
+      onPatchTask?.(t.id, { completed: completing });
+      return fetch('/api/tasks', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: todayYmdStr(),
+          taskId: t.id,
+          completed: completing,
+        }),
+      })
+        .then((r) => r.json().catch(() => ({})))
+        .then((json) => {
+          refresh();
         if (completing && json?.flyStatus) {
           if (json.flyStatus.justHitLimit) {
             showNotification(
@@ -247,7 +251,7 @@ export default React.memo(function TaskList({
                 </span>
               </div>,
             );
-          } else if (!json.flyStatus.limitHit) {
+          } else if (json.awarded) {
             showNotification(
               <div className="flex items-center gap-3 pr-2">
                 <Fly size={28} y={-4} />
@@ -264,7 +268,14 @@ export default React.memo(function TaskList({
           }
         }
       })
-      .catch(refresh);
+        .catch(refresh);
+    };
+
+    // Completing on the planner: the tongue reaches in from the left edge,
+    // grabs the fly and drags it off-screen, persisting once it's gone. If no
+    // fly is on screen (or the tongue is busy), just persist directly.
+    if (completing && triggerTongue({ key: t.id, onPersist: persist })) return;
+    void persist();
   };
 
   const setRepeatDirect = (

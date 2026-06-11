@@ -15,6 +15,7 @@ import { Icon } from '@/components/ui/Icon';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
+import { useLeftTongue } from './LeftTongue';
 
 type OnGrabParams = {
   clientX: number;
@@ -78,6 +79,9 @@ export default function TaskCard({
     // Fallback: try to find by Name
     return userTags?.find((t) => t.name === tagIdentifier);
   };
+
+  const { registerFly, isHidden } = useLeftTongue();
+  const grabbing = isHidden(task.id);
 
   // Keep latest callbacks in refs to avoid effect re-runs
   const onGrabRef = useRef(onGrab);
@@ -432,15 +436,20 @@ export default function TaskCard({
             }`}
           >
             <span
+              ref={(el) => registerFly(task.id, el)}
               className={`absolute inset-0 flex items-center justify-center rounded-full border border-muted-foreground/10 bg-muted transition-opacity duration-200 ${
-                task.completed ? 'opacity-0 pointer-events-none' : 'opacity-100'
+                task.completed || grabbing
+                  ? 'opacity-0 pointer-events-none'
+                  : 'opacity-100'
               }`}
             >
               <Fly size={36} paused={task.completed} y={-3} />
             </span>
             <span
               className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
-                task.completed ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                task.completed || grabbing
+                  ? 'opacity-100'
+                  : 'opacity-0 pointer-events-none'
               }`}
             >
               <CheckCircle2 className="h-8 w-8 text-green-500" />
