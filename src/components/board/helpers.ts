@@ -125,6 +125,23 @@ export const cmpYmd = (a: string, b: string): number =>
 /** Today as YYYY-MM-DD (local). */
 export const todayYmd = (): string => ymd(new Date());
 
+/**
+ * Friendly label for a date relative to today, e.g. "today", "tomorrow",
+ * "yesterday", or "Fri, Jun 12" for anything further out.
+ */
+export const relativeDayLabel = (s: string): string => {
+  const today = todayYmd();
+  if (s === today) return 'today';
+  if (s === addDays(today, 1)) return 'tomorrow';
+  if (s === addDays(today, -1)) return 'yesterday';
+  const d = parseYmd(s);
+  return d.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+};
+
 // DnD ids (use display day index)
 export const draggableIdFor = (displayDay: DisplayDay, taskId: string) =>
   `${taskId}__d${displayDay}`;

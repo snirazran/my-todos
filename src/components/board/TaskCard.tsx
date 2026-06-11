@@ -432,7 +432,7 @@ export default function TaskCard({
             }`}
           >
             <span
-              className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
+              className={`absolute inset-0 flex items-center justify-center rounded-full border border-muted-foreground/10 bg-muted transition-opacity duration-200 ${
                 task.completed ? 'opacity-0 pointer-events-none' : 'opacity-100'
               }`}
             >

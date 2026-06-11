@@ -40,6 +40,7 @@ import BacklogBox from './BacklogBox';
 import BacklogTray from './BacklogTray';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { useSheetStore } from '@/lib/sheetStore';
 
 type RepeatChoice = 'this-week' | 'weekly';
 
@@ -515,6 +516,10 @@ export default function TaskBoard({
   recomputeCanPanRef.current = recomputeCanPan;
 
   const snapSuppressed = !!drag?.active || panActive;
+
+  // Lock the horizontal board scroller while any sheet/popup is open so the
+  // page behind the backdrop can't be slid around.
+  const scrollLocked = useSheetStore((s) => s.count) > 0;
 
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   const [quickText, setQuickText] = useState('');
@@ -1012,12 +1017,13 @@ export default function TaskBoard({
         dir="ltr"
         data-role="board-scroller"
         data-drag={drag?.active ? '1' : '0'}
-        onPointerDown={startPanIfEligible}
-        onPointerMove={onPanMove}
-        onPointerUp={endPan}
+        onPointerDown={scrollLocked ? undefined : startPanIfEligible}
+        onPointerMove={scrollLocked ? undefined : onPanMove}
+        onPointerUp={scrollLocked ? undefined : endPan}
         className={[
           'no-scrollbar absolute inset-0 w-full h-full',
-          'flex flex-col items-start overflow-x-auto overflow-y-hidden overscroll-x-contain touch-pan-x',
+          'flex flex-col items-start overflow-y-hidden overscroll-x-contain',
+          scrollLocked ? 'overflow-x-hidden touch-none' : 'overflow-x-auto touch-pan-x',
           snapSuppressed
             ? 'snap-none'
             : 'snap-x snap-mandatory scroll-smooth md:snap-none',

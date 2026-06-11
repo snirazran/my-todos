@@ -128,17 +128,6 @@ export default function TaskDetailSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task?.id]);
 
-  // When the editor opens (or the active tab changes while open), focus the
-  // relevant field so the user can start typing immediately.
-  useEffect(() => {
-    if (!expanded) return;
-    const t = setTimeout(() => {
-      if (tab === 'notes') notesRef.current?.focus();
-      else newItemRef.current?.focus();
-    }, 60);
-    return () => clearTimeout(t);
-  }, [expanded, tab]);
-
   const tagDetails = useMemo(() => {
     const byId = new Map(tags.map((t) => [t.id, t] as const));
     const byName = new Map(tags.map((t) => [t.name, t] as const));
@@ -614,7 +603,7 @@ export default function TaskDetailSheet({
                             ) : (
                               <button
                                 onClick={() => toggleItem(it.id)}
-                                className={`min-w-0 flex-1 truncate text-left text-[16px] transition-colors sm:text-[15px] ${
+                                className={`min-w-0 flex-1 break-words text-left text-[16px] transition-colors sm:text-[15px] ${
                                   it.done
                                     ? 'text-muted-foreground line-through'
                                     : 'text-foreground'
@@ -681,11 +670,6 @@ export default function TaskDetailSheet({
                       )}
                     </div>
 
-                    {checklist.length === 0 && (
-                      <p className="mt-3 text-center text-[12px] text-muted-foreground/60">
-                        Break this task into small, checkable steps.
-                      </p>
-                    )}
                     {checklist.length >= MAX_ITEMS && (
                       <p className="mt-2 px-1 text-[11px] font-bold text-muted-foreground">
                         Maximum {MAX_ITEMS} items reached.

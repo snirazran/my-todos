@@ -13,13 +13,13 @@ import {
   type DisplayDay,
   type ApiDay,
   apiDayFromDisplay,
-  labelForDisplayDay,
+  relativeDayLabel,
 } from './helpers';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
 import Fly from '@/components/ui/fly';
-import { Plus, LayoutList, ListTodo, Repeat } from 'lucide-react';
+import { Plus, LayoutList, ListTodo, Repeat, CalendarClock } from 'lucide-react';
 import { TimePopup } from '@/components/ui/TimePopup';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
@@ -199,6 +199,24 @@ export default React.memo(function TaskList({
         .catch(() => {});
     }
     s.stopTimer();
+  };
+
+  const handleToggleComplete = (t: Task) => {
+    if (isFuture) {
+      showNotification(
+        <div className="flex items-center gap-3 pr-2">
+          <CalendarClock className="h-6 w-6 shrink-0 text-primary" />
+          <div className="flex flex-col leading-none">
+            <span className="text-base font-black">Not so fast!</span>
+            <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              This task isn&rsquo;t due yet
+            </span>
+          </div>
+        </div>,
+      );
+      return;
+    }
+    toggleComplete(t);
   };
 
   const toggleComplete = (t: Task) => {
@@ -564,7 +582,7 @@ export default React.memo(function TaskList({
             isAnyDragging={isAnyDragging}
             compact
             onTap={() => setActionSheetId(t.id)}
-            onToggleComplete={!isFuture ? () => toggleComplete(t) : undefined}
+            onToggleComplete={() => handleToggleComplete(t)}
             disableDrag={disableDrag}
           />
         </div>,
@@ -715,14 +733,7 @@ export default React.memo(function TaskList({
         variant={dialogVariant}
         itemLabel={dialog?.task.text}
         repeatMode={dialog?.task.repeatMode}
-        dayLabel={
-          dialog && dialog.day < 7
-            ? labelForDisplayDay(
-                dialog.day as Exclude<DisplayDay, 7>,
-                daysOrder,
-              )
-            : undefined
-        }
+        dayLabel={dateKey ? relativeDayLabel(dateKey) : undefined}
         busy={busy}
         onClose={() => setDialog(null)}
         onDeleteToday={

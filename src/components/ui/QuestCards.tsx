@@ -605,12 +605,15 @@ export function CategoryQuestPresentationCard({
           <button
             type="button"
             onClick={() => setShowSwitch(true)}
-            className="group absolute inset-0 z-20 flex items-center justify-center bg-black/45 transition-colors [@media(hover:hover)]:hover:bg-black/55"
-            aria-label="Switch focus"
+            className="group absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/45 px-4 text-center transition-colors [@media(hover:hover)]:hover:bg-black/55"
+            aria-label="Switch quest"
           >
             <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-[12px] font-black uppercase tracking-[0.12em] text-slate-900 shadow-[0_4px_0_0_rgba(15,23,42,0.25)] ring-1 ring-black/10 backdrop-blur-sm transition active:translate-y-[2px] active:shadow-none group-active:translate-y-[2px]">
               <Repeat className="h-4 w-4" strokeWidth={2.75} />
-              Switch focus
+              Switch quest
+            </span>
+            <span className="text-[12px] font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+              Tap to switch to this quest
             </span>
           </button>
         )}
@@ -644,33 +647,20 @@ export function CategoryQuestPresentationCard({
         </div>
 
         {usesFocusTags && !locked && !isCompleted && linkedTags.length === 0 && (
-          <div className="absolute inset-x-0 bottom-0 z-10 p-2.5 sm:p-3">
-            <button
-              type="button"
-              onClick={onEditTags}
-              className="flex w-full items-center gap-2.5 rounded-2xl bg-black/55 px-3 py-2.5 text-left ring-1 ring-white/15 backdrop-blur-md transition active:scale-[0.99]"
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white">
-                <Tags className="h-4 w-4" strokeWidth={2.5} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-black leading-tight text-white">
-                  Pick your{' '}
-                  {category?.shortLabel || category?.name
-                    ? `${(category?.shortLabel || category?.name)!.toLowerCase()} `
-                    : ''}
-                  tag
-                </span>
-                <span className="block text-[11px] font-medium text-white/70">
-                  Tasks with this tag count toward the quest.
-                </span>
-              </span>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-primary px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-primary-foreground shadow-[0_2px_0_rgba(15,23,42,0.18)]">
-                <Plus className="h-3.5 w-3.5" strokeWidth={3} />
-                Pick a tag
-              </span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onEditTags}
+            className="group absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-black/45 px-4 text-center transition-colors [@media(hover:hover)]:hover:bg-black/55"
+            aria-label="Pick a tag"
+          >
+            <span className="inline-flex items-center gap-2 rounded-full bg-white/95 px-4 py-2.5 text-[12px] font-black uppercase tracking-[0.12em] text-slate-900 shadow-[0_4px_0_0_rgba(15,23,42,0.25)] ring-1 ring-black/10 backdrop-blur-sm transition active:translate-y-[2px] active:shadow-none group-active:translate-y-[2px]">
+              <Tags className="h-4 w-4" strokeWidth={2.75} />
+              Pick a tag
+            </span>
+            <span className="text-[12px] font-bold text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]">
+              Choose a tag to start this quest
+            </span>
+          </button>
         )}
       </div>
 
@@ -840,7 +830,7 @@ function SwitchFocusConfirm({
                 <Repeat className="h-7 w-7" strokeWidth={2.5} />
               </div>
               <h3 className="text-center text-xl font-black text-foreground">
-                Switch your focus?
+                Switch your quest?
               </h3>
               <p className="mx-auto mt-1.5 max-w-[19rem] text-center text-[14px] leading-snug text-muted-foreground">
                 Switching to{' '}
@@ -860,14 +850,14 @@ function SwitchFocusConfirm({
                   disabled={switching}
                   className="h-12 w-full rounded-2xl bg-primary text-[14px] font-black uppercase tracking-wide text-primary-foreground transition active:scale-[0.98] disabled:opacity-60"
                 >
-                  {switching ? 'Switching...' : 'Switch focus'}
+                  {switching ? 'Switching...' : 'Switch quest'}
                 </button>
                 {onUpgrade && (
                   <div className="flex flex-col gap-2">
                   <button
                     type="button"
                     onClick={onUpgrade}
-                    aria-label="Focus on all quests with Frog Plus"
+                    aria-label="Advance all quests with Frog Plus"
                     className="group relative isolate flex h-14 w-full items-center justify-center gap-2.5 rounded-2xl px-4 ring-2 ring-amber-200/80 transition-transform active:scale-[0.98]"
                   >
                     <span
@@ -883,7 +873,7 @@ function SwitchFocusConfirm({
                       className="-my-8 -ml-1 h-20 w-20 drop-shadow-[0_3px_0_rgba(31,98,28,0.4)]"
                     />
                     <span className="text-sm font-black uppercase tracking-[0.08em] text-emerald-900 drop-shadow-[0_1px_0_rgba(255,255,255,0.5)]">
-                      Focus on all quests with
+                      Advance all quests with
                     </span>
                     <span className="inline-flex items-center rounded-lg bg-gradient-to-b from-emerald-600 to-emerald-800 px-2 py-1.5 text-[11px] font-black uppercase leading-none tracking-[0.18em] text-amber-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_2px_4px_rgba(0,0,0,0.25)] ring-1 ring-emerald-900/40">
                       Plus

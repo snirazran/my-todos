@@ -812,39 +812,40 @@ export function QuestsPanel({
                                 </div>
                               </div>
 
-                              {/* Desktop: masonry-style 2-column layout, daily first */}
-                              <div className="hidden md:block md:columns-2 md:gap-4 [column-fill:balance]">
-                                {(dailyQuests.length === 0
-                                  ? [<PanelCard key="empty-daily">No active daily quests here.</PanelCard>]
-                                  : dailyQuests.map(renderDailyCard)
-                                ).map((node, i) => (
-                                  <div
-                                    key={`daily-cell-${i}`}
-                                    className="mb-4 break-inside-avoid"
-                                  >
-                                    {node}
+                              {/* Desktop: 2-column layout, daily first. Cells are
+                                  split into two flex columns (alternating) so both
+                                  columns start flush at the top — avoids the
+                                  CSS multi-column balancing gap/shadow artifact. */}
+                              {(() => {
+                                const cells: React.ReactNode[] = [
+                                  ...(dailyQuests.length === 0
+                                    ? [<PanelCard key="empty-daily">No active daily quests here.</PanelCard>]
+                                    : dailyQuests.map(renderDailyCard)
+                                  ).map((node, i) => (
+                                    <div key={`daily-cell-${i}`}>{node}</div>
+                                  )),
+                                  ...(Array.isArray(focusEmptyStates.props.children)
+                                    ? focusEmptyStates.props.children
+                                        .filter(Boolean)
+                                        .map((child: React.ReactNode, i: number) => (
+                                          <div key={`focus-empty-${i}`}>{child}</div>
+                                        ))
+                                    : []),
+                                  ...filteredCategoryQuests.map((quest) => (
+                                    <div key={`focus-cell-${quest.id}`}>
+                                      {renderFocusCard(quest)}
+                                    </div>
+                                  )),
+                                ];
+                                const leftCol = cells.filter((_, i) => i % 2 === 0);
+                                const rightCol = cells.filter((_, i) => i % 2 === 1);
+                                return (
+                                  <div className="hidden gap-4 md:grid md:grid-cols-2">
+                                    <div className="flex flex-col gap-4">{leftCol}</div>
+                                    <div className="flex flex-col gap-4">{rightCol}</div>
                                   </div>
-                                ))}
-                                {Array.isArray(focusEmptyStates.props.children) &&
-                                  focusEmptyStates.props.children
-                                    .filter(Boolean)
-                                    .map((child: React.ReactNode, i: number) => (
-                                      <div
-                                        key={`focus-empty-${i}`}
-                                        className="mb-4 break-inside-avoid"
-                                      >
-                                        {child}
-                                      </div>
-                                    ))}
-                                {filteredCategoryQuests.map((quest) => (
-                                  <div
-                                    key={`focus-cell-${quest.id}`}
-                                    className="mb-4 break-inside-avoid"
-                                  >
-                                    {renderFocusCard(quest)}
-                                  </div>
-                                ))}
-                              </div>
+                                );
+                              })()}
                             </>
                           );
                         })()}
@@ -889,8 +890,8 @@ export function QuestsPanel({
         open={editingFocusCategoryId !== null}
         taskId={editingFocusCategoryId}
         onClose={() => setEditingFocusCategoryId(null)}
-        title={editingFocusCategory ? `Connect a tag to ${editingFocusCategory.name}` : "Connect a focus tag"}
-        description={data?.isPremium ? 'Choose tags to decide which tasks count toward this focus area.' : 'Choose one tag to decide which tasks count toward this focus area.'}
+        title={editingFocusCategory ? `Pick a tag for ${editingFocusCategory.name}` : "Pick a tag"}
+        description={data?.isPremium ? 'Tasks with these tags count toward this quest.' : 'Tasks with this tag count toward this quest.'}
         initialTags={editingFocusCategoryId ? (categoryTagMap.get(editingFocusCategoryId) || []) : []}
         maxSelectedTags={data?.isPremium ? undefined : 1}
         currentFocusCategoryId={editingFocusCategoryId ?? undefined}
