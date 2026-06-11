@@ -1,7 +1,14 @@
 'use client';
 import Fly from '@/components/ui/fly';
 import { Icon } from '@/components/ui/Icon';
-import { CalendarDays, Clock, Bell, EllipsisVertical } from 'lucide-react';
+import {
+  CalendarDays,
+  Clock,
+  Bell,
+  EllipsisVertical,
+  Pen,
+  ListChecks,
+} from 'lucide-react';
 
 export default function DragOverlay({
   x,
@@ -17,6 +24,8 @@ export default function DragOverlay({
   startTime,
   endTime,
   reminder,
+  notes,
+  checklist,
   frogodoroSession,
 }: {
   x: number;
@@ -32,6 +41,8 @@ export default function DragOverlay({
   startTime?: string;
   endTime?: string;
   reminder?: string;
+  notes?: string;
+  checklist?: { id: string; text: string; done: boolean }[];
   frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null;
 }) {
   return (
@@ -98,6 +109,36 @@ export default function DragOverlay({
               {calendarEventId && (
                 <CalendarDays className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
               )}
+              {(notes?.trim() || (checklist && checklist.length > 0)) && (
+                <span className="inline-flex flex-shrink-0 items-center gap-1.5 no-underline">
+                  {notes?.trim() && (
+                    <Pen
+                      aria-label="Has notes"
+                      className="h-4 w-4 text-muted-foreground/70"
+                    />
+                  )}
+                  {checklist &&
+                    checklist.length > 0 &&
+                    (() => {
+                      const done = checklist.filter((c) => c.done).length;
+                      const total = checklist.length;
+                      return (
+                        <span
+                          className={`inline-flex items-center gap-1 ${
+                            done === total
+                              ? 'text-primary'
+                              : 'text-muted-foreground/70'
+                          }`}
+                        >
+                          <ListChecks className="h-4 w-4" />
+                          <span className="text-[11px] font-bold tabular-nums no-underline">
+                            {done}/{total}
+                          </span>
+                        </span>
+                      );
+                    })()}
+                </span>
+              )}
             </div>
           </div>
           {frogodoroSession && ((frogodoroSession.focusTime ?? 0) > 0 || (frogodoroSession.breakTime ?? 0) > 0) && (() => {
@@ -123,7 +164,7 @@ export default function DragOverlay({
           })()}
         </div>
 
-        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center">
+        <span className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-muted-foreground/10 bg-muted">
           <span style={{ transform: 'rotate(2deg)' }}>
             <Fly size={36} y={-3} />
           </span>

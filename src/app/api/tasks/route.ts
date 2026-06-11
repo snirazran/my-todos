@@ -581,6 +581,20 @@ export async function POST(req: NextRequest) {
   const startTime = body.startTime;
   const endTime = body.endTime;
   const reminder = body.reminder;
+  // Carried over when restoring a saved (backlog) task so notes/checklist survive.
+  const notes = typeof body?.notes === 'string' ? body.notes : undefined;
+  const checklist = Array.isArray(body?.checklist)
+    ? body.checklist
+        .filter(
+          (it: unknown): it is Record<string, unknown> =>
+            !!it && typeof it === 'object',
+        )
+        .map((it: Record<string, unknown>) => ({
+          id: String(it.id ?? ''),
+          text: String(it.text ?? ''),
+          done: Boolean(it.done),
+        }))
+    : undefined;
 
   const repeat =
     body?.repeat === 'backlog'
@@ -636,6 +650,8 @@ export async function POST(req: NextRequest) {
       createdAt: now,
       updatedAt: now,
       tags,
+      notes,
+      checklist,
       startTime,
       endTime,
       reminder,
@@ -692,6 +708,8 @@ export async function POST(req: NextRequest) {
       createdAt: now,
       updatedAt: now,
       tags,
+      notes,
+      checklist,
       startTime,
       endTime,
       reminder,
@@ -763,6 +781,8 @@ export async function POST(req: NextRequest) {
         createdAt: now,
         updatedAt: now,
         tags,
+        notes,
+        checklist,
         startTime,
         endTime,
         reminder,
@@ -812,6 +832,8 @@ export async function POST(req: NextRequest) {
       createdAt: now,
       updatedAt: now,
       tags,
+      notes,
+      checklist,
       startTime,
       endTime,
       reminder,
@@ -824,6 +846,8 @@ export async function POST(req: NextRequest) {
       completed: false,
       type: 'regular',
       tags: task.tags || [],
+      notes: task.notes ?? '',
+      checklist: task.checklist ?? [],
       date: task.date,
       startTime: task.startTime,
       endTime: task.endTime,
@@ -846,6 +870,8 @@ export async function POST(req: NextRequest) {
         createdAt: now,
         updatedAt: now,
         tags,
+        notes,
+        checklist,
         startTime,
         endTime,
         reminder,
@@ -857,6 +883,8 @@ export async function POST(req: NextRequest) {
         completed: false,
         type: 'backlog',
         tags: task.tags || [],
+        notes: task.notes ?? '',
+        checklist: task.checklist ?? [],
         startTime: task.startTime,
         endTime: task.endTime,
         reminder: task.reminder,
@@ -876,6 +904,8 @@ export async function POST(req: NextRequest) {
         createdAt: now,
         updatedAt: now,
         tags,
+        notes,
+        checklist,
         startTime,
         endTime,
         reminder,
@@ -887,6 +917,8 @@ export async function POST(req: NextRequest) {
         completed: false,
         type: 'regular',
         tags: task.tags || [],
+        notes: task.notes ?? '',
+        checklist: task.checklist ?? [],
         date: task.date,
         startTime: task.startTime,
         endTime: task.endTime,
@@ -1966,11 +1998,42 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
   });
 }
 
+type ChecklistItemInput = { id: string; text: string; done: boolean };
+
+/** Coerce a request-provided checklist into the stored shape, or undefined. */
+function sanitizeChecklistInput(
+  value: unknown,
+): ChecklistItemInput[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .filter(
+      (it: unknown): it is Record<string, unknown> =>
+        !!it && typeof it === 'object',
+    )
+    .map((it: Record<string, unknown>) => ({
+      id: String(it.id ?? ''),
+      text: String(it.text ?? ''),
+      done: Boolean(it.done),
+    }));
+}
+
+type BoardTaskInput = {
+  id: string;
+  text?: string;
+  tags?: string[];
+  notes?: string;
+  checklist?: unknown;
+  calendarEventId?: string;
+  startTime?: string;
+  endTime?: string;
+  reminder?: string;
+};
+
 async function handleBoardPut(
   uid: string,
   body: {
     day: number;
-    tasks: Array<{ id: string; text?: string; tags?: string[] }>;
+    tasks: BoardTaskInput[];
   },
   tz: string,
 ) {
@@ -2034,7 +2097,13 @@ async function handleBoardPut(
     }
     await Promise.all(
       ids.map((id, i) => {
-        const t = (tasks as any[]).find(item => item.id === id);
+        const t = tasks.find((item) => item.id === id);
+        // Prefer request-provided details: a concurrent move (the source day's
+        // save) may delete the doc before this read, so the DB can't be trusted.
+        const notes =
+          typeof t?.notes === 'string' ? t.notes : notesById.get(id) ?? '';
+        const checklist =
+          sanitizeChecklistInput(t?.checklist) ?? checklistById.get(id) ?? [];
         return TaskModel.updateOne(
           { userId: uid, type: 'backlog', weekStart, id },
           {
@@ -2042,8 +2111,8 @@ async function handleBoardPut(
               order: i + 1,
               text: textById.get(id) ?? textFromReq.get(id) ?? '',
               tags: tagsFromReq.get(id) ?? tagsById.get(id) ?? [],
-              notes: notesById.get(id) ?? '',
-              checklist: checklistById.get(id) ?? [],
+              notes,
+              checklist,
               weekStart,
               updatedAt: now,
               calendarEventId: t?.calendarEventId ?? calIdById.get(id),
@@ -2073,7 +2142,7 @@ async function handleBoardPut(
     return NextResponse.json({ ok: true });
   }
   const weekday: Weekday = day as Weekday;
-  const batch = tasks as Array<{ id: string; text?: string; tags?: string[] }>;
+  const batch = tasks;
   const ids = batch.map((t) => t.id);
 
   // 1. Remove regular tasks that are no longer in this day's list
@@ -2101,12 +2170,16 @@ async function handleBoardPut(
   const reminderById = new Map(docs.map((d) => [d.id, d.reminder]));
 
   await Promise.all(
-    batch.map((t: any, i) => {
+    batch.map((t, i) => {
       const ttype = typeById.get(t.id);
       const textFromReq = t.text ?? textById.get(t.id) ?? '';
       const tags = t.tags ?? tagsById.get(t.id) ?? [];
-      const notes = notesById.get(t.id) ?? '';
-      const checklist = checklistById.get(t.id) ?? [];
+      // Prefer request-provided details: a concurrent move may already have
+      // deleted the source doc, so the DB lookup can't be trusted here.
+      const notes =
+        typeof t.notes === 'string' ? t.notes : notesById.get(t.id) ?? '';
+      const checklist =
+        sanitizeChecklistInput(t.checklist) ?? checklistById.get(t.id) ?? [];
 
       // Use request values if they exist, otherwise fallback to DB values
       const calendarEventId = t.calendarEventId ?? calIdById.get(t.id);
@@ -2196,15 +2269,7 @@ async function handleBoardPutByDate(
   uid: string,
   body: {
     dateKey: string;
-    tasks: Array<{
-      id: string;
-      text?: string;
-      tags?: string[];
-      calendarEventId?: string;
-      startTime?: string;
-      endTime?: string;
-      reminder?: string;
-    }>;
+    tasks: BoardTaskInput[];
   },
   tz: string,
 ) {
@@ -2252,8 +2317,12 @@ async function handleBoardPutByDate(
       const ttype = typeById.get(t.id);
       const textFromReq = t.text ?? textById.get(t.id) ?? '';
       const tags = t.tags ?? tagsById.get(t.id) ?? [];
-      const notes = notesById.get(t.id) ?? '';
-      const checklist = checklistById.get(t.id) ?? [];
+      // Prefer request-provided details: a concurrent move may already have
+      // deleted the source doc, so the DB lookup can't be trusted here.
+      const notes =
+        typeof t.notes === 'string' ? t.notes : notesById.get(t.id) ?? '';
+      const checklist =
+        sanitizeChecklistInput(t.checklist) ?? checklistById.get(t.id) ?? [];
       if (ttype === 'weekly') {
         // Convert to a one-off regular on this date so order persists
         return TaskModel.updateOne(

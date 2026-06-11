@@ -1014,6 +1014,8 @@ export default function Home() {
           reminder,
           repeatEndDate,
           repeatRule,
+          notes,
+          checklist,
         }) => {
           try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -1035,6 +1037,8 @@ export default function Home() {
                 reminder,
                 repeatEndDate,
                 repeatRule,
+                notes,
+                checklist,
               }),
             });
             const data = await res.json();

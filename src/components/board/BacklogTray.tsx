@@ -31,6 +31,8 @@ interface Props {
     startTime?: string;
     endTime?: string;
     reminder?: string;
+    notes?: string;
+    checklist?: { id: string; text: string; done: boolean }[];
     frogodoroSession?: { date: string; focusTime: number; breakTime: number } | null;
   }) => void;
   setCardRef: (id: string, el: HTMLDivElement | null) => void;
@@ -284,6 +286,8 @@ export default React.memo(function BacklogTray({
                           startTime: t.startTime,
                           endTime: t.endTime,
                           reminder: t.reminder,
+                          notes: t.notes,
+                          checklist: t.checklist,
                           frogodoroSession: t.frogodoroSession,
                         });
                       }}

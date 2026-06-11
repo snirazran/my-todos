@@ -6,6 +6,8 @@ import type {
 
 export type RepeatChoice = 'this-week' | 'weekly' | 'monthly' | 'custom';
 
+export type ChecklistItem = { id: string; text: string; done: boolean };
+
 export type SavedTag = {
   id: string;
   name: string;
@@ -28,6 +30,9 @@ export type QuickAddSubmit = {
   repeatEndDate?: string | null;
   /** Custom recurrence rule (when repeat === 'custom'). */
   repeatRule?: import('./utils').RepeatRule | null;
+  /** Carried over when restoring a saved task so its card details survive. */
+  notes?: string;
+  checklist?: ChecklistItem[];
 };
 
 export type QuickAddSheetProps = Readonly<{

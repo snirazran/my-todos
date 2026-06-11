@@ -38,6 +38,7 @@ import {
 } from './quick-add/utils';
 import type {
   ActivePicker,
+  ChecklistItem,
   QuickAddSheetProps,
   RepeatChoice,
 } from './quick-add/types';
@@ -70,6 +71,10 @@ export default function QuickAddSheet({
   const [inputFocused, setInputFocused] = useState(false);
   const [pickedBacklogTaskId, setPickedBacklogTaskId] = useState<string | null>(null);
   const [pickedBacklogText, setPickedBacklogText] = useState<string | null>(null);
+  const [pickedNotes, setPickedNotes] = useState<string | undefined>(undefined);
+  const [pickedChecklist, setPickedChecklist] = useState<
+    ChecklistItem[] | undefined
+  >(undefined);
   const [showSavedConfirm, setShowSavedConfirm] = useState(false);
   const pendingSubmitRef = useRef<(() => Promise<void>) | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -167,6 +172,8 @@ export default function QuickAddSheet({
     setInputFocused(false);
     setPickedBacklogTaskId(null);
     setPickedBacklogText(null);
+    setPickedNotes(undefined);
+    setPickedChecklist(undefined);
     setShowSavedConfirm(false);
     setHasSuggestionContent(false);
 
@@ -348,6 +355,8 @@ export default function QuickAddSheet({
         reminder: notifyEnabled ? reminder : undefined,
         repeatEndDate: repeat !== 'this-week' ? repeatEndDate : null,
         repeatRule: repeat === 'custom' ? repeatRule : null,
+        notes: pickedBacklogTaskId ? pickedNotes : undefined,
+        checklist: pickedBacklogTaskId ? pickedChecklist : undefined,
       });
       if (removeSavedTask && pickedBacklogTaskId) {
         const backlogKey = '/api/tasks?view=board&day=-1';
@@ -743,9 +752,13 @@ export default function QuickAddSheet({
                             if (pick.backlogTaskId) {
                               setPickedBacklogTaskId(pick.backlogTaskId);
                               setPickedBacklogText(pick.text);
+                              setPickedNotes(pick.notes);
+                              setPickedChecklist(pick.checklist);
                             } else {
                               setPickedBacklogTaskId(null);
                               setPickedBacklogText(null);
+                              setPickedNotes(undefined);
+                              setPickedChecklist(undefined);
                             }
                             inputRef.current?.focus();
                           }}

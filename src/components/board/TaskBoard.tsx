@@ -1406,6 +1406,8 @@ export default function TaskBoard({
           startTime={drag.startTime}
           endTime={drag.endTime}
           reminder={drag.reminder}
+          notes={drag.notes}
+          checklist={drag.checklist}
           frogodoroSession={drag.frogodoroSession}
         />
       )}

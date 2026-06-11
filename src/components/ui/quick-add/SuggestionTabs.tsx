@@ -2,12 +2,13 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { Clock, Bell, Plus } from 'lucide-react';
+import { Clock, Bell, Plus, Pen, ListChecks } from 'lucide-react';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import type {
   FocusCategoryTagMap,
   MacroCategoryId,
 } from '@/lib/quests/types';
+import type { ChecklistItem } from './types';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
 import { fetcher, formatTimeDisplay } from './utils';
@@ -19,6 +20,8 @@ type BacklogTask = {
   startTime?: string;
   endTime?: string;
   reminder?: string;
+  notes?: string;
+  checklist?: ChecklistItem[];
 };
 
 const SAVED_TAB = '__saved__' as const;
@@ -32,6 +35,8 @@ export type SuggestionPick = {
   endTime?: string;
   reminder?: string;
   backlogTaskId?: string;
+  notes?: string;
+  checklist?: ChecklistItem[];
 };
 
 type Props = {
@@ -119,6 +124,8 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                     endTime: t.endTime,
                     reminder: t.reminder,
                     backlogTaskId: t.id,
+                    notes: t.notes,
+                    checklist: t.checklist,
                   })
                 }
                 className="group flex items-center gap-3 w-full rounded-2xl border border-border/60 bg-card px-3 py-2.5 text-left transition-all [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:bg-primary/5 active:scale-[0.99]"
@@ -127,11 +134,46 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                   <Fly size={28} y={-3} paused />
                 </span>
                 <div className="min-w-0 flex-1 flex flex-col gap-1">
-                  <span className="text-[13px] font-bold text-foreground truncate">
-                    {t.text}
-                  </span>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <span className="text-[13px] font-bold text-foreground truncate">
+                      {t.text}
+                    </span>
+                    {(t.notes?.trim() ||
+                      (t.checklist && t.checklist.length > 0)) && (
+                      <span className="inline-flex flex-shrink-0 items-center gap-1.5">
+                        {t.notes?.trim() && (
+                          <Pen
+                            aria-label="Has notes"
+                            className="h-3.5 w-3.5 text-muted-foreground/70"
+                          />
+                        )}
+                        {t.checklist &&
+                          t.checklist.length > 0 &&
+                          (() => {
+                            const done = t.checklist.filter(
+                              (c) => c.done,
+                            ).length;
+                            const total = t.checklist.length;
+                            return (
+                              <span
+                                className={`inline-flex items-center gap-1 ${
+                                  done === total
+                                    ? 'text-primary'
+                                    : 'text-muted-foreground/70'
+                                }`}
+                              >
+                                <ListChecks className="h-3.5 w-3.5" />
+                                <span className="text-[10px] font-bold tabular-nums">
+                                  {done}/{total}
+                                </span>
+                              </span>
+                            );
+                          })()}
+                      </span>
+                    )}
+                  </div>
                   {((t.tags && t.tags.length > 0) || t.startTime) && (
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap items-center gap-1">
                       {t.startTime && (
                         <span className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal text-primary shadow-sm">
                           <Clock className="w-2.5 h-2.5 shrink-0" />

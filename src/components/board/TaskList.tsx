@@ -77,6 +77,8 @@ export default React.memo(function TaskList({
     startTime?: string;
     endTime?: string;
     reminder?: string;
+    notes?: string;
+    checklist?: { id: string; text: string; done: boolean }[];
     frogodoroSession?: {
       date: string;
       focusTime: number;
@@ -577,6 +579,8 @@ export default React.memo(function TaskList({
                 startTime: t.startTime,
                 endTime: t.endTime,
                 reminder: t.reminder,
+                notes: t.notes,
+                checklist: t.checklist,
                 frogodoroSession: t.frogodoroSession,
               });
             }}
