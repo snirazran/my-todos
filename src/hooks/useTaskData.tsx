@@ -25,7 +25,14 @@ export interface Task {
   tags?: string[];
   notes?: string;
   checklist?: ChecklistItem[];
-  repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly';
+  repeatMode?:
+    | 'none'
+    | 'daily'
+    | 'weekdays'
+    | 'weekend'
+    | 'weekly'
+    | 'monthly'
+    | 'custom';
   repeatGroupId?: string;
   date?: string;
   completedDates?: string[];
@@ -999,8 +1006,17 @@ export function useTaskData({
   const setTaskRepeat = useCallback(
     async (
       taskId: string,
-      mode: 'none' | 'daily' | 'weekdays' | 'weekly',
+      mode:
+        | 'none'
+        | 'daily'
+        | 'weekdays'
+        | 'weekend'
+        | 'weekly'
+        | 'monthly'
+        | 'custom',
       dayOfWeek?: number,
+      endDate?: string | null,
+      rule?: import('@/components/ui/quick-add/utils').RepeatRule | null,
     ) => {
       // Optimistically reflect the chosen mode so the picker/chip updates
       // instantly; the server then expands daily/weekdays into siblings.
@@ -1011,7 +1027,13 @@ export function useTaskData({
             ...todayData,
             tasks: todayData.tasks.map((t) =>
               t.id === taskId
-                ? ({ ...t, repeatMode: mode, type: optimisticType } as Task)
+                ? ({
+                    ...t,
+                    repeatMode: mode,
+                    type: optimisticType,
+                    repeatEndDate:
+                      mode === 'none' ? undefined : endDate ?? undefined,
+                  } as Task)
                 : t,
             ),
             weeklyIds:
@@ -1032,7 +1054,7 @@ export function useTaskData({
           body: JSON.stringify({
             taskId,
             date: dateStr,
-            setRepeat: { mode, dayOfWeek },
+            setRepeat: { mode, dayOfWeek, endDate: endDate ?? null, rule: rule ?? null },
             timezone: tz,
           }),
         });

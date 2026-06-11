@@ -911,12 +911,12 @@ export default function Home() {
                     }
                     updateTaskDetails(id, details);
                   }}
-                  onSetRepeat={(id, mode, dayOfWeek) => {
+                  onSetRepeat={(id, mode, dayOfWeek, endDate, rule) => {
                     if (!user) {
                       router.push('/login');
                       return;
                     }
-                    setTaskRepeat(id, mode, dayOfWeek);
+                    setTaskRepeat(id, mode, dayOfWeek, endDate, rule);
                   }}
                   onUpdateTags={(id, t, scope) => {
                     if (!user) {
@@ -1012,6 +1012,8 @@ export default function Home() {
           startTime,
           endTime,
           reminder,
+          repeatEndDate,
+          repeatRule,
         }) => {
           try {
             const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -1031,6 +1033,8 @@ export default function Home() {
                 startTime,
                 endTime,
                 reminder,
+                repeatEndDate,
+                repeatRule,
               }),
             });
             const data = await res.json();
@@ -1066,6 +1070,17 @@ export default function Home() {
                     };
                   }, false);
                 }
+
+                // Monthly / custom repeats are stored without a fixed dayOfWeek,
+                // so the optimistic filter above can't place them. Revalidate so
+                // the server's occurrence engine decides if they land on today.
+                const needsRevalidate = newTasks.some(
+                  (t: any) =>
+                    t.repeatMode === 'monthly' ||
+                    t.repeatMode === 'custom' ||
+                    t.repeatRule,
+                );
+                if (needsRevalidate) mutateToday();
               }
             } else if (user) {
               // Fallback

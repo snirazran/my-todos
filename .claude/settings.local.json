@@ -99,7 +99,10 @@
       "Bash(break)",
       "Bash(awk '/----- fresh -----/{f=1} f' /tmp/nextdev.log)",
       "Bash(echo \"EXIT: $?\")",
-      "Bash(kill 9445)"
+      "Bash(kill 9445)",
+      "Bash(sed -n '1,45p' src/components/ui/quick-add/types.ts)",
+      "Bash(sed -n '1006,1060p' src/app/page.tsx)",
+      "Bash(npx eslint *)"
     ]
   }
 }

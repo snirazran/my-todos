@@ -11,7 +11,14 @@ interface Props {
   variant: Variant;
   itemLabel?: string;
   dayLabel?: string;
-  repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly';
+  repeatMode?:
+    | 'none'
+    | 'daily'
+    | 'weekdays'
+    | 'weekend'
+    | 'weekly'
+    | 'monthly'
+    | 'custom';
   busy?: boolean;
   onClose: () => void;
   onDeleteToday?: () => void;
@@ -110,7 +117,9 @@ export function DeleteDialog({
               <Trash2 className="w-4 h-4" />
             )}
             {variant === 'weekly'
-              ? repeatMode === 'daily' || repeatMode === 'weekdays'
+              ? repeatMode === 'daily' ||
+                repeatMode === 'weekdays' ||
+                repeatMode === 'weekend'
                 ? 'Delete all repeats'
                 : 'Stop repeating'
               : variant === 'backlog'

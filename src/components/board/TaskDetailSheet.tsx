@@ -22,7 +22,9 @@ import { Icon as AppIcon } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import Fly from '@/components/ui/fly';
 import type { ChecklistItem } from '@/hooks/useTaskData';
-import type { RepeatMode } from '@/components/ui/quick-add/utils';
+import type { RepeatMode, RepeatRule } from '@/components/ui/quick-add/utils';
+import { monthlyRepeatLabel } from '@/components/ui/quick-add/utils';
+import { parseYmd, todayYmd } from '@/components/board/helpers';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -39,6 +41,8 @@ export interface TaskDetailTask {
   notes?: string;
   checklist?: ChecklistItem[];
   repeatMode?: RepeatMode;
+  repeatEndDate?: string;
+  repeatRule?: RepeatRule;
   startTime?: string;
   endTime?: string;
   reminder?: string;
@@ -58,7 +62,12 @@ interface TaskDetailSheetProps {
   onSkipToday?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
-  onSetRepeat?: (mode: RepeatMode, dayOfWeek?: number) => void;
+  onSetRepeat?: (
+    mode: RepeatMode,
+    dayOfWeek?: number,
+    endDate?: string | null,
+    rule?: RepeatRule | null,
+  ) => void;
   onSchedule?: () => void;
   onAddTags?: () => void;
   onUpdateDetails?: (details: {
@@ -67,6 +76,8 @@ interface TaskDetailSheetProps {
   }) => void;
   /** Duplicate a completed task onto a new day. */
   onDuplicate?: (when: 'today' | 'tomorrow') => void;
+  /** Date (YYYY-MM-DD) a new monthly repeat should anchor to. Defaults to today. */
+  monthlyAnchorYmd?: string;
 }
 
 const newId = () =>
@@ -92,6 +103,7 @@ export default function TaskDetailSheet({
   onAddTags,
   onUpdateDetails,
   onDuplicate,
+  monthlyAnchorYmd,
 }: TaskDetailSheetProps) {
   // Keep the last task around so the slide-down exit animation can still
   // render content after the parent clears `task` on close.
@@ -185,7 +197,13 @@ export default function TaskDetailSheet({
     setAndPersistChecklist(checklist.filter((it) => it.id !== id));
 
   const doneCount = checklist.filter((it) => it.done).length;
-  const repeatDay = displayTask.dayOfWeek ?? new Date().getDay();
+  // For weekly tasks use their stored weekday; otherwise anchor to the date the
+  // task sits on (the column being edited), falling back to today.
+  const repeatDay =
+    displayTask.dayOfWeek ??
+    (monthlyAnchorYmd
+      ? parseYmd(monthlyAnchorYmd).getDay()
+      : new Date().getDay());
   const repeatMode: RepeatMode =
     displayTask.repeatMode ?? (isWeekly ? 'weekly' : 'none');
   const repeatChipLabel =
@@ -693,8 +711,12 @@ export default function TaskDetailSheet({
         onClose={() => setShowRepeat(false)}
         currentMode={repeatMode}
         repeatDayLabel={DAY_NAMES[repeatDay]}
-        onChange={(mode) => {
-          onSetRepeat?.(mode, repeatDay);
+        monthlyLabel={monthlyRepeatLabel(monthlyAnchorYmd ?? todayYmd())}
+        currentEndDate={displayTask?.repeatEndDate ?? null}
+        currentRule={displayTask?.repeatRule ?? null}
+        anchorYmd={monthlyAnchorYmd ?? todayYmd()}
+        onChange={(mode, endDate, rule) => {
+          onSetRepeat?.(mode, repeatDay, endDate, rule);
           setShowRepeat(false);
         }}
       />

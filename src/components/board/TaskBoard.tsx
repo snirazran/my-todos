@@ -90,6 +90,8 @@ export default function TaskBoard({
     startTime?: string;
     endTime?: string;
     reminder?: string;
+    repeatEndDate?: string | null;
+    repeatRule?: import('@/components/ui/quick-add/utils').RepeatRule | null;
   }) => Promise<void> | void;
   todayKey: string;
   activeDateKey: string;
@@ -1336,6 +1338,8 @@ export default function TaskBoard({
           startTime,
           endTime,
           reminder,
+          repeatEndDate,
+          repeatRule,
         }) => {
           if (!onQuickAdd) {
             onRequestAdd(
@@ -1380,6 +1384,8 @@ export default function TaskBoard({
             startTime,
             endTime,
             reminder,
+            repeatEndDate,
+            repeatRule,
           });
           setShowQuickAdd(false);
         }}

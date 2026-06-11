@@ -15,9 +15,25 @@ export interface TaskDoc {
   suppressedDates?: string[]; // YYYY-MM-DD entries hidden for that date
   notes?: string; // free-text notes shown in the task detail card
   checklist?: { id: string; text: string; done: boolean }[]; // Trello-like sub-items
-  repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly'; // chosen repeat option
-  repeatGroupId?: string; // links daily/weekdays sibling tasks together
+  repeatMode?:
+    | 'none'
+    | 'daily'
+    | 'weekdays'
+    | 'weekend'
+    | 'weekly'
+    | 'monthly'
+    | 'custom'; // chosen repeat option
+  repeatGroupId?: string; // links daily/weekdays/weekend sibling tasks together
   repeatStartDate?: string; // YYYY-MM-DD first date this repeat should appear
+  repeatEndDate?: string; // YYYY-MM-DD last date this repeat should appear (inclusive); absent = never ends
+  repeatDayOfMonth?: number; // 1..31 anchor day for monthly repeats
+  repeatRule?: {
+    // custom interval-based recurrence (RRULE-like)
+    freq: 'daily' | 'weekly' | 'monthly';
+    interval: number; // every N days/weeks/months
+    byWeekday?: number[]; // weekly: 0..6 (Sun..Sat)
+    byMonthday?: number[]; // monthly: 1..31
+  };
   dayOfWeek?: Weekday;
   date?: string;
   weekStart?: string;
@@ -56,9 +72,33 @@ const TaskSchema = new Schema<TaskDoc>(
     completedDates: { type: [String], default: [] },
     suppressedDates: { type: [String], default: [] },
     notes: { type: String },
-    repeatMode: { type: String, enum: ['none', 'daily', 'weekdays', 'weekly'] },
+    repeatMode: {
+      type: String,
+      enum: [
+        'none',
+        'daily',
+        'weekdays',
+        'weekend',
+        'weekly',
+        'monthly',
+        'custom',
+      ],
+    },
     repeatGroupId: { type: String, index: true },
     repeatStartDate: { type: String },
+    repeatEndDate: { type: String },
+    repeatDayOfMonth: { type: Number, min: 1, max: 31 },
+    repeatRule: {
+      type: {
+        freq: { type: String, enum: ['daily', 'weekly', 'monthly'] },
+        interval: { type: Number, default: 1, min: 1 },
+        byWeekday: { type: [Number], default: undefined },
+        byMonthday: { type: [Number], default: undefined },
+      },
+      required: false,
+      _id: false,
+      default: undefined,
+    },
     checklist: {
       type: [
         {

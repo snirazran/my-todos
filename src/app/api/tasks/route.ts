@@ -91,6 +91,123 @@ function repeatStartForDoc(task: TaskDoc, tz: string) {
   return getZonedYMD(new Date(task.createdAt), tz);
 }
 
+/** Validate/normalize a YYYY-MM-DD repeat end date; returns null when absent/invalid. */
+function normalizeRepeatEnd(value: unknown): string | null {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? value
+    : null;
+}
+
+/** True when `date` falls after the repeat's end date (i.e. the occurrence should be hidden). */
+function isAfterRepeatEnd(task: Pick<TaskDoc, 'repeatEndDate'>, date: string) {
+  return !!task.repeatEndDate && date > task.repeatEndDate;
+}
+
+/** Day-of-month (1..31) from a YYYY-MM-DD string. */
+function domFromYMD(ymd: string) {
+  return Number(ymd.slice(8, 10));
+}
+
+/**
+ * True when a monthly-repeat doc does NOT occur on `date` (its anchor
+ * day-of-month differs). For non-monthly docs this is always false.
+ */
+function monthlyExcludesDate(
+  task: Pick<TaskDoc, 'repeatMode' | 'repeatDayOfMonth'>,
+  date: string,
+) {
+  return (
+    task.repeatMode === 'monthly' &&
+    typeof task.repeatDayOfMonth === 'number' &&
+    task.repeatDayOfMonth !== domFromYMD(date)
+  );
+}
+
+// --- Custom recurrence (interval-based, RRULE-like) -------------------------
+
+/** Whole days between two YYYY-MM-DD dates (b - a). */
+function daysBetweenYMD(a: string, b: string) {
+  return Math.round((Date.parse(b) - Date.parse(a)) / 86400000);
+}
+
+/** YYYY-MM-DD of the Sunday that begins the week containing `ymd`. */
+function weekStartYMD(ymd: string) {
+  const dow = dowFromYMD(ymd);
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - dow);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Whether a custom-rule doc occurs on `date`. Anchored to `repeatStartDate`;
+ * start/end-date bounds are checked by the caller.
+ */
+function customOccursOn(
+  task: Pick<TaskDoc, 'repeatRule' | 'repeatStartDate'>,
+  date: string,
+) {
+  const rule = task.repeatRule;
+  const start = task.repeatStartDate;
+  if (!rule || !start) return false;
+  const interval = Math.max(1, rule.interval || 1);
+
+  if (rule.freq === 'daily') {
+    const diff = daysBetweenYMD(start, date);
+    return diff >= 0 && diff % interval === 0;
+  }
+  if (rule.freq === 'weekly') {
+    const days = rule.byWeekday ?? [];
+    if (!days.includes(dowFromYMD(date))) return false;
+    const weekDiff = Math.round(
+      daysBetweenYMD(weekStartYMD(start), weekStartYMD(date)) / 7,
+    );
+    return weekDiff >= 0 && weekDiff % interval === 0;
+  }
+  // monthly
+  const dom = rule.byMonthday ?? [];
+  if (!dom.includes(domFromYMD(date))) return false;
+  const [sy, sm] = start.split('-').map(Number);
+  const [dy, dm] = date.split('-').map(Number);
+  const monthDiff = (dy - sy) * 12 + (dm - sm);
+  return monthDiff >= 0 && monthDiff % interval === 0;
+}
+
+/** Validate/clamp a custom repeat rule from request input, anchored to a date. */
+function normalizeRepeatRule(
+  raw: unknown,
+  anchor: string,
+): TaskDoc['repeatRule'] | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Record<string, unknown>;
+  const freq = r.freq;
+  if (freq !== 'daily' && freq !== 'weekly' && freq !== 'monthly') return null;
+  const max = freq === 'daily' ? 100 : freq === 'weekly' ? 52 : 12;
+  let interval = Math.round(Number(r.interval));
+  if (!Number.isFinite(interval)) interval = 1;
+  interval = Math.min(max, Math.max(1, interval));
+  const rule: NonNullable<TaskDoc['repeatRule']> = { freq, interval };
+  if (freq === 'weekly') {
+    const days = Array.isArray(r.byWeekday)
+      ? Array.from(
+          new Set(
+            r.byWeekday.map(Number).filter((d: number) => d >= 0 && d <= 6),
+          ),
+        ).sort((a, b) => a - b)
+      : [];
+    rule.byWeekday = days.length ? days : [dowFromYMD(anchor)];
+  } else if (freq === 'monthly') {
+    const dom = Array.isArray(r.byMonthday)
+      ? Array.from(
+          new Set(
+            r.byMonthday.map(Number).filter((d: number) => d >= 1 && d <= 31),
+          ),
+        ).sort((a, b) => a - b)
+      : [];
+    rule.byMonthday = dom.length ? dom : [domFromYMD(anchor)];
+  }
+  return rule;
+}
+
 function isBoardMode(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   return (
@@ -470,7 +587,9 @@ export async function POST(req: NextRequest) {
       ? 'backlog'
       : body?.repeat === 'this-week'
         ? 'this-week'
-        : 'weekly';
+        : body?.repeat === 'monthly'
+          ? 'monthly'
+          : 'weekly';
   if (!text)
     return NextResponse.json({ error: 'text is required' }, { status: 400 });
   const explicitDates: string[] = Array.isArray(body?.dates)
@@ -494,6 +613,116 @@ export async function POST(req: NextRequest) {
   const createdIds: string[] = [];
   const now = new Date();
   const createdTasks: any[] = [];
+
+  // Monthly repeat: a single persistent doc anchored to a day-of-month.
+  if (repeat === 'monthly') {
+    const anchor = explicitDates.slice().sort()[0];
+    if (!anchor)
+      return NextResponse.json(
+        { error: 'monthly repeat requires a date' },
+        { status: 400 },
+      );
+    const repeatDayOfMonth = domFromYMD(anchor);
+    const repeatEndDate = normalizeRepeatEnd(body?.repeatEndDate) ?? undefined;
+    const dayOfWeek = dowFromYMD(anchor);
+    const id = uuid();
+    const order = await nextOrderForDay(uid, dayOfWeek, anchor);
+    const task = await TaskModel.create({
+      userId: uid,
+      type: 'weekly',
+      id,
+      text,
+      order,
+      createdAt: now,
+      updatedAt: now,
+      tags,
+      startTime,
+      endTime,
+      reminder,
+      repeatMode: 'monthly',
+      repeatStartDate: anchor,
+      repeatEndDate,
+      repeatDayOfMonth,
+    });
+    void syncGamification(uid, tz);
+    return NextResponse.json({
+      ok: true,
+      ids: [id],
+      tasks: [
+        {
+          id: task.id,
+          text: task.text,
+          order: task.order,
+          completed: false,
+          type: 'weekly',
+          tags: task.tags || [],
+          startTime: task.startTime,
+          endTime: task.endTime,
+          reminder: task.reminder,
+          repeatMode: 'monthly',
+          repeatStartDate: anchor,
+          repeatEndDate,
+          repeatDayOfMonth,
+        },
+      ],
+    });
+  }
+
+  // Custom interval recurrence (the "Custom…" builder).
+  if (body?.repeatRule) {
+    const anchor = explicitDates.slice().sort()[0];
+    if (!anchor)
+      return NextResponse.json(
+        { error: 'custom repeat requires a date' },
+        { status: 400 },
+      );
+    const rule = normalizeRepeatRule(body.repeatRule, anchor);
+    if (!rule)
+      return NextResponse.json({ error: 'invalid repeatRule' }, { status: 400 });
+    const repeatEndDate = normalizeRepeatEnd(body?.repeatEndDate) ?? undefined;
+    const dow = dowFromYMD(anchor);
+    const id = uuid();
+    const order = await nextOrderForDay(uid, dow, anchor);
+    const task = await TaskModel.create({
+      userId: uid,
+      type: 'weekly',
+      id,
+      text,
+      order,
+      createdAt: now,
+      updatedAt: now,
+      tags,
+      startTime,
+      endTime,
+      reminder,
+      repeatMode: 'custom',
+      repeatStartDate: anchor,
+      repeatEndDate,
+      repeatRule: rule,
+    });
+    void syncGamification(uid, tz);
+    return NextResponse.json({
+      ok: true,
+      ids: [id],
+      tasks: [
+        {
+          id: task.id,
+          text: task.text,
+          order: task.order,
+          completed: false,
+          type: 'weekly',
+          tags: task.tags || [],
+          startTime: task.startTime,
+          endTime: task.endTime,
+          reminder: task.reminder,
+          repeatMode: 'custom',
+          repeatStartDate: anchor,
+          repeatEndDate,
+          repeatRule: rule,
+        },
+      ],
+    });
+  }
   if (repeat === 'weekly') {
     if (days.some((d) => d === -1))
       return NextResponse.json(
@@ -506,10 +735,19 @@ export async function POST(req: NextRequest) {
     const repeatGroupId = isMulti ? uuid() : undefined;
     const isWeekdaysSet =
       days.length === 5 && [1, 2, 3, 4, 5].every((d) => days.includes(d));
-    const repeatMode: 'daily' | 'weekdays' | 'weekly' =
-      days.length === 7 ? 'daily' : isWeekdaysSet ? 'weekdays' : 'weekly';
+    const isWeekendSet =
+      days.length === 2 && [0, 6].every((d) => days.includes(d));
+    const repeatMode: 'daily' | 'weekdays' | 'weekend' | 'weekly' =
+      days.length === 7
+        ? 'daily'
+        : isWeekdaysSet
+          ? 'weekdays'
+          : isWeekendSet
+            ? 'weekend'
+            : 'weekly';
     const explicitStartDate =
       explicitDates.length > 0 ? explicitDates.slice().sort()[0] : undefined;
+    const repeatEndDate = normalizeRepeatEnd(body?.repeatEndDate) ?? undefined;
     for (const d of days) {
       const dayOfWeek: Weekday = d as Weekday;
       const repeatStartDate = explicitStartDate ?? weekDates[dayOfWeek];
@@ -531,6 +769,7 @@ export async function POST(req: NextRequest) {
         repeatMode,
         repeatGroupId,
         repeatStartDate,
+        repeatEndDate,
       });
       createdIds.push(id);
       createdTasks.push({
@@ -547,6 +786,7 @@ export async function POST(req: NextRequest) {
         repeatMode,
         repeatGroupId,
         repeatStartDate,
+        repeatEndDate,
       });
     }
     void syncGamification(uid, tz);
@@ -818,7 +1058,14 @@ export async function PUT(req: NextRequest) {
   // modes as QuickAdd. daily/weekdays expand into linked sibling weekly tasks
   // (a repeat group) so a task can appear on multiple days.
   if (body.setRepeat !== undefined && taskId) {
-    const mode: 'none' | 'daily' | 'weekdays' | 'weekly' =
+    const mode:
+      | 'none'
+      | 'daily'
+      | 'weekdays'
+      | 'weekend'
+      | 'weekly'
+      | 'monthly'
+      | 'custom' =
       body.setRepeat.mode ?? (body.setRepeat.weekly ? 'weekly' : 'none');
     const doc = await TaskModel.findOne({
       userId: uid,
@@ -836,6 +1083,8 @@ export async function PUT(req: NextRequest) {
       });
     }
 
+    const repeatEndDate = normalizeRepeatEnd(body.setRepeat.endDate);
+
     if (mode === 'none') {
       const targetDate =
         date ||
@@ -850,15 +1099,81 @@ export async function PUT(req: NextRequest) {
             completedDates: 1,
             repeatGroupId: 1,
             repeatStartDate: 1,
+            repeatEndDate: 1,
+            repeatDayOfMonth: 1,
+            repeatRule: 1,
           },
         },
+      );
+    } else if (mode === 'monthly') {
+      const repeatStartDate =
+        typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+          ? date
+          : doc.date || getZonedToday(tz);
+      const set: Record<string, unknown> = {
+        type: 'weekly',
+        repeatMode: 'monthly',
+        repeatStartDate,
+        repeatDayOfMonth: domFromYMD(repeatStartDate),
+      };
+      const unset: Record<string, unknown> = {
+        date: 1,
+        weekStart: 1,
+        completed: 1,
+        dayOfWeek: 1,
+        repeatGroupId: 1,
+        repeatRule: 1,
+      };
+      if (repeatEndDate) set.repeatEndDate = repeatEndDate;
+      else unset.repeatEndDate = 1;
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        { $set: set, $unset: unset },
+      );
+    } else if (mode === 'custom') {
+      const repeatStartDate =
+        typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+          ? date
+          : doc.date || getZonedToday(tz);
+      const rule = normalizeRepeatRule(body.setRepeat.rule, repeatStartDate);
+      if (!rule)
+        return NextResponse.json(
+          { error: 'invalid repeatRule' },
+          { status: 400 },
+        );
+      const set: Record<string, unknown> = {
+        type: 'weekly',
+        repeatMode: 'custom',
+        repeatStartDate,
+        repeatRule: rule,
+      };
+      const unset: Record<string, unknown> = {
+        date: 1,
+        weekStart: 1,
+        completed: 1,
+        dayOfWeek: 1,
+        repeatGroupId: 1,
+        repeatDayOfMonth: 1,
+      };
+      if (repeatEndDate) set.repeatEndDate = repeatEndDate;
+      else unset.repeatEndDate = 1;
+      await TaskModel.updateOne(
+        { userId: uid, id: taskId },
+        { $set: set, $unset: unset },
       );
     } else {
       const requested = Number(body.setRepeat.dayOfWeek);
       const dow = isWeekday(requested) ? requested : new Date().getDay();
-      const isMulti = mode === 'daily' || mode === 'weekdays';
-      // Weekdays must land on Mon–Fri.
-      const weeklyDay = (mode === 'weekdays' && (dow === 0 || dow === 6) ? 1 : dow) as Weekday;
+      const isMulti =
+        mode === 'daily' || mode === 'weekdays' || mode === 'weekend';
+      // Weekdays must land on Mon–Fri; weekend on Sat/Sun.
+      const weeklyDay = (
+        mode === 'weekdays' && (dow === 0 || dow === 6)
+          ? 1
+          : mode === 'weekend' && dow !== 0 && dow !== 6
+            ? 6
+            : dow
+      ) as Weekday;
       const groupId = isMulti ? doc.repeatGroupId || uuid() : undefined;
       const repeatStartDate =
         typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
@@ -871,7 +1186,15 @@ export async function PUT(req: NextRequest) {
         repeatMode: mode,
         repeatStartDate,
       };
-      const unset: Record<string, unknown> = { date: 1, weekStart: 1, completed: 1 };
+      const unset: Record<string, unknown> = {
+        date: 1,
+        weekStart: 1,
+        completed: 1,
+        repeatDayOfMonth: 1,
+        repeatRule: 1,
+      };
+      if (repeatEndDate) set.repeatEndDate = repeatEndDate;
+      else unset.repeatEndDate = 1;
       if (isMulti) set.repeatGroupId = groupId;
       else unset.repeatGroupId = 1;
       await TaskModel.updateOne(
@@ -880,7 +1203,12 @@ export async function PUT(req: NextRequest) {
       );
 
       if (isMulti) {
-        const allDays = mode === 'daily' ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5];
+        const allDays =
+          mode === 'daily'
+            ? [0, 1, 2, 3, 4, 5, 6]
+            : mode === 'weekend'
+              ? [0, 6]
+              : [1, 2, 3, 4, 5];
         const { weekDates } = getRollingWeekDatesZoned(tz);
         const now = new Date();
         for (const d of allDays.filter((day) => day !== weeklyDay)) {
@@ -900,6 +1228,7 @@ export async function PUT(req: NextRequest) {
             repeatMode: mode,
             repeatGroupId: groupId,
             repeatStartDate,
+            repeatEndDate: repeatEndDate ?? undefined,
             startTime: doc.startTime,
             endTime: doc.endTime,
             reminder: doc.reminder,
@@ -1126,6 +1455,8 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
     deletedAt: { $exists: false },
     $or: [
       { type: 'weekly', dayOfWeek: dow },
+      { type: 'weekly', repeatMode: 'monthly' },
+      { type: 'weekly', repeatRule: { $exists: true } },
       { type: 'regular', date },
     ],
   })
@@ -1137,7 +1468,10 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       const repeatStart = repeatStartForDoc(t, tz);
       return (
         !(t.suppressedDates ?? []).includes(date) &&
-        !(repeatStart && date < repeatStart)
+        !(repeatStart && date < repeatStart) &&
+        !isAfterRepeatEnd(t, date) &&
+        !monthlyExcludesDate(t, date) &&
+        !(t.repeatRule && !customOccursOn(t, date))
       );
     },
   );
@@ -1162,6 +1496,9 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       repeatMode: t.repeatMode,
       repeatGroupId: t.repeatGroupId,
       repeatStartDate: repeatStartForDoc(t, tz),
+      repeatEndDate: t.repeatEndDate,
+      repeatDayOfMonth: t.repeatDayOfMonth,
+      repeatRule: t.repeatRule,
       dayOfWeek: t.dayOfWeek,
       completedDates: t.completedDates ?? [],
       frogodoroSettings: t.frogodoroSettings,
@@ -1231,6 +1568,8 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       deletedAt: { $exists: false },
       $or: [
         { type: 'weekly', dayOfWeek: dayNum },
+        { type: 'weekly', repeatMode: 'monthly' },
+        { type: 'weekly', repeatRule: { $exists: true } },
         { type: 'regular', date: weekDates[dayNum] },
       ],
     })
@@ -1243,7 +1582,10 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
           const repeatStart = repeatStartForDoc(t, tz);
           return (
             !(t.suppressedDates ?? []).includes(weekDates[dayNum]) &&
-            !(repeatStart && weekDates[dayNum] < repeatStart)
+            !(repeatStart && weekDates[dayNum] < repeatStart) &&
+            !isAfterRepeatEnd(t, weekDates[dayNum]) &&
+            !monthlyExcludesDate(t, weekDates[dayNum]) &&
+            !(t.repeatRule && !customOccursOn(t, weekDates[dayNum]))
           );
         },
       )
@@ -1262,6 +1604,10 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         endTime: t.endTime,
         reminder: t.reminder,
         repeatStartDate: repeatStartForDoc(t, tz),
+        repeatEndDate: t.repeatEndDate,
+        repeatMode: t.repeatMode,
+        repeatDayOfMonth: t.repeatDayOfMonth,
+        repeatRule: t.repeatRule,
       }))
       .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     return NextResponse.json(out);
@@ -1278,6 +1624,16 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         type: 'weekly',
         deletedAt: { $exists: false },
         dayOfWeek: { $in: [0, 1, 2, 3, 4, 5, 6] },
+      },
+      {
+        type: 'weekly',
+        deletedAt: { $exists: false },
+        repeatMode: 'monthly',
+      },
+      {
+        type: 'weekly',
+        deletedAt: { $exists: false },
+        repeatRule: { $exists: true },
       },
       {
         type: 'regular',
@@ -1312,17 +1668,53 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       continue;
     }
 
+    // Custom rules can land on several days within the week — push each match.
+    if (doc.repeatRule) {
+      const repeatStart = repeatStartForDoc(doc, tz);
+      for (let di = 0; di < weekDates.length; di++) {
+        const date = weekDates[di];
+        if (!customOccursOn(doc, date)) continue;
+        if (isAfterRepeatEnd(doc, date)) continue;
+        if ((doc.suppressedDates ?? []).includes(date)) continue;
+        week[di].push({
+          id: doc.id,
+          text: doc.text,
+          order: doc.order,
+          type: doc.type,
+          completed: (doc.completedDates ?? []).includes(date),
+          tags: doc.tags ?? [],
+          repeatStartDate: repeatStart,
+          repeatEndDate: doc.repeatEndDate,
+          repeatMode: doc.repeatMode,
+          repeatRule: doc.repeatRule,
+          frogodoroSession:
+            doc.frogodoroSessions?.find((session) => session.date === date) ??
+            null,
+          calendarEventId: doc.calendarEventId,
+          startTime: doc.startTime,
+          endTime: doc.endTime,
+          reminder: doc.reminder,
+        });
+      }
+      continue;
+    }
+
     const day =
-      doc.type === 'weekly'
-        ? doc.dayOfWeek
-        : doc.date
-          ? dateToDay.get(doc.date)
-          : undefined;
-    if (day === undefined) continue;
+      doc.repeatMode === 'monthly' && typeof doc.repeatDayOfMonth === 'number'
+        ? (weekDates.findIndex((wd) => domFromYMD(wd) === doc.repeatDayOfMonth) as
+            | Weekday
+            | -1)
+        : doc.type === 'weekly'
+          ? doc.dayOfWeek
+          : doc.date
+            ? dateToDay.get(doc.date)
+            : undefined;
+    if (day === undefined || day === -1) continue;
 
     const date = weekDates[day];
     const repeatStart = repeatStartForDoc(doc, tz);
     if (repeatStart && date < repeatStart) continue;
+    if (isAfterRepeatEnd(doc, date)) continue;
     if ((doc.suppressedDates ?? []).includes(date)) continue;
 
     week[day].push({
@@ -1335,6 +1727,9 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         (!!doc.completed && doc.type === 'regular'),
       tags: doc.tags ?? [],
       repeatStartDate: repeatStart,
+      repeatEndDate: doc.repeatEndDate,
+      repeatMode: doc.repeatMode,
+      repeatDayOfMonth: doc.repeatDayOfMonth,
       frogodoroSession:
         doc.frogodoroSessions?.find((session) => session.date === date) ??
         null,
@@ -1385,6 +1780,16 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         type: 'weekly',
         deletedAt: { $exists: false },
         dayOfWeek: { $in: Array.from(dowSet) },
+      },
+      {
+        type: 'weekly',
+        deletedAt: { $exists: false },
+        repeatMode: 'monthly',
+      },
+      {
+        type: 'weekly',
+        deletedAt: { $exists: false },
+        repeatRule: { $exists: true },
       },
       {
         type: 'regular',
@@ -1455,6 +1860,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
       for (const d of dates) {
         if (dowFromYMD(d) !== doc.dayOfWeek) continue;
         if (repeatStart && d < repeatStart) continue;
+        if (isAfterRepeatEnd(doc, d)) continue;
         if ((doc.suppressedDates ?? []).includes(d)) continue;
         byDate[d].push({
           id: doc.id,
@@ -1468,7 +1874,69 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           repeatMode: doc.repeatMode,
           repeatGroupId: doc.repeatGroupId,
           repeatStartDate: repeatStart,
+          repeatEndDate: doc.repeatEndDate,
           dayOfWeek: doc.dayOfWeek,
+          frogodoroSession:
+            doc.frogodoroSessions?.find((s) => s.date === d) ?? null,
+          calendarEventId: doc.calendarEventId,
+          startTime: doc.startTime,
+          endTime: doc.endTime,
+          reminder: doc.reminder,
+        });
+      }
+    }
+    if (doc.repeatMode === 'monthly' && typeof doc.repeatDayOfMonth === 'number') {
+      // expand monthly repeat onto the matching day-of-month in each month
+      const repeatStart = repeatStartForDoc(doc, tz);
+      for (const d of dates) {
+        if (domFromYMD(d) !== doc.repeatDayOfMonth) continue;
+        if (repeatStart && d < repeatStart) continue;
+        if (isAfterRepeatEnd(doc, d)) continue;
+        if ((doc.suppressedDates ?? []).includes(d)) continue;
+        byDate[d].push({
+          id: doc.id,
+          text: doc.text,
+          order: doc.order,
+          type: doc.type,
+          completed: (doc.completedDates ?? []).includes(d),
+          tags: doc.tags ?? [],
+          notes: doc.notes ?? '',
+          checklist: doc.checklist ?? [],
+          repeatMode: doc.repeatMode,
+          repeatStartDate: repeatStart,
+          repeatEndDate: doc.repeatEndDate,
+          repeatDayOfMonth: doc.repeatDayOfMonth,
+          dayOfWeek: dowFromYMD(d),
+          frogodoroSession:
+            doc.frogodoroSessions?.find((s) => s.date === d) ?? null,
+          calendarEventId: doc.calendarEventId,
+          startTime: doc.startTime,
+          endTime: doc.endTime,
+          reminder: doc.reminder,
+        });
+      }
+    }
+    if (doc.repeatRule) {
+      // custom interval recurrence — evaluate each date in the window
+      const repeatStart = repeatStartForDoc(doc, tz);
+      for (const d of dates) {
+        if (!customOccursOn(doc, d)) continue;
+        if (isAfterRepeatEnd(doc, d)) continue;
+        if ((doc.suppressedDates ?? []).includes(d)) continue;
+        byDate[d].push({
+          id: doc.id,
+          text: doc.text,
+          order: doc.order,
+          type: doc.type,
+          completed: (doc.completedDates ?? []).includes(d),
+          tags: doc.tags ?? [],
+          notes: doc.notes ?? '',
+          checklist: doc.checklist ?? [],
+          repeatMode: doc.repeatMode,
+          repeatStartDate: repeatStart,
+          repeatEndDate: doc.repeatEndDate,
+          repeatRule: doc.repeatRule,
+          dayOfWeek: dowFromYMD(d),
           frogodoroSession:
             doc.frogodoroSessions?.find((s) => s.date === d) ?? null,
           calendarEventId: doc.calendarEventId,

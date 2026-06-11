@@ -10,9 +10,24 @@ export type Task = {
   tags?: string[];
   notes?: string;
   checklist?: { id: string; text: string; done: boolean }[];
-  repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly';
+  repeatMode?:
+    | 'none'
+    | 'daily'
+    | 'weekdays'
+    | 'weekend'
+    | 'weekly'
+    | 'monthly'
+    | 'custom';
   repeatGroupId?: string;
   repeatStartDate?: string;
+  repeatEndDate?: string;
+  repeatDayOfMonth?: number;
+  repeatRule?: {
+    freq: 'daily' | 'weekly' | 'monthly';
+    interval: number;
+    byWeekday?: number[];
+    byMonthday?: number[];
+  };
   dayOfWeek?: number;
   completedDates?: string[];
   frogodoroSession?: {

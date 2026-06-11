@@ -22,17 +22,22 @@ import {
 import { TimeSliderColumn } from './TimeSliderColumn';
 import { TagsView } from './TagsView';
 import { RepeatView } from './RepeatView';
+import { EndDateCalendarSheet } from './EndDateCalendarSheet';
+import { CustomRepeatSheet } from './CustomRepeatSheet';
 import {
   HOURS_24,
   MINUTES_60,
 } from './constants';
 import {
   allDisplayDays,
+  monthlyRepeatLabel,
   pad,
   repeatModeFor,
   weekdayDisplayDays,
+  weekendDisplayDays,
   ymdLocal,
   type RepeatMode,
+  type RepeatRule,
 } from './utils';
 import type { ActivePicker, RepeatChoice } from './types';
 import type { TagManager } from './useTagManager';
@@ -75,6 +80,10 @@ type Props = {
   repeatDay: DisplayDay;
   pickedDays: DisplayDay[];
   setPickedDays: React.Dispatch<React.SetStateAction<DisplayDay[]>>;
+  repeatEndDate: string | null;
+  setRepeatEndDate: (v: string | null) => void;
+  repeatRule: RepeatRule | null;
+  setRepeatRule: (v: RepeatRule | null) => void;
 
   // tags
   tagManager: TagManager;
@@ -117,6 +126,10 @@ export function PickerSheet(props: Props) {
     repeatDay,
     pickedDays,
     setPickedDays,
+    repeatEndDate,
+    setRepeatEndDate,
+    repeatRule,
+    setRepeatRule,
     tagManager,
     selectedTagIds,
     setSelectedTagIds,
@@ -124,10 +137,25 @@ export function PickerSheet(props: Props) {
     tagInputRef,
   } = props;
 
-  const currentRepeatMode = repeatModeFor(pickedDays, repeat, daysOrder);
+  const [showRepeatEndCalendar, setShowRepeatEndCalendar] = useState(false);
+  const [showCustomSheet, setShowCustomSheet] = useState(false);
+
+  const currentRepeatMode: RepeatMode =
+    repeat === 'custom'
+      ? 'custom'
+      : repeat === 'monthly'
+        ? 'monthly'
+        : repeatModeFor(pickedDays, repeat, daysOrder);
   const setRepeatMode = (mode: RepeatMode) => {
+    // Any preset choice clears a previously-built custom rule.
+    setRepeatRule(null);
     if (mode === 'none') {
       setRepeat('this-week');
+      setRepeatEndDate(null);
+      return;
+    }
+    if (mode === 'monthly') {
+      setRepeat('monthly');
       return;
     }
     setRepeat('weekly');
@@ -135,6 +163,8 @@ export function PickerSheet(props: Props) {
       setPickedDays(allDisplayDays());
     } else if (mode === 'weekdays') {
       setPickedDays(weekdayDisplayDays(daysOrder));
+    } else if (mode === 'weekend') {
+      setPickedDays(weekendDisplayDays(daysOrder));
     } else {
       setPickedDays([repeatDay]);
     }
@@ -251,7 +281,12 @@ export function PickerSheet(props: Props) {
                 repeatDay as Exclude<DisplayDay, 7>,
                 daysOrder,
               )}
-              onClose={() => setActivePicker(null)}
+              monthlyLabel={monthlyRepeatLabel(selectedDateKey || todayKey)}
+              endDate={repeatEndDate}
+              onPickEndDate={() => setShowRepeatEndCalendar(true)}
+              onClearEndDate={() => setRepeatEndDate(null)}
+              customRule={repeatRule}
+              onOpenCustom={() => setShowCustomSheet(true)}
             />
           )}
         </div>
@@ -276,6 +311,31 @@ export function PickerSheet(props: Props) {
         setReminderTimeParts={setReminderTimeParts}
         saveReminderTime={saveReminderTime}
         onClose={cancelReminderPicker}
+      />
+
+      <EndDateCalendarSheet
+        open={activePicker === 'repeat' && showRepeatEndCalendar}
+        value={repeatEndDate}
+        minDateKey={todayKey}
+        onSelect={(dateKey) => {
+          setRepeatEndDate(dateKey);
+          setShowRepeatEndCalendar(false);
+        }}
+        onClose={() => setShowRepeatEndCalendar(false)}
+        zIndex={1700}
+      />
+
+      <CustomRepeatSheet
+        open={activePicker === 'repeat' && showCustomSheet}
+        onClose={() => setShowCustomSheet(false)}
+        initialRule={repeatRule}
+        initialEndDate={repeatEndDate}
+        anchorYmd={selectedDateKey || todayKey}
+        onSave={(rule, end) => {
+          setRepeatRule(rule);
+          setRepeatEndDate(end);
+          setRepeat('custom');
+        }}
       />
     </>
   );

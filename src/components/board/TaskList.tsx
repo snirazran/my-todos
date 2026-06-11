@@ -6,7 +6,7 @@ import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
 import TaskDetailSheet from './TaskDetailSheet';
 import { EditScopeDialog } from './EditScopeDialog';
-import type { RepeatMode } from '@/components/ui/quick-add/utils';
+import type { RepeatMode, RepeatRule } from '@/components/ui/quick-add/utils';
 import {
   Task,
   draggableIdFor,
@@ -269,10 +269,14 @@ export default React.memo(function TaskList({
     taskId: string,
     mode: RepeatMode,
     dayOfWeek?: number,
+    endDate?: string | null,
+    rule?: RepeatRule | null,
   ) => {
     onPatchTask?.(taskId, {
       repeatMode: mode,
       type: mode === 'none' ? 'regular' : 'weekly',
+      repeatEndDate: mode === 'none' ? undefined : endDate ?? undefined,
+      repeatRule: mode === 'custom' ? rule ?? undefined : undefined,
     });
     fetch('/api/tasks', {
       method: 'PUT',
@@ -280,7 +284,7 @@ export default React.memo(function TaskList({
       body: JSON.stringify({
         taskId,
         date: dateKey ?? todayYmdStr(),
-        setRepeat: { mode, dayOfWeek },
+        setRepeat: { mode, dayOfWeek, endDate: endDate ?? null, rule: rule ?? null },
         timezone: tz,
       }),
     }).then(refresh);
@@ -788,9 +792,11 @@ export default React.memo(function TaskList({
         onSchedule={
           sheetTask ? () => setScheduleDialog({ task: sheetTask }) : undefined
         }
+        monthlyAnchorYmd={dateKey}
         onSetRepeat={
           sheetTask
-            ? (mode, dow) => setRepeatDirect(sheetTask.id, mode, dow)
+            ? (mode, dow, endDate, rule) =>
+                setRepeatDirect(sheetTask.id, mode, dow, endDate, rule)
             : undefined
         }
         onDoLater={

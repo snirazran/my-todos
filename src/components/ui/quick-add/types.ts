@@ -4,7 +4,7 @@ import type {
   MacroCategoryId,
 } from '@/lib/quests/types';
 
-export type RepeatChoice = 'this-week' | 'weekly';
+export type RepeatChoice = 'this-week' | 'weekly' | 'monthly' | 'custom';
 
 export type SavedTag = {
   id: string;
@@ -24,6 +24,10 @@ export type QuickAddSubmit = {
   startTime?: string;
   endTime?: string;
   reminder?: string;
+  /** YYYY-MM-DD last date a repeating task should appear; null = never ends. */
+  repeatEndDate?: string | null;
+  /** Custom recurrence rule (when repeat === 'custom'). */
+  repeatRule?: import('./utils').RepeatRule | null;
 };
 
 export type QuickAddSheetProps = Readonly<{

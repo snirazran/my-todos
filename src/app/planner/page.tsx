@@ -274,14 +274,18 @@ export default function ManageTasksPage() {
       startTime,
       endTime,
       reminder,
+      repeatEndDate,
+      repeatRule,
     }: {
       text: string;
       dates: string[];
-      repeat: 'this-week' | 'weekly';
+      repeat: 'this-week' | 'weekly' | 'monthly' | 'custom';
       tags: string[];
       startTime?: string;
       endTime?: string;
       reminder?: string;
+      repeatEndDate?: string | null;
+      repeatRule?: import('@/components/ui/quick-add/utils').RepeatRule | null;
     }) => {
       try {
         await fetch('/api/tasks?view=board', {
@@ -301,6 +305,8 @@ export default function ManageTasksPage() {
             startTime,
             endTime,
             reminder,
+            repeatEndDate,
+            repeatRule,
           }),
         });
       } catch (e) {

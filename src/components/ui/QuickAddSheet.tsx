@@ -27,10 +27,14 @@ import { useTagManager } from './quick-add/useTagManager';
 import { useCalendarMonth } from './quick-add/useCalendarMonth';
 import { useKeyboardInset } from './quick-add/useKeyboardInset';
 import {
+  customRepeatLabel,
+  formatEndDateLabel,
   formatTimeDisplay,
+  monthlyRepeatLabel,
   parseYmdLocal,
   repeatModeFor,
   ymdLocal,
+  type RepeatRule,
 } from './quick-add/utils';
 import type {
   ActivePicker,
@@ -90,6 +94,8 @@ export default function QuickAddSheet({
   const [activePicker, setActivePicker] = useState<ActivePicker>(null);
   const [selectedDateKey, setSelectedDateKey] = useState('');
   const [showCalendarPicker, setShowCalendarPicker] = useState(false);
+  const [repeatEndDate, setRepeatEndDate] = useState<string | null>(null);
+  const [repeatRule, setRepeatRule] = useState<RepeatRule | null>(null);
 
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
@@ -144,6 +150,8 @@ export default function QuickAddSheet({
     ]);
 
     setRepeat(defaultRepeat);
+    setRepeatEndDate(null);
+    setRepeatRule(null);
     setTags([]);
     setIsSubmitting(false);
     tagManager.reset();
@@ -182,7 +190,7 @@ export default function QuickAddSheet({
   const repeatDay = (
     isLater || anchorDisplayDay === 7 ? todayIndex : anchorDisplayDay
   ) as DisplayDay;
-  const repeatsOn = repeat === 'weekly';
+  const repeatsOn = repeat !== 'this-week';
   const hasTaskText = text.trim().length > 0;
   const keyboardActive = inputFocused && keyboardInset > 0;
   const availableSheetHeight = Math.max(
@@ -260,15 +268,30 @@ export default function QuickAddSheet({
             })
           : labelForDisplayDay(selectedDay as Exclude<DisplayDay, 7>, daysOrder);
 
-  const repeatMode = repeatModeFor(pickedDays, repeat, daysOrder);
-  const repeatLabel =
+  const repeatMode =
+    repeat === 'custom'
+      ? 'custom'
+      : repeat === 'monthly'
+        ? 'monthly'
+        : repeatModeFor(pickedDays, repeat, daysOrder);
+  const repeatBaseLabel =
     repeatMode === 'daily'
       ? 'Every day'
       : repeatMode === 'weekdays'
         ? 'Every weekday'
-        : repeatMode === 'weekly'
-          ? `Every week on ${labelForDisplayDay(repeatDay as Exclude<DisplayDay, 7>, daysOrder)}`
-          : 'Does not repeat';
+        : repeatMode === 'weekend'
+          ? 'Every weekend'
+          : repeatMode === 'weekly'
+            ? `Every week on ${labelForDisplayDay(repeatDay as Exclude<DisplayDay, 7>, daysOrder)}`
+            : repeatMode === 'monthly'
+              ? monthlyRepeatLabel(selectedDateKey || todayKey)
+              : repeatMode === 'custom' && repeatRule
+                ? customRepeatLabel(repeatRule)
+                : 'Does not repeat';
+  const repeatLabel =
+    repeatMode !== 'none' && repeatEndDate
+      ? `${repeatBaseLabel} · until ${formatEndDateLabel(repeatEndDate)}`
+      : repeatBaseLabel;
 
   const selectSingleDay = (day: DisplayDay) => {
     setPickedDays([day]);
@@ -304,9 +327,13 @@ export default function QuickAddSheet({
     if (apiDays.length === 0) return;
 
     const exactDates =
-      repeat === 'this-week' && !isLater && selectedDateKey
-        ? [selectedDateKey]
-        : undefined;
+      repeat === 'monthly' || repeat === 'custom'
+        ? selectedDateKey
+          ? [selectedDateKey]
+          : undefined
+        : repeat === 'this-week' && !isLater && selectedDateKey
+          ? [selectedDateKey]
+          : undefined;
 
     setIsSubmitting(true);
     try {
@@ -319,6 +346,8 @@ export default function QuickAddSheet({
         startTime: startTime || undefined,
         endTime: endTime || undefined,
         reminder: notifyEnabled ? reminder : undefined,
+        repeatEndDate: repeat !== 'this-week' ? repeatEndDate : null,
+        repeatRule: repeat === 'custom' ? repeatRule : null,
       });
       if (removeSavedTask && pickedBacklogTaskId) {
         const backlogKey = '/api/tasks?view=board&day=-1';
@@ -759,6 +788,10 @@ export default function QuickAddSheet({
                   repeatDay={repeatDay}
                   pickedDays={pickedDays}
                   setPickedDays={setPickedDays}
+                  repeatEndDate={repeatEndDate}
+                  setRepeatEndDate={setRepeatEndDate}
+                  repeatRule={repeatRule}
+                  setRepeatRule={setRepeatRule}
                   tagManager={tagManager}
                   selectedTagIds={tags}
                   setSelectedTagIds={setTags}

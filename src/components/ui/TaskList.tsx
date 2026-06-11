@@ -76,7 +76,14 @@ interface Task {
   tags?: string[];
   notes?: string;
   checklist?: { id: string; text: string; done: boolean }[];
-  repeatMode?: 'none' | 'daily' | 'weekdays' | 'weekly';
+  repeatMode?:
+    | 'none'
+    | 'daily'
+    | 'weekdays'
+    | 'weekend'
+    | 'weekly'
+    | 'monthly'
+    | 'custom';
   repeatGroupId?: string;
   dayOfWeek?: number;
   frogodoroSession?: {
@@ -813,8 +820,17 @@ export default function TaskList({
   ) => void;
   onSetRepeat?: (
     taskId: string,
-    mode: 'none' | 'daily' | 'weekdays' | 'weekly',
+    mode:
+      | 'none'
+      | 'daily'
+      | 'weekdays'
+      | 'weekend'
+      | 'weekly'
+      | 'monthly'
+      | 'custom',
     dayOfWeek?: number,
+    endDate?: string | null,
+    rule?: import('@/components/ui/quick-add/utils').RepeatRule | null,
   ) => void;
   onUpdateTags?: (
     taskId: string,
@@ -1683,8 +1699,8 @@ export default function TaskList({
             }
             onSetRepeat={
               onSetRepeat
-                ? (mode, dayOfWeek) =>
-                    onSetRepeat(sheetTask.id, mode, dayOfWeek)
+                ? (mode, dayOfWeek, endDate, rule) =>
+                    onSetRepeat(sheetTask.id, mode, dayOfWeek, endDate, rule)
                 : undefined
             }
             onDoLater={
