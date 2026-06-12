@@ -21,6 +21,7 @@ interface NotificationContextType {
   showNotification: (
     content: React.ReactNode,
     undoAction?: () => void | Promise<void>,
+    options?: { durationMs?: number },
   ) => void;
   hideNotification: () => void;
   isVisible: boolean;
@@ -83,10 +84,17 @@ export function NotificationProvider({
   }, []);
 
   const showNotification = useCallback(
-    (content: React.ReactNode, undoAction?: () => void | Promise<void>) => {
+    (
+      content: React.ReactNode,
+      undoAction?: () => void | Promise<void>,
+      options?: { durationMs?: number },
+    ) => {
       const id = Date.now() + Math.random();
       setNotifications((prev) => [...prev, { id, content, undoAction }]);
-      const timeout = setTimeout(() => dismiss(id), AUTO_DISMISS_MS);
+      const timeout = setTimeout(
+        () => dismiss(id),
+        options?.durationMs ?? AUTO_DISMISS_MS,
+      );
       timeoutsRef.current.set(id, timeout);
     },
     [dismiss],

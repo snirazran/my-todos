@@ -295,6 +295,7 @@ export function useTaskData({
         const json = await res.json();
 
         if (json.ok) {
+          window.dispatchEvent(new Event('quests-maybe-changed'));
           // Update Fly/Hunger status if returned
           // We use a functional update to ensure we're modifying the LATEST state (which might include the optimistic change)
           if (json.flyStatus || json.hungerStatus) {

@@ -247,6 +247,7 @@ export default React.memo(function TaskList({
         .then((r) => r.json().catch(() => ({})))
         .then((json) => {
           refresh();
+        window.dispatchEvent(new Event('quests-maybe-changed'));
         if (typeof json?.flyStatus?.balance === 'number') {
           patchInventoryFlies(json.flyStatus.balance);
         }

@@ -9,6 +9,7 @@ import { GlobalTimer } from '@/components/providers/GlobalTimer';
 import { GlobalCalendarSync } from '@/components/ui/GoogleCalendarSync';
 import { GlobalSkinRotation } from '@/components/ui/SkinRotation';
 import { ReferralClaimer } from '@/components/providers/ReferralClaimer';
+import { QuestClaimWatcher } from '@/components/providers/QuestClaimWatcher';
 
 export default function Providers({ children }: { children: ReactNode }) {
   return (
@@ -25,6 +26,7 @@ export default function Providers({ children }: { children: ReactNode }) {
           <GlobalSkinRotation />
           <PushNotificationInit />
           <ReferralClaimer />
+          <QuestClaimWatcher />
           {children}
         </NotificationProvider>
       </SWRConfig>

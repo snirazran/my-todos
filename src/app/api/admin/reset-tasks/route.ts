@@ -29,6 +29,16 @@ export async function POST() {
       },
     };
 
+    if (user.wardrobe) {
+      user.wardrobe.flyDaily = {
+        date: '',
+        earned: 0,
+        taskIds: [],
+        limitNotified: false,
+      };
+      user.markModified('wardrobe');
+    }
+
     await user.save();
 
     return NextResponse.json({
