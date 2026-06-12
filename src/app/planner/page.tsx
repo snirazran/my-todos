@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import TaskBoard from '@/components/board/TaskBoard';
 import { LeftTongueProvider } from '@/components/board/LeftTongue';
 import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
+import { seedQuestClaims } from '@/lib/questClaims';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import {
@@ -35,6 +36,10 @@ export default function ManageTasksPage() {
   const [windowStart, setWindowStart] = useState<string>(addDays(today, -INITIAL_PAST));
   const [windowEnd, setWindowEnd] = useState<string>(addDays(today, INITIAL_FUTURE));
   const [activeDateKey, setActiveDateKey] = useState<string>(today);
+
+  useEffect(() => {
+    void seedQuestClaims();
+  }, []);
 
   // Prevent parent <main> from scrolling on this page
   useEffect(() => {

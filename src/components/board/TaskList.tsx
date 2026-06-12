@@ -24,6 +24,7 @@ import { TimePopup } from '@/components/ui/TimePopup';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { patchInventoryFlies } from '@/hooks/useInventory';
+import { notifyQuestClaims } from '@/lib/questClaims';
 import { useLeftTongue } from './LeftTongue';
 
 export default React.memo(function TaskList({
@@ -247,7 +248,7 @@ export default React.memo(function TaskList({
         .then((r) => r.json().catch(() => ({})))
         .then((json) => {
           refresh();
-        window.dispatchEvent(new Event('quests-maybe-changed'));
+        void notifyQuestClaims(showNotification);
         if (typeof json?.flyStatus?.balance === 'number') {
           patchInventoryFlies(json.flyStatus.balance);
         }
@@ -263,13 +264,15 @@ export default React.memo(function TaskList({
             );
           } else if (json.awarded) {
             showNotification(
-              <div className="flex items-center gap-3 pr-2">
-                <Fly size={28} y={-4} />
-                <div className="flex flex-col leading-none">
-                  <span className="font-black text-base">
+              <div className="flex w-full items-center gap-3">
+                <div className="grid h-12 w-12 shrink-0 place-items-center">
+                  <Fly size={44} y={-2} />
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col leading-tight">
+                  <span className="text-[14px] font-black text-foreground">
                     +1 Fly Collected!
                   </span>
-                  <span className="text-[10px] text-muted-foreground font-bold mt-0.5 uppercase tracking-wider">
+                  <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     Keep it up!
                   </span>
                 </div>

@@ -3,6 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import { buildRewardCatalog, syncQuestState } from '@/lib/quests/engine';
 import { getActiveQuestSeasonView } from '@/lib/quests/seasons';
+import { getCachedCatalog } from '@/lib/skins/getCatalog';
 
 const isDataUrl = (value: unknown): value is string =>
   typeof value === 'string' && value.startsWith('data:');
@@ -29,6 +30,39 @@ function lightenCategory<T extends { id?: string; coverImageUrl?: string }>(
   if (!isDataUrl(category.coverImageUrl) || !category.id) return category;
   return { ...category, coverImageUrl: categoryCoverRef(category.id) };
 }
+
+function objectiveSummaryLabel(block: {
+  type?: string;
+  subject?: string;
+  action?: string;
+  tagMode?: string;
+  target?: number;
+}): string {
+  const target = Math.max(0, block.target ?? 0);
+  if (block.type === 'focus_minutes') {
+    return block.tagMode === 'focus_category_tags'
+      ? `Focus for ${target} minutes on tagged tasks`
+      : `Focus for ${target} minutes on tasks`;
+  }
+  const subject = block.subject === 'any' || target !== 1 ? 'tasks' : 'task';
+  const action = block.action === 'add' ? 'Add' : 'Complete';
+  const scope =
+    block.tagMode === 'focus_category_tags'
+      ? `${subject} with focus tags`
+      : subject;
+  return `${action} ${target} ${scope}`;
+}
+
+type ClaimableEntry = {
+  id: string;
+  kind: 'objective' | 'season';
+  placement?: 'daily' | 'category';
+  categoryName?: string;
+  objectiveLabel?: string;
+  seasonName?: string;
+  day?: number;
+  reward?: any;
+};
 
 function normalizeQuestTag(tag: any, index: number, isPremium: boolean) {
   if (typeof tag === 'string') {
@@ -132,6 +166,58 @@ export async function GET(req: Request) {
       activeSeason && activeSeason.claimable && !activeSeason.claimedToday ? 1 : 0;
     const claimableCount = questClaimable + seasonDailyClaimable;
 
+    const categoryNameById = new Map<string, string>(
+      (dashboard.macroCategories ?? []).map((c: any) => [c.id, c.name]),
+    );
+    const claimables: ClaimableEntry[] = [];
+    for (const quest of [...dashboard.dailyQuests, ...dashboard.categoryQuests]) {
+      if (quest.claimed || quest.locked) continue;
+      for (const block of quest.logic) {
+        if (
+          (block.rewards?.length ?? 0) > 0 &&
+          block.progress >= block.target &&
+          !quest.claimedObjectiveIds.includes(block.id)
+        ) {
+          claimables.push({
+            id: `${quest.id}:${block.id}`,
+            kind: 'objective',
+            placement: quest.placement,
+            categoryName:
+              quest.placement === 'category'
+                ? categoryNameById.get(quest.categoryId ?? '')
+                : undefined,
+            objectiveLabel: objectiveSummaryLabel(block),
+            reward: block.rewards?.[0],
+          });
+        }
+      }
+    }
+    if (activeSeason && activeSeason.claimable && !activeSeason.claimedToday) {
+      const dayEntry = activeSeason.rewardsByDay.find(
+        (e) => e.day === activeSeason.currentDay,
+      );
+      const seasonReward = dashboard.isPremium
+        ? dayEntry?.premiumRewards?.[0] ?? dayEntry?.freeRewards?.[0]
+        : dayEntry?.freeRewards?.[0];
+      claimables.push({
+        id: `season:${activeSeason.id}:${activeSeason.currentDay}`,
+        kind: 'season',
+        seasonName: activeSeason.name,
+        day: activeSeason.currentDay,
+        reward: seasonReward,
+      });
+    }
+    const claimableRewards = claimables
+      .map((c) => c.reward)
+      .filter(Boolean) as import('@/lib/quests/types').QuestRewards;
+    let claimablesRewardCatalog: Record<string, unknown> = {};
+    if (isSummary && claimableRewards.some((r) => r?.itemId)) {
+      const catalog = dashboard.catalog?.length
+        ? dashboard.catalog
+        : await getCachedCatalog();
+      claimablesRewardCatalog = buildRewardCatalog(catalog, [claimableRewards]);
+    }
+
     // Count active quests the user can still work on (not claimed, not yet fully claimable)
     const activeCount = [...dashboard.dailyQuests, ...dashboard.categoryQuests].filter(
       (quest) => !quest.claimed && !quest.claimable && !quest.locked,
@@ -143,6 +229,8 @@ export async function GET(req: Request) {
         {
           isPremium: dashboard.isPremium,
           claimableCount,
+          claimables,
+          claimablesRewardCatalog,
           activeCount,
           activeFocusCategoryId: dashboard.activeFocusCategoryId,
           onboarding: {

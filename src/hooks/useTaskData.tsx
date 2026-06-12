@@ -5,6 +5,7 @@ import { useAuth } from '@/components/auth/AuthContext';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useReminderScheduler } from '@/hooks/useReminderScheduler';
 import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
+import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
 import Fly from '@/components/ui/fly';
 
 // --- Types ---
@@ -102,6 +103,10 @@ export function useTaskData({
   const { user } = useAuth();
   const { showNotification, hideNotification } = useNotification();
   const { cancelNotification } = useReminderScheduler();
+
+  useEffect(() => {
+    void seedQuestClaims();
+  }, []);
 
   const today = new Date();
   const dateStr = format(today, 'yyyy-MM-dd');
@@ -295,7 +300,7 @@ export function useTaskData({
         const json = await res.json();
 
         if (json.ok) {
-          window.dispatchEvent(new Event('quests-maybe-changed'));
+          void notifyQuestClaims(showNotification);
           // Update Fly/Hunger status if returned
           // We use a functional update to ensure we're modifying the LATEST state (which might include the optimistic change)
           if (json.flyStatus || json.hungerStatus) {
@@ -335,13 +340,15 @@ export function useTaskData({
                 );
               } else if (newEarned > prevEarned) {
                 showNotification(
-                  <div className="flex items-center gap-3 pr-2">
-                    <Fly size={28} y={-4} />
-                    <div className="flex flex-col leading-none">
-                      <span className="font-black text-base">
+                  <div className="flex w-full items-center gap-3">
+                    <div className="grid h-12 w-12 shrink-0 place-items-center">
+                      <Fly size={44} y={-2} />
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col leading-tight">
+                      <span className="text-[14px] font-black text-foreground">
                         +1 Fly Collected!
                       </span>
-                      <span className="text-[10px] text-muted-foreground font-bold mt-0.5 uppercase tracking-wider">
+                      <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                         Keep it up!
                       </span>
                     </div>

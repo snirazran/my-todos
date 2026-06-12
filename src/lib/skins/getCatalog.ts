@@ -49,6 +49,19 @@ export async function getFullCatalog(): Promise<ItemDef[]> {
   }));
 }
 
+let catalogCache: { at: number; items: ItemDef[] } | null = null;
+const CATALOG_CACHE_TTL_MS = 5 * 60_000;
+
+/** Like getFullCatalog, but cached in-process for a few minutes. */
+export async function getCachedCatalog(): Promise<ItemDef[]> {
+  if (catalogCache && Date.now() - catalogCache.at < CATALOG_CACHE_TTL_MS) {
+    return catalogCache.items;
+  }
+  const items = await getFullCatalog();
+  catalogCache = { at: Date.now(), items };
+  return items;
+}
+
 /** Build a byId lookup from a catalog array */
 export function buildById(catalog: ItemDef[]): Record<string, ItemDef> {
   return Object.fromEntries(catalog.map((i) => [i.id, i]));
