@@ -333,6 +333,7 @@ async function awardFlyForTask(
   userId: string,
   taskId: string,
   tz: string,
+  countTowardDaily: boolean = true,
 ): Promise<{
   awarded: boolean;
   flyStatus: FlyStatus;
@@ -389,21 +390,24 @@ async function awardFlyForTask(
 
   const statsUpdates: Record<string, any> = {};
 
-  let nextDailyTasksCount = isNewDay ? 1 : currentStats.dailyTasksCount;
-  if (!alreadyCountedInStats && !isNewDay) nextDailyTasksCount += 1;
+  let nextDailyTasksCount = isNewDay ? 0 : currentStats.dailyTasksCount;
+  if (countTowardDaily) {
+    nextDailyTasksCount = isNewDay ? 1 : currentStats.dailyTasksCount;
+    if (!alreadyCountedInStats && !isNewDay) nextDailyTasksCount += 1;
 
-  if (!alreadyCountedInStats) {
-    if (isNewDay) {
-      statsUpdates['statistics.daily'] = {
-        date: today,
-        dailyTasksCount: 1,
-        dailyMilestoneGifts: 0,
-        completedTaskIds: [taskId],
-        taskCountAtLastGift: 0,
-      };
-    } else {
-      statsUpdates['statistics.daily.dailyTasksCount'] =
-        currentStats.dailyTasksCount + 1;
+    if (!alreadyCountedInStats) {
+      if (isNewDay) {
+        statsUpdates['statistics.daily'] = {
+          date: today,
+          dailyTasksCount: 1,
+          dailyMilestoneGifts: 0,
+          completedTaskIds: [taskId],
+          taskCountAtLastGift: 0,
+        };
+      } else {
+        statsUpdates['statistics.daily.dailyTasksCount'] =
+          currentStats.dailyTasksCount + 1;
+      }
     }
   }
 
@@ -416,7 +420,7 @@ async function awardFlyForTask(
     }
 
     const ops: any = { $set: finalUpdates };
-    if (!isNewDay && !alreadyCountedInStats) {
+    if (countTowardDaily && !isNewDay && !alreadyCountedInStats) {
       ops.$inc = { ...(ops.$inc || {}), 'statistics.daily.dailyTasksCount': 1 };
       ops.$push = { 'statistics.daily.completedTaskIds': taskId };
       delete finalUpdates['statistics.daily.dailyTasksCount'];
@@ -460,8 +464,8 @@ async function awardFlyForTask(
   let nextBalance = currentBalance;
   let awardedFly = false;
 
-  if (!atLimit) {
-    nextEarned += 1;
+  if (countTowardDaily ? !atLimit : true) {
+    if (countTowardDaily) nextEarned += 1;
     nextBalance += 1;
     awardedFly = true;
     setFields['wardrobe.flies'] = nextBalance;
@@ -481,7 +485,7 @@ async function awardFlyForTask(
 
   const ops: any = { $set: setFields };
 
-  if (!isNewDay && !alreadyCountedInStats) {
+  if (countTowardDaily && !isNewDay && !alreadyCountedInStats) {
     ops.$inc = { ...(ops.$inc || {}), 'statistics.daily.dailyTasksCount': 1 };
     ops.$push = {
       ...(ops.$push || {}),
@@ -498,10 +502,91 @@ async function awardFlyForTask(
       earnedToday: nextEarned,
       limit: DAILY_FLY_LIMIT,
       limitHit: hitLimit,
-      justHitLimit: hitLimit && !limitNotified ? true : undefined,
+      justHitLimit:
+        countTowardDaily && hitLimit && !limitNotified ? true : undefined,
     },
     hungerStatus: finalHungerStatus,
     dailyTasksCount: nextDailyTasksCount,
+  };
+}
+
+async function unawardFlyForTask(
+  userId: string,
+  taskId: string,
+  tz: string,
+  countTowardDaily: boolean = true,
+): Promise<{
+  flyStatus: FlyStatus;
+  hungerStatus: HungerStatus;
+  dailyTasksCount: number;
+}> {
+  const today = getZonedToday(tz);
+  const user = (await UserModel.findById(userId, {
+    wardrobe: 1,
+    statistics: 1,
+  }).lean()) as LeanUser;
+
+  if (!user) {
+    return {
+      flyStatus: {
+        balance: 0,
+        earnedToday: 0,
+        limit: DAILY_FLY_LIMIT,
+        limitHit: false,
+      },
+      hungerStatus: {
+        hunger: MAX_HUNGER_MS,
+        stolenFlies: 0,
+        maxHunger: MAX_HUNGER_MS,
+      },
+      dailyTasksCount: 0,
+    };
+  }
+
+  const { updates: hungerUpdates, status: hungerStatus } = calculateHunger(user);
+  const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
+  const daily = normalizeDailyFly(
+    today,
+    wardrobe.flyDaily as DailyFlyProgress | undefined,
+  );
+  const balance = hungerUpdates['wardrobe.flies'] ?? wardrobe.flies ?? 0;
+  const dailyTasksCount =
+    user.statistics?.daily?.date === today
+      ? user.statistics.daily.dailyTasksCount ?? 0
+      : 0;
+
+  const wasRewarded = (daily.taskIds ?? []).includes(taskId);
+  const setFields: Record<string, any> = { ...hungerUpdates };
+
+  let nextEarned = daily.earned;
+  let nextBalance = balance;
+
+  if (wasRewarded) {
+    if (countTowardDaily) nextEarned = Math.max(0, daily.earned - 1);
+    nextBalance = Math.max(0, balance - 1);
+    const nextDaily: DailyFlyProgress = {
+      date: today,
+      earned: nextEarned,
+      taskIds: (daily.taskIds ?? []).filter((id) => id !== taskId),
+      limitNotified: nextEarned >= DAILY_FLY_LIMIT ? daily.limitNotified : false,
+    };
+    setFields['wardrobe.flies'] = nextBalance;
+    setFields['wardrobe.flyDaily'] = nextDaily;
+  }
+
+  if (Object.keys(setFields).length > 0) {
+    await UserModel.updateOne({ _id: user._id }, { $set: setFields });
+  }
+
+  return {
+    flyStatus: {
+      balance: nextBalance,
+      earnedToday: nextEarned,
+      limit: DAILY_FLY_LIMIT,
+      limitHit: nextEarned >= DAILY_FLY_LIMIT,
+    },
+    hungerStatus,
+    dailyTasksCount,
   };
 }
 
@@ -1358,20 +1443,31 @@ export async function PUT(req: NextRequest) {
   let flyStatus: FlyStatus | undefined;
   let hungerStatus: HungerStatus | undefined;
   let dailyTasksCount: number | undefined;
-  if (completed && !alreadyCompletedForDate)
-    ({ flyStatus, hungerStatus, dailyTasksCount } = await awardFlyForTask(
+  let awarded = false;
+  const isTodayCompletion = date === getZonedToday(tz);
+  if (completed && !alreadyCompletedForDate) {
+    const res = await awardFlyForTask(uid, taskId, tz, isTodayCompletion);
+    flyStatus = res.flyStatus;
+    hungerStatus = res.hungerStatus;
+    dailyTasksCount = res.dailyTasksCount;
+    awarded = res.awarded;
+  } else if (!completed) {
+    ({ flyStatus, hungerStatus, dailyTasksCount } = await unawardFlyForTask(
       uid,
       taskId,
       tz,
+      isTodayCompletion,
     ));
-  else
+  } else {
     ({ flyStatus, hungerStatus, dailyTasksCount } = await currentFlyStatus(
       uid,
       tz,
     ));
+  }
   void syncGamification(uid, tz);
   return NextResponse.json({
     ok: true,
+    awarded,
     flyStatus,
     hungerStatus,
     dailyTasksCount,

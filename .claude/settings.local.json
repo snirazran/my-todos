@@ -102,7 +102,8 @@
       "Bash(kill 9445)",
       "Bash(sed -n '1,45p' src/components/ui/quick-add/types.ts)",
       "Bash(sed -n '1006,1060p' src/app/page.tsx)",
-      "Bash(npx eslint *)"
+      "Bash(npx eslint *)",
+      "Bash(awk 'NR>=1030 && NR<=1120 && /const tz|body.timezone|getZonedToday|tz =/' /Users/snirazran/Fullstack/my-todos/src/app/api/tasks/route.ts)"
     ]
   }
 }

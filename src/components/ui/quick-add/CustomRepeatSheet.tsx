@@ -158,7 +158,7 @@ export function CustomRepeatSheet({
     <>
       <BaseSheet
         open={open}
-        onOpenChange={(v) => !v && commitAndClose()}
+        onOpenChange={(v) => !v && onClose()}
         zIndex={zIndex}
         className="bg-background ring-1 ring-border/70 sm:mx-4 sm:max-w-[440px]"
       >
@@ -167,9 +167,9 @@ export function CustomRepeatSheet({
             <div className="relative mb-5 flex h-9 items-center justify-center">
               <button
                 type="button"
-                onClick={commitAndClose}
+                onClick={onClose}
                 className="absolute left-0 grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
-                aria-label="Done"
+                aria-label="Close"
               >
                 <X className="h-5 w-5 stroke-[3]" />
               </button>
@@ -334,6 +334,14 @@ export function CustomRepeatSheet({
                 </>
               )}
             </div>
+
+            <button
+              type="button"
+              onClick={commitAndClose}
+              className="mt-5 h-11 w-full rounded-xl bg-primary text-[14px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
+            >
+              Done
+            </button>
           </div>
         )}
       </BaseSheet>

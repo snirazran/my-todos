@@ -10,6 +10,16 @@ export function mutateInventoryCaches() {
   mutateGlobal(INVENTORY_SUMMARY_KEY);
 }
 
+export function patchInventoryFlies(balance: number) {
+  const patch = (curr: any) => {
+    if (!curr?.wardrobe) return curr;
+    if (curr.wardrobe.flies === balance) return curr;
+    return { ...curr, wardrobe: { ...curr.wardrobe, flies: balance } };
+  };
+  mutateGlobal(INVENTORY_KEY, patch, { revalidate: false });
+  mutateGlobal(INVENTORY_SUMMARY_KEY, patch, { revalidate: false });
+}
+
 type ApiData = {
   wardrobe: {
     equipped: Partial<Record<WardrobeSlot, string | null>>;

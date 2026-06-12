@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import TaskBoard from '@/components/board/TaskBoard';
 import { LeftTongueProvider } from '@/components/board/LeftTongue';
+import { FlyGainPopup } from '@/components/ui/FlyGainPopup';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import {
@@ -417,6 +418,7 @@ export default function ManageTasksPage() {
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-background">
+      <FlyGainPopup />
       <LeftTongueProvider>
       <div className="absolute inset-0">
         <TaskBoard

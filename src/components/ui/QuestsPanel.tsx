@@ -2072,10 +2072,10 @@ function FlyGainPill({ toast }: { toast: FlyGainToast }) {
 
   return (
     <motion.div
-      className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[10000] flex justify-center px-4"
-      initial={{ opacity: 0, y: -42, scale: 0.96 }}
+      className="fixed inset-x-0 top-[calc(env(safe-area-inset-top)+3rem)] z-[10000] flex justify-center px-4"
+      initial={{ opacity: 1, y: -42, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, y: -34, scale: 0.98 }}
+      exit={{ opacity: 1, y: -140, scale: 0.96 }}
       transition={{ duration: 0.42, ease: [0.32, 0.72, 0, 1] }}
     >
       <FlyCounter balance={value} variant="desktop" />

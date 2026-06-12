@@ -136,42 +136,42 @@ export default function SiteHeader() {
   return (
     <>
       {(pathname === '/' || pathname === '/wardrobe') && (
-        <>
+        <div
+          className={cn(
+            'fixed left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden',
+            isLoadingScreenVisible && 'pointer-events-none',
+          )}
+          aria-disabled={isLoadingScreenVisible}
+        >
+          <RightActions
+            user={user}
+            loading={loading}
+            onSignIn={() => router.push('/login')}
+            onSignOut={() => {
+              clearAuthTokenCookie();
+              router.replace('/login');
+            }}
+            compactMobileHome
+          />
+        </div>
+      )}
+      {(pathname === '/' || pathname === '/wardrobe') &&
+        user &&
+        flyBalance !== undefined && (
           <div
             className={cn(
-              'fixed left-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center px-2 py-1 md:hidden',
+              'fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] px-2 py-1 md:hidden',
               isLoadingScreenVisible && 'pointer-events-none',
             )}
             aria-disabled={isLoadingScreenVisible}
           >
-            <RightActions
-              user={user}
-              loading={loading}
-              onSignIn={() => router.push('/login')}
-              onSignOut={() => {
-                clearAuthTokenCookie();
-                router.replace('/login');
-              }}
-              compactMobileHome
+            <FlyCounter
+              balance={flyBalance}
+              variant="mobile"
+              onClick={() => setShopOpen(true)}
             />
           </div>
-          {user && flyBalance !== undefined && (
-            <div
-              className={cn(
-                'fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] px-2 py-1 md:hidden',
-                isLoadingScreenVisible && 'pointer-events-none',
-              )}
-              aria-disabled={isLoadingScreenVisible}
-            >
-              <FlyCounter
-                balance={flyBalance}
-                variant="mobile"
-                onClick={() => setShopOpen(true)}
-              />
-            </div>
-          )}
-        </>
-      )}
+        )}
       <header
         className={cn(
           'relative z-[90] hidden w-full h-16 border-b border-border/40 bg-background/95 backdrop-blur-xl md:block',

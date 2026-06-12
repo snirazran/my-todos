@@ -23,6 +23,7 @@ import { Plus, LayoutList, ListTodo, Repeat, CalendarClock } from 'lucide-react'
 import { TimePopup } from '@/components/ui/TimePopup';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { patchInventoryFlies } from '@/hooks/useInventory';
 import { useLeftTongue } from './LeftTongue';
 
 export default React.memo(function TaskList({
@@ -108,6 +109,8 @@ export default React.memo(function TaskList({
     patch: Partial<Task>,
     scope?: 'one' | 'all',
     groupId?: string,
+    /** Limit a scope='one' patch to the task instance in this date column. */
+    dateKey?: string,
   ) => void;
   dateKey?: string;
   isToday?: boolean;
@@ -228,19 +231,25 @@ export default React.memo(function TaskList({
     if (completing) stopTimerIfActive(t.id);
 
     const persist = () => {
-      onPatchTask?.(t.id, { completed: completing });
+      // Scope to this column's date so sibling instances of a repeating task
+      // don't all flash completed and then revert on refetch.
+      onPatchTask?.(t.id, { completed: completing }, 'one', undefined, dateKey);
       return fetch('/api/tasks', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          date: todayYmdStr(),
+          date: dateKey ?? todayYmdStr(),
           taskId: t.id,
           completed: completing,
+          timezone: tz,
         }),
       })
         .then((r) => r.json().catch(() => ({})))
         .then((json) => {
           refresh();
+        if (typeof json?.flyStatus?.balance === 'number') {
+          patchInventoryFlies(json.flyStatus.balance);
+        }
         if (completing && json?.flyStatus) {
           if (json.flyStatus.justHitLimit) {
             showNotification(
@@ -274,7 +283,11 @@ export default React.memo(function TaskList({
     // Completing on the planner: the tongue reaches in from the left edge,
     // grabs the fly and drags it off-screen, persisting once it's gone. If no
     // fly is on screen (or the tongue is busy), just persist directly.
-    if (completing && triggerTongue({ key: t.id, onPersist: persist })) return;
+    if (
+      completing &&
+      triggerTongue({ key: draggableIdFor(day, t.id), onPersist: persist })
+    )
+      return;
     void persist();
   };
 

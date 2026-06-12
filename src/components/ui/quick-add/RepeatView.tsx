@@ -98,7 +98,7 @@ export function RepeatView({
 
           {endsExpanded && (
             <>
-              <div className="mx-4 border-t border-border" />
+              <div className="border-t border-border" />
               <button
                 type="button"
                 onClick={onClearEndDate}
@@ -111,7 +111,7 @@ export function RepeatView({
                   </span>
                 )}
               </button>
-              <div className="mx-4 border-t border-border" />
+              <div className="border-t border-border" />
               <button
                 type="button"
                 onClick={onPickEndDate}
@@ -138,7 +138,7 @@ export function RepeatView({
           const active = option.mode === currentMode;
           return (
             <React.Fragment key={option.mode}>
-              {i > 0 && <div className="mx-4 border-t border-border" />}
+              {i > 0 && <div className="border-t border-border" />}
               <button
                 type="button"
                 onClick={() => setRepeatMode(option.mode)}
@@ -159,7 +159,7 @@ export function RepeatView({
           );
         })}
 
-        <div className="mx-4 border-t border-border" />
+        <div className="border-t border-border" />
         <button
           type="button"
           onClick={onOpenCustom}
@@ -174,7 +174,11 @@ export function RepeatView({
               ? `${customRepeatLabel(customRule)} · until ${formatEndDateLabel(endDate)}`
               : customRepeatLabel(customRule)
             : 'Custom…'}
-          <ChevronRight className="h-4 w-4 stroke-[3]" />
+          {currentMode === 'custom' && (
+            <span className="grid h-6 w-6 place-items-center rounded-full bg-primary text-primary-foreground">
+              <Check className="h-4 w-4 stroke-[3]" />
+            </span>
+          )}
         </button>
       </div>
     </div>

@@ -550,17 +550,21 @@ export default function TaskBoard({
       patch: Partial<Task>,
       scope: 'one' | 'all' = 'one',
       groupId?: string,
+      // When set (scope 'one'), only patch the instance in this date column.
+      // Repeating tasks share one id across every column, so without this an
+      // id-only match would patch every future instance too.
+      dateKey?: string,
     ) => {
-      const match = (t: Task) =>
+      const match = (t: Task, columnKey?: string) =>
         scope === 'all' && groupId
           ? t.repeatGroupId === groupId
-          : t.id === taskId;
+          : t.id === taskId && (!dateKey || columnKey === dateKey);
       setTasksByDate((prev) => {
         let changed = false;
         const next: Record<string, Task[]> = {};
         for (const k in prev) {
           next[k] = prev[k].map((t) => {
-            if (match(t)) {
+            if (match(t, k)) {
               changed = true;
               return { ...t, ...patch };
             }
@@ -569,9 +573,12 @@ export default function TaskBoard({
         }
         return changed ? next : prev;
       });
-      setBacklog((prev) =>
-        prev.map((t) => (match(t) ? { ...t, ...patch } : t)),
-      );
+      // The backlog isn't tied to a date column; skip it when date-scoped.
+      if (!dateKey) {
+        setBacklog((prev) =>
+          prev.map((t) => (match(t) ? { ...t, ...patch } : t)),
+        );
+      }
     },
     [setTasksByDate, setBacklog],
   );

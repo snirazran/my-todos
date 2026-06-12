@@ -81,7 +81,10 @@ export default function TaskCard({
   };
 
   const { registerFly, isHidden } = useLeftTongue();
-  const grabbing = isHidden(task.id);
+  // Key the tongue by the per-column drag id, not task.id: a repeating task
+  // shares one id across every date column, so keying by id would collide and
+  // make the tongue grab (and hide) the wrong instance.
+  const grabbing = isHidden(dragId);
 
   // Keep latest callbacks in refs to avoid effect re-runs
   const onGrabRef = useRef(onGrab);
@@ -436,7 +439,7 @@ export default function TaskCard({
             }`}
           >
             <span
-              ref={(el) => registerFly(task.id, el)}
+              ref={(el) => registerFly(dragId, el)}
               className={`absolute inset-0 flex items-center justify-center rounded-full border border-muted-foreground/10 bg-muted transition-opacity duration-200 ${
                 task.completed || grabbing
                   ? 'opacity-0 pointer-events-none'
