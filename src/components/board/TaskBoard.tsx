@@ -1050,6 +1050,12 @@ export default function TaskBoard({
     // you slide toward it and loads on release; on web it's a plain click.
     const pull = edgePull.side === side ? edgePull.amount : 0;
     const armed = pull >= PULL_ARM;
+    // Progressive color: a muted resting state that ramps up to full primary
+    // right as the pull crosses the arm threshold — mirrors the TaskList
+    // swipe-icon fill. Works for both the mobile pull and the desktop edge-pan;
+    // the REST floor keeps the button looking tappable when it's idle.
+    const REST_FILL = 0.4;
+    const fill = Math.max(REST_FILL, Math.min(1, pull / PULL_ARM));
     const Chevron = isPast ? ChevronsLeft : ChevronsRight;
     const label = !isMobile
       ? 'Click to load'
@@ -1071,6 +1077,10 @@ export default function TaskBoard({
           <motion.span
             animate={{ scale: armed ? 1.06 : 1 }}
             transition={{ type: 'spring', stiffness: 320, damping: 22 }}
+            style={{
+              filter: `grayscale(${1 - fill})`,
+              opacity: 0.5 + 0.5 * fill,
+            }}
             className="grid h-12 w-12 place-items-center rounded-full bg-primary text-primary-foreground transition-transform group-hover:scale-105 group-active:scale-95"
           >
             <Chevron className="h-5 w-5" strokeWidth={2.75} />
@@ -1078,7 +1088,10 @@ export default function TaskBoard({
 
           {/* Label */}
           <span className="flex flex-col items-center gap-0.5 leading-none">
-            <span className="text-[13px] font-black tracking-tight text-primary">
+            <span
+              style={{ opacity: 0.55 + 0.45 * fill }}
+              className="text-[13px] font-black tracking-tight text-primary"
+            >
               {label}
             </span>
             <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">
