@@ -63,6 +63,7 @@ export default function TaskBoard({
   onExtendWindow,
   onJumpToDate,
   onMoveTaskToDate,
+  onMoveRepeatInstance,
   onToggleRepeat,
   onScheduleTask,
   onEditTask,
@@ -103,6 +104,13 @@ export default function TaskBoard({
     taskId: string,
     fromDateKey: string,
     targetKey: string,
+  ) => void | Promise<void>;
+  onMoveRepeatInstance?: (
+    taskId: string,
+    newId: string,
+    fromDate: string,
+    toDate: string,
+    order?: number,
   ) => void | Promise<void>;
   onToggleRepeat?: (taskId: string, dateKey: string) => Promise<void> | void;
   onScheduleTask?: (
@@ -687,7 +695,63 @@ export default function TaskBoard({
         saveCol(toDay, sourceList).catch(() => {});
       } else {
         const destList = colAt(toDay).slice();
-        destList.splice(Math.min(toIndex, destList.length), 0, moved);
+        const destIndex = Math.min(toIndex, destList.length);
+
+        // Moving one occurrence of a repeating task to another day must not
+        // touch the series: detach it into a standalone one-off (fresh id) on
+        // the destination and suppress the source date on the rule.
+        const isRepeatInstance =
+          moved.type === 'weekly' &&
+          drag.fromDay !== BACKLOG_IDX &&
+          toDay !== BACKLOG_IDX;
+        const fromDate = windowDates[drag.fromDay];
+        const toDate = windowDates[toDay];
+
+        if (isRepeatInstance && fromDate && toDate && onMoveRepeatInstance) {
+          const newId =
+            typeof crypto !== 'undefined' && 'randomUUID' in crypto
+              ? crypto.randomUUID()
+              : `${moved.id}-${Date.now()}`;
+          const instance: Task = {
+            ...moved,
+            id: newId,
+            type: 'regular',
+            repeatMode: 'none',
+            repeatGroupId: undefined,
+            repeatRule: undefined,
+            repeatDayOfMonth: undefined,
+            repeatStartDate: undefined,
+            repeatEndDate: undefined,
+            dayOfWeek: undefined,
+            completedDates: undefined,
+          };
+          destList.splice(destIndex, 0, instance);
+          setColAt(drag.fromDay, sourceList);
+          setColAt(toDay, destList);
+          (async () => {
+            try {
+              await onMoveRepeatInstance(
+                moved.id,
+                newId,
+                fromDate,
+                toDate,
+                destIndex + 1,
+              );
+              await saveCol(toDay, destList);
+              await saveCol(drag.fromDay, sourceList);
+            } catch (e) {
+              console.error('move repeat instance failed', e);
+            }
+          })();
+          return;
+        }
+
+        // A non-repeating task may already exist on the destination day (e.g. a
+        // repeat that recurs there); every occurrence shares the same id, so
+        // drop any existing copy before inserting to avoid duplicate keys.
+        const existingIdx = destList.findIndex((t) => t.id === moved.id);
+        if (existingIdx !== -1) destList.splice(existingIdx, 1);
+        destList.splice(destIndex, 0, moved);
         setColAt(drag.fromDay, sourceList);
         setColAt(toDay, destList);
         Promise.all([
@@ -696,7 +760,15 @@ export default function TaskBoard({
         ]).catch(() => {});
       }
     },
-    [drag, BACKLOG_IDX, colAt, setColAt, saveCol],
+    [
+      drag,
+      BACKLOG_IDX,
+      colAt,
+      setColAt,
+      saveCol,
+      windowDates,
+      onMoveRepeatInstance,
+    ],
   );
 
   const handleEditTask = useCallback(

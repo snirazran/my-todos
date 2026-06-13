@@ -1029,6 +1029,65 @@ export async function PUT(req: NextRequest) {
     Array.isArray(body.tasks)
   )
     return handleBoardPutByDate(uid, body, tz);
+  // Move a single occurrence of a repeating task to a different day. The series
+  // is left intact: the source date is suppressed (that one occurrence hidden)
+  // and a standalone one-off regular task is materialized on the target date.
+  if (body.moveInstance) {
+    const { taskId, newId, fromDate, toDate, order } = body.moveInstance;
+    const ymd = /^\d{4}-\d{2}-\d{2}$/;
+    if (!taskId || !newId || !ymd.test(fromDate) || !ymd.test(toDate))
+      return NextResponse.json(
+        { error: 'Invalid moveInstance payload' },
+        { status: 400 },
+      );
+    const doc = await TaskModel.findOne({
+      userId: uid,
+      id: taskId,
+    }).lean<TaskDoc>();
+    if (!doc)
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+
+    const now = new Date();
+    // Hide the occurrence on its original date without touching the rule.
+    await TaskModel.updateOne(
+      { userId: uid, id: taskId },
+      { $addToSet: { suppressedDates: fromDate } },
+    );
+    // Materialize the moved occurrence as a standalone one-off.
+    const weekday = dowFromYMD(toDate);
+    const newOrder =
+      typeof order === 'number'
+        ? order
+        : await nextOrderForDay(uid, weekday, toDate);
+    await TaskModel.updateOne(
+      { userId: uid, type: 'regular', id: newId },
+      {
+        $set: {
+          text: doc.text,
+          date: toDate,
+          order: newOrder,
+          tags: doc.tags ?? [],
+          notes: doc.notes ?? '',
+          checklist: doc.checklist ?? [],
+          startTime: doc.startTime,
+          endTime: doc.endTime,
+          reminder: doc.reminder,
+          updatedAt: now,
+        },
+        $setOnInsert: {
+          userId: uid,
+          type: 'regular',
+          id: newId,
+          createdAt: now,
+          completed: false,
+        },
+      },
+      { upsert: true },
+    );
+    await syncGamification(uid, tz);
+    return NextResponse.json({ ok: true, id: newId });
+  }
+
   // New: Handle "move" operation (atomic move between lists)
   if (body.move) {
     const { type, date: moveDate } = body.move;
@@ -2396,11 +2455,17 @@ async function handleBoardPutByDate(
       startTime: 1,
       endTime: 1,
       reminder: 1,
+      repeatMode: 1,
+      dayOfWeek: 1,
+      repeatDayOfMonth: 1,
+      repeatRule: 1,
+      repeatStartDate: 1,
     },
   )
     .lean<TaskDoc[]>()
     .exec();
   const typeById = new Map(docs.map((d) => [d.id, d.type]));
+  const docById = new Map(docs.map((d) => [d.id, d]));
   const textById = new Map(docs.map((d) => [d.id, d.text]));
   const tagsById = new Map(docs.map((d) => [d.id, d.tags ?? []]));
   const notesById = new Map(docs.map((d) => [d.id, d.notes]));
@@ -2420,7 +2485,28 @@ async function handleBoardPutByDate(
       const checklist =
         sanitizeChecklistInput(t.checklist) ?? checklistById.get(t.id) ?? [];
       if (ttype === 'weekly') {
-        // Convert to a one-off regular on this date so order persists
+        // `type: 'weekly'` covers every repeat kind (weekly / monthly / custom).
+        // When the task is being reordered within a column that is a *natural*
+        // occurrence of its rule, only persist the new order — never detach it
+        // into a one-off, which would strip the repeat (and, for monthly/custom,
+        // wipe every other generated occurrence). Only when the task lands on a
+        // day the rule doesn't fall on do we convert it to a one-off regular.
+        const doc = docById.get(t.id);
+        const occursHere =
+          doc?.repeatMode === 'monthly'
+            ? domFromYMD(dateKey) === doc.repeatDayOfMonth
+            : doc?.repeatRule
+              ? customOccursOn(doc, dateKey)
+              : typeof doc?.dayOfWeek === 'number'
+                ? dowFromYMD(dateKey) === doc.dayOfWeek
+                : false;
+        if (occursHere) {
+          return TaskModel.updateOne(
+            { userId: uid, id: t.id },
+            { $set: { order: i + 1, updatedAt: now, tags } },
+          );
+        }
+        // Lands on a non-occurrence day: detach into a one-off regular task.
         return TaskModel.updateOne(
           { userId: uid, id: t.id },
           {
@@ -2431,7 +2517,15 @@ async function handleBoardPutByDate(
               updatedAt: now,
               tags,
             },
-            $unset: { dayOfWeek: 1 },
+            $unset: {
+              dayOfWeek: 1,
+              repeatMode: 1,
+              repeatGroupId: 1,
+              repeatRule: 1,
+              repeatDayOfMonth: 1,
+              repeatStartDate: 1,
+              repeatEndDate: 1,
+            },
           },
         );
       }
