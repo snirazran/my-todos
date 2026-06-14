@@ -120,7 +120,7 @@ export function NotificationProvider({
     const ro = new ResizeObserver(update);
     ro.observe(el);
     return () => ro.disconnect();
-  }, [notifications.length]);
+  }, [notifications.length, mounted]);
 
   const handleUndo = async (item: NotificationItem) => {
     if (!item.undoAction) return;

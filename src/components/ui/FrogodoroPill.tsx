@@ -124,7 +124,7 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
         style={{ width: `${progressPercent}%` }}
       />
 
-      <div className="relative z-10 flex items-center gap-3 px-3 py-3">
+      <div className="relative z-10 flex items-center gap-4 px-3 py-3">
       <button
         type="button"
         onClick={onClick}
