@@ -44,6 +44,27 @@ import { useSheetStore } from '@/lib/sheetStore';
 
 type RepeatChoice = 'this-week' | 'weekly';
 
+// Keep finished tasks pinned to the bottom of a column while preserving the
+// relative order within the active and completed groups (stable). Returns the
+// original array reference when it's already in order so memoized consumers and
+// React.memo children don't re-render needlessly.
+function sortCompletedLast(tasks: Task[]): Task[] {
+  let seenCompleted = false;
+  let needsSort = false;
+  for (const t of tasks) {
+    if (t.completed) seenCompleted = true;
+    else if (seenCompleted) {
+      needsSort = true;
+      break;
+    }
+  }
+  if (!needsSort) return tasks;
+  const active: Task[] = [];
+  const completed: Task[] = [];
+  for (const t of tasks) (t.completed ? completed : active).push(t);
+  return [...active, ...completed];
+}
+
 export default function TaskBoard({
   windowDates,
   tasksByDate,
@@ -162,14 +183,22 @@ export default function TaskBoard({
     return i >= 0 ? i : todayIdx;
   }, [windowDates, activeDateKey, todayIdx]);
 
+  // Day columns with finished tasks pinned to the bottom. Used for both
+  // rendering and drag math so the visual order matches array indices.
+  const sortedTasksByDate = useMemo(() => {
+    const out: Record<string, Task[]> = {};
+    for (const k in tasksByDate) out[k] = sortCompletedLast(tasksByDate[k]);
+    return out;
+  }, [tasksByDate]);
+
   // helpers to get/set a column by index
   const colAt = useCallback(
     (i: number): Task[] => {
       if (i === BACKLOG_IDX) return backlog;
       const d = windowDates[i];
-      return d ? (tasksByDate[d] ?? []) : [];
+      return d ? (sortedTasksByDate[d] ?? []) : [];
     },
-    [BACKLOG_IDX, backlog, tasksByDate, windowDates],
+    [BACKLOG_IDX, backlog, sortedTasksByDate, windowDates],
   );
 
   const setColAt = useCallback(
@@ -1164,7 +1193,7 @@ export default function TaskBoard({
               >
                 <TaskList
                   day={i as any}
-                  items={tasksByDate[dk] ?? []}
+                  items={sortedTasksByDate[dk] ?? []}
                   isDragging={!!drag?.active}
                   dragFromDay={drag?.fromDay}
                   dragFromIndex={drag?.fromIndex}

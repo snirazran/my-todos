@@ -1381,102 +1381,58 @@ export default function TaskList({
               onDragCancel={handleDragCancel}
               modifiers={[restrictToActiveArea]}
             >
-              <div className="relative">
-                {/* Active Tasks */}
-                <div className="relative overflow-visible">
-                  <SortableContext
-                    items={activeTaskIds}
-                    strategy={verticalListSortingStrategy}
-                  >
-                    <AnimatePresence initial={false}>
-                      {sortedActiveTasks.map((task) => {
-                        const isCompleted = task.completed || vSet.has(task.id);
-                        const isMenuOpen = menu?.id === task.id;
-                        const isExitingLater =
-                          exitAction?.id === task.id &&
-                          exitAction.type === 'later';
+              {/* Single list: finished tasks reorder to the bottom in place,
+                  no separate section / fancy transition between groups. */}
+              <div className="relative overflow-visible">
+                <SortableContext
+                  items={activeTaskIds}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <AnimatePresence initial={false}>
+                    {sortedVisibleTasks.map((task) => {
+                      const isCompleted = task.completed || vSet.has(task.id);
+                      const isMenuOpen = menu?.id === task.id;
+                      const isExitingLater =
+                        exitAction?.id === task.id &&
+                        exitAction.type === 'later';
 
-                        return (
-                          <SortableTaskItem
-                            key={task.id}
-                            task={task}
-                            isDone={isCompleted}
-                            isMenuOpen={isMenuOpen}
-                            isExitingLater={isExitingLater}
-                            renderBullet={renderBullet}
-                            handleTaskToggle={handleTaskToggle}
-                            onMenuOpen={openMenu}
-                            getTagDetails={getTagDetails}
-                            isDragDisabled={isCompleted}
-                            isWeekly={taskKind(task) === 'weekly'}
-                            isGlowActive={isGlowActive}
-                            disableLayout={isAnyDragging}
-                            isSortDragging={isAnyDragging}
-                            onDoLater={
-                              onDoLater
-                                ? (t) => {
-                                    setExitAction({ id: t.id, type: 'later' });
-                                    setTimeout(() => onDoLater(t.id), 0);
-                                    setTimeout(() => setExitAction(null), 800);
-                                  }
-                                : undefined
-                            }
-                            onStartTimer={onStartTimer ? (t) => onStartTimer(t) : undefined}
-                            onOpenDetail={(t) => setActionSheetId(t.id)}
-                            paused={paused}
-                          />
-                        );
-                      })}
-                    </AnimatePresence>
-                  </SortableContext>
-                </div>
-
-                {/* Completed Tasks Section */}
-                {showCompleted && completedTasks.length > 0 && (
-                  <>
-                    {/* Subtle divider */}
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.3, delay: 0.1 }}
-                      className="flex items-center gap-3 px-3 py-2 mt-1 mb-2"
-                    >
-                      <div className="flex-1 h-px bg-border/50" />
-                      <span className="text-[11px] font-medium text-muted-foreground/50 uppercase tracking-wider select-none">
-                        Completed
-                      </span>
-                      <div className="flex-1 h-px bg-border/50" />
-                    </motion.div>
-
-                    <div className="relative overflow-visible">
-                      <AnimatePresence initial={false}>
-                        {completedTasks.map((task) => {
-                          const isMenuOpen = menu?.id === task.id;
-
-                          return (
-                            <SortableTaskItem
-                              key={task.id}
-                              task={task}
-                              isDone={true}
-                              isMenuOpen={isMenuOpen}
-                              isExitingLater={false}
-                              renderBullet={renderBullet}
-                              handleTaskToggle={handleTaskToggle}
-                              onMenuOpen={openMenu}
-                              getTagDetails={getTagDetails}
-                              isDragDisabled={true}
-                              isWeekly={taskKind(task) === 'weekly'}
-                              isGlowActive={false}
-                              disableLayout={true}
-                              isSortDragging={isAnyDragging}
-                              onOpenDetail={(t) => setActionSheetId(t.id)}
-                            />
-                          );
-                        })}
-                      </AnimatePresence>
-                    </div>
-                  </>
-                )}
+                      return (
+                        <SortableTaskItem
+                          key={task.id}
+                          task={task}
+                          isDone={isCompleted}
+                          isMenuOpen={isMenuOpen}
+                          isExitingLater={isExitingLater}
+                          renderBullet={renderBullet}
+                          handleTaskToggle={handleTaskToggle}
+                          onMenuOpen={openMenu}
+                          getTagDetails={getTagDetails}
+                          isDragDisabled={isCompleted}
+                          isWeekly={taskKind(task) === 'weekly'}
+                          isGlowActive={isCompleted ? false : isGlowActive}
+                          disableLayout={isCompleted ? true : isAnyDragging}
+                          isSortDragging={isAnyDragging}
+                          onDoLater={
+                            !isCompleted && onDoLater
+                              ? (t) => {
+                                  setExitAction({ id: t.id, type: 'later' });
+                                  setTimeout(() => onDoLater(t.id), 0);
+                                  setTimeout(() => setExitAction(null), 800);
+                                }
+                              : undefined
+                          }
+                          onStartTimer={
+                            !isCompleted && onStartTimer
+                              ? (t) => onStartTimer(t)
+                              : undefined
+                          }
+                          onOpenDetail={(t) => setActionSheetId(t.id)}
+                          paused={paused}
+                        />
+                      );
+                    })}
+                  </AnimatePresence>
+                </SortableContext>
               </div>
             </DndContext>
           )}
