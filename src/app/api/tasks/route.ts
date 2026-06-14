@@ -2647,32 +2647,15 @@ async function nextOrderForDay(userId: string, weekday: Weekday, date: string) {
       { type: 'regular', date },
     ],
   };
-  const tasks = await TaskModel.find(
-    dayQuery,
-    { order: 1, completed: 1, completedDates: 1, type: 1 },
-  )
-    .sort({ order: 1 })
-    .lean<TaskDoc[]>()
+  // Append to the very end (highest order). New tasks should always land at the
+  // end of the unfinished list; the UI sorts completed tasks to the bottom
+  // regardless of their stored order, so a max-order active task renders after
+  // all other unfinished tasks and above the finished ones.
+  const last = await TaskModel.findOne(dayQuery, { order: 1 })
+    .sort({ order: -1 })
+    .lean<TaskDoc>()
     .exec();
-
-  if (tasks.length === 0) return 1;
-
-  const isDoneForDate = (t: TaskDoc) =>
-    t.type === 'weekly'
-      ? Array.isArray(t.completedDates) && t.completedDates.includes(date)
-      : !!t.completed;
-
-  const firstDoneIdx = tasks.findIndex(isDoneForDate);
-  if (firstDoneIdx === -1) {
-    return (tasks[tasks.length - 1].order ?? 0) + 1;
-  }
-
-  const boundaryOrder = tasks[firstDoneIdx].order ?? 0;
-  await TaskModel.updateMany(
-    { ...dayQuery, order: { $gte: boundaryOrder } },
-    { $inc: { order: 1 } },
-  );
-  return boundaryOrder;
+  return (last?.order ?? 0) + 1;
 }
 
 async function nextOrderBacklog(userId: string, weekStart: string) {
