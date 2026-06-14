@@ -345,13 +345,15 @@ export default function TaskCard({
                 ? 'text-sm font-semibold leading-snug'
                 : 'text-[15px] font-medium leading-[1.4]'
             } ${
-              task.completed
-                ? 'text-muted-foreground line-through'
-                : 'text-foreground'
+              task.completed ? 'text-muted-foreground' : 'text-foreground'
             }`}
           >
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              <span className="min-w-0 whitespace-pre-wrap break-words">
+              <span
+                className={`min-w-0 whitespace-pre-wrap break-words ${
+                  task.completed ? 'line-through' : ''
+                }`}
+              >
                 {task.text}
               </span>
               {isRepeating && (
