@@ -104,25 +104,26 @@ export function FrogDisplay({
       ? Math.max(0, Math.min(100, (displayedHunger / maxHunger) * 100))
       : 100;
 
-  // Expanded hunger states for better transition
+  // Expanded hunger states for better transition. The label is always
+  // "HUNGER LEVEL" — the color/fill conveys how full the frog is.
   const getHungerState = (p: number) => {
     if (p > 80)
       return {
         bg: 'bg-emerald-500',
         text: 'text-emerald-500',
-        label: 'FULL TUMMY!',
+        label: 'Hunger bar',
       };
     if (p > 60)
-      return { bg: 'bg-lime-500', text: 'text-lime-500', label: 'SATISFIED!' };
+      return { bg: 'bg-lime-500', text: 'text-lime-500', label: 'Hunger bar' };
     if (p > 40)
       return {
         bg: 'bg-yellow-500',
         text: 'text-yellow-500',
-        label: 'A BIT HUNGRY',
+        label: 'Hunger bar',
       };
     if (p > 20)
-      return { bg: 'bg-amber-500', text: 'text-amber-500', label: 'HUNGRY!' };
-    return { bg: 'bg-rose-500', text: 'text-rose-500', label: 'STARVING!!' };
+      return { bg: 'bg-amber-500', text: 'text-amber-500', label: 'Hunger bar' };
+    return { bg: 'bg-rose-500', text: 'text-rose-500', label: 'Hunger bar' };
   };
 
   const {
@@ -215,7 +216,7 @@ export function FrogDisplay({
               {/* Dark base label — readable on the muted bg where the fill doesn't reach (non-starving states) */}
               {hungerPercent > 20 && (
                 <div className="absolute inset-0 flex items-center px-4 pointer-events-none">
-                  <span className="text-[11px] font-black uppercase tracking-[0.15em] text-foreground/75 whitespace-nowrap">
+                  <span className="text-[11px] font-black tracking-[0.06em] text-foreground/75 whitespace-nowrap">
                     {hungerStatus}
                   </span>
                 </div>
@@ -232,7 +233,7 @@ export function FrogDisplay({
                 >
                   {hungerPercent > 20 && (
                     <div className="absolute top-0 bottom-0 left-3 flex items-center pointer-events-none">
-                      <span className="text-[11px] font-black uppercase tracking-[0.15em] text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)] whitespace-nowrap">
+                      <span className="text-[11px] font-black tracking-[0.06em] text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.35)] whitespace-nowrap">
                         {hungerStatus}
                       </span>
                     </div>
@@ -242,7 +243,7 @@ export function FrogDisplay({
               {/* Starving: render dark label on top of everything so it stays readable over the small red fill */}
               {hungerPercent <= 20 && (
                 <div className="absolute inset-0 flex items-center px-4 pointer-events-none">
-                  <span className="text-[11px] font-black uppercase tracking-[0.15em] text-foreground/85 whitespace-nowrap">
+                  <span className="text-[11px] font-black tracking-[0.06em] text-foreground/85 whitespace-nowrap">
                     {hungerStatus}
                   </span>
                 </div>

@@ -620,6 +620,7 @@ export default React.memo(function TaskList({
             onTap={() => setActionSheetId(t.id)}
             onToggleComplete={() => handleToggleComplete(t)}
             disableDrag={disableDrag}
+            showStreak
           />
         </div>,
       );

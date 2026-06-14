@@ -123,6 +123,124 @@ function monthlyExcludesDate(
   );
 }
 
+/** Add `n` days to a YYYY-MM-DD string (UTC-noon anchored to dodge DST). */
+function addDaysYMD(ymd: string, n: number) {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Whether a single repeating doc is scheduled on `date` (rule + end-date only;
+ *  start-date and suppression are handled by the group-level walker). */
+function siblingOccursOn(task: TaskDoc, date: string) {
+  if (isAfterRepeatEnd(task, date)) return false;
+  if (task.repeatRule) return customOccursOn(task, date);
+  if (task.repeatMode === 'monthly' && typeof task.repeatDayOfMonth === 'number')
+    return domFromYMD(date) === task.repeatDayOfMonth;
+  if (typeof task.dayOfWeek === 'number') return dowFromYMD(date) === task.dayOfWeek;
+  return false;
+}
+
+/**
+ * Consecutive-completion streak for a repeating habit, as of `today`. A
+ * daily/weekdays/weekend habit is stored as several sibling docs (one per
+ * weekday, linked by repeatGroupId), each holding its own completedDates — so
+ * the streak is computed across the WHOLE group: the habit is "scheduled" on a
+ * date if any sibling is, and "done" if any sibling recorded it. Walks backward
+ * from today until the first missed scheduled date. Today not being done yet
+ * doesn't break the streak (the day isn't over); suppressed/skipped dates are
+ * ignored.
+ */
+function computeGroupStreak(sibs: TaskDoc[], today: string, tz: string) {
+  if (sibs.length === 0) return 0;
+  const completed = new Set<string>();
+  const suppressed = new Set<string>();
+  let earliestStart: string | undefined;
+  for (const s of sibs) {
+    for (const d of s.completedDates ?? []) completed.add(d);
+    for (const d of s.suppressedDates ?? []) suppressed.add(d);
+    const rs = repeatStartForDoc(s, tz);
+    if (rs && (!earliestStart || rs < earliestStart)) earliestStart = rs;
+  }
+  let streak = 0;
+  let d = today;
+  for (let guard = 0; guard < 2000; guard++) {
+    if (earliestStart && d < earliestStart) break;
+    if (!suppressed.has(d) && sibs.some((s) => siblingOccursOn(s, d))) {
+      const done = completed.has(d);
+      if (d === today && !done) {
+        // Today's occurrence isn't done yet — neither count nor break.
+      } else if (done) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+    d = addDaysYMD(d, -1);
+  }
+  return streak;
+}
+
+/**
+ * Build a map of taskId -> streak for the given weekly docs, resolving each
+ * doc's full repeat group (fetching siblings not present in `weeklyDocs`) so
+ * grouped habits share one streak across weekdays.
+ */
+async function streakMapForWeeklyDocs(
+  uid: string,
+  weeklyDocs: TaskDoc[],
+  today: string,
+  tz: string,
+) {
+  const map = new Map<string, number>();
+  if (weeklyDocs.length === 0) return map;
+
+  const groupIds = Array.from(
+    new Set(
+      weeklyDocs
+        .map((d) => d.repeatGroupId)
+        .filter((g): g is string => !!g),
+    ),
+  );
+
+  const byGroup = new Map<string, TaskDoc[]>();
+  if (groupIds.length > 0) {
+    const sibs = await TaskModel.find(
+      { userId: uid, repeatGroupId: { $in: groupIds } },
+      {
+        id: 1,
+        type: 1,
+        dayOfWeek: 1,
+        completedDates: 1,
+        suppressedDates: 1,
+        repeatGroupId: 1,
+        repeatRule: 1,
+        repeatStartDate: 1,
+        repeatEndDate: 1,
+        repeatMode: 1,
+        repeatDayOfMonth: 1,
+        createdAt: 1,
+      },
+    )
+      .lean<TaskDoc[]>()
+      .exec();
+    for (const s of sibs) {
+      const k = s.repeatGroupId!;
+      if (!byGroup.has(k)) byGroup.set(k, []);
+      byGroup.get(k)!.push(s);
+    }
+  }
+
+  for (const d of weeklyDocs) {
+    const sibs =
+      d.repeatGroupId && byGroup.has(d.repeatGroupId)
+        ? byGroup.get(d.repeatGroupId)!
+        : [d];
+    map.set(d.id, computeGroupStreak(sibs, today, tz));
+  }
+  return map;
+}
+
 // --- Custom recurrence (interval-based, RRULE-like) -------------------------
 
 /** Whole days between two YYYY-MM-DD dates (b - a). */
@@ -1667,6 +1785,12 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       .filter((t: TaskDoc) => t.type === 'weekly')
       .map((t: TaskDoc) => t.id),
   );
+  const streakMap = await streakMapForWeeklyDocs(
+    userId,
+    filtered.filter((t) => t.type === 'weekly'),
+    todayLocal,
+    tz,
+  );
   const output = filtered
     .map((t: TaskDoc) => ({
       id: t.id,
@@ -1688,6 +1812,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
       repeatRule: t.repeatRule,
       dayOfWeek: t.dayOfWeek,
       completedDates: t.completedDates ?? [],
+      streak: t.type === 'weekly' ? streakMap.get(t.id) ?? 0 : 0,
       frogodoroSettings: t.frogodoroSettings,
       frogodoroSession: t.frogodoroSessions?.find((s) => s.date === date) ?? null,
       calendarEventId: t.calendarEventId,
@@ -2139,6 +2264,23 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
   for (const d of dates)
     byDate[d].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   backlog.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+  // Attach the (as-of-today) repeat streak to every occurrence of a repeating
+  // task — shown on every column. The streak is a group-level, as-of-today
+  // value identical across an occurrence's dates.
+  const todayLocal = getZonedToday(tz);
+  const streakByDocId = await streakMapForWeeklyDocs(
+    uid,
+    docs.filter((d) => d.type === 'weekly'),
+    todayLocal,
+    tz,
+  );
+  for (const d of dates) {
+    for (const occ of byDate[d]) {
+      const s = streakByDocId.get(occ.id);
+      if (s !== undefined) occ.streak = s;
+    }
+  }
 
   // expose user account creation date for slider lower bound
   const user = (await UserModel.findById(uid, { createdAt: 1 }).lean()) as any;

@@ -30,6 +30,8 @@ export type Task = {
   };
   dayOfWeek?: number;
   completedDates?: string[];
+  /** Consecutive-completion streak for a repeating task, as of today. */
+  streak?: number;
   frogodoroSession?: {
     date: string;
     focusTime: number;

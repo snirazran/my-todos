@@ -37,6 +37,8 @@ export interface Task {
   repeatGroupId?: string;
   date?: string;
   completedDates?: string[];
+  /** Consecutive-completion streak for a repeating task, as of today. */
+  streak?: number;
   frogodoroSettings?: {
     focusDuration: number;
     breakDuration: number;
@@ -275,10 +277,16 @@ export function useTaskData({
       const prevToday = todayData;
       const prevBacklog = backlogData;
 
-      // Optimistic Update
-      const updatedTasks = todayData.tasks.map((t) =>
-        t.id === taskId ? { ...t, completed: nextCompleted } : t,
-      );
+      // Optimistic Update — also nudge the repeat streak so the fire badge
+      // reacts instantly (the server recomputes the exact value on refetch).
+      const updatedTasks = todayData.tasks.map((t) => {
+        if (t.id !== taskId) return t;
+        const nextStreak =
+          t.type === 'weekly'
+            ? Math.max(0, (t.streak ?? 0) + (nextCompleted ? 1 : -1))
+            : t.streak;
+        return { ...t, completed: nextCompleted, streak: nextStreak };
+      });
 
       const sortedTasks = sortTasks(updatedTasks);
 

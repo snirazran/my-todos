@@ -10,6 +10,7 @@ import {
   EllipsisVertical,
   Pen,
   ListChecks,
+  Flame,
 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,6 +43,7 @@ export default function TaskCard({
   onTap,
   onToggleComplete,
   disableDrag = false,
+  showStreak = false,
 }: {
   dragId: string;
   task: Task;
@@ -64,6 +66,8 @@ export default function TaskCard({
   onToggleComplete?: () => void;
   /** Disable initiating drag (e.g., past-date columns). Tap still works. */
   disableDrag?: boolean;
+  /** Show the repeat streak (fire) badge — only on the today column. */
+  showStreak?: boolean;
 }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -352,6 +356,17 @@ export default function TaskCard({
               </span>
               {isRepeating && (
                 <Icon name="repeat" label="Repeating" className="w-5 h-5 flex-shrink-0" />
+              )}
+              {showStreak && isRepeating && (task.streak ?? 0) > 0 && (
+                <span
+                  className="inline-flex flex-shrink-0 items-center gap-0.5 text-orange-500 no-underline"
+                  title={`${task.streak} in a row`}
+                >
+                  <Flame className="h-4 w-4" fill="currentColor" />
+                  <span className="text-[12px] font-black tabular-nums leading-none">
+                    ×{task.streak}
+                  </span>
+                </span>
               )}
               {task.calendarEventId && (
                 <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />

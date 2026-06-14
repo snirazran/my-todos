@@ -574,45 +574,28 @@ export default function FrogodoroSheet({
                       transition={{ duration: 0.15 }}
                     >
                       {/* Timer Card */}
-                      <div className={`px-4 pt-5 pb-4 ${getPhaseColor()} relative overflow-hidden`}>
-                        {/* Top-right actions: help + close */}
-                        <div className="absolute top-3 right-3 z-10 flex items-center gap-1.5">
-                          <button
-                            onClick={() => setShowHelp(true)}
-                            aria-label="How it works"
-                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-black leading-none"
-                          >
-                            ?
-                          </button>
-                          <button
-                            onClick={() => onOpenChange(false)}
-                            aria-label="Close"
-                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                        </div>
+                      <div className={`px-4 pt-11 pb-4 ${getPhaseColor()} relative overflow-hidden`}>
+                        {/* Help — top-left */}
+                        <button
+                          onClick={() => setShowHelp(true)}
+                          aria-label="How it works"
+                          className="absolute top-3 left-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-black leading-none"
+                        >
+                          ?
+                        </button>
+                        {/* Close — top-right */}
+                        <button
+                          onClick={() => onOpenChange(false)}
+                          aria-label="Close"
+                          className="absolute top-3 right-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
 
-                        {/* Task name */}
+                        {/* Task name (centered) */}
                         {task && (
-                          <div className="mb-3 pr-20">
-                            {task.tags && task.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1 mb-1">
-                                {task.tags.map((tagId) => {
-                                  const tag = userTags.find((ut) => ut.id === tagId || ut.name === tagId);
-                                  if (!tag) return null;
-                                  return (
-                                    <span
-                                      key={tagId}
-                                      className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider bg-white/20 text-white border border-white/20"
-                                    >
-                                      {tag.name}
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                            )}
-                            <p className="text-sm font-bold text-white/90 truncate">{task.text}</p>
+                          <div className="mb-3 px-10 text-center">
+                            <p className="truncate text-lg font-black text-white">{task.text}</p>
                           </div>
                         )}
 

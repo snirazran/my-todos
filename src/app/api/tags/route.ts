@@ -3,9 +3,48 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
 import TaskModel from '@/lib/models/Task';
+import QuestCategoryModel from '@/lib/models/QuestCategory';
+import { getZonedToday } from '@/lib/utils';
 import { v4 as uuid } from 'uuid';
 
 export const dynamic = 'force-dynamic';
+
+/** Add `n` days to a YYYY-MM-DD string (UTC-noon anchored to dodge DST). */
+function addDaysYMD(ymd: string, n: number) {
+  const d = new Date(`${ymd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Friendly label for a YYYY-MM-DD relative to `today`. */
+function dateLabel(ymd: string, today: string) {
+  if (ymd === today) return 'Today';
+  if (ymd === addDaysYMD(today, 1)) return 'Tomorrow';
+  return new Date(`${ymd}T12:00:00Z`).toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+/** Human label for a repeating task's cadence. */
+function repeatLabel(t: any): string {
+  switch (t.repeatMode) {
+    case 'daily':
+      return 'Every day';
+    case 'weekdays':
+      return 'Weekdays';
+    case 'weekend':
+      return 'Weekends';
+    case 'monthly':
+      return 'Monthly';
+    case 'custom':
+      return 'Custom';
+    case 'weekly':
+    default:
+      return 'Weekly';
+  }
+}
 
 const FREE_TAG_LIMIT = 6;
 const PREMIUM_TAG_LIMIT = 50;
@@ -55,6 +94,13 @@ export async function GET(req: NextRequest) {
   try {
     const userId = await requireUserId();
     await connectMongo();
+
+    const { searchParams } = new URL(req.url);
+    const usageId = searchParams.get('usage');
+    if (usageId) {
+      return await handleTagUsage(req, userId, usageId);
+    }
+
     const user = await UserModel.findById(userId, {
       tags: 1,
       premiumUntil: 1,
@@ -76,6 +122,135 @@ export async function GET(req: NextRequest) {
       }));
 
     return NextResponse.json({ tags, isPremium });
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+}
+
+/**
+ * Tasks that currently use a tag (today + future only; repeating tasks listed
+ * once, not per occurrence) plus the focus area the tag is linked to, if any.
+ */
+async function handleTagUsage(
+  req: NextRequest,
+  userId: string,
+  tagId: string,
+) {
+  const { searchParams } = new URL(req.url);
+  const tz = searchParams.get('timezone') || 'UTC';
+  const today = getZonedToday(tz);
+
+  const user = await UserModel.findById(userId, {
+    tags: 1,
+    focusProfile: 1,
+  }).lean<{ tags?: any[]; focusProfile?: any }>();
+
+  const tagDef = (user?.tags ?? []).find(
+    (t: any) => (typeof t === 'string' ? t : t?.id) === tagId,
+  );
+  const tagName =
+    tagDef && typeof tagDef === 'object' ? tagDef.name : (tagDef as string);
+  const tagMatch = { $in: [tagId, tagName].filter(Boolean) };
+
+  const docs = await TaskModel.find(
+    {
+      userId,
+      deletedAt: { $exists: false },
+      tags: tagMatch,
+      $or: [
+        { type: 'regular', date: { $gte: today } },
+        { type: 'weekly' },
+      ],
+    },
+    {
+      id: 1,
+      text: 1,
+      type: 1,
+      date: 1,
+      repeatMode: 1,
+      repeatGroupId: 1,
+      repeatEndDate: 1,
+    },
+  )
+    .sort({ date: 1 })
+    .lean<any[]>()
+    .exec();
+
+  const tasks: { id: string; text: string; type: 'repeating' | 'once'; when: string }[] = [];
+  const seenGroups = new Set<string>();
+  for (const d of docs) {
+    if (d.type === 'weekly') {
+      // Drop series that have already ended, and show each series only once.
+      if (d.repeatEndDate && d.repeatEndDate < today) continue;
+      const key = d.repeatGroupId || d.id;
+      if (seenGroups.has(key)) continue;
+      seenGroups.add(key);
+      tasks.push({ id: d.id, text: d.text, type: 'repeating', when: repeatLabel(d) });
+    } else {
+      tasks.push({
+        id: d.id,
+        text: d.text,
+        type: 'once',
+        when: d.date ? dateLabel(d.date, today) : '',
+      });
+    }
+  }
+
+  // Focus area association (from the user's focus profile tag map).
+  let focus: { categoryId: string; name: string; accent?: string } | null = null;
+  const map = user?.focusProfile?.categoryTagMap ?? [];
+  const entry = map.find(
+    (m: any) => Array.isArray(m.tagIds) && m.tagIds.includes(tagId),
+  );
+  if (entry?.categoryId) {
+    const cat = await QuestCategoryModel.findOne(
+      { categoryId: entry.categoryId },
+      { name: 1, accent: 1 },
+    ).lean<{ name?: string; accent?: string }>();
+    focus = {
+      categoryId: entry.categoryId,
+      name: cat?.name || entry.categoryId,
+      accent: cat?.accent,
+    };
+  }
+
+  return NextResponse.json({ tasks, focus });
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const userId = await requireUserId();
+    const { id, color, name } = await req.json();
+    if (!id) {
+      return NextResponse.json({ error: 'Tag id required' }, { status: 400 });
+    }
+    await connectMongo();
+
+    const set: Record<string, unknown> = {};
+    if (typeof color === 'string' && color.trim()) {
+      set['tags.$[t].color'] = color.trim();
+    }
+    if (typeof name === 'string' && name.trim()) {
+      const trimmed = name.trim();
+      if (trimmed.length > 20) {
+        return NextResponse.json(
+          { error: 'Tag name too long (max 20 chars)' },
+          { status: 400 },
+        );
+      }
+      set['tags.$[t].name'] = trimmed;
+    }
+    if (Object.keys(set).length === 0) {
+      return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+    }
+
+    await UserModel.updateOne(
+      { _id: userId },
+      { $set: set },
+      { arrayFilters: [{ 't.id': id }] },
+    );
+
+    return NextResponse.json({ ok: true });
   } catch {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

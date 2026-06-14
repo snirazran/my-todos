@@ -206,6 +206,29 @@ export function useTagManager({
     }
   };
 
+  const updateTag = async (
+    id: string,
+    patch: { color?: string; name?: string },
+  ) => {
+    // Optimistic: apply to the cached tag list right away.
+    const updatedTags = savedTags.map((t) =>
+      t.id === id ? { ...t, ...patch } : t,
+    );
+    mutate('/api/tags', { ...tagsData, tags: updatedTags }, false);
+    window.dispatchEvent(new Event('tags-updated'));
+    try {
+      await fetch('/api/tags', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...patch }),
+      });
+      mutate('/api/tags');
+    } catch (error) {
+      console.error('Failed to update tag', error);
+      mutate('/api/tags');
+    }
+  };
+
   const deleteSavedTag = async (id: string, _name: string, e: React.MouseEvent) => {
     e.stopPropagation();
 
@@ -241,6 +264,7 @@ export function useTagManager({
     createAndSaveTag,
     quickCreateTag,
     deleteSavedTag,
+    updateTag,
     removeTag,
     toggleTag,
     getTagDetails,

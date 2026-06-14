@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion } from 'framer-motion';
-import { Pause } from 'lucide-react';
+import { Pause, Play, SkipForward, Square } from 'lucide-react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +19,12 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
     timeLeft,
     phase,
     selectedTaskId,
+    settings,
+    phaseElapsed,
+    startTimer,
+    pauseTimer,
+    stopTimer,
+    completePhase,
   } = useFrogodoroStore();
 
   const [portalTarget, setPortalTarget] = useState<HTMLElement | null>(null);
@@ -35,10 +41,64 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const phaseAccent =
+  // Same green/blue as the rest of the Frogodoro UI. The base is the phase
+  // colour; the elapsed fill is a darker shade of that same colour and grows
+  // left→right as the phase passes.
+  const phaseBase =
     phase === 'focus'
       ? 'bg-primary text-primary-foreground'
-      : 'bg-sky-500 text-white';
+      : 'bg-sky-500 dark:bg-sky-600 text-white';
+  const phaseFill = 'bg-black/20';
+
+  const phaseDuration =
+    (phase === 'focus' ? settings.focusDuration : settings.breakDuration) * 60;
+  const progressPercent =
+    phaseDuration > 0
+      ? Math.min(100, Math.max(0, ((phaseDuration - timeLeft) / phaseDuration) * 100))
+      : 0;
+
+  // Play/pause toggle and stop — GlobalTimer flushes unsaved time on the
+  // isRunning→false transition, so these only need the store actions.
+  const handlePlayPause = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isRunning) pauseTimer();
+    else startTimer();
+  };
+  const handleStop = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    stopTimer();
+  };
+  // Skip to the next phase. completePhase advances state immediately, so we must
+  // flush the unsaved elapsed time to the DB *before* calling it (GlobalTimer's
+  // pause-flush can't, since the phase/timeLeft have already moved on).
+  const handleSkip = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const phaseDuration =
+      (phase === 'focus' ? settings.focusDuration : settings.breakDuration) * 60;
+    const liveElapsed = phaseDuration - timeLeft;
+    const unsaved = Math.max(0, liveElapsed - phaseElapsed);
+    if (selectedTaskId && unsaved > 0) {
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const session = {
+        date: today,
+        focusTime: phase === 'focus' ? unsaved : 0,
+        breakTime: phase === 'break' ? unsaved : 0,
+      };
+      window.dispatchEvent(
+        new CustomEvent('frogodoro-progress-saved', {
+          detail: { taskId: selectedTaskId, session },
+        }),
+      );
+      void fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session, timezone }),
+      }).catch(() => {});
+    }
+    completePhase(false, liveElapsed);
+  };
 
   return createPortal(
     <motion.div
@@ -48,11 +108,23 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
       exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className={cn(
-        'pointer-events-auto w-full md:w-[380px] md:self-end',
-        'flex items-center gap-3 px-4 py-3 rounded-[18px] border border-white/10 shadow-sm backdrop-blur-2xl',
-        phaseAccent,
+        'pointer-events-auto relative w-full overflow-hidden md:w-[380px] md:self-end',
+        'rounded-[18px] border border-white/10 shadow-sm backdrop-blur-2xl',
+        phaseBase,
       )}
     >
+      {/* Progress fill — grows left→right as the phase elapses */}
+      <div
+        aria-hidden
+        className={cn(
+          'absolute inset-y-0 left-0 z-0',
+          phaseFill,
+          isRunning ? 'transition-[width] duration-1000 ease-linear' : '',
+        )}
+        style={{ width: `${progressPercent}%` }}
+      />
+
+      <div className="relative z-10 flex items-center gap-3 px-3 py-3">
       <button
         type="button"
         onClick={onClick}
@@ -115,6 +187,40 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
           </span>
         </div>
       </button>
+
+      {/* Quick controls — stop · play/pause · skip-to-next-phase (far right) */}
+      <div className="flex shrink-0 items-center gap-4">
+        <button
+          type="button"
+          onClick={handleStop}
+          aria-label="Stop"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 active:scale-95"
+        >
+          <Square className="h-3.5 w-3.5 fill-current" />
+        </button>
+        <button
+          type="button"
+          onClick={handlePlayPause}
+          aria-label={isRunning ? 'Pause' : 'Resume'}
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 active:scale-95"
+        >
+          {isRunning ? (
+            <Pause className="h-4 w-4 fill-current" />
+          ) : (
+            <Play className="h-4 w-4 fill-current" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={handleSkip}
+          aria-label="Skip to next phase"
+          title="Skip to next phase"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30 active:scale-95"
+        >
+          <SkipForward className="h-4 w-4 fill-current" />
+        </button>
+      </div>
+      </div>
     </motion.div>,
     portalTarget,
   );

@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ChevronRight, Shuffle, X } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Icon } from '@/components/ui/Icon';
+import { mutateInventoryCaches } from '@/hooks/useInventory';
+import { mutateBackgrounds } from '@/hooks/useBackgrounds';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 
 const STORAGE_KEY = 'skinRotationInterval';
@@ -237,6 +239,10 @@ async function rotateOnce() {
     }
 
     await Promise.allSettled(equipCalls);
+    // Revalidate the SWR caches the frog/wardrobe/background read from so the
+    // new look shows up live, without needing a navigation or manual refresh.
+    mutateInventoryCaches();
+    mutateBackgrounds();
     window.dispatchEvent(new Event('wardrobe-refresh'));
     window.dispatchEvent(new Event('background-refresh'));
   } catch {

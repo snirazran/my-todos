@@ -64,6 +64,16 @@ export default function SiteHeader() {
   const [shopOpen, setShopOpen] = useState(false);
   const wardrobeRef = useRef<HTMLDivElement>(null);
 
+  // Skin & background rotation popup (opened from the wardrobe page).
+  const [rotationOpen, setRotationOpen] = useState(false);
+  const [rotationValue, setRotationValue] = useState<RotationInterval>('disabled');
+  useEffect(() => {
+    setRotationValue(getRotationInterval());
+    const handler = () => setRotationValue(getRotationInterval());
+    window.addEventListener('skin-rotation-change', handler);
+    return () => window.removeEventListener('skin-rotation-change', handler);
+  }, []);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (wardrobeRef.current && !wardrobeRef.current.contains(event.target as Node)) {
@@ -160,11 +170,21 @@ export default function SiteHeader() {
         flyBalance !== undefined && (
           <div
             className={cn(
-              'fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] px-2 py-1 md:hidden',
+              'fixed right-4 top-[calc(env(safe-area-inset-top)+0.5rem)] z-[90] flex items-center gap-2 px-2 py-1 md:hidden',
               isLoadingScreenVisible && 'pointer-events-none',
             )}
             aria-disabled={isLoadingScreenVisible}
           >
+            {pathname === '/wardrobe' && (
+              <button
+                type="button"
+                onClick={() => setRotationOpen(true)}
+                aria-label="Skin & background rotation"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-card/80 shadow-sm backdrop-blur-xl transition-colors active:scale-95"
+              >
+                <Icon name="shuffle" label="Skin rotation" className="h-7 w-7" />
+              </button>
+            )}
             <FlyCounter
               balance={flyBalance}
               variant="mobile"
@@ -338,6 +358,17 @@ export default function SiteHeader() {
             }}
           />
 
+          {user && flyBalance !== undefined && pathname === '/wardrobe' && (
+            <button
+              type="button"
+              onClick={() => setRotationOpen(true)}
+              aria-label="Skin & background rotation"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-border/50 bg-card/80 shadow-sm transition-colors hover:bg-muted active:scale-95"
+            >
+              <Icon name="shuffle" label="Skin rotation" className="h-7 w-7" />
+            </button>
+          )}
+
           {user && flyBalance !== undefined && (
             <FlyCounter
               balance={flyBalance}
@@ -359,6 +390,17 @@ export default function SiteHeader() {
         `}</style>
       </div>
       </header>
+
+      <SkinRotationDialog
+        open={rotationOpen}
+        currentValue={rotationValue}
+        onClose={() => setRotationOpen(false)}
+        onSelect={(v) => {
+          setRotationInterval(v);
+          setRotationValue(v);
+          setRotationOpen(false);
+        }}
+      />
     </>
   );
 }
@@ -585,6 +627,16 @@ function MobileSheet({
 
   useEffect(() => setMounted(true), []);
 
+  // Swipe-to-close is enabled on mobile only (the desktop sheet is a centered card).
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   // Reset to main view whenever the sheet opens
   useEffect(() => {
     if (isOpen) setView('main');
@@ -616,7 +668,15 @@ function MobileSheet({
           animate={{ x: 0 }}
           exit={{ x: '-100%' }}
           transition={{ type: 'spring', damping: 28, stiffness: 220 }}
-          className="fixed z-[101] inset-0 h-[100dvh] w-full overflow-y-auto bg-slate-100 dark:bg-background md:bg-white dark:md:bg-background"
+          drag={isMobile ? 'x' : false}
+          dragDirectionLock
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={{ left: 0.9, right: 0 }}
+          onDragEnd={(_e, info) => {
+            // Swipe far enough left, or flick left quickly, to dismiss.
+            if (info.offset.x < -100 || info.velocity.x < -500) onClose();
+          }}
+          className="fixed z-[1340] inset-0 h-[100dvh] w-full overflow-y-auto bg-slate-100 dark:bg-background md:bg-white dark:md:bg-background"
         >
         <div className="mx-auto w-full md:max-w-xl md:min-h-full md:bg-slate-100 md:border-x md:border-border/60 md:shadow-[0_0_0_6px_rgba(15,23,42,0.10)] dark:md:bg-background">
           {/* Top bar */}
@@ -979,7 +1039,7 @@ function MainView({
 
       {plusInfoOpen && createPortal(
         <div
-          className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/50 backdrop-blur-sm px-5"
+          className="fixed inset-0 z-[1360] flex items-center justify-center bg-black/50 backdrop-blur-sm px-5"
           onClick={() => setPlusInfoOpen(false)}
         >
           <div

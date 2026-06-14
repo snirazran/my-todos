@@ -96,6 +96,8 @@ interface Task {
   endTime?: string;
   reminder?: string;
   completedDates?: string[];
+  /** Consecutive-completion streak for a repeating task, as of today. */
+  streak?: number;
 }
 
 interface SortableTaskItemProps {
@@ -607,6 +609,17 @@ const SortableTaskItem = React.forwardRef<
                   </motion.span>
                   {isWeekly && (
                     <Icon name="repeat" label="Repeating" className="w-5 h-5 flex-shrink-0" />
+                  )}
+                  {isWeekly && (task.streak ?? 0) > 0 && (
+                    <span
+                      className="inline-flex flex-shrink-0 items-center gap-0.5 text-orange-500 no-underline"
+                      title={`${task.streak} in a row`}
+                    >
+                      <Flame className="h-4 w-4" fill="currentColor" />
+                      <span className="text-[12px] font-black tabular-nums leading-none">
+                        ×{task.streak}
+                      </span>
+                    </span>
                   )}
                   {task.calendarEventId && (
                     <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
