@@ -76,8 +76,8 @@ function buildLayout(snap: LiveTimerSnapshot): any {
           type: 'timer',
           properties: [
             { endTime: snap.endTime },
-            { style: 'timer' },
-            { fontSize: 30 },
+            { style: 'countdown' },
+            { fontSize: 24 },
             { fontWeight: 'bold' },
             { monospaced: true },
             { color },
@@ -88,7 +88,7 @@ function buildLayout(snap: LiveTimerSnapshot): any {
           type: 'text',
           properties: [
             { text: fmt(snap.timeLeft) },
-            { fontSize: 30 },
+            { fontSize: 24 },
             { fontWeight: 'bold' },
             { monospaced: true },
             { color },
@@ -100,24 +100,24 @@ function buildLayout(snap: LiveTimerSnapshot): any {
     type: 'container',
     properties: [
       { direction: 'horizontal' },
-      { spacing: 10 },
-      { padding: 16 },
+      { spacing: 9 },
+      { padding: 12 },
       { insideAlignment: 'center' },
     ],
     children: [
       {
         type: 'image',
-        properties: [{ systemName: symbol }, { color }, { width: 22 }, { height: 22 }],
+        properties: [{ systemName: symbol }, { color }, { width: 18 }, { height: 18 }],
       },
       {
         type: 'container',
-        properties: [{ direction: 'vertical' }, { spacing: 2 }],
+        properties: [{ direction: 'vertical' }, { spacing: 1 }],
         children: [
           {
             type: 'text',
             properties: [
               { text: label },
-              { fontSize: 16 },
+              { fontSize: 14 },
               { fontWeight: 'bold' },
               { color },
             ],
@@ -126,7 +126,7 @@ function buildLayout(snap: LiveTimerSnapshot): any {
             type: 'text',
             properties: [
               { text: snap.taskName || 'Frogodoro' },
-              { fontSize: 12 },
+              { fontSize: 11 },
               { color: '#8e8e93' },
             ],
           },
@@ -158,14 +158,14 @@ function buildIsland(snap: LiveTimerSnapshot): any {
   const { label, color, symbol } = phaseMeta(snap.phase);
   const compactTime =
     snap.isRunning && snap.endTime
-      ? { type: 'timer', properties: [{ endTime: snap.endTime }, { style: 'timer' }, { color }, { monospaced: true }] }
+      ? { type: 'timer', properties: [{ endTime: snap.endTime }, { style: 'countdown' }, { color }, { monospaced: true }] }
       : { type: 'text', properties: [{ text: fmt(snap.timeLeft) }, { color }, { monospaced: true }] };
 
   return {
     expanded: {
       leading: {
         type: 'image',
-        properties: [{ systemName: symbol }, { color }, { width: 24 }, { height: 24 }],
+        properties: [{ systemName: symbol }, { color }, { width: 22 }, { height: 22 }],
       },
       center: {
         type: 'text',
@@ -175,8 +175,8 @@ function buildIsland(snap: LiveTimerSnapshot): any {
         type: snap.isRunning && snap.endTime ? 'timer' : 'text',
         properties:
           snap.isRunning && snap.endTime
-            ? [{ endTime: snap.endTime }, { style: 'timer' }, { fontSize: 22 }, { fontWeight: 'bold' }, { color }, { monospaced: true }]
-            : [{ text: fmt(snap.timeLeft) }, { fontSize: 22 }, { fontWeight: 'bold' }, { color }, { monospaced: true }],
+            ? [{ endTime: snap.endTime }, { style: 'countdown' }, { fontSize: 20 }, { fontWeight: 'bold' }, { color }, { monospaced: true }]
+            : [{ text: fmt(snap.timeLeft) }, { fontSize: 20 }, { fontWeight: 'bold' }, { color }, { monospaced: true }],
       },
     },
     compactLeading: {
