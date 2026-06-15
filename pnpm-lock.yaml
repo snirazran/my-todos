@@ -16,6 +16,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.91.1
         version: 0.91.1(zod@4.0.10)
+      '@capacitor-firebase/messaging':
+        specifier: ^8.3.0
+        version: 8.3.0(@capacitor/core@8.0.2)(firebase@12.9.0)
       '@capacitor/android':
         specifier: ^8.0.2
         version: 8.0.2(@capacitor/core@8.0.2)
@@ -31,9 +34,6 @@ importers:
       '@capacitor/local-notifications':
         specifier: ^8.0.2
         version: 8.0.2(@capacitor/core@8.0.2)
-      '@capacitor/push-notifications':
-        specifier: ^8.0.1
-        version: 8.0.1(@capacitor/core@8.0.2)
       '@capgo/capacitor-social-login':
         specifier: ^8.3.20
         version: 8.3.20(@capacitor/core@8.0.2)
@@ -774,6 +774,15 @@ packages:
     resolution: {integrity: sha512-4zBIxpPzowiZpusoFkyGVwakdRJUyuH5PxQ/PrqghfdFWWasvnCdPfQXHrenDai+gyLARulZjZowCOj6fjT4pA==}
     engines: {node: '>=6.9.0'}
 
+  '@capacitor-firebase/messaging@8.3.0':
+    resolution: {integrity: sha512-gjlpPH8nFN2D4PGpg+Bi7Pk1Apy+nRh6DHTI8hr4o3QfCmZPnNCT0mhhT8Rcdpwf2D+E5NxkaVy4/2GYiXoF8Q==}
+    peerDependencies:
+      '@capacitor/core': '>=8.0.0'
+      firebase: ^12.6.0
+    peerDependenciesMeta:
+      firebase:
+        optional: true
+
   '@capacitor/android@8.0.2':
     resolution: {integrity: sha512-0D7j0YvzjnfCMKLvFkAbx8b3Vwx+QfHFG5NzoXpI9sAl3zWiLsfa+NX4x92Fy+k4MGjLSMAfLThCqILYGDDsgw==}
     peerDependencies:
@@ -794,11 +803,6 @@ packages:
 
   '@capacitor/local-notifications@8.0.2':
     resolution: {integrity: sha512-X7KE/I4ZutMTGVHNUyTjIugYcQEcHJRLks+TsPnOriuS+lo0geSTuaRln6zAZlJSSXSoVMSSzHexdSbIjR/8iw==}
-    peerDependencies:
-      '@capacitor/core': '>=8.0.0'
-
-  '@capacitor/push-notifications@8.0.1':
-    resolution: {integrity: sha512-CDY6syMxdG81Epn+V4fCYRR4L9tVS72F1kVrTY2ka6umWy4BmwXOXPsxGxlE5PmHLOhmBwKpy3uOiIJtSpMhOw==}
     peerDependencies:
       '@capacitor/core': '>=8.0.0'
 
@@ -5657,6 +5661,12 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
+  '@capacitor-firebase/messaging@8.3.0(@capacitor/core@8.0.2)(firebase@12.9.0)':
+    dependencies:
+      '@capacitor/core': 8.0.2
+    optionalDependencies:
+      firebase: 12.9.0
+
   '@capacitor/android@8.0.2(@capacitor/core@8.0.2)':
     dependencies:
       '@capacitor/core': 8.0.2
@@ -5692,10 +5702,6 @@ snapshots:
       '@capacitor/core': 8.0.2
 
   '@capacitor/local-notifications@8.0.2(@capacitor/core@8.0.2)':
-    dependencies:
-      '@capacitor/core': 8.0.2
-
-  '@capacitor/push-notifications@8.0.1(@capacitor/core@8.0.2)':
     dependencies:
       '@capacitor/core': 8.0.2
 

@@ -17,9 +17,6 @@ const config: CapacitorConfig = {
     cleartext: serverUrl.startsWith('http://'),
   },
   plugins: {
-    PushNotifications: {
-      presentationOptions: ['badge', 'sound', 'alert'],
-    },
     SocialLogin: {
       providers: {
         google: true,

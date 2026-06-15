@@ -3,29 +3,32 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { cn } from '@/lib/utils';
 import type { OnboardingStepProps } from './types';
 import { OnboardingFrogHeader, ONBOARDING_BODY_CLASS } from './OnboardingFrogHeader';
 
 async function enableNotifications() {
   if (Capacitor.isNativePlatform()) {
-    let status = await PushNotifications.checkPermissions();
-    if (status.receive === 'prompt') {
-      status = await PushNotifications.requestPermissions();
+    let status = await FirebaseMessaging.checkPermissions();
+    if (
+      status.receive === 'prompt' ||
+      status.receive === 'prompt-with-rationale'
+    ) {
+      status = await FirebaseMessaging.requestPermissions();
     }
     if (status.receive !== 'granted') return;
 
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-    await PushNotifications.addListener('registration', async (token) => {
+    const { token } = await FirebaseMessaging.getToken();
+    if (token) {
       await fetch('/api/notifications/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ fcmToken: token.value, timezone }),
+        body: JSON.stringify({ fcmToken: token, timezone }),
       });
-    });
-    await PushNotifications.register();
+    }
     return;
   }
 

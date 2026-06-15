@@ -104,7 +104,9 @@
       "Bash(sed -n '1006,1060p' src/app/page.tsx)",
       "Bash(npx eslint *)",
       "Bash(awk 'NR>=1030 && NR<=1120 && /const tz|body.timezone|getZonedToday|tz =/' /Users/snirazran/Fullstack/my-todos/src/app/api/tasks/route.ts)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(ls android/app/google-services.json)",
+      "Bash(grep -rn \"google-services\\\\|com.google.gms\" android/build.gradle android/app/build.gradle)"
     ]
   }
 }

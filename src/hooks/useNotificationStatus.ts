@@ -2,9 +2,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 
 export type PushPermission = 'granted' | 'denied' | 'prompt' | 'unknown';
+
+function normalizePermission(value: string): PushPermission {
+  if (value === 'granted' || value === 'denied') return value;
+  if (value === 'prompt' || value === 'prompt-with-rationale') return 'prompt';
+  return 'unknown';
+}
 
 export function useNotificationStatus() {
   const isNative =
@@ -15,13 +21,8 @@ export function useNotificationStatus() {
   const refresh = useCallback(async () => {
     if (!isNative) return;
     try {
-      const status = await PushNotifications.checkPermissions();
-      const value = status.receive;
-      setPermission(
-        value === 'granted' || value === 'denied' || value === 'prompt'
-          ? value
-          : 'unknown',
-      );
+      const status = await FirebaseMessaging.checkPermissions();
+      setPermission(normalizePermission(status.receive));
     } catch {
       setPermission('unknown');
     }
@@ -35,15 +36,23 @@ export function useNotificationStatus() {
     if (!isNative) return permission;
     setLoading(true);
     try {
-      const status = await PushNotifications.requestPermissions();
-      const next: PushPermission =
-        status.receive === 'granted' || status.receive === 'denied' || status.receive === 'prompt'
-          ? status.receive
-          : 'unknown';
+      const status = await FirebaseMessaging.requestPermissions();
+      const next = normalizePermission(status.receive);
       setPermission(next);
       if (next === 'granted') {
         try {
-          await PushNotifications.register();
+          // Mint the FCM token and register it with the server.
+          const { token } = await FirebaseMessaging.getToken();
+          if (token) {
+            const timezone =
+              Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+            await fetch('/api/notifications/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              credentials: 'include',
+              body: JSON.stringify({ fcmToken: token, timezone }),
+            });
+          }
         } catch {
           /* ignore */
         }

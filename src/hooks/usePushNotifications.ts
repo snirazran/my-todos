@@ -3,15 +3,18 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
-import { PushNotifications } from '@capacitor/push-notifications';
+import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
 /**
- * dd
  * Hook that handles push notification setup for native platforms (Android/iOS).
  * - Requests permission
  * - Registers the FCM token with the server
  * - Tracks user activity for smart notification timing
+ *
+ * Uses @capacitor-firebase/messaging so both iOS and Android return a real FCM
+ * registration token (the bare @capacitor/push-notifications plugin returns a
+ * raw APNs token on iOS, which Firebase cannot send to).
  *
  * On web, this hook is a no-op (push notifications use a different mechanism).
  */
@@ -29,13 +32,30 @@ export function usePushNotifications(userId: string | null | undefined) {
 
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
+    async function registerToken(token: string) {
+      if (!token) return;
+      try {
+        await fetch('/api/notifications/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ fcmToken: token, timezone: tz }),
+        });
+      } catch (err) {
+        console.error('Failed to register FCM token:', err);
+      }
+    }
+
     async function setup() {
       try {
         // Check current permission status
-        let permStatus = await PushNotifications.checkPermissions();
+        let permStatus = await FirebaseMessaging.checkPermissions();
 
-        if (permStatus.receive === 'prompt') {
-          permStatus = await PushNotifications.requestPermissions();
+        if (
+          permStatus.receive === 'prompt' ||
+          permStatus.receive === 'prompt-with-rationale'
+        ) {
+          permStatus = await FirebaseMessaging.requestPermissions();
         }
 
         if (permStatus.receive !== 'granted') {
@@ -43,39 +63,24 @@ export function usePushNotifications(userId: string | null | undefined) {
           return;
         }
 
-        // Register with the native push notification service
-        await PushNotifications.register();
-
-        // Listen for the registration token
-        PushNotifications.addListener('registration', async (token) => {
-          console.log('Push registration token:', token.value);
-
-          try {
-            await fetch('/api/notifications/register', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              credentials: 'include',
-              body: JSON.stringify({
-                fcmToken: token.value,
-                timezone: tz,
-              }),
-            });
-          } catch (err) {
-            console.error('Failed to register FCM token:', err);
-          }
+        // Keep the server in sync if Firebase rotates the token.
+        await FirebaseMessaging.addListener('tokenReceived', (event) => {
+          console.log('FCM token received:', event.token);
+          void registerToken(event.token);
         });
 
-        // Handle registration errors
-        PushNotifications.addListener('registrationError', (err) => {
-          console.error('Push registration error:', err);
-        });
+        // Fetch the current token (registers with APNs/FCM under the hood).
+        const { token } = await FirebaseMessaging.getToken();
+        await registerToken(token);
 
-        // Handle received notifications while app is in foreground
-        PushNotifications.addListener(
-          'pushNotificationReceived',
-          async (notification) => {
+        // Handle messages received while the app is in the foreground.
+        await FirebaseMessaging.addListener(
+          'notificationReceived',
+          async (event) => {
+            const notification = event.notification;
             console.log('Push notification received:', notification);
-            const type = notification.data?.type;
+            const type = (notification.data as Record<string, unknown> | undefined)
+              ?.type;
             const shouldDisplayForegroundTimerNotification =
               type === 'timer_complete' ||
               type === 'break_started' ||
@@ -111,11 +116,13 @@ export function usePushNotifications(userId: string | null | undefined) {
         );
 
         // Handle notification tap (app opened from notification)
-        PushNotifications.addListener(
-          'pushNotificationActionPerformed',
-          (action) => {
-            const path = action.notification.data?.path;
-            if (path) {
+        await FirebaseMessaging.addListener(
+          'notificationActionPerformed',
+          (event) => {
+            const path = (
+              event.notification.data as Record<string, unknown> | undefined
+            )?.path;
+            if (typeof path === 'string' && path) {
               router.push(path);
             }
           },
@@ -145,7 +152,7 @@ export function usePushNotifications(userId: string | null | undefined) {
 
     // Cleanup listeners on unmount
     return () => {
-      PushNotifications.removeAllListeners();
+      void FirebaseMessaging.removeAllListeners();
     };
   }, [userId, router]);
 }

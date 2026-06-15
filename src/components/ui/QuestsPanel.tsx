@@ -27,6 +27,7 @@ import {
   type QuestTagChip,
 } from './QuestCards';
 import { RewardCard } from './gift-box/RewardCard';
+import GiftBoxOpening from './gift-box/GiftBoxOpening';
 import { SingleRewardCard } from './daily-reward/RewardCard';
 import { RotatingRays } from './gift-box/RotatingRays';
 import { RARITY_CONFIG as GIFT_RARITY_CONFIG } from './gift-box/constants';
@@ -258,7 +259,15 @@ export function QuestsPanel({
   const [rewardRevealQueue, setRewardRevealQueue] = useState<
     QuestRewardRevealEntry[]
   >([]);
-  const [openingGiftKey, setOpeningGiftKey] = useState<string | null>(null);
+  // When opening a quest gift reward, play the full "tap to unwrap" gift-box
+  // flow instead of revealing the prize instantly. `remaining` lets multi-copy
+  // rewards be unwrapped one box at a time; `instance` re-mounts GiftBoxOpening
+  // for each subsequent box.
+  const [giftOpening, setGiftOpening] = useState<{
+    entry: QuestRewardRevealEntry;
+    remaining: number;
+    instance: number;
+  } | null>(null);
   const [flyGainToast, setFlyGainToast] = useState<FlyGainToast | null>(null);
   const [dailyPage, setDailyPage] = useState(0);
   const [carouselDragging, setCarouselDragging] = useState(false);
@@ -499,50 +508,40 @@ export function QuestsPanel({
     setRewardRevealQueue((current) => current.slice(1));
   };
 
-  const handleRewardRevealOpenGift = async (entry: QuestRewardRevealEntry) => {
+  const handleRewardRevealOpenGift = (entry: QuestRewardRevealEntry) => {
     if (entry.item.slot !== 'container') {
       handleRewardRevealClaim(entry);
       return;
     }
-    if (openingGiftKey) return;
+    if (giftOpening) return;
 
-    const totalToOpen = entry.quantity ?? 1;
-
-    setOpeningGiftKey(entry.key);
+    // Launch the full "tap to unwrap" gift-box experience. Each box is
+    // unwrapped (and its prize revealed) by GiftBoxOpening itself.
     setClaimMessage(null);
-    try {
-      // Open all copies sequentially, collect prize entries
-      const prizeEntries: QuestRewardRevealEntry[] = [];
-      for (let i = 0; i < totalToOpen; i++) {
-        const res = await fetch('/api/skins/open-gift', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ giftBoxId: entry.item.id }),
-        });
-        const payload = await res.json();
-        if (!res.ok || !payload.prize) {
-          throw new Error(payload.error || 'Could not open gift');
-        }
-        const prize = payload.prize as ItemDef;
-        prizeEntries.push({
-          key: `${prize.id}-${rewardRevealIdRef.current}`,
-          item: prize,
-        });
-        rewardRevealIdRef.current += 1;
-      }
+    setGiftOpening({
+      entry,
+      remaining: entry.quantity ?? 1,
+      instance: 0,
+    });
+  };
 
-      // Replace current entry with all prize entries (shown one after another)
-      setRewardRevealQueue((current) =>
-        current[0]?.key === entry.key
-          ? [...prizeEntries, ...current.slice(1)]
-          : current,
+  // Called when a single gift box from the tap-to-unwrap flow is dismissed
+  // (prize claimed or closed). Advance to the next copy, or finish and remove
+  // the gift entry from the reveal queue once every box is done.
+  const handleGiftBoxClosed = () => {
+    mutateInventoryCaches();
+    setGiftOpening((current) => {
+      if (!current) return null;
+      const remaining = current.remaining - 1;
+      if (remaining > 0) {
+        return { ...current, remaining, instance: current.instance + 1 };
+      }
+      const entryKey = current.entry.key;
+      setRewardRevealQueue((queue) =>
+        queue[0]?.key === entryKey ? queue.slice(1) : queue,
       );
-      mutateInventoryCaches();
-    } catch (err: any) {
-      setClaimMessage(err.message || 'Could not open gift');
-    } finally {
-      setOpeningGiftKey(null);
-    }
+      return null;
+    });
   };
 
   const handleClaimObjective = async (questId: string, objectiveId: string) => {
@@ -857,12 +856,19 @@ export function QuestsPanel({
               </div>
               <QuestRewardRevealOverlay
                 queue={rewardRevealQueue}
-                openingGiftKey={openingGiftKey}
                 isPremium={data?.isPremium ?? false}
                 onClaim={handleRewardRevealClaim}
                 onOpenGift={handleRewardRevealOpenGift}
                 paused={false}
               />
+              {giftOpening && (
+                <GiftBoxOpening
+                  key={`${giftOpening.entry.key}-${giftOpening.instance}`}
+                  giftBoxId={giftOpening.entry.item.id}
+                  onClose={handleGiftBoxClosed}
+                  onWin={() => mutateInventoryCaches()}
+                />
+              )}
               <FlyGainToastPill toast={flyGainToast} />
               <QuestSeasonEventOverlay
                 season={data?.activeSeason ?? null}
@@ -1960,14 +1966,12 @@ function PremiumFlyCounter({
 
 function QuestRewardRevealOverlay({
   queue,
-  openingGiftKey,
   isPremium,
   onClaim,
   onOpenGift,
   paused = false,
 }: {
   queue: QuestRewardRevealEntry[];
-  openingGiftKey: string | null;
   isPremium: boolean;
   onClaim: (entry: QuestRewardRevealEntry) => void;
   onOpenGift: (entry: QuestRewardRevealEntry) => void;
@@ -2007,7 +2011,7 @@ function QuestRewardRevealOverlay({
             <RewardCard
               key={entry.key}
               prize={entry.item}
-              claiming={openingGiftKey === entry.key}
+              claiming={false}
               onClaim={
                 entry.item.slot === 'container'
                   ? () => onOpenGift(entry)
