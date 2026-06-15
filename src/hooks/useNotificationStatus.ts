@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
+import { openAppNotificationSettings } from '@/lib/openAppNotificationSettings';
 
 export type PushPermission = 'granted' | 'denied' | 'prompt' | 'unknown';
 
@@ -63,6 +64,27 @@ export function useNotificationStatus() {
     }
   }, [isNative, permission]);
 
+  const openSettings = useCallback(async () => {
+    await openAppNotificationSettings();
+  }, []);
+
+  /**
+   * Single entry point for every "Enable notifications" button. If iOS has
+   * never shown the permission prompt we trigger the native dialog; otherwise
+   * (already granted or hard-denied) the only way to change the toggle is the
+   * OS settings screen, so we deep-link there.
+   */
+  const enableOrConfigure = useCallback(async () => {
+    if (!isNative) return permission;
+    const status = await FirebaseMessaging.checkPermissions();
+    const current = normalizePermission(status.receive);
+    if (current === 'prompt') {
+      return requestEnable();
+    }
+    await openSettings();
+    return current;
+  }, [isNative, permission, requestEnable, openSettings]);
+
   return {
     isNative,
     permission,
@@ -71,5 +93,7 @@ export function useNotificationStatus() {
     loading,
     refresh,
     requestEnable,
+    openSettings,
+    enableOrConfigure,
   };
 }

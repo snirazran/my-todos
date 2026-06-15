@@ -22,6 +22,8 @@ import {
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { playTimerSound, unlockAudio, type TimerSound } from '@/lib/timerSounds';
+import { useNotificationStatus } from '@/hooks/useNotificationStatus';
+import { Bell } from 'lucide-react';
 
 interface Task {
   id: string;
@@ -80,6 +82,7 @@ export default function FrogodoroSheet({
   } = useFrogodoroStore();
 
   const [localSettings, setLocalSettings] = useState(settings);
+  const { canEnable: canEnableNotifs, enableOrConfigure } = useNotificationStatus();
 
   useEffect(() => {
     setMounted(true);
@@ -705,6 +708,18 @@ export default function FrogodoroSheet({
                             </button>
                           )}
                         </div>
+
+                        {/* Enable-notifications hint — so timer-complete alerts can land */}
+                        {canEnableNotifs && (
+                          <button
+                            type="button"
+                            onClick={() => void enableOrConfigure()}
+                            className="mx-auto mt-3 flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-[11px] font-bold text-white/90 transition-colors hover:bg-white/25 active:scale-95"
+                          >
+                            <Bell className="h-3.5 w-3.5" />
+                            Enable notifications to get timer alerts
+                          </button>
+                        )}
                       </div>
 
                       {/* Stats Row */}
