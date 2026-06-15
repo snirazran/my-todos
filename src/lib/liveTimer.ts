@@ -1,7 +1,28 @@
 'use client';
 
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { LiveActivities } from 'capacitor-live-activities';
+
+/** Custom Android plugin (ongoing chronometer notification). iOS has no impl. */
+interface FrogTimerPlugin {
+  start(opts: {
+    phase: string;
+    isRunning: boolean;
+    endTime: number;
+    timeLeft: number;
+    taskName: string;
+  }): Promise<void>;
+  update(opts: {
+    phase: string;
+    isRunning: boolean;
+    endTime: number;
+    timeLeft: number;
+    taskName: string;
+  }): Promise<void>;
+  stop(): Promise<void>;
+}
+
+const FrogTimer = registerPlugin<FrogTimerPlugin>('FrogTimer');
 
 /**
  * Cross-platform "live timer" controller for the Frogodoro focus/break timer.
@@ -185,14 +206,38 @@ function computeSignature(snap: LiveTimerSnapshot): string | null {
  */
 export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
-  // Android support arrives in Phase 2 (custom chronometer plugin).
-  if (Capacitor.getPlatform() !== 'ios') return;
 
   const desiredSig = computeSignature(snap);
-
   if (desiredSig === signature) return;
+  signature = desiredSig;
 
-  // Tear down whatever is currently showing.
+  const platform = Capacitor.getPlatform();
+
+  if (platform === 'android') {
+    try {
+      if (!desiredSig) {
+        await FrogTimer.stop();
+      } else {
+        // A re-notify with the same id updates in place — no flicker, so no
+        // need for the iOS end-then-start dance.
+        await FrogTimer.start({
+          phase: snap.phase,
+          isRunning: snap.isRunning,
+          endTime: snap.endTime ?? 0,
+          timeLeft: snap.timeLeft,
+          taskName: snap.taskName,
+        });
+      }
+    } catch (err) {
+      console.error('FrogTimer failed:', err);
+      signature = null;
+    }
+    return;
+  }
+
+  if (platform !== 'ios') return;
+
+  // iOS: the timer element is baked into the layout, so recreate on change.
   if (activityId) {
     try {
       await LiveActivities.endActivity({ activityId, data: {} });
@@ -202,7 +247,6 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
     activityId = null;
   }
 
-  signature = desiredSig;
   if (!desiredSig) return;
 
   try {
