@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import { NotificationProvider } from '@/components/providers/NotificationProvider';
 import { PushNotificationInit } from '@/components/providers/PushNotificationInit';
 import { GlobalTimer } from '@/components/providers/GlobalTimer';
+import { LiveTimerController } from '@/components/providers/LiveTimerController';
 import { GlobalCalendarSync } from '@/components/ui/GoogleCalendarSync';
 import { GlobalSkinRotation } from '@/components/ui/SkinRotation';
 import { ReferralClaimer } from '@/components/providers/ReferralClaimer';
@@ -21,6 +22,7 @@ export default function Providers({ children }: { children: ReactNode }) {
       >
         <NotificationProvider>
           <GlobalTimer />
+          <LiveTimerController />
           <GlobalCalendarSync />
           <GlobalSkinRotation />
           <PushNotificationInit />

@@ -3,21 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { useFrogodoroStore, PomodoroPhase, FrogodoroSettings } from '@/lib/frogodoroStore';
 import { playTimerSoundLooped, unlockAudio } from '@/lib/timerSounds';
+import {
+  scheduleTimerNotifications,
+  cancelTimerNotifications,
+} from '@/lib/timerNotifications';
 import { format } from 'date-fns';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
-
-async function sendTimerNotification(phase: PomodoroPhase, autoStartBreak: boolean) {
-  try {
-    await fetch('/api/notifications/timer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ phase, autoStartBreak }),
-    });
-  } catch {
-    // Silent fail — notification is non-critical
-  }
-}
 
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings): number {
   return phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
@@ -307,11 +298,9 @@ export function GlobalTimer() {
           }
         }
 
-        // Push notification
-        sendTimerNotification(
-          phaseRef.current,
-          phaseRef.current === 'focus' && settingsRef.current.autoStartBreaks,
-        );
+        // Completion delivery is handled by the local notification scheduled at
+        // phase start (see the effect below) — it fires even if the app is
+        // closed, so we don't send a push here (which also caused duplicates).
 
         completePhase(settingsRef.current.autoStartBreaks);
       }
@@ -319,6 +308,22 @@ export function GlobalTimer() {
 
     return () => clearInterval(interval);
   }, [isRunning, endTime, completePhase, tickTimer]);
+
+  // Schedule the OS-level completion notification whenever a phase is running,
+  // so it lands on time regardless of whether the app is open. Only the device
+  // that owns the timer schedules, to avoid cross-device duplicates.
+  useEffect(() => {
+    if (isRunning && endTime && ownsTimerRef.current) {
+      void scheduleTimerNotifications({
+        phase,
+        endTime,
+        autoStartBreak: phase === 'focus' && settings.autoStartBreaks,
+        breakDurationSec: settings.breakDuration * 60,
+      });
+    } else {
+      void cancelTimerNotifications();
+    }
+  }, [isRunning, endTime, phase, settings.autoStartBreaks, settings.breakDuration]);
 
   // Reset tab title when timer stops
   useEffect(() => {

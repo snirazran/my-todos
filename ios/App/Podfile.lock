@@ -15,6 +15,8 @@ PODS:
   - CapacitorFirebaseMessaging (8.3.0):
     - Capacitor
     - FirebaseMessaging (~> 12.7.0)
+  - CapacitorLiveActivities (8.0.0):
+    - Capacitor
   - CapacitorLocalNotifications (8.0.2):
     - Capacitor
   - CapacitorNativeSettings (8.1.0):
@@ -78,6 +80,7 @@ PODS:
     - AppAuth/Core (~> 2.0)
     - GTMSessionFetcher/Core (< 4.0, >= 3.3)
   - GTMSessionFetcher/Core (3.5.0)
+  - LiveActivitiesKit (7.0.0)
   - nanopb (3.30910.0):
     - nanopb/decode (= 3.30910.0)
     - nanopb/encode (= 3.30910.0)
@@ -89,9 +92,11 @@ DEPENDENCIES:
   - "Capacitor (from `../../node_modules/.pnpm/@capacitor+ios@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/ios`)"
   - "CapacitorCordova (from `../../node_modules/.pnpm/@capacitor+ios@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/ios`)"
   - "CapacitorFirebaseMessaging (from `../../node_modules/.pnpm/@capacitor-firebase+messaging@8.3.0_@capacitor+core@8.0.2_firebase@12.9.0/node_modules/@capacitor-firebase/messaging`)"
+  - "CapacitorLiveActivities (from `../../node_modules/.pnpm/capacitor-live-activities@8.0.0_@capacitor+core@8.0.2/node_modules/capacitor-live-activities`)"
   - "CapacitorLocalNotifications (from `../../node_modules/.pnpm/@capacitor+local-notifications@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/local-notifications`)"
   - "CapacitorNativeSettings (from `../../node_modules/.pnpm/capacitor-native-settings@8.1.0_@capacitor+core@8.0.2/node_modules/capacitor-native-settings`)"
   - "CapgoCapacitorSocialLogin (from `../../node_modules/.pnpm/@capgo+capacitor-social-login@8.3.20_@capacitor+core@8.0.2/node_modules/@capgo/capacitor-social-login`)"
+  - LiveActivitiesKit (from `../../node_modules/capacitor-live-activities`)
 
 SPEC REPOS:
   trunk:
@@ -116,12 +121,16 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/.pnpm/@capacitor+ios@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/ios"
   CapacitorFirebaseMessaging:
     :path: "../../node_modules/.pnpm/@capacitor-firebase+messaging@8.3.0_@capacitor+core@8.0.2_firebase@12.9.0/node_modules/@capacitor-firebase/messaging"
+  CapacitorLiveActivities:
+    :path: "../../node_modules/.pnpm/capacitor-live-activities@8.0.0_@capacitor+core@8.0.2/node_modules/capacitor-live-activities"
   CapacitorLocalNotifications:
     :path: "../../node_modules/.pnpm/@capacitor+local-notifications@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/local-notifications"
   CapacitorNativeSettings:
     :path: "../../node_modules/.pnpm/capacitor-native-settings@8.1.0_@capacitor+core@8.0.2/node_modules/capacitor-native-settings"
   CapgoCapacitorSocialLogin:
     :path: "../../node_modules/.pnpm/@capgo+capacitor-social-login@8.3.20_@capacitor+core@8.0.2/node_modules/@capgo/capacitor-social-login"
+  LiveActivitiesKit:
+    :path: "../../node_modules/capacitor-live-activities"
 
 SPEC CHECKSUMS:
   AppAuth: 1c1a8afa7e12f2ec3a294d9882dfa5ab7d3cb063
@@ -129,6 +138,7 @@ SPEC CHECKSUMS:
   Capacitor: 2b79172ad27f3be2d103cce88b8eb9803fdcc744
   CapacitorCordova: 921bdb690ebe82421b24fce45552fd3dea2ae43a
   CapacitorFirebaseMessaging: d48c9156ee96e166416f1d910cb8de53143cea5f
+  CapacitorLiveActivities: 55cc80423a5630f6ab61ed53f5fed8e370c7325c
   CapacitorLocalNotifications: 4db83a7f6bdd2f30dcedf5c6f92c415065467a24
   CapacitorNativeSettings: d512b84fdcc04948c32f267621079a0d7c0d452f
   CapgoCapacitorSocialLogin: bb85ca430d4bc6f5482a63a924242f5042d3b077
@@ -141,9 +151,10 @@ SPEC CHECKSUMS:
   GoogleUtilities: 00c88b9a86066ef77f0da2fab05f65d7768ed8e1
   GTMAppAuth: 217a876b249c3c585a54fd6f73e6b58c4f5c4238
   GTMSessionFetcher: 5aea5ba6bd522a239e236100971f10cb71b96ab6
+  LiveActivitiesKit: 75f8860e0b5a8c1466e39b562c787043fb18e97b
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
 
-PODFILE CHECKSUM: a68b6d0190846c6c0a168d4d260ca0beb492a809
+PODFILE CHECKSUM: 4549458e0d8922c06db2317a74566c25c230549c
 
 COCOAPODS: 1.16.2

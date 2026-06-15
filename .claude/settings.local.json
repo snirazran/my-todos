@@ -115,7 +115,10 @@
       "Bash(md5 -q public/192x192.png)",
       "Bash(md5 -q public/frogress-icon.png)",
       "Bash(md5 -q public/48x48.png)",
-      "Bash(awk '/export declare enum IOSSettings/,/}/' node_modules/capacitor-native-settings/dist/esm/definitions.d.ts)"
+      "Bash(awk '/export declare enum IOSSettings/,/}/' node_modules/capacitor-native-settings/dist/esm/definitions.d.ts)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
