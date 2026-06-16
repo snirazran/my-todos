@@ -9,6 +9,7 @@ import {
   MINUTES_60,
 } from './quick-add/constants';
 import { pad } from './quick-add/utils';
+import { useNotificationStatus } from '@/hooks/useNotificationStatus';
 
 interface Props {
   open: boolean;
@@ -39,6 +40,7 @@ export function TimePopup({
   const [startTime, setStartTime] = useState(initialStartTime || DEFAULT_TIME);
   // Opening Notify means you want a reminder, so the picker is always ready.
   const hasExisting = !!initialReminder;
+  const { canEnable: canEnableNotifs, enableOrConfigure } = useNotificationStatus();
 
   useEffect(() => setMounted(true), []);
 
@@ -57,6 +59,11 @@ export function TimePopup({
 
   const handleSave = async () => {
     await onSave({ startTime, endTime: '', reminder: 'at_time' });
+    // A reminder is useless if the OS won't let us deliver it — nudge the user
+    // to switch notifications on right after they save one.
+    if (canEnableNotifs) {
+      await enableOrConfigure();
+    }
   };
 
   const handleRemove = async () => {

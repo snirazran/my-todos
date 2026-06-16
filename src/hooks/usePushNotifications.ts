@@ -4,7 +4,6 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
-import { LocalNotifications } from '@capacitor/local-notifications';
 
 /**
  * Hook that handles push notification setup for native platforms (Android/iOS).
@@ -72,48 +71,6 @@ export function usePushNotifications(userId: string | null | undefined) {
         // Fetch the current token (registers with APNs/FCM under the hood).
         const { token } = await FirebaseMessaging.getToken();
         await registerToken(token);
-
-        // Handle messages received while the app is in the foreground.
-        await FirebaseMessaging.addListener(
-          'notificationReceived',
-          async (event) => {
-            const notification = event.notification;
-            console.log('Push notification received:', notification);
-            const type = (notification.data as Record<string, unknown> | undefined)
-              ?.type;
-            const shouldDisplayForegroundTimerNotification =
-              type === 'timer_complete' ||
-              type === 'break_started' ||
-              type === 'break_complete';
-
-            if (!shouldDisplayForegroundTimerNotification) return;
-
-            try {
-              const perms = await LocalNotifications.checkPermissions();
-              if (perms.display !== 'granted') {
-                const requested = await LocalNotifications.requestPermissions();
-                if (requested.display !== 'granted') return;
-              }
-
-              await LocalNotifications.schedule({
-                notifications: [
-                  {
-                    id: Date.now() % 2147483647,
-                    title: notification.title ?? 'Frogodoro timer',
-                    body: notification.body ?? 'Your timer status changed.',
-                    schedule: { at: new Date(Date.now() + 100) },
-                    sound: 'default',
-                    smallIcon: 'ic_notification',
-                    iconColor: '#4CAF50',
-                    extra: notification.data,
-                  },
-                ],
-              });
-            } catch (err) {
-              console.error('Failed to show foreground timer notification:', err);
-            }
-          },
-        );
 
         // Handle notification tap (app opened from notification)
         await FirebaseMessaging.addListener(

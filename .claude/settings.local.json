@@ -106,7 +106,19 @@
       "Bash(awk 'NR>=1030 && NR<=1120 && /const tz|body.timezone|getZonedToday|tz =/' /Users/snirazran/Fullstack/my-todos/src/app/api/tasks/route.ts)",
       "Bash(git rm *)",
       "Bash(ls android/app/google-services.json)",
-      "Bash(grep -rn \"google-services\\\\|com.google.gms\" android/build.gradle android/app/build.gradle)"
+      "Bash(grep -rn \"google-services\\\\|com.google.gms\" android/build.gradle android/app/build.gradle)",
+      "Bash(pnpm remove *)",
+      "Bash(plutil -extract BUNDLE_ID raw ios/App/App/GoogleService-Info.plist)",
+      "Bash(open ios/App/App.xcworkspace)",
+      "Bash(md5 -q ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png)",
+      "Bash(md5 -q public/512x512.png)",
+      "Bash(md5 -q public/192x192.png)",
+      "Bash(md5 -q public/frogress-icon.png)",
+      "Bash(md5 -q public/48x48.png)",
+      "Bash(awk '/export declare enum IOSSettings/,/}/' node_modules/capacitor-native-settings/dist/esm/definitions.d.ts)",
+      "WebFetch(domain:www.npmjs.com)",
+      "WebSearch",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }

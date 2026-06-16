@@ -80,7 +80,7 @@ export default function NotificationStep({ selections, onNext, onBack, saving, d
       >
         <div className="flex w-[calc(100%+4rem)] max-w-[calc(100vw-1.5rem)] items-center gap-3 rounded-3xl bg-muted/70 px-4 py-3 shadow-sm">
           <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-background shadow-sm">
-            <img src="/48x48.png" alt="" className="h-10 w-10 rounded-xl" />
+            <img src="/frogress-icon.png" alt="" className="h-10 w-10 rounded-xl" />
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">

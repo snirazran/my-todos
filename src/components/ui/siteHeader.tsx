@@ -418,6 +418,8 @@ import {
   User,
   Settings,
   Bell,
+  BellRing,
+  Mail,
   SlidersHorizontal,
   Database,
   Pause,
@@ -612,14 +614,14 @@ function MobileSheet({
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
   const [view, setView] = useState<
-    'main' | 'preferences' | 'community' | 'profile' | 'helpCenter' | 'contact'
+    'main' | 'preferences' | 'notifications' | 'community' | 'profile' | 'helpCenter' | 'contact'
   >('main');
   const [contactTopic, setContactTopic] = useState<'question' | 'bug'>('question');
   const [contactBack, setContactBack] = useState<'main' | 'helpCenter'>('main');
   const [toast, setToast] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
-  const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, requestEnable, loading: notifLoading } = useNotificationStatus();
+  const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, enableOrConfigure, loading: notifLoading } = useNotificationStatus();
   const { data: userInfo, mutate: refreshUserInfo } = useSWR<UserInfo>(
     showAuth && user ? '/api/user' : null,
     userInfoFetcher,
@@ -649,9 +651,9 @@ function MobileSheet({
   };
 
   const handleEnableNotifs = async () => {
-    const next = await requestEnable();
+    const next = await enableOrConfigure();
     if (next === 'granted') setToast('Notifications enabled');
-    else if (next === 'denied') setToast('Notifications were blocked. Enable them from system settings.');
+    else if (next === 'denied') setToast('Opening settings — turn notifications on there.');
     else setToast('Permission still pending');
     window.setTimeout(() => setToast(null), 2500);
   };
@@ -702,6 +704,9 @@ function MobileSheet({
               {view === 'preferences' && (
                 <h2 className="text-base font-black tracking-tight">Preferences</h2>
               )}
+              {view === 'notifications' && (
+                <h2 className="text-base font-black tracking-tight">Notifications</h2>
+              )}
               {view === 'community' && (
                 <h2 className="text-base font-black tracking-tight">Join our frog community</h2>
               )}
@@ -746,6 +751,7 @@ function MobileSheet({
                   isNative={isNative}
                   notifLoading={notifLoading}
                   onEnableNotifs={handleEnableNotifs}
+                  onOpenNotifications={() => setView('notifications')}
                   onOpenPreferences={() => setView('preferences')}
                   onOpenQuestFocus={() => {
                     onOpenQuestOnboarding();
@@ -784,6 +790,13 @@ function MobileSheet({
                   onOpenQuestOnboarding();
                   onClose();
                 }}
+              />
+            ) : view === 'notifications' ? (
+              <NotificationsView
+                notifsEnabled={notifsEnabled}
+                notifLoading={notifLoading}
+                onEnableNotifs={handleEnableNotifs}
+                onManageEmail={() => flashSoon('Email notifications')}
               />
             ) : view === 'community' ? (
               <CommunityPanel />
@@ -867,6 +880,7 @@ function MainView({
   isNative,
   notifLoading,
   onEnableNotifs,
+  onOpenNotifications,
   onOpenPreferences,
   onOpenQuestFocus,
   onInviteFriends,
@@ -893,6 +907,7 @@ function MainView({
   isNative: boolean;
   notifLoading: boolean;
   onEnableNotifs: () => void;
+  onOpenNotifications: () => void;
   onOpenPreferences: () => void;
   onOpenQuestFocus: () => void;
   onInviteFriends: () => void;
@@ -1007,7 +1022,7 @@ function MainView({
                 {notifsEnabled ? 'On' : 'Off'}
               </span>
             }
-            onClick={onEnableNotifs}
+            onClick={onOpenNotifications}
           />
         )}
         <MenuRow
@@ -1168,6 +1183,68 @@ function PreferencesView({
 
       <MenuSection title="Integrations">
         <GoogleCalendarSync />
+      </MenuSection>
+    </div>
+  );
+}
+
+function NotificationsView({
+  notifsEnabled,
+  notifLoading,
+  onEnableNotifs,
+  onManageEmail,
+}: {
+  notifsEnabled: boolean;
+  notifLoading: boolean;
+  onEnableNotifs: () => void;
+  onManageEmail: () => void;
+}) {
+  return (
+    <div className="space-y-5">
+      {/* Status card */}
+      <div className="rounded-2xl bg-card border border-border/50 px-5 py-4 shadow-sm flex items-center gap-3">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500/10">
+          <BellRing className="w-6 h-6 text-amber-500" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black tracking-tight">Push notifications</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            {notifsEnabled
+              ? 'You’re all set to get reminders.'
+              : 'Turn these on to get reminders from your frog.'}
+          </p>
+        </div>
+        <span
+          className={cn(
+            'text-[11px] font-black uppercase tracking-wider rounded-full px-2.5 py-1',
+            notifsEnabled
+              ? 'bg-emerald-500/12 text-emerald-600'
+              : 'bg-muted text-muted-foreground',
+          )}
+        >
+          {notifsEnabled ? 'On' : 'Off'}
+        </span>
+      </div>
+
+      <button
+        type="button"
+        onClick={onEnableNotifs}
+        disabled={notifLoading}
+        className="w-full h-12 rounded-2xl bg-primary text-sm font-black tracking-wide text-primary-foreground shadow-lg shadow-primary/25 transition-all active:scale-[0.98] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+      >
+        {notifLoading
+          ? 'Enabling…'
+          : notifsEnabled
+            ? 'Manage in system settings'
+            : 'Enable notifications'}
+      </button>
+
+      <MenuSection title="More">
+        <MenuRow
+          icon={<Mail className="w-7 h-7 text-sky-500" />}
+          label="Manage email notifications"
+          onClick={onManageEmail}
+        />
       </MenuSection>
     </div>
   );
