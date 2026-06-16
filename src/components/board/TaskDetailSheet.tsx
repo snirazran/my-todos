@@ -30,6 +30,7 @@ import {
   formatEndDateLabel,
 } from '@/components/ui/quick-add/utils';
 import { parseYmd, todayYmd } from '@/components/board/helpers';
+import { randomUUID } from '@/lib/uuid';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -87,10 +88,7 @@ interface TaskDetailSheetProps {
   monthlyAnchorYmd?: string;
 }
 
-const newId = () =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : `c_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+const newId = () => randomUUID();
 
 export default function TaskDetailSheet({
   open,

@@ -8,6 +8,7 @@ import React, {
   useState,
 } from 'react';
 import { usePathname } from 'next/navigation';
+import { randomUUID } from '@/lib/uuid';
 import { motion } from 'framer-motion';
 import {
   CalendarCheck,
@@ -737,10 +738,7 @@ export default function TaskBoard({
         const toDate = windowDates[toDay];
 
         if (isRepeatInstance && fromDate && toDate && onMoveRepeatInstance) {
-          const newId =
-            typeof crypto !== 'undefined' && 'randomUUID' in crypto
-              ? crypto.randomUUID()
-              : `${moved.id}-${Date.now()}`;
+          const newId = randomUUID();
           const instance: Task = {
             ...moved,
             id: newId,

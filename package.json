@@ -13,7 +13,9 @@
     "open:android": "npx cap open android",
     "ios": "npx cap run ios",
     "open:ios": "npx cap open ios",
-    "sync": "npx cap sync"
+    "sync": "npx cap sync",
+    "sync:dev": "CAP_DEV=true npx cap sync",
+    "sync:prod": "CAP_DEV=false npx cap sync"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.91.1",

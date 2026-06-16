@@ -9,7 +9,7 @@ patchedDependencies:
     hash: knspupdgwovpabfas3vo5hobna
     path: patches/@rive-app__react-canvas-lite@4.28.1.patch
   capacitor-live-activities@8.0.0:
-    hash: qozjnpnb4nzys7r2hnwtt5mvvq
+    hash: 33jeyeutzfyucnz3gtkwh2ylsq
     path: patches/capacitor-live-activities@8.0.0.patch
 
 importers:
@@ -99,7 +99,7 @@ importers:
         version: 1.9.4
       capacitor-live-activities:
         specifier: ^8.0.0
-        version: 8.0.0(patch_hash=qozjnpnb4nzys7r2hnwtt5mvvq)(@capacitor/core@8.0.2)
+        version: 8.0.0(patch_hash=33jeyeutzfyucnz3gtkwh2ylsq)(@capacitor/core@8.0.2)
       capacitor-native-settings:
         specifier: '8'
         version: 8.1.0(@capacitor/core@8.0.2)
@@ -7653,7 +7653,7 @@ snapshots:
 
   canvas-confetti@1.9.4: {}
 
-  capacitor-live-activities@8.0.0(patch_hash=qozjnpnb4nzys7r2hnwtt5mvvq)(@capacitor/core@8.0.2):
+  capacitor-live-activities@8.0.0(patch_hash=33jeyeutzfyucnz3gtkwh2ylsq)(@capacitor/core@8.0.2):
     dependencies:
       '@capacitor/core': 8.0.2
 

@@ -15,10 +15,10 @@ index 12b97c71f506862bf173cc09db6d3f966c20eb3a..c9fc1bcf0c38942816cec6f3d76e6cd1
              return AnyView(
                  buildSegmentedProgressView(element, data)
 diff --git a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift
-index 19404a3f6a90490c9508769d00f7283de715220e..a30c4357dcd42edde55689a4427d52757573fe78 100644
+index 19404a3f6a90490c9508769d00f7283de715220e..5e7b256b3b81e43d886b1acdf4c364f6abd1ad11 100644
 --- a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift
 +++ b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift
-@@ -46,15 +46,73 @@ extension JSONLayoutParser {
+@@ -46,15 +46,110 @@ extension JSONLayoutParser {
          Logger.viewCycle.error("📀 buildTimerView -> endDate: \(endDate) / style: \(style ?? "-")")
          
          if(style == "countdown"){
@@ -54,6 +54,10 @@ index 19404a3f6a90490c9508769d00f7283de715220e..a30c4357dcd42edde55689a4427d5275
 +        let size = getDouble(from: resolveValue(element.properties["size"], with: data)) ?? 22
 +        let lineWidth = CGFloat(getDouble(from: resolveValue(element.properties["lineWidth"], with: data)) ?? 3)
 +        let paused = resolveValue(element.properties["paused"], with: data) as? Bool ?? false
++        // The system circular ProgressView can't be sized reliably, so callers
++        // that need an exact size (the big expanded ring) opt out of the live
++        // animation and get the static, precisely-sized snapshot ring instead.
++        let animated = resolveValue(element.properties["animated"], with: data) as? Bool ?? true
 +
 +        let startTime = getDouble(from: resolveValue(element.properties["startTime"], with: data))
 +        let endTime = getDouble(from: resolveValue(element.properties["endTime"], with: data))
@@ -74,13 +78,46 @@ index 19404a3f6a90490c9508769d00f7283de715220e..a30c4357dcd42edde55689a4427d5275
 +        let tint = Color(hex: color)
 +        let cg = CGFloat(size)
 +
++        // While running, hand the countdown window to the system so it animates
++        // the ring continuously without us recreating the activity (the static
++        // `trim` ring below only updates on start/pause/resume). Circular
++        // ProgressView support for `timerInterval` is iOS-version dependent; if a
++        // given OS renders it static, the worst case is what we had before.
++        if animated, !paused, let start = startTime, let end = endTime, end > start {
++            let startDate = Date(timeIntervalSince1970: start / 1000)
++            let endDate = Date(timeIntervalSince1970: end / 1000)
++            // The system circular indicator is ~20pt and can't be grown by frame
++            // or controlSize, so scale it to the requested size. This only stays
++            // un-clipped when the caller centers it with margin (the big expanded
++            // ring) — hugging a region edge clips the scaled-up stroke.
++            return AnyView(
++                ProgressView(timerInterval: startDate...endDate, countsDown: true) {
++                    EmptyView()
++                } currentValueLabel: {
++                    EmptyView()
++                }
++                .progressViewStyle(.circular)
++                .tint(tint)
++                .scaleEffect(cg / 20.0)
++                .frame(width: cg, height: cg)
++            )
++        }
++
++        // SwiftUI centers a stroke on the circle's path, so half the line width
++        // bleeds past the frame and gets clipped by the tight Dynamic Island
++        // compact region (the ring looked flattened on one edge). Inset both
++        // circles by half the line width so the whole stroke stays in bounds.
++        let inset = lineWidth / 2
++
 +        let ring = ZStack {
 +            Circle()
 +                .stroke(tint.opacity(0.25), lineWidth: lineWidth)
++                .padding(inset)
 +            Circle()
 +                .trim(from: 0, to: remaining)
 +                .stroke(tint.opacity(paused ? 0.5 : 1), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
 +                .rotationEffect(.degrees(-90))
++                .padding(inset)
 +            if paused {
 +                Image(systemName: "pause.fill")
 +                    .resizable()
@@ -94,25 +131,63 @@ index 19404a3f6a90490c9508769d00f7283de715220e..a30c4357dcd42edde55689a4427d5275
 +        return AnyView(ring)
 +    }
  }
+diff --git a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+TextView.swift b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+TextView.swift
+index 6186d713b8e4e9cdd13e9ea7acf057a0be01545d..3e0aaa2e5d9ecbc579aac7b46fe896a79c32bb38 100644
+--- a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+TextView.swift
++++ b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+TextView.swift
+@@ -33,7 +33,19 @@ extension JSONLayoutParser {
+             let lineLimit = getInt(from: resolveValue(element.properties["lineLimit"], with: data)) ?? 0
+             let fontFamily = getString(from: resolveValue(element.properties["fontFamily"], with: data)) ?? ""
+             let monospacedDigit = resolveValue(element.properties["monospacedDigit"], with: data) as? Bool ?? false
+-            
++            let width = getDouble(from: resolveValue(element.properties["width"], with: data)) ?? 0
++            let maxWidth = getDouble(from: resolveValue(element.properties["maxWidth"], with: data)) ?? 0
++            let height = getDouble(from: resolveValue(element.properties["height"], with: data)) ?? 0
++            let minimumScaleFactor = getDouble(from: resolveValue(element.properties["minimumScaleFactor"], with: data)) ?? 0
++            let frameAlignment = getString(from: resolveValue(element.properties["frameAlignment"], with: data)) ?? ""
++            // Direction-aware so `.leading`/`.trailing` flip on RTL devices.
++            let frameAlignments: [String: Alignment] = [
++                "leading": .leading,
++                "center": .center,
++                "trailing": .trailing,
++            ]
++            let fAlign = frameAlignments[frameAlignment] ?? .center
++
+             let weights: [String: Font.Weight] = [
+                 "bold": .bold,
+                 "semibold": .semibold,
+@@ -86,7 +98,24 @@ extension JSONLayoutParser {
+                 .if(monospacedDigit == true){ view in
+                     view.monospacedDigit()
+                 }
+-            
++                // Lets an oversized headline (e.g. the big expanded timer) shrink
++                // to fit a narrow region instead of wrapping or clipping.
++                .if(minimumScaleFactor > 0){ view in
++                    view.minimumScaleFactor(CGFloat(minimumScaleFactor))
++                }
++                // A fixed `width` keeps a self-counting `Text(timerInterval:)` from
++                // reserving its worst-case (HH:MM:SS) width, which otherwise blows
++                // the Dynamic Island pill out to full width and clips the digits.
++                .if(width != 0){ view in
++                    view.frame(width: CGFloat(width), alignment: fAlign)
++                }
++                .if(maxWidth != 0){ view in
++                    view.frame(maxWidth: CGFloat(maxWidth), alignment: fAlign)
++                }
++                .if(height != 0){ view in
++                    view.frame(height: CGFloat(height))
++                }
++
+             Logger.viewCycle.error("📀 buildTextView -> fontSize: \(fontSize), fontWeight: \(fontWeight), color: \(color), fontFamily: \(fontFamily), alignment: \(alignment), lineLimit: \(lineLimit), monospacedDigit: \(monospacedDigit)")
+             
+             return textView
 diff --git a/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift b/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift
-index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..717154251cb79b5d18848b6c3be899257b5cec2e 100644
+index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..5cf8d18565768eb85e02116b14819804a8e367fa 100644
 --- a/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift
 +++ b/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift
-@@ -23,6 +23,9 @@ public struct DynamicActivityWidget: Widget {
-                 from: layout,
-                 with: context.state.data
-             )
-+            // Force LTR so the layout isn't mirrored on RTL devices (Hebrew),
-+            // which otherwise pushed content off the leading edge and cropped it.
-+            .environment(\.layoutDirection, .leftToRight)
-             .ifLet(behavior.backgroundTint) { view, color in
-                 view.activityBackgroundTint(Color(hex: color))
-             }.ifLet(behavior.systemActionForegroundColor) { view, color in
-@@ -129,48 +132,55 @@ class DynamicIslandLayoutParser {
-     static func createCompactLeading(from layout: DynamicIslandLayoutData, with data: [String: AnyCodable]) -> some View {
-         if let element = layout.compactLeading {
+@@ -131,42 +131,42 @@ class DynamicIslandLayoutParser {
              AnyView(JSONLayoutParser.parseView(from: element, with: data))
-+                .environment(\.layoutDirection, .leftToRight)
          }
      }
 -    
@@ -121,7 +196,6 @@ index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..717154251cb79b5d18848b6c3be89925
      static func createCompactTrailing(from layout: DynamicIslandLayoutData, with data: [String: AnyCodable]) -> some View {
          if let element = layout.compactTrailing {
              AnyView(JSONLayoutParser.parseView(from: element, with: data))
-+                .environment(\.layoutDirection, .leftToRight)
          }
      }
 -    
@@ -130,7 +204,6 @@ index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..717154251cb79b5d18848b6c3be89925
      static func createMinimal(from layout: DynamicIslandLayoutData, with data: [String: AnyCodable]) -> some View {
          if let element = layout.minimal {
              AnyView(JSONLayoutParser.parseView(from: element, with: data))
-+                .environment(\.layoutDirection, .leftToRight)
          }
      }
 -    
@@ -139,7 +212,6 @@ index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..717154251cb79b5d18848b6c3be89925
      static func createExpandedBottom(from layout: DynamicIslandLayoutData, with data: [String: AnyCodable]) -> some View {
          if let element = layout.expanded?.bottom {
              JSONLayoutParser.parseView(from: element, with: data)
-+                .environment(\.layoutDirection, .leftToRight)
          }
      }
 -    
@@ -148,7 +220,6 @@ index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..717154251cb79b5d18848b6c3be89925
      static func createExpandedLeading(from layout: DynamicIslandLayoutData, with data: [String: AnyCodable]) -> some View {
          if let element = layout.expanded?.leading {
              JSONLayoutParser.parseView(from: element, with: data)
-+                .environment(\.layoutDirection, .leftToRight)
          }
      }
 -    
@@ -157,7 +228,6 @@ index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..717154251cb79b5d18848b6c3be89925
      static func createExpandedCenter(from layout: DynamicIslandLayoutData, with data: [String: AnyCodable]) -> some View {
          if let element = layout.expanded?.center {
              JSONLayoutParser.parseView(from: element, with: data)
-+                .environment(\.layoutDirection, .leftToRight)
          }
      }
 -    
@@ -165,11 +235,6 @@ index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..717154251cb79b5d18848b6c3be89925
      @ViewBuilder
      static func createExpandedTrailing(from layout: DynamicIslandLayoutData, with data: [String: AnyCodable]) -> some View {
          if let element = layout.expanded?.trailing {
-             JSONLayoutParser.parseView(from: element, with: data)
-+                .environment(\.layoutDirection, .leftToRight)
-         }
-     }
- }
 diff --git a/ios/Plugin/LiveActivities.swift b/ios/Plugin/LiveActivities.swift
 index 8d2aad6c28dfc68454ef438eab2b903b7e10d419..0131063b29057e694d17ecd0c4df43bde2ef4d34 100644
 --- a/ios/Plugin/LiveActivities.swift

@@ -8,6 +8,7 @@ import {
   cancelTimerNotifications,
 } from '@/lib/timerNotifications';
 import { format } from 'date-fns';
+import { randomUUID } from '@/lib/uuid';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings): number {
@@ -19,7 +20,7 @@ function getClientId() {
   const existing = window.localStorage.getItem(key);
   if (existing) return existing;
 
-  const id = crypto.randomUUID();
+  const id = randomUUID();
   window.localStorage.setItem(key, id);
   return id;
 }

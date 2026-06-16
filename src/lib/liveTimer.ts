@@ -153,80 +153,185 @@ function buildLayout(snap: LiveTimerSnapshot): any {
  * paused it fades and shows a centered pause glyph. The live MM:SS number beside
  * it provides the continuous countdown.
  */
-function ringElement(snap: LiveTimerSnapshot, size: number, lineWidth: number): any {
+function ringElement(
+  snap: LiveTimerSnapshot,
+  size: number,
+  lineWidth: number,
+  animated = true,
+): any {
   const { color } = phaseMeta(snap.phase);
-  return {
-    type: 'circular-timer',
-    properties: [
-      { color },
-      { size },
-      { lineWidth },
-      { paused: !snap.isRunning },
-      // Fraction remaining, captured at reconcile time.
-      { value: Math.max(0, snap.timeLeft) },
-      { total: Math.max(1, snap.totalSeconds) },
-    ],
-  };
+  const properties: any[] = [
+    { color },
+    { size },
+    { lineWidth },
+    { paused: !snap.isRunning },
+    // Fraction remaining, captured at reconcile time (used for the paused/static
+    // snapshot ring).
+    { value: Math.max(0, snap.timeLeft) },
+    { total: Math.max(1, snap.totalSeconds) },
+  ];
+
+  // While running, also hand over the full start…end window so the native ring
+  // can self-animate via ProgressView(timerInterval:) — no per-second activity
+  // recreation needed. startTime is anchored off the phase's total duration.
+  if (snap.isRunning && snap.endTime) {
+    const startTime = snap.endTime - Math.max(1, snap.totalSeconds) * 1000;
+    properties.push({ startTime }, { endTime: snap.endTime });
+  }
+
+  // Opt out of the live animation when an exact size matters (the big expanded
+  // ring): the system circular ProgressView can't be sized precisely, so we use
+  // the static, exactly-sized snapshot ring there instead.
+  if (!animated) properties.push({ animated: false });
+
+  return { type: 'circular-timer', properties };
 }
 
 /** Dynamic Island layout — compact pill + expanded view. */
 function buildIsland(snap: LiveTimerSnapshot): any {
   const { label, color } = phaseMeta(snap.phase);
+  // A self-counting `timer` reserves its worst-case (HH:MM:SS) width, which
+  // bloats the compact pill to full width and clips the digits. Pin both states
+  // to the same fixed MM:SS width so running and paused render identically, and
+  // trailing-align so the time hugs the pill edge (`.trailing` flips on RTL)
+  // instead of floating in the middle of the reserved frame.
+  const COMPACT_TIME_WIDTH = 54;
+  // Note: unlike a plain text, a `Text(timerInterval:)` fills its fixed-width
+  // frame and renders its digits leading, ignoring the frame's alignment — so
+  // the running timer also needs `alignment: 'trailing'` (multilineTextAlignment)
+  // to push the digits to the edge, matching the paused text.
   const compactTime =
     snap.isRunning && snap.endTime
-      ? { type: 'timer', properties: [{ endTime: snap.endTime }, { style: 'countdown' }, { color }, { monospacedDigit: true }] }
-      : { type: 'text', properties: [{ text: fmt(snap.timeLeft) }, { color }, { monospacedDigit: true }] };
+      ? { type: 'timer', properties: [{ endTime: snap.endTime }, { style: 'countdown' }, { color }, { monospacedDigit: true }, { width: COMPACT_TIME_WIDTH }, { frameAlignment: 'trailing' }, { alignment: 'trailing' }] }
+      : { type: 'text', properties: [{ text: fmt(snap.timeLeft) }, { color }, { monospacedDigit: true }, { width: COMPACT_TIME_WIDTH }, { frameAlignment: 'trailing' }] };
+
+  // Big Apple-style countdown headline. It lives ALONE in the trailing region
+  // (the phase label is in `center`, under the camera), so nothing competes for
+  // width and it can render large — the trailing region spans to the screen edge
+  // and the headline grows leftward into the camera gap as it widens. lineLimit 1
+  // + minimumScaleFactor are a safety net for the paused (plain-text) state.
+  // A live `Text(timerInterval:)` does NOT honor `minimumScaleFactor` — it
+  // reserves fixed geometry and TRUNCATES ("114:...") instead of shrinking when
+  // the value is too wide for its region. (The paused state is plain `Text`, so
+  // it would scale, but the running timer won't.) So the only reliable way to
+  // avoid the crop is to choose the font from how wide the value will be.
+  //
+  // The timer only ever counts DOWN from when the activity is (re)created, so the
+  // widest value it will display is the current remaining time. We pick the font
+  // off that value's character count, calibrated against the real trailing-region
+  // width (verified on device): "M:SS"/"MM:SS" (<=5 chars, under 100 min) fit big
+  // at 66; "MMM:SS" (6 chars, 100–999 min) and beyond step down with margin to
+  // spare so they never sit at the clip boundary. Sub-100-minute timers are never
+  // shrunk.
+  const widestSeconds =
+    snap.isRunning && snap.endTime
+      ? Math.max(0, Math.round((snap.endTime - Date.now()) / 1000))
+      : snap.timeLeft;
+  const TIME_MAX_FONT = 66;
+  const timeLen = fmt(widestSeconds).length;
+  const EXPANDED_TIME_FONT = timeLen <= 5 ? TIME_MAX_FONT : timeLen === 6 ? 48 : 40;
+  const EXPANDED_TIME_WEIGHT = 'light';
+  // Pin the ring, label, and headline to a constant-height box so they stay
+  // VERTICALLY CENTERED on one line at every value (the regions are otherwise
+  // top-aligned, so a shorter font would float up). `.frame(height:)` centers
+  // content within the box (default alignment `.center`).
+  //
+  // The box is kept as SHORT as possible so the Dynamic Island isn't taller than
+  // it needs to be — the island sizes to this box. It only has to contain the
+  // 52pt ring (the tallest fully-visible element) plus a little margin; the 66pt
+  // digits' visible cap height is ~48pt, well within it, and the font's empty
+  // ascender/descender slack (which would otherwise force a ~79pt line) is
+  // clipped harmlessly since digits have no ascenders/descenders.
+  const TIME_BOX_HEIGHT = 52;
+  const bigTime =
+    snap.isRunning && snap.endTime
+      ? {
+          type: 'timer',
+          properties: [
+            { endTime: snap.endTime },
+            { style: 'countdown' },
+            { fontSize: EXPANDED_TIME_FONT },
+            { fontWeight: EXPANDED_TIME_WEIGHT },
+            { color },
+            { monospacedDigit: true },
+            { lineLimit: 1 },
+            { minimumScaleFactor: 0.6 },
+            { height: TIME_BOX_HEIGHT },
+          ],
+        }
+      : {
+          type: 'text',
+          properties: [
+            { text: fmt(snap.timeLeft) },
+            { fontSize: EXPANDED_TIME_FONT },
+            { fontWeight: EXPANDED_TIME_WEIGHT },
+            { color },
+            { monospacedDigit: true },
+            { lineLimit: 1 },
+            { minimumScaleFactor: 0.6 },
+            { height: TIME_BOX_HEIGHT },
+          ],
+        };
+
+  // Phase label ("Break"/"Focus"), phase-colored to match the digits. It sits in
+  // the CENTER region — the space UNDER the camera — so it doesn't compete for the
+  // narrow leading region's width (which truncated "Focus" -> "Foc...") and
+  // doesn't steal width from the big trailing digits.
+  //
+  // Crucially it carries NO height constraint. A fixed-height box here would force
+  // the under-camera band taller and grow the whole island; with only its natural
+  // text height it tucks into the space that already exists below the camera
+  // without pushing the minimum expanded height up. `minimumScaleFactor` is a
+  // safety net so it scales rather than truncates if ever pinched. The x-offset
+  // nudges it toward the digits, RTL-aware (digits are on the right in LTR, left
+  // in RTL — iOS mirrors the regions — so flip the sign by document direction).
+  const isRTL =
+    typeof document !== 'undefined' &&
+    (document.documentElement.dir === 'rtl' || document.dir === 'rtl');
+  const LABEL_NUDGE_X = 12; // toward the digits
+  const phaseLabel = {
+    type: 'text',
+    properties: [
+      { text: label },
+      { fontSize: 16 },
+      { fontWeight: 'semibold' },
+      { color },
+      { lineLimit: 1 },
+      { minimumScaleFactor: 0.7 },
+      { offset: { x: isRTL ? -LABEL_NUDGE_X : LABEL_NUDGE_X, y: 0 } },
+    ],
+  };
+
+  // Leading ring in a fixed-height box so it centers within its band. Only the
+  // expanded ring gets the box — the compact/lock-screen rings built by
+  // `ringElement` are untouched.
+  const baseRing = ringElement(snap, 52, 5.5, false);
+  const expandedRing = {
+    ...baseRing,
+    properties: [...baseRing.properties, { height: TIME_BOX_HEIGHT }],
+  };
 
   return {
-    // Expanded view echoes Apple's Timer: a big headline countdown with a
-    // small label/status subtitle beneath it on the leading side, and the
-    // phase glyph on the trailing side (where Apple shows its controls).
+    // Ring on the LEADING edge and the big countdown alone on the TRAILING edge —
+    // both in the band beside the camera, each in a fixed-height box so they stay
+    // vertically centered at every value. The phase label goes in CENTER (under
+    // the camera) with no height box, so it doesn't widen-crowd either region or
+    // grow the island. Keeping the time alone in trailing lets it render large
+    // without truncating (it owns the full trailing width and grows leftward into
+    // the camera gap as the digits widen). The ring is the static, exactly-sized
+    // snapshot (animated: false) — the live ring can't be sized reliably
+    // (scaleEffect overshot); the always-visible compact pill keeps the animation.
     expanded: {
-      leading: {
-        type: 'container',
-        properties: [{ direction: 'vertical' }, { spacing: 2 }, { insideAlignment: 'leading' }],
-        children: [
-          snap.isRunning && snap.endTime
-            ? {
-                type: 'timer',
-                properties: [
-                  { endTime: snap.endTime },
-                  { style: 'countdown' },
-                  { fontSize: 34 },
-                  { fontWeight: 'bold' },
-                  { color },
-                  { monospacedDigit: true },
-                  { alignment: 'leading' },
-                ],
-              }
-            : {
-                type: 'text',
-                properties: [
-                  { text: fmt(snap.timeLeft) },
-                  { fontSize: 34 },
-                  { fontWeight: 'bold' },
-                  { color },
-                  { monospacedDigit: true },
-                  { alignment: 'leading' },
-                ],
-              },
-          {
-            type: 'text',
-            properties: [
-              { text: snap.isRunning ? label : `${label} · Paused` },
-              { fontSize: 14 },
-              { fontWeight: 'semibold' },
-              { color: '#8e8e93' },
-            ],
-          },
-        ],
-      },
-      trailing: ringElement(snap, 34, 4),
+      leading: expandedRing,
+      center: phaseLabel,
+      trailing: bigTime,
     },
-    // Apple's compact pill puts the time on the leading side and the animated
-    // ring on the trailing side — mirror that.
-    compactLeading: compactTime,
-    compactTrailing: ringElement(snap, 20, 2.5),
+    // Apple's compact pill puts the progress ring on the leading side and the
+    // countdown on the trailing side. We use leading/trailing (not hard-coded
+    // left/right) so the OS mirrors it per device language: LTR shows ring-left
+    // / timer-right, RTL flips to ring-right / timer-left.
+    compactLeading: ringElement(snap, 20, 2.5),
+    compactTrailing: compactTime,
     minimal: ringElement(snap, 20, 2.5),
   };
 }

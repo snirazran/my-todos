@@ -52,6 +52,7 @@ import {
   HungerStatus,
 } from '@/hooks/useTaskData';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
 import WeeklyWrapped from '@/components/ui/WeeklyWrapped';
 import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
@@ -1096,7 +1097,7 @@ export default function Home() {
             } else {
               setGuestTasks((prev) => [
                 ...prev,
-                { id: crypto.randomUUID(), text, completed: false, tags },
+                { id: randomUUID(), text, completed: false, tags },
               ]);
             }
           } catch (e) {

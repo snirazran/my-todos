@@ -118,7 +118,16 @@
       "Bash(awk '/export declare enum IOSSettings/,/}/' node_modules/capacitor-native-settings/dist/esm/definitions.d.ts)",
       "WebFetch(domain:www.npmjs.com)",
       "WebSearch",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git check-ignore *)",
+      "Bash(npx patch-package *)",
+      "Bash(npx tsx *)",
+      "Bash(CAP_DEV=true npx tsx -e \"import c from './capacitor.config.ts'; console.log\\(c.server\\)\")",
+      "Bash(CAP_DEV=true CAP_DEV_HOST=localhost CAP_DEV_PORT=3000 npx tsx -e \"import c from './capacitor.config.ts'; console.log\\(c.server\\)\")",
+      "Bash(CAP_DEV=true CAP_SERVER_URL=https://frogress.com npx tsx -e \"import c from './capacitor.config.ts'; console.log\\(c.server\\)\")",
+      "Bash(cp .env.local /tmp/envbak)",
+      "Bash(cp /tmp/envbak .env.local)",
+      "Bash(perl -0pi -e 's/\\\\n                \\\\.environment\\\\\\(\\\\\\\\\\\\.layoutDirection, \\\\.leftToRight\\\\\\)//g' __TRACKED_VAR__/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift)"
     ]
   }
 }

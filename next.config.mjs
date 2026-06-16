@@ -1,7 +1,20 @@
 // next.config.mjs
+import { networkInterfaces } from 'node:os';
+
+// When the Capacitor app loads from this dev server over the LAN (CAP_DEV mode),
+// requests for HMR/_next resources arrive with the machine's LAN IP as origin.
+// Next 16 blocks those by default, which breaks hot reload and asset loading.
+// Allow every non-internal IPv4 we have, plus the common private ranges so this
+// keeps working when the IP changes. Dev-only — never applied to production.
+const lanOrigins = Object.values(networkInterfaces())
+  .flat()
+  .filter((addr) => addr && addr.family === 'IPv4' && !addr.internal)
+  .map((addr) => addr.address);
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,
+  allowedDevOrigins: [...lanOrigins, '192.168.*.*', '10.*.*.*', '172.16.*.*'],
   images: {
     // Serve modern formats automatically (next/image negotiates per-browser).
     formats: ['image/avif', 'image/webp'],
