@@ -9,7 +9,7 @@ patchedDependencies:
     hash: knspupdgwovpabfas3vo5hobna
     path: patches/@rive-app__react-canvas-lite@4.28.1.patch
   capacitor-live-activities@8.0.0:
-    hash: quomwosumzmtr47ce5rabbph4e
+    hash: kevslgdmmz7ld7c4rsj4rujm54
     path: patches/capacitor-live-activities@8.0.0.patch
 
 importers:
@@ -99,7 +99,7 @@ importers:
         version: 1.9.4
       capacitor-live-activities:
         specifier: ^8.0.0
-        version: 8.0.0(patch_hash=quomwosumzmtr47ce5rabbph4e)(@capacitor/core@8.0.2)
+        version: 8.0.0(patch_hash=kevslgdmmz7ld7c4rsj4rujm54)(@capacitor/core@8.0.2)
       capacitor-native-settings:
         specifier: '8'
         version: 8.1.0(@capacitor/core@8.0.2)
@@ -2409,6 +2409,7 @@ packages:
   '@xmldom/xmldom@0.8.11':
     resolution: {integrity: sha512-cQzWCtO6C8TQiYl1ruKNn2U6Ao4o4WBBcbL61yJl84x+j5sOWWFU9X7DpND8XZG3daDppSsigMdfAIl2upQBRw==}
     engines: {node: '>=10.0.0'}
+    deprecated: this version has critical issues, please update to the latest version
 
   abort-controller@3.0.0:
     resolution: {integrity: sha512-h8lQ8tacZYnR3vNQTgibj+tODHI5/+l06Au2Pcriv/Gmet0eaj4TwWH41sO9wnHDiQsEj19q0drzdWdeAHtweg==}
@@ -3295,6 +3296,7 @@ packages:
 
   glob@10.4.5:
     resolution: {integrity: sha512-7Bv8RF0k6xjo7d4A/PxYLbUCfb6c+Vpd2/mB2yRDlew7Jb5hEXiCD9ibfO7wpk8i4sevK6DFny9h7EYbM3/sHg==}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   glob@13.0.2:
@@ -4610,6 +4612,7 @@ packages:
   tar@7.5.7:
     resolution: {integrity: sha512-fov56fJiRuThVFXD6o6/Q354S7pnWMJIVlDBYijsTNx6jKSE4pvrDTs6lUnmGvNyfJwFQQwWy3owKz1ucIhveQ==}
     engines: {node: '>=18'}
+    deprecated: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
 
   teeny-request@9.0.0:
     resolution: {integrity: sha512-resvxdc6Mgb7YEThw6G6bExlXKkv6+YbuzGg9xuXxSgxJF7Ozs+o8Y9+2R3sArdWdW8nOokoQb1yrpFB0pQK2g==}
@@ -4789,10 +4792,12 @@ packages:
 
   uuid@8.3.2:
     resolution: {integrity: sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   uuid@9.0.1:
     resolution: {integrity: sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA==}
+    deprecated: uuid@10 and below is no longer supported.  For ESM codebases, update to uuid@latest.  For CommonJS codebases, use uuid@11 (but be aware this version will likely be deprecated in 2028).
     hasBin: true
 
   web-vitals@4.2.4:
@@ -7653,7 +7658,7 @@ snapshots:
 
   canvas-confetti@1.9.4: {}
 
-  capacitor-live-activities@8.0.0(patch_hash=quomwosumzmtr47ce5rabbph4e)(@capacitor/core@8.0.2):
+  capacitor-live-activities@8.0.0(patch_hash=kevslgdmmz7ld7c4rsj4rujm54)(@capacitor/core@8.0.2):
     dependencies:
       '@capacitor/core': 8.0.2
 
