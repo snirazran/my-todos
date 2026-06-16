@@ -1,0 +1,106 @@
+diff --git a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+BuildView.swift b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+BuildView.swift
+index 12b97c71f506862bf173cc09db6d3f966c20eb3a..c9fc1bcf0c38942816cec6f3d76e6cd14a3993a6 100644
+--- a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+BuildView.swift
++++ b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+BuildView.swift
+@@ -328,6 +328,11 @@ extension JSONLayoutParser {
+                 buildTimerView(element, data)
+                     .modifier(ViewModifierChain(element: element, data: data))
+             )
++        case "circular-timer":
++            return AnyView(
++                buildCircularTimerView(element, data)
++                    .modifier(ViewModifierChain(element: element, data: data))
++            )
+         case "segmented-progress":
+             return AnyView(
+                 buildSegmentedProgressView(element, data)
+diff --git a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift
+index 19404a3f6a90490c9508769d00f7283de715220e..5921ca569eaede0c90f5f8f775f7d8bbd7524f21 100644
+--- a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift
++++ b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift
+@@ -46,15 +46,83 @@ extension JSONLayoutParser {
+         Logger.viewCycle.error("📀 buildTimerView -> endDate: \(endDate) / style: \(style ?? "-")")
+         
+         if(style == "countdown"){
++            // `Text(timerInterval:)` is greedy: by default it grabs the maximum
++            // width offered by its container, which makes the Dynamic Island
++            // compact pill stretch much wider while running than the static
++            // paused text. `monospacedDigit()` keeps the width stable as digits
++            // change, and `fixedSize(horizontal:)` pins it to its intrinsic
++            // width so the running pill matches the paused one.
+             return AnyView(Text(
+                 timerInterval: Date.now...endDate,
+                 pauseTime: nil,
+                 countsDown: true,
+                 showsHours: false
+-            ).modifier(ViewModifierText(element: element, data: data)))
+-            
++            )
++            .monospacedDigit()
++            .fixedSize(horizontal: true, vertical: false)
++            .modifier(ViewModifierText(element: element, data: data)))
++
+         }
+         
+         return AnyView(Text(endDate, style: selectedStyle).modifier(ViewModifierText(element: element, data: data)))
+     }
++
++    /// An auto-animating circular countdown ring, like Apple's Timer Live
++    /// Activity. When `startTime`+`endTime` are supplied (and not paused),
++    /// `ProgressView(timerInterval:)` with the circular style drains the ring on
++    /// its own — the system animates it smoothly to completion with no per-second
++    /// JS updates. When paused (or only `value`/`total` given) it renders a
++    /// static ring at the current fraction.
++    static func buildCircularTimerView(_ element: LayoutElement, _ data: [String: AnyCodable]) -> AnyView {
++        let color = getString(from: resolveValue(element.properties["color"], with: data)) ?? "#007AFF"
++        let size = getDouble(from: resolveValue(element.properties["size"], with: data)) ?? 22
++        let lineWidth = getDouble(from: resolveValue(element.properties["lineWidth"], with: data))
++        let paused = resolveValue(element.properties["paused"], with: data) as? Bool ?? false
++
++        let startTime = getDouble(from: resolveValue(element.properties["startTime"], with: data))
++        let endTime = getDouble(from: resolveValue(element.properties["endTime"], with: data))
++
++        Logger.viewCycle.error("📀 buildCircularTimerView -> start: \(startTime ?? 0) end: \(endTime ?? 0) paused: \(paused)")
++
++        let tint = Color(hex: color)
++
++        // Live, self-animating ring for the running state.
++        if !paused, let start = startTime, let end = endTime, end > start {
++            let startDate = Date(timeIntervalSince1970: start / 1000)
++            let endDate = Date(timeIntervalSince1970: end / 1000)
++            return AnyView(
++                ProgressView(timerInterval: startDate...endDate, countsDown: true) {
++                    EmptyView()
++                } currentValueLabel: {
++                    EmptyView()
++                }
++                .progressViewStyle(.circular)
++                .tint(tint)
++                .labelsHidden()
++                .frame(width: CGFloat(size), height: CGFloat(size))
++            )
++        }
++
++        // Static ring (paused / fallback): fraction from value/total, or from
++        // how much of the start…end window is left at render time.
++        var fraction = getDouble(from: resolveValue(element.properties["value"], with: data))
++        let total = getDouble(from: resolveValue(element.properties["total"], with: data)) ?? 1
++        if fraction != nil { fraction = fraction! / total }
++        if fraction == nil, let start = startTime, let end = endTime, end > start {
++            let now = Date().timeIntervalSince1970 * 1000
++            fraction = max(0, min(1, (end - now) / (end - start)))
++        }
++
++        let ring = ZStack {
++            Circle()
++                .stroke(tint.opacity(0.25), lineWidth: CGFloat(lineWidth ?? 3))
++            Circle()
++                .trim(from: 0, to: CGFloat(fraction ?? 1))
++                .stroke(tint, style: StrokeStyle(lineWidth: CGFloat(lineWidth ?? 3), lineCap: .round))
++                .rotationEffect(.degrees(-90))
++        }
++        .frame(width: CGFloat(size), height: CGFloat(size))
++
++        return AnyView(ring)
++    }
+ }

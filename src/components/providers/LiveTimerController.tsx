@@ -15,6 +15,11 @@ export function LiveTimerController() {
   const timerActive = useFrogodoroStore((s) => s.timerActive);
   const endTime = useFrogodoroStore((s) => s.endTime);
   const timeLeft = useFrogodoroStore((s) => s.timeLeft);
+  // Total seconds for the current phase — anchors the animated progress ring so
+  // it reflects whole-session progress, not just the remaining slice.
+  const totalSeconds = useFrogodoroStore((s) =>
+    s.phase === 'focus' ? s.settings.focusDuration * 60 : s.settings.breakDuration * 60,
+  );
 
   useEffect(() => {
     void reconcileLiveTimer({
@@ -23,9 +28,10 @@ export function LiveTimerController() {
       phase,
       endTime,
       timeLeft,
+      totalSeconds,
       taskName: '',
     });
-  }, [phase, isRunning, timerActive, endTime, timeLeft]);
+  }, [phase, isRunning, timerActive, endTime, timeLeft, totalSeconds]);
 
   return null;
 }

@@ -84,7 +84,8 @@
   },
   "pnpm": {
     "patchedDependencies": {
-      "@rive-app/react-canvas-lite@4.28.1": "patches/@rive-app__react-canvas-lite@4.28.1.patch"
+      "@rive-app/react-canvas-lite@4.28.1": "patches/@rive-app__react-canvas-lite@4.28.1.patch",
+      "capacitor-live-activities@8.0.0": "patches/capacitor-live-activities@8.0.0.patch"
     }
   }
 }
