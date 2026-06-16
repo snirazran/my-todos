@@ -29,11 +29,9 @@ interface FrogTimerPlugin {
 }
 
 const FrogTimer = registerPlugin<FrogTimerPlugin>('FrogTimer');
-const IOS_LAYOUT_VERSION = 2;
 
 let activityId: string | null = null;
 let signature: string | null = null;
-let iosActivityLayoutVersion: number | null = null;
 let tokenListenerReady = false;
 
 async function putPushToken(id: string, token: string): Promise<void> {
@@ -270,7 +268,6 @@ async function endAllIosActivities(): Promise<void> {
     console.error('getAllActivities failed:', err);
   }
   activityId = null;
-  iosActivityLayoutVersion = null;
 }
 
 async function getCurrentIosActivityId(): Promise<string | null> {
@@ -328,16 +325,12 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
 
   try {
     const existingId = await getCurrentIosActivityId();
-    if (existingId && iosActivityLayoutVersion === IOS_LAYOUT_VERSION) {
+    if (existingId) {
       await LiveActivities.updateActivity({
         activityId: existingId,
         data: buildLiveActivityData(snap),
       } as any);
       return;
-    }
-
-    if (existingId) {
-      await endAllIosActivities();
     }
 
     const { activityId: id } = await LiveActivities.startActivity({
@@ -351,7 +344,6 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
       staleDate: snap.endTime ?? undefined,
     } as any);
     activityId = id;
-    iosActivityLayoutVersion = IOS_LAYOUT_VERSION;
   } catch (err) {
     console.error('startActivity failed:', err);
     signature = null;
