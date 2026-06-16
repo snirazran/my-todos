@@ -92,7 +92,7 @@ DEPENDENCIES:
   - "Capacitor (from `../../node_modules/.pnpm/@capacitor+ios@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/ios`)"
   - "CapacitorCordova (from `../../node_modules/.pnpm/@capacitor+ios@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/ios`)"
   - "CapacitorFirebaseMessaging (from `../../node_modules/.pnpm/@capacitor-firebase+messaging@8.3.0_@capacitor+core@8.0.2_firebase@12.9.0/node_modules/@capacitor-firebase/messaging`)"
-  - "CapacitorLiveActivities (from `../../node_modules/.pnpm/capacitor-live-activities@8.0.0_patch_hash=33jeyeutzfyucnz3gtkwh2ylsq_@capacitor+core@8.0.2/node_modules/capacitor-live-activities`)"
+  - "CapacitorLiveActivities (from `../../node_modules/.pnpm/capacitor-live-activities@8.0.0_patch_hash=quomwosumzmtr47ce5rabbph4e_@capacitor+core@8.0.2/node_modules/capacitor-live-activities`)"
   - "CapacitorLocalNotifications (from `../../node_modules/.pnpm/@capacitor+local-notifications@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/local-notifications`)"
   - "CapacitorNativeSettings (from `../../node_modules/.pnpm/capacitor-native-settings@8.1.0_@capacitor+core@8.0.2/node_modules/capacitor-native-settings`)"
   - "CapgoCapacitorSocialLogin (from `../../node_modules/.pnpm/@capgo+capacitor-social-login@8.3.20_@capacitor+core@8.0.2/node_modules/@capgo/capacitor-social-login`)"
@@ -122,7 +122,7 @@ EXTERNAL SOURCES:
   CapacitorFirebaseMessaging:
     :path: "../../node_modules/.pnpm/@capacitor-firebase+messaging@8.3.0_@capacitor+core@8.0.2_firebase@12.9.0/node_modules/@capacitor-firebase/messaging"
   CapacitorLiveActivities:
-    :path: "../../node_modules/.pnpm/capacitor-live-activities@8.0.0_patch_hash=33jeyeutzfyucnz3gtkwh2ylsq_@capacitor+core@8.0.2/node_modules/capacitor-live-activities"
+    :path: "../../node_modules/.pnpm/capacitor-live-activities@8.0.0_patch_hash=quomwosumzmtr47ce5rabbph4e_@capacitor+core@8.0.2/node_modules/capacitor-live-activities"
   CapacitorLocalNotifications:
     :path: "../../node_modules/.pnpm/@capacitor+local-notifications@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/local-notifications"
   CapacitorNativeSettings:
@@ -155,6 +155,6 @@ SPEC CHECKSUMS:
   nanopb: fad817b59e0457d11a5dfbde799381cd727c1275
   PromisesObjC: f5707f49cb48b9636751c5b2e7d227e43fba9f47
 
-PODFILE CHECKSUM: b3aab194a1d776b17379d8628a45d996bd158cf9
+PODFILE CHECKSUM: b7ce60d4056cbb16d553d4e70b0c622251f2e751
 
 COCOAPODS: 1.16.2

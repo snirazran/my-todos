@@ -127,7 +127,8 @@
       "Bash(CAP_DEV=true CAP_SERVER_URL=https://frogress.com npx tsx -e \"import c from './capacitor.config.ts'; console.log\\(c.server\\)\")",
       "Bash(cp .env.local /tmp/envbak)",
       "Bash(cp /tmp/envbak .env.local)",
-      "Bash(perl -0pi -e 's/\\\\n                \\\\.environment\\\\\\(\\\\\\\\\\\\.layoutDirection, \\\\.leftToRight\\\\\\)//g' __TRACKED_VAR__/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift)"
+      "Bash(perl -0pi -e 's/\\\\n                \\\\.environment\\\\\\(\\\\\\\\\\\\.layoutDirection, \\\\.leftToRight\\\\\\)//g' __TRACKED_VAR__/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift)",
+      "Bash(tee /tmp/pnpm_patch_out.txt)"
     ]
   }
 }

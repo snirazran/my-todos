@@ -22,10 +22,6 @@ index 19404a3f6a90490c9508769d00f7283de715220e..5e7b256b3b81e43d886b1acdf4c364f6
          Logger.viewCycle.error("📀 buildTimerView -> endDate: \(endDate) / style: \(style ?? "-")")
          
          if(style == "countdown"){
-+            // `monospacedDigit()` keeps the width stable as the digits change so
-+            // the pill doesn't jitter. (Do NOT add `.fixedSize()` here — on a
-+            // `Text(timerInterval:)` it collapses to zero width and renders
-+            // blank inside a Live Activity.)
              return AnyView(Text(
                  timerInterval: Date.now...endDate,
                  pauseTime: nil,
@@ -42,28 +38,16 @@ index 19404a3f6a90490c9508769d00f7283de715220e..5e7b256b3b81e43d886b1acdf4c364f6
          return AnyView(Text(endDate, style: selectedStyle).modifier(ViewModifierText(element: element, data: data)))
      }
 +
-+    /// A circular progress ring echoing Apple's Timer Live Activity. iOS does
-+    /// not expose an auto-animating *circular* countdown to third parties
-+    /// (`ProgressView(.circular)` ignores `timerInterval`), so this draws a
-+    /// fixed-size `Circle().trim` whose fraction is computed at render time from
-+    /// the start…end window. It refreshes whenever the activity is recreated
-+    /// (start / pause / resume / phase change). When paused the ring fades and
-+    /// shows a centered pause glyph, exactly like Apple's.
 +    static func buildCircularTimerView(_ element: LayoutElement, _ data: [String: AnyCodable]) -> AnyView {
 +        let color = getString(from: resolveValue(element.properties["color"], with: data)) ?? "#007AFF"
 +        let size = getDouble(from: resolveValue(element.properties["size"], with: data)) ?? 22
 +        let lineWidth = CGFloat(getDouble(from: resolveValue(element.properties["lineWidth"], with: data)) ?? 3)
 +        let paused = resolveValue(element.properties["paused"], with: data) as? Bool ?? false
-+        // The system circular ProgressView can't be sized reliably, so callers
-+        // that need an exact size (the big expanded ring) opt out of the live
-+        // animation and get the static, precisely-sized snapshot ring instead.
 +        let animated = resolveValue(element.properties["animated"], with: data) as? Bool ?? true
 +
 +        let startTime = getDouble(from: resolveValue(element.properties["startTime"], with: data))
 +        let endTime = getDouble(from: resolveValue(element.properties["endTime"], with: data))
 +
-+        // Fraction remaining: prefer explicit value/total, else derive from the
-+        // start…end window at render time.
 +        var fraction = getDouble(from: resolveValue(element.properties["value"], with: data))
 +        let total = getDouble(from: resolveValue(element.properties["total"], with: data)) ?? 1
 +        if let f = fraction { fraction = total > 0 ? f / total : f }
@@ -78,18 +62,9 @@ index 19404a3f6a90490c9508769d00f7283de715220e..5e7b256b3b81e43d886b1acdf4c364f6
 +        let tint = Color(hex: color)
 +        let cg = CGFloat(size)
 +
-+        // While running, hand the countdown window to the system so it animates
-+        // the ring continuously without us recreating the activity (the static
-+        // `trim` ring below only updates on start/pause/resume). Circular
-+        // ProgressView support for `timerInterval` is iOS-version dependent; if a
-+        // given OS renders it static, the worst case is what we had before.
 +        if animated, !paused, let start = startTime, let end = endTime, end > start {
 +            let startDate = Date(timeIntervalSince1970: start / 1000)
 +            let endDate = Date(timeIntervalSince1970: end / 1000)
-+            // The system circular indicator is ~20pt and can't be grown by frame
-+            // or controlSize, so scale it to the requested size. This only stays
-+            // un-clipped when the caller centers it with margin (the big expanded
-+            // ring) — hugging a region edge clips the scaled-up stroke.
 +            return AnyView(
 +                ProgressView(timerInterval: startDate...endDate, countsDown: true) {
 +                    EmptyView()
@@ -103,10 +78,6 @@ index 19404a3f6a90490c9508769d00f7283de715220e..5e7b256b3b81e43d886b1acdf4c364f6
 +            )
 +        }
 +
-+        // SwiftUI centers a stroke on the circle's path, so half the line width
-+        // bleeds past the frame and gets clipped by the tight Dynamic Island
-+        // compact region (the ring looked flattened on one edge). Inset both
-+        // circles by half the line width so the whole stroke stays in bounds.
 +        let inset = lineWidth / 2
 +
 +        let ring = ZStack {
@@ -145,7 +116,6 @@ index 6186d713b8e4e9cdd13e9ea7acf057a0be01545d..3e0aaa2e5d9ecbc579aac7b46fe896a7
 +            let height = getDouble(from: resolveValue(element.properties["height"], with: data)) ?? 0
 +            let minimumScaleFactor = getDouble(from: resolveValue(element.properties["minimumScaleFactor"], with: data)) ?? 0
 +            let frameAlignment = getString(from: resolveValue(element.properties["frameAlignment"], with: data)) ?? ""
-+            // Direction-aware so `.leading`/`.trailing` flip on RTL devices.
 +            let frameAlignments: [String: Alignment] = [
 +                "leading": .leading,
 +                "center": .center,
@@ -161,14 +131,9 @@ index 6186d713b8e4e9cdd13e9ea7acf057a0be01545d..3e0aaa2e5d9ecbc579aac7b46fe896a7
                      view.monospacedDigit()
                  }
 -            
-+                // Lets an oversized headline (e.g. the big expanded timer) shrink
-+                // to fit a narrow region instead of wrapping or clipping.
 +                .if(minimumScaleFactor > 0){ view in
 +                    view.minimumScaleFactor(CGFloat(minimumScaleFactor))
 +                }
-+                // A fixed `width` keeps a self-counting `Text(timerInterval:)` from
-+                // reserving its worst-case (HH:MM:SS) width, which otherwise blows
-+                // the Dynamic Island pill out to full width and clips the digits.
 +                .if(width != 0){ view in
 +                    view.frame(width: CGFloat(width), alignment: fAlign)
 +                }
@@ -236,19 +201,41 @@ index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..5cf8d18565768eb85e02116b14819804
      static func createExpandedTrailing(from layout: DynamicIslandLayoutData, with data: [String: AnyCodable]) -> some View {
          if let element = layout.expanded?.trailing {
 diff --git a/ios/Plugin/LiveActivities.swift b/ios/Plugin/LiveActivities.swift
-index 8d2aad6c28dfc68454ef438eab2b903b7e10d419..0131063b29057e694d17ecd0c4df43bde2ef4d34 100644
+index 8d2aad6c28dfc68454ef438eab2b903b7e10d419..d8216a0462d5f5eeb13392c4c6a60ae4e1a0ae3f 100644
 --- a/ios/Plugin/LiveActivities.swift
 +++ b/ios/Plugin/LiveActivities.swift
-@@ -135,38 +135,44 @@ import ActivityKit
+@@ -62,11 +62,22 @@ import ActivityKit
+             let activity = try Activity.request(
+                 attributes: attributes,
+                 content: activityContent,
+-                pushType: nil
++                pushType: .token
+             )
+-            
++
+             activities[activityId] = activity
+-            
++
++            Task {
++                for await tokenData in activity.pushTokenUpdates {
++                    let hex = tokenData.map { String(format: "%02x", $0) }.joined()
++                    NotificationCenter.default.post(
++                        name: Notification.Name("LiveActivityPushTokenReceived"),
++                        object: nil,
++                        userInfo: ["activityId": activityId, "token": hex]
++                    )
++                }
++            }
++
+             Logger.viewCycle.error("✅ Started activity with custom ID: \(activityId)")
+             Logger.viewCycle.error("🔍 System ID: \(activity.id)")
+             Logger.viewCycle.error("📊 Total activities tracked: \(self.activities.count)")
+@@ -135,38 +146,44 @@ import ActivityKit
          finalData: [String: Any]?,
          behavior: [String: Any]?
      ) async throws {
 -        guard let activity = activities[activityId] else {
 -            // Tentar recuperar
-+        // Resolve the activity, recovering from the system if it isn't in our
-+        // in-memory map (e.g. after the WebView reloaded). Previously this
-+        // recovered the activity but then `return`ed without ending it, which
-+        // is what left orphaned cards stacking up on the lock screen.
 +        var activity = activities[activityId]
 +        if activity == nil {
              await syncExistingActivities()
@@ -284,9 +271,6 @@ index 8d2aad6c28dfc68454ef438eab2b903b7e10d419..0131063b29057e694d17ecd0c4df43bd
          }
 -        
 +
-+        // `.immediate` removes the card right away. With `.default` an ended
-+        // activity lingers on the lock screen for up to four hours, so each
-+        // pause/resume looked like it was adding a brand-new widget.
          await activity.end(
              finalContent,
 -            dismissalPolicy: .default
@@ -297,3 +281,31 @@ index 8d2aad6c28dfc68454ef438eab2b903b7e10d419..0131063b29057e694d17ecd0c4df43bd
          activities.removeValue(forKey: activityId)
          Logger.viewCycle.error("✅ Ended activity: \(activityId)")
      }
+diff --git a/ios/Plugin/LiveActivitiesPlugin.swift b/ios/Plugin/LiveActivitiesPlugin.swift
+index 4d11a889959f173c75a702610b1db721dd399e35..1a39f23c51bc77d76b46b5ae0744dcefdadb77fe 100644
+--- a/ios/Plugin/LiveActivitiesPlugin.swift
++++ b/ios/Plugin/LiveActivitiesPlugin.swift
+@@ -22,7 +22,22 @@ public class LiveActivitiesPlugin: CAPPlugin, CAPBridgedPlugin {
+         CAPPluginMethod(name: "listImages", returnType: CAPPluginReturnPromise),
+         CAPPluginMethod(name: "cleanupImages", returnType: CAPPluginReturnPromise)
+     ]
+-    
++
++    override public func load() {
++        NotificationCenter.default.addObserver(
++            forName: Notification.Name("LiveActivityPushTokenReceived"),
++            object: nil,
++            queue: .main
++        ) { [weak self] note in
++            guard
++                let info = note.userInfo,
++                let activityId = info["activityId"] as? String,
++                let token = info["token"] as? String
++            else { return }
++            self?.notifyListeners("pushToken", data: ["activityId": activityId, "token": token])
++        }
++    }
++
+     // MARK: - Compression Analysis
+     
+     struct CompressionDecision {

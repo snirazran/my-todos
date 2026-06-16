@@ -83,6 +83,7 @@ export default function FrogodoroSheet({
 
   const [localSettings, setLocalSettings] = useState(settings);
   const { canEnable: canEnableNotifs, enableOrConfigure } = useNotificationStatus();
+  const showTimerTestSettings = process.env.NODE_ENV !== 'production';
 
   useEffect(() => {
     setMounted(true);
@@ -300,6 +301,20 @@ export default function FrogodoroSheet({
     await persistTaskSettings(localSettings);
   };
 
+  const formatDurationSetting = (minutes: number) => {
+    if (minutes < 1) return `${Math.round(minutes * 60)}s`;
+    return `${minutes}m`;
+  };
+
+  const applyTenSecondTestSettings = () => {
+    setLocalSettings({
+      ...localSettings,
+      focusDuration: 10 / 60,
+      breakDuration: 10 / 60,
+      autoStartBreaks: true,
+    });
+  };
+
   const getDurationControl = () => {
     if (phase === 'focus') {
       return { key: 'focusDuration' as const, min: 1, max: 120, step: 5 };
@@ -414,12 +429,12 @@ export default function FrogodoroSheet({
                           <div className="flex items-center gap-3 px-4 py-2.5 bg-primary/5 border-b border-border/30">
                             <div className="w-2.5 h-2.5 rounded-full bg-primary shrink-0" />
                             <p className="flex-1 text-sm font-semibold text-foreground">Focus</p>
-                            <span className="text-xs font-black text-primary tabular-nums">{settings.focusDuration}m</span>
+                            <span className="text-xs font-black text-primary tabular-nums">{formatDurationSetting(settings.focusDuration)}</span>
                           </div>
                           <div className="flex items-center gap-3 px-4 py-2.5 bg-sky-500/5">
                             <div className="w-2.5 h-2.5 rounded-full bg-sky-400 shrink-0" />
                             <p className="flex-1 text-sm font-semibold text-foreground">Break</p>
-                            <span className="text-xs font-black text-sky-500 tabular-nums">{settings.breakDuration}m</span>
+                            <span className="text-xs font-black text-sky-500 tabular-nums">{formatDurationSetting(settings.breakDuration)}</span>
                           </div>
                         </div>
                       </div>
@@ -457,6 +472,15 @@ export default function FrogodoroSheet({
                         <div className="space-y-2">
                           <p className="px-1 text-[11px] font-black uppercase tracking-widest text-primary/60">Durations</p>
                           <div className="overflow-hidden rounded-2xl border border-primary/10 bg-primary/5 p-2.5 space-y-2">
+                            {showTimerTestSettings && (
+                              <button
+                                type="button"
+                                onClick={applyTenSecondTestSettings}
+                                className="flex w-full items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-black text-amber-700 transition-all active:scale-[0.98] dark:text-amber-300"
+                              >
+                                Set focus and break to 10s
+                              </button>
+                            )}
                             {/* Focus */}
                             <div className="flex items-center gap-3 rounded-xl bg-background px-3 py-3 shadow-sm">
                               <div className="w-3 h-3 rounded-full bg-primary shrink-0" />
@@ -471,7 +495,7 @@ export default function FrogodoroSheet({
                                 >
                                   −
                                 </button>
-                                <span className="w-12 text-sm font-black text-center text-primary tabular-nums">{localSettings.focusDuration}m</span>
+                                <span className="w-12 text-sm font-black text-center text-primary tabular-nums">{formatDurationSetting(localSettings.focusDuration)}</span>
                                 <button
                                   type="button"
                                   onClick={() => setLocalSettings({ ...localSettings, focusDuration: Math.min(120, localSettings.focusDuration + 5) })}
@@ -495,7 +519,7 @@ export default function FrogodoroSheet({
                                 >
                                   −
                                 </button>
-                                <span className="w-12 text-sm font-black text-center text-sky-500 tabular-nums">{localSettings.breakDuration}m</span>
+                                <span className="w-12 text-sm font-black text-center text-sky-500 tabular-nums">{formatDurationSetting(localSettings.breakDuration)}</span>
                                 <button
                                   type="button"
                                   onClick={() => setLocalSettings({ ...localSettings, breakDuration: Math.min(60, localSettings.breakDuration + 1) })}

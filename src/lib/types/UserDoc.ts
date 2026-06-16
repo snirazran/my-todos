@@ -85,8 +85,15 @@ export type UserDoc = {
   calendarAccessToken?: string;
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   activeFrogodoroTimer?: ActiveFrogodoroTimer | null;
+  liveActivity?: LiveActivityRef | null;
   lastRecapWeek?: string;
   onboardingCompleted?: boolean;
+};
+
+export type LiveActivityRef = {
+  id: string;
+  pushToken: string;
+  updatedAt: string;
 };
 
 export type ActiveFrogodoroTimer = {

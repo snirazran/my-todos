@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel from '@/lib/models/User';
+import {
+  cancelFrogodoroTimerProcessing,
+  scheduleFrogodoroTimerProcessing,
+} from '@/lib/frogodoroDelayedTimer';
 import type { PomodoroPhase } from '@/lib/frogodoroStore';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 
@@ -92,6 +96,15 @@ export async function PUT(req: NextRequest) {
       { $set: { activeFrogodoroTimer: timer } },
     );
 
+    if (timer.status === 'running' && timer.endsAt) {
+      scheduleFrogodoroTimerProcessing({
+        userId,
+        endsAt: timer.endsAt,
+      });
+    } else {
+      cancelFrogodoroTimerProcessing(userId);
+    }
+
     return NextResponse.json({ timer });
   } catch {
     return unauth();
@@ -106,6 +119,7 @@ export async function DELETE() {
       { _id: userId },
       { $set: { activeFrogodoroTimer: null } },
     );
+    cancelFrogodoroTimerProcessing(userId);
 
     return NextResponse.json({ timer: null });
   } catch {

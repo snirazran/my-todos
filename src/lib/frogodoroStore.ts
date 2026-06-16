@@ -66,7 +66,8 @@ interface FrogodoroState {
 }
 
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings) {
-  return phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
+  const minutes = phase === 'focus' ? settings.focusDuration : settings.breakDuration;
+  return Math.max(1, Math.round(minutes * 60));
 }
 
 export const useFrogodoroStore = create<FrogodoroState>()(

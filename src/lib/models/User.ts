@@ -92,6 +92,10 @@ const UserSchema = new Schema<UserDoc>(
       type: Schema.Types.Mixed,
       default: null,
     },
+    liveActivity: {
+      type: Schema.Types.Mixed,
+      default: null,
+    },
     lastRecapWeek: { type: String, default: '' },
     onboardingCompleted: { type: Boolean, default: false },
   },
