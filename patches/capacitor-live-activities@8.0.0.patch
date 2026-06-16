@@ -1,5 +1,5 @@
 diff --git a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+BuildView.swift b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+BuildView.swift
-index 12b97c71f506862bf173cc09db6d3f966c20eb3a..c9fc1bcf0c38942816cec6f3d76e6cd14a3993a6 100644
+index 12b97c7..c9fc1bc 100644
 --- a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+BuildView.swift
 +++ b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+BuildView.swift
 @@ -328,6 +328,11 @@ extension JSONLayoutParser {
@@ -15,15 +15,10 @@ index 12b97c71f506862bf173cc09db6d3f966c20eb3a..c9fc1bcf0c38942816cec6f3d76e6cd1
              return AnyView(
                  buildSegmentedProgressView(element, data)
 diff --git a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift
-index 19404a3f6a90490c9508769d00f7283de715220e..5e7b256b3b81e43d886b1acdf4c364f6abd1ad11 100644
+index 19404a3..7d5859b 100644
 --- a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift
 +++ b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+ProgressTimer.swift
-@@ -46,15 +46,110 @@ extension JSONLayoutParser {
-         Logger.viewCycle.error("📀 buildTimerView -> endDate: \(endDate) / style: \(style ?? "-")")
-         
-         if(style == "countdown"){
-             return AnyView(Text(
-                 timerInterval: Date.now...endDate,
+@@ -51,10 +51,76 @@ extension JSONLayoutParser {
                  pauseTime: nil,
                  countsDown: true,
                  showsHours: false
@@ -103,10 +98,10 @@ index 19404a3f6a90490c9508769d00f7283de715220e..5e7b256b3b81e43d886b1acdf4c364f6
 +    }
  }
 diff --git a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+TextView.swift b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+TextView.swift
-index 6186d713b8e4e9cdd13e9ea7acf057a0be01545d..3e0aaa2e5d9ecbc579aac7b46fe896a79c32bb38 100644
+index 6186d71..ca55356 100644
 --- a/ios/LiveActivitiesKit/Parser/JSONLayoutParser+TextView.swift
 +++ b/ios/LiveActivitiesKit/Parser/JSONLayoutParser+TextView.swift
-@@ -33,7 +33,19 @@ extension JSONLayoutParser {
+@@ -33,7 +33,18 @@ extension JSONLayoutParser {
              let lineLimit = getInt(from: resolveValue(element.properties["lineLimit"], with: data)) ?? 0
              let fontFamily = getString(from: resolveValue(element.properties["fontFamily"], with: data)) ?? ""
              let monospacedDigit = resolveValue(element.properties["monospacedDigit"], with: data) as? Bool ?? false
@@ -126,7 +121,7 @@ index 6186d713b8e4e9cdd13e9ea7acf057a0be01545d..3e0aaa2e5d9ecbc579aac7b46fe896a7
              let weights: [String: Font.Weight] = [
                  "bold": .bold,
                  "semibold": .semibold,
-@@ -86,7 +98,24 @@ extension JSONLayoutParser {
+@@ -86,7 +97,19 @@ extension JSONLayoutParser {
                  .if(monospacedDigit == true){ view in
                      view.monospacedDigit()
                  }
@@ -148,7 +143,7 @@ index 6186d713b8e4e9cdd13e9ea7acf057a0be01545d..3e0aaa2e5d9ecbc579aac7b46fe896a7
              
              return textView
 diff --git a/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift b/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift
-index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..5cf8d18565768eb85e02116b14819804a8e367fa 100644
+index 50491ee..5cf8d18 100644
 --- a/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift
 +++ b/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift
 @@ -131,42 +131,42 @@ class DynamicIslandLayoutParser {
@@ -201,7 +196,7 @@ index 50491eede1d3c2ad0fc31a02e9645366604cbeaa..5cf8d18565768eb85e02116b14819804
      static func createExpandedTrailing(from layout: DynamicIslandLayoutData, with data: [String: AnyCodable]) -> some View {
          if let element = layout.expanded?.trailing {
 diff --git a/ios/Plugin/LiveActivities.swift b/ios/Plugin/LiveActivities.swift
-index 8d2aad6c28dfc68454ef438eab2b903b7e10d419..d8216a0462d5f5eeb13392c4c6a60ae4e1a0ae3f 100644
+index 8d2aad6..2900fe0 100644
 --- a/ios/Plugin/LiveActivities.swift
 +++ b/ios/Plugin/LiveActivities.swift
 @@ -62,11 +62,22 @@ import ActivityKit
@@ -230,7 +225,7 @@ index 8d2aad6c28dfc68454ef438eab2b903b7e10d419..d8216a0462d5f5eeb13392c4c6a60ae4
              Logger.viewCycle.error("✅ Started activity with custom ID: \(activityId)")
              Logger.viewCycle.error("🔍 System ID: \(activity.id)")
              Logger.viewCycle.error("📊 Total activities tracked: \(self.activities.count)")
-@@ -135,38 +146,44 @@ import ActivityKit
+@@ -135,38 +146,37 @@ import ActivityKit
          finalData: [String: Any]?,
          behavior: [String: Any]?
      ) async throws {
@@ -282,7 +277,7 @@ index 8d2aad6c28dfc68454ef438eab2b903b7e10d419..d8216a0462d5f5eeb13392c4c6a60ae4
          Logger.viewCycle.error("✅ Ended activity: \(activityId)")
      }
 diff --git a/ios/Plugin/LiveActivitiesPlugin.swift b/ios/Plugin/LiveActivitiesPlugin.swift
-index 4d11a889959f173c75a702610b1db721dd399e35..1a39f23c51bc77d76b46b5ae0744dcefdadb77fe 100644
+index 4d11a88..1a39f23 100644
 --- a/ios/Plugin/LiveActivitiesPlugin.swift
 +++ b/ios/Plugin/LiveActivitiesPlugin.swift
 @@ -22,7 +22,22 @@ public class LiveActivitiesPlugin: CAPPlugin, CAPBridgedPlugin {
