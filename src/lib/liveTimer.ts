@@ -75,7 +75,7 @@ function phaseMeta(phase: 'focus' | 'break') {
  * beneath it, and a big phase glyph on the trailing side for balance.
  */
 function buildLayout(snap: LiveTimerSnapshot): any {
-  const { label, color, symbol } = phaseMeta(snap.phase);
+  const { label, color } = phaseMeta(snap.phase);
 
   // Headline countdown — large, bold, monospaced so it reads like Apple's.
   const bigTime =
@@ -140,24 +140,21 @@ function buildLayout(snap: LiveTimerSnapshot): any {
         children: [bigTime, subtitle],
       },
       { type: 'spacer', properties: [] },
-      {
-        type: 'image',
-        properties: [{ systemName: symbol }, { color }, { width: 38 }, { height: 38 }],
-      },
+      ringElement(snap, 44, 5),
     ],
   };
 }
 
 /**
- * Animated circular countdown ring (our custom `circular-timer` element). When
- * running it self-drains to completion like Apple's Timer; when paused it shows
- * a static ring at the current fraction. `startTime` anchors the full phase
- * window so the ring reflects total progress, not just the remaining slice.
+ * Circular progress ring (our custom `circular-timer` element) echoing Apple's
+ * Timer. iOS doesn't let third parties auto-animate a circular countdown, so the
+ * ring is a snapshot of how much time remains (`value`/`total`), recomputed each
+ * time the activity is recreated (start / pause / resume / phase change). When
+ * paused it fades and shows a centered pause glyph. The live MM:SS number beside
+ * it provides the continuous countdown.
  */
 function ringElement(snap: LiveTimerSnapshot, size: number, lineWidth: number): any {
   const { color } = phaseMeta(snap.phase);
-  const startTime =
-    snap.endTime != null ? snap.endTime - snap.totalSeconds * 1000 : null;
   return {
     type: 'circular-timer',
     properties: [
@@ -165,9 +162,7 @@ function ringElement(snap: LiveTimerSnapshot, size: number, lineWidth: number): 
       { size },
       { lineWidth },
       { paused: !snap.isRunning },
-      ...(startTime != null ? [{ startTime }] : []),
-      ...(snap.endTime != null ? [{ endTime: snap.endTime }] : []),
-      // Fallback fraction for the paused/idle state when no window exists.
+      // Fraction remaining, captured at reconcile time.
       { value: Math.max(0, snap.timeLeft) },
       { total: Math.max(1, snap.totalSeconds) },
     ],
