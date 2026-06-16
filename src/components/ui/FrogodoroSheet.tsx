@@ -143,7 +143,7 @@ export default function FrogodoroSheet({
 
   // Derived
   const phaseDuration =
-    phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
+    Math.max(1, Math.round((phase === 'focus' ? settings.focusDuration : settings.breakDuration) * 60));
   const liveElapsed = phaseDuration - timeLeft;
 
   const hasStats =
@@ -237,11 +237,11 @@ export default function FrogodoroSheet({
 
   const handleStopTimer = async () => {
     const taskId = selectedTaskId;
-    const elapsed = liveElapsed;
+    const unsavedElapsed = Math.max(0, liveElapsed - storeElapsed);
     const currentPhase = phase;
 
-    if (isRunning && taskId && elapsed > 0) {
-      await saveSessionToDb(taskId, currentPhase, elapsed);
+    if (taskId && unsavedElapsed > 0) {
+      await saveSessionToDb(taskId, currentPhase, unsavedElapsed);
       onMutateToday?.();
     }
     stopTimer();

@@ -14,7 +14,7 @@ def capacitor_pods
   pod 'CapacitorFirebaseMessaging', :path => '../../node_modules/.pnpm/@capacitor-firebase+messaging@8.3.0_@capacitor+core@8.0.2_firebase@12.9.0/node_modules/@capacitor-firebase/messaging'
   pod 'CapacitorLocalNotifications', :path => '../../node_modules/.pnpm/@capacitor+local-notifications@8.0.2_@capacitor+core@8.0.2/node_modules/@capacitor/local-notifications'
   pod 'CapgoCapacitorSocialLogin', :path => '../../node_modules/.pnpm/@capgo+capacitor-social-login@8.3.20_@capacitor+core@8.0.2/node_modules/@capgo/capacitor-social-login'
-  pod 'CapacitorLiveActivities', :path => '../../node_modules/.pnpm/capacitor-live-activities@8.0.0_patch_hash=kevslgdmmz7ld7c4rsj4rujm54_@capacitor+core@8.0.2/node_modules/capacitor-live-activities'
+  pod 'CapacitorLiveActivities', :path => '../../node_modules/.pnpm/capacitor-live-activities@8.0.0_patch_hash=2k5dzarcuu653ce4cc6mygid7m_@capacitor+core@8.0.2/node_modules/capacitor-live-activities'
   pod 'CapacitorNativeSettings', :path => '../../node_modules/.pnpm/capacitor-native-settings@8.1.0_@capacitor+core@8.0.2/node_modules/capacitor-native-settings'
 end
 
