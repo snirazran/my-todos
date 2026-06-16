@@ -990,6 +990,8 @@ function QuestSeasonBanner({
         ) : (
           <div className="absolute inset-0 h-full w-full bg-[linear-gradient(135deg,#f59e0b_0%,#10b981_55%,#0f766e_100%)]" />
         )}
+        {/* Same recessed inset feel as the home background photo. */}
+        <div className="pointer-events-none absolute inset-0 shadow-[rgba(0,0,0,0.06)_0px_2px_4px_0px_inset,rgba(0,0,0,0.15)_0px_-2px_5px_0px_inset]" />
         <div className="absolute inset-x-0 top-24 flex justify-center p-4 md:top-12 lg:top-16 xl:top-20">
           <div className="flex flex-col items-center gap-3 md:gap-2">
             <span

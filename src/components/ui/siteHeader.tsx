@@ -194,7 +194,8 @@ export default function SiteHeader() {
         )}
       <header
         className={cn(
-          'relative z-[90] hidden w-full h-16 border-b border-border/40 bg-background/95 backdrop-blur-xl md:block',
+          'relative z-[90] hidden w-full h-16 bg-background/95 backdrop-blur-xl md:block',
+          pathname !== '/planner' && 'shadow-lg shadow-black/5 dark:shadow-black/20',
           isLoadingScreenVisible && 'pointer-events-none',
         )}
         aria-disabled={isLoadingScreenVisible}

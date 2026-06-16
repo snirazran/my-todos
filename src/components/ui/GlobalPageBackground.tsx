@@ -40,6 +40,11 @@ export function GlobalPageBackground() {
         alt=""
         className="h-full w-full object-cover object-top"
       />
+      {/* Inset "recessed" feel on the whole image. Same tight-inset style top
+          and bottom; the bottom uses a higher opacity only to compensate for
+          the dark, busy water — so it reads the SAME amount of inset as the top
+          inset that lands on the flat light sky. */}
+      <div className="absolute inset-0 shadow-[rgba(0,0,0,0.06)_0px_2px_4px_0px_inset,rgba(0,0,0,0.15)_0px_-2px_5px_0px_inset]" />
     </picture>
   );
 }
