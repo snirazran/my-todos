@@ -302,13 +302,23 @@ function buildIsland(snap: LiveTimerSnapshot): any {
     ],
   };
 
-  // Leading ring in a fixed-height box so it centers within its band. Only the
-  // expanded ring gets the box — the compact/lock-screen rings built by
-  // `ringElement` are untouched.
-  const baseRing = ringElement(snap, 52, 5.5, false);
+  // Leading ring — ANIMATED (self-counting system `ProgressView(.circular)`) so it
+  // ticks live like the compact pill instead of freezing mid-run.
+  //
+  // The native side enlarges this ring with `scaleEffect(size / 20)`, assuming the
+  // system circular ProgressView is ~20pt. On iOS 26 its natural size is bigger,
+  // so passing the real 52 overshoots into a giant clipped ring. We instead pass a
+  // SMALLER `size` to dial the scale down so the *visual* ring lands near 52pt.
+  // `EXPANDED_RING_SIZE` is the tuning knob: lower = smaller on screen. The frame
+  // shrinks with it too, but the height box (52) re-centers the scaled ring and
+  // the horizontal padding keeps the stroke off the island edge so it isn't
+  // clipped. (Trade-off: the system ring is the thin style — no faded track /
+  // rounded cap — so it won't perfectly match the paused trim ring's look.)
+  const EXPANDED_RING_SIZE = 34;
+  const baseRing = ringElement(snap, EXPANDED_RING_SIZE, 5, true);
   const expandedRing = {
     ...baseRing,
-    properties: [...baseRing.properties, { height: TIME_BOX_HEIGHT }],
+    properties: [...baseRing.properties, { height: TIME_BOX_HEIGHT }, { paddingHorizontal: 12 }],
   };
 
   return {
