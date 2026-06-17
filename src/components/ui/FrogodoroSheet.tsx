@@ -12,6 +12,8 @@ import {
   Plus,
   Minus,
   Square,
+  Check,
+  Lock,
 } from 'lucide-react';
 import { motion, AnimatePresence, useDragControls } from 'framer-motion';
 import {
@@ -21,9 +23,17 @@ import {
 } from '@/lib/frogodoroStore';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
-import { playTimerSound, unlockAudio, type TimerSound } from '@/lib/timerSounds';
+import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
+import {
+  playTimerSound,
+  stopTimerSound,
+  unlockAudio,
+  normalizeTimerSound,
+  TIMER_SOUNDS,
+  type TimerSound,
+} from '@/lib/timerSounds';
 import { useNotificationStatus } from '@/hooks/useNotificationStatus';
-import { Bell } from 'lucide-react';
+import { Bell, Volume2 } from 'lucide-react';
 
 interface Task {
   id: string;
@@ -70,7 +80,6 @@ export default function FrogodoroSheet({
     timerActive,
     sessionStats,
     phaseElapsed: storeElapsed,
-    startedByPhase,
     setSettings,
     setTask,
     startTimer,
@@ -79,11 +88,19 @@ export default function FrogodoroSheet({
     switchPhase,
     completePhase,
     updateSessionStats,
+    awaitingDone,
+    setAwaitingDone,
+    setSelectedTaskName,
+    lastCompletedPhase,
+    lastFocusElapsed,
+    lastBreakElapsed,
   } = useFrogodoroStore();
+  const addOpenSheet = useFrogodoroUiStore((s) => s.addOpenSheet);
+  const removeOpenSheet = useFrogodoroUiStore((s) => s.removeOpenSheet);
 
   const [localSettings, setLocalSettings] = useState(settings);
+  const [previewingId, setPreviewingId] = useState<TimerSound | null>(null);
   const { canEnable: canEnableNotifs, enableOrConfigure } = useNotificationStatus();
-  const showTimerTestSettings = true;
 
   useEffect(() => {
     setMounted(true);
@@ -133,18 +150,76 @@ export default function FrogodoroSheet({
     }
   }, [open, task]);
 
-  // Reset sub-views when sheet closes
+  // Keep the store's task name in sync so the global completion popup can show
+  // it (it has no access to task data on its own).
   useEffect(() => {
-    if (!open) {
+    if (open && task?.text) setSelectedTaskName(task.text);
+  }, [open, task, setSelectedTaskName]);
+
+  // While this sheet is open, suppress the global completion popup — this sheet
+  // shows its own Done.
+  useEffect(() => {
+    if (!open) return;
+    addOpenSheet();
+    return () => removeOpenSheet();
+  }, [open, addOpenSheet, removeOpenSheet]);
+
+  // Reset sub-views on a real open→closed transition (a user dismissal). This
+  // must NOT fire merely because a completion sets awaitingDone while the popup
+  // is still minimized — otherwise it would silence the alarm and drop the Done
+  // state before the popup auto-opens.
+  const prevOpenRef = useRef(open);
+  useEffect(() => {
+    const wasOpen = prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (wasOpen && !open) {
       setShowSettings(false);
       setShowHelp(false);
+      stopTimerSound();
+      setPreviewingId(null);
+      // Dismissing the popup also acknowledges a finished session: silence the
+      // alarm (GlobalTimer stops playback when this flips false) and end the
+      // session so the next phase is left fresh rather than active.
+      if (awaitingDone) {
+        setAwaitingDone(false);
+        stopTimer();
+      }
     }
-  }, [open]);
+  }, [open, awaitingDone, setAwaitingDone, stopTimer]);
+
+  // Stop any sound preview when leaving the settings view
+  useEffect(() => {
+    if (!showSettings) {
+      stopTimerSound();
+      setPreviewingId(null);
+    }
+  }, [showSettings]);
+
+  // Toggle a sound preview: select it and play it, or stop it if it's the
+  // one already previewing.
+  const handleSoundSelect = (id: TimerSound) => {
+    setLocalSettings((prev) => ({ ...prev, timerSound: id }));
+    if (previewingId === id) {
+      stopTimerSound();
+      setPreviewingId(null);
+      return;
+    }
+    if (id === 'none') {
+      stopTimerSound();
+      setPreviewingId(null);
+      return;
+    }
+    setPreviewingId(id);
+    playTimerSound(id, () => setPreviewingId(null));
+  };
 
   // Derived
   const phaseDuration =
     Math.max(1, Math.round((phase === 'focus' ? settings.focusDuration : settings.breakDuration) * 60));
   const liveElapsed = phaseDuration - timeLeft;
+  // Elapsed fill — grows bottom→top across the timer card as the phase passes,
+  // mirroring the left→right progress fill in the Frogodoro notification pill.
+  const progressPercent = Math.min(100, Math.max(0, (liveElapsed / phaseDuration) * 100));
 
   const hasStats =
     sessionStats.focusTime > 0 ||
@@ -235,6 +310,17 @@ export default function FrogodoroSheet({
     }
   };
 
+  // Acknowledge a finished session: silence the alarm and end the session. A
+  // session ends when its timer ends, so the next phase is left fresh and
+  // inactive (not a continuation) — the user starts it anew when ready. Doesn't
+  // save progress; the completed phase was already saved when it finished.
+  const handleDone = () => {
+    setAwaitingDone(false);
+    stopTimer();
+  };
+
+  // Stop ends the current session and stays on the popup (now idle), so you can
+  // pick a mode and start a new session if you like.
   const handleStopTimer = async () => {
     const taskId = selectedTaskId;
     const unsavedElapsed = Math.max(0, liveElapsed - storeElapsed);
@@ -245,19 +331,22 @@ export default function FrogodoroSheet({
       onMutateToday?.();
     }
     stopTimer();
-    onOpenChange(false);
   };
 
+  // Fast-forward: end the current phase now and switch to the other tab. No
+  // Done/alarm — it's a deliberate skip. The next phase only auto-starts if the
+  // matching auto-start setting is on (focus → break uses auto-start breaks).
   const handleManualSkip = async () => {
     const unsavedElapsed = Math.max(0, liveElapsed - storeElapsed);
     if (selectedTaskId && unsavedElapsed > 0) {
       await saveSessionToDb(selectedTaskId, phase, unsavedElapsed);
       onMutateToday?.();
     }
-    completePhase(false, liveElapsed);
+    const autoStart = phase === 'focus' ? settings.autoStartBreaks : false;
+    completePhase(autoStart, liveElapsed, false);
   };
 
-  const handleTabSwitch = (newPhase: PomodoroPhase) => {
+  const handleTabSwitch = async (newPhase: PomodoroPhase) => {
     if (newPhase === phase || isRunning) return;
     // Only fold in the time not already counted for this phase. The phase's
     // countdown is preserved across tab switches, so adding the full
@@ -271,6 +360,10 @@ export default function FrogodoroSheet({
         updated.breakTime = sessionStats.breakTime + unsavedElapsed;
       }
       updateSessionStats(updated);
+      // Persist the leaving phase's not-yet-saved time so switching tabs (e.g.
+      // after pausing partway) keeps the progress instead of dropping it.
+      await saveSessionToDb(selectedTaskId, phase, unsavedElapsed);
+      onMutateToday?.();
     }
     switchPhase(newPhase);
   };
@@ -306,20 +399,26 @@ export default function FrogodoroSheet({
     return `${minutes}m`;
   };
 
-  const applyTenSecondTestSettings = () => {
-    setLocalSettings({
-      ...localSettings,
-      focusDuration: 10 / 60,
-      breakDuration: 10 / 60,
-      autoStartBreaks: true,
-    });
+  // Duration ladder (minutes): 10s → 1m → 5m → 10m … → 120m. 10 seconds is the
+  // lowest rung (handy for quick tests, but available for normal use too).
+  const TEN_SECONDS = 10 / 60;
+  const DURATION_MAX = 120;
+  const decreaseDuration = (v: number) => {
+    if (v <= 1) return TEN_SECONDS; // 1m (or below) → 10s
+    if (v === 5) return 1; // 5m → 1m
+    return Math.max(1, v - 5);
+  };
+  const increaseDuration = (v: number) => {
+    if (v < 1) return 1; // 10s → 1m
+    if (v === 1) return 5; // 1m → 5m
+    return Math.min(DURATION_MAX, v + 5);
   };
 
   const getDurationControl = () => {
     if (phase === 'focus') {
-      return { key: 'focusDuration' as const, min: 1, max: 120, step: 5 };
+      return { key: 'focusDuration' as const, min: TEN_SECONDS, max: DURATION_MAX };
     }
-    return { key: 'breakDuration' as const, min: 1, max: 60, step: 1 };
+    return { key: 'breakDuration' as const, min: TEN_SECONDS, max: DURATION_MAX };
   };
 
   const adjustCurrentDuration = (direction: -1 | 1) => {
@@ -327,13 +426,8 @@ export default function FrogodoroSheet({
 
     const control = getDurationControl();
     const currentValue = settings[control.key];
-    const rawNextValue = currentValue + control.step * direction;
     const nextValue =
-      phase === 'focus' && direction === -1 && currentValue === 5
-        ? 1
-        : phase === 'focus' && direction === 1 && currentValue === 1
-          ? 5
-          : Math.min(control.max, Math.max(control.min, rawNextValue));
+      direction === -1 ? decreaseDuration(currentValue) : increaseDuration(currentValue);
 
     if (nextValue === currentValue) return;
 
@@ -343,13 +437,32 @@ export default function FrogodoroSheet({
     void persistTaskSettings(nextSettings);
   };
 
+  // While awaiting Done the phase has already advanced to the next one, but the
+  // popup should still wear the just-finished phase's identity (its colour and
+  // the time that elapsed), so use the completed phase for display.
+  const displayPhase =
+    awaitingDone && lastCompletedPhase ? lastCompletedPhase : phase;
+
   const getPhaseColor = () =>
-    phase === 'focus'
+    displayPhase === 'focus'
       ? 'bg-primary text-primary-foreground'
       : 'bg-sky-500 dark:bg-sky-600 text-white';
 
   const getPhaseAccent = () =>
-    phase === 'focus' ? 'text-primary' : 'text-sky-500';
+    displayPhase === 'focus' ? 'text-primary' : 'text-sky-500';
+
+  // The actual time spent in whichever phase just finished — shown frozen in
+  // the Done state (so a fast-forwarded phase shows real elapsed, not the set
+  // duration), instead of the next phase's countdown.
+  const completedDuration =
+    displayPhase === 'focus' ? lastFocusElapsed : lastBreakElapsed;
+
+  // With auto-start breaks, focus → break ran as one continuous session, so the
+  // Done screen summarises both halves: split green (focus) / blue (break),
+  // each with its actual elapsed time.
+  const splitDone = awaitingDone && settings.autoStartBreaks;
+  const focusSeconds = lastFocusElapsed;
+  const breakSeconds = lastBreakElapsed;
 
   if (!mounted) return null;
 
@@ -365,29 +478,29 @@ export default function FrogodoroSheet({
             className="fixed inset-0 z-[999] bg-black/80"
           />
 
-          <motion.div
-            initial={{ y: '100%', opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: '100%', opacity: 0 }}
-            transition={{
-              type: 'tween',
-              ease: [0.32, 0.72, 0, 1],
-              duration: 0.4,
-            }}
-            drag={!isDesktop ? 'y' : false}
-            dragControls={dragControls}
-            dragListener={false}
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={{ top: 0, bottom: 0.6 }}
-            dragMomentum={false}
-            onDragEnd={(_e, { offset, velocity }) => {
-              if (offset.y + velocity.y * 0.15 > 130 || velocity.y > 800) {
-                onOpenChange(false);
+          <div className="fixed inset-0 z-[1000] flex items-end justify-center pointer-events-none px-3 pb-4 sm:items-center sm:p-6">
+            <motion.div
+              initial={isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%', opacity: 0 }}
+              animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0, opacity: 1 }}
+              exit={isDesktop ? { opacity: 0, scale: 0.98 } : { y: '100%', opacity: 0 }}
+              transition={
+                isDesktop
+                  ? { type: 'tween', ease: [0.25, 0.1, 0.25, 1], duration: 0.2 }
+                  : { type: 'tween', ease: [0.32, 0.72, 0, 1], duration: 0.4 }
               }
-            }}
-            className="fixed left-0 right-0 bottom-0 z-[1000] pointer-events-none will-change-transform px-3 pb-4 sm:px-6 sm:pb-6"
-          >
-            <div className="pointer-events-auto mx-auto w-full max-w-[500px] pb-[env(safe-area-inset-bottom)]">
+              drag={!isDesktop ? 'y' : false}
+              dragControls={dragControls}
+              dragListener={false}
+              dragConstraints={{ top: 0, bottom: 0 }}
+              dragElastic={{ top: 0, bottom: 0.6 }}
+              dragMomentum={false}
+              onDragEnd={(_e, { offset, velocity }) => {
+                if (offset.y + velocity.y * 0.15 > 130 || velocity.y > 800) {
+                  onOpenChange(false);
+                }
+              }}
+              className="pointer-events-auto w-full max-w-[500px] pb-[env(safe-area-inset-bottom)] will-change-transform"
+            >
               <div className="relative rounded-[28px] bg-popover/95 backdrop-blur-2xl shadow-[0_24px_48px_rgba(15,23,42,0.25)] overflow-hidden">
                 {/* Drag handle – mobile only. Overlaid so the timer view's
                     colour reaches the rounded top edge (no white strip). */}
@@ -457,135 +570,139 @@ export default function FrogodoroSheet({
                       ref={overscroll.bind}
                       className="p-5 max-h-[70vh] overflow-y-auto overscroll-none no-scrollbar"
                     >
-                      <div className="mb-5 flex items-center justify-between">
-                        <h3 className="text-lg font-black text-foreground">Timer Settings</h3>
+                      <div className="mb-6 flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-foreground">Settings</h3>
                         <button
                           onClick={() => setShowSettings(false)}
-                          className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/15"
+                          className="flex h-8 w-8 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
                         >
                           <X className="w-4 h-4" />
                         </button>
                       </div>
 
-                      <div className="space-y-4">
-                        {/* Durations */}
-                        <div className="space-y-2">
-                          <p className="px-1 text-[11px] font-black uppercase tracking-widest text-primary/60">Durations</p>
-                          <div className="overflow-hidden rounded-2xl border border-primary/10 bg-primary/5 p-2.5 space-y-2">
-                            {showTimerTestSettings && (
-                              <button
-                                type="button"
-                                onClick={applyTenSecondTestSettings}
-                                className="flex w-full items-center justify-center rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs font-black text-amber-700 transition-all active:scale-[0.98] dark:text-amber-300"
-                              >
-                                Set focus and break to 10s
-                              </button>
+                      <div className="space-y-7">
+                        {/* Durations — locked while a session is active, since
+                            you can't change a running/paused timer's length. */}
+                        <section className="space-y-2.5">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Durations</p>
+                            {timerActive && (
+                              <span className="flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                                <Lock className="h-3 w-3" />
+                                Durations locked during a session
+                              </span>
                             )}
+                          </div>
+                          <div className={`divide-y divide-border/60 rounded-2xl border border-border/60 ${timerActive ? 'opacity-50' : ''}`}>
                             {/* Focus */}
-                            <div className="flex items-center gap-3 rounded-xl bg-background px-3 py-3 shadow-sm">
-                              <div className="w-3 h-3 rounded-full bg-primary shrink-0" />
-                              <div className="flex-1">
-                                <p className="text-sm font-black text-foreground">Focus</p>
+                            <div className="flex items-center justify-between px-4 py-3.5">
+                              <div className="flex items-center gap-2.5">
+                                <span className="h-2.5 w-2.5 rounded-full bg-primary" />
+                                <span className="text-sm font-medium text-foreground">Focus</span>
                               </div>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-3">
                                 <button
                                   type="button"
-                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: localSettings.focusDuration === 5 ? 1 : Math.max(1, localSettings.focusDuration - 5) })}
-                                  className="flex items-center justify-center w-6 h-6 text-sm transition-all border rounded-full bg-background border-border/70 text-muted-foreground active:scale-90"
+                                  aria-label="Decrease focus"
+                                  disabled={timerActive}
+                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: decreaseDuration(localSettings.focusDuration) })}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/70 active:scale-90 disabled:cursor-not-allowed disabled:hover:bg-muted disabled:active:scale-100"
                                 >
                                   −
                                 </button>
-                                <span className="w-12 text-sm font-black text-center text-primary tabular-nums">{formatDurationSetting(localSettings.focusDuration)}</span>
+                                <span className="w-12 text-center text-sm font-semibold text-foreground tabular-nums">{formatDurationSetting(localSettings.focusDuration)}</span>
                                 <button
                                   type="button"
-                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: localSettings.focusDuration === 1 ? 5 : Math.min(120, localSettings.focusDuration + 5) })}
-                                  className="flex items-center justify-center w-6 h-6 text-sm transition-all rounded-full bg-primary/10 text-primary active:scale-90"
+                                  aria-label="Increase focus"
+                                  disabled={timerActive}
+                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: increaseDuration(localSettings.focusDuration) })}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-primary transition-colors hover:bg-primary/15 active:scale-90 disabled:cursor-not-allowed disabled:hover:bg-primary/10 disabled:active:scale-100"
                                 >
                                   +
                                 </button>
                               </div>
                             </div>
                             {/* Break */}
-                            <div className="flex items-center gap-3 rounded-xl bg-background px-3 py-3 shadow-sm">
-                              <div className="w-3 h-3 rounded-full bg-sky-400 shrink-0" />
-                              <div className="flex-1">
-                                <p className="text-sm font-black text-foreground">Break</p>
+                            <div className="flex items-center justify-between px-4 py-3.5">
+                              <div className="flex items-center gap-2.5">
+                                <span className="h-2.5 w-2.5 rounded-full bg-sky-400" />
+                                <span className="text-sm font-medium text-foreground">Break</span>
                               </div>
-                              <div className="flex items-center gap-1.5">
+                              <div className="flex items-center gap-3">
                                 <button
                                   type="button"
-                                  onClick={() => setLocalSettings({ ...localSettings, breakDuration: Math.max(1, localSettings.breakDuration - 1) })}
-                                  className="flex items-center justify-center w-6 h-6 text-sm transition-all border rounded-full bg-background border-border/70 text-muted-foreground active:scale-90"
+                                  aria-label="Decrease break"
+                                  disabled={timerActive}
+                                  onClick={() => setLocalSettings({ ...localSettings, breakDuration: decreaseDuration(localSettings.breakDuration) })}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors hover:bg-muted/70 active:scale-90 disabled:cursor-not-allowed disabled:hover:bg-muted disabled:active:scale-100"
                                 >
                                   −
                                 </button>
-                                <span className="w-12 text-sm font-black text-center text-sky-500 tabular-nums">{formatDurationSetting(localSettings.breakDuration)}</span>
+                                <span className="w-12 text-center text-sm font-semibold text-foreground tabular-nums">{formatDurationSetting(localSettings.breakDuration)}</span>
                                 <button
                                   type="button"
-                                  onClick={() => setLocalSettings({ ...localSettings, breakDuration: Math.min(60, localSettings.breakDuration + 1) })}
-                                  className="flex items-center justify-center w-6 h-6 text-sm transition-all rounded-full bg-sky-500/10 text-sky-500 active:scale-90"
+                                  aria-label="Increase break"
+                                  disabled={timerActive}
+                                  onClick={() => setLocalSettings({ ...localSettings, breakDuration: increaseDuration(localSettings.breakDuration) })}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-500/10 text-sky-500 transition-colors hover:bg-sky-500/15 active:scale-90 disabled:cursor-not-allowed disabled:hover:bg-sky-500/10 disabled:active:scale-100"
                                 >
                                   +
                                 </button>
                               </div>
                             </div>
                           </div>
-                        </div>
+                        </section>
 
                         {/* Auto-start */}
                         <button
                           type="button"
                           onClick={() => setLocalSettings({ ...localSettings, autoStartBreaks: !localSettings.autoStartBreaks })}
-                          className={`flex w-full items-center justify-between rounded-2xl px-4 py-3 transition-all active:scale-[0.98] ${
-                            localSettings.autoStartBreaks
-                              ? 'bg-primary/10 text-primary'
-                              : 'bg-muted/15 text-muted-foreground'
-                          }`}
+                          className="flex w-full items-center justify-between rounded-2xl border border-border/60 px-4 py-3.5 text-left transition-colors hover:bg-muted/30"
                         >
-                          <div className="text-left">
-                            <p className="text-sm font-black">Auto-start breaks</p>
-                            <p className={`text-[11px] font-semibold ${localSettings.autoStartBreaks ? 'text-primary/60' : 'text-muted-foreground/50'}`}>
-                              Breaks begin automatically
-                            </p>
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Auto-start breaks</p>
+                            <p className="text-xs text-muted-foreground">Breaks begin automatically</p>
                           </div>
-                          <span className={`relative h-7 w-12 rounded-full transition-colors ${localSettings.autoStartBreaks ? 'bg-primary' : 'bg-muted-foreground/25'}`}>
-                            <span className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${localSettings.autoStartBreaks ? 'translate-x-5' : 'translate-x-0'}`} />
+                          <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${localSettings.autoStartBreaks ? 'bg-primary' : 'bg-muted-foreground/25'}`}>
+                            <span className={`absolute left-0.5 top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${localSettings.autoStartBreaks ? 'translate-x-5' : 'translate-x-0'}`} />
                           </span>
                         </button>
 
                         {/* Sound */}
-                        <div className="space-y-2">
-                          <p className="px-1 text-[11px] font-black uppercase tracking-widest text-primary/60">Finish Sound</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            {([
-                              { id: 'bell', label: 'Bell' },
-                              { id: 'chime', label: 'Chime' },
-                              { id: 'digital', label: 'Digital' },
-                              { id: 'none', label: 'Silent' },
-                            ] as { id: TimerSound; label: string }[]).map(({ id, label }) => (
-                              <button
-                                key={id}
-                                type="button"
-                                onClick={() => {
-                                  setLocalSettings({ ...localSettings, timerSound: id });
-                                  playTimerSound(id);
-                                }}
-                                className={`h-11 rounded-xl text-sm font-black transition-all active:scale-95 ${
-                                  localSettings.timerSound === id
-                                    ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/20'
-                                    : 'border border-border/70 bg-background text-muted-foreground hover:bg-muted/40'
-                                }`}
-                              >
-                                {label}
-                              </button>
-                            ))}
+                        <section className="space-y-2.5">
+                          <div className="flex items-baseline justify-between">
+                            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Finish sound</p>
+                            <p className="text-xs text-muted-foreground/70">Tap to preview</p>
                           </div>
-                        </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            {TIMER_SOUNDS.map(({ id, label }) => {
+                              const isSelected = normalizeTimerSound(localSettings.timerSound) === id;
+                              const isPreviewing = previewingId === id;
+                              return (
+                                <button
+                                  key={id}
+                                  type="button"
+                                  onClick={() => handleSoundSelect(id)}
+                                  className={`relative flex h-11 items-center justify-center gap-1.5 rounded-xl border px-3 text-sm font-medium transition-colors ${
+                                    isSelected
+                                      ? 'border-primary bg-primary/10 text-primary'
+                                      : 'border-border/60 text-muted-foreground hover:bg-muted/30'
+                                  }`}
+                                >
+                                  {isPreviewing && (
+                                    <Volume2 className="h-3.5 w-3.5 shrink-0 animate-pulse" />
+                                  )}
+                                  <span className="truncate">{label}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </section>
                       </div>
 
                       <button
                         onClick={saveSettings}
-                        className="mt-6 w-full rounded-2xl bg-primary py-3.5 text-base font-black text-primary-foreground shadow-sm shadow-primary/20 transition-all hover:bg-primary/90 active:scale-[0.98]"
+                        className="mt-8 w-full rounded-2xl bg-primary py-3.5 text-base font-bold text-primary-foreground transition-colors hover:bg-primary/90 active:scale-[0.99]"
                       >
                         Save
                       </button>
@@ -601,23 +718,50 @@ export default function FrogodoroSheet({
                       transition={{ duration: 0.15 }}
                     >
                       {/* Timer Card */}
-                      <div className={`px-4 pt-11 pb-4 ${getPhaseColor()} relative overflow-hidden`}>
-                        {/* Help — top-left */}
-                        <button
-                          onClick={() => setShowHelp(true)}
-                          aria-label="How it works"
-                          className="absolute top-3 left-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-black leading-none"
-                        >
-                          ?
-                        </button>
-                        {/* Close — top-right */}
-                        <button
-                          onClick={() => onOpenChange(false)}
-                          aria-label="Close"
-                          className="absolute top-3 right-3 z-10 flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
+                      <div className={`relative overflow-hidden ${splitDone ? 'bg-sky-500 dark:bg-sky-600 text-white' : getPhaseColor()}`}>
+                        {splitDone ? (
+                          /* Split background: green (focus) | blue (break) */
+                          <div aria-hidden className="absolute inset-y-0 left-0 z-0 w-1/2 bg-primary" />
+                        ) : (
+                          /* Elapsed fill — grows bottom→top as the phase passes */
+                          <div
+                            aria-hidden
+                            className={`absolute inset-x-0 bottom-0 z-0 bg-black/20 ${
+                              isRunning ? 'transition-[height] duration-1000 ease-linear' : ''
+                            }`}
+                            style={{ height: `${progressPercent}%` }}
+                          />
+                        )}
+
+                        <div className="relative z-10 px-4 pt-11 pb-4">
+                        {/* Help + Settings + Close — top-right, with gaps. The
+                            settings gear lives here so it's always reachable,
+                            even mid-session. */}
+                        <div className="absolute top-3 right-3 z-10 flex items-center gap-2.5">
+                          <button
+                            onClick={() => setShowHelp(true)}
+                            aria-label="How it works"
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white text-sm font-black leading-none"
+                          >
+                            ?
+                          </button>
+                          {!awaitingDone && (
+                            <button
+                              onClick={() => setShowSettings(true)}
+                              aria-label="Settings"
+                              className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                            >
+                              <Settings2 className="w-4 h-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => onOpenChange(false)}
+                            aria-label="Close"
+                            className="flex items-center justify-center w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 transition-colors text-white"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
 
                         {/* Task name (centered) */}
                         {task && (
@@ -626,34 +770,59 @@ export default function FrogodoroSheet({
                           </div>
                         )}
 
-                        {/* Phase Tabs */}
-                        <div className="flex items-center justify-center gap-1 mb-4">
-                          {[
-                            { id: 'focus', label: 'Focus' },
-                            { id: 'break', label: 'Break' },
-                          ].map((p) => (
-                            <button
-                              key={p.id}
-                              onClick={() => handleTabSwitch(p.id as PomodoroPhase)}
-                              className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
-                                phase === p.id
-                                  ? 'bg-black/25 text-white shadow-inner'
-                                  : isRunning
-                                    ? 'bg-transparent text-white/30 cursor-not-allowed'
+                        {/* Mode row. Idle: switchable Focus/Break tabs (pick what
+                            to start). Mid-session: locked label of the current
+                            mode. Finished: "time's up". */}
+                        {awaitingDone ? (
+                          <div className="mb-4 text-center">
+                            <p className="text-sm font-black uppercase tracking-widest text-white/90">Time&apos;s up!</p>
+                          </div>
+                        ) : timerActive ? (
+                          <div className="mb-4 flex items-center justify-center">
+                            <span className="rounded-full bg-black/25 px-3 py-1.5 text-xs font-bold text-white shadow-inner">
+                              {phase === 'focus' ? 'Focus' : 'Break'}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-1 mb-4">
+                            {[
+                              { id: 'focus', label: 'Focus' },
+                              { id: 'break', label: 'Break' },
+                            ].map((p) => (
+                              <button
+                                key={p.id}
+                                onClick={() => handleTabSwitch(p.id as PomodoroPhase)}
+                                className={`px-3 py-1.5 text-xs font-bold rounded-full transition-all ${
+                                  phase === p.id
+                                    ? 'bg-black/25 text-white shadow-inner'
                                     : 'bg-transparent text-white/70 hover:bg-black/10'
-                              }`}
-                            >
-                              {p.label}
-                            </button>
-                          ))}
-                        </div>
+                                }`}
+                              >
+                                {p.label}
+                              </button>
+                            ))}
+                          </div>
+                        )}
 
-                        {/* Time Display */}
+                        {/* Time Display — split focus/break summary with auto-start
+                            breaks, otherwise the single phase time/countdown. */}
+                        {splitDone ? (
+                          <div className="mb-4 flex items-stretch">
+                            <div className="flex-1 text-center">
+                              <p className="text-[11px] font-black uppercase tracking-widest text-white/80">Focus</p>
+                              <p className="text-[44px] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">{formatTime(focusSeconds)}</p>
+                            </div>
+                            <div className="flex-1 text-center">
+                              <p className="text-[11px] font-black uppercase tracking-widest text-white/80">Break</p>
+                              <p className="text-[44px] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">{formatTime(breakSeconds)}</p>
+                            </div>
+                          </div>
+                        ) : (
                         <div className="mb-4 flex items-center justify-center gap-3">
                           {(() => {
                             const control = getDurationControl();
                             const duration = settings[control.key];
-                            const canAdjust = !isRunning && !startedByPhase[phase];
+                            const canAdjust = !timerActive && !awaitingDone;
                             return (
                               <>
                                 {canAdjust && (
@@ -669,7 +838,7 @@ export default function FrogodoroSheet({
                                 )}
 
                                 <div className="min-w-[210px] text-center text-[72px] font-black leading-none tracking-tighter text-white drop-shadow-lg tabular-nums">
-                                  {formatTime(timeLeft)}
+                                  {formatTime(awaitingDone ? completedDuration : timeLeft)}
                                 </div>
 
                                 {canAdjust && (
@@ -687,11 +856,37 @@ export default function FrogodoroSheet({
                             );
                           })()}
                         </div>
+                        )}
 
-                        {/* Controls */}
+                        {/* Controls — when the session is over, the only action
+                            is Done (which silences the alarm and closes). */}
+                        {awaitingDone ? (
+                          <div className="flex items-center justify-center">
+                            <button
+                              onClick={handleDone}
+                              className={`relative flex items-center justify-center px-12 py-3 bg-white dark:bg-slate-50 text-[16px]
+                                font-black uppercase tracking-widest rounded-2xl shadow-[0_6px_0_rgba(0,0,0,0.15)]
+                                active:shadow-[0_0_0_rgba(0,0,0,0.15)] active:translate-y-1.5 transition-all ${getPhaseAccent()}`}
+                            >
+                              <Check className="w-5 h-5 mr-1.5" />
+                              DONE
+                            </button>
+                          </div>
+                        ) : (
                         <div className="flex items-center justify-center gap-3">
-                          {/* Spacer balances the right-side button so START stays centered */}
-                          <div className="w-10 shrink-0" aria-hidden />
+                          {/* Left: Stop ends the active session. Idle → spacer so
+                              START stays centred. */}
+                          {timerActive ? (
+                            <button
+                              onClick={handleStopTimer}
+                              aria-label="Stop session"
+                              className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-all"
+                            >
+                              <Square className="w-5 h-5 fill-current opacity-90" />
+                            </button>
+                          ) : (
+                            <div className="w-10 shrink-0" aria-hidden />
+                          )}
 
                           <button
                             onClick={toggleTimer}
@@ -704,35 +899,23 @@ export default function FrogodoroSheet({
                             ) : (
                               <Play className="w-5 h-5 mr-1.5 fill-current" />
                             )}
-                            {isRunning
-                              ? 'PAUSE'
-                              : startedByPhase[phase]
-                                ? 'CONTINUE'
-                                : 'START'}
+                            {isRunning ? 'PAUSE' : timerActive ? 'RESUME' : 'START'}
                           </button>
 
+                          {/* Right: Skip (fast-forward) only while running. */}
                           {isRunning ? (
                             <button
                               onClick={handleManualSkip}
+                              aria-label="Skip"
                               className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-all"
                             >
                               <SkipForward className="w-5 h-5 fill-current opacity-90" />
                             </button>
                           ) : (
-                            <button
-                              onClick={
-                                timerActive ? handleStopTimer : () => setShowSettings(true)
-                              }
-                              className="p-2.5 bg-white/20 hover:bg-white/30 rounded-xl active:scale-95 text-white transition-all"
-                            >
-                              {timerActive ? (
-                                <Square className="w-5 h-5 fill-current opacity-90" />
-                              ) : (
-                                <Settings2 className="w-5 h-5 text-white/90" />
-                              )}
-                            </button>
+                            <div className="w-10 shrink-0" aria-hidden />
                           )}
                         </div>
+                        )}
 
                         {/* Enable-notifications hint — so timer-complete alerts can land */}
                         {canEnableNotifs && (
@@ -745,6 +928,7 @@ export default function FrogodoroSheet({
                             Enable notifications to get timer alerts
                           </button>
                         )}
+                        </div>
                       </div>
 
                       {/* Stats Row */}
@@ -782,8 +966,8 @@ export default function FrogodoroSheet({
                   )}
                 </AnimatePresence>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>,

@@ -16,7 +16,7 @@ export const DEFAULT_SETTINGS: FrogodoroSettings = {
   focusDuration: 25,
   breakDuration: 5,
   autoStartBreaks: false,
-  timerSound: 'bell',
+  timerSound: 'dreamscape',
 };
 
 export interface SessionStats {
@@ -32,6 +32,7 @@ export const DEFAULT_SESSION_STATS: SessionStats = {
 interface FrogodoroState {
   settings: FrogodoroSettings;
   selectedTaskId: string;
+  selectedTaskName: string;
   phase: PomodoroPhase;
   timerActive: boolean;
   isRunning: boolean;
@@ -47,6 +48,14 @@ interface FrogodoroState {
   lastCompletionId: number;
   lastCompletedTaskId: string;
   lastCompletedPhase: PomodoroPhase | null;
+  // True after a phase ends into a non-running (paused) state — the timer
+  // alarm keeps sounding until the user acknowledges it by clicking Done.
+  awaitingDone: boolean;
+  // Actual seconds spent in each phase of the current/just-finished session
+  // (resets when a fresh session starts). Drives the Done screen so a
+  // fast-forwarded phase shows the real elapsed time, not the duration set.
+  lastFocusElapsed: number;
+  lastBreakElapsed: number;
 
   // Actions
   setSettings: (settings: FrogodoroSettings) => void;
@@ -56,7 +65,19 @@ interface FrogodoroState {
   stopTimer: () => void;
   tickTimer: (newTimeLeft: number) => void;
   switchPhase: (phase: PomodoroPhase) => void;
-  completePhase: (autoStart?: boolean, elapsedOverride?: number) => void;
+  completePhase: (
+    autoStart?: boolean,
+    elapsedOverride?: number,
+    awaitDone?: boolean,
+  ) => void;
+  // Records a server-driven phase completion (the advance path doesn't go
+  // through completePhase) so the UI can react: bump the completion signal that
+  // opens the popup, and set whether the alarm is awaiting acknowledgement.
+  registerCompletion: (completedPhase: PomodoroPhase, awaitDone: boolean) => void;
+  setAwaitingDone: (value: boolean) => void;
+  setSelectedTaskName: (name: string) => void;
+  // Records the actual elapsed time of a completed phase for the Done screen.
+  setPhaseElapsedResult: (phase: PomodoroPhase, seconds: number) => void;
   addSessionSpend: (time: number) => void;
   clearSessionSpend: () => void;
   updateSessionStats: (stats: SessionStats) => void;
@@ -75,6 +96,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
     (set, get) => ({
       settings: DEFAULT_SETTINGS,
       selectedTaskId: '',
+      selectedTaskName: '',
       phase: 'focus',
       timerActive: false,
       isRunning: false,
@@ -91,6 +113,9 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       lastCompletionId: 0,
       lastCompletedTaskId: '',
       lastCompletedPhase: null,
+      awaitingDone: false,
+      lastFocusElapsed: 0,
+      lastBreakElapsed: 0,
 
       setSettings: (settings) =>
         set((state) => {
@@ -145,6 +170,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             currentSessionSpend: isSameTask ? state.currentSessionSpend : 0,
             sessionStats: isSameTask ? state.sessionStats : DEFAULT_SESSION_STATS,
             phaseElapsed: isSameTask ? state.phaseElapsed : 0,
+            lastFocusElapsed: isSameTask ? state.lastFocusElapsed : 0,
+            lastBreakElapsed: isSameTask ? state.lastBreakElapsed : 0,
           };
         });
       },
@@ -155,6 +182,9 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           // begin a Break, the previous Focus countdown is cleared (and vice
           // versa). Tab-switching alone preserves both; only Start resets.
           const other: PomodoroPhase = state.phase === 'focus' ? 'break' : 'focus';
+          // A fresh start (not a resume from pause) begins a new session, so
+          // clear the previous session's elapsed totals.
+          const freshSession = !state.timerActive;
           return {
             timerActive: true,
             isRunning: true,
@@ -168,6 +198,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
               ...state.remainingByPhase,
               [other]: getPhaseDuration(other, state.settings),
             },
+            lastFocusElapsed: freshSession ? 0 : state.lastFocusElapsed,
+            lastBreakElapsed: freshSession ? 0 : state.lastBreakElapsed,
           };
         });
       },
@@ -229,7 +261,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
         });
       },
 
-      completePhase: (autoStart = false, elapsedOverride?: number) => {
+      completePhase: (autoStart = false, elapsedOverride?: number, awaitDone?: boolean) => {
         set((state) => {
           const completionFields = {
             lastCompletionId: state.lastCompletionId + 1,
@@ -246,6 +278,10 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           if (state.phase === 'focus') {
             const nextPhase: PomodoroPhase = 'break';
             const time = breakFull;
+            // No auto-start → the break is queued but paused; the alarm waits
+            // for the user to acknowledge it with Done. A manual skip passes
+            // awaitDone=false so it just switches modes with no Done/alarm.
+            const resolvedAwait = awaitDone ?? !autoStart;
             return {
               phase: nextPhase,
               isRunning: autoStart,
@@ -256,7 +292,12 @@ export const useFrogodoroStore = create<FrogodoroState>()(
               // only if auto-start is on).
               remainingByPhase: { focus: focusFull, break: time },
               startedByPhase: { focus: false, break: autoStart },
+              // Active only while running or awaiting Done; a silent skip lands
+              // idle on the next mode so it shows tabs + Start, not Resume.
+              timerActive: autoStart || resolvedAwait,
               ...completionFields,
+              awaitingDone: resolvedAwait,
+              lastFocusElapsed: elapsed,
               sessionStats: {
                 ...state.sessionStats,
                 focusTime: state.sessionStats.focusTime + elapsed,
@@ -266,6 +307,9 @@ export const useFrogodoroStore = create<FrogodoroState>()(
 
           // Break finished → return to focus, never auto-start
           const time = focusFull;
+          // Break finished → never auto-starts; await Done unless a manual
+          // skip explicitly opts out (awaitDone=false).
+          const resolvedAwait = awaitDone ?? true;
           return {
             phase: 'focus',
             isRunning: false,
@@ -274,7 +318,10 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             phaseElapsed: 0,
             remainingByPhase: { focus: time, break: breakFull },
             startedByPhase: { focus: false, break: false },
+            timerActive: resolvedAwait,
             ...completionFields,
+            awaitingDone: resolvedAwait,
+            lastBreakElapsed: elapsed,
             sessionStats: {
               ...state.sessionStats,
               breakTime: state.sessionStats.breakTime + elapsed,
@@ -282,6 +329,23 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           };
         });
       },
+
+      registerCompletion: (completedPhase, awaitDone) =>
+        set((state) => ({
+          lastCompletionId: state.lastCompletionId + 1,
+          lastCompletedTaskId: state.selectedTaskId,
+          lastCompletedPhase: completedPhase,
+          awaitingDone: awaitDone,
+        })),
+
+      setAwaitingDone: (value) => set({ awaitingDone: value }),
+
+      setSelectedTaskName: (name) => set({ selectedTaskName: name }),
+
+      setPhaseElapsedResult: (phase, seconds) =>
+        set(phase === 'focus'
+          ? { lastFocusElapsed: seconds }
+          : { lastBreakElapsed: seconds }),
 
       addSessionSpend: (time) =>
         set((state) => ({
@@ -312,6 +376,23 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           (timer.status === 'running' && runningTimeLeft > 0) ||
           runningTimeLeft < phaseFull;
 
+        // The server timer only tracks the ACTIVE phase. For the other phase,
+        // keep whatever this client already has (e.g. a focus paused mid-way
+        // while you peek at the Break tab) instead of clobbering it back to
+        // full — but only if it's a genuine partial (between 0 and full); a
+        // fresh or just-finished phase resets to full / not-started.
+        const prev = get();
+        const keepRemaining = (p: PomodoroPhase) => {
+          const cur = prev.remainingByPhase[p];
+          const full = p === 'focus' ? focusFull : breakFull;
+          return cur > 0 && cur < full ? cur : full;
+        };
+        const keepStarted = (p: PomodoroPhase) => {
+          const cur = prev.remainingByPhase[p];
+          const full = p === 'focus' ? focusFull : breakFull;
+          return cur > 0 && cur < full;
+        };
+
         set({
           selectedTaskId: timer.taskId,
           settings: timer.settings,
@@ -324,12 +405,12 @@ export const useFrogodoroStore = create<FrogodoroState>()(
               : null,
           timeLeft: runningTimeLeft,
           remainingByPhase: {
-            focus: timer.phase === 'focus' ? runningTimeLeft : focusFull,
-            break: timer.phase === 'break' ? runningTimeLeft : breakFull,
+            focus: timer.phase === 'focus' ? runningTimeLeft : keepRemaining('focus'),
+            break: timer.phase === 'break' ? runningTimeLeft : keepRemaining('break'),
           },
           startedByPhase: {
-            focus: timer.phase === 'focus' ? started : false,
-            break: timer.phase === 'break' ? started : false,
+            focus: timer.phase === 'focus' ? started : keepStarted('focus'),
+            break: timer.phase === 'break' ? started : keepStarted('break'),
           },
           sessionStats: timer.sessionStats,
         });

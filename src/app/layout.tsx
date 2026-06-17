@@ -49,8 +49,8 @@ export const metadata: Metadata = {
   title: 'Frogress',
   description: 'Frogress Todo List App',
   icons: {
-    icon: '/48x48.png',
-    shortcut: '/48x48.png',
+    icon: '/frogress-icon.png',
+    shortcut: '/frogress-icon.png',
     apple: '/180x180.png',
     other: {
       rel: 'apple-touch-icon-precomposed',

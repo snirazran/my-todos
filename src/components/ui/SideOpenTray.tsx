@@ -19,6 +19,8 @@ interface SideOpenTrayProps {
   className?: string;
   iconContainerClassName?: string;
   lockScroll?: boolean;
+  /** z-index for the backdrop (panel sits at backdropZ + 5). Default 80. */
+  backdropZ?: number;
 }
 
 export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
@@ -37,6 +39,7 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
       className,
       iconContainerClassName,
       lockScroll = true,
+      backdropZ = 80,
     },
     ref
   ) => {
@@ -105,9 +108,10 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
               animate={{ opacity: isDraggingAny ? 0 : 1 - closeProgress }}
               exit={{ opacity: 0 }}
               transition={{ type: 'tween', duration: 0.15, ease: 'easeOut' }}
-              className="fixed inset-0 z-[80] bg-background/60 will-change-[opacity]"
+              className="fixed inset-0 bg-background/60 will-change-[opacity]"
               onClick={onClose}
               style={{
+                zIndex: backdropZ,
                 pointerEvents:
                   closeProgress > 0.5 || isDraggingAny ? 'none' : 'auto',
               }}
@@ -137,13 +141,13 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
                 : { type: 'tween', duration: 0.4, ease: [0.32, 0.72, 0, 1] }
               }
               className={cn(
-                "fixed z-[90] flex flex-col bg-card border-r border-border/50 shadow-2xl overflow-hidden",
+                "fixed flex flex-col bg-card border-r border-border/50 shadow-2xl overflow-hidden",
                 "inset-x-0 bottom-0 top-[15vh] rounded-t-[32px] border-t",
                 "md:inset-y-0 md:left-0 md:right-auto md:w-[420px] md:top-0 md:bottom-0 md:rounded-none md:border-t-0",
                 className
               )}
               onClick={(e) => e.stopPropagation()}
-              style={{ pointerEvents: isDraggingAny ? 'none' : 'auto', willChange: 'transform, opacity' }}
+              style={{ zIndex: backdropZ + 5, pointerEvents: isDraggingAny ? 'none' : 'auto', willChange: 'transform, opacity' }}
             >
               {/* Drag Handle (Mobile Only) */}
               {!isDesktop && (

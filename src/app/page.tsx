@@ -29,6 +29,7 @@ import TaskList from '@/components/ui/TaskList';
 import QuickAddSheet from '@/components/ui/QuickAddSheet';
 import FrogodoroSheet from '@/components/ui/FrogodoroSheet';
 import FrogodoroPill from '@/components/ui/FrogodoroPill';
+import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import { useBackgrounds } from '@/hooks/useBackgrounds';
@@ -452,6 +453,16 @@ export default function Home() {
     lastCompletionId,
     lastCompletedTaskId,
   } = useFrogodoroStore();
+
+  // This page hosts the full timer UI (pill + sheet), so suppress the global
+  // mini overlay while it's mounted.
+  const addFullTimerHost = useFrogodoroUiStore((s) => s.addFullTimerHost);
+  const removeFullTimerHost = useFrogodoroUiStore((s) => s.removeFullTimerHost);
+  useEffect(() => {
+    addFullTimerHost();
+    return () => removeFullTimerHost();
+  }, [addFullTimerHost, removeFullTimerHost]);
+
   const frogPhaseDuration =
     frogPhase === 'focus'
       ? frogSettings.focusDuration * 60
@@ -520,19 +531,20 @@ export default function Home() {
     if (lastCompletionId === lastHandledTimerCompletionRef.current) return;
 
     // GlobalTimer rehydrates server-side timer state on mount and may fire a
-    // synthetic completePhase if the persisted endTime had already passed.
-    // Treat completions that arrive in the first few seconds as rehydration
-    // artifacts and only update the ref — don't open the timer popup.
-    const isRehydrationArtifact =
-      Date.now() - homeMountTimeRef.current < 4000;
-
+    // synthetic completion if the persisted endTime had already passed. Treat
+    // completions in the first few seconds as rehydration artifacts.
+    const isRehydrationArtifact = Date.now() - homeMountTimeRef.current < 4000;
     lastHandledTimerCompletionRef.current = lastCompletionId;
     if (isRehydrationArtifact) return;
+
+    // Prefer this page's own (richer) Frogodoro popup when nothing is blocking
+    // it. If another popup/menu is open, leave it to the global completion popup
+    // (GlobalFrogodoroMini), which renders above everything.
+    if (useSheetStore.getState().count > 0) return;
 
     const completedTask =
       data.find((t) => t.id === lastCompletedTaskId) ??
       data.find((t) => t.id === frogTaskId);
-
     if (completedTask) setTimerTask(completedTask);
     setShowTimer(true);
   }, [

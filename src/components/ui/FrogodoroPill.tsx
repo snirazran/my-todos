@@ -200,12 +200,6 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
             <Pause className="w-4 h-4 fill-current" />
           )}
 
-          {isRunning && (
-            <span className="absolute top-0 right-0 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-            </span>
-          )}
         </div>
 
         <div className="flex flex-1 items-center justify-between gap-3 min-w-0">

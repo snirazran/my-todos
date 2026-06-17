@@ -2,7 +2,12 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { useFrogodoroStore, PomodoroPhase, FrogodoroSettings } from '@/lib/frogodoroStore';
-import { playTimerSoundLooped, unlockAudio } from '@/lib/timerSounds';
+import {
+  playTimerSoundUntilStopped,
+  playTransitionBeep,
+  unlockAudio,
+  normalizeTimerSound,
+} from '@/lib/timerSounds';
 import {
   scheduleTimerNotifications,
   cancelTimerNotifications,
@@ -36,8 +41,11 @@ export function GlobalTimer() {
     settings,
     sessionStats,
     phaseElapsed,
+    awaitingDone,
     tickTimer,
     completePhase,
+    registerCompletion,
+    setAwaitingDone,
     setPhaseElapsed,
   } = useFrogodoroStore();
 
@@ -58,13 +66,27 @@ export function GlobalTimer() {
   useEffect(() => {
     const handler = () => unlockAudio();
     clientIdRef.current = getClientId();
+    // Clear any persisted "awaiting Done" flag on load so a reload doesn't
+    // resurrect a stuck alarm from a completion that happened in a past session.
+    setAwaitingDone(false);
     document.addEventListener('touchstart', handler, { once: true });
     document.addEventListener('click', handler, { once: true });
     return () => {
       document.removeEventListener('touchstart', handler);
       document.removeEventListener('click', handler);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // While a completion is awaiting acknowledgement, keep the alarm sounding
+  // until the user clicks Done (which flips awaitingDone false → cleanup stops).
+  useEffect(() => {
+    if (!awaitingDone) return;
+    const stop = playTimerSoundUntilStopped(
+      normalizeTimerSound(settingsRef.current.timerSound),
+    );
+    return stop;
+  }, [awaitingDone]);
 
   // Save Progress API Caller
   const saveProgress = async (
@@ -169,6 +191,21 @@ export function GlobalTimer() {
         return;
       }
 
+      // Detect a phase completion that this update is carrying. The server (its
+      // scheduled processor, or another device) advances the timer and pushes
+      // the next phase over SSE — which is what actually drives the transition,
+      // even on the device that was running it. Catch it here so the open app
+      // can sound the alarm + show the Done prompt regardless of which path won
+      // the race. Skipped on the first load so a persisted, already-expired
+      // timer isn't treated as a fresh completion.
+      const prevState = useFrogodoroStore.getState();
+      const isCompletion =
+        hasLoadedRemoteTimerRef.current &&
+        prevState.timerActive &&
+        prevState.isRunning &&
+        timer.phase !== prevState.phase;
+      const completedPhase = prevState.phase;
+
       lastRevRef.current = rev;
       lastRemoteUpdatedAtRef.current = timer.updatedAt;
       hasLoadedRemoteTimerRef.current = true;
@@ -177,8 +214,29 @@ export function GlobalTimer() {
         isRunningRef.current && timer.status === 'paused';
       suppressNextPublishRef.current = true;
       useFrogodoroStore.getState().hydrateActiveTimer(timer, serverNow);
+
+      if (isCompletion) {
+        // Natural completion → the phase ran to 0, so its elapsed is its full
+        // duration. Record it for the Done screen's summary.
+        const mins =
+          completedPhase === 'focus'
+            ? timer.settings?.focusDuration
+            : timer.settings?.breakDuration;
+        const completedFull = Math.max(1, Math.round((mins ?? 0) * 60));
+        useFrogodoroStore.getState().setPhaseElapsedResult(completedPhase, completedFull);
+
+        // A break that auto-started keeps running → a short beep marks the
+        // switch (the chosen alarm can be long; we don't want it mid-flow).
+        // Anything that lands paused is a finished session: open the popup and
+        // sound the alarm until the user clicks Done.
+        if (timer.status === 'running') {
+          playTransitionBeep();
+        } else {
+          registerCompletion(completedPhase, true);
+        }
+      }
     },
-    [],
+    [registerCompletion],
   );
 
   // Publish meaningful timer state changes, not every second.
@@ -338,8 +396,7 @@ export function GlobalTimer() {
       // Set title synchronously before tickTimer so it lands before React renders
       const m = Math.floor(remaining / 60).toString().padStart(2, '0');
       const s = (remaining % 60).toString().padStart(2, '0');
-      const icon = phaseRef.current === 'focus' ? '🐸' : '☕';
-      document.title = `${icon} ${m}:${s} - Frogress`;
+      document.title = `${m}:${s} - Frogress`;
 
       tickTimer(remaining);
 
@@ -350,12 +407,15 @@ export function GlobalTimer() {
         // server's authoritative next phase to arrive over SSE.
         if (!ownsTimerRef.current) return;
 
-        // Play finish sound (loops up to 3x, stops on user interaction)
-        playTimerSoundLooped(settingsRef.current.timerSound);
+        const completedPhase = phaseRef.current;
+        const willAutoStart =
+          completedPhase === 'focus' && settingsRef.current.autoStartBreaks;
 
         // The server is the single authority for the phase transition (and for
         // recording the completed phase's progress). Ask it to advance and apply
-        // the result; fall back to a local transition only if the request fails.
+        // the result — applyRemoteTimer detects the completion and drives the
+        // alarm + Done prompt. Fall back to a local transition only if the
+        // request fails (e.g. offline), handling the alarm here in that case.
         void (async () => {
           try {
             const res = await fetch('/api/frogodoro/advance', {
@@ -391,7 +451,13 @@ export function GlobalTimer() {
                 );
               }
             }
-            completePhase(settingsRef.current.autoStartBreaks);
+            // Offline: applyRemoteTimer never ran, so own the alarm here.
+            // completePhase sets awaitingDone (paused case) → the awaitingDone
+            // effect plays the looping alarm; an auto-started break just beeps.
+            if (willAutoStart) {
+              playTransitionBeep();
+            }
+            completePhase(willAutoStart);
           }
         })();
       }

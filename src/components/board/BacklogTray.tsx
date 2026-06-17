@@ -149,6 +149,7 @@ export default React.memo(function BacklogTray({
         icon={<Icon name="saved" className="h-6 w-6" />}
         iconContainerClassName="bg-primary/10 text-primary"
         className="md:w-[500px]"
+        backdropZ={1305}
         isDraggingAny={isDraggingAny}
         closeProgress={closeProgress}
         rightActions={

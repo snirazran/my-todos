@@ -21,7 +21,7 @@ const DEFAULT_SETTINGS: FrogodoroSettings = {
   focusDuration: 25,
   breakDuration: 5,
   autoStartBreaks: false,
-  timerSound: 'bell',
+  timerSound: 'dreamscape',
 };
 const DEFAULT_SESSION_STATS: SessionStats = {
   focusTime: 0,

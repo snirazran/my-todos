@@ -128,7 +128,8 @@
       "Bash(cp .env.local /tmp/envbak)",
       "Bash(cp /tmp/envbak .env.local)",
       "Bash(perl -0pi -e 's/\\\\n                \\\\.environment\\\\\\(\\\\\\\\\\\\.layoutDirection, \\\\.leftToRight\\\\\\)//g' __TRACKED_VAR__/ios/LiveActivitiesKit/Widget/DynamicActivityWidget.swift)",
-      "Bash(tee /tmp/pnpm_patch_out.txt)"
+      "Bash(tee /tmp/pnpm_patch_out.txt)",
+      "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 40)"
     ]
   }
 }

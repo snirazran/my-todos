@@ -13,6 +13,7 @@ import {
 import { Icon } from '@/components/ui/Icon';
 import { Button } from '@/components/ui/button';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { useRegisterOpenSheet } from '@/lib/sheetStore';
 import { useUIStore } from '@/lib/uiStore';
 import { clearAuthTokenCookie } from '@/lib/authCookie';
 import { useInventory } from '@/hooks/useInventory';
@@ -613,6 +614,10 @@ function MobileSheet({
 }: any) {
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
+  // Register this full-screen menu as an open popup so the Frogodoro timer
+  // treats it as a blocker (its finished-session popup then shows globally,
+  // above the menu, instead of behind it).
+  useRegisterOpenSheet(isOpen);
   const [view, setView] = useState<
     'main' | 'preferences' | 'notifications' | 'community' | 'profile' | 'helpCenter' | 'contact'
   >('main');

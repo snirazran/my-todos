@@ -18,7 +18,7 @@ const defaultSettings = {
   focusDuration: 25,
   breakDuration: 5,
   autoStartBreaks: false,
-  timerSound: 'bell' as const,
+  timerSound: 'dreamscape' as const,
 };
 const defaultSessionStats = {
   focusTime: 0,

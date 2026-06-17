@@ -41,6 +41,7 @@ import BacklogBox from './BacklogBox';
 import BacklogTray from './BacklogTray';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
+import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { useSheetStore } from '@/lib/sheetStore';
 
 type RepeatChoice = 'this-week' | 'weekly';
@@ -567,6 +568,16 @@ export default function TaskBoard({
   const [timerTask, setTimerTask] = useState<Task | null>(null);
   const { stackHeight: notificationStackHeight } = useNotification();
   const frogTaskId = useFrogodoroStore((s) => s.selectedTaskId);
+  const lastCompletionId = useFrogodoroStore((s) => s.lastCompletionId);
+  const lastCompletedTaskId = useFrogodoroStore((s) => s.lastCompletedTaskId);
+
+  // Planner hosts the full timer UI, so suppress the global mini overlay here.
+  const addFullTimerHost = useFrogodoroUiStore((s) => s.addFullTimerHost);
+  const removeFullTimerHost = useFrogodoroUiStore((s) => s.removeFullTimerHost);
+  useEffect(() => {
+    addFullTimerHost();
+    return () => removeFullTimerHost();
+  }, [addFullTimerHost, removeFullTimerHost]);
 
   const findTaskById = useCallback(
     (id: string | null | undefined): Task | null => {
@@ -579,6 +590,30 @@ export default function TaskBoard({
     },
     [tasksByDate, backlog],
   );
+
+  // On a finished session, prefer this page's own Frogodoro popup when nothing
+  // is blocking it; otherwise the global completion popup handles it (above any
+  // open popup). Mirrors the home page.
+  const lastHandledCompletionRef = useRef<number | null>(null);
+  const boardMountTimeRef = useRef<number>(Date.now());
+  useEffect(() => {
+    if (lastHandledCompletionRef.current === null) {
+      lastHandledCompletionRef.current = lastCompletionId;
+      return;
+    }
+    if (lastCompletionId === lastHandledCompletionRef.current) return;
+
+    const isRehydrationArtifact = Date.now() - boardMountTimeRef.current < 4000;
+    lastHandledCompletionRef.current = lastCompletionId;
+    if (isRehydrationArtifact) return;
+
+    if (useSheetStore.getState().count > 0) return;
+
+    const completedTask =
+      findTaskById(lastCompletedTaskId) ?? findTaskById(frogTaskId);
+    if (completedTask) setTimerTask(completedTask);
+    setShowTimer(true);
+  }, [lastCompletionId, lastCompletedTaskId, frogTaskId, findTaskById]);
 
   // Optimistically patch a task (and its repeat group when scope='all') across
   // the planner's local state, so detail-card edits feel instant.
