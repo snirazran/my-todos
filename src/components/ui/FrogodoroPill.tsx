@@ -17,6 +17,7 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
     timerActive,
     isRunning,
     timeLeft,
+    endTime,
     phase,
     selectedTaskId,
     settings,
@@ -57,8 +58,10 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
       ? Math.min(100, Math.max(0, ((phaseDuration - timeLeft) / phaseDuration) * 100))
       : 0;
 
-  // Play/pause toggle and stop — GlobalTimer flushes unsaved time on the
-  // isRunning→false transition, so these only need the store actions.
+  // Pause flushes unsaved time via GlobalTimer's isRunning→false effect (it
+  // preserves timeLeft). Stop does not, because stopTimer resets timeLeft to the
+  // full duration in the same update, so the flush effect sees 0 elapsed — we
+  // must persist the unsaved time here first, like handleSkip and the sheet do.
   const handlePlayPause = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isRunning) pauseTimer();
@@ -66,7 +69,41 @@ export default function FrogodoroPill({ onClick, taskName }: Props) {
   };
   const handleStop = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Capture elapsed from the absolute endTime while running (accurate even
+    // right after resuming from background, when the ticked timeLeft can be
+    // momentarily stale); from timeLeft when paused.
+    const liveElapsed =
+      isRunning && endTime
+        ? phaseDuration - Math.max(0, Math.round((endTime - Date.now()) / 1000))
+        : phaseDuration - timeLeft;
+    const unsaved = Math.max(0, liveElapsed - phaseElapsed);
+
+    // Stop the live timer first so the running session stops being counted, then
+    // apply the persisted (optimistic) increment. Otherwise, for the moment
+    // between bumping the saved total and halting the timer, the same elapsed is
+    // counted in both the saved total and the live session — a transient double.
     stopTimer();
+
+    if (selectedTaskId && unsaved > 0) {
+      const d = new Date();
+      const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const session = {
+        date: today,
+        focusTime: phase === 'focus' ? unsaved : 0,
+        breakTime: phase === 'break' ? unsaved : 0,
+      };
+      window.dispatchEvent(
+        new CustomEvent('frogodoro-progress-saved', {
+          detail: { taskId: selectedTaskId, session },
+        }),
+      );
+      void fetch(`/api/tasks/${selectedTaskId}/frogodoro`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session, timezone }),
+      }).catch(() => {});
+    }
   };
   // Skip to the next phase. completePhase advances state immediately, so we must
   // flush the unsaved elapsed time to the DB *before* calling it (GlobalTimer's

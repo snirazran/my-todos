@@ -62,7 +62,7 @@ interface FrogodoroState {
   updateSessionStats: (stats: SessionStats) => void;
   setPhaseElapsed: (elapsed: number) => void;
   resetSessionStats: () => void;
-  hydrateActiveTimer: (timer: ActiveFrogodoroTimer) => void;
+  hydrateActiveTimer: (timer: ActiveFrogodoroTimer, serverNow?: number) => void;
 }
 
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings) {
@@ -291,15 +291,26 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       updateSessionStats: (stats) => set({ sessionStats: stats }),
       setPhaseElapsed: (elapsed) => set({ phaseElapsed: elapsed }),
       resetSessionStats: () => set({ sessionStats: DEFAULT_SESSION_STATS, phaseElapsed: 0 }),
-      hydrateActiveTimer: (timer) => {
+      hydrateActiveTimer: (timer, serverNow) => {
+        const skew = (serverNow ?? Date.now()) - Date.now();
+        const serverFrameNow = serverNow ?? Date.now();
         const endsAtMs = timer.endsAt ? new Date(timer.endsAt).getTime() : null;
         const runningTimeLeft =
           timer.status === 'running' && endsAtMs
-            ? Math.max(0, Math.round((endsAtMs - Date.now()) / 1000))
+            ? Math.max(0, Math.round((endsAtMs - serverFrameNow) / 1000))
             : timer.timeLeft;
 
         const focusFull = getPhaseDuration('focus', timer.settings);
         const breakFull = getPhaseDuration('break', timer.settings);
+        const phaseFull = timer.phase === 'focus' ? focusFull : breakFull;
+
+        // A phase counts as "started" only if it's running or was paused
+        // mid-way (partial time left). A phase that was just auto-advanced into
+        // but never run (full time left, paused) is NOT started, so the Live
+        // Activity is dismissed rather than left showing a frozen/paused timer.
+        const started =
+          (timer.status === 'running' && runningTimeLeft > 0) ||
+          runningTimeLeft < phaseFull;
 
         set({
           selectedTaskId: timer.taskId,
@@ -308,8 +319,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           timerActive: true,
           isRunning: timer.status === 'running' && runningTimeLeft > 0,
           endTime:
-            timer.status === 'running' && runningTimeLeft > 0
-              ? Date.now() + runningTimeLeft * 1000
+            timer.status === 'running' && runningTimeLeft > 0 && endsAtMs
+              ? endsAtMs - skew
               : null,
           timeLeft: runningTimeLeft,
           remainingByPhase: {
@@ -317,8 +328,8 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             break: timer.phase === 'break' ? runningTimeLeft : breakFull,
           },
           startedByPhase: {
-            focus: timer.phase === 'focus',
-            break: timer.phase === 'break',
+            focus: timer.phase === 'focus' ? started : false,
+            break: timer.phase === 'break' ? started : false,
           },
           sessionStats: timer.sessionStats,
         });

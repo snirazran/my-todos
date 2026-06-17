@@ -490,7 +490,7 @@ export default function FrogodoroSheet({
                               <div className="flex items-center gap-1.5">
                                 <button
                                   type="button"
-                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: Math.max(1, localSettings.focusDuration - 5) })}
+                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: localSettings.focusDuration === 5 ? 1 : Math.max(1, localSettings.focusDuration - 5) })}
                                   className="flex items-center justify-center w-6 h-6 text-sm transition-all border rounded-full bg-background border-border/70 text-muted-foreground active:scale-90"
                                 >
                                   −
@@ -498,7 +498,7 @@ export default function FrogodoroSheet({
                                 <span className="w-12 text-sm font-black text-center text-primary tabular-nums">{formatDurationSetting(localSettings.focusDuration)}</span>
                                 <button
                                   type="button"
-                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: Math.min(120, localSettings.focusDuration + 5) })}
+                                  onClick={() => setLocalSettings({ ...localSettings, focusDuration: localSettings.focusDuration === 1 ? 5 : Math.min(120, localSettings.focusDuration + 5) })}
                                   className="flex items-center justify-center w-6 h-6 text-sm transition-all rounded-full bg-primary/10 text-primary active:scale-90"
                                 >
                                   +
@@ -653,9 +653,10 @@ export default function FrogodoroSheet({
                           {(() => {
                             const control = getDurationControl();
                             const duration = settings[control.key];
+                            const canAdjust = !isRunning && !startedByPhase[phase];
                             return (
                               <>
-                                {!isRunning && (
+                                {canAdjust && (
                                   <button
                                     type="button"
                                     onClick={() => adjustCurrentDuration(-1)}
@@ -671,7 +672,7 @@ export default function FrogodoroSheet({
                                   {formatTime(timeLeft)}
                                 </div>
 
-                                {!isRunning && (
+                                {canAdjust && (
                                   <button
                                     type="button"
                                     onClick={() => adjustCurrentDuration(1)}

@@ -106,6 +106,7 @@ export type ActiveFrogodoroTimer = {
   settings: FrogodoroSettings;
   sessionStats: SessionStats;
   updatedAt: string;
+  rev?: number;
 };
 
 export type MissedReviewProgress = {

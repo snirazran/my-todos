@@ -58,7 +58,7 @@ export function buildLiveActivityData(snap: LiveTimerSnapshot, now = Date.now())
   return {
     color,
     label,
-    subtitle: snap.isRunning ? snap.taskName || 'Frogodoro' : 'Paused',
+    subtitle: snap.isRunning ? snap.taskName : 'Paused',
     endTime,
     timeText: fmt(snap.timeLeft),
     timeFont: expandedTimeFont(widest),

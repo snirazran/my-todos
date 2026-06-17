@@ -6,6 +6,7 @@ import {
   cancelFrogodoroTimerProcessing,
   scheduleFrogodoroTimerProcessing,
 } from '@/lib/frogodoroDelayedTimer';
+import { publishTimerEvent } from '@/lib/frogodoroEvents';
 import type { PomodoroPhase } from '@/lib/frogodoroStore';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 
@@ -74,6 +75,7 @@ export async function GET() {
 
     return NextResponse.json({
       timer: user?.activeFrogodoroTimer ?? null,
+      serverNow: Date.now(),
     });
   } catch {
     return unauth();
@@ -91,21 +93,30 @@ export async function PUT(req: NextRequest) {
     }
 
     await connectMongo();
+    const existing = await UserModel.findById(userId, {
+      'activeFrogodoroTimer.rev': 1,
+    }).lean();
+    const prevRev =
+      (existing as { activeFrogodoroTimer?: { rev?: number } } | null)
+        ?.activeFrogodoroTimer?.rev ?? 0;
+    const stored: ActiveFrogodoroTimer = { ...timer, rev: prevRev + 1 };
+
     await UserModel.updateOne(
       { _id: userId },
-      { $set: { activeFrogodoroTimer: timer } },
+      { $set: { activeFrogodoroTimer: stored } },
     );
+    publishTimerEvent(userId, stored);
 
-    if (timer.status === 'running' && timer.endsAt) {
+    if (stored.status === 'running' && stored.endsAt) {
       scheduleFrogodoroTimerProcessing({
         userId,
-        endsAt: timer.endsAt,
+        endsAt: stored.endsAt,
       });
     } else {
       cancelFrogodoroTimerProcessing(userId);
     }
 
-    return NextResponse.json({ timer });
+    return NextResponse.json({ timer: stored, serverNow: Date.now() });
   } catch {
     return unauth();
   }
@@ -119,9 +130,10 @@ export async function DELETE() {
       { _id: userId },
       { $set: { activeFrogodoroTimer: null } },
     );
+    publishTimerEvent(userId, null);
     cancelFrogodoroTimerProcessing(userId);
 
-    return NextResponse.json({ timer: null });
+    return NextResponse.json({ timer: null, serverNow: Date.now() });
   } catch {
     return unauth();
   }

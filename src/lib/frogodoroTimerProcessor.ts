@@ -8,6 +8,7 @@ import {
 } from '@/lib/notifications/liveActivity';
 import { buildLiveActivityData } from '@/lib/liveActivityData';
 import { scheduleFrogodoroTimerProcessing } from '@/lib/frogodoroDelayedTimer';
+import { publishTimerEvent } from '@/lib/frogodoroEvents';
 import { syncQuestState } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
 import type {
@@ -39,6 +40,8 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
   };
   const completedDuration = getPhaseDuration(timer.phase, settings);
 
+  const boundary = timer.endsAt ? new Date(timer.endsAt).getTime() : now.getTime();
+
   if (timer.phase === 'focus') {
     const nextPhase: PomodoroPhase = 'break';
     const nextDuration = getPhaseDuration(nextPhase, settings);
@@ -54,7 +57,7 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
         status: autoStart ? 'running' : 'paused',
         timeLeft: nextDuration,
         endsAt: autoStart
-          ? new Date(now.getTime() + nextDuration * 1000).toISOString()
+          ? new Date(boundary + nextDuration * 1000).toISOString()
           : null,
         settings,
         sessionStats: {
@@ -131,6 +134,36 @@ async function saveTimerProgress({
 }
 
 export async function processDueFrogodoroTimers() {
+  const results: Array<{
+    userId: string;
+    processed: boolean;
+    sent?: number;
+    reason?: string;
+  }> = [];
+
+  let processedTotal = 0;
+
+  for (let pass = 0; pass < 10; pass++) {
+    const passProcessed = await processDuePass(results);
+    processedTotal += passProcessed;
+    if (passProcessed === 0) break;
+  }
+
+  return {
+    ok: true,
+    processed: processedTotal,
+    results,
+  };
+}
+
+async function processDuePass(
+  results: Array<{
+    userId: string;
+    processed: boolean;
+    sent?: number;
+    reason?: string;
+  }>,
+): Promise<number> {
   const now = new Date();
   const users = await UserModel.find({
     'activeFrogodoroTimer.status': 'running',
@@ -141,113 +174,153 @@ export async function processDueFrogodoroTimers() {
     .lean()
     .exec();
 
-  const results: Array<{
-    userId: string;
-    processed: boolean;
-    sent?: number;
-    reason?: string;
-  }> = [];
+  let processed = 0;
 
   for (const user of users) {
-    const userId = String((user as any)._id);
-    const timer = (user as any).activeFrogodoroTimer as ActiveFrogodoroTimer;
-    const prefs = (user as any).notificationPrefs as NotificationPrefs | undefined;
+    const outcome = await processOneDueTimer(user, now);
+    results.push(outcome.result);
+    if (outcome.processed) processed += 1;
+  }
 
-    if (!timer?.taskId || !timer.endsAt) {
-      results.push({ userId, processed: false, reason: 'invalid_timer' });
-      continue;
-    }
+  return processed;
+}
 
-    const next = getNextTimer(timer, now);
-    const claim = await UserModel.updateOne(
-      {
-        _id: userId,
-        'activeFrogodoroTimer.status': 'running',
-        'activeFrogodoroTimer.endsAt': timer.endsAt,
-      },
-      { $set: { activeFrogodoroTimer: next.nextTimer } },
-    );
+type ProcessResult = {
+  userId: string;
+  processed: boolean;
+  sent?: number;
+  reason?: string;
+};
 
-    if (claim.modifiedCount !== 1) {
-      results.push({ userId, processed: false, reason: 'already_claimed' });
-      continue;
-    }
+async function processOneDueTimer(
+  user: unknown,
+  now: Date,
+): Promise<{ processed: boolean; result: ProcessResult; timer?: ActiveFrogodoroTimer }> {
+  const userId = String((user as any)._id);
+  const timer = (user as any).activeFrogodoroTimer as ActiveFrogodoroTimer;
+  const prefs = (user as any).notificationPrefs as NotificationPrefs | undefined;
 
-    const timezone = prefs?.timezone || 'UTC';
-    await saveTimerProgress({
-      userId,
-      taskId: timer.taskId,
-      phase: next.completedPhase,
-      seconds: next.completedDuration,
-      timezone,
-    });
+  if (!timer?.taskId || !timer.endsAt) {
+    return { processed: false, result: { userId, processed: false, reason: 'invalid_timer' } };
+  }
 
-    const tokens = prefs?.enabled ? prefs.fcmTokens ?? [] : [];
-    const push = await sendTimerPushToUser({
-      userId,
-      phase: next.completedPhase,
-      autoStartBreak: next.autoStartBreak,
-      tokens,
-    });
+  const next = getNextTimer(timer, now);
+  const nextTimer: ActiveFrogodoroTimer = {
+    ...next.nextTimer,
+    rev: (timer.rev ?? 0) + 1,
+  };
 
-    const live = (user as any).liveActivity as LiveActivityRef | null | undefined;
-    if (live?.id && live.pushToken) {
-      if (next.autoStartBreak && next.nextTimer.endsAt) {
-        const endTime = new Date(next.nextTimer.endsAt).getTime();
-        const total = next.nextTimer.timeLeft;
-        const data = buildLiveActivityData(
-          {
-            active: true,
-            isRunning: true,
-            phase: 'break',
-            endTime,
-            timeLeft: total,
-            totalSeconds: total,
-            taskName: '',
-          },
-          now.getTime(),
-        );
-        await sendLiveActivityUpdate({
-          pushToken: live.pushToken,
-          activityId: live.id,
-          data,
-          staleDate: endTime,
-        });
-      } else {
-        const data = buildLiveActivityData(
-          {
-            active: true,
-            isRunning: false,
-            phase: next.nextTimer.phase,
-            endTime: 0,
-            timeLeft: next.nextTimer.timeLeft,
-            totalSeconds: next.nextTimer.timeLeft,
-            taskName: '',
-          },
-          now.getTime(),
-        );
-        await sendLiveActivityEnd({
-          pushToken: live.pushToken,
-          activityId: live.id,
-          data,
-        });
-        await UserModel.updateOne({ _id: userId }, { $set: { liveActivity: null } });
-      }
-    }
+  const claim = await UserModel.updateOne(
+    {
+      _id: userId,
+      'activeFrogodoroTimer.status': 'running',
+      'activeFrogodoroTimer.endsAt': timer.endsAt,
+    },
+    { $set: { activeFrogodoroTimer: nextTimer } },
+  );
 
-    if (next.nextTimer.status === 'running' && next.nextTimer.endsAt) {
-      scheduleFrogodoroTimerProcessing({
-        userId,
-        endsAt: next.nextTimer.endsAt,
+  if (claim.modifiedCount !== 1) {
+    return { processed: false, result: { userId, processed: false, reason: 'already_claimed' } };
+  }
+
+  publishTimerEvent(userId, nextTimer);
+
+  const timezone = prefs?.timezone || 'UTC';
+  await saveTimerProgress({
+    userId,
+    taskId: timer.taskId,
+    phase: next.completedPhase,
+    seconds: next.completedDuration,
+    timezone,
+  });
+
+  const tokens = prefs?.enabled ? prefs.fcmTokens ?? [] : [];
+  const push = await sendTimerPushToUser({
+    userId,
+    phase: next.completedPhase,
+    autoStartBreak: next.autoStartBreak,
+    tokens,
+  });
+
+  const live = (user as any).liveActivity as LiveActivityRef | null | undefined;
+  if (live?.id && live.pushToken) {
+    const breakEndsAt = nextTimer.endsAt ? new Date(nextTimer.endsAt).getTime() : 0;
+    if (next.autoStartBreak && breakEndsAt > now.getTime()) {
+      const endTime = breakEndsAt;
+      const total = nextTimer.timeLeft;
+      const data = buildLiveActivityData(
+        {
+          active: true,
+          isRunning: true,
+          phase: 'break',
+          endTime,
+          timeLeft: total,
+          totalSeconds: total,
+          taskName: '',
+        },
+        now.getTime(),
+      );
+      await sendLiveActivityUpdate({
+        pushToken: live.pushToken,
+        activityId: live.id,
+        data,
+        staleDate: endTime,
       });
+    } else if (!next.autoStartBreak) {
+      const data = buildLiveActivityData(
+        {
+          active: true,
+          isRunning: false,
+          phase: nextTimer.phase,
+          endTime: 0,
+          timeLeft: nextTimer.timeLeft,
+          totalSeconds: nextTimer.timeLeft,
+          taskName: '',
+        },
+        now.getTime(),
+      );
+      await sendLiveActivityEnd({
+        pushToken: live.pushToken,
+        activityId: live.id,
+        data,
+      });
+      await UserModel.updateOne({ _id: userId }, { $set: { liveActivity: null } });
     }
+  }
 
-    results.push({ userId, processed: true, sent: push.sent });
+  if (nextTimer.status === 'running' && nextTimer.endsAt) {
+    scheduleFrogodoroTimerProcessing({ userId, endsAt: nextTimer.endsAt });
   }
 
   return {
-    ok: true,
-    processed: results.filter((result) => result.processed).length,
-    results,
+    processed: true,
+    timer: nextTimer,
+    result: { userId, processed: true, sent: push.sent },
   };
+}
+
+const ADVANCE_TOLERANCE_MS = 1500;
+
+export async function advanceUserTimer(
+  userId: string,
+): Promise<ActiveFrogodoroTimer | null> {
+  const now = new Date();
+  const user = await UserModel.findById(userId)
+    .select('_id activeFrogodoroTimer notificationPrefs liveActivity')
+    .lean()
+    .exec();
+
+  const timer = (user as any)?.activeFrogodoroTimer as
+    | ActiveFrogodoroTimer
+    | null
+    | undefined;
+  if (!timer) return null;
+
+  const endsAtMs = timer.endsAt ? new Date(timer.endsAt).getTime() : 0;
+  const isDue =
+    timer.status === 'running' && endsAtMs > 0 && endsAtMs <= now.getTime() + ADVANCE_TOLERANCE_MS;
+  if (!isDue) return timer;
+
+  const outcome = await processOneDueTimer(user, now);
+  return outcome.timer ?? timer;
 }

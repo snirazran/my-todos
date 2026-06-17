@@ -32,6 +32,7 @@ const FrogTimer = registerPlugin<FrogTimerPlugin>('FrogTimer');
 
 let activityId: string | null = null;
 let signature: string | null = null;
+let currentMode: 'run' | 'pause' | null = null;
 let tokenListenerReady = false;
 
 async function putPushToken(id: string, token: string): Promise<void> {
@@ -268,6 +269,7 @@ async function endAllIosActivities(): Promise<void> {
     console.error('getAllActivities failed:', err);
   }
   activityId = null;
+  currentMode = null;
 }
 
 async function getCurrentIosActivityId(): Promise<string | null> {
@@ -275,7 +277,12 @@ async function getCurrentIosActivityId(): Promise<string | null> {
   try {
     const result = await LiveActivities.getAllActivities();
     const activities = ((result as any).activities ?? []) as any[];
-    const active = activities.find((a: any) => a.state === 'active') ?? activities[0];
+    // Only reuse a genuinely live activity. An ended/dismissed one can't be
+    // revived via updateActivity, so falling back to it would silently no-op
+    // (the "continue → no island" bug); return null to start a fresh one.
+    const active = activities.find(
+      (a: any) => a.state === 'active' || a.state === 'stale',
+    );
     const id = active?.id;
     activityId = typeof id === 'string' ? id : null;
     return activityId;
@@ -323,14 +330,28 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
 
   ensureTokenListener();
 
+  const desiredMode: 'run' | 'pause' =
+    snap.isRunning && snap.endTime ? 'run' : 'pause';
+
   try {
     const existingId = await getCurrentIosActivityId();
-    if (existingId) {
+
+    // The layout's countdown element type (a self-updating `timer` vs a static
+    // `text`) is fixed when the activity is created and can't be swapped via
+    // updateActivity. So a value-only change within the same mode is an update,
+    // but a run↔pause flip must end the old activity and start a fresh one —
+    // otherwise a frozen `timer` element fed a 0/paused endTime renders
+    // "Invalid Timer".
+    if (existingId && currentMode === desiredMode) {
       await LiveActivities.updateActivity({
         activityId: existingId,
         data: buildLiveActivityData(snap),
       } as any);
       return;
+    }
+
+    if (existingId) {
+      await endAllIosActivities();
     }
 
     const { activityId: id } = await LiveActivities.startActivity({
@@ -344,6 +365,7 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
       staleDate: snap.endTime ?? undefined,
     } as any);
     activityId = id;
+    currentMode = desiredMode;
   } catch (err) {
     console.error('startActivity failed:', err);
     signature = null;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useFrogodoroStore, PomodoroPhase, FrogodoroSettings } from '@/lib/frogodoroStore';
 import { playTimerSoundLooped, unlockAudio } from '@/lib/timerSounds';
 import {
@@ -39,7 +39,6 @@ export function GlobalTimer() {
     tickTimer,
     completePhase,
     setPhaseElapsed,
-    hydrateActiveTimer,
   } = useFrogodoroStore();
 
   const prevIsRunning = useRef(isRunning);
@@ -50,6 +49,10 @@ export function GlobalTimer() {
   const hasLoadedRemoteTimerRef = useRef(false);
   const lastRemoteUpdatedAtRef = useRef('');
   const lastPublishedSignatureRef = useRef('');
+  const lastRevRef = useRef(-1);
+  const isRunningRef = useRef(isRunning);
+
+  useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
 
   // Unlock AudioContext on first user interaction (required for mobile)
   useEffect(() => {
@@ -121,6 +124,9 @@ export function GlobalTimer() {
       if (data?.timer?.updatedAt) {
         lastRemoteUpdatedAtRef.current = data.timer.updatedAt;
       }
+      if (typeof data?.timer?.rev === 'number') {
+        lastRevRef.current = data.timer.rev;
+      }
     } catch {
       // Cross-device timer sync is best-effort.
     }
@@ -134,10 +140,46 @@ export function GlobalTimer() {
       });
       lastRemoteUpdatedAtRef.current = '';
       lastPublishedSignatureRef.current = '';
+      lastRevRef.current = -1;
     } catch {
       // Cross-device timer sync is best-effort.
     }
   };
+
+  // Single entry point for applying server-authoritative timer state, whether
+  // it arrives via SSE, the initial GET, a resync, or the advance response.
+  const applyRemoteTimer = useCallback(
+    (timer: ActiveFrogodoroTimer | null, serverNow: number) => {
+      if (!timer?.updatedAt) {
+        if (!hasLoadedRemoteTimerRef.current) {
+          const store = useFrogodoroStore.getState();
+          if (store.timerActive) {
+            suppressNextPublishRef.current = true;
+            store.stopTimer();
+          }
+        }
+        hasLoadedRemoteTimerRef.current = true;
+        lastRevRef.current = -1;
+        lastRemoteUpdatedAtRef.current = '';
+        return;
+      }
+
+      const rev = typeof timer.rev === 'number' ? timer.rev : 0;
+      if (hasLoadedRemoteTimerRef.current && rev <= lastRevRef.current) {
+        return;
+      }
+
+      lastRevRef.current = rev;
+      lastRemoteUpdatedAtRef.current = timer.updatedAt;
+      hasLoadedRemoteTimerRef.current = true;
+      ownsTimerRef.current = timer.clientId === clientIdRef.current;
+      suppressNextPauseSaveRef.current =
+        isRunningRef.current && timer.status === 'paused';
+      suppressNextPublishRef.current = true;
+      useFrogodoroStore.getState().hydrateActiveTimer(timer, serverNow);
+    },
+    [],
+  );
 
   // Publish meaningful timer state changes, not every second.
   useEffect(() => {
@@ -185,54 +227,73 @@ export function GlobalTimer() {
     void publishActiveTimer(timer);
   }, [endTime, isRunning, phase, selectedTaskId, sessionStats, settings, timerActive]);
 
-  // Poll for timer changes started from another app window/device.
+  // Sync timer state across windows/devices in real time via SSE. A GET resync
+  // gates the (authenticated) connection — logged-out users get a 401 and never
+  // open the stream — and also serves as a periodic + on-focus backstop that
+  // re-establishes the stream if it drops (e.g. iOS suspending the app).
   useEffect(() => {
-    const loadActiveTimer = async () => {
+    let cancelled = false;
+    let es: EventSource | null = null;
+
+    const connect = () => {
+      if (es || cancelled) return;
+      try {
+        const source = new EventSource('/api/frogodoro/stream', {
+          withCredentials: true,
+        });
+        source.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data) as {
+              timer: ActiveFrogodoroTimer | null;
+              serverNow: number;
+            };
+            applyRemoteTimer(data.timer, data.serverNow ?? Date.now());
+          } catch {
+            // ignore malformed events
+          }
+        };
+        source.onerror = () => {
+          source.close();
+          if (es === source) es = null;
+        };
+        es = source;
+      } catch {
+        es = null;
+      }
+    };
+
+    const resync = async () => {
       try {
         const res = await fetch('/api/frogodoro/active', {
           credentials: 'include',
         });
-        if (!res.ok) return;
+        if (!res.ok || cancelled) return;
         const data = await res.json();
-        const timer = data?.timer as ActiveFrogodoroTimer | null;
-        if (!timer?.updatedAt) {
-          // localStorage persists `timerActive: true` across sessions. On
-          // the first poll, if the server confirms there's no timer, clear
-          // the stale local state so the FrogodoroPill doesn't stick
-          // around pointing at a task that no longer exists.
-          if (!hasLoadedRemoteTimerRef.current) {
-            const store = useFrogodoroStore.getState();
-            if (store.timerActive) {
-              suppressNextPublishRef.current = true;
-              store.stopTimer();
-            }
-          }
-          hasLoadedRemoteTimerRef.current = true;
-          return;
-        }
-
-        if (timer.updatedAt === lastRemoteUpdatedAtRef.current) {
-          hasLoadedRemoteTimerRef.current = true;
-          return;
-        }
-
-        lastRemoteUpdatedAtRef.current = timer.updatedAt;
-        hasLoadedRemoteTimerRef.current = true;
-        ownsTimerRef.current = timer.clientId === clientIdRef.current;
-        suppressNextPauseSaveRef.current = isRunning && timer.status === 'paused';
-        suppressNextPublishRef.current = true;
-        hydrateActiveTimer(timer);
+        applyRemoteTimer(
+          (data?.timer as ActiveFrogodoroTimer | null) ?? null,
+          typeof data?.serverNow === 'number' ? data.serverNow : Date.now(),
+        );
+        connect();
       } catch {
         // Cross-device timer sync is best-effort.
       }
     };
 
-    void loadActiveTimer();
-    if (!timerActive) return;
+    void resync();
+    const interval = window.setInterval(resync, 30000);
 
-    const interval = window.setInterval(loadActiveTimer, 5000);
-    return () => window.clearInterval(interval);
-  }, [hydrateActiveTimer, isRunning, timerActive]);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void resync();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+      es?.close();
+    };
+  }, [applyRemoteTimer]);
 
   // Detect pause/stop to flush partial time for any phase
   useEffect(() => {
@@ -285,30 +346,59 @@ export function GlobalTimer() {
       if (remaining === 0) {
         clearInterval(interval);
 
+        // The non-owning device never drives the transition; it waits for the
+        // server's authoritative next phase to arrive over SSE.
         if (!ownsTimerRef.current) return;
 
         // Play finish sound (loops up to 3x, stops on user interaction)
         playTimerSoundLooped(settingsRef.current.timerSound);
 
-        // Auto Save on Complete — save the full phase duration
-        if (selectedTaskIdRef.current) {
-          const phaseDuration = getPhaseDuration(phaseRef.current, settingsRef.current);
-          const unsavedElapsed = Math.max(0, phaseDuration - phaseElapsedRef.current);
-          if (unsavedElapsed > 0) {
-            saveProgress(selectedTaskIdRef.current, phaseRef.current, unsavedElapsed);
+        // The server is the single authority for the phase transition (and for
+        // recording the completed phase's progress). Ask it to advance and apply
+        // the result; fall back to a local transition only if the request fails.
+        void (async () => {
+          try {
+            const res = await fetch('/api/frogodoro/advance', {
+              method: 'POST',
+              credentials: 'include',
+            });
+            if (res.ok) {
+              const data = await res.json();
+              if (data?.timer) {
+                applyRemoteTimer(
+                  data.timer as ActiveFrogodoroTimer,
+                  typeof data.serverNow === 'number' ? data.serverNow : Date.now(),
+                );
+                return;
+              }
+            }
+            throw new Error('advance failed');
+          } catch {
+            if (selectedTaskIdRef.current) {
+              const phaseDuration = getPhaseDuration(
+                phaseRef.current,
+                settingsRef.current,
+              );
+              const unsavedElapsed = Math.max(
+                0,
+                phaseDuration - phaseElapsedRef.current,
+              );
+              if (unsavedElapsed > 0) {
+                saveProgress(
+                  selectedTaskIdRef.current,
+                  phaseRef.current,
+                  unsavedElapsed,
+                );
+              }
+            }
+            completePhase(settingsRef.current.autoStartBreaks);
           }
-        }
-
-        // Completion delivery is handled by the local notification scheduled at
-        // phase start (see the effect below) — it fires even if the app is
-        // closed, so we don't send a push here (which also caused duplicates).
-
-        completePhase(settingsRef.current.autoStartBreaks);
+        })();
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isRunning, endTime, completePhase, tickTimer]);
+  }, [isRunning, endTime, completePhase, tickTimer, applyRemoteTimer]);
 
   // Schedule the OS-level completion notification whenever a phase is running,
   // so it lands on time regardless of whether the app is open. Only the device
