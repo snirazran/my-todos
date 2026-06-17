@@ -83,7 +83,7 @@ export default function FrogodoroSheet({
 
   const [localSettings, setLocalSettings] = useState(settings);
   const { canEnable: canEnableNotifs, enableOrConfigure } = useNotificationStatus();
-  const showTimerTestSettings = process.env.NODE_ENV !== 'production';
+  const showTimerTestSettings = true;
 
   useEffect(() => {
     setMounted(true);
