@@ -2168,12 +2168,16 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
       });
       continue;
     }
-    if (doc.type === 'weekly' && typeof doc.dayOfWeek === 'number') {
-      // expand into every matching date in the window
+    // A weekly doc is expanded by exactly ONE rule, in priority order:
+    // custom repeatRule → monthly → legacy dayOfWeek. These must be mutually
+    // exclusive — a custom/monthly doc can still carry a stale `dayOfWeek`
+    // field, and evaluating both would emit the same occurrence twice (the
+    // planner duplicate bug). Mirrors siblingOccursOn's precedence.
+    if (doc.repeatRule) {
+      // custom interval recurrence — evaluate each date in the window
       const repeatStart = repeatStartForDoc(doc, tz);
       for (const d of dates) {
-        if (dowFromYMD(d) !== doc.dayOfWeek) continue;
-        if (repeatStart && d < repeatStart) continue;
+        if (!customOccursOn(doc, d)) continue;
         if (isAfterRepeatEnd(doc, d)) continue;
         if ((doc.suppressedDates ?? []).includes(d)) continue;
         byDate[d].push({
@@ -2186,10 +2190,10 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           notes: doc.notes ?? '',
           checklist: doc.checklist ?? [],
           repeatMode: doc.repeatMode,
-          repeatGroupId: doc.repeatGroupId,
           repeatStartDate: repeatStart,
           repeatEndDate: doc.repeatEndDate,
-          dayOfWeek: doc.dayOfWeek,
+          repeatRule: doc.repeatRule,
+          dayOfWeek: dowFromYMD(d),
           frogodoroSession:
             doc.frogodoroSessions?.find((s) => s.date === d) ?? null,
           calendarEventId: doc.calendarEventId,
@@ -2198,8 +2202,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           reminder: doc.reminder,
         });
       }
-    }
-    if (doc.repeatMode === 'monthly' && typeof doc.repeatDayOfMonth === 'number') {
+    } else if (doc.repeatMode === 'monthly' && typeof doc.repeatDayOfMonth === 'number') {
       // expand monthly repeat onto the matching day-of-month in each month
       const repeatStart = repeatStartForDoc(doc, tz);
       for (const d of dates) {
@@ -2229,12 +2232,12 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           reminder: doc.reminder,
         });
       }
-    }
-    if (doc.repeatRule) {
-      // custom interval recurrence — evaluate each date in the window
+    } else if (doc.type === 'weekly' && typeof doc.dayOfWeek === 'number') {
+      // legacy weekly (dayOfWeek) — expand into every matching date in the window
       const repeatStart = repeatStartForDoc(doc, tz);
       for (const d of dates) {
-        if (!customOccursOn(doc, d)) continue;
+        if (dowFromYMD(d) !== doc.dayOfWeek) continue;
+        if (repeatStart && d < repeatStart) continue;
         if (isAfterRepeatEnd(doc, d)) continue;
         if ((doc.suppressedDates ?? []).includes(d)) continue;
         byDate[d].push({
@@ -2247,10 +2250,10 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
           notes: doc.notes ?? '',
           checklist: doc.checklist ?? [],
           repeatMode: doc.repeatMode,
+          repeatGroupId: doc.repeatGroupId,
           repeatStartDate: repeatStart,
           repeatEndDate: doc.repeatEndDate,
-          repeatRule: doc.repeatRule,
-          dayOfWeek: dowFromYMD(d),
+          dayOfWeek: doc.dayOfWeek,
           frogodoroSession:
             doc.frogodoroSessions?.find((s) => s.date === d) ?? null,
           calendarEventId: doc.calendarEventId,
