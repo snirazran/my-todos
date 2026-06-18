@@ -50,32 +50,46 @@ private struct TimeView: View {
 @available(iOS 16.1, *)
 private struct RingView: View {
     let state: FrogTimerAttributes.ContentState
+    var size: CGFloat
     var lineWidth: CGFloat
 
     var body: some View {
+        let tint = Color(hex: state.color)
+        let running = !state.paused && state.endTime > 0 && state.ringEnd > state.ringStart
         ZStack {
-            Circle()
-                .stroke(Color(hex: state.color).opacity(0.25), lineWidth: lineWidth)
-            if state.paused || state.endTime <= 0 {
-                Circle()
-                    .trim(from: 0, to: ringFraction(state))
-                    .stroke(
-                        Color(hex: state.color),
-                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round)
-                    )
-                    .rotationEffect(.degrees(-90))
-            } else {
-                let start = Date(timeIntervalSince1970: state.ringStart / 1000)
-                let end = Date(timeIntervalSince1970: state.ringEnd / 1000)
-                ProgressView(timerInterval: start...end, countsDown: true) {
-                    EmptyView()
-                } currentValueLabel: {
-                    EmptyView()
+            // Both states use the same scaled circular ProgressView so the ring
+            // size + thickness are identical: a self-ticking timer while running,
+            // a fixed-fraction ring while paused. (System renders at ~20pt, so
+            // scale up to the target size.)
+            Group {
+                if running {
+                    let start = Date(timeIntervalSince1970: state.ringStart / 1000)
+                    let end = Date(timeIntervalSince1970: state.ringEnd / 1000)
+                    ProgressView(timerInterval: start...end, countsDown: true) {
+                        EmptyView()
+                    } currentValueLabel: {
+                        EmptyView()
+                    }
+                    .progressViewStyle(.circular)
+                    .tint(tint)
+                } else {
+                    ProgressView(value: ringFraction(state), total: 1.0)
+                        .progressViewStyle(.circular)
+                        .tint(tint.opacity(state.paused ? 0.6 : 1))
                 }
-                .progressViewStyle(.circular)
-                .tint(Color(hex: state.color))
+            }
+            .scaleEffect(size / 20.0)
+            .frame(width: size, height: size)
+
+            if state.paused {
+                Image(systemName: "pause.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size * 0.32, height: size * 0.32)
+                    .foregroundColor(tint.opacity(0.9))
             }
         }
+        .frame(width: size, height: size)
     }
 }
 
@@ -91,29 +105,29 @@ struct FrogTimerLiveActivity: Widget {
             let state = context.state
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    RingView(state: state, lineWidth: 5)
-                        .frame(width: 34, height: 34)
+                    RingView(state: state, size: 34, lineWidth: 5)
                         .padding(.horizontal, 12)
+                        .frame(maxHeight: .infinity, alignment: .center)
                 }
                 DynamicIslandExpandedRegion(.center) {
                     Text(state.label)
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(Color(hex: state.color))
                         .lineLimit(1)
+                        .frame(maxHeight: .infinity, alignment: .center)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     TimeView(state: state, font: .system(size: 26, weight: .light))
                         .frame(maxWidth: 90, alignment: .trailing)
+                        .frame(maxHeight: .infinity, alignment: .center)
                 }
             } compactLeading: {
-                RingView(state: state, lineWidth: 2.5)
-                    .frame(width: 20, height: 20)
+                RingView(state: state, size: 20, lineWidth: 2.5)
             } compactTrailing: {
                 TimeView(state: state, font: .system(size: 14))
                     .frame(width: 54, alignment: .trailing)
             } minimal: {
-                RingView(state: state, lineWidth: 2.5)
-                    .frame(width: 20, height: 20)
+                RingView(state: state, size: 20, lineWidth: 2.5)
             }
             .keylineTint(Color(hex: state.color))
         }
@@ -135,8 +149,8 @@ struct FrogTimerLiveActivity: Widget {
                 }
             }
             Spacer()
-            RingView(state: state, lineWidth: 4)
-                .frame(width: 36, height: 36)
+            RingView(state: state, size: 34, lineWidth: 4)
+                .padding(.trailing, 12)
         }
     }
 }
