@@ -16,10 +16,15 @@ export async function GET() {
   }
 
   await connectMongo();
-  const user = await UserModel.findById(userId, { activeFrogodoroTimer: 1 }).lean();
+  const user = await UserModel.findById(userId, {
+    activeFrogodoroTimer: 1,
+    frogodoroSeq: 1,
+  }).lean();
   const initial =
     (user as { activeFrogodoroTimer?: ActiveFrogodoroTimer | null } | null)
       ?.activeFrogodoroTimer ?? null;
+  const initialSeq =
+    (user as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
 
   const encoder = new TextEncoder();
   let cleanup = () => {};
@@ -36,7 +41,7 @@ export async function GET() {
         }
       };
 
-      send({ timer: initial, serverNow: Date.now() });
+      send({ timer: initial, serverNow: Date.now(), seq: initialSeq });
 
       const unsubscribe = subscribeTimer(userId, send);
 

@@ -3,6 +3,7 @@ import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 export type TimerEvent = {
   timer: ActiveFrogodoroTimer | null;
   serverNow: number;
+  seq: number;
 };
 
 type Subscriber = (event: TimerEvent) => void;
@@ -45,10 +46,11 @@ export function hasActiveTimerSubscriber(userId: string): boolean {
 export function publishTimerEvent(
   userId: string,
   timer: ActiveFrogodoroTimer | null,
+  seq: number,
 ): void {
   const set = getBus().get(userId);
   if (!set || set.size === 0) return;
-  const event: TimerEvent = { timer, serverNow: Date.now() };
+  const event: TimerEvent = { timer, serverNow: Date.now(), seq };
   set.forEach((fn) => {
     try {
       fn(event);

@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       user = (await UserModel.findOne(
         {
           $or: [
+            { 'notificationPrefs.fcmTokens': token },
             { 'liveActivity.pushToken': token },
             { liveActivityStartToken: token },
           ],
@@ -122,11 +123,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    await UserModel.updateOne(
+    const updated = await UserModel.findOneAndUpdate(
       { _id: userId },
-      { $set: { activeFrogodoroTimer: next } },
-    );
-    publishTimerEvent(userId, next);
+      { $set: { activeFrogodoroTimer: next }, $inc: { frogodoroSeq: 1 } },
+      { new: true, projection: { frogodoroSeq: 1 } },
+    ).lean();
+    const seq = (updated as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
+    publishTimerEvent(userId, next, seq);
 
     if (next.status === 'running' && next.endsAt) {
       scheduleFrogodoroTimerProcessing({ userId, endsAt: next.endsAt });

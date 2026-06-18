@@ -85,6 +85,11 @@ export type UserDoc = {
   calendarAccessToken?: string;
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   activeFrogodoroTimer?: ActiveFrogodoroTimer | null;
+  // Monotonic counter bumped on every timer state write (start/pause/resume/
+  // stop/done/advance/clear). Every timer response + SSE event carries the seq
+  // of the state it represents, so clients can ignore out-of-order/stale events
+  // (including nulls) deterministically.
+  frogodoroSeq?: number;
   liveActivity?: LiveActivityRef | null;
   // Push-to-start token for the iOS Live Activity (iOS 17.2+). Persists across
   // activities, so the server can create the island via APNs while the app is

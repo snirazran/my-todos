@@ -19,6 +19,7 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "registerPushToStart", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setApiOrigin", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setControlToken", returnType: CAPPluginReturnPromise),
     ]
 
     @available(iOS 16.2, *)
@@ -28,6 +29,19 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     }
     private var _current: Any?
 
+    // All activity operations run through this serial chain so concurrent
+    // show()/end() calls can never race into creating duplicate activities.
+    // Each op awaits the previous one before running.
+    private var opChain: Task<Void, Never>?
+
+    private func enqueue(_ work: @escaping () async -> Void) {
+        let previous = opChain
+        opChain = Task {
+            await previous?.value
+            await work()
+        }
+    }
+
     @objc func show(_ call: CAPPluginCall) {
         guard #available(iOS 16.2, *) else { call.resolve(); return }
         guard let data = call.getObject("data") else {
@@ -36,14 +50,25 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
         let state = Self.state(from: data)
 
-        Task {
+        enqueue {
             do {
                 let content = ActivityContent(state: state, staleDate: self.staleDate(state))
-                if let activity = self.activeActivity() {
+
+                // Reconcile to exactly one activity. Reuse our own, else adopt an
+                // existing live one, else create. Then end any extras so the set
+                // never grows (which would churn the push token).
+                var activity = self.current
+                if activity == nil
+                    || !(activity!.activityState == .active || activity!.activityState == .stale) {
+                    activity = Activity<FrogTimerAttributes>.activities.first {
+                        $0.activityState == .active || $0.activityState == .stale
+                    }
+                }
+
+                if let activity {
+                    self.current = activity
+                    self.observe(activity)
                     if state.finished == true {
-                        // Ring locally (auto-expand + sound). The server only
-                        // fires its APNs alert when NO client is connected (app
-                        // closed), so the two never double up.
                         await activity.update(
                             content,
                             alertConfiguration: AlertConfiguration(
@@ -55,16 +80,19 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                     } else {
                         await activity.update(content)
                     }
+                    for extra in Activity<FrogTimerAttributes>.activities where extra.id != activity.id {
+                        await extra.end(nil, dismissalPolicy: .immediate)
+                    }
                     call.resolve(["activityId": activity.id])
                 } else {
-                    let activity = try Activity.request(
+                    let created = try Activity.request(
                         attributes: FrogTimerAttributes(),
                         content: content,
                         pushType: .token
                     )
-                    self.current = activity
-                    self.observe(activity)
-                    call.resolve(["activityId": activity.id])
+                    self.current = created
+                    self.observe(created)
+                    call.resolve(["activityId": created.id])
                 }
             } catch {
                 call.reject("startActivity failed: \(error.localizedDescription)")
@@ -74,11 +102,14 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func end(_ call: CAPPluginCall) {
         guard #available(iOS 16.2, *) else { call.resolve(); return }
-        Task {
+        enqueue {
             for activity in Activity<FrogTimerAttributes>.activities {
                 await activity.end(nil, dismissalPolicy: .immediate)
             }
             self.current = nil
+            self.observeTask?.cancel()
+            self.observeTask = nil
+            self.observedId = nil
             call.resolve()
         }
     }
@@ -87,6 +118,17 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         if let origin = call.getString("origin"), !origin.isEmpty {
             UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")?
                 .set(origin, forKey: "frogApiOrigin")
+        }
+        call.resolve()
+    }
+
+    // The stable per-install identity (FCM token) the Live Activity button intent
+    // uses to authenticate /control. Unlike the activity push token it doesn't
+    // change when the activity is recreated, so buttons keep working.
+    @objc func setControlToken(_ call: CAPPluginCall) {
+        if let token = call.getString("token"), !token.isEmpty {
+            UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")?
+                .set(token, forKey: "frogControlToken")
         }
         call.resolve()
     }
@@ -104,22 +146,17 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
-    @available(iOS 16.2, *)
-    private func activeActivity() -> Activity<FrogTimerAttributes>? {
-        if let current = self.current,
-           current.activityState == .active || current.activityState == .stale {
-            return current
-        }
-        let live = Activity<FrogTimerAttributes>.activities.first {
-            $0.activityState == .active || $0.activityState == .stale
-        }
-        self.current = live
-        return live
-    }
+    private var observeTask: Task<Void, Never>?
+    private var observedId: String?
 
     @available(iOS 16.2, *)
     private func observe(_ activity: Activity<FrogTimerAttributes>) {
-        Task {
+        // Only one observer per activity — re-observing the same one would stack
+        // duplicate pushToken listeners.
+        if observedId == activity.id { return }
+        observeTask?.cancel()
+        observedId = activity.id
+        observeTask = Task {
             for await tokenData in activity.pushTokenUpdates {
                 let token = tokenData.map { String(format: "%02x", $0) }.joined()
                 Self.storeToken(token, key: "frogActivityPushToken")

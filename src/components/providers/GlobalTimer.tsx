@@ -56,19 +56,12 @@ export function GlobalTimer() {
   const suppressNextPauseSaveRef = useRef(false);
   const suppressNextPublishRef = useRef(false);
   const hasLoadedRemoteTimerRef = useRef(false);
-  // True once we've actually loaded a real (non-null) server timer this session.
-  // Lets us tell a genuine remote clear (stop/done) apart from a transient or
-  // initial null — so a null never wipes a locally-started timer that simply
-  // hasn't been published to the server yet.
-  const hadRemoteTimerRef = useRef(false);
-  // Timestamp + payload of the last running timer we published. Lets us detect a
-  // stale `null` that races our own start (e.g. the initial resync GET that
-  // queried before our PUT landed) and re-assert instead of wiping the timer.
-  const lastRunningPublishAtRef = useRef(0);
-  const lastPublishedTimerRef = useRef<Omit<ActiveFrogodoroTimer, 'updatedAt'> | null>(null);
+  // Highest server seq we've applied. Every timer event carries the seq of the
+  // state it represents; we ignore anything not strictly newer, which orders all
+  // events (incl. clears) deterministically and kills stale/out-of-order races.
+  const lastSeqRef = useRef(-1);
   const lastRemoteUpdatedAtRef = useRef('');
   const lastPublishedSignatureRef = useRef('');
-  const lastRevRef = useRef(-1);
   const isRunningRef = useRef(isRunning);
 
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
@@ -160,8 +153,10 @@ export function GlobalTimer() {
       if (data?.timer?.updatedAt) {
         lastRemoteUpdatedAtRef.current = data.timer.updatedAt;
       }
-      if (typeof data?.timer?.rev === 'number') {
-        lastRevRef.current = data.timer.rev;
+      // Our own write is the newest state; record its seq so the echo (SSE/GET)
+      // is ignored as not-newer, breaking the publish→echo→hydrate loop.
+      if (typeof data?.seq === 'number' && data.seq > lastSeqRef.current) {
+        lastSeqRef.current = data.seq;
       }
     } catch {
       // Cross-device timer sync is best-effort.
@@ -170,13 +165,18 @@ export function GlobalTimer() {
 
   const clearActiveTimer = async () => {
     try {
-      await fetch('/api/frogodoro/active', {
+      const res = await fetch('/api/frogodoro/active', {
         method: 'DELETE',
         credentials: 'include',
       });
       lastRemoteUpdatedAtRef.current = '';
       lastPublishedSignatureRef.current = '';
-      lastRevRef.current = -1;
+      if (res.ok) {
+        const data = await res.json().catch(() => null);
+        if (typeof data?.seq === 'number' && data.seq > lastSeqRef.current) {
+          lastSeqRef.current = data.seq;
+        }
+      }
     } catch {
       // Cross-device timer sync is best-effort.
     }
@@ -185,52 +185,35 @@ export function GlobalTimer() {
   // Single entry point for applying server-authoritative timer state, whether
   // it arrives via SSE, the initial GET, a resync, or the advance response.
   const applyRemoteTimer = useCallback(
-    (timer: ActiveFrogodoroTimer | null, serverNow: number) => {
+    (timer: ActiveFrogodoroTimer | null, serverNow: number, seq: number) => {
+      // The server stamps every state write with a monotonic seq. Ignore any
+      // event whose seq isn't strictly newer than the last we applied — this
+      // deterministically drops stale/out-of-order events (including a null GET
+      // that raced our own start), so no time-window or "had a timer" heuristics
+      // are needed. A seq of -1 (legacy/unknown) is always treated as fresh.
+      const hasSeq = typeof seq === 'number' && seq >= 0;
+      if (hasSeq && hasLoadedRemoteTimerRef.current && seq <= lastSeqRef.current) {
+        return;
+      }
+      if (hasSeq) lastSeqRef.current = seq;
+
       if (!timer?.updatedAt) {
-        // Only a genuine remote clear (Stop/Done from another device/surface)
-        // should stop the local timer — and we know it's genuine only if we'd
-        // previously loaded a real server timer this session. A transient or
-        // initial null must NOT wipe a locally-started timer that simply hasn't
-        // been published yet (e.g. started during the first resync); that one
-        // should survive and publish itself.
         const store = useFrogodoroStore.getState();
-
-        // A `null` that races our own recent start is stale (e.g. the initial
-        // resync GET that queried the server before our PUT committed). Ignore it
-        // rather than wiping the just-started timer; the next legit event syncs.
-        if (
-          store.timerActive &&
-          store.isRunning &&
-          Date.now() - lastRunningPublishAtRef.current < 4000
-        ) {
-          hasLoadedRemoteTimerRef.current = true;
-          return;
-        }
-
-        if (hadRemoteTimerRef.current && (store.timerActive || store.awaitingDone)) {
+        if (store.timerActive || store.awaitingDone) {
           suppressNextPublishRef.current = true;
           store.setAwaitingDone(false);
           store.stopTimer();
         }
-        hadRemoteTimerRef.current = false;
         hasLoadedRemoteTimerRef.current = true;
-        lastRevRef.current = -1;
         lastRemoteUpdatedAtRef.current = '';
-        return;
-      }
-
-      const rev = typeof timer.rev === 'number' ? timer.rev : 0;
-      if (hasLoadedRemoteTimerRef.current && rev <= lastRevRef.current) {
         return;
       }
 
       // Detect a phase completion that this update is carrying. The server (its
       // scheduled processor, or another device) advances the timer and pushes
-      // the next phase over SSE — which is what actually drives the transition,
-      // even on the device that was running it. Catch it here so the open app
-      // can sound the alarm + show the Done prompt regardless of which path won
-      // the race. Skipped on the first load so a persisted, already-expired
-      // timer isn't treated as a fresh completion.
+      // the next phase — which drives the transition even on the device that was
+      // running it. Catch it here so the open app can sound the alarm + show the
+      // Done prompt regardless of which path won the race.
       const prevState = useFrogodoroStore.getState();
       const isCompletion =
         hasLoadedRemoteTimerRef.current &&
@@ -239,10 +222,8 @@ export function GlobalTimer() {
         timer.phase !== prevState.phase;
       const completedPhase = prevState.phase;
 
-      lastRevRef.current = rev;
       lastRemoteUpdatedAtRef.current = timer.updatedAt;
       hasLoadedRemoteTimerRef.current = true;
-      hadRemoteTimerRef.current = true;
       ownsTimerRef.current = timer.clientId === clientIdRef.current;
       suppressNextPauseSaveRef.current =
         isRunningRef.current && timer.status === 'paused';
@@ -288,8 +269,6 @@ export function GlobalTimer() {
     if (!selectedTaskId || !clientIdRef.current || !hasLoadedRemoteTimerRef.current) return;
 
     if (!timerActive) {
-      lastRunningPublishAtRef.current = 0;
-      lastPublishedTimerRef.current = null;
       void clearActiveTimer();
       return;
     }
@@ -330,9 +309,6 @@ export function GlobalTimer() {
       sessionStats: timer.sessionStats,
     });
 
-    lastPublishedTimerRef.current = timer;
-    lastRunningPublishAtRef.current = timer.status === 'running' ? Date.now() : 0;
-
     if (signature === lastPublishedSignatureRef.current) return;
     lastPublishedSignatureRef.current = signature;
     void publishActiveTimer(timer);
@@ -357,8 +333,13 @@ export function GlobalTimer() {
             const data = JSON.parse(e.data) as {
               timer: ActiveFrogodoroTimer | null;
               serverNow: number;
+              seq: number;
             };
-            applyRemoteTimer(data.timer, data.serverNow ?? Date.now());
+            applyRemoteTimer(
+              data.timer,
+              data.serverNow ?? Date.now(),
+              typeof data.seq === 'number' ? data.seq : -1,
+            );
           } catch {
             // ignore malformed events
           }
@@ -383,6 +364,7 @@ export function GlobalTimer() {
         applyRemoteTimer(
           (data?.timer as ActiveFrogodoroTimer | null) ?? null,
           typeof data?.serverNow === 'number' ? data.serverNow : Date.now(),
+          typeof data?.seq === 'number' ? data.seq : -1,
         );
         connect();
       } catch {
@@ -481,6 +463,7 @@ export function GlobalTimer() {
                 applyRemoteTimer(
                   data.timer as ActiveFrogodoroTimer,
                   typeof data.serverNow === 'number' ? data.serverNow : Date.now(),
+                  typeof data.seq === 'number' ? data.seq : -1,
                 );
                 return;
               }

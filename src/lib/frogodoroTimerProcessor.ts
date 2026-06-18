@@ -210,20 +210,22 @@ async function processOneDueTimer(
     rev: (timer.rev ?? 0) + 1,
   };
 
-  const claim = await UserModel.updateOne(
+  const claimed = await UserModel.findOneAndUpdate(
     {
       _id: userId,
       'activeFrogodoroTimer.status': 'running',
       'activeFrogodoroTimer.endsAt': timer.endsAt,
     },
-    { $set: { activeFrogodoroTimer: nextTimer } },
-  );
+    { $set: { activeFrogodoroTimer: nextTimer }, $inc: { frogodoroSeq: 1 } },
+    { new: true, projection: { frogodoroSeq: 1 } },
+  ).lean();
 
-  if (claim.modifiedCount !== 1) {
+  if (!claimed) {
     return { processed: false, result: { userId, processed: false, reason: 'already_claimed' } };
   }
 
-  publishTimerEvent(userId, nextTimer);
+  const seq = (claimed as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
+  publishTimerEvent(userId, nextTimer, seq);
 
   const timezone = prefs?.timezone || 'UTC';
   await saveTimerProgress({

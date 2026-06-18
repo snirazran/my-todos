@@ -92,6 +92,7 @@ const UserSchema = new Schema<UserDoc>(
       type: Schema.Types.Mixed,
       default: null,
     },
+    frogodoroSeq: { type: Number, default: 0 },
     liveActivity: {
       type: Schema.Types.Mixed,
       default: null,

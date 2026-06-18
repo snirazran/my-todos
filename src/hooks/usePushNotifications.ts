@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
+import { setLiveActivityControlToken } from '@/lib/liveTimer';
 
 /**
  * Hook that handles push notification setup for native platforms (Android/iOS).
@@ -33,6 +34,8 @@ export function usePushNotifications(userId: string | null | undefined) {
 
     async function registerToken(token: string) {
       if (!token) return;
+      // Stash it for the Live Activity Done/Pause/Stop intent to authenticate with.
+      void setLiveActivityControlToken(token);
       try {
         await fetch('/api/notifications/register', {
           method: 'POST',

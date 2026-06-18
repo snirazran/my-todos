@@ -132,7 +132,9 @@
       "PowerShell(npx tsc --noEmit 2>&1 | Select-Object -First 40)",
       "Bash(grep -rln \"FirebaseMessagingService\\\\|onMessageReceived\\\\|RemoteMessage\" app/src)",
       "Bash(grep -n \"service\\\\|MessagingService\\\\|firebase\" app/src/main/AndroidManifest.xml)",
-      "Read(//Users/snirazran/Fullstack/**)"
+      "Read(//Users/snirazran/Fullstack/**)",
+      "Bash(plutil -extract NSAppTransportSecurity xml1 -o - App/Info.plist)",
+      "Bash(grep -A12 \"NSAppTransportSecurity\" App/Info.plist)"
     ]
   }
 }

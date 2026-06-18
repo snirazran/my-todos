@@ -77,11 +77,13 @@ export async function GET() {
 
     const user = await UserModel.findById(userId, {
       activeFrogodoroTimer: 1,
+      frogodoroSeq: 1,
     }).lean();
 
     return NextResponse.json({
       timer: user?.activeFrogodoroTimer ?? null,
       serverNow: Date.now(),
+      seq: (user as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0,
     });
   } catch {
     return unauth();
@@ -117,11 +119,13 @@ export async function PUT(req: NextRequest) {
       ?.notificationPrefs;
     const stored: ActiveFrogodoroTimer = { ...timer, rev: prevRev + 1 };
 
-    await UserModel.updateOne(
+    const updated = await UserModel.findOneAndUpdate(
       { _id: userId },
-      { $set: { activeFrogodoroTimer: stored } },
-    );
-    publishTimerEvent(userId, stored);
+      { $set: { activeFrogodoroTimer: stored }, $inc: { frogodoroSeq: 1 } },
+      { new: true, projection: { frogodoroSeq: 1 } },
+    ).lean();
+    const seq = (updated as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
+    publishTimerEvent(userId, stored, seq);
 
     if (stored.status === 'running' && stored.endsAt) {
       scheduleFrogodoroTimerProcessing({
@@ -134,7 +138,7 @@ export async function PUT(req: NextRequest) {
 
     await fanOutTimerState(userId, stored, live, startToken, prefs);
 
-    return NextResponse.json({ timer: stored, serverNow: Date.now() });
+    return NextResponse.json({ timer: stored, serverNow: Date.now(), seq });
   } catch {
     return unauth();
   }
@@ -153,9 +157,9 @@ export async function DELETE() {
     const prefs = (existing as { notificationPrefs?: NotificationPrefs } | null)
       ?.notificationPrefs;
 
-    await clearTimerAndFanOut(userId, live, prefs);
+    const seq = await clearTimerAndFanOut(userId, live, prefs);
 
-    return NextResponse.json({ timer: null, serverNow: Date.now() });
+    return NextResponse.json({ timer: null, serverNow: Date.now(), seq });
   } catch {
     return unauth();
   }

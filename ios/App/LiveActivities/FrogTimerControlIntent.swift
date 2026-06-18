@@ -62,8 +62,11 @@ struct FrogTimerControlIntent: LiveActivityIntent {
 
     private func postToServer() async {
         let suite = UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")
+        // Prefer the stable control (FCM) token; fall back to the volatile push
+        // tokens only if it isn't set yet.
         let token =
-            suite?.string(forKey: "frogActivityPushToken")
+            suite?.string(forKey: "frogControlToken")
+            ?? suite?.string(forKey: "frogActivityPushToken")
             ?? suite?.string(forKey: "frogPushToStartToken")
         let origin = suite?.string(forKey: "frogApiOrigin") ?? "https://frogress.com"
 

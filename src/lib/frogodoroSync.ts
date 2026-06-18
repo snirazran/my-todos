@@ -140,12 +140,15 @@ export async function clearTimerAndFanOut(
   userId: string,
   live: LiveActivityRef | null | undefined,
   prefs: NotificationPrefs | null | undefined,
-): Promise<void> {
-  await UserModel.updateOne(
+): Promise<number> {
+  const doc = await UserModel.findOneAndUpdate(
     { _id: userId },
-    { $set: { activeFrogodoroTimer: null, liveActivity: null } },
-  );
-  publishTimerEvent(userId, null);
+    { $set: { activeFrogodoroTimer: null, liveActivity: null }, $inc: { frogodoroSeq: 1 } },
+    { new: true, projection: { frogodoroSeq: 1 } },
+  ).lean();
+  const seq = (doc as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
+  publishTimerEvent(userId, null, seq);
   cancelFrogodoroTimerProcessing(userId);
   await fanOutTimerStop(userId, live, prefs);
+  return seq;
 }

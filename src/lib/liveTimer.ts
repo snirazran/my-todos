@@ -25,6 +25,7 @@ interface FrogLiveActivityPlugin {
   end(): Promise<void>;
   registerPushToStart(): Promise<void>;
   setApiOrigin(opts: { origin: string }): Promise<void>;
+  setControlToken(opts: { token: string }): Promise<void>;
   addListener(
     eventName: 'pushToken',
     cb: (event: { activityId?: string; token?: string }) => void,
@@ -40,6 +41,20 @@ const FrogLiveActivity = registerPlugin<FrogLiveActivityPlugin>('FrogLiveActivit
 
 let signature: string | null = null;
 let iosListenersReady = false;
+
+// Hand the stable per-install FCM token to the native Live Activity button
+// intent (via the App Group) so it can authenticate /control without depending
+// on the volatile activity push token.
+export async function setLiveActivityControlToken(token: string): Promise<void> {
+  if (!token || !Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
+    return;
+  }
+  try {
+    await FrogLiveActivity.setControlToken({ token });
+  } catch {
+    void 0;
+  }
+}
 
 async function putLiveActivity(body: Record<string, string>): Promise<void> {
   try {
