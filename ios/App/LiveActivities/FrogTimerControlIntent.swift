@@ -20,8 +20,13 @@ struct FrogTimerControlIntent: LiveActivityIntent {
     init(action: String) { self.action = action }
 
     func perform() async throws -> some IntentResult {
+        // Apply the change to the island instantly, then return so the button
+        // releases immediately (the system keeps the button pending until
+        // perform() returns). The server sync runs detached so it doesn't add
+        // round-trip latency to the tap.
         await applyLocally()
-        await postToServer()
+        let act = action
+        Task { await Self.postToServer(action: act) }
         return .result()
     }
 
@@ -60,7 +65,7 @@ struct FrogTimerControlIntent: LiveActivityIntent {
         }
     }
 
-    private func postToServer() async {
+    private static func postToServer(action: String) async {
         let suite = UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")
         // Prefer the stable control (FCM) token; fall back to the volatile push
         // tokens only if it isn't set yet.

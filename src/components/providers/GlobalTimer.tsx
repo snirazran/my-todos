@@ -43,6 +43,7 @@ export function GlobalTimer() {
     sessionStats,
     phaseElapsed,
     awaitingDone,
+    pendingSync,
     tickTimer,
     completePhase,
     registerCompletion,
@@ -54,14 +55,16 @@ export function GlobalTimer() {
   const clientIdRef = useRef<string | null>(null);
   const ownsTimerRef = useRef(true);
   const suppressNextPauseSaveRef = useRef(false);
-  const suppressNextPublishRef = useRef(false);
   const hasLoadedRemoteTimerRef = useRef(false);
   // Highest server seq we've applied. Every timer event carries the seq of the
   // state it represents; we ignore anything not strictly newer, which orders all
   // events (incl. clears) deterministically and kills stale/out-of-order races.
   const lastSeqRef = useRef(-1);
+  // The pendingSync value we last pushed to the server. The publisher fires only
+  // when the store's pendingSync (bumped solely by user-intent actions) moves
+  // past this — so hydrations and display ticks never publish.
+  const lastSyncedPendingRef = useRef(0);
   const lastRemoteUpdatedAtRef = useRef('');
-  const lastPublishedSignatureRef = useRef('');
   const isRunningRef = useRef(isRunning);
 
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
@@ -170,7 +173,6 @@ export function GlobalTimer() {
         credentials: 'include',
       });
       lastRemoteUpdatedAtRef.current = '';
-      lastPublishedSignatureRef.current = '';
       if (res.ok) {
         const data = await res.json().catch(() => null);
         if (typeof data?.seq === 'number' && data.seq > lastSeqRef.current) {
@@ -181,6 +183,31 @@ export function GlobalTimer() {
       // Cross-device timer sync is best-effort.
     }
   };
+
+  // Builds the server payload from the CURRENT store state at call time. Used by
+  // the user-action publisher and the first-load adopt path.
+  const buildTimerPayload = useCallback(():
+    | Omit<ActiveFrogodoroTimer, 'updatedAt'>
+    | null => {
+    const s = useFrogodoroStore.getState();
+    if (!s.selectedTaskId || !clientIdRef.current) return null;
+    const running = s.isRunning && !!s.endTime;
+    const snapshotTimeLeft =
+      running && s.endTime
+        ? Math.max(0, Math.round((s.endTime - Date.now()) / 1000))
+        : s.timeLeft;
+    return {
+      taskId: s.selectedTaskId,
+      clientId: clientIdRef.current,
+      phase: s.phase,
+      status: s.isRunning ? 'running' : 'paused',
+      timeLeft: snapshotTimeLeft,
+      endsAt: running && s.endTime ? new Date(s.endTime).toISOString() : null,
+      finished: s.awaitingDone,
+      settings: s.settings,
+      sessionStats: s.sessionStats,
+    };
+  }, []);
 
   // Single entry point for applying server-authoritative timer state, whether
   // it arrives via SSE, the initial GET, a resync, or the advance response.
@@ -199,13 +226,27 @@ export function GlobalTimer() {
 
       if (!timer?.updatedAt) {
         const store = useFrogodoroStore.getState();
-        if (store.timerActive || store.awaitingDone) {
-          suppressNextPublishRef.current = true;
-          store.setAwaitingDone(false);
-          store.stopTimer();
-        }
+        const firstLoad = !hasLoadedRemoteTimerRef.current;
         hasLoadedRemoteTimerRef.current = true;
         lastRemoteUpdatedAtRef.current = '';
+
+        // First reconcile after mount: if the server has no timer but this device
+        // does (a fresh start in the load window, or the server lost it), the
+        // local timer wins — publish it rather than wiping it.
+        if (firstLoad && (store.timerActive || store.awaitingDone)) {
+          const payload = buildTimerPayload();
+          if (payload) void publishActiveTimer(payload);
+          return;
+        }
+
+        // A later null is a genuine remote clear (Stop/Done on another surface) —
+        // mirror it locally. Sync lastSyncedPending so this stop doesn't bounce
+        // back to the server as a redundant clear.
+        if (store.timerActive || store.awaitingDone) {
+          store.setAwaitingDone(false);
+          store.stopTimer();
+          lastSyncedPendingRef.current = useFrogodoroStore.getState().pendingSync;
+        }
         return;
       }
 
@@ -227,7 +268,6 @@ export function GlobalTimer() {
       ownsTimerRef.current = timer.clientId === clientIdRef.current;
       suppressNextPauseSaveRef.current =
         isRunningRef.current && timer.status === 'paused';
-      suppressNextPublishRef.current = true;
       useFrogodoroStore.getState().hydrateActiveTimer(timer, serverNow);
 
       if (isCompletion) {
@@ -264,55 +304,29 @@ export function GlobalTimer() {
     [registerCompletion],
   );
 
-  // Publish meaningful timer state changes, not every second.
+  // Publish to the server ONLY in response to user-intent actions, detected via
+  // the store's pendingSync counter (bumped by start/pause/resume/stop/switch/
+  // complete and nothing else). Server→client hydration and per-second display
+  // ticks never bump it, so they never publish — this is what makes the server
+  // the single source of truth with no echo loop.
   useEffect(() => {
-    if (!selectedTaskId || !clientIdRef.current || !hasLoadedRemoteTimerRef.current) return;
+    if (pendingSync === 0) return;
+    // Not ready to sync yet (first server reconcile hasn't run). The first-load
+    // adopt path in applyRemoteTimer will push local state once it does.
+    if (!clientIdRef.current || !hasLoadedRemoteTimerRef.current) return;
+    if (pendingSync === lastSyncedPendingRef.current) return;
+    lastSyncedPendingRef.current = pendingSync;
 
-    if (!timerActive) {
+    ownsTimerRef.current = true;
+
+    if (!useFrogodoroStore.getState().timerActive) {
       void clearActiveTimer();
       return;
     }
 
-    if (suppressNextPublishRef.current) {
-      suppressNextPublishRef.current = false;
-      return;
-    }
-
-    ownsTimerRef.current = true;
-
-    const snapshotTimeLeft = isRunning && endTime
-      ? Math.max(0, Math.round((endTime - Date.now()) / 1000))
-      : timeLeftRef.current;
-
-    const timer: Omit<ActiveFrogodoroTimer, 'updatedAt'> = {
-      taskId: selectedTaskId,
-      clientId: clientIdRef.current,
-      phase,
-      status: isRunning ? 'running' : 'paused',
-      timeLeft: snapshotTimeLeft,
-      endsAt: isRunning && endTime ? new Date(endTime).toISOString() : null,
-      // Preserve the ringing state so interacting with the app while the alarm
-      // is up doesn't clear it on the server (Done is the only thing that does).
-      finished: useFrogodoroStore.getState().awaitingDone,
-      settings,
-      sessionStats,
-    };
-
-    const signature = JSON.stringify({
-      taskId: timer.taskId,
-      phase: timer.phase,
-      status: timer.status,
-      timeLeft: timer.timeLeft,
-      endsAt: timer.endsAt,
-      finished: timer.finished,
-      settings: timer.settings,
-      sessionStats: timer.sessionStats,
-    });
-
-    if (signature === lastPublishedSignatureRef.current) return;
-    lastPublishedSignatureRef.current = signature;
-    void publishActiveTimer(timer);
-  }, [endTime, isRunning, phase, selectedTaskId, sessionStats, settings, timerActive]);
+    const payload = buildTimerPayload();
+    if (payload) void publishActiveTimer(payload);
+  }, [pendingSync, buildTimerPayload]);
 
   // Sync timer state across windows/devices in real time via SSE. A GET resync
   // gates the (authenticated) connection — logged-out users get a 401 and never

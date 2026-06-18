@@ -56,6 +56,11 @@ interface FrogodoroState {
   // fast-forwarded phase shows the real elapsed time, not the duration set.
   lastFocusElapsed: number;
   lastBreakElapsed: number;
+  // Bumped ONLY by explicit user-intent actions (start/pause/resume/stop/
+  // switch/complete). The publisher watches this and nothing else, so server→
+  // client hydration and display ticks never trigger a publish — which is what
+  // makes the server the single source of truth with no echo loop.
+  pendingSync: number;
 
   // Actions
   setSettings: (settings: FrogodoroSettings) => void;
@@ -116,6 +121,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       awaitingDone: false,
       lastFocusElapsed: 0,
       lastBreakElapsed: 0,
+      pendingSync: 0,
 
       setSettings: (settings) =>
         set((state) => {
@@ -172,6 +178,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             phaseElapsed: isSameTask ? state.phaseElapsed : 0,
             lastFocusElapsed: isSameTask ? state.lastFocusElapsed : 0,
             lastBreakElapsed: isSameTask ? state.lastBreakElapsed : 0,
+            pendingSync: isSameTask ? state.pendingSync : state.pendingSync + 1,
           };
         });
       },
@@ -200,6 +207,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             },
             lastFocusElapsed: freshSession ? 0 : state.lastFocusElapsed,
             lastBreakElapsed: freshSession ? 0 : state.lastBreakElapsed,
+            pendingSync: state.pendingSync + 1,
           };
         });
       },
@@ -213,6 +221,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             ...state.remainingByPhase,
             [state.phase]: state.timeLeft,
           },
+          pendingSync: state.pendingSync + 1,
         }));
       },
 
@@ -228,6 +237,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             focus: getPhaseDuration('focus', state.settings),
             break: getPhaseDuration('break', state.settings),
           },
+          pendingSync: state.pendingSync + 1,
         }));
       },
 
@@ -257,6 +267,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             timeLeft: targetRemaining,
             remainingByPhase,
             phaseElapsed: phaseDuration - targetRemaining,
+            pendingSync: state.pendingSync + 1,
           };
         });
       },
@@ -302,6 +313,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
                 ...state.sessionStats,
                 focusTime: state.sessionStats.focusTime + elapsed,
               },
+              pendingSync: state.pendingSync + 1,
             };
           }
 
@@ -326,6 +338,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
               ...state.sessionStats,
               breakTime: state.sessionStats.breakTime + elapsed,
             },
+            pendingSync: state.pendingSync + 1,
           };
         });
       },
