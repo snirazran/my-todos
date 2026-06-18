@@ -17,19 +17,32 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
     const id = typeof body?.activityId === 'string' ? body.activityId : '';
     const pushToken = typeof body?.pushToken === 'string' ? body.pushToken : '';
+    const pushToStartToken =
+      typeof body?.pushToStartToken === 'string' ? body.pushToStartToken : '';
 
-    if (!id || !pushToken) {
+    if (!pushToStartToken && (!id || !pushToken)) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 400 });
     }
 
-    const liveActivity: LiveActivityRef = {
-      id,
-      pushToken,
-      updatedAt: new Date().toISOString(),
-    };
-
     await connectMongo();
-    await UserModel.updateOne({ _id: userId }, { $set: { liveActivity } });
+
+    // The push-to-start token arrives on its own event and persists across
+    // activities, so it's stored independently of the current activity ref.
+    if (pushToStartToken) {
+      await UserModel.updateOne(
+        { _id: userId },
+        { $set: { liveActivityStartToken: pushToStartToken } },
+      );
+    }
+
+    if (id && pushToken) {
+      const liveActivity: LiveActivityRef = {
+        id,
+        pushToken,
+        updatedAt: new Date().toISOString(),
+      };
+      await UserModel.updateOne({ _id: userId }, { $set: { liveActivity } });
+    }
 
     const user = await UserModel.findById(userId, { activeFrogodoroTimer: 1 }).lean();
     const timer = user?.activeFrogodoroTimer as ActiveFrogodoroTimer | null | undefined;

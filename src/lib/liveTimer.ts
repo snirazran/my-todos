@@ -1,10 +1,9 @@
 'use client';
 
 import { Capacitor, registerPlugin } from '@capacitor/core';
-import { LiveActivities } from 'capacitor-live-activities';
 import {
   buildLiveActivityData,
-  phaseMeta,
+  type LiveActivityData,
   type LiveTimerSnapshot,
 } from '@/lib/liveActivityData';
 
@@ -18,31 +17,36 @@ interface FrogTimerPlugin {
     timeLeft: number;
     taskName: string;
   }): Promise<void>;
-  update(opts: {
-    phase: string;
-    isRunning: boolean;
-    endTime: number;
-    timeLeft: number;
-    taskName: string;
-  }): Promise<void>;
   stop(): Promise<void>;
 }
 
+interface FrogLiveActivityPlugin {
+  show(opts: { data: LiveActivityData }): Promise<{ activityId: string }>;
+  end(): Promise<void>;
+  registerPushToStart(): Promise<void>;
+  addListener(
+    eventName: 'pushToken',
+    cb: (event: { activityId?: string; token?: string }) => void,
+  ): Promise<unknown>;
+  addListener(
+    eventName: 'pushToStartToken',
+    cb: (event: { token?: string }) => void,
+  ): Promise<unknown>;
+}
+
 const FrogTimer = registerPlugin<FrogTimerPlugin>('FrogTimer');
+const FrogLiveActivity = registerPlugin<FrogLiveActivityPlugin>('FrogLiveActivity');
 
-let activityId: string | null = null;
 let signature: string | null = null;
-let currentMode: 'run' | 'pause' | null = null;
-let tokenListenerReady = false;
+let iosListenersReady = false;
 
-async function putPushToken(id: string, token: string): Promise<void> {
-  if (!id || !token) return;
+async function putLiveActivity(body: Record<string, string>): Promise<void> {
   try {
     await fetch('/api/frogodoro/live-activity', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ activityId: id, pushToken: token }),
+      body: JSON.stringify(body),
     });
   } catch {
     void 0;
@@ -60,191 +64,24 @@ async function deletePushToken(): Promise<void> {
   }
 }
 
-function ensureTokenListener(): void {
-  if (tokenListenerReady) return;
-  tokenListenerReady = true;
+function ensureIosListeners(): void {
+  if (iosListenersReady) return;
+  iosListenersReady = true;
   try {
-    (LiveActivities as any).addListener?.(
-      'pushToken',
-      (event: { activityId?: string; token?: string }) => {
-        if (event?.token) void putPushToken(event.activityId ?? activityId ?? '', event.token);
-      },
-    );
+    void FrogLiveActivity.addListener('pushToken', (event) => {
+      if (event?.token) {
+        void putLiveActivity({ activityId: event.activityId ?? '', pushToken: event.token });
+      }
+    });
+    void FrogLiveActivity.addListener('pushToStartToken', (event) => {
+      if (event?.token) void putLiveActivity({ pushToStartToken: event.token });
+    });
+    // Register once so the server can create the island via APNs even when the
+    // app is closed (iOS 17.2+). No-op on older iOS.
+    void FrogLiveActivity.registerPushToStart();
   } catch {
     void 0;
   }
-}
-
-function ringElement(size: number, lineWidth: number, animated = true): any {
-  const properties: any[] = [
-    { color: '{{color}}' },
-    { size },
-    { lineWidth },
-    { paused: '{{paused}}' },
-    { value: '{{ringValue}}' },
-    { total: '{{ringTotal}}' },
-    { startTime: '{{ringStart}}' },
-    { endTime: '{{ringEnd}}' },
-  ];
-  if (!animated) properties.push({ animated: false });
-  return { type: 'circular-timer', properties };
-}
-
-function buildLayout(snap: LiveTimerSnapshot): any {
-  const lockScreenRing = ringElement(36, 4);
-  const bigTime =
-    snap.isRunning && snap.endTime
-      ? {
-          type: 'timer',
-          properties: [
-            { endTime: '{{endTime}}' },
-            { style: 'countdown' },
-            { fontSize: 40 },
-            { fontWeight: 'bold' },
-            { monospacedDigit: true },
-            { color: '{{color}}' },
-            { alignment: 'leading' },
-          ],
-        }
-      : {
-          type: 'text',
-          properties: [
-            { text: '{{timeText}}' },
-            { fontSize: 40 },
-            { fontWeight: 'bold' },
-            { monospacedDigit: true },
-            { color: '{{color}}' },
-            { alignment: 'leading' },
-          ],
-        };
-
-  const subtitle = {
-    type: 'container',
-    properties: [{ direction: 'horizontal' }, { spacing: 6 }, { insideAlignment: 'center' }],
-    children: [
-      {
-        type: 'text',
-        properties: [{ text: '{{label}}' }, { fontSize: 15 }, { fontWeight: 'semibold' }, { color: '{{color}}' }],
-      },
-      {
-        type: 'text',
-        properties: [{ text: '{{subtitle}}' }, { fontSize: 14 }, { color: '#8e8e93' }],
-      },
-    ],
-  };
-
-  return {
-    type: 'container',
-    properties: [
-      { direction: 'horizontal' },
-      { spacing: 12 },
-      { padding: 16 },
-      { insideAlignment: 'center' },
-    ],
-    children: [
-      {
-        type: 'container',
-        properties: [{ direction: 'vertical' }, { spacing: 4 }, { insideAlignment: 'leading' }],
-        children: [bigTime, subtitle],
-      },
-      { type: 'spacer', properties: [] },
-      { ...lockScreenRing, properties: [...lockScreenRing.properties, { offset: { x: -10, y: 0 } }] },
-    ],
-  };
-}
-
-function buildIsland(snap: LiveTimerSnapshot): any {
-  const COMPACT_TIME_WIDTH = 54;
-  const compactTime =
-    snap.isRunning && snap.endTime
-      ? {
-          type: 'timer',
-          properties: [
-            { endTime: '{{endTime}}' },
-            { style: 'countdown' },
-            { color: '{{color}}' },
-            { monospacedDigit: true },
-            { width: COMPACT_TIME_WIDTH },
-            { frameAlignment: 'trailing' },
-            { alignment: 'trailing' },
-          ],
-        }
-      : {
-          type: 'text',
-          properties: [
-            { text: '{{timeText}}' },
-            { color: '{{color}}' },
-            { monospacedDigit: true },
-            { width: COMPACT_TIME_WIDTH },
-            { frameAlignment: 'trailing' },
-          ],
-        };
-
-  const TIME_BOX_HEIGHT = 52;
-  const bigTime =
-    snap.isRunning && snap.endTime
-      ? {
-          type: 'timer',
-          properties: [
-            { endTime: '{{endTime}}' },
-            { style: 'countdown' },
-            { fontSize: '{{timeFont}}' },
-            { fontWeight: 'light' },
-            { color: '{{color}}' },
-            { monospacedDigit: true },
-            { lineLimit: 1 },
-            { minimumScaleFactor: 0.6 },
-            { height: TIME_BOX_HEIGHT },
-          ],
-        }
-      : {
-          type: 'text',
-          properties: [
-            { text: '{{timeText}}' },
-            { fontSize: '{{timeFont}}' },
-            { fontWeight: 'light' },
-            { color: '{{color}}' },
-            { monospacedDigit: true },
-            { lineLimit: 1 },
-            { minimumScaleFactor: 0.6 },
-            { height: TIME_BOX_HEIGHT },
-          ],
-        };
-
-  const isRTL =
-    typeof document !== 'undefined' &&
-    (document.documentElement.dir === 'rtl' || document.dir === 'rtl');
-  const LABEL_NUDGE_X = 12;
-  const phaseLabel = {
-    type: 'text',
-    properties: [
-      { text: '{{label}}' },
-      { fontSize: 16 },
-      { fontWeight: 'semibold' },
-      { color: '{{color}}' },
-      { lineLimit: 1 },
-      { minimumScaleFactor: 0.7 },
-      { offset: { x: isRTL ? -LABEL_NUDGE_X : LABEL_NUDGE_X, y: 0 } },
-    ],
-  };
-
-  const EXPANDED_RING_SIZE = 34;
-  const baseRing = ringElement(EXPANDED_RING_SIZE, 5, true);
-  const expandedRing = {
-    ...baseRing,
-    properties: [...baseRing.properties, { height: TIME_BOX_HEIGHT }, { paddingHorizontal: 12 }],
-  };
-
-  return {
-    expanded: {
-      leading: expandedRing,
-      center: phaseLabel,
-      trailing: bigTime,
-    },
-    compactLeading: ringElement(20, 2.5),
-    compactTrailing: compactTime,
-    minimal: ringElement(20, 2.5),
-  };
 }
 
 function computeSignature(snap: LiveTimerSnapshot): string | null {
@@ -253,42 +90,6 @@ function computeSignature(snap: LiveTimerSnapshot): string | null {
     return `run:${snap.phase}:${snap.endTime}`;
   }
   return `pause:${snap.phase}:${Math.round(snap.timeLeft)}`;
-}
-
-async function endAllIosActivities(): Promise<void> {
-  try {
-    const { activities } = await LiveActivities.getAllActivities();
-    await Promise.all(
-      (activities ?? []).map((a: any) =>
-        LiveActivities.endActivity({ activityId: a.id, data: {} }).catch((err) =>
-          console.error('endActivity failed:', err),
-        ),
-      ),
-    );
-  } catch (err) {
-    console.error('getAllActivities failed:', err);
-  }
-  activityId = null;
-  currentMode = null;
-}
-
-async function getCurrentIosActivityId(): Promise<string | null> {
-  if (activityId) return activityId;
-  try {
-    const result = await LiveActivities.getAllActivities();
-    const activities = ((result as any).activities ?? []) as any[];
-    // Only reuse a genuinely live activity. An ended/dismissed one can't be
-    // revived via updateActivity, so falling back to it would silently no-op
-    // (the "continue → no island" bug); return null to start a fresh one.
-    const active = activities.find(
-      (a: any) => a.state === 'active' || a.state === 'stale',
-    );
-    const id = active?.id;
-    activityId = typeof id === 'string' ? id : null;
-    return activityId;
-  } catch {
-    return null;
-  }
 }
 
 export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void> {
@@ -322,52 +123,19 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
 
   if (platform !== 'ios') return;
 
-  if (!desiredSig) {
-    await endAllIosActivities();
-    void deletePushToken();
-    return;
-  }
-
-  ensureTokenListener();
-
-  const desiredMode: 'run' | 'pause' =
-    snap.isRunning && snap.endTime ? 'run' : 'pause';
+  ensureIosListeners();
 
   try {
-    const existingId = await getCurrentIosActivityId();
-
-    // The layout's countdown element type (a self-updating `timer` vs a static
-    // `text`) is fixed when the activity is created and can't be swapped via
-    // updateActivity. So a value-only change within the same mode is an update,
-    // but a run↔pause flip must end the old activity and start a fresh one —
-    // otherwise a frozen `timer` element fed a 0/paused endTime renders
-    // "Invalid Timer".
-    if (existingId && currentMode === desiredMode) {
-      await LiveActivities.updateActivity({
-        activityId: existingId,
-        data: buildLiveActivityData(snap),
-      } as any);
+    if (!desiredSig) {
+      await FrogLiveActivity.end();
+      void deletePushToken();
       return;
     }
-
-    if (existingId) {
-      await endAllIosActivities();
-    }
-
-    const { activityId: id } = await LiveActivities.startActivity({
-      layout: buildLayout(snap),
-      dynamicIslandLayout: buildIsland(snap),
-      behavior: {
-        widgetUrl: '',
-        keyLineTint: phaseMeta(snap.phase).color,
-      },
-      data: buildLiveActivityData(snap),
-      staleDate: snap.endTime ?? undefined,
-    } as any);
-    activityId = id;
-    currentMode = desiredMode;
+    // The native widget renders run vs paused from the content-state, so a
+    // run<->pause change is a plain in-place update — no end-and-recreate.
+    await FrogLiveActivity.show({ data: buildLiveActivityData(snap) });
   } catch (err) {
-    console.error('startActivity failed:', err);
+    console.error('FrogLiveActivity failed:', err);
     signature = null;
   }
 }

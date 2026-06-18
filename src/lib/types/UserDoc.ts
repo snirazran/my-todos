@@ -86,6 +86,11 @@ export type UserDoc = {
   cosmeticOverrides?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
   activeFrogodoroTimer?: ActiveFrogodoroTimer | null;
   liveActivity?: LiveActivityRef | null;
+  // Push-to-start token for the iOS Live Activity (iOS 17.2+). Persists across
+  // activities, so the server can create the island via APNs while the app is
+  // closed. Independent of `liveActivity`, which is the current activity's
+  // per-instance update token.
+  liveActivityStartToken?: string | null;
   lastRecapWeek?: string;
   onboardingCompleted?: boolean;
 };

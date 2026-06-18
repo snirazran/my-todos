@@ -112,3 +112,68 @@ export async function sendTimerPushToUser({
 
   return { sent, type: notification.type };
 }
+
+export type TimerControlAction = 'start' | 'pause' | 'resume' | 'stop';
+
+export async function sendTimerControlPush({
+  userId,
+  tokens,
+  action,
+  phase,
+  endTime,
+  timeLeft,
+  taskName,
+}: {
+  userId: string;
+  tokens: string[];
+  action: TimerControlAction;
+  phase: PomodoroPhase;
+  endTime: number;
+  timeLeft: number;
+  taskName: string;
+}) {
+  if (tokens.length === 0) return { sent: 0 };
+
+  const messaging = getAdminMessaging();
+  const invalidTokens: string[] = [];
+  let sent = 0;
+
+  for (const token of tokens) {
+    try {
+      await messaging.send({
+        token,
+        data: {
+          type: 'timer_control',
+          action,
+          phase,
+          endTime: String(endTime),
+          timeLeft: String(timeLeft),
+          taskName,
+        },
+        android: { priority: 'high' as const },
+        apns: {
+          headers: { 'apns-priority': '5', 'apns-push-type': 'background' },
+          payload: { aps: { 'content-available': 1 } },
+        },
+      });
+      sent++;
+    } catch (err: any) {
+      if (
+        err?.code === 'messaging/registration-token-not-registered' ||
+        err?.code === 'messaging/invalid-registration-token'
+      ) {
+        invalidTokens.push(token);
+      }
+      console.error('FCM timer control push failed:', err?.message);
+    }
+  }
+
+  if (invalidTokens.length > 0) {
+    await UserModel.updateOne(
+      { _id: userId },
+      { $pull: { 'notificationPrefs.fcmTokens': { $in: invalidTokens } } },
+    );
+  }
+
+  return { sent };
+}

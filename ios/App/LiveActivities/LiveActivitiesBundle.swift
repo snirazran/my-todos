@@ -7,5 +7,6 @@ struct LiveActivitiesBundle: WidgetBundle {
     var body: some Widget {
         LiveActivities()
         DynamicActivityWidget()
+        FrogTimerLiveActivity()
     }
 }

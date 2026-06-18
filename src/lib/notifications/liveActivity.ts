@@ -127,6 +127,8 @@ async function send(payload: unknown, pushToken: string): Promise<PushResult> {
   }
 }
 
+// content-state is the flat LiveActivityData, matching the native
+// FrogTimerAttributes.ContentState (ios/App/FrogTimerShared/FrogTimerAttributes.swift).
 export async function sendLiveActivityUpdate(opts: {
   pushToken: string;
   activityId: string;
@@ -136,7 +138,7 @@ export async function sendLiveActivityUpdate(opts: {
   const aps: Record<string, unknown> = {
     timestamp: Math.floor(Date.now() / 1000),
     event: 'update',
-    'content-state': { data: opts.data, activityId: opts.activityId },
+    'content-state': opts.data,
   };
   if (opts.staleDate) aps['stale-date'] = Math.floor(opts.staleDate / 1000);
   return send({ aps }, opts.pushToken);
@@ -150,8 +152,27 @@ export async function sendLiveActivityEnd(opts: {
   const aps: Record<string, unknown> = {
     timestamp: Math.floor(Date.now() / 1000),
     event: 'end',
-    'content-state': { data: opts.data, activityId: opts.activityId },
+    'content-state': opts.data,
     'dismissal-date': Math.floor(Date.now() / 1000),
   };
   return send({ aps }, opts.pushToken);
+}
+
+// Creates the Live Activity remotely via the user's push-to-start token, so the
+// island appears even when the app is closed (iOS 17.2+). `attributes-type`
+// must match the Swift struct name.
+export async function sendLiveActivityStart(opts: {
+  pushToStartToken: string;
+  data: LiveActivityData;
+  staleDate?: number | null;
+}): Promise<PushResult> {
+  const aps: Record<string, unknown> = {
+    timestamp: Math.floor(Date.now() / 1000),
+    event: 'start',
+    'attributes-type': 'FrogTimerAttributes',
+    attributes: {},
+    'content-state': opts.data,
+  };
+  if (opts.staleDate) aps['stale-date'] = Math.floor(opts.staleDate / 1000);
+  return send({ aps }, opts.pushToStartToken);
 }
