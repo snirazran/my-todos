@@ -359,10 +359,32 @@ export const useFrogodoroStore = create<FrogodoroState>()(
         const skew = (serverNow ?? Date.now()) - Date.now();
         const serverFrameNow = serverNow ?? Date.now();
         const endsAtMs = timer.endsAt ? new Date(timer.endsAt).getTime() : null;
+
+        const prev = get();
+
+        // The wall-clock endTime, corrected for client/server clock skew. Each
+        // round-trip the skew jitters by up to a second, which would make a
+        // running timer's endTime (and thus the Live Activity signature) drift
+        // every echo — causing an end/recreate storm. So if we already have a
+        // running timer for the same phase whose endTime is within ~2s of the
+        // freshly computed one, keep our existing endTime: same timer, no drift.
+        const computedEndTime =
+          timer.status === 'running' && endsAtMs ? endsAtMs - skew : null;
+        const stableEndTime =
+          computedEndTime !== null &&
+          prev.isRunning &&
+          prev.phase === timer.phase &&
+          prev.endTime !== null &&
+          Math.abs(prev.endTime - computedEndTime) < 2000
+            ? prev.endTime
+            : computedEndTime;
+
         const runningTimeLeft =
-          timer.status === 'running' && endsAtMs
-            ? Math.max(0, Math.round((endsAtMs - serverFrameNow) / 1000))
-            : timer.timeLeft;
+          timer.status === 'running' && stableEndTime
+            ? Math.max(0, Math.round((stableEndTime - Date.now()) / 1000))
+            : timer.status === 'running' && endsAtMs
+              ? Math.max(0, Math.round((endsAtMs - serverFrameNow) / 1000))
+              : timer.timeLeft;
 
         const focusFull = getPhaseDuration('focus', timer.settings);
         const breakFull = getPhaseDuration('break', timer.settings);
@@ -381,7 +403,6 @@ export const useFrogodoroStore = create<FrogodoroState>()(
         // while you peek at the Break tab) instead of clobbering it back to
         // full — but only if it's a genuine partial (between 0 and full); a
         // fresh or just-finished phase resets to full / not-started.
-        const prev = get();
         const keepRemaining = (p: PomodoroPhase) => {
           const cur = prev.remainingByPhase[p];
           const full = p === 'focus' ? focusFull : breakFull;
@@ -400,9 +421,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
           timerActive: true,
           isRunning: timer.status === 'running' && runningTimeLeft > 0,
           endTime:
-            timer.status === 'running' && runningTimeLeft > 0 && endsAtMs
-              ? endsAtMs - skew
-              : null,
+            timer.status === 'running' && runningTimeLeft > 0 ? stableEndTime : null,
           timeLeft: runningTimeLeft,
           remainingByPhase: {
             focus: timer.phase === 'focus' ? runningTimeLeft : keepRemaining('focus'),

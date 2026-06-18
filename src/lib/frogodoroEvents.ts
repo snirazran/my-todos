@@ -33,6 +33,15 @@ export function subscribeTimer(userId: string, fn: Subscriber): () => void {
   };
 }
 
+// Whether a live client (open app/web) is currently connected for this user.
+// Used to decide which surface rings the finish alert: a connected client rings
+// locally (works even on the simulator), so the server skips its APNs alert to
+// avoid double-firing; with no client connected (app closed) the server rings.
+export function hasActiveTimerSubscriber(userId: string): boolean {
+  const set = getBus().get(userId);
+  return !!set && set.size > 0;
+}
+
 export function publishTimerEvent(
   userId: string,
   timer: ActiveFrogodoroTimer | null,

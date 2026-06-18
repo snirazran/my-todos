@@ -26,6 +26,8 @@
 		60AE54532FE416F800222D18 /* FrogTimerLiveActivity.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54522FE416F800222D18 /* FrogTimerLiveActivity.swift */; };
 		60AE54552FE4173C00222D18 /* FrogLiveActivityPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54542FE4173C00222D18 /* FrogLiveActivityPlugin.swift */; };
 		60AE54572FE41ECA00222D18 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54562FE41ECA00222D18 /* MainViewController.swift */; };
+		60AE54592FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */; };
+		60AE545A2FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		F76207B087AC76F6689761F7 /* Pods_LiveActivitiesExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0A77A78A14762DCD2132693B /* Pods_LiveActivitiesExtension.framework */; };
 /* End PBXBuildFile section */
@@ -80,6 +82,7 @@
 		60AE54522FE416F800222D18 /* FrogTimerLiveActivity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogTimerLiveActivity.swift; sourceTree = "<group>"; };
 		60AE54542FE4173C00222D18 /* FrogLiveActivityPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = FrogLiveActivityPlugin.swift; path = App/FrogLiveActivityPlugin.swift; sourceTree = SOURCE_ROOT; };
 		60AE54562FE41ECA00222D18 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
+		60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FrogTimerControlIntent.swift; sourceTree = "<group>"; };
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		BF3B7F4485804668208BDEF7 /* Pods-LiveActivitiesExtension.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-LiveActivitiesExtension.release.xcconfig"; path = "Pods/Target Support Files/Pods-LiveActivitiesExtension/Pods-LiveActivitiesExtension.release.xcconfig"; sourceTree = "<group>"; };
@@ -168,6 +171,7 @@
 				60AE54482FE0612600222D18 /* LiveActivitiesBundle.swift */,
 				60AE544F2FE4161A00222D18 /* FrogTimerAttributes.swift */,
 				60AE54522FE416F800222D18 /* FrogTimerLiveActivity.swift */,
+				60AE54582FE4336400222D18 /* FrogTimerControlIntent.swift */,
 			);
 			path = LiveActivities;
 			sourceTree = "<group>";
@@ -352,6 +356,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				60AE545A2FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */,
 				60AE54512FE4161A00222D18 /* FrogTimerAttributes.swift in Sources */,
 				60AE54552FE4173C00222D18 /* FrogLiveActivityPlugin.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
@@ -363,6 +368,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				60AE54592FE4336400222D18 /* FrogTimerControlIntent.swift in Sources */,
 				60AE544A2FE0612600222D18 /* LiveActivities.swift in Sources */,
 				60AE54502FE4161A00222D18 /* FrogTimerAttributes.swift in Sources */,
 				60AE54532FE416F800222D18 /* FrogTimerLiveActivity.swift in Sources */,

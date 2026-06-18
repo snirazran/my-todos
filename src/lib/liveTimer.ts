@@ -24,6 +24,7 @@ interface FrogLiveActivityPlugin {
   show(opts: { data: LiveActivityData }): Promise<{ activityId: string }>;
   end(): Promise<void>;
   registerPushToStart(): Promise<void>;
+  setApiOrigin(opts: { origin: string }): Promise<void>;
   addListener(
     eventName: 'pushToken',
     cb: (event: { activityId?: string; token?: string }) => void,
@@ -76,6 +77,12 @@ function ensureIosListeners(): void {
     void FrogLiveActivity.addListener('pushToStartToken', (event) => {
       if (event?.token) void putLiveActivity({ pushToStartToken: event.token });
     });
+    // Tell the Done/Pause/Stop button intent which server to call (this device's
+    // current origin — prod or the dev server), since the intent runs natively
+    // and can't read the webview's location.
+    if (typeof window !== 'undefined') {
+      void FrogLiveActivity.setApiOrigin({ origin: window.location.origin });
+    }
     // Register once so the server can create the island via APNs even when the
     // app is closed (iOS 17.2+). No-op on older iOS.
     void FrogLiveActivity.registerPushToStart();
@@ -86,6 +93,7 @@ function ensureIosListeners(): void {
 
 function computeSignature(snap: LiveTimerSnapshot): string | null {
   if (!snap.active) return null;
+  if (snap.finished) return `done:${snap.phase}`;
   if (snap.isRunning && snap.endTime) {
     return `run:${snap.phase}:${snap.endTime}`;
   }
@@ -138,16 +146,4 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
     console.error('FrogLiveActivity failed:', err);
     signature = null;
   }
-}
-
-export async function clearLiveTimer(): Promise<void> {
-  await reconcileLiveTimer({
-    active: false,
-    isRunning: false,
-    phase: 'focus',
-    endTime: null,
-    timeLeft: 0,
-    totalSeconds: 0,
-    taskName: '',
-  });
 }

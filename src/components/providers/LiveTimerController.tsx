@@ -11,23 +11,32 @@ export function LiveTimerController() {
   const phaseStarted = useFrogodoroStore((s) => s.startedByPhase[s.phase]);
   const endTime = useFrogodoroStore((s) => s.endTime);
   const timeLeft = useFrogodoroStore((s) => s.timeLeft);
-  const totalSeconds = useFrogodoroStore((s) =>
-    s.phase === 'focus' ? s.settings.focusDuration * 60 : s.settings.breakDuration * 60,
-  );
+  const awaitingDone = useFrogodoroStore((s) => s.awaitingDone);
+  const lastCompletedPhase = useFrogodoroStore((s) => s.lastCompletedPhase);
+  const settings = useFrogodoroStore((s) => s.settings);
 
-  const active = timerActive && (isRunning || phaseStarted);
+  // While the alarm is ringing (awaitingDone) keep the activity alive in its
+  // finished state — show the phase that just ended, not the queued next one.
+  const displayPhase = awaitingDone ? lastCompletedPhase ?? phase : phase;
+  const totalSeconds =
+    displayPhase === 'focus'
+      ? settings.focusDuration * 60
+      : settings.breakDuration * 60;
+
+  const active = timerActive && (isRunning || phaseStarted || awaitingDone);
 
   useEffect(() => {
     void reconcileLiveTimer({
       active,
       isRunning,
-      phase,
+      phase: displayPhase,
       endTime,
-      timeLeft,
+      timeLeft: awaitingDone ? 0 : timeLeft,
       totalSeconds,
       taskName: '',
+      finished: awaitingDone,
     });
-  }, [phase, isRunning, active, endTime, timeLeft, totalSeconds]);
+  }, [displayPhase, isRunning, active, endTime, timeLeft, totalSeconds, awaitingDone]);
 
   return null;
 }

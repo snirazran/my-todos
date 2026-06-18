@@ -134,6 +134,7 @@ export async function sendLiveActivityUpdate(opts: {
   activityId: string;
   data: LiveActivityData;
   staleDate?: number | null;
+  alert?: { title: string; body: string; sound?: string };
 }): Promise<PushResult> {
   const aps: Record<string, unknown> = {
     timestamp: Math.floor(Date.now() / 1000),
@@ -141,6 +142,12 @@ export async function sendLiveActivityUpdate(opts: {
     'content-state': opts.data,
   };
   if (opts.staleDate) aps['stale-date'] = Math.floor(opts.staleDate / 1000);
+  // An alert makes the Dynamic Island expand and play a sound — the ringing
+  // behaviour when a phase finishes while the app is closed.
+  if (opts.alert) {
+    aps.alert = { title: opts.alert.title, body: opts.alert.body };
+    aps.sound = opts.alert.sound ?? 'default';
+  }
   return send({ aps }, opts.pushToken);
 }
 

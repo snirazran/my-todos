@@ -8,6 +8,7 @@ export interface LiveTimerSnapshot {
   timeLeft: number;
   totalSeconds: number;
   taskName: string;
+  finished?: boolean;
 }
 
 export const FOCUS_COLOR = '#16a34a';
@@ -43,6 +44,7 @@ export type LiveActivityData = {
   ringStart: number;
   ringEnd: number;
   paused: boolean;
+  finished: boolean;
 };
 
 export function buildLiveActivityData(snap: LiveTimerSnapshot, now = Date.now()): LiveActivityData {
@@ -54,11 +56,12 @@ export function buildLiveActivityData(snap: LiveTimerSnapshot, now = Date.now())
       ? Math.max(0, Math.round((snap.endTime - now) / 1000))
       : snap.timeLeft;
   const ringStart = snap.isRunning && snap.endTime ? snap.endTime - total * 1000 : 0;
+  const finished = !!snap.finished;
 
   return {
     color,
-    label,
-    subtitle: snap.isRunning ? snap.taskName : 'Paused',
+    label: finished ? "Time's up" : label,
+    subtitle: finished ? `${label} done` : snap.isRunning ? snap.taskName : 'Paused',
     endTime,
     timeText: fmt(snap.timeLeft),
     timeFont: expandedTimeFont(widest),
@@ -67,5 +70,6 @@ export function buildLiveActivityData(snap: LiveTimerSnapshot, now = Date.now())
     ringStart,
     ringEnd: endTime,
     paused: !snap.isRunning,
+    finished,
   };
 }

@@ -1,6 +1,7 @@
 import ActivityKit
 import WidgetKit
 import SwiftUI
+import AppIntents
 
 @available(iOS 16.1, *)
 private extension Color {
@@ -81,7 +82,13 @@ private struct RingView: View {
             .scaleEffect(size / 20.0)
             .frame(width: size, height: size)
 
-            if state.paused {
+            if state.finished == true {
+                Image(systemName: "bell.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: size * 0.34, height: size * 0.34)
+                    .foregroundColor(tint)
+            } else if state.paused {
                 Image(systemName: "pause.fill")
                     .resizable()
                     .scaledToFit()
@@ -90,6 +97,89 @@ private struct RingView: View {
             }
         }
         .frame(width: size, height: size)
+    }
+}
+
+@available(iOS 17.0, *)
+private struct CircleControlButton: View {
+    let systemImage: String
+    let action: String
+    var fg: Color
+    var bg: Color
+
+    var body: some View {
+        Button(intent: FrogTimerControlIntent(action: action)) {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .bold))
+                .foregroundColor(fg)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(bg))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+@available(iOS 17.0, *)
+private struct DoneButton: View {
+    var tint: Color
+
+    var body: some View {
+        Button(intent: FrogTimerControlIntent(action: "done")) {
+            Label("Done", systemImage: "checkmark")
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 18)
+                .frame(height: 44)
+                .background(Capsule().fill(tint))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// The "ringing" finished header: a bell + label, shown left of the Done button.
+@available(iOS 16.1, *)
+private func finishedHeader(_ state: FrogTimerAttributes.ContentState) -> some View {
+    let tint = Color(hex: state.color)
+    return HStack(spacing: 10) {
+        Image(systemName: "bell.fill")
+            .font(.system(size: 17, weight: .semibold))
+            .foregroundColor(tint)
+            .fixedSize()
+        VStack(alignment: .leading, spacing: 1) {
+            Text("Time's up")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(tint)
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+            Text(state.subtitle)
+                .font(.system(size: 13))
+                .foregroundColor(Color(white: 0.62))
+                .lineLimit(1)
+        }
+    }
+}
+
+// Circular icon buttons for the Dynamic Island (matches Apple's timer/alarm).
+@available(iOS 16.1, *)
+@ViewBuilder
+private func islandControls(_ state: FrogTimerAttributes.ContentState) -> some View {
+    if #available(iOS 17.0, *) {
+        let tint = Color(hex: state.color)
+        HStack(spacing: 8) {
+            if state.finished == true {
+                CircleControlButton(systemImage: "checkmark", action: "done", fg: tint, bg: tint.opacity(0.3))
+            } else {
+                CircleControlButton(
+                    systemImage: state.paused ? "play.fill" : "pause.fill",
+                    action: state.paused ? "resume" : "pause",
+                    fg: tint,
+                    bg: tint.opacity(0.3)
+                )
+                CircleControlButton(systemImage: "xmark", action: "stop", fg: .white, bg: .white.opacity(0.2))
+            }
+        }
     }
 }
 
@@ -105,27 +195,41 @@ struct FrogTimerLiveActivity: Widget {
             let state = context.state
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    RingView(state: state, size: 34, lineWidth: 5)
-                        .padding(.horizontal, 12)
-                        .frame(maxHeight: .infinity, alignment: .center)
+                    if state.finished == true {
+                        finishedHeader(state)
+                            .frame(maxHeight: .infinity, alignment: .center)
+                    } else {
+                        islandControls(state)
+                            .frame(maxHeight: .infinity, alignment: .center)
+                    }
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    Text(state.label)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundColor(Color(hex: state.color))
-                        .lineLimit(1)
-                        .frame(maxHeight: .infinity, alignment: .center)
+                    if state.finished != true {
+                        Text(state.label)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(Color(hex: state.color))
+                            .lineLimit(1)
+                            .frame(maxHeight: .infinity, alignment: .center)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    TimeView(state: state, font: .system(size: 26, weight: .light))
-                        .frame(maxWidth: 90, alignment: .trailing)
-                        .frame(maxHeight: .infinity, alignment: .center)
+                    if state.finished == true {
+                        if #available(iOS 17.0, *) {
+                            DoneButton(tint: Color(hex: state.color))
+                                .frame(maxHeight: .infinity, alignment: .center)
+                        }
+                    } else {
+                        TimeView(state: state, font: .system(size: 24, weight: .medium))
+                            .multilineTextAlignment(.trailing)
+                            .frame(width: 82, alignment: .trailing)
+                            .frame(maxHeight: .infinity, alignment: .center)
+                    }
                 }
             } compactLeading: {
                 RingView(state: state, size: 20, lineWidth: 2.5)
             } compactTrailing: {
                 TimeView(state: state, font: .system(size: 14))
-                    .frame(width: 54, alignment: .trailing)
+                    .frame(width: 50, alignment: .trailing)
             } minimal: {
                 RingView(state: state, size: 20, lineWidth: 2.5)
             }
@@ -135,22 +239,26 @@ struct FrogTimerLiveActivity: Widget {
 
     @ViewBuilder
     private func lockScreen(_ state: FrogTimerAttributes.ContentState) -> some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                TimeView(state: state, font: .system(size: 40, weight: .bold))
-                HStack(spacing: 6) {
-                    Text(state.label)
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundColor(Color(hex: state.color))
-                    Text(state.subtitle)
-                        .font(.system(size: 14))
-                        .foregroundColor(Color(white: 0.56))
-                        .lineLimit(1)
+        if state.finished == true {
+            HStack(spacing: 12) {
+                finishedHeader(state)
+                Spacer(minLength: 8)
+                if #available(iOS 17.0, *) {
+                    DoneButton(tint: Color(hex: state.color))
                 }
             }
-            Spacer()
-            RingView(state: state, size: 34, lineWidth: 4)
-                .padding(.trailing, 12)
+        } else {
+            HStack(spacing: 12) {
+                islandControls(state)
+                Spacer(minLength: 8)
+                Text(state.label)
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundColor(Color(hex: state.color))
+                    .lineLimit(1)
+                TimeView(state: state, font: .system(size: 40, weight: .bold))
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 120, alignment: .trailing)
+            }
         }
     }
 }

@@ -20,5 +20,6 @@ struct FrogTimerAttributes: ActivityAttributes {
         var ringStart: Double    // epoch ms (run start) for the live ring
         var ringEnd: Double       // epoch ms (run end) for the live ring
         var paused: Bool
+        var finished: Bool?      // phase ended, alarm ringing, awaiting Done
     }
 }

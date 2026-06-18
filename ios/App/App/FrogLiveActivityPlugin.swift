@@ -18,6 +18,7 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "show", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "end", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "registerPushToStart", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "setApiOrigin", returnType: CAPPluginReturnPromise),
     ]
 
     @available(iOS 16.2, *)
@@ -37,15 +38,28 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
         Task {
             do {
+                let content = ActivityContent(state: state, staleDate: self.staleDate(state))
                 if let activity = self.activeActivity() {
-                    await activity.update(
-                        ActivityContent(state: state, staleDate: self.staleDate(state))
-                    )
+                    if state.finished == true {
+                        // Ring locally (auto-expand + sound). The server only
+                        // fires its APNs alert when NO client is connected (app
+                        // closed), so the two never double up.
+                        await activity.update(
+                            content,
+                            alertConfiguration: AlertConfiguration(
+                                title: "Time's up",
+                                body: LocalizedStringResource(stringLiteral: state.subtitle),
+                                sound: .default
+                            )
+                        )
+                    } else {
+                        await activity.update(content)
+                    }
                     call.resolve(["activityId": activity.id])
                 } else {
                     let activity = try Activity.request(
                         attributes: FrogTimerAttributes(),
-                        content: ActivityContent(state: state, staleDate: self.staleDate(state)),
+                        content: content,
                         pushType: .token
                     )
                     self.current = activity
@@ -69,11 +83,20 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
+    @objc func setApiOrigin(_ call: CAPPluginCall) {
+        if let origin = call.getString("origin"), !origin.isEmpty {
+            UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")?
+                .set(origin, forKey: "frogApiOrigin")
+        }
+        call.resolve()
+    }
+
     @objc func registerPushToStart(_ call: CAPPluginCall) {
         if #available(iOS 17.2, *) {
             Task {
                 for await tokenData in Activity<FrogTimerAttributes>.pushToStartTokenUpdates {
                     let token = tokenData.map { String(format: "%02x", $0) }.joined()
+                    Self.storeToken(token, key: "frogPushToStartToken")
                     self.notifyListeners("pushToStartToken", data: ["token": token])
                 }
             }
@@ -99,9 +122,17 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         Task {
             for await tokenData in activity.pushTokenUpdates {
                 let token = tokenData.map { String(format: "%02x", $0) }.joined()
+                Self.storeToken(token, key: "frogActivityPushToken")
                 self.notifyListeners("pushToken", data: ["activityId": activity.id, "token": token])
             }
         }
+    }
+
+    // Mirror the push tokens into the shared App Group so the Live Activity
+    // button intent (which runs even when the app is closed) can authenticate
+    // its control calls to the server.
+    private static func storeToken(_ token: String, key: String) {
+        UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")?.set(token, forKey: key)
     }
 
     @available(iOS 16.2, *)
@@ -129,7 +160,8 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
             ringTotal: double("ringTotal"),
             ringStart: double("ringStart"),
             ringEnd: double("ringEnd"),
-            paused: data["paused"] as? Bool ?? false
+            paused: data["paused"] as? Bool ?? false,
+            finished: data["finished"] as? Bool ?? false
         )
     }
 }

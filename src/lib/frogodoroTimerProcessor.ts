@@ -1,14 +1,12 @@
 import UserModel from '@/lib/models/User';
 import TaskModel from '@/lib/models/Task';
 import type { FrogodoroSettings, PomodoroPhase, SessionStats } from '@/lib/frogodoroStore';
-import { sendTimerPushToUser } from '@/lib/notifications/timer';
 import {
   sendLiveActivityUpdate,
-  sendLiveActivityEnd,
 } from '@/lib/notifications/liveActivity';
 import { buildLiveActivityData } from '@/lib/liveActivityData';
 import { scheduleFrogodoroTimerProcessing } from '@/lib/frogodoroDelayedTimer';
-import { publishTimerEvent } from '@/lib/frogodoroEvents';
+import { publishTimerEvent, hasActiveTimerSubscriber } from '@/lib/frogodoroEvents';
 import { syncQuestState } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
 import type {
@@ -59,6 +57,7 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
         endsAt: autoStart
           ? new Date(boundary + nextDuration * 1000).toISOString()
           : null,
+        finished: !autoStart,
         settings,
         sessionStats: {
           ...sessionStats,
@@ -81,6 +80,7 @@ function getNextTimer(timer: ActiveFrogodoroTimer, now: Date) {
       status: 'paused',
       timeLeft: nextDuration,
       endsAt: null,
+      finished: true,
       settings,
       sessionStats: {
         ...sessionStats,
@@ -234,14 +234,6 @@ async function processOneDueTimer(
     timezone,
   });
 
-  const tokens = prefs?.enabled ? prefs.fcmTokens ?? [] : [];
-  const push = await sendTimerPushToUser({
-    userId,
-    phase: next.completedPhase,
-    autoStartBreak: next.autoStartBreak,
-    tokens,
-  });
-
   const live = (user as any).liveActivity as LiveActivityRef | null | undefined;
   if (live?.id && live.pushToken) {
     const breakEndsAt = nextTimer.endsAt ? new Date(nextTimer.endsAt).getTime() : 0;
@@ -266,25 +258,35 @@ async function processOneDueTimer(
         data,
         staleDate: endTime,
       });
-    } else if (!next.autoStartBreak) {
+    } else {
+      // Finished (non-auto-start): keep the island alive in the ringing state
+      // (shows "Time's up" + a Done button) rather than ending it. The completed
+      // phase drives the label/color; the Done action clears it later.
+      const total = getPhaseDuration(next.completedPhase, nextTimer.settings);
       const data = buildLiveActivityData(
         {
           active: true,
           isRunning: false,
-          phase: nextTimer.phase,
+          finished: true,
+          phase: next.completedPhase,
           endTime: 0,
-          timeLeft: nextTimer.timeLeft,
-          totalSeconds: nextTimer.timeLeft,
+          timeLeft: 0,
+          totalSeconds: total,
           taskName: '',
         },
         now.getTime(),
       );
-      await sendLiveActivityEnd({
+      // Only ring via APNs when no client is connected (app closed); a connected
+      // client rings locally, so this avoids a double alert.
+      const clientConnected = hasActiveTimerSubscriber(userId);
+      await sendLiveActivityUpdate({
         pushToken: live.pushToken,
         activityId: live.id,
         data,
+        alert: clientConnected
+          ? undefined
+          : { title: "Time's up", body: 'Your session finished.' },
       });
-      await UserModel.updateOne({ _id: userId }, { $set: { liveActivity: null } });
     }
   }
 
@@ -295,7 +297,7 @@ async function processOneDueTimer(
   return {
     processed: true,
     timer: nextTimer,
-    result: { userId, processed: true, sent: push.sent },
+    result: { userId, processed: true },
   };
 }
 

@@ -70,6 +70,11 @@ export async function scheduleTimerNotifications(opts: {
     await cancelTimerNotifications();
     if (endTime <= Date.now()) return;
 
+    // On iOS the Live Activity is the audible alert (it auto-expands + rings),
+    // so this banner is silent to avoid a double sound. Android has no Live
+    // Activity, so its banner keeps the sound.
+    const notifSound = Capacitor.getPlatform() === 'ios' ? undefined : 'default';
+
     const first = phaseEndContent(phase, autoStartBreak);
     const notifications = [
       {
@@ -77,7 +82,7 @@ export async function scheduleTimerNotifications(opts: {
         title: first.title,
         body: first.body,
         schedule: { at: new Date(endTime), allowWhileIdle: true },
-        sound: 'default',
+        sound: notifSound,
         smallIcon: 'ic_notification',
         iconColor: '#4CAF50',
         extra: { type: first.type, path: '/timer' },
@@ -96,7 +101,7 @@ export async function scheduleTimerNotifications(opts: {
         title: 'Break finished',
         body: 'Ready to focus? Start again whenever you are.',
         schedule: { at: new Date(breakEnd), allowWhileIdle: true },
-        sound: 'default',
+        sound: notifSound,
         smallIcon: 'ic_notification',
         iconColor: '#4CAF50',
         extra: { type: 'break_complete', path: '/timer' },

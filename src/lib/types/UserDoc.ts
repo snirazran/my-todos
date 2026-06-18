@@ -112,6 +112,9 @@ export type ActiveFrogodoroTimer = {
   sessionStats: SessionStats;
   updatedAt: string;
   rev?: number;
+  // A phase just ended into a non-auto-start state and is awaiting Done — the
+  // alarm is ringing across devices. Cleared when any surface acknowledges Done.
+  finished?: boolean;
 };
 
 export type MissedReviewProgress = {

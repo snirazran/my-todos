@@ -13,6 +13,7 @@ import {
   cancelTimerNotifications,
 } from '@/lib/timerNotifications';
 import { format } from 'date-fns';
+import { Capacitor } from '@capacitor/core';
 import { randomUUID } from '@/lib/uuid';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 
@@ -55,6 +56,16 @@ export function GlobalTimer() {
   const suppressNextPauseSaveRef = useRef(false);
   const suppressNextPublishRef = useRef(false);
   const hasLoadedRemoteTimerRef = useRef(false);
+  // True once we've actually loaded a real (non-null) server timer this session.
+  // Lets us tell a genuine remote clear (stop/done) apart from a transient or
+  // initial null — so a null never wipes a locally-started timer that simply
+  // hasn't been published to the server yet.
+  const hadRemoteTimerRef = useRef(false);
+  // Timestamp + payload of the last running timer we published. Lets us detect a
+  // stale `null` that races our own start (e.g. the initial resync GET that
+  // queried before our PUT landed) and re-assert instead of wiping the timer.
+  const lastRunningPublishAtRef = useRef(0);
+  const lastPublishedTimerRef = useRef<Omit<ActiveFrogodoroTimer, 'updatedAt'> | null>(null);
   const lastRemoteUpdatedAtRef = useRef('');
   const lastPublishedSignatureRef = useRef('');
   const lastRevRef = useRef(-1);
@@ -80,8 +91,11 @@ export function GlobalTimer() {
 
   // While a completion is awaiting acknowledgement, keep the alarm sounding
   // until the user clicks Done (which flips awaitingDone false → cleanup stops).
+  // On native, the looping web audio would hijack the Dynamic Island as a
+  // "Now Playing" media control (and the user picked a one-shot sound anyway),
+  // so there the OS notification sound provides the audio instead.
   useEffect(() => {
-    if (!awaitingDone) return;
+    if (!awaitingDone || Capacitor.isNativePlatform()) return;
     const stop = playTimerSoundUntilStopped(
       normalizeTimerSound(settingsRef.current.timerSound),
     );
@@ -173,13 +187,32 @@ export function GlobalTimer() {
   const applyRemoteTimer = useCallback(
     (timer: ActiveFrogodoroTimer | null, serverNow: number) => {
       if (!timer?.updatedAt) {
-        if (!hasLoadedRemoteTimerRef.current) {
-          const store = useFrogodoroStore.getState();
-          if (store.timerActive) {
-            suppressNextPublishRef.current = true;
-            store.stopTimer();
-          }
+        // Only a genuine remote clear (Stop/Done from another device/surface)
+        // should stop the local timer — and we know it's genuine only if we'd
+        // previously loaded a real server timer this session. A transient or
+        // initial null must NOT wipe a locally-started timer that simply hasn't
+        // been published yet (e.g. started during the first resync); that one
+        // should survive and publish itself.
+        const store = useFrogodoroStore.getState();
+
+        // A `null` that races our own recent start is stale (e.g. the initial
+        // resync GET that queried the server before our PUT committed). Ignore it
+        // rather than wiping the just-started timer; the next legit event syncs.
+        if (
+          store.timerActive &&
+          store.isRunning &&
+          Date.now() - lastRunningPublishAtRef.current < 4000
+        ) {
+          hasLoadedRemoteTimerRef.current = true;
+          return;
         }
+
+        if (hadRemoteTimerRef.current && (store.timerActive || store.awaitingDone)) {
+          suppressNextPublishRef.current = true;
+          store.setAwaitingDone(false);
+          store.stopTimer();
+        }
+        hadRemoteTimerRef.current = false;
         hasLoadedRemoteTimerRef.current = true;
         lastRevRef.current = -1;
         lastRemoteUpdatedAtRef.current = '';
@@ -209,6 +242,7 @@ export function GlobalTimer() {
       lastRevRef.current = rev;
       lastRemoteUpdatedAtRef.current = timer.updatedAt;
       hasLoadedRemoteTimerRef.current = true;
+      hadRemoteTimerRef.current = true;
       ownsTimerRef.current = timer.clientId === clientIdRef.current;
       suppressNextPauseSaveRef.current =
         isRunningRef.current && timer.status === 'paused';
@@ -235,6 +269,16 @@ export function GlobalTimer() {
           registerCompletion(completedPhase, true);
         }
       }
+
+      // Always mirror the server's ringing flag. If a completion arrived via a
+      // path that didn't trip isCompletion (e.g. this backgrounded device lost
+      // the advance race), this still marks awaitingDone so the next publish
+      // stays "finished" and doesn't overwrite the Done island with the queued
+      // paused phase. Likewise clears it when the server is no longer ringing.
+      const store = useFrogodoroStore.getState();
+      if (!!timer.finished !== store.awaitingDone) {
+        store.setAwaitingDone(!!timer.finished);
+      }
     },
     [registerCompletion],
   );
@@ -244,6 +288,8 @@ export function GlobalTimer() {
     if (!selectedTaskId || !clientIdRef.current || !hasLoadedRemoteTimerRef.current) return;
 
     if (!timerActive) {
+      lastRunningPublishAtRef.current = 0;
+      lastPublishedTimerRef.current = null;
       void clearActiveTimer();
       return;
     }
@@ -266,6 +312,9 @@ export function GlobalTimer() {
       status: isRunning ? 'running' : 'paused',
       timeLeft: snapshotTimeLeft,
       endsAt: isRunning && endTime ? new Date(endTime).toISOString() : null,
+      // Preserve the ringing state so interacting with the app while the alarm
+      // is up doesn't clear it on the server (Done is the only thing that does).
+      finished: useFrogodoroStore.getState().awaitingDone,
       settings,
       sessionStats,
     };
@@ -276,9 +325,13 @@ export function GlobalTimer() {
       status: timer.status,
       timeLeft: timer.timeLeft,
       endsAt: timer.endsAt,
+      finished: timer.finished,
       settings: timer.settings,
       sessionStats: timer.sessionStats,
     });
+
+    lastPublishedTimerRef.current = timer;
+    lastRunningPublishAtRef.current = timer.status === 'running' ? Date.now() : 0;
 
     if (signature === lastPublishedSignatureRef.current) return;
     lastPublishedSignatureRef.current = signature;
