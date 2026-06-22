@@ -184,10 +184,29 @@ export async function DELETE(req: NextRequest) {
   try {
     const userId = await requireUserId();
     const url = new URL(req.url);
+    const clientId = url.searchParams.get('clientId');
     console.log(
-      `Frogodoro DELETE /active by clientId=${url.searchParams.get('clientId')} owns=${url.searchParams.get('owns')} visible=${url.searchParams.get('visible')}`,
+      `Frogodoro DELETE /active by clientId=${clientId} owns=${url.searchParams.get('owns')} visible=${url.searchParams.get('visible')}`,
     );
     await connectMongo();
+
+    // Every current client identifies itself (clientId is always sent, even as
+    // 'unknown'). A param-less DELETE can only come from a stale/rogue build
+    // running the old spurious-clear bug — never let it nuke a running timer.
+    // Treat it as a no-op read so the caller re-hydrates the real state.
+    if (clientId === null) {
+      console.log('Frogodoro DELETE /active IGNORED (no clientId — stale client)');
+      const user = await UserModel.findById(userId, {
+        activeFrogodoroTimer: 1,
+        frogodoroSeq: 1,
+      }).lean();
+      return NextResponse.json({
+        timer: user?.activeFrogodoroTimer ?? null,
+        serverNow: Date.now(),
+        seq: (user as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0,
+      });
+    }
+
     const existing = await UserModel.findById(userId, {
       liveActivity: 1,
       notificationPrefs: 1,
