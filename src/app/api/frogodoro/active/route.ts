@@ -96,6 +96,7 @@ export async function PUT(req: NextRequest) {
     const userId = await requireUserId();
     const body = await req.json();
     const timer = normalizeTimer(body?.timer);
+    const localLiveActivity = body?.localLiveActivity === true;
 
     if (!timer) {
       return NextResponse.json({ error: 'Invalid timer' }, { status: 400 });
@@ -170,6 +171,7 @@ export async function PUT(req: NextRequest) {
       startToken,
       startTokenClockSkewMs,
       prefs,
+      localLiveActivity,
     ).catch((e) => console.error('Frogodoro fan-out failed:', e));
 
     return NextResponse.json({ timer: stored, serverNow: Date.now(), seq });

@@ -156,11 +156,19 @@ export function GlobalTimer() {
   const publishActiveTimer = async (timer: Omit<ActiveFrogodoroTimer, 'updatedAt'>) => {
     publishInFlightRef.current = true;
     try {
+      // A foregrounded iOS app creates the Live Activity locally (quiet, no
+      // banner), so the server must NOT also fire a push-to-start — that push
+      // requires an alert and would flash an unwanted banner/expand on the very
+      // device that just started the timer.
+      const localLiveActivity =
+        Capacitor.getPlatform() === 'ios' &&
+        typeof document !== 'undefined' &&
+        document.visibilityState === 'visible';
       const res = await fetch('/api/frogodoro/active', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ timer }),
+        body: JSON.stringify({ timer, localLiveActivity }),
       });
       if (!res.ok) return;
       const data = await res.json();
@@ -524,8 +532,12 @@ export function GlobalTimer() {
   useEffect(() => {
     if (!isRunning || !endTime) return;
 
+    let lastTick = Date.now();
+
     const interval = setInterval(() => {
       const now = Date.now();
+      const gap = now - lastTick;
+      lastTick = now;
       const remaining = Math.max(0, Math.round((endTime - now) / 1000));
 
       // Set title synchronously before tickTimer so it lands before React renders
@@ -537,6 +549,14 @@ export function GlobalTimer() {
 
       if (remaining === 0) {
         clearInterval(interval);
+
+        // A large gap between ticks means the webview was suspended (backgrounded
+        // app) and this 0 reflects time that elapsed off-screen, not a real-time
+        // countdown. The server already processed this completion (its scheduler/
+        // ticker) and the resume resync delivers the authoritative result — so
+        // don't fire a duplicate alarm/advance here (which re-rang a session the
+        // user had already Done'd from the Dynamic Island).
+        if (gap > 2500) return;
 
         // The non-owning device never drives the transition; it waits for the
         // server's authoritative next phase to arrive over SSE.

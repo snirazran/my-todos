@@ -77,6 +77,10 @@ export async function fanOutTimerState(
   startToken: string | null | undefined,
   startTokenClockSkewMs: number | null | undefined,
   prefs: NotificationPrefs | null | undefined,
+  // The publishing device is a foregrounded iOS app that creates the Live
+  // Activity itself — don't push-to-start it (that push must carry an alert and
+  // would flash a banner on the device that just started the timer).
+  suppressPushToStart = false,
 ): Promise<void> {
   const tasks: Promise<unknown>[] = [];
   const clearRef = () =>
@@ -122,7 +126,7 @@ export async function fanOutTimerState(
           res.gone || res.reason === 'BadDeviceToken' ? clearRef() : undefined,
         ),
       );
-    } else if (running && startToken) {
+    } else if (running && startToken && !suppressPushToStart) {
       const startKey = `${timer.taskId}:${timer.phase}:${timer.endsAt}`;
       const reserved = await reserveLiveActivityRemoteStart(userId, startKey);
       if (!reserved) {
