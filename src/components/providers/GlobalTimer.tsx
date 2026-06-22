@@ -14,6 +14,7 @@ import {
 } from '@/lib/timerNotifications';
 import { format } from 'date-fns';
 import { Capacitor } from '@capacitor/core';
+import { App } from '@capacitor/app';
 import { randomUUID } from '@/lib/uuid';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
 
@@ -433,6 +434,17 @@ export function GlobalTimer() {
       }
     };
 
+    // Coming back from the background, the SSE was almost certainly suspended;
+    // its EventSource can still read non-null (so connect() would no-op). Tear it
+    // down and resync from scratch so the store snaps to server truth.
+    const forceResync = () => {
+      if (es) {
+        es.close();
+        es = null;
+      }
+      void resync();
+    };
+
     void resync();
     // SSE is the live channel. Only poll to re-establish it when it's actually
     // dropped (cheap reconnect), plus a slow full resync as a catch-all for a
@@ -447,11 +459,31 @@ export function GlobalTimer() {
     };
     document.addEventListener('visibilitychange', onVisible);
 
+    // iOS Capacitor doesn't reliably fire `visibilitychange` on app resume, so
+    // without this the in-app webview keeps counting a stale endTime after the
+    // user paused/played from the Dynamic Island while backgrounded — showing a
+    // different time than the island/web. appStateChange(isActive) is the
+    // reliable foreground signal; force a full resync to re-hydrate from server.
+    let appStateHandle: { remove: () => void } | null = null;
+    if (Capacitor.isNativePlatform()) {
+      void App.addListener('appStateChange', ({ isActive }) => {
+        if (isActive && !cancelled) forceResync();
+      })
+        .then((handle) => {
+          if (cancelled) handle.remove();
+          else appStateHandle = handle;
+        })
+        .catch(() => {
+          // Plugin missing from an older native shell — visibilitychange covers web.
+        });
+    }
+
     return () => {
       cancelled = true;
       window.clearInterval(reconnectPoll);
       window.clearInterval(safetyResync);
       document.removeEventListener('visibilitychange', onVisible);
+      appStateHandle?.remove();
       es?.close();
     };
   }, [applyRemoteTimer]);

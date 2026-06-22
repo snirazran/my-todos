@@ -21,6 +21,7 @@
     "@anthropic-ai/sdk": "^0.91.1",
     "@capacitor-firebase/messaging": "^8.3.0",
     "@capacitor/android": "^8.0.2",
+    "@capacitor/app": "^8",
     "@capacitor/cli": "^8.0.2",
     "@capacitor/core": "^8.0.2",
     "@capacitor/ios": "^8.0.2",
