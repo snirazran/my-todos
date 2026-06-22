@@ -216,6 +216,10 @@ export async function clearTimerAndFanOut(
   userId: string,
   live: LiveActivityRef | null | undefined,
   prefs: NotificationPrefs | null | undefined,
+  // A native Done/Stop tap already ended its own widget locally, so skip the
+  // APNs/FCM end echo (it would re-touch the widget the user just dismissed).
+  // The web still learns of the clear via the SSE publish below.
+  suppressNativeFanOut = false,
 ): Promise<number> {
   const doc = await UserModel.findOneAndUpdate(
     { _id: userId },
@@ -225,6 +229,6 @@ export async function clearTimerAndFanOut(
   const seq = (doc as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
   publishTimerEvent(userId, null, seq);
   cancelFrogodoroTimerProcessing(userId);
-  await fanOutTimerStop(userId, live, prefs);
+  if (!suppressNativeFanOut) await fanOutTimerStop(userId, live, prefs);
   return seq;
 }
