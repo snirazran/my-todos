@@ -7,7 +7,7 @@ import {
   cancelFrogodoroTimerProcessing,
   scheduleFrogodoroTimerProcessing,
 } from '@/lib/frogodoroDelayedTimer';
-import { clearTimerAndFanOut } from '@/lib/frogodoroSync';
+import { fanOutTimerState, clearTimerAndFanOut } from '@/lib/frogodoroSync';
 import type {
   ActiveFrogodoroTimer,
   LiveActivityRef,
@@ -80,13 +80,13 @@ export async function POST(req: NextRequest) {
 
     const userId = String(user._id);
     const live = user.liveActivity;
+    const startToken = user.liveActivityStartToken;
+    const startTokenClockSkewMs = user.liveActivityStartClockSkewMs;
     const prefs = user.notificationPrefs;
     const timer = user.activeFrogodoroTimer;
 
     if (action === 'stop' || action === 'done') {
-      // Quiet: the native widget that sent this already ended itself; just clear
-      // and let SSE sync the web — no APNs/FCM end echo back to the widget.
-      await clearTimerAndFanOut(userId, live, prefs, true);
+      await clearTimerAndFanOut(userId, live, prefs);
       return NextResponse.json({ ok: true });
     }
 
@@ -132,11 +132,6 @@ export async function POST(req: NextRequest) {
       { new: true, projection: { frogodoroSeq: 1 } },
     ).lean();
     const seq = (updated as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
-    // SSE keeps the web/foreground app in sync. We deliberately DON'T fan out to
-    // the native widget (APNs/FCM) here: /control is only ever called by a native
-    // widget button, which already repainted itself optimistically before this
-    // request. Echoing the same state back would re-push it ~hundreds of ms later
-    // and visibly re-sync the widget after the instant local update.
     publishTimerEvent(userId, next, seq);
 
     if (next.status === 'running' && next.endsAt) {
@@ -144,6 +139,8 @@ export async function POST(req: NextRequest) {
     } else {
       cancelFrogodoroTimerProcessing(userId);
     }
+
+    await fanOutTimerState(userId, next, live, startToken, startTokenClockSkewMs, prefs);
 
     return NextResponse.json({ ok: true });
   } catch {
