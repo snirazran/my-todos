@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import TaskModel from '@/lib/models/Task';
+import { addFrogodoroSession } from '@/lib/frogodoroSessions';
 import { syncQuestState } from '@/lib/quests/engine';
 
 export async function PUT(
@@ -16,57 +17,42 @@ export async function PUT(
 
     await connectMongo();
 
-    const task = await TaskModel.findOne({ id, userId });
-    if (!task) {
+    const exists = await TaskModel.exists({ id, userId });
+    if (!exists) {
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
     let isModified = false;
 
-    // Update settings if provided
-    if (settings) {
-      task.frogodoroSettings = {
-        ...task.frogodoroSettings,
-        ...settings,
-      };
-      isModified = true;
+    if (settings && typeof settings === 'object') {
+      const setOps: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(settings)) {
+        setOps[`frogodoroSettings.${key}`] = value;
+      }
+      if (Object.keys(setOps).length > 0) {
+        await TaskModel.updateOne({ id, userId }, { $set: setOps });
+        isModified = true;
+      }
     }
 
-    // Update session if provided
     if (session && session.date) {
-      if (!task.frogodoroSessions) {
-        task.frogodoroSessions = [];
-      }
-
-      const idx = task.frogodoroSessions.findIndex(
-        (s: any) => s.date === session.date,
+      await addFrogodoroSession(
+        userId,
+        id,
+        session.date,
+        session.focusTime ?? 0,
+        session.breakTime ?? 0,
       );
-
-      if (idx !== -1) {
-        task.frogodoroSessions[idx].focusTime =
-          (task.frogodoroSessions[idx].focusTime ?? 0) + (session.focusTime ?? 0);
-        task.frogodoroSessions[idx].breakTime =
-          (task.frogodoroSessions[idx].breakTime ?? 0) + (session.breakTime ?? 0);
-      } else {
-        task.frogodoroSessions.push({
-          date: session.date,
-          focusTime: session.focusTime ?? 0,
-          breakTime: session.breakTime ?? 0,
-        });
-      }
       isModified = true;
     }
 
     if (isModified) {
-      task.markModified('frogodoroSettings');
-      task.markModified('frogodoroSessions');
-      await task.save();
       void syncQuestState({ userId, timezone }).catch((syncError) => {
         console.error('Quest sync failed after frogodoro update:', syncError);
       });
     }
 
-    return NextResponse.json({ success: true, task });
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Frogodoro API error:', error);
     return NextResponse.json(

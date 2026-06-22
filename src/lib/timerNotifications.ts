@@ -70,10 +70,7 @@ export async function scheduleTimerNotifications(opts: {
     await cancelTimerNotifications();
     if (endTime <= Date.now()) return;
 
-    // On iOS the Live Activity is the audible alert (it auto-expands + rings),
-    // so this banner is silent to avoid a double sound. Android has no Live
-    // Activity, so its banner keeps the sound.
-    const notifSound = Capacitor.getPlatform() === 'ios' ? undefined : 'default';
+    const notifSound = undefined;
 
     const first = phaseEndContent(phase, autoStartBreak);
     const notifications = [

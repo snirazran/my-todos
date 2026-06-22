@@ -24,6 +24,7 @@ type UserFields = {
   activeFrogodoroTimer?: ActiveFrogodoroTimer | null;
   liveActivity?: LiveActivityRef | null;
   liveActivityStartToken?: string | null;
+  liveActivityStartClockSkewMs?: number | null;
   notificationPrefs?: NotificationPrefs;
 };
 
@@ -31,6 +32,7 @@ const SELECT = {
   activeFrogodoroTimer: 1,
   liveActivity: 1,
   liveActivityStartToken: 1,
+  liveActivityStartClockSkewMs: 1,
   notificationPrefs: 1,
 } as const;
 
@@ -79,6 +81,7 @@ export async function POST(req: NextRequest) {
     const userId = String(user._id);
     const live = user.liveActivity;
     const startToken = user.liveActivityStartToken;
+    const startTokenClockSkewMs = user.liveActivityStartClockSkewMs;
     const prefs = user.notificationPrefs;
     const timer = user.activeFrogodoroTimer;
 
@@ -137,7 +140,7 @@ export async function POST(req: NextRequest) {
       cancelFrogodoroTimerProcessing(userId);
     }
 
-    await fanOutTimerState(userId, next, live, startToken, prefs);
+    await fanOutTimerState(userId, next, live, startToken, startTokenClockSkewMs, prefs);
 
     return NextResponse.json({ ok: true });
   } catch {

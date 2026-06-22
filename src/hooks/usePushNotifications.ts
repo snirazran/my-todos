@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
-import { setLiveActivityControlToken } from '@/lib/liveTimer';
+import { setLiveActivityControlToken, setTimerControlConfig } from '@/lib/liveTimer';
 
 /**
  * Hook that handles push notification setup for native platforms (Android/iOS).
@@ -36,12 +36,17 @@ export function usePushNotifications(userId: string | null | undefined) {
       if (!token) return;
       // Stash it for the Live Activity Done/Pause/Stop intent to authenticate with.
       void setLiveActivityControlToken(token);
+      void setTimerControlConfig(token);
       try {
         await fetch('/api/notifications/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
-          body: JSON.stringify({ fcmToken: token, timezone: tz }),
+          body: JSON.stringify({
+          fcmToken: token,
+          timezone: tz,
+          platform: Capacitor.getPlatform(),
+        }),
         });
       } catch (err) {
         console.error('Failed to register FCM token:', err);

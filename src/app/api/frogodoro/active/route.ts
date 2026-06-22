@@ -53,6 +53,7 @@ function normalizeTimer(input: unknown): ActiveFrogodoroTimer | null {
   return {
     taskId: timer.taskId,
     clientId: typeof timer.clientId === 'string' ? timer.clientId : undefined,
+    clientStamp: typeof timer.clientStamp === 'number' ? timer.clientStamp : undefined,
     phase,
     status,
     timeLeft: Math.max(0, Math.floor(timer.timeLeft)),
@@ -103,21 +104,47 @@ export async function PUT(req: NextRequest) {
     await connectMongo();
     const existing = await UserModel.findById(userId, {
       'activeFrogodoroTimer.rev': 1,
+      'activeFrogodoroTimer.clientId': 1,
+      'activeFrogodoroTimer.clientStamp': 1,
       liveActivity: 1,
       liveActivityStartToken: 1,
+      liveActivityStartClockSkewMs: 1,
       notificationPrefs: 1,
+      frogodoroSeq: 1,
     }).lean();
-    const prevRev =
-      (existing as { activeFrogodoroTimer?: { rev?: number } } | null)
-        ?.activeFrogodoroTimer?.rev ?? 0;
+    const existingTimer = (
+      existing as {
+        activeFrogodoroTimer?: { rev?: number; clientId?: string; clientStamp?: number };
+      } | null
+    )?.activeFrogodoroTimer;
+    const prevRev = existingTimer?.rev ?? 0;
+
+    if (
+      existingTimer &&
+      timer.clientId &&
+      existingTimer.clientId === timer.clientId &&
+      typeof timer.clientStamp === 'number' &&
+      typeof existingTimer.clientStamp === 'number' &&
+      timer.clientStamp <= existingTimer.clientStamp
+    ) {
+      const currentSeq =
+        (existing as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
+      return NextResponse.json({ stale: true, serverNow: Date.now(), seq: currentSeq });
+    }
     const live = (existing as { liveActivity?: LiveActivityRef | null } | null)
       ?.liveActivity;
     const startToken = (
       existing as { liveActivityStartToken?: string | null } | null
     )?.liveActivityStartToken;
+    const startTokenClockSkewMs = (
+      existing as { liveActivityStartClockSkewMs?: number | null } | null
+    )?.liveActivityStartClockSkewMs;
     const prefs = (existing as { notificationPrefs?: NotificationPrefs } | null)
       ?.notificationPrefs;
     const stored: ActiveFrogodoroTimer = { ...timer, rev: prevRev + 1 };
+    console.log(
+      `Frogodoro PUT /active clientId=${stored.clientId} status=${stored.status} finished=${stored.finished === true}`,
+    );
 
     const updated = await UserModel.findOneAndUpdate(
       { _id: userId },
@@ -136,7 +163,14 @@ export async function PUT(req: NextRequest) {
       cancelFrogodoroTimerProcessing(userId);
     }
 
-    await fanOutTimerState(userId, stored, live, startToken, prefs);
+    void fanOutTimerState(
+      userId,
+      stored,
+      live,
+      startToken,
+      startTokenClockSkewMs,
+      prefs,
+    ).catch((e) => console.error('Frogodoro fan-out failed:', e));
 
     return NextResponse.json({ timer: stored, serverNow: Date.now(), seq });
   } catch {
@@ -144,9 +178,13 @@ export async function PUT(req: NextRequest) {
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
   try {
     const userId = await requireUserId();
+    const url = new URL(req.url);
+    console.log(
+      `Frogodoro DELETE /active by clientId=${url.searchParams.get('clientId')} owns=${url.searchParams.get('owns')} visible=${url.searchParams.get('visible')}`,
+    );
     await connectMongo();
     const existing = await UserModel.findById(userId, {
       liveActivity: 1,

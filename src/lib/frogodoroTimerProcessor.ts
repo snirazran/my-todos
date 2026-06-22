@@ -1,12 +1,13 @@
 import UserModel from '@/lib/models/User';
-import TaskModel from '@/lib/models/Task';
+import { addFrogodoroSession } from '@/lib/frogodoroSessions';
 import type { FrogodoroSettings, PomodoroPhase, SessionStats } from '@/lib/frogodoroStore';
 import {
   sendLiveActivityUpdate,
 } from '@/lib/notifications/liveActivity';
+import { sendTimerControlPush, sendTimerFinishedPush } from '@/lib/notifications/timer';
 import { buildLiveActivityData } from '@/lib/liveActivityData';
 import { scheduleFrogodoroTimerProcessing } from '@/lib/frogodoroDelayedTimer';
-import { publishTimerEvent, hasActiveTimerSubscriber } from '@/lib/frogodoroEvents';
+import { publishTimerEvent } from '@/lib/frogodoroEvents';
 import { syncQuestState } from '@/lib/quests/engine';
 import { getZonedToday } from '@/lib/utils';
 import type {
@@ -105,29 +106,15 @@ async function saveTimerProgress({
   timezone: string;
 }) {
   const today = getZonedToday(timezone);
-  const task = await TaskModel.findOne({ id: taskId, userId });
-  if (!task) return;
+  const saved = await addFrogodoroSession(
+    userId,
+    taskId,
+    today,
+    phase === 'focus' ? seconds : 0,
+    phase === 'break' ? seconds : 0,
+  );
+  if (!saved) return;
 
-  const session = {
-    date: today,
-    focusTime: phase === 'focus' ? seconds : 0,
-    breakTime: phase === 'break' ? seconds : 0,
-  };
-
-  if (!task.frogodoroSessions) task.frogodoroSessions = [];
-  const idx = task.frogodoroSessions.findIndex((s: any) => s.date === today);
-
-  if (idx !== -1) {
-    task.frogodoroSessions[idx].focusTime =
-      (task.frogodoroSessions[idx].focusTime ?? 0) + session.focusTime;
-    task.frogodoroSessions[idx].breakTime =
-      (task.frogodoroSessions[idx].breakTime ?? 0) + session.breakTime;
-  } else {
-    task.frogodoroSessions.push(session);
-  }
-
-  task.markModified('frogodoroSessions');
-  await task.save();
   await syncQuestState({ userId, timezone }).catch((error) => {
     console.error('Quest sync failed after server timer processing:', error);
   });
@@ -278,17 +265,29 @@ async function processOneDueTimer(
         },
         now.getTime(),
       );
-      // Only ring via APNs when no client is connected (app closed); a connected
-      // client rings locally, so this avoids a double alert.
-      const clientConnected = hasActiveTimerSubscriber(userId);
       await sendLiveActivityUpdate({
         pushToken: live.pushToken,
         activityId: live.id,
         data,
-        alert: clientConnected
-          ? undefined
-          : { title: "Time's up", body: 'Your session finished.' },
+        alert: { title: "Time's up", body: 'Your session finished.' },
       });
+    }
+  }
+
+  const tokens = prefs?.enabled ? prefs.androidFcmTokens ?? [] : [];
+  if (tokens.length > 0) {
+    if (next.autoStartBreak && nextTimer.status === 'running' && nextTimer.endsAt) {
+      await sendTimerControlPush({
+        userId,
+        tokens,
+        action: 'start',
+        phase: nextTimer.phase,
+        endTime: new Date(nextTimer.endsAt).getTime(),
+        timeLeft: nextTimer.timeLeft,
+        taskName: '',
+      });
+    } else {
+      await sendTimerFinishedPush({ userId, tokens, phase: next.completedPhase });
     }
   }
 

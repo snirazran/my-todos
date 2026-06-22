@@ -53,7 +53,11 @@ export function GlobalTimer() {
 
   const prevIsRunning = useRef(isRunning);
   const clientIdRef = useRef<string | null>(null);
-  const ownsTimerRef = useRef(true);
+  // A device is NOT the owner until hydration proves it (clientId match) or the
+  // user starts a timer here (the publisher claims it). Starting at `true` let a
+  // freshly launched/woken non-owner act as owner before the first reconcile and
+  // clear the timer the other on-screen device is running.
+  const ownsTimerRef = useRef(false);
   const suppressNextPauseSaveRef = useRef(false);
   const hasLoadedRemoteTimerRef = useRef(false);
   // Highest server seq we've applied. Every timer event carries the seq of the
@@ -66,6 +70,11 @@ export function GlobalTimer() {
   const lastSyncedPendingRef = useRef(0);
   const lastRemoteUpdatedAtRef = useRef('');
   const isRunningRef = useRef(isRunning);
+  // True while our own PUT/DELETE to /active is outstanding. A resync GET that
+  // lands in this window can read transitional state and clobber the optimistic
+  // local countdown (the "timer jumps back" on tab-switch), so we skip applying
+  // remote reads until our write settles and its seq is recorded.
+  const publishInFlightRef = useRef(false);
 
   useEffect(() => { isRunningRef.current = isRunning; }, [isRunning]);
 
@@ -144,6 +153,7 @@ export function GlobalTimer() {
   useEffect(() => { phaseElapsedRef.current = phaseElapsed; }, [phaseElapsed]);
 
   const publishActiveTimer = async (timer: Omit<ActiveFrogodoroTimer, 'updatedAt'>) => {
+    publishInFlightRef.current = true;
     try {
       const res = await fetch('/api/frogodoro/active', {
         method: 'PUT',
@@ -163,15 +173,22 @@ export function GlobalTimer() {
       }
     } catch {
       // Cross-device timer sync is best-effort.
+    } finally {
+      publishInFlightRef.current = false;
     }
   };
 
   const clearActiveTimer = async () => {
+    publishInFlightRef.current = true;
     try {
-      const res = await fetch('/api/frogodoro/active', {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      const cid = clientIdRef.current ?? 'unknown';
+      const res = await fetch(
+        `/api/frogodoro/active?clientId=${encodeURIComponent(cid)}&owns=${ownsTimerRef.current}&visible=${typeof document !== 'undefined' ? document.visibilityState : 'na'}`,
+        {
+          method: 'DELETE',
+          credentials: 'include',
+        },
+      );
       lastRemoteUpdatedAtRef.current = '';
       if (res.ok) {
         const data = await res.json().catch(() => null);
@@ -181,6 +198,8 @@ export function GlobalTimer() {
       }
     } catch {
       // Cross-device timer sync is best-effort.
+    } finally {
+      publishInFlightRef.current = false;
     }
   };
 
@@ -199,6 +218,7 @@ export function GlobalTimer() {
     return {
       taskId: s.selectedTaskId,
       clientId: clientIdRef.current,
+      clientStamp: Date.now(),
       phase: s.phase,
       status: s.isRunning ? 'running' : 'paused',
       timeLeft: snapshotTimeLeft,
@@ -213,6 +233,13 @@ export function GlobalTimer() {
   // it arrives via SSE, the initial GET, a resync, or the advance response.
   const applyRemoteTimer = useCallback(
     (timer: ActiveFrogodoroTimer | null, serverNow: number, seq: number) => {
+      // While our own write is outstanding, never let an incoming read (SSE
+      // initial snapshot, echo, or a resync) apply — it can carry null or an
+      // older endsAt that lands in the window before our PUT response records
+      // the new seq, clobbering the optimistic start (timer "stops" or jumps).
+      // Once the write settles, lastSeqRef holds its seq and the normal seq
+      // guard below filters anything stale.
+      if (publishInFlightRef.current) return;
       // The server stamps every state write with a monotonic seq. Ignore any
       // event whose seq isn't strictly newer than the last we applied — this
       // deterministically drops stale/out-of-order events (including a null GET
@@ -315,6 +342,20 @@ export function GlobalTimer() {
     // adopt path in applyRemoteTimer will push local state once it does.
     if (!clientIdRef.current || !hasLoadedRemoteTimerRef.current) return;
     if (pendingSync === lastSyncedPendingRef.current) return;
+
+    // A device that doesn't own the active timer and isn't on-screen must stay
+    // passive. When the backgrounded app is woken (push-to-start, SSE reconnect)
+    // its reconcile can flip local state and bump pendingSync; without this
+    // guard that publishes a stale state — or clears the shared timer — out from
+    // under the device the user is actually on. Consume the bump and bail; the
+    // next foreground resync re-hydrates this device from the server.
+    const visible =
+      typeof document === 'undefined' || document.visibilityState === 'visible';
+    if (!visible && !ownsTimerRef.current) {
+      lastSyncedPendingRef.current = pendingSync;
+      return;
+    }
+
     lastSyncedPendingRef.current = pendingSync;
 
     ownsTimerRef.current = true;
@@ -369,6 +410,12 @@ export function GlobalTimer() {
     };
 
     const resync = async () => {
+      // Don't let a backstop read clobber our own optimistic state while a
+      // write is in flight — the publish response (and SSE echo) will sync us.
+      if (publishInFlightRef.current) {
+        connect();
+        return;
+      }
       try {
         const res = await fetch('/api/frogodoro/active', {
           credentials: 'include',
@@ -387,7 +434,13 @@ export function GlobalTimer() {
     };
 
     void resync();
-    const interval = window.setInterval(resync, 30000);
+    // SSE is the live channel. Only poll to re-establish it when it's actually
+    // dropped (cheap reconnect), plus a slow full resync as a catch-all for a
+    // stream that died silently (e.g. iOS suspended the app without an error).
+    const reconnectPoll = window.setInterval(() => {
+      if (!es) void resync();
+    }, 30000);
+    const safetyResync = window.setInterval(resync, 180000);
 
     const onVisible = () => {
       if (document.visibilityState === 'visible') void resync();
@@ -396,7 +449,8 @@ export function GlobalTimer() {
 
     return () => {
       cancelled = true;
-      window.clearInterval(interval);
+      window.clearInterval(reconnectPoll);
+      window.clearInterval(safetyResync);
       document.removeEventListener('visibilitychange', onVisible);
       es?.close();
     };

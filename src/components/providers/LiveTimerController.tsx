@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { reconcileLiveTimer } from '@/lib/liveTimer';
 
 export function LiveTimerController() {
+  const [foregroundTick, setForegroundTick] = useState(0);
   const phase = useFrogodoroStore((s) => s.phase);
   const isRunning = useFrogodoroStore((s) => s.isRunning);
   const timerActive = useFrogodoroStore((s) => s.timerActive);
@@ -26,6 +27,24 @@ export function LiveTimerController() {
   const active = timerActive && (isRunning || phaseStarted || awaitingDone);
 
   useEffect(() => {
+    const timeouts: number[] = [];
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        setForegroundTick((value) => value + 1);
+        const timeout = window.setTimeout(() => {
+          setForegroundTick((value) => value + 1);
+        }, 500);
+        timeouts.push(timeout);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      timeouts.forEach((timeout) => window.clearTimeout(timeout));
+    };
+  }, []);
+
+  useEffect(() => {
     void reconcileLiveTimer({
       active,
       isRunning,
@@ -36,7 +55,16 @@ export function LiveTimerController() {
       taskName: '',
       finished: awaitingDone,
     });
-  }, [displayPhase, isRunning, active, endTime, timeLeft, totalSeconds, awaitingDone]);
+  }, [
+    displayPhase,
+    isRunning,
+    active,
+    endTime,
+    timeLeft,
+    totalSeconds,
+    awaitingDone,
+    foregroundTick,
+  ]);
 
   return null;
 }

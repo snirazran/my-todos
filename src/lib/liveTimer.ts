@@ -18,10 +18,13 @@ interface FrogTimerPlugin {
     taskName: string;
   }): Promise<void>;
   stop(): Promise<void>;
+  setControlConfig(opts: { origin: string; token: string }): Promise<void>;
 }
 
 interface FrogLiveActivityPlugin {
-  show(opts: { data: LiveActivityData }): Promise<{ activityId: string }>;
+  show(opts: {
+    data: LiveActivityData;
+  }): Promise<{ activityId?: string; skipped?: boolean; reason?: string }>;
   end(): Promise<void>;
   registerPushToStart(): Promise<void>;
   setApiOrigin(opts: { origin: string }): Promise<void>;
@@ -42,6 +45,10 @@ const FrogLiveActivity = registerPlugin<FrogLiveActivityPlugin>('FrogLiveActivit
 let signature: string | null = null;
 let iosListenersReady = false;
 
+function isDocumentForegrounded(): boolean {
+  return typeof document === 'undefined' || document.visibilityState === 'visible';
+}
+
 // Hand the stable per-install FCM token to the native Live Activity button
 // intent (via the App Group) so it can authenticate /control without depending
 // on the volatile activity push token.
@@ -56,7 +63,26 @@ export async function setLiveActivityControlToken(token: string): Promise<void> 
   }
 }
 
-async function putLiveActivity(body: Record<string, string>): Promise<void> {
+// Hand the FCM token + API origin to the Android notification action buttons so
+// their BroadcastReceiver can authenticate /control while the app is minimized
+// or killed (it can't read the webview's cookie or location).
+export async function setTimerControlConfig(token: string): Promise<void> {
+  if (
+    !token ||
+    typeof window === 'undefined' ||
+    !Capacitor.isNativePlatform() ||
+    Capacitor.getPlatform() !== 'android'
+  ) {
+    return;
+  }
+  try {
+    await FrogTimer.setControlConfig({ origin: window.location.origin, token });
+  } catch {
+    void 0;
+  }
+}
+
+async function putLiveActivity(body: Record<string, string | number>): Promise<void> {
   try {
     await fetch('/api/frogodoro/live-activity', {
       method: 'PUT',
@@ -86,11 +112,17 @@ function ensureIosListeners(): void {
   try {
     void FrogLiveActivity.addListener('pushToken', (event) => {
       if (event?.token) {
-        void putLiveActivity({ activityId: event.activityId ?? '', pushToken: event.token });
+        void putLiveActivity({
+          activityId: event.activityId ?? '',
+          pushToken: event.token,
+          clientNow: Date.now(),
+        });
       }
     });
     void FrogLiveActivity.addListener('pushToStartToken', (event) => {
-      if (event?.token) void putLiveActivity({ pushToStartToken: event.token });
+      if (event?.token) {
+        void putLiveActivity({ pushToStartToken: event.token, clientNow: Date.now() });
+      }
     });
     // Tell the Done/Pause/Stop button intent which server to call (this device's
     // current origin — prod or the dev server), since the intent runs natively
@@ -118,11 +150,13 @@ function computeSignature(snap: LiveTimerSnapshot): string | null {
 export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 
-  const desiredSig = computeSignature(snap);
-  if (desiredSig === signature) return;
-  signature = desiredSig;
-
   const platform = Capacitor.getPlatform();
+
+  if (platform === 'ios') ensureIosListeners();
+
+  const desiredSig = computeSignature(snap);
+
+  if (desiredSig === signature) return;
 
   if (platform === 'android') {
     try {
@@ -146,7 +180,12 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
 
   if (platform !== 'ios') return;
 
-  ensureIosListeners();
+  // iOS only allows creating a Live Activity from the app while it is in the
+  // foreground. Cross-device/background starts are handled by APNs push-to-start
+  // from the server; keep the local signature unchanged so foregrounding retries.
+  if (desiredSig && !isDocumentForegrounded()) return;
+
+  signature = desiredSig;
 
   try {
     if (!desiredSig) {
@@ -156,7 +195,10 @@ export async function reconcileLiveTimer(snap: LiveTimerSnapshot): Promise<void>
     }
     // The native widget renders run vs paused from the content-state, so a
     // run<->pause change is a plain in-place update — no end-and-recreate.
-    await FrogLiveActivity.show({ data: buildLiveActivityData(snap) });
+    const result = await FrogLiveActivity.show({ data: buildLiveActivityData(snap) });
+    if (result?.skipped) {
+      signature = null;
+    }
   } catch (err) {
     console.error('FrogLiveActivity failed:', err);
     signature = null;

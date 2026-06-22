@@ -106,7 +106,12 @@ export async function sendTimerPushToUser({
   if (invalidTokens.length > 0) {
     await UserModel.updateOne(
       { _id: userId },
-      { $pull: { 'notificationPrefs.fcmTokens': { $in: invalidTokens } } },
+      {
+        $pull: {
+          'notificationPrefs.fcmTokens': { $in: invalidTokens },
+          'notificationPrefs.androidFcmTokens': { $in: invalidTokens },
+        },
+      },
     );
   }
 
@@ -171,7 +176,68 @@ export async function sendTimerControlPush({
   if (invalidTokens.length > 0) {
     await UserModel.updateOne(
       { _id: userId },
-      { $pull: { 'notificationPrefs.fcmTokens': { $in: invalidTokens } } },
+      {
+        $pull: {
+          'notificationPrefs.fcmTokens': { $in: invalidTokens },
+          'notificationPrefs.androidFcmTokens': { $in: invalidTokens },
+        },
+      },
+    );
+  }
+
+  return { sent };
+}
+
+export async function sendTimerFinishedPush({
+  userId,
+  tokens,
+  phase,
+}: {
+  userId: string;
+  tokens: string[];
+  phase: PomodoroPhase;
+}) {
+  if (tokens.length === 0) return { sent: 0 };
+
+  const messaging = getAdminMessaging();
+  const invalidTokens: string[] = [];
+  let sent = 0;
+
+  for (const token of tokens) {
+    try {
+      await messaging.send({
+        token,
+        data: {
+          type: 'timer_finished',
+          phase,
+        },
+        android: { priority: 'high' as const },
+        apns: {
+          headers: { 'apns-priority': '5', 'apns-push-type': 'background' },
+          payload: { aps: { 'content-available': 1 } },
+        },
+      });
+      sent++;
+    } catch (err: any) {
+      if (
+        err?.code === 'messaging/registration-token-not-registered' ||
+        err?.code === 'messaging/invalid-registration-token'
+      ) {
+        invalidTokens.push(token);
+      }
+      console.error('FCM timer finished push failed:', err?.message);
+    }
+  }
+
+  if (invalidTokens.length > 0) {
+    await UserModel.updateOne(
+      { _id: userId },
+      {
+        $pull: {
+          'notificationPrefs.fcmTokens': { $in: invalidTokens },
+          'notificationPrefs.androidFcmTokens': { $in: invalidTokens },
+        },
+      },
     );
   }
 

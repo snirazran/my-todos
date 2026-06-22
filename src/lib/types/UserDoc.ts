@@ -96,6 +96,8 @@ export type UserDoc = {
   // closed. Independent of `liveActivity`, which is the current activity's
   // per-instance update token.
   liveActivityStartToken?: string | null;
+  liveActivityStartClockSkewMs?: number | null;
+  liveActivityRemoteStart?: { key: string; attemptedAt: string } | null;
   lastRecapWeek?: string;
   onboardingCompleted?: boolean;
 };
@@ -104,11 +106,13 @@ export type LiveActivityRef = {
   id: string;
   pushToken: string;
   updatedAt: string;
+  clockSkewMs?: number;
 };
 
 export type ActiveFrogodoroTimer = {
   taskId: string;
   clientId?: string;
+  clientStamp?: number;
   phase: PomodoroPhase;
   status: 'running' | 'paused';
   timeLeft: number;
@@ -128,6 +132,7 @@ export type MissedReviewProgress = {
 
 export type NotificationPrefs = {
   fcmTokens: string[]; // Device FCM tokens (one per device)
+  androidFcmTokens?: string[]; // Subset of fcmTokens that are Android (timer control/alarm pushes are Android-only)
   enabled: boolean; // User opt-in for push notifications
   activityHours: number[]; // Rolling log of active hours (last 50)
   lastNotifiedAt?: Date; // Prevent duplicate sends

@@ -1,5 +1,8 @@
 package io.frog.tasks;
 
+import android.content.Context;
+import android.content.SharedPreferences;
+
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
@@ -33,6 +36,23 @@ public class FrogTimerPlugin extends Plugin {
     @PluginMethod
     public void stop(PluginCall call) {
         FrogTimerNotification.cancel(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void setControlConfig(PluginCall call) {
+        String origin = call.getString("origin", "");
+        String token = call.getString("token", "");
+        SharedPreferences prefs =
+                getContext().getSharedPreferences("frog_timer_control", Context.MODE_PRIVATE);
+        SharedPreferences.Editor ed = prefs.edit();
+        if (origin != null && !origin.isEmpty()) {
+            ed.putString("origin", origin);
+        }
+        if (token != null && !token.isEmpty()) {
+            ed.putString("token", token);
+        }
+        ed.apply();
         call.resolve();
     }
 

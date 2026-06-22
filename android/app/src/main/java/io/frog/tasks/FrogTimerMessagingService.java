@@ -35,6 +35,12 @@ public class FrogTimerMessagingService extends FirebaseMessagingService {
             handleTimerControl(data);
             return;
         }
+        if ("timer_finished".equals(data.get("type"))) {
+            String phase = data.get("phase");
+            FrogTimerNotification.showAlarm(
+                    getApplicationContext(), phase == null ? "focus" : phase);
+            return;
+        }
 
         FirebaseMessagingPlugin.onMessageReceived(remoteMessage);
     }

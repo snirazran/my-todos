@@ -134,7 +134,11 @@
       "Bash(grep -n \"service\\\\|MessagingService\\\\|firebase\" app/src/main/AndroidManifest.xml)",
       "Read(//Users/snirazran/Fullstack/**)",
       "Bash(plutil -extract NSAppTransportSecurity xml1 -o - App/Info.plist)",
-      "Bash(grep -A12 \"NSAppTransportSecurity\" App/Info.plist)"
+      "Bash(grep -A12 \"NSAppTransportSecurity\" App/Info.plist)",
+      "Bash(NODE_OPTIONS= npx tsc --noEmit)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(echo \"tsc exit: $?\")",
+      "WebFetch(domain:apnspush.com)"
     ]
   }
 }

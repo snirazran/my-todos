@@ -23,6 +23,50 @@ export function phaseTotalSeconds(timer: ActiveFrogodoroTimer): number {
   return Math.max(1, Math.round(minutes * 60));
 }
 
+function tokenLabel(token: string | null | undefined): string {
+  return token ? `${token.slice(0, 8)}...${token.slice(-6)}` : 'none';
+}
+
+export function normalizeClockSkewMs(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && Math.abs(value) < 10 * 60_000
+    ? Math.round(value)
+    : 0;
+}
+
+export function liveActivityEndTimeForDevice(
+  serverEndTime: number,
+  clockSkewMs: unknown,
+): number {
+  return serverEndTime - normalizeClockSkewMs(clockSkewMs);
+}
+
+export async function reserveLiveActivityRemoteStart(
+  userId: string,
+  key: string,
+): Promise<boolean> {
+  const cutoff = new Date(Date.now() - 30_000).toISOString();
+  const reserved = await UserModel.findOneAndUpdate(
+    {
+      _id: userId,
+      $or: [
+        { 'liveActivityRemoteStart.key': { $ne: key } },
+        { 'liveActivityRemoteStart.attemptedAt': { $lt: cutoff } },
+        { liveActivityRemoteStart: { $exists: false } },
+      ],
+    },
+    {
+      $set: {
+        liveActivityRemoteStart: {
+          key,
+          attemptedAt: new Date().toISOString(),
+        },
+      },
+    },
+    { projection: { _id: 1 } },
+  ).lean();
+  return !!reserved;
+}
+
 // Fan a state change made on one device out to that user's other surfaces that
 // the SSE stream can't reach (a backgrounded/killed phone): the iOS Live
 // Activity via APNs and the Android live-timer notification via a data FCM.
@@ -31,48 +75,76 @@ export async function fanOutTimerState(
   timer: ActiveFrogodoroTimer,
   live: LiveActivityRef | null | undefined,
   startToken: string | null | undefined,
+  startTokenClockSkewMs: number | null | undefined,
   prefs: NotificationPrefs | null | undefined,
 ): Promise<void> {
   const tasks: Promise<unknown>[] = [];
   const clearRef = () =>
     UserModel.updateOne({ _id: userId }, { $set: { liveActivity: null } });
+  const clearStartToken = () =>
+    UserModel.updateOne({ _id: userId }, { $set: { liveActivityStartToken: null } });
+  const livePushConfigured = isLiveActivityPushConfigured();
 
-  if (isLiveActivityPushConfigured()) {
+  console.log(
+    `Frogodoro fan-out: status=${timer.status} phase=${timer.phase} finished=${timer.finished === true} live=${live?.id ? 'yes' : 'no'} liveToken=${tokenLabel(live?.pushToken)} startToken=${tokenLabel(startToken)} apns=${livePushConfigured ? 'yes' : 'no'}`,
+  );
+
+  if (livePushConfigured) {
     const finished = timer.finished === true;
     const running = !finished && timer.status === 'running' && !!timer.endsAt;
     const endTime = running ? new Date(timer.endsAt as string).getTime() : 0;
+    const deviceEndTime =
+      running && live?.id
+        ? liveActivityEndTimeForDevice(endTime, live.clockSkewMs)
+        : running
+          ? liveActivityEndTimeForDevice(endTime, startTokenClockSkewMs)
+          : 0;
     const data = buildLiveActivityData({
       active: true,
       isRunning: running,
       finished,
       phase: timer.phase,
-      endTime: running ? endTime : 0,
+      endTime: deviceEndTime,
       timeLeft: finished ? 0 : timer.timeLeft,
       totalSeconds: phaseTotalSeconds(timer),
       taskName: '',
     });
 
     if (live?.id && live.pushToken) {
+      console.log(`Frogodoro fan-out: sending Live Activity update ${live.id}`);
       tasks.push(
         sendLiveActivityUpdate({
           pushToken: live.pushToken,
           activityId: live.id,
           data,
-          staleDate: running ? endTime : null,
-        }).then((res) => (res.gone ? clearRef() : undefined)),
+          staleDate: running ? deviceEndTime : null,
+        }).then((res) =>
+          res.gone || res.reason === 'BadDeviceToken' ? clearRef() : undefined,
+        ),
       );
     } else if (running && startToken) {
-      tasks.push(
-        sendLiveActivityStart({
-          pushToStartToken: startToken,
-          data,
-          staleDate: endTime,
-        }),
-      );
+      const startKey = `${timer.taskId}:${timer.phase}:${timer.endsAt}`;
+      const reserved = await reserveLiveActivityRemoteStart(userId, startKey);
+      if (!reserved) {
+        console.log('Frogodoro fan-out: skipped duplicate remote start reservation');
+      } else {
+        console.log('Frogodoro fan-out: sending Live Activity remote start');
+        tasks.push(
+          sendLiveActivityStart({
+            pushToStartToken: startToken,
+            data,
+            staleDate: deviceEndTime,
+          }).then((res) =>
+            res.gone || res.reason === 'BadDeviceToken' ? clearStartToken() : undefined,
+          ),
+        );
+      }
+    } else {
+      console.log('Frogodoro fan-out: no Live Activity push target for this state');
     }
   }
 
-  const tokens = prefs?.enabled ? prefs.fcmTokens ?? [] : [];
+  const tokens = prefs?.enabled ? prefs.androidFcmTokens ?? [] : [];
   if (tokens.length > 0) {
     tasks.push(
       sendTimerControlPush({
@@ -115,7 +187,7 @@ export async function fanOutTimerStop(
     );
   }
 
-  const tokens = prefs?.enabled ? prefs.fcmTokens ?? [] : [];
+  const tokens = prefs?.enabled ? prefs.androidFcmTokens ?? [] : [];
   if (tokens.length > 0) {
     tasks.push(
       sendTimerControlPush({

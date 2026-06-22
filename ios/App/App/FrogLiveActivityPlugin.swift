@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import Capacitor
 import ActivityKit
 
@@ -85,6 +86,10 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
                     }
                     call.resolve(["activityId": activity.id])
                 } else {
+                    guard UIApplication.shared.applicationState == .active else {
+                        call.resolve(["skipped": true, "reason": "notForeground"])
+                        return
+                    }
                     let created = try Activity.request(
                         attributes: FrogTimerAttributes(),
                         content: content,
@@ -135,6 +140,11 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func registerPushToStart(_ call: CAPPluginCall) {
         if #available(iOS 17.2, *) {
+            if let tokenData = Activity<FrogTimerAttributes>.pushToStartToken {
+                let token = tokenData.map { String(format: "%02x", $0) }.joined()
+                Self.storeToken(token, key: "frogPushToStartToken")
+                self.notifyListeners("pushToStartToken", data: ["token": token])
+            }
             Task {
                 for await tokenData in Activity<FrogTimerAttributes>.pushToStartTokenUpdates {
                     let token = tokenData.map { String(format: "%02x", $0) }.joined()

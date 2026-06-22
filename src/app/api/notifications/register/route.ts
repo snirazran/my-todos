@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { fcmToken, timezone } = body;
+  const { fcmToken, timezone, platform } = body;
 
   if (!fcmToken || typeof fcmToken !== 'string') {
     return NextResponse.json(
@@ -32,22 +32,42 @@ export async function POST(req: NextRequest) {
 
   await connectMongo();
 
-  // Add token (deduplicated) and set enabled + timezone
-  await UserModel.updateOne(
-    { _id: uid },
-    {
-      $addToSet: { 'notificationPrefs.fcmTokens': fcmToken },
-      $set: {
-        'notificationPrefs.enabled': true,
-        'notificationPrefs.timezone': timezone || 'UTC',
+  const baseSet = {
+    'notificationPrefs.enabled': true,
+    'notificationPrefs.timezone': timezone || 'UTC',
+  };
+  const baseSetOnInsert = {
+    'notificationPrefs.activityHours': [],
+    'notificationPrefs.morningSlot': 9,
+    'notificationPrefs.eveningSlot': 18,
+  };
+
+  // Add token (deduplicated) and set enabled + timezone. Android tokens are
+  // tracked separately so timer-control/alarm pushes (handled natively only on
+  // Android) aren't sent to iOS tokens, which use the Live Activity instead.
+  if (platform === 'android') {
+    await UserModel.updateOne(
+      { _id: uid },
+      {
+        $addToSet: {
+          'notificationPrefs.fcmTokens': fcmToken,
+          'notificationPrefs.androidFcmTokens': fcmToken,
+        },
+        $set: baseSet,
+        $setOnInsert: baseSetOnInsert,
       },
-      $setOnInsert: {
-        'notificationPrefs.activityHours': [],
-        'notificationPrefs.morningSlot': 9,
-        'notificationPrefs.eveningSlot': 18,
+    );
+  } else {
+    await UserModel.updateOne(
+      { _id: uid },
+      {
+        $addToSet: { 'notificationPrefs.fcmTokens': fcmToken },
+        $pull: { 'notificationPrefs.androidFcmTokens': fcmToken },
+        $set: baseSet,
+        $setOnInsert: baseSetOnInsert,
       },
-    },
-  );
+    );
+  }
 
   return NextResponse.json({ ok: true });
 }
