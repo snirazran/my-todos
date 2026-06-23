@@ -1177,6 +1177,9 @@ export async function PUT(req: NextRequest) {
       typeof order === 'number'
         ? order
         : await nextOrderForDay(uid, weekday, toDate);
+    // Carry the focus/break logged on the original occurrence's day onto the
+    // new one-off, re-stamped to the destination date (sessions are date-keyed).
+    const movedSession = doc.frogodoroSessions?.find((s) => s.date === fromDate);
     await TaskModel.updateOne(
       { userId: uid, type: 'regular', id: newId },
       {
@@ -1190,6 +1193,17 @@ export async function PUT(req: NextRequest) {
           startTime: doc.startTime,
           endTime: doc.endTime,
           reminder: doc.reminder,
+          ...(movedSession
+            ? {
+                frogodoroSessions: [
+                  {
+                    date: toDate,
+                    focusTime: movedSession.focusTime ?? 0,
+                    breakTime: movedSession.breakTime ?? 0,
+                  },
+                ],
+              }
+            : {}),
           updatedAt: now,
         },
         $setOnInsert: {
@@ -1262,26 +1276,27 @@ export async function PUT(req: NextRequest) {
       const weekday = dowFromYMD(moveDate); // 0..6
       const newOrder = await nextOrderForDay(uid, weekday, moveDate);
 
-      await TaskModel.updateOne(
-        { userId: uid, id: taskId },
+      // Pipeline update so we can re-stamp the date-keyed frogodoro sessions
+      // onto the new day in the same write — a regular task lives on one date,
+      // so all its sessions belong to moveDate after the move.
+      await TaskModel.updateOne({ userId: uid, id: taskId }, [
         {
           $set: {
             type: 'regular',
             date: moveDate,
             order: newOrder,
             updatedAt: now,
-            // We keep 'completed' state? If moving back to today, maybe keep it as is if it was completed?
-            // Usually 'Do Later' implies it wasn't done. 'Move to Today' implies we want to do it.
-            // Let's assume we keep provided 'completed' or default to current.
-            // For now, let's NOT reset completed unless specified, but usually backlog items are not completed.
-          },
-          $unset: {
-            weekStart: 1,
-            dayOfWeek: 1,
-            suppressedDates: 1,
+            frogodoroSessions: {
+              $map: {
+                input: { $ifNull: ['$frogodoroSessions', []] },
+                as: 's',
+                in: { $mergeObjects: ['$$s', { date: moveDate }] },
+              },
+            },
           },
         },
-      );
+        { $unset: ['weekStart', 'dayOfWeek', 'suppressedDates'] },
+      ]);
       await syncGamification(uid, tz);
       return NextResponse.json({ ok: true });
     }
@@ -2329,6 +2344,11 @@ type BoardTaskInput = {
   startTime?: string;
   endTime?: string;
   reminder?: string;
+  frogodoroSession?: {
+    date?: string;
+    focusTime?: number;
+    breakTime?: number;
+  } | null;
 };
 
 async function handleBoardPut(
@@ -2642,6 +2662,25 @@ async function handleBoardPutByDate(
         ...(reminder !== undefined ? { reminder } : {}),
         ...(calendarEventId !== undefined ? { calendarEventId } : {}),
       };
+      // The frogodoro session is stored in an array keyed by date; a moved
+      // regular task must carry its focus/break onto the new day, so re-stamp
+      // the request's session to this column's date. (Regular tasks live on one
+      // day, so collapsing to the single current-date entry is correct.)
+      const fsess = t.frogodoroSession;
+      const frogodoroFields =
+        fsess &&
+        (typeof fsess.focusTime === 'number' ||
+          typeof fsess.breakTime === 'number')
+          ? {
+              frogodoroSessions: [
+                {
+                  date: dateKey,
+                  focusTime: fsess.focusTime ?? 0,
+                  breakTime: fsess.breakTime ?? 0,
+                },
+              ],
+            }
+          : {};
       if (ttype === 'weekly') {
         // `type: 'weekly'` covers every repeat kind (weekly / monthly / custom).
         // When the task is being reordered within a column that is a *natural*
@@ -2707,6 +2746,7 @@ async function handleBoardPutByDate(
                 notes,
                 checklist,
                 ...scheduleFields,
+                ...frogodoroFields,
                 date: dateKey,
                 order: i + 1,
                 completed: false,
@@ -2727,6 +2767,7 @@ async function handleBoardPutByDate(
             notes,
             checklist,
             ...scheduleFields,
+            ...frogodoroFields,
             date: dateKey,
             order: i + 1,
             updatedAt: now,
