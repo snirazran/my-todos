@@ -26,6 +26,7 @@ type UserFields = {
   liveActivityStartToken?: string | null;
   liveActivityStartClockSkewMs?: number | null;
   notificationPrefs?: NotificationPrefs;
+  frogodoroControlSeq?: number;
 };
 
 const SELECT = {
@@ -34,7 +35,19 @@ const SELECT = {
   liveActivityStartToken: 1,
   liveActivityStartClockSkewMs: 1,
   notificationPrefs: 1,
+  frogodoroControlSeq: 1,
 } as const;
+
+function controlSeqFilter(userId: string, controlSeq: number | null) {
+  if (controlSeq === null) return { _id: userId };
+  return {
+    _id: userId,
+    $or: [
+      { frogodoroControlSeq: { $exists: false } },
+      { frogodoroControlSeq: { $lt: controlSeq } },
+    ],
+  };
+}
 
 // Drive the timer from a native surface (iOS Live Activity / Android notification
 // buttons). Native callers send their push token for auth (they can't send the
@@ -45,7 +58,7 @@ export async function POST(req: NextRequest) {
   try {
     await connectMongo();
 
-    let body: { action?: unknown; token?: unknown } = {};
+    let body: { action?: unknown; token?: unknown; controlSeq?: unknown } = {};
     try {
       body = await req.json();
     } catch {
@@ -56,6 +69,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
     const token = typeof body?.token === 'string' ? body.token : '';
+    const rawControlSeq =
+      typeof body?.controlSeq === 'number' && Number.isFinite(body.controlSeq)
+        ? Math.floor(body.controlSeq)
+        : null;
 
     let user: UserFields | null = null;
     if (token) {
@@ -84,20 +101,51 @@ export async function POST(req: NextRequest) {
     const startTokenClockSkewMs = user.liveActivityStartClockSkewMs;
     const prefs = user.notificationPrefs;
     const timer = user.activeFrogodoroTimer;
+    const controlSeq = token && rawControlSeq && rawControlSeq > 0 ? rawControlSeq : null;
+
+    console.log(
+      `Frogodoro control: action=${action} seq=${controlSeq ?? 'none'} matchedBy=${token ? 'token' : 'cookie'} userId=${userId} timer=${timer ? timer.status : 'none'}`,
+    );
+
+    if (
+      controlSeq !== null &&
+      typeof user.frogodoroControlSeq === 'number' &&
+      controlSeq <= user.frogodoroControlSeq
+    ) {
+      console.log(
+        `Frogodoro control: ignored stale native seq=${controlSeq} current=${user.frogodoroControlSeq}`,
+      );
+      return NextResponse.json({ ok: true, stale: true });
+    }
 
     if (action === 'stop' || action === 'done') {
+      if (controlSeq !== null) {
+        const accepted = await UserModel.updateOne(controlSeqFilter(userId, controlSeq), {
+          $set: { frogodoroControlSeq: controlSeq },
+        });
+        if (accepted.matchedCount === 0) {
+          return NextResponse.json({ ok: true, stale: true });
+        }
+      }
       await clearTimerAndFanOut(userId, live, prefs);
+      if (controlSeq !== null) {
+        await UserModel.updateOne({ _id: userId }, { $max: { frogodoroControlSeq: controlSeq } });
+      }
       return NextResponse.json({ ok: true });
     }
 
     if (!timer) {
+      console.log('Frogodoro control: no active timer for matched user — no-op');
+      if (controlSeq !== null) {
+        await UserModel.updateOne({ _id: userId }, { $max: { frogodoroControlSeq: controlSeq } });
+      }
       return NextResponse.json({ ok: true });
     }
 
     const now = Date.now();
     let next: ActiveFrogodoroTimer | null = null;
 
-    if (action === 'pause' && timer.status === 'running') {
+    if (action === 'pause') {
       const endsAtMs = timer.endsAt ? new Date(timer.endsAt).getTime() : 0;
       const timeLeft = endsAtMs
         ? Math.max(0, Math.round((endsAtMs - now) / 1000))
@@ -105,17 +153,22 @@ export async function POST(req: NextRequest) {
       next = {
         ...timer,
         status: 'paused',
-        timeLeft,
+        timeLeft: timer.status === 'running' ? timeLeft : timer.timeLeft,
         endsAt: null,
         finished: false,
         rev: (timer.rev ?? 0) + 1,
         updatedAt: new Date(now).toISOString(),
       };
-    } else if (action === 'resume' && timer.status === 'paused') {
+    } else if (action === 'resume') {
+      const timeLeft =
+        timer.status === 'running' && timer.endsAt
+          ? Math.max(0, Math.round((new Date(timer.endsAt).getTime() - now) / 1000))
+          : timer.timeLeft;
       next = {
         ...timer,
         status: 'running',
-        endsAt: new Date(now + timer.timeLeft * 1000).toISOString(),
+        timeLeft,
+        endsAt: new Date(now + timeLeft * 1000).toISOString(),
         finished: false,
         rev: (timer.rev ?? 0) + 1,
         updatedAt: new Date(now).toISOString(),
@@ -123,14 +176,27 @@ export async function POST(req: NextRequest) {
     }
 
     if (!next) {
+      console.log(
+        `Frogodoro control: action=${action} ignored — timer.status=${timer.status} (no transition) — no-op`,
+      );
       return NextResponse.json({ ok: true });
     }
 
     const updated = await UserModel.findOneAndUpdate(
-      { _id: userId },
-      { $set: { activeFrogodoroTimer: next }, $inc: { frogodoroSeq: 1 } },
+      controlSeqFilter(userId, controlSeq),
+      {
+        $set: {
+          activeFrogodoroTimer: next,
+          ...(controlSeq !== null ? { frogodoroControlSeq: controlSeq } : {}),
+        },
+        $inc: { frogodoroSeq: 1 },
+      },
       { new: true, projection: { frogodoroSeq: 1 } },
     ).lean();
+    if (!updated) {
+      console.log(`Frogodoro control: skipped stale native update seq=${controlSeq}`);
+      return NextResponse.json({ ok: true, stale: true });
+    }
     const seq = (updated as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
     publishTimerEvent(userId, next, seq);
 

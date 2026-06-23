@@ -17,6 +17,7 @@ import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { randomUUID } from '@/lib/uuid';
 import type { ActiveFrogodoroTimer } from '@/lib/types/UserDoc';
+import { getCurrentLiveActivityState } from '@/lib/liveTimer';
 
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings): number {
   return phase === 'focus' ? settings.focusDuration * 60 : settings.breakDuration * 60;
@@ -175,6 +176,15 @@ export function GlobalTimer() {
       if (data?.timer?.updatedAt) {
         lastRemoteUpdatedAtRef.current = data.timer.updatedAt;
       }
+      if (typeof data?.timer?.rev === 'number') {
+        useFrogodoroStore.getState().setActiveTimerRev(data.timer.rev);
+      }
+      if (data?.stale === true && data?.timer) {
+        useFrogodoroStore.getState().hydrateActiveTimer(
+          data.timer as ActiveFrogodoroTimer,
+          typeof data.serverNow === 'number' ? data.serverNow : Date.now(),
+        );
+      }
       // Our own write is the newest state; record its seq so the echo (SSE/GET)
       // is ignored as not-newer, breaking the publish→echo→hydrate loop.
       if (typeof data?.seq === 'number' && data.seq > lastSeqRef.current) {
@@ -235,6 +245,7 @@ export function GlobalTimer() {
       finished: s.awaitingDone,
       settings: s.settings,
       sessionStats: s.sessionStats,
+      rev: s.activeTimerRev ?? undefined,
     };
   }, []);
 
@@ -339,6 +350,27 @@ export function GlobalTimer() {
     },
     [registerCompletion],
   );
+
+  const applyNativeLiveActivityState = useCallback(async () => {
+    const state = await getCurrentLiveActivityState();
+    if (!state?.active) return;
+
+    const phase: PomodoroPhase =
+      state.label.toLowerCase().includes('break') ? 'break' : 'focus';
+    const running = !state.paused && state.endTime > 0 && state.finished !== true;
+    const timeLeft = running
+      ? Math.max(0, Math.round((state.endTime - Date.now()) / 1000))
+      : Math.max(0, Math.round(state.ringValue));
+
+    useFrogodoroStore.getState().hydrateLiveActivitySnapshot({
+      phase,
+      isRunning: running,
+      endTime: running ? state.endTime : null,
+      timeLeft,
+      totalSeconds: state.ringTotal,
+      finished: state.finished,
+    });
+  }, []);
 
   // Publish to the server ONLY in response to user-intent actions, detected via
   // the store's pendingSync counter (bumped by start/pause/resume/stop/switch/
@@ -450,6 +482,7 @@ export function GlobalTimer() {
         es.close();
         es = null;
       }
+      void applyNativeLiveActivityState();
       void resync();
     };
 
@@ -463,7 +496,7 @@ export function GlobalTimer() {
     const safetyResync = window.setInterval(resync, 180000);
 
     const onVisible = () => {
-      if (document.visibilityState === 'visible') void resync();
+      if (document.visibilityState === 'visible') forceResync();
     };
     document.addEventListener('visibilitychange', onVisible);
 
@@ -494,7 +527,7 @@ export function GlobalTimer() {
       appStateHandle?.remove();
       es?.close();
     };
-  }, [applyRemoteTimer]);
+  }, [applyNativeLiveActivityState, applyRemoteTimer]);
 
   // Detect pause/stop to flush partial time for any phase
   useEffect(() => {

@@ -138,7 +138,11 @@
       "Bash(NODE_OPTIONS= npx tsc --noEmit)",
       "Bash(echo \"exit: $?\")",
       "Bash(echo \"tsc exit: $?\")",
-      "WebFetch(domain:apnspush.com)"
+      "WebFetch(domain:apnspush.com)",
+      "WebFetch(domain:bfrearson.github.io)",
+      "WebFetch(domain:www.reactnative.university)",
+      "Bash(awk 'NR>=340 && NR<=400' App.xcodeproj/project.pbxproj)",
+      "Bash(awk NR>=194 && NR<=230 *)"
     ]
   }
 }

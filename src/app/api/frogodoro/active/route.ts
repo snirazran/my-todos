@@ -67,6 +67,7 @@ function normalizeTimer(input: unknown): ActiveFrogodoroTimer | null {
       ...defaultSessionStats,
       ...(timer.sessionStats ?? {}),
     },
+    rev: typeof timer.rev === 'number' ? timer.rev : undefined,
     updatedAt: new Date().toISOString(),
   };
 }
@@ -104,9 +105,7 @@ export async function PUT(req: NextRequest) {
 
     await connectMongo();
     const existing = await UserModel.findById(userId, {
-      'activeFrogodoroTimer.rev': 1,
-      'activeFrogodoroTimer.clientId': 1,
-      'activeFrogodoroTimer.clientStamp': 1,
+      activeFrogodoroTimer: 1,
       liveActivity: 1,
       liveActivityStartToken: 1,
       liveActivityStartClockSkewMs: 1,
@@ -115,10 +114,26 @@ export async function PUT(req: NextRequest) {
     }).lean();
     const existingTimer = (
       existing as {
-        activeFrogodoroTimer?: { rev?: number; clientId?: string; clientStamp?: number };
+        activeFrogodoroTimer?: ActiveFrogodoroTimer | null;
       } | null
     )?.activeFrogodoroTimer;
     const prevRev = existingTimer?.rev ?? 0;
+
+    if (
+      existingTimer &&
+      typeof timer.rev === 'number' &&
+      typeof existingTimer.rev === 'number' &&
+      timer.rev < existingTimer.rev
+    ) {
+      const currentSeq =
+        (existing as { frogodoroSeq?: number } | null)?.frogodoroSeq ?? 0;
+      return NextResponse.json({
+        stale: true,
+        timer: existingTimer,
+        serverNow: Date.now(),
+        seq: currentSeq,
+      });
+    }
 
     if (
       existingTimer &&

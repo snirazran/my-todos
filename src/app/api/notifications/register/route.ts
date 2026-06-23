@@ -32,6 +32,27 @@ export async function POST(req: NextRequest) {
 
   await connectMongo();
 
+  // An FCM token identifies one device, which belongs to one account at a time.
+  // Logging into a different account on the same device leaves the token on the
+  // old user doc, so a token-authed lookup (e.g. the Live Activity /control
+  // intent) can resolve to the wrong, timer-less account. Strip the token off
+  // every other user before re-adding it to this one so it stays unique.
+  await UserModel.updateMany(
+    {
+      _id: { $ne: uid },
+      $or: [
+        { 'notificationPrefs.fcmTokens': fcmToken },
+        { 'notificationPrefs.androidFcmTokens': fcmToken },
+      ],
+    },
+    {
+      $pull: {
+        'notificationPrefs.fcmTokens': fcmToken,
+        'notificationPrefs.androidFcmTokens': fcmToken,
+      },
+    },
+  );
+
   const baseSet = {
     'notificationPrefs.enabled': true,
     'notificationPrefs.timezone': timezone || 'UTC',

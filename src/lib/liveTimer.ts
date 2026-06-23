@@ -26,6 +26,9 @@ interface FrogLiveActivityPlugin {
     data: LiveActivityData;
   }): Promise<{ activityId?: string; skipped?: boolean; reason?: string }>;
   end(): Promise<void>;
+  getState(): Promise<
+    ({ active: false } | ({ active: true; activityId?: string } & LiveActivityData))
+  >;
   registerPushToStart(): Promise<void>;
   setApiOrigin(opts: { origin: string }): Promise<void>;
   setControlToken(opts: { token: string }): Promise<void>;
@@ -60,6 +63,19 @@ export async function setLiveActivityControlToken(token: string): Promise<void> 
     await FrogLiveActivity.setControlToken({ token });
   } catch {
     void 0;
+  }
+}
+
+export async function getCurrentLiveActivityState(): Promise<
+  ({ active: false } | ({ active: true; activityId?: string } & LiveActivityData)) | null
+> {
+  if (!Capacitor.isNativePlatform() || Capacitor.getPlatform() !== 'ios') {
+    return null;
+  }
+  try {
+    return await FrogLiveActivity.getState();
+  } catch {
+    return null;
   }
 }
 

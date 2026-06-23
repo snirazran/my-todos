@@ -90,6 +90,9 @@ export type UserDoc = {
   // of the state it represents, so clients can ignore out-of-order/stale events
   // (including nulls) deterministically.
   frogodoroSeq?: number;
+  // Highest native Live Activity / notification control sequence accepted for
+  // this user. Prevents late Pause/Resume POSTs from overwriting newer taps.
+  frogodoroControlSeq?: number;
   liveActivity?: LiveActivityRef | null;
   // Push-to-start token for the iOS Live Activity (iOS 17.2+). Persists across
   // activities, so the server can create the island via APNs while the app is

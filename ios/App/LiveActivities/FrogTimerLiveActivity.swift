@@ -101,6 +101,19 @@ private struct RingView: View {
 }
 
 @available(iOS 17.0, *)
+private struct TimerControlButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 1.13 : 1)
+            .brightness(configuration.isPressed ? 0.08 : 0)
+            .animation(
+                .interactiveSpring(response: 0.16, dampingFraction: 0.62, blendDuration: 0.02),
+                value: configuration.isPressed
+            )
+    }
+}
+
+@available(iOS 17.0, *)
 private struct CircleControlButton: View {
     let systemImage: String
     let action: String
@@ -111,11 +124,16 @@ private struct CircleControlButton: View {
         Button(intent: FrogTimerControlIntent(action: action)) {
             Image(systemName: systemImage)
                 .font(.system(size: 18, weight: .bold))
+                .contentTransition(.identity)
                 .foregroundColor(fg)
                 .frame(width: 44, height: 44)
                 .background(Circle().fill(bg))
+                .contentShape(Circle())
+                .transaction { transaction in
+                    transaction.animation = nil
+                }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TimerControlButtonStyle())
     }
 }
 
@@ -127,14 +145,19 @@ private struct DoneButton: View {
         Button(intent: FrogTimerControlIntent(action: "done")) {
             Label("Done", systemImage: "checkmark")
                 .font(.system(size: 16, weight: .bold))
+                .contentTransition(.identity)
                 .foregroundColor(.white)
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .padding(.horizontal, 18)
                 .frame(height: 44)
                 .background(Capsule().fill(tint))
+                .contentShape(Capsule())
+                .transaction { transaction in
+                    transaction.animation = nil
+                }
         }
-        .buttonStyle(.plain)
+        .buttonStyle(TimerControlButtonStyle())
     }
 }
 
@@ -179,6 +202,9 @@ private func islandControls(_ state: FrogTimerAttributes.ContentState) -> some V
                 )
                 CircleControlButton(systemImage: "xmark", action: "stop", fg: .white, bg: .white.opacity(0.2))
             }
+        }
+        .transaction { transaction in
+            transaction.animation = nil
         }
     }
 }

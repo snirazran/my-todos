@@ -51,6 +51,7 @@ interface FrogodoroState {
   // True after a phase ends into a non-running (paused) state — the timer
   // alarm keeps sounding until the user acknowledges it by clicking Done.
   awaitingDone: boolean;
+  activeTimerRev: number | null;
   // Actual seconds spent in each phase of the current/just-finished session
   // (resets when a fresh session starts). Drives the Done screen so a
   // fast-forwarded phase shows the real elapsed time, not the duration set.
@@ -89,6 +90,15 @@ interface FrogodoroState {
   setPhaseElapsed: (elapsed: number) => void;
   resetSessionStats: () => void;
   hydrateActiveTimer: (timer: ActiveFrogodoroTimer, serverNow?: number) => void;
+  hydrateLiveActivitySnapshot: (snapshot: {
+    phase?: PomodoroPhase;
+    isRunning: boolean;
+    endTime: number | null;
+    timeLeft: number;
+    totalSeconds: number;
+    finished?: boolean;
+  }) => void;
+  setActiveTimerRev: (rev: number | null) => void;
 }
 
 function getPhaseDuration(phase: PomodoroPhase, settings: FrogodoroSettings) {
@@ -119,6 +129,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       lastCompletedTaskId: '',
       lastCompletedPhase: null,
       awaitingDone: false,
+      activeTimerRev: null,
       lastFocusElapsed: 0,
       lastBreakElapsed: 0,
       pendingSync: 0,
@@ -178,6 +189,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             phaseElapsed: isSameTask ? state.phaseElapsed : 0,
             lastFocusElapsed: isSameTask ? state.lastFocusElapsed : 0,
             lastBreakElapsed: isSameTask ? state.lastBreakElapsed : 0,
+            activeTimerRev: isSameTask ? state.activeTimerRev : null,
             pendingSync: isSameTask ? state.pendingSync : state.pendingSync + 1,
           };
         });
@@ -237,6 +249,7 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             focus: getPhaseDuration('focus', state.settings),
             break: getPhaseDuration('break', state.settings),
           },
+          activeTimerRev: null,
           pendingSync: state.pendingSync + 1,
         }));
       },
@@ -368,6 +381,39 @@ export const useFrogodoroStore = create<FrogodoroState>()(
       updateSessionStats: (stats) => set({ sessionStats: stats }),
       setPhaseElapsed: (elapsed) => set({ phaseElapsed: elapsed }),
       resetSessionStats: () => set({ sessionStats: DEFAULT_SESSION_STATS, phaseElapsed: 0 }),
+      hydrateLiveActivitySnapshot: (snapshot) =>
+        set((state) => {
+          if (!state.timerActive && !state.awaitingDone) return {};
+          const phase = snapshot.phase ?? state.phase;
+          const focusFull = getPhaseDuration('focus', state.settings);
+          const breakFull = getPhaseDuration('break', state.settings);
+          const full = Math.max(1, Math.round(snapshot.totalSeconds));
+          const timeLeft =
+            snapshot.isRunning && snapshot.endTime
+              ? Math.max(0, Math.round((snapshot.endTime - Date.now()) / 1000))
+              : Math.max(0, Math.round(snapshot.timeLeft));
+          const started =
+            snapshot.isRunning ||
+            timeLeft < (phase === 'focus' ? focusFull : breakFull) ||
+            timeLeft < full;
+
+          return {
+            phase,
+            timerActive: true,
+            isRunning: snapshot.isRunning && timeLeft > 0,
+            endTime: snapshot.isRunning && timeLeft > 0 ? snapshot.endTime : null,
+            timeLeft,
+            awaitingDone: snapshot.finished === true ? true : state.awaitingDone,
+            remainingByPhase: {
+              ...state.remainingByPhase,
+              [phase]: timeLeft,
+            },
+            startedByPhase: {
+              ...state.startedByPhase,
+              [phase]: started,
+            },
+          };
+        }),
       hydrateActiveTimer: (timer, serverNow) => {
         const skew = (serverNow ?? Date.now()) - Date.now();
         const serverFrameNow = serverNow ?? Date.now();
@@ -445,8 +491,10 @@ export const useFrogodoroStore = create<FrogodoroState>()(
             break: timer.phase === 'break' ? started : keepStarted('break'),
           },
           sessionStats: timer.sessionStats,
+          activeTimerRev: timer.rev ?? null,
         });
       },
+      setActiveTimerRev: (rev) => set({ activeTimerRev: rev }),
     }),
     {
       name: 'frogodoro-storage',

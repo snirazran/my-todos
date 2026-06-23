@@ -21,6 +21,7 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "registerPushToStart", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setApiOrigin", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "setControlToken", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getState", returnType: CAPPluginReturnPromise),
     ]
 
     @available(iOS 16.2, *)
@@ -138,6 +139,34 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve()
     }
 
+    @objc func getState(_ call: CAPPluginCall) {
+        guard #available(iOS 16.2, *) else {
+            call.resolve(["active": false])
+            return
+        }
+        guard let activity = Self.activeActivity(preferred: current) else {
+            call.resolve(["active": false])
+            return
+        }
+        let state = activity.content.state
+        call.resolve([
+            "active": true,
+            "activityId": activity.id,
+            "color": state.color,
+            "label": state.label,
+            "subtitle": state.subtitle,
+            "endTime": state.endTime,
+            "timeText": state.timeText,
+            "timeFont": state.timeFont,
+            "ringValue": state.ringValue,
+            "ringTotal": state.ringTotal,
+            "ringStart": state.ringStart,
+            "ringEnd": state.ringEnd,
+            "paused": state.paused,
+            "finished": state.finished ?? false,
+        ])
+    }
+
     @objc func registerPushToStart(_ call: CAPPluginCall) {
         if #available(iOS 17.2, *) {
             if let tokenData = Activity<FrogTimerAttributes>.pushToStartToken {
@@ -180,6 +209,19 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
     // its control calls to the server.
     private static func storeToken(_ token: String, key: String) {
         UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")?.set(token, forKey: key)
+    }
+
+    @available(iOS 16.2, *)
+    private static func activeActivity(
+        preferred: Activity<FrogTimerAttributes>?
+    ) -> Activity<FrogTimerAttributes>? {
+        if let preferred,
+           preferred.activityState == .active || preferred.activityState == .stale {
+            return preferred
+        }
+        return Activity<FrogTimerAttributes>.activities.first {
+            $0.activityState == .active || $0.activityState == .stale
+        }
     }
 
     @available(iOS 16.2, *)
