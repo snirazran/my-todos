@@ -1988,6 +1988,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       for (let di = 0; di < weekDates.length; di++) {
         const date = weekDates[di];
         if (!customOccursOn(doc, date)) continue;
+        if (repeatStart && date < repeatStart) continue;
         if (isAfterRepeatEnd(doc, date)) continue;
         if ((doc.suppressedDates ?? []).includes(date)) continue;
         week[di].push({
@@ -2178,6 +2179,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
       const repeatStart = repeatStartForDoc(doc, tz);
       for (const d of dates) {
         if (!customOccursOn(doc, d)) continue;
+        if (repeatStart && d < repeatStart) continue;
         if (isAfterRepeatEnd(doc, d)) continue;
         if ((doc.suppressedDates ?? []).includes(d)) continue;
         byDate[d].push({
