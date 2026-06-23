@@ -460,7 +460,7 @@ export default function QuickAddSheet({
                     )}
                     <div dir="ltr" className="w-full pt-1">
                       <div className="mb-1 flex shrink-0 items-center gap-2 sm:gap-3">
-                        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted sm:h-14 sm:w-14">
+                        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted sm:h-16 sm:w-16">
                           <Fly size={36} y={-3} />
                         </div>
                         <div className="relative flex-1">
@@ -475,7 +475,7 @@ export default function QuickAddSheet({
                             spellCheck={false}
                             autoComplete="off"
                             maxLength={100}
-                            className="h-12 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-lg font-medium text-foreground ring-2 ring-border shadow-[0_3px_0_0_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-primary/60 disabled:opacity-50 text-left sm:h-14 sm:text-xl"
+                            className="h-14 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-xl font-medium text-foreground ring-2 ring-border shadow-[0_3px_0_0_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-primary/60 disabled:opacity-50 text-left sm:h-16 sm:text-xl"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey) {
                                 e.preventDefault();
@@ -553,14 +553,14 @@ export default function QuickAddSheet({
                           onClick={() => {
                             setActivePicker('tags');
                           }}
-                          className="group flex h-10 w-full items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-12 sm:gap-3"
+                          className="group flex h-12 w-full items-center gap-3 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-14 sm:gap-3"
                         >
                           <span className="grid h-full w-12 shrink-0 place-items-center sm:w-14">
-                            <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary sm:h-10 sm:w-10">
-                              <Icon name="filter" label="Tags" className="h-6 w-6 sm:h-7 sm:w-7" />
+                            <span className="grid h-11 w-11 place-items-center rounded-full bg-primary/10 text-primary sm:h-12 sm:w-12">
+                              <Icon name="filter" label="Tags" className="h-7 w-7 sm:h-8 sm:w-8" />
                             </span>
                           </span>
-                          <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground sm:text-[15px]">
+                          <span className="min-w-0 flex-1 text-[15px] font-extrabold text-muted-foreground sm:text-[16px]">
                             {tags.length > 0
                               ? `${tags.length} tag${tags.length === 1 ? '' : 's'} selected`
                               : 'Add tags'}
@@ -571,14 +571,14 @@ export default function QuickAddSheet({
                           <button
                             type="button"
                             onClick={() => setActivePicker('date')}
-                            className="group flex h-10 w-full items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-12 sm:gap-3"
+                            className="group flex h-12 w-full items-center gap-3 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-14 sm:gap-3"
                           >
                             <span className="grid h-full w-12 shrink-0 place-items-center sm:w-14">
-                              <span className="grid h-9 w-9 place-items-center rounded-full bg-primary/10 text-primary sm:h-10 sm:w-10">
-                                <Icon name="planner" label="Date" className="h-6 w-6 sm:h-7 sm:w-7" />
+                              <span className="grid h-11 w-11 place-items-center rounded-full bg-primary/10 text-primary sm:h-12 sm:w-12">
+                                <Icon name="planner" label="Date" className="h-7 w-7 sm:h-8 sm:w-8" />
                               </span>
                             </span>
-                            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-extrabold text-muted-foreground sm:text-[15px]">
+                            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[15px] font-extrabold text-muted-foreground sm:text-[16px]">
                               <span className="truncate">{selectedDateLabel}</span>
                             </span>
                           </button>
@@ -595,14 +595,14 @@ export default function QuickAddSheet({
                               setShowReminderPicker(true);
                             }
                           }}
-                          className="group flex h-10 w-full cursor-pointer items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-12 sm:gap-3"
+                          className="group flex h-12 w-full cursor-pointer items-center gap-3 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-14 sm:gap-3"
                         >
                           <span className="grid h-full w-12 shrink-0 place-items-center sm:w-14">
-                            <span className={`grid h-9 w-9 place-items-center rounded-full transition-colors sm:h-10 sm:w-10 ${notifyEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
+                            <span className={`grid h-11 w-11 place-items-center rounded-full transition-colors sm:h-12 sm:w-12 ${notifyEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
                               <Bell className="h-[18px] w-[18px] stroke-[2.5] sm:h-5 sm:w-5" />
                             </span>
                           </span>
-                          <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[13px] font-extrabold text-muted-foreground sm:text-[15px]">
+                          <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[15px] font-extrabold text-muted-foreground sm:text-[16px]">
                             <span>Notify</span>
                             {notifyEnabled && (
                               <span className="text-primary">· {formatTimeDisplay(startTime || '09:00')}</span>
@@ -635,14 +635,14 @@ export default function QuickAddSheet({
                           <button
                             type="button"
                             onClick={() => setActivePicker('repeat')}
-                            className="group flex h-10 w-full items-center gap-2 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-12 sm:gap-3"
+                            className="group flex h-12 w-full items-center gap-3 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-14 sm:gap-3"
                           >
                             <span className="grid h-full w-12 shrink-0 place-items-center sm:w-14">
-                              <span className={`grid h-9 w-9 place-items-center rounded-full sm:h-10 sm:w-10 ${repeatsOn ? 'bg-primary/10' : 'bg-muted'}`}>
-                                <Icon name="repeat" label="Repeat" className={`h-6 w-6 sm:h-7 sm:w-7 ${repeatsOn ? '' : 'opacity-50 grayscale'}`} />
+                              <span className={`grid h-11 w-11 place-items-center rounded-full sm:h-12 sm:w-12 ${repeatsOn ? 'bg-primary/10' : 'bg-muted'}`}>
+                                <Icon name="repeat" label="Repeat" className={`h-7 w-7 sm:h-8 sm:w-8 ${repeatsOn ? '' : 'opacity-50 grayscale'}`} />
                               </span>
                             </span>
-                            <span className="min-w-0 flex-1 text-[13px] font-extrabold text-muted-foreground sm:text-[15px]">
+                            <span className="min-w-0 flex-1 text-[15px] font-extrabold text-muted-foreground sm:text-[16px]">
                               {repeatLabel}
                             </span>
                           </button>
@@ -675,7 +675,7 @@ export default function QuickAddSheet({
                             onClick={handleSubmit}
                             disabled={!hasTaskText || isSubmitting}
                             className={[
-                              'group relative h-12 w-full rounded-[28px] text-[15px] font-black overflow-hidden transition-all sm:h-14 sm:text-[17px]',
+                              'group relative h-14 w-full rounded-[28px] text-[17px] font-black overflow-hidden transition-all sm:h-16 sm:text-[18px]',
                               'bg-[#4f9149] text-white',
                               'shadow-[0_4px_0_0_#34631f] ring-1 ring-[#34631f]/40',
                               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4f9149]/40',

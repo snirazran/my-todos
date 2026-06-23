@@ -273,6 +273,7 @@ export default function TaskDetailSheet({
         className="sm:max-w-md max-h-[92vh] !border-0 !bg-transparent !shadow-none"
         zIndex={1400}
         hideHandle
+        showClose={false}
       >
         {({ bindScroll, dragControls }) => (
           <div

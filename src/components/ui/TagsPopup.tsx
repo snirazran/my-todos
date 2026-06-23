@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Lock, X } from 'lucide-react';
+import { Lock } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { TagsView } from './quick-add/TagsView';
@@ -163,14 +163,6 @@ export default function TagsPopup({
           >
             {/* Header */}
             <div className="relative mb-5 flex h-9 items-center justify-center">
-              <button
-                type="button"
-                onClick={onClose}
-                className="absolute left-0 grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
-                aria-label="Close picker"
-              >
-                <X className="h-5 w-5 stroke-[3]" />
-              </button>
               <h2 className="text-[18px] font-extrabold text-muted-foreground">
                 {displayTitle}
               </h2>
@@ -249,14 +241,6 @@ function FocusTagLimitDialog({
           ref={bindScroll}
           className="relative overflow-y-auto overscroll-none px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-1 text-card-foreground sm:px-6 sm:pb-6 sm:pt-3"
         >
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="absolute right-4 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-400/15 text-amber-500">
             <Lock className="h-7 w-7" strokeWidth={2.5} />
           </div>
@@ -333,14 +317,6 @@ function SwitchTagFocusDialog({
           ref={bindScroll}
           className="relative overflow-y-auto overscroll-none px-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-1 text-card-foreground sm:px-6 sm:pb-6 sm:pt-3"
         >
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="absolute right-4 top-2 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/50 bg-background/80 text-muted-foreground transition hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
-          </button>
           <div
             className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl text-white shadow-sm"
             style={{ backgroundColor: tag.color }}

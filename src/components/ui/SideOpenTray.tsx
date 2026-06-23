@@ -191,9 +191,10 @@ export const SideOpenTray = React.forwardRef<HTMLDivElement, SideOpenTrayProps>(
                   {rightActions}
                   <button
                     onClick={onClose}
+                    aria-label="Close"
                     className="flex items-center justify-center w-9 h-9 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground transition-all active:scale-95 shrink-0"
                   >
-                    <X size={16} strokeWidth={2.5} />
+                    <X size={18} />
                   </button>
                 </div>
               </div>

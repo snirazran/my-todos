@@ -1,6 +1,6 @@
 'use client';
 
-import { X, EyeOff, Trash2, Repeat } from 'lucide-react';
+import { EyeOff, Trash2, Repeat } from 'lucide-react';
 import React from 'react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 
@@ -82,14 +82,6 @@ export function DeleteDialog({
               {description}
             </p>
           </div>
-          <button
-            className="flex-shrink-0 p-2 -mr-1 -mt-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-rose-300/70"
-            onClick={onClose}
-            aria-label="Close"
-            title="Close"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         <div className="mt-6 space-y-2.5">

@@ -3,7 +3,7 @@ import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Lock, Shirt, X, ShoppingBag, Repeat, ChevronDown, Sparkles, Paintbrush, Crown, Hand, Image as ImageIcon, Gift } from 'lucide-react';
+import { Lock, Shirt, ShoppingBag, Repeat, ChevronDown, Sparkles, Paintbrush, Crown, Hand, Image as ImageIcon, Gift } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
@@ -561,15 +561,6 @@ function WardrobeManagerContent({
                   Customize your frog and preview changes live.
                 </p>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={onClose}
-                className="flex items-center justify-center w-9 h-9 rounded-full text-muted-foreground transition-all active:scale-95 bg-muted/60 hover:bg-muted"
-              >
-                <X className="w-4 h-4" strokeWidth={2.5} />
-              </button>
             </div>
           </div>
         </div>

@@ -231,14 +231,6 @@ export function PickerSheet(props: Props) {
           className="mx-auto min-h-0 w-full flex-1 overflow-y-auto overscroll-none px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-8"
         >
           <div className="relative mb-7 flex h-9 items-center justify-center">
-            <button
-              type="button"
-              onClick={() => setActivePicker(null)}
-              className="absolute left-0 grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
-              aria-label="Close picker"
-            >
-              <X className="h-5 w-5 stroke-[3]" />
-            </button>
             <h2 className="text-[18px] font-extrabold text-muted-foreground">
               {displayPicker === 'tags'
                 ? 'Tags'
@@ -436,7 +428,7 @@ function CalendarOverlay({
     >
       {() => (
         <div dir="ltr" className="mx-auto w-full px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between pr-11">
             <h3 className="text-[17px] font-extrabold text-foreground">
               {calendarMonthLabel}
             </h3>
@@ -532,14 +524,6 @@ function ReminderOverlay({
       {() => (
         <div dir="ltr" className="mx-auto w-full px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6">
           <div className="relative mb-5 flex h-8 items-center justify-center">
-            <button
-              type="button"
-              onClick={onClose}
-              className="absolute left-0 grid h-8 w-8 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Cancel"
-            >
-              <X className="h-4 w-4 stroke-[3]" />
-            </button>
             <h3 className="text-[16px] font-extrabold text-foreground">Notify</h3>
           </div>
 

@@ -95,16 +95,8 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
             ref={bindScroll}
             className="mx-auto w-full min-h-0 flex-1 overflow-y-auto overscroll-none px-5 pt-1"
           >
-            {/* Header — close (left), delete (right) */}
+            {/* Header — delete (left); close is the sheet's standard top-right X */}
             <div className="relative mb-5 flex h-9 items-center justify-center">
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close"
-                className="absolute left-0 grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
-              >
-                <X className="h-5 w-5 stroke-[3]" />
-              </button>
               <h2 className="text-[18px] font-extrabold text-muted-foreground">
                 Edit tag
               </h2>
@@ -113,7 +105,7 @@ export function TagManagerSheet({ open, tag, onClose, onSave, onDelete }: Props)
                 onClick={() => setConfirmDelete(true)}
                 aria-label="Delete tag"
                 title="Delete tag"
-                className="absolute right-0 grid h-10 w-10 place-items-center rounded-full bg-rose-100/70 text-rose-600 transition-colors hover:bg-rose-200/70 dark:bg-rose-500/15 dark:text-rose-300"
+                className="absolute left-0 grid h-10 w-10 place-items-center rounded-full bg-rose-100/70 text-rose-600 transition-colors hover:bg-rose-200/70 dark:bg-rose-500/15 dark:text-rose-300"
               >
                 <Trash2 className="h-5 w-5" />
               </button>

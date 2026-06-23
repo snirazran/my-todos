@@ -196,16 +196,6 @@ export default function WeeklyRecap({
             ref={(el) => { scrollRef.current = el; bindScroll(el); }}
             className="overflow-y-auto overscroll-contain px-5 pb-10"
           >
-            {/* ── Close button ── */}
-            <div className="flex justify-end pt-2">
-              <button
-                onClick={() => handleClose(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-muted/50 text-muted-foreground hover:bg-muted transition-colors"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
             {/* ── Header with frog + score ── */}
             <motion.div
               initial={{ y: -10, opacity: 0 }}

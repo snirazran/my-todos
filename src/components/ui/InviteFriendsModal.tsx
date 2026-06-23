@@ -158,14 +158,14 @@ export function InviteFriendsModal({
         <>
           <div
             onClick={closeInvite}
-            className="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm"
+            className="fixed inset-0 z-[1400] bg-black/60 backdrop-blur-sm"
           />
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-            className="pointer-events-none fixed inset-0 z-[201] flex md:items-center md:justify-center md:p-6"
+            className="pointer-events-none fixed inset-0 z-[1401] flex md:items-center md:justify-center md:p-6"
           >
             <div className="pointer-events-auto mx-auto flex h-full w-full flex-col overflow-hidden bg-background md:h-auto md:max-h-[calc(100dvh-3rem)] md:w-[min(100vw-3rem,32rem)] md:rounded-[32px] md:shadow-2xl">
               {step === 'overview' && (
@@ -229,7 +229,7 @@ function OverviewStep({
         />
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_48%,rgba(0,0,0,0.22)_72%,rgba(0,0,0,0.62)_100%)]" />
         <div className="absolute inset-x-0 bottom-0 h-[50%] bg-gradient-to-b from-transparent via-black/30 to-black/76" />
-        <CloseButton onClose={onClose} className="left-4 top-4 text-white" />
+        <CloseButton onClose={onClose} className="right-4 top-4 text-white" />
         <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center">
           <h2 className="text-3xl font-black tracking-tight [text-shadow:0_2px_0_rgba(25,83,43,0.75),0_4px_14px_rgba(0,0,0,0.32)]">
             {config.headline}
@@ -562,7 +562,7 @@ function Loading({ onClose }: { onClose: () => void }) {
     <div className="flex h-full flex-col items-center justify-center gap-4 px-6 py-10">
       <button
         onClick={onClose}
-        className="absolute left-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-muted transition-colors hover:bg-muted/80"
+        className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-muted transition-colors hover:bg-muted/80"
       >
         <X className="h-4 w-4" />
       </button>

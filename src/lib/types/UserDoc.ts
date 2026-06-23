@@ -79,7 +79,6 @@ export type UserDoc = {
   focusProfile?: FocusProfile;
   quests?: unknown;
   dailyRewards?: DailyRewardProgress;
-  missedReview?: MissedReviewProgress;
   notificationPrefs?: NotificationPrefs;
   calendarSyncEnabled?: boolean;
   calendarAccessToken?: string;
@@ -127,10 +126,6 @@ export type ActiveFrogodoroTimer = {
   // A phase just ended into a non-auto-start state and is awaiting Done — the
   // alarm is ringing across devices. Cleared when any surface acknowledges Done.
   finished?: boolean;
-};
-
-export type MissedReviewProgress = {
-  lastShownDate?: string;
 };
 
 export type NotificationPrefs = {

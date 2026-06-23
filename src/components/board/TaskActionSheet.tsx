@@ -122,13 +122,6 @@ export default function TaskActionSheet({
         >
           {/* Identity */}
           <div className="relative flex flex-col items-center px-5 pt-2 pb-5 text-center">
-            <button
-              onClick={close}
-              className="absolute right-4 top-1 flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-              aria-label="Close"
-            >
-              <X size={18} />
-            </button>
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted/60 ring-1 ring-border/60">
               {isCompleted ? (
                 <CheckCircle2 className="h-8 w-8 text-green-500" />

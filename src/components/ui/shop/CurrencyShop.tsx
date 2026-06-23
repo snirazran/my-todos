@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
@@ -59,14 +58,6 @@ export function CurrencyShop({ open, onOpenChange, balance }: CurrencyShopProps)
                     </span>
                   </div>
                 </div>
-                <button
-                  onClick={onClose}
-                  type="button"
-                  aria-label="Close"
-                  className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground ring-1 ring-border/70 transition-colors hover:bg-muted/70 hover:text-foreground"
-                >
-                  <X className="h-5 w-5 stroke-[2.5]" />
-                </button>
               </div>
 
               {/* Packs */}

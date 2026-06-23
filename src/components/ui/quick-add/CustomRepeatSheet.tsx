@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Check, ChevronRight, ChevronUp, X } from 'lucide-react';
+import { Check, ChevronRight, ChevronUp } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { TimeSliderColumn } from './TimeSliderColumn';
 import { EndDateCalendarSheet } from './EndDateCalendarSheet';
@@ -165,14 +165,6 @@ export function CustomRepeatSheet({
         {() => (
           <div className="mx-auto w-full px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6">
             <div className="relative mb-5 flex h-9 items-center justify-center">
-              <button
-                type="button"
-                onClick={onClose}
-                className="absolute left-0 grid h-10 w-10 place-items-center rounded-full bg-muted text-muted-foreground transition-colors hover:text-foreground"
-                aria-label="Close"
-              >
-                <X className="h-5 w-5 stroke-[3]" />
-              </button>
               <h2 className="text-[18px] font-extrabold text-foreground">
                 Repeat
               </h2>

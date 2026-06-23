@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useSheetOverscrollDrag } from '@/components/ui/useSheetOverscrollDrag';
 import { useRegisterOpenSheet } from '@/lib/sheetStore';
+import { CloseButton } from '@/components/ui/CloseButton';
 
 export interface BaseSheetRenderProps {
   isDesktop: boolean;
@@ -40,6 +41,10 @@ export interface BaseSheetProps {
   mobileTransition?: Transition;
   /** Hide the default grab handle (e.g. when the sheet renders its own) */
   hideHandle?: boolean;
+  /** Show the standard top-right close button (default true). */
+  showClose?: boolean;
+  /** Accessible label for the close button. */
+  closeAriaLabel?: string;
 }
 
 const defaultDesktopTransition: Transition = {
@@ -73,6 +78,8 @@ export function BaseSheet({
   zIndex = 1050,
   mobileTransition,
   hideHandle = false,
+  showClose = true,
+  closeAriaLabel,
 }: BaseSheetProps) {
   const resolvedMobileTransition = mobileTransition ?? defaultMobileTransition;
   const [mounted, setMounted] = useState(false);
@@ -185,7 +192,7 @@ export function BaseSheet({
               }}
               style={{ willChange: 'transform' }}
               className={cn(
-                'pointer-events-auto flex w-full flex-col overflow-hidden rounded-t-[24px] border border-border/50 bg-card text-card-foreground shadow-lg sm:rounded-[34px] sm:shadow-2xl',
+                'pointer-events-auto relative flex w-full flex-col overflow-hidden rounded-t-[24px] border border-border/50 bg-card text-card-foreground shadow-lg sm:rounded-[34px] sm:shadow-2xl',
                 className,
               )}
             >
@@ -197,6 +204,13 @@ export function BaseSheet({
                 >
                   <div className="w-12 h-1.5 rounded-full bg-border/60" />
                 </div>
+              )}
+
+              {showClose && (
+                <CloseButton
+                  onClick={() => onOpenChange(false)}
+                  ariaLabel={closeAriaLabel ?? 'Close'}
+                />
               )}
 
               {children({

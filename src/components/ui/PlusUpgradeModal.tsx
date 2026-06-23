@@ -91,7 +91,7 @@ export function PlusUpgradeModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="absolute left-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30"
+                className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/20 text-white transition-colors hover:bg-white/30"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />

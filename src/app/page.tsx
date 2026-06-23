@@ -38,10 +38,6 @@ import { PageBackground } from '@/components/ui/PageBackground';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
-import {
-  MissedTasksPopup,
-  type MissedTasksStatus,
-} from '@/components/ui/MissedTasksPopup';
 import { useFrogTongue, TONGUE_STROKE } from '@/hooks/useFrogTongue';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import useSWR, { mutate as swrMutate } from 'swr';
@@ -125,70 +121,6 @@ export default function Home() {
   } = useTaskData();
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const [dismissMissedReview, setDismissMissedReview] = useState(false);
-  const { data: missedTasksData, mutate: mutateMissedTasks } =
-    useSWR<MissedTasksStatus>(
-      user
-        ? `/api/missed-tasks?timezone=${encodeURIComponent(timezone)}`
-        : null,
-      (url: string) => fetch(url).then((res) => res.json()),
-      { revalidateOnFocus: false },
-    );
-  const debugMockTags = [
-    { id: 'debug-tag-work', name: 'Work', color: '#3b82f6' },
-    { id: 'debug-tag-health', name: 'Health', color: '#22c55e' },
-    { id: 'debug-tag-personal', name: 'Personal', color: '#f59e0b' },
-  ];
-  const debugYesterday = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 1);
-    return d.toISOString().split('T')[0];
-  })();
-  const debugMissedTasksData: MissedTasksStatus | undefined = isDebugMode
-    ? {
-        today: new Date().toISOString().split('T')[0],
-        yesterday: debugYesterday,
-        reviewedToday: false,
-        isPremium: false,
-        flyBalance: 12,
-        completionCost: 1,
-        items: [
-          {
-            id: 'debug-1',
-            text: 'Finish project report',
-            completed: false,
-            date: debugYesterday,
-            type: 'regular' as const,
-            tags: ['debug-tag-work'],
-          },
-          {
-            id: 'debug-2',
-            text: 'Review pull requests',
-            completed: false,
-            date: debugYesterday,
-            type: 'weekly' as const,
-            tags: ['debug-tag-work', 'debug-tag-personal'],
-          },
-          {
-            id: 'debug-5',
-            text: 'Go grocery shopping',
-            completed: false,
-            date: debugYesterday,
-            type: 'regular' as const,
-          },
-        ],
-      }
-    : undefined;
-  const activeMissedTasksData = isDebugMode
-    ? debugMissedTasksData
-    : missedTasksData;
-  const shouldShowMissedReview = isDebugMode
-    ? !dismissMissedReview
-    : !!user &&
-      !!activeMissedTasksData &&
-      !dismissMissedReview &&
-      !activeMissedTasksData.reviewedToday &&
-      (activeMissedTasksData.items?.length ?? 0) > 0;
 
   // Weekly Recap
   const [dismissRecap, setDismissRecap] = useState(false);
@@ -405,7 +337,6 @@ export default function Home() {
   const isAnyPanelOpen =
     isWardrobeOpen ||
     isQuestOnboardingOpen ||
-    shouldShowMissedReview ||
     showQuickAdd ||
     showTimer ||
     isBacklogOpen ||
@@ -598,7 +529,6 @@ export default function Home() {
   );
   const isPremium = !!questsData?.isPremium;
   const questOnboarding = questsData?.onboarding;
-  const wasMissedReviewOpen = useRef(false);
 
   const [showWeeklyWrapped, setShowWeeklyWrapped] = useState(false);
   const isFirstDayOfWeek = [0, 1].includes(new Date().getDay()); // Sunday or Monday
@@ -609,15 +539,6 @@ export default function Home() {
     window.location.search.includes('wrapped=1');
 
   const showRecapIndicator = !!user && !!recapData && !showWeeklyWrapped;
-
-  useEffect(() => {
-    if (wasMissedReviewOpen.current && !shouldShowMissedReview) {
-      void mutateToday();
-      void mutateBacklog();
-      void mutateQuests();
-    }
-    wasMissedReviewOpen.current = shouldShowMissedReview;
-  }, [shouldShowMissedReview, mutateToday, mutateBacklog, mutateQuests]);
 
   useEffect(() => {
     if (questOnboarding?.complete) {
@@ -1126,7 +1047,7 @@ export default function Home() {
         onMutateToday={() => mutateToday()}
       />
 
-      {!showTimer && !shouldShowMissedReview && (
+      {!showTimer && (
         <FrogodoroPill
           onClick={() => {
             const t = tasks.find((t) => t.id === frogTaskId);
@@ -1141,7 +1062,7 @@ export default function Home() {
       )}
 
       <HungerWarningModal
-        open={!!user && hungerStatus.stolenFlies > 0 && !shouldShowMissedReview}
+        open={!!user && hungerStatus.stolenFlies > 0}
         stolenFlies={hungerStatus.stolenFlies}
         indices={indices}
         onAcknowledge={async () => {
@@ -1152,36 +1073,6 @@ export default function Home() {
           mutateToday();
         }}
       />
-
-      {activeMissedTasksData && (
-        <MissedTasksPopup
-          show={shouldShowMissedReview}
-          status={activeMissedTasksData}
-          tags={isDebugMode ? [...tags, ...debugMockTags] : tags}
-          hunger={user ? hungerStatus.hunger : undefined}
-          maxHunger={user ? hungerStatus.maxHunger : undefined}
-          questClaimableCount={questsData?.claimableCount ?? 0}
-          questActiveCount={questsData?.activeCount ?? 0}
-          isPremium={isPremium}
-          onClose={() => setDismissMissedReview(true)}
-          onItemResolved={async (id, nextFlyBalance) => {
-            await mutateMissedTasks(
-              (current) =>
-                current
-                  ? {
-                      ...current,
-                      flyBalance: nextFlyBalance ?? current.flyBalance,
-                      items: current.items.filter((item) => item.id !== id),
-                    }
-                  : current,
-              { revalidate: false },
-            );
-          }}
-          onStatusChanged={async () => {
-            await mutateMissedTasks();
-          }}
-        />
-      )}
 
       <QuestOnboardingPopup
         show={

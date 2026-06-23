@@ -16,7 +16,6 @@ import {
   Gift,
   Wind,
   Bell,
-  CalendarClock,
   RefreshCw,
   Send,
   CheckCircle,
@@ -180,19 +179,6 @@ function AdminPageContent() {
       } else {
         flash('error', 'Failed to reset weekly wrapped');
       }
-    } catch {
-      flash('error', 'Network error');
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const handleResetMissedReview = async () => {
-    setLoading('reset-missed-review');
-    try {
-      const res = await fetch('/api/admin/reset-missed-review', { method: 'POST' });
-      if (res.ok) flash('success', 'Missed-review popup reset');
-      else flash('error', 'Failed to reset missed review');
     } catch {
       flash('error', 'Network error');
     } finally {
@@ -377,14 +363,6 @@ function AdminPageContent() {
               description="Rebuild quests for the selected focus areas"
               loading={loading === 'refresh-focus-quests'}
               onClick={() => handleRefreshQuests('focus')}
-            />
-            <ActionButton
-              icon={<CalendarClock className="w-5 h-5" />}
-              accent="bg-lime-500/10 text-lime-600 dark:text-lime-400"
-              title="Reset Missed Review"
-              description="Show yesterday's missed tasks popup again"
-              loading={loading === 'reset-missed-review'}
-              onClick={handleResetMissedReview}
             />
             <ActionButton
               icon={<Sparkles className="w-5 h-5" />}

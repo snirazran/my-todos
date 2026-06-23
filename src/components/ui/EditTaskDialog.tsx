@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Check, Pencil, X } from 'lucide-react';
+import { Check, Pencil } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 
 interface Props {
@@ -64,14 +64,6 @@ export function EditTaskDialog({
               <div className="mx-auto flex w-full flex-1 flex-col">
                 {/* Header */}
                 <div className="relative mb-5 flex h-8 items-center justify-center">
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="absolute left-0 grid h-8 w-8 place-items-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    aria-label="Close"
-                  >
-                    <X className="h-4 w-4 stroke-[3]" />
-                  </button>
                   <h3 className="text-[16px] font-extrabold text-foreground">
                     {displayTitle}
                   </h3>
