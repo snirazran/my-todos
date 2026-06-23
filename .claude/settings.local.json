@@ -142,7 +142,9 @@
       "WebFetch(domain:bfrearson.github.io)",
       "WebFetch(domain:www.reactnative.university)",
       "Bash(awk 'NR>=340 && NR<=400' App.xcodeproj/project.pbxproj)",
-      "Bash(awk NR>=194 && NR<=230 *)"
+      "Bash(awk NR>=194 && NR<=230 *)",
+      "Bash(echo \"exit-grep=$?\")",
+      "Bash(echo \"tsc=$?\")"
     ]
   }
 }

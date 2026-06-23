@@ -626,7 +626,7 @@ function MobileSheet({
   const [toast, setToast] = useState<string | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [plusOpen, setPlusOpen] = useState(false);
-  const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, enableOrConfigure, loading: notifLoading } = useNotificationStatus();
+  const { canEnable: canEnableNotifs, isEnabled: notifsEnabled, isNative, isWeb, enableOrConfigure, disable: disableNotifs, loading: notifLoading } = useNotificationStatus();
   const { data: userInfo, mutate: refreshUserInfo } = useSWR<UserInfo>(
     showAuth && user ? '/api/user' : null,
     userInfoFetcher,
@@ -658,8 +658,19 @@ function MobileSheet({
   const handleEnableNotifs = async () => {
     const next = await enableOrConfigure();
     if (next === 'granted') setToast('Notifications enabled');
-    else if (next === 'denied') setToast('Opening settings — turn notifications on there.');
+    else if (next === 'denied')
+      setToast(
+        isWeb
+          ? 'Blocked — allow notifications in your browser site settings.'
+          : 'Opening settings — turn notifications on there.',
+      );
     else setToast('Permission still pending');
+    window.setTimeout(() => setToast(null), 2500);
+  };
+
+  const handleDisableNotifs = async () => {
+    await disableNotifs();
+    setToast('Notifications turned off on this device');
     window.setTimeout(() => setToast(null), 2500);
   };
 
@@ -754,6 +765,7 @@ function MobileSheet({
                   canEnableNotifs={canEnableNotifs}
                   notifsEnabled={notifsEnabled}
                   isNative={isNative}
+                  isWeb={isWeb}
                   notifLoading={notifLoading}
                   onEnableNotifs={handleEnableNotifs}
                   onOpenNotifications={() => setView('notifications')}
@@ -800,7 +812,9 @@ function MobileSheet({
               <NotificationsView
                 notifsEnabled={notifsEnabled}
                 notifLoading={notifLoading}
+                isWeb={isWeb}
                 onEnableNotifs={handleEnableNotifs}
+                onDisableNotifs={handleDisableNotifs}
                 onManageEmail={() => flashSoon('Email notifications')}
               />
             ) : view === 'community' ? (
@@ -883,6 +897,7 @@ function MainView({
   canEnableNotifs,
   notifsEnabled,
   isNative,
+  isWeb,
   notifLoading,
   onEnableNotifs,
   onOpenNotifications,
@@ -910,6 +925,7 @@ function MainView({
   theme?: string;
   setTheme: (t: string) => void;
   isNative: boolean;
+  isWeb: boolean;
   notifLoading: boolean;
   onEnableNotifs: () => void;
   onOpenNotifications: () => void;
@@ -945,8 +961,8 @@ function MainView({
         </p>
       </div>
 
-      {/* Enable notifications promo (mobile only, when not enabled) */}
-      {isNative && canEnableNotifs && !notifsEnabled && (
+      {/* Enable notifications promo (mobile + web, when not enabled) */}
+      {(isNative || isWeb) && canEnableNotifs && !notifsEnabled && (
         <PromoCard
           icon={<Bell className="w-7 h-7 text-amber-300" strokeWidth={2.5} />}
           title="Enable notifications"
@@ -1018,7 +1034,7 @@ function MainView({
 
       {/* Account */}
       <MenuSection title="Account">
-        {isNative && (
+        {(isNative || isWeb) && (
           <MenuRow
             icon={<Bell className="w-7 h-7 text-amber-500" />}
             label="Notifications"
@@ -1196,12 +1212,16 @@ function PreferencesView({
 function NotificationsView({
   notifsEnabled,
   notifLoading,
+  isWeb,
   onEnableNotifs,
+  onDisableNotifs,
   onManageEmail,
 }: {
   notifsEnabled: boolean;
   notifLoading: boolean;
+  isWeb: boolean;
   onEnableNotifs: () => void;
+  onDisableNotifs: () => void;
   onManageEmail: () => void;
 }) {
   return (
@@ -1212,37 +1232,65 @@ function NotificationsView({
           <BellRing className="w-6 h-6 text-amber-500" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-sm font-black tracking-tight">Push notifications</p>
+          <p className="text-sm font-black tracking-tight">
+            {isWeb ? 'Browser notifications' : 'Push notifications'}
+          </p>
           <p className="text-xs font-medium text-muted-foreground">
             {notifsEnabled
-              ? 'You’re all set to get reminders.'
+              ? isWeb
+                ? 'This browser will get timer & reminder alerts.'
+                : 'You’re all set to get reminders.'
               : 'Turn these on to get reminders from your frog.'}
           </p>
         </div>
-        <span
-          className={cn(
-            'text-[11px] font-black uppercase tracking-wider rounded-full px-2.5 py-1',
-            notifsEnabled
-              ? 'bg-emerald-500/12 text-emerald-600'
-              : 'bg-muted text-muted-foreground',
-          )}
-        >
-          {notifsEnabled ? 'On' : 'Off'}
-        </span>
+        {isWeb ? (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={notifsEnabled}
+            aria-label="Toggle browser notifications"
+            disabled={notifLoading}
+            onClick={notifsEnabled ? onDisableNotifs : onEnableNotifs}
+            className={cn(
+              'inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors disabled:opacity-60',
+              notifsEnabled ? 'bg-emerald-500' : 'bg-muted',
+            )}
+          >
+            <span
+              className={cn(
+                'h-5 w-5 rounded-full bg-white shadow transition-transform',
+                notifsEnabled ? 'translate-x-5' : 'translate-x-0',
+              )}
+            />
+          </button>
+        ) : (
+          <span
+            className={cn(
+              'text-[11px] font-black uppercase tracking-wider rounded-full px-2.5 py-1',
+              notifsEnabled
+                ? 'bg-emerald-500/12 text-emerald-600'
+                : 'bg-muted text-muted-foreground',
+            )}
+          >
+            {notifsEnabled ? 'On' : 'Off'}
+          </span>
+        )}
       </div>
 
-      <button
-        type="button"
-        onClick={onEnableNotifs}
-        disabled={notifLoading}
-        className="w-full h-12 rounded-2xl bg-primary text-sm font-black tracking-wide text-primary-foreground shadow-lg shadow-primary/25 transition-all active:scale-[0.98] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        {notifLoading
-          ? 'Enabling…'
-          : notifsEnabled
-            ? 'Manage in system settings'
-            : 'Enable notifications'}
-      </button>
+      {!isWeb && (
+        <button
+          type="button"
+          onClick={onEnableNotifs}
+          disabled={notifLoading}
+          className="w-full h-12 rounded-2xl bg-primary text-sm font-black tracking-wide text-primary-foreground shadow-lg shadow-primary/25 transition-all active:scale-[0.98] hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {notifLoading
+            ? 'Enabling…'
+            : notifsEnabled
+              ? 'Manage in system settings'
+              : 'Enable notifications'}
+        </button>
+      )}
 
       <MenuSection title="More">
         <MenuRow

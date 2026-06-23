@@ -1,14 +1,25 @@
 'use client';
 
+import { useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { useAuth } from '@/components/auth/AuthContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { initWebPush } from '@/lib/webPush';
 
 /**
  * Invisible component that initializes push notifications.
- * Must be rendered inside AuthContext and on native platforms.
+ * Native platforms register via usePushNotifications; web (re)binds the
+ * already-granted web-push token + foreground listener on load.
  */
 export function PushNotificationInit() {
   const { user } = useAuth();
   usePushNotifications(user?.uid);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    if (Capacitor.isNativePlatform()) return;
+    void initWebPush();
+  }, [user?.uid]);
+
   return null;
 }

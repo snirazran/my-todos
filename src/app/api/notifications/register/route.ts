@@ -92,3 +92,41 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ ok: true });
 }
+
+/**
+ * DELETE /api/notifications/register
+ * Body: { fcmToken: string }
+ *
+ * Removes a single device's token (used by the web "turn off" toggle, which
+ * can't deep-link to OS settings). The browser permission stays granted; the
+ * device simply stops receiving until re-registered.
+ */
+export async function DELETE(req: NextRequest) {
+  let uid: string;
+  try {
+    uid = await requireUserId();
+  } catch {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const { fcmToken } = body;
+
+  if (!fcmToken || typeof fcmToken !== 'string') {
+    return NextResponse.json({ error: 'fcmToken is required' }, { status: 400 });
+  }
+
+  await connectMongo();
+
+  await UserModel.updateOne(
+    { _id: uid },
+    {
+      $pull: {
+        'notificationPrefs.fcmTokens': fcmToken,
+        'notificationPrefs.androidFcmTokens': fcmToken,
+      },
+    },
+  );
+
+  return NextResponse.json({ ok: true });
+}
