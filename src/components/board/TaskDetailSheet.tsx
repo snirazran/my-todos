@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
+  CalendarDays,
   CalendarPlus,
   Check,
   CheckCircle2,
@@ -82,8 +83,12 @@ interface TaskDetailSheetProps {
     notes?: string;
     checklist?: ChecklistItem[];
   }) => void;
-  /** Duplicate a completed task onto a new day. */
+  /** Duplicate a completed/past task onto a new day. */
   onDuplicate?: (when: 'today' | 'tomorrow') => void;
+  /** Open a calendar to duplicate this task onto a specific picked date. */
+  onPickDate?: () => void;
+  /** True when the task sits on a past day. Past tasks get the minimal sheet. */
+  isPast?: boolean;
   /** Date (YYYY-MM-DD) a new monthly repeat should anchor to. Defaults to today. */
   monthlyAnchorYmd?: string;
 }
@@ -108,6 +113,8 @@ export default function TaskDetailSheet({
   onAddTags,
   onUpdateDetails,
   onDuplicate,
+  onPickDate,
+  isPast = false,
   monthlyAnchorYmd,
 }: TaskDetailSheetProps) {
   // Keep the last task around so the slide-down exit animation can still
@@ -163,6 +170,11 @@ export default function TaskDetailSheet({
   }, [tags]);
 
   if (!displayTask) return null;
+
+  // Past tasks (done or not) get the stripped-down sheet: a single primary
+  // action (Undo when done, Complete otherwise) plus the duplicate options.
+  // No notify/tags/notes/checklist/repeat editing on a past day.
+  const minimal = isCompleted || isPast;
 
   const close = () => onOpenChange(false);
   const runAndClose = (fn?: () => void) => () => {
@@ -279,7 +291,7 @@ export default function TaskDetailSheet({
             {/* Header — controls, streak, title, repeat/time meta and tags. */}
             <div className="relative px-5 pb-3 pt-1 text-center">
               <div className="flex items-center justify-end gap-3">
-                {!isCompleted && onEdit && (
+                {!minimal && onEdit && (
                   <button
                     onClick={onEdit}
                     aria-label="Edit task"
@@ -390,6 +402,31 @@ export default function TaskDetailSheet({
                   <span className="text-[13px] font-black text-foreground">Undo</span>
                 </button>
               </div>
+            ) : minimal ? (
+              <div className="flex justify-center px-5 pb-6 pt-2">
+                {onComplete ? (
+                  <button
+                    onClick={runAndClose(onComplete)}
+                    className="flex flex-col items-center gap-2"
+                  >
+                    <span className="grid h-[78px] w-[78px] place-items-center rounded-[26px] bg-card shadow-[0_6px_0_0_rgba(0,0,0,0.10)] ring-1 ring-border transition-transform active:translate-y-0.5">
+                      <Fly size={52} y={-3} />
+                    </span>
+                    <span className="text-[13px] font-black text-foreground">
+                      Complete
+                    </span>
+                  </button>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 opacity-60">
+                    <span className="grid h-[78px] w-[78px] place-items-center rounded-[26px] bg-muted/40 ring-1 ring-border">
+                      <Fly size={52} y={-3} />
+                    </span>
+                    <span className="text-[13px] font-black text-muted-foreground">
+                      Upcoming
+                    </span>
+                  </div>
+                )}
+              </div>
             ) : (
             <div className="grid grid-cols-3 items-end px-2 pb-4 pt-1">
               <div className="flex justify-center">
@@ -455,8 +492,8 @@ export default function TaskDetailSheet({
             )}
             </div>
 
-            {/* Card 2 — duplicate (completed only) */}
-            {isCompleted && onDuplicate && (
+            {/* Card 2 — duplicate (completed + past tasks) */}
+            {minimal && onDuplicate && (
               <div className="rounded-[28px] border border-border/50 bg-card p-4 shadow-sm">
                 <p className="mb-2 text-center text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
                   Duplicate to
@@ -474,6 +511,14 @@ export default function TaskDetailSheet({
                   >
                     <CalendarPlus className="h-4 w-4 text-primary" /> Tomorrow
                   </button>
+                  {onPickDate && (
+                    <button
+                      onClick={runAndClose(onPickDate)}
+                      className="col-span-2 flex items-center justify-center gap-1.5 rounded-2xl border border-border/60 bg-muted/40 py-3 text-[14px] font-bold text-foreground transition-colors hover:bg-muted"
+                    >
+                      <CalendarDays className="h-4 w-4 text-primary" /> Pick a date…
+                    </button>
+                  )}
                 </div>
               </div>
             )}
@@ -481,7 +526,7 @@ export default function TaskDetailSheet({
             {/* Card 2 — utilities (active, collapsed only; mirrors the
                 QuickAddSheet "saved" container). All share a thirds-based width
                 so every row stays column-aligned and centered. */}
-            {!isCompleted && !expanded && (
+            {!minimal && !expanded && (
             <div className="shrink-0 flex flex-wrap justify-center rounded-[28px] border border-border/50 bg-card p-2 shadow-sm">
               {onSetRepeat && (
                 <MiniAction
@@ -529,7 +574,7 @@ export default function TaskDetailSheet({
             {/* Card 3 — notes / checklist editor (active, expanded). Fills the
                 remaining height and scrolls inside, so the cards above keep
                 their size. */}
-            {!isCompleted && expanded && (
+            {!minimal && expanded && (
             <div className="flex min-h-0 flex-1 flex-col rounded-[28px] border border-border/50 bg-card p-4 shadow-sm">
               <div className="flex shrink-0 items-center gap-2">
                 <div className="flex flex-1 rounded-full bg-muted p-1">

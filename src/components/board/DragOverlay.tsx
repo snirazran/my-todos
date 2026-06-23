@@ -3,12 +3,11 @@ import Fly from '@/components/ui/fly';
 import { Icon } from '@/components/ui/Icon';
 import {
   CalendarDays,
-  Clock,
-  Bell,
   EllipsisVertical,
   Pen,
   ListChecks,
 } from 'lucide-react';
+import { TimeTag } from '@/components/ui/TimeTag';
 
 export default function DragOverlay({
   x,
@@ -70,14 +69,13 @@ export default function DragOverlay({
           {(tags && tags.length > 0 || startTime || reminder) && (
             <div className="mb-1 flex flex-wrap items-center gap-1">
               {startTime && (
-                <span className="isolate inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-[4px] text-[10px] leading-[1] font-bold uppercase tracking-normal text-primary shadow-sm">
-                  <Clock className="w-2.5 h-2.5 shrink-0" />
-                  <span className="leading-[1]">
-                    {startTime}
-                    {endTime && endTime !== startTime ? ` - ${endTime}` : ''}
-                  </span>
-                  {reminder && <Bell className="w-2.5 h-2.5 shrink-0 text-amber-500" />}
-                </span>
+                <TimeTag
+                  startTime={startTime}
+                  endTime={endTime}
+                  reminder={reminder}
+                  size="md"
+                  className="isolate"
+                />
               )}
               {tags?.map((tag) => (
                 <span

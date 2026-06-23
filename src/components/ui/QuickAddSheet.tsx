@@ -474,7 +474,7 @@ export default function QuickAddSheet({
                             disabled={isSubmitting}
                             spellCheck={false}
                             autoComplete="off"
-                            maxLength={45}
+                            maxLength={100}
                             className="h-12 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-lg font-medium text-foreground ring-2 ring-border shadow-[0_3px_0_0_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-primary/60 disabled:opacity-50 text-left sm:h-14 sm:text-xl"
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && !e.shiftKey) {
@@ -484,14 +484,14 @@ export default function QuickAddSheet({
                               if (e.key === 'Escape') onOpenChange(false);
                             }}
                           />
-                          {text.length >= 40 && (
+                          {text.length >= 95 && (
                             <span
                               aria-hidden="true"
                               className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums ${
-                                text.length >= 45 ? 'text-rose-500' : 'text-rose-400'
+                                text.length >= 100 ? 'text-rose-500' : 'text-rose-400'
                               }`}
                             >
-                              {text.length}/45
+                              {text.length}/100
                             </span>
                           )}
                         </div>

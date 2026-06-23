@@ -86,6 +86,7 @@ export default function TaskBoard({
   onExtendWindow,
   onJumpToDate,
   onMoveTaskToDate,
+  onDuplicateTaskToDate,
   onMoveRepeatInstance,
   onToggleRepeat,
   onScheduleTask,
@@ -126,6 +127,10 @@ export default function TaskBoard({
   onMoveTaskToDate?: (
     taskId: string,
     fromDateKey: string,
+    targetKey: string,
+  ) => void | Promise<void>;
+  onDuplicateTaskToDate?: (
+    taskId: string,
     targetKey: string,
   ) => void | Promise<void>;
   onMoveRepeatInstance?: (
@@ -279,6 +284,7 @@ export default function TaskBoard({
   const [pendingMove, setPendingMove] = useState<{
     taskId: string;
     fromDateKey: string;
+    mode: 'move' | 'duplicate';
   } | null>(null);
 
   // Whether the past edge can still load more (bounded by account creation).
@@ -659,7 +665,16 @@ export default function TaskBoard({
     undefined,
   );
 
-  const effectiveTargetDay = targetDay;
+  // Past tasks can be picked up, but they can only move to today/future — so
+  // while hovering a past column we hide the drop placeholder entirely (the
+  // drop itself is also blocked in onDrop).
+  const isPastDay = (day: number | null) =>
+    day !== null &&
+    day >= 0 &&
+    day < N &&
+    cmpYmd(windowDates[day], todayKey) < 0;
+
+  const effectiveTargetDay = isPastDay(targetDay) ? null : targetDay;
 
   // Clamp Target Index Logic (unchanged)
   let clampedTargetIndex = targetIndex;
@@ -910,7 +925,11 @@ export default function TaskBoard({
     if (dateZoneActive && !isDragOverBacklog) {
       const fromKey =
         drag.fromDay !== BACKLOG_IDX ? windowDates[drag.fromDay] : '';
-      setPendingMove({ taskId: drag.taskId, fromDateKey: fromKey ?? '' });
+      setPendingMove({
+        taskId: drag.taskId,
+        fromDateKey: fromKey ?? '',
+        mode: 'move',
+      });
       setMoveCalendarOpen(true);
       endDrag();
       setDateZoneActive(false);
@@ -927,21 +946,12 @@ export default function TaskBoard({
       finalToIndex = backlog.length;
     }
 
-    // BLOCK: no dragging onto a past date when source is today/future.
-    if (
-      finalToDay !== BACKLOG_IDX &&
-      drag.fromDay !== BACKLOG_IDX &&
-      finalToDay >= 0 &&
-      finalToDay < N
-    ) {
-      const fromKey = windowDates[drag.fromDay];
+    // BLOCK: a task can never move into the past — only today or future. This
+    // applies to every source (past tasks are draggable, but only forward), so
+    // dropping onto any past column just cancels back to the origin.
+    if (finalToDay !== BACKLOG_IDX && finalToDay >= 0 && finalToDay < N) {
       const toKey = windowDates[finalToDay];
-      if (
-        fromKey &&
-        toKey &&
-        cmpYmd(fromKey, todayKey) >= 0 &&
-        cmpYmd(toKey, todayKey) < 0
-      ) {
+      if (toKey && cmpYmd(toKey, todayKey) < 0) {
         // cancel the drop
         endDrag();
         setIsDragOverBacklog(false);
@@ -1265,8 +1275,16 @@ export default function TaskBoard({
                   showCompleted={getShowCompleted(i)}
                   daysOrder={daysOrder}
                   emptyMode={cmpYmd(dk, todayKey) < 0 ? 'none' : 'add'}
-                  disableDrag={cmpYmd(dk, todayKey) < 0}
+                  disableDrag={false}
                   isFuture={cmpYmd(dk, todayKey) > 0}
+                  onPickDuplicateDate={(taskId) => {
+                    setPendingMove({
+                      taskId,
+                      fromDateKey: dk,
+                      mode: 'duplicate',
+                    });
+                    setMoveCalendarOpen(true);
+                  }}
                 />
               </DayColumn>
             </div>
@@ -1358,8 +1376,16 @@ export default function TaskBoard({
         minDate={todayKey}
         heading={(() => {
           const t = pendingMove ? findTaskById(pendingMove.taskId)?.text : '';
+          if (pendingMove?.mode === 'duplicate') {
+            return t ? `Duplicate “${t}” to which day?` : 'Duplicate to which day?';
+          }
           return t ? `Pick a day to move “${t}”` : 'Pick a day to move this task';
         })()}
+        todayLabel={
+          pendingMove?.mode === 'duplicate'
+            ? 'Duplicate to today'
+            : 'Jump back to today'
+        }
         hasTasksOn={
           new Set(
             Object.entries(tasksByDate)
@@ -1368,7 +1394,9 @@ export default function TaskBoard({
           )
         }
         onSelect={(d) => {
-          if (pendingMove) {
+          if (pendingMove?.mode === 'duplicate') {
+            onDuplicateTaskToDate?.(pendingMove.taskId, d);
+          } else if (pendingMove) {
             onMoveTaskToDate?.(pendingMove.taskId, pendingMove.fromDateKey, d);
           }
           setPendingMove(null);

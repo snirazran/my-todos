@@ -90,6 +90,9 @@ export default function RootLayout({
           href="/bg-web.webp"
           media="(min-width: 1280px)"
         />
+        {/* The fly the frog's tongue grabs on task completion — preload so the
+            very first completion never renders a blank (uncached) fly. */}
+        <link rel="preload" as="image" href="/fly.svg" type="image/svg+xml" />
       </head>
       <body
         className={[

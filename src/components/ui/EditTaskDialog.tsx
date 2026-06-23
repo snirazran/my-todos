@@ -13,7 +13,7 @@ interface Props {
   title?: string;
 }
 
-const MAX_LENGTH = 45;
+const MAX_LENGTH = 100;
 
 export function EditTaskDialog({
   open,
@@ -102,7 +102,7 @@ export function EditTaskDialog({
                       placeholder="Task name"
                       className="h-12 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-lg font-medium text-foreground ring-1 ring-border/80 shadow-[0_1px_0_rgba(255,255,255,.1)_inset] focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 text-left"
                     />
-                    {text.length >= 40 && (
+                    {text.length >= MAX_LENGTH - 5 && (
                       <span
                         aria-hidden="true"
                         className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums ${

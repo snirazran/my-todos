@@ -2,7 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { Clock, Bell, Plus, Pen, ListChecks } from 'lucide-react';
+import { Plus, Pen, ListChecks } from 'lucide-react';
+import { TimeTag } from '@/components/ui/TimeTag';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import type {
   FocusCategoryTagMap,
@@ -11,7 +12,7 @@ import type {
 import type { ChecklistItem } from './types';
 import Fly from '@/components/ui/fly';
 import { cn } from '@/lib/utils';
-import { fetcher, formatTimeDisplay } from './utils';
+import { fetcher } from './utils';
 
 type BacklogTask = {
   id: string;
@@ -175,11 +176,11 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                   {((t.tags && t.tags.length > 0) || t.startTime) && (
                     <div className="flex flex-wrap items-center gap-1">
                       {t.startTime && (
-                        <span className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal text-primary shadow-sm">
-                          <Clock className="w-2.5 h-2.5 shrink-0" />
-                          <span>{formatTimeDisplay(t.startTime)}{t.endTime && t.endTime !== t.startTime ? ` - ${formatTimeDisplay(t.endTime)}` : ''}</span>
-                          {t.reminder && <Bell className="w-2.5 h-2.5 shrink-0 text-amber-500" />}
-                        </span>
+                        <TimeTag
+                          startTime={t.startTime}
+                          endTime={t.endTime}
+                          reminder={t.reminder}
+                        />
                       )}
                       {t.tags?.map((tagId) => {
                         const tag = getTagDetails(tagId);

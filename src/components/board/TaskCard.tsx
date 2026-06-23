@@ -5,14 +5,13 @@ import {
   CheckCircle2,
   Plus,
   CalendarDays,
-  Clock,
-  Bell,
   EllipsisVertical,
   Pen,
   ListChecks,
   Flame,
 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
+import { TimeTag } from '@/components/ui/TimeTag';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
@@ -43,6 +42,7 @@ export default function TaskCard({
   onTap,
   onToggleComplete,
   disableDrag = false,
+  isPast = false,
   showStreak = false,
 }: {
   dragId: string;
@@ -66,6 +66,8 @@ export default function TaskCard({
   onToggleComplete?: () => void;
   /** Disable initiating drag (e.g., past-date columns). Tap still works. */
   disableDrag?: boolean;
+  /** True on past-day columns — completed cards become a clickable pointer. */
+  isPast?: boolean;
   /** Show the repeat streak (fire) badge — only on the today column. */
   showStreak?: boolean;
 }) {
@@ -252,7 +254,9 @@ export default function TaskCard({
           ? 'group relative overflow-visible flex items-center gap-2 px-2 py-2 select-none rounded-[14px] transition-all duration-200'
           : 'group relative overflow-visible flex items-start gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
         task.completed
-          ? 'cursor-default'
+          ? isPast
+            ? 'cursor-pointer'
+            : 'cursor-default'
           : disableDrag
             ? 'cursor-pointer'
             : 'cursor-grab',
@@ -289,16 +293,13 @@ export default function TaskCard({
             >
               <>
                 {task.startTime && (
-                  <span
-                    className="isolate inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-[4px] text-[10px] leading-[1] font-bold uppercase tracking-normal text-primary shadow-sm"
-                  >
-                    <Clock className="w-2.5 h-2.5 shrink-0" />
-                    <span className="leading-[1]">
-                      {task.startTime}
-                      {task.endTime && task.endTime !== task.startTime ? ` - ${task.endTime}` : ''}
-                    </span>
-                    {task.reminder && <Bell className="w-2.5 h-2.5 shrink-0 text-amber-500" />}
-                  </span>
+                  <TimeTag
+                    startTime={task.startTime}
+                    endTime={task.endTime}
+                    reminder={task.reminder}
+                    size="md"
+                    className="isolate"
+                  />
                 )}
                 {task.tags?.map((tagId) => {
                   const tagDetails = getTagDetails(tagId);

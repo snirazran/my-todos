@@ -10,14 +10,13 @@ import {
   ChevronDown,
   Check,
   CalendarDays,
-  Clock,
-  Bell,
   Plus,
   Flame,
   Pen,
   ListChecks,
 } from 'lucide-react';
 import Fly from '@/components/ui/fly';
+import { TimeTag } from '@/components/ui/TimeTag';
 import { Icon } from '@/components/ui/Icon';
 import {
   AnimatePresence,
@@ -547,15 +546,14 @@ const SortableTaskItem = React.forwardRef<
                         <motion.span
                           initial={false}
                           exit={{ opacity: 0, scale: 0 }}
-                          className="inline-flex items-center gap-1 rounded-md border border-primary/20 bg-primary/10 px-1.5 py-0.5 text-[9px] font-bold uppercase md:text-[11px] tracking-normal text-primary shadow-sm transition-colors"
                           key="task-time-tag"
+                          className="inline-flex"
                         >
-                          <Clock className="w-2.5 h-2.5 shrink-0" />
-                          <span>
-                            {task.startTime}
-                            {task.endTime && task.endTime !== task.startTime ? ` - ${task.endTime}` : ''}
-                          </span>
-                          {task.reminder && <Bell className="w-2.5 h-2.5 shrink-0 text-amber-500" />}
+                          <TimeTag
+                            startTime={task.startTime}
+                            endTime={task.endTime}
+                            reminder={task.reminder}
+                          />
                         </motion.span>
                       )}
                       {task.tags?.map((tagId) => {

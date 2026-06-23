@@ -2631,6 +2631,17 @@ async function handleBoardPutByDate(
         typeof t.notes === 'string' ? t.notes : notesById.get(t.id) ?? '';
       const checklist =
         sanitizeChecklistInput(t.checklist) ?? checklistById.get(t.id) ?? [];
+      const srcDoc = docById.get(t.id);
+      const startTime = t.startTime ?? srcDoc?.startTime;
+      const endTime = t.endTime ?? srcDoc?.endTime;
+      const reminder = t.reminder ?? srcDoc?.reminder;
+      const calendarEventId = t.calendarEventId ?? srcDoc?.calendarEventId;
+      const scheduleFields = {
+        ...(startTime !== undefined ? { startTime } : {}),
+        ...(endTime !== undefined ? { endTime } : {}),
+        ...(reminder !== undefined ? { reminder } : {}),
+        ...(calendarEventId !== undefined ? { calendarEventId } : {}),
+      };
       if (ttype === 'weekly') {
         // `type: 'weekly'` covers every repeat kind (weekly / monthly / custom).
         // When the task is being reordered within a column that is a *natural*
@@ -2663,6 +2674,9 @@ async function handleBoardPutByDate(
               order: i + 1,
               updatedAt: now,
               tags,
+              notes,
+              checklist,
+              ...scheduleFields,
             },
             $unset: {
               dayOfWeek: 1,
@@ -2692,6 +2706,7 @@ async function handleBoardPutByDate(
                 tags,
                 notes,
                 checklist,
+                ...scheduleFields,
                 date: dateKey,
                 order: i + 1,
                 completed: false,
@@ -2711,6 +2726,7 @@ async function handleBoardPutByDate(
             tags,
             notes,
             checklist,
+            ...scheduleFields,
             date: dateKey,
             order: i + 1,
             updatedAt: now,

@@ -13,7 +13,9 @@ import {
   todayYmd,
   addDays,
   cmpYmd,
+  relativeDayLabel,
 } from '@/components/board/helpers';
+import { useNotification } from '@/components/providers/NotificationProvider';
 
 type DateRangeResponse = {
   byDate: Record<string, Task[]>;
@@ -55,6 +57,8 @@ export default function ManageTasksPage() {
   const tz = typeof window !== 'undefined'
     ? Intl.DateTimeFormat().resolvedOptions().timeZone
     : 'UTC';
+
+  const { showNotification } = useNotification();
 
   const fetchRange = useCallback(
     async (from: string, to: string, mergeOnly = false) => {
@@ -192,6 +196,27 @@ export default function ManageTasksPage() {
       await jumpToDate(targetKey);
     },
     [tz, jumpToDate],
+  );
+
+  const duplicateTaskToDate = useCallback(
+    async (taskId: string, targetKey: string) => {
+      try {
+        await fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            duplicateFrom: taskId,
+            date: targetKey,
+            timezone: tz,
+          }),
+        });
+        showNotification(`Duplicated to ${relativeDayLabel(targetKey)}`);
+      } catch (e) {
+        console.error('duplicateTaskToDate failed', e);
+      }
+      await jumpToDate(targetKey);
+    },
+    [tz, jumpToDate, showNotification],
   );
 
   // Move a single occurrence of a repeating task to another day: suppress the
@@ -474,6 +499,7 @@ export default function ManageTasksPage() {
           onExtendWindow={onExtendWindow}
           onJumpToDate={jumpToDate}
           onMoveTaskToDate={moveTaskToDate}
+          onDuplicateTaskToDate={duplicateTaskToDate}
           onMoveRepeatInstance={moveRepeatInstance}
           onToggleRepeat={onToggleRepeat}
           onScheduleTask={onScheduleTask}

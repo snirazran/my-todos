@@ -72,13 +72,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && auth.currentUser) {
-        // Force a fresh token when the user returns to the tab
-        // This avoids expired token errors after idle periods
+        // Refresh the cookie when the user returns to the tab. Non-forced:
+        // Firebase only hits the network when the token is expired/near expiry,
+        // so we avoid a guaranteed network round-trip (and its transient
+        // auth/network-request-failed) on every single focus.
         try {
-          const token = await auth.currentUser.getIdToken(true);
+          const token = await auth.currentUser.getIdToken();
           setAuthTokenCookie(token);
         } catch (e) {
-          console.error('Error refreshing token on visibility change:', e);
+          console.warn('Token refresh on visibility change skipped:', e);
         }
       }
     };

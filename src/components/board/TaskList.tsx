@@ -56,6 +56,7 @@ export default React.memo(function TaskList({
   emptyMode = 'add',
   disableDrag = false,
   isFuture = false,
+  onPickDuplicateDate,
 }: {
   day: DisplayDay;
   items: Task[];
@@ -125,6 +126,8 @@ export default React.memo(function TaskList({
   disableDrag?: boolean;
   /** True if this column's date is in the future. Hides "Mark as complete" in the action sheet. */
   isFuture?: boolean;
+  /** Open the board-level calendar to duplicate a task onto a specific picked date. */
+  onPickDuplicateDate?: (taskId: string) => void;
 }) {
   const [menu, setMenu] = useState<{
     id: string;
@@ -332,18 +335,25 @@ export default React.memo(function TaskList({
     }).then(refresh);
   };
 
-  const duplicate = (taskId: string, when: 'today' | 'tomorrow') => {
-    const d = new Date();
-    if (when === 'tomorrow') d.setDate(d.getDate() + 1);
+  const duplicateToDate = (taskId: string, dateYmd: string) => {
     fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         duplicateFrom: taskId,
-        date: ymdLocal(d),
+        date: dateYmd,
         timezone: tz,
       }),
-    }).then(refresh);
+    }).then(() => {
+      refresh();
+      showNotification(`Duplicated to ${relativeDayLabel(dateYmd)}`);
+    });
+  };
+
+  const duplicate = (taskId: string, when: 'today' | 'tomorrow') => {
+    const d = new Date();
+    if (when === 'tomorrow') d.setDate(d.getDate() + 1);
+    duplicateToDate(taskId, ymdLocal(d));
   };
 
   const placeholderAt =
@@ -620,6 +630,7 @@ export default React.memo(function TaskList({
             onTap={() => setActionSheetId(t.id)}
             onToggleComplete={() => handleToggleComplete(t)}
             disableDrag={disableDrag}
+            isPast={!!dateKey && !isToday && !isFuture}
             showStreak
           />
         </div>,
@@ -853,6 +864,12 @@ export default React.memo(function TaskList({
         onDuplicate={
           sheetTask ? (when) => duplicate(sheetTask.id, when) : undefined
         }
+        onPickDate={
+          sheetTask && onPickDuplicateDate
+            ? () => onPickDuplicateDate(sheetTask.id)
+            : undefined
+        }
+        isPast={!!dateKey && !isToday && !isFuture}
       />
 
       <EditScopeDialog

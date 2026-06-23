@@ -10,7 +10,7 @@ import React, {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { X, CalendarCheck, FolderOpen } from 'lucide-react';
+import { X, CalendarCheck, FolderOpen, CopyPlus } from 'lucide-react';
 
 interface NotificationItem {
   id: number;
@@ -166,7 +166,11 @@ export function NotificationProvider({
           {notifications.map((n) => {
             const isSavedTasksToast = n.content === 'Moved to Saved Tasks';
             const isMovedToTodayToast = n.content === 'Moved to Today';
-            const isMoveToast = isSavedTasksToast || isMovedToTodayToast;
+            const isDuplicateToast =
+              typeof n.content === 'string' &&
+              n.content.startsWith('Duplicated to');
+            const isMoveToast =
+              isSavedTasksToast || isMovedToTodayToast || isDuplicateToast;
             const isUndoing = undoingId === n.id;
             return (
               <motion.div
@@ -189,6 +193,8 @@ export function NotificationProvider({
                   >
                     {isSavedTasksToast ? (
                       <FolderOpen size={14} />
+                    ) : isDuplicateToast ? (
+                      <CopyPlus size={14} />
                     ) : (
                       <CalendarCheck size={14} />
                     )}
