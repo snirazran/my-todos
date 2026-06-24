@@ -6,6 +6,7 @@ export type DailyFlyProgress = {
   date: string;
   earned: number;
   taskIds?: string[];
+  taskFlies?: Record<string, number>;
   limitNotified?: boolean;
 };
 

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
-import { Plus, Pen, ListChecks } from 'lucide-react';
+import { Pen, ListChecks } from 'lucide-react';
 import { TimeTag } from '@/components/ui/TimeTag';
 import { Icon as AppIcon } from '@/components/ui/Icon';
 import type {
@@ -108,8 +108,7 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
         <div
           ref={scrollRef}
           onScroll={updateFade}
-          className="h-full min-h-0 overflow-y-auto px-1 pr-1.5 pb-2 overscroll-contain"
-          style={{ scrollbarGutter: 'stable' }}
+          className="h-full min-h-0 overflow-y-auto px-1 pb-2 overscroll-contain"
         >
           <div className="flex flex-col gap-1.5">
             {backlog.map((t) => (
@@ -131,10 +130,35 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                 }
                 className="group flex items-center gap-3 w-full rounded-2xl border border-border/60 bg-card px-3 py-2.5 text-left transition-all [@media(hover:hover)]:hover:border-primary/40 [@media(hover:hover)]:hover:bg-primary/5 active:scale-[0.99]"
               >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
-                  <Fly size={28} y={-3} paused />
-                </span>
                 <div className="min-w-0 flex-1 flex flex-col gap-1">
+                  {((t.tags && t.tags.length > 0) || t.startTime) && (
+                    <div className="flex flex-wrap items-center gap-1">
+                      {t.startTime && (
+                        <TimeTag
+                          startTime={t.startTime}
+                          endTime={t.endTime}
+                          reminder={t.reminder}
+                        />
+                      )}
+                      {t.tags?.map((tagId) => {
+                        const tag = getTagDetails(tagId);
+                        if (!tag) return null;
+                        return (
+                          <span
+                            key={tagId}
+                            className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal shadow-sm"
+                            style={{
+                              backgroundColor: `${tag.color}20`,
+                              color: tag.color,
+                              borderColor: `${tag.color}40`,
+                            }}
+                          >
+                            {tag.name}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
                   <div className="flex min-w-0 items-center gap-1.5">
                     <span className="text-[13px] font-bold text-foreground truncate">
                       {t.text}
@@ -173,40 +197,14 @@ export function SuggestionTabs({ open, className, onPick, onContentChange }: Pro
                       </span>
                     )}
                   </div>
-                  {((t.tags && t.tags.length > 0) || t.startTime) && (
-                    <div className="flex flex-wrap items-center gap-1">
-                      {t.startTime && (
-                        <TimeTag
-                          startTime={t.startTime}
-                          endTime={t.endTime}
-                          reminder={t.reminder}
-                        />
-                      )}
-                      {t.tags?.map((tagId) => {
-                        const tag = getTagDetails(tagId);
-                        if (!tag) return null;
-                        return (
-                          <span
-                            key={tagId}
-                            className="inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-normal shadow-sm"
-                            style={{
-                              backgroundColor: `${tag.color}20`,
-                              color: tag.color,
-                              borderColor: `${tag.color}40`,
-                            }}
-                          >
-                            {tag.name}
-                          </span>
-                        );
-                      })}
-                    </div>
-                  )}
                 </div>
-                <span
-                  aria-hidden
-                  className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground transition-colors [@media(hover:hover)]:group-hover:bg-primary [@media(hover:hover)]:group-hover:text-primary-foreground"
-                >
-                  <Plus className="h-4 w-4 stroke-[3]" />
+                <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted">
+                  <Fly size={28} y={-3} paused />
+                  {1 + (t.checklist?.filter((c) => c.done).length ?? 0) > 1 && (
+                    <span className="absolute -right-1 -top-1.5 sm:-top-1 flex min-w-[16px] items-center justify-center rounded-full border border-card bg-primary px-1 py-0.5 text-[9px] font-black leading-none text-primary-foreground shadow-sm">
+                      ×{1 + (t.checklist?.filter((c) => c.done).length ?? 0)}
+                    </span>
+                  )}
                 </span>
               </button>
             ))}

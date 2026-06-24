@@ -33,11 +33,11 @@ import {
 import { parseYmd, todayYmd } from '@/components/board/helpers';
 import { randomUUID } from '@/lib/uuid';
 import { TaskRepeatPopup } from './TaskRepeatPopup';
+import RichNotesEditor from './RichNotesEditor';
 
 const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // Common-sense limits for the task card.
-const NOTES_MAX = 1000;
 const ITEM_MAX = 120;
 const MAX_ITEMS = 20;
 
@@ -133,7 +133,6 @@ export default function TaskDetailSheet({
   const [expanded, setExpanded] = useState(false);
   const [showRepeat, setShowRepeat] = useState(false);
 
-  const notesRef = useRef<HTMLTextAreaElement>(null);
   const newItemRef = useRef<HTMLInputElement>(null);
 
   // Seed local state only when a *different* task opens — not on every task
@@ -145,23 +144,14 @@ export default function TaskDetailSheet({
       setChecklist(task.checklist ?? []);
       setNewItem('');
       setEditingId(null);
-      setTab('notes');
-      setExpanded(false);
+      const hasNotes = !!(task.notes ?? '').trim();
+      const hasChecklist = (task.checklist?.length ?? 0) > 0;
+      setTab(hasNotes || !hasChecklist ? 'notes' : 'checklist');
+      setExpanded(hasNotes || hasChecklist);
       setShowRepeat(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, task?.id]);
-
-  // Auto-grow the notes textarea with its content (capped by the card via
-  // max-h + overflow-y-auto), so a short note shows a small box and a long one
-  // grows until it hits the max and then scrolls — mirroring the checklist.
-  useEffect(() => {
-    if (!expanded || tab !== 'notes') return;
-    const el = notesRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [notes, tab, expanded]);
 
   const tagDetails = useMemo(() => {
     const byId = new Map(tags.map((t) => [t.id, t] as const));
@@ -290,55 +280,60 @@ export default function TaskDetailSheet({
               <div className="h-1.5 w-12 rounded-full bg-border/70" />
             </div>
             {/* Header — controls, streak, title, repeat/time meta and tags. */}
-            <div className="relative px-5 pb-3 pt-1 text-center">
-              <div className="flex items-center justify-end gap-3">
+            <div className="relative px-5 pb-3 pt-3 text-center">
+              {onDelete && (
+                <button
+                  onClick={runAndClose(onDelete)}
+                  aria-label="Delete task"
+                  title="Delete"
+                  className="absolute left-4 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-rose-100/70 text-rose-600 transition-colors hover:bg-rose-200/70 dark:bg-rose-500/15 dark:text-rose-300"
+                >
+                  <Trash2 size={17} />
+                </button>
+              )}
+              <button
+                onClick={close}
+                aria-label="Close"
+                className="absolute right-4 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              >
+                <X size={18} />
+              </button>
+
+              {isRepeating && streak > 0 && (
+                <div className="flex justify-center">
+                  <span
+                    className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-1 text-orange-500"
+                    title={`${streak} in a row`}
+                  >
+                    <Flame className="h-3.5 w-3.5" fill="currentColor" />
+                    <span className="text-[12px] font-black tabular-nums leading-none">
+                      ×{streak}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider">
+                      streak
+                    </span>
+                  </span>
+                </div>
+              )}
+
+              <div className="mt-1.5 flex items-center justify-center gap-2 px-10">
+                {!minimal && onEdit && (
+                  <span className="h-9 w-9 shrink-0" aria-hidden />
+                )}
+                <h2 className="px-1 text-[22px] font-black leading-tight tracking-tight text-foreground">
+                  {displayTask.text}
+                </h2>
                 {!minimal && onEdit && (
                   <button
                     onClick={onEdit}
                     aria-label="Edit task"
                     title="Edit"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
-                    <Pencil size={17} />
+                    <Pencil size={16} />
                   </button>
                 )}
-                {onDelete && (
-                  <button
-                    onClick={runAndClose(onDelete)}
-                    aria-label="Delete task"
-                    title="Delete"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-rose-100/70 text-rose-600 transition-colors hover:bg-rose-200/70 dark:bg-rose-500/15 dark:text-rose-300"
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                )}
-                <button
-                  onClick={close}
-                  aria-label="Close"
-                  className="flex h-9 w-9 items-center justify-center rounded-full bg-muted/60 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                >
-                  <X size={18} />
-                </button>
               </div>
-
-              {isRepeating && streak > 0 && (
-                <span
-                  className="absolute left-4 top-4 inline-flex items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-1 text-orange-500"
-                  title={`${streak} in a row`}
-                >
-                  <Flame className="h-3.5 w-3.5" fill="currentColor" />
-                  <span className="text-[12px] font-black tabular-nums leading-none">
-                    ×{streak}
-                  </span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider">
-                    streak
-                  </span>
-                </span>
-              )}
-
-              <h2 className="mt-2 px-2 text-[22px] font-black leading-tight tracking-tight text-foreground">
-                {displayTask.text}
-              </h2>
 
               {isCompleted ? (
                 <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 text-[12px] font-bold">
@@ -524,11 +519,14 @@ export default function TaskDetailSheet({
               </div>
             )}
 
-            {/* Card 2 — utilities (active, collapsed only; mirrors the
-                QuickAddSheet "saved" container). All share a thirds-based width
-                so every row stays column-aligned and centered. */}
-            {!minimal && !expanded && (
-            <div className="shrink-0 flex flex-wrap justify-center rounded-[28px] border border-border/50 bg-card p-2 shadow-sm">
+            {/* Card 2a — primary utilities (repeat / notify / tags). Always
+                visible so they stay reachable while the editor is open. */}
+            {!minimal && (
+            <div
+              className={`shrink-0 self-center flex justify-center gap-1 rounded-[28px] border border-border/50 bg-card p-2 shadow-sm transition-[width] ${
+                expanded ? 'w-full' : 'w-[94%]'
+              }`}
+            >
               {onSetRepeat && (
                 <MiniAction
                   active={repeatMode !== 'none'}
@@ -553,6 +551,13 @@ export default function TaskDetailSheet({
                   icon={<Tag className="h-5 w-5" />}
                 />
               )}
+            </div>
+            )}
+
+            {/* Card 2b — notes / checklist openers (collapsed only; replaced by
+                the editor below once expanded). */}
+            {!minimal && !expanded && (
+            <div className="shrink-0 self-center flex w-[88%] justify-center gap-1 rounded-[28px] border border-border/50 bg-card p-2 shadow-sm">
               <MiniAction
                 icon={<Pen className="h-5 w-5" />}
                 label="Notes"
@@ -578,7 +583,7 @@ export default function TaskDetailSheet({
             {!minimal && expanded && (
             <div className="flex min-h-0 flex-1 flex-col rounded-[28px] border border-border/50 bg-card p-4 shadow-sm">
               <div className="flex shrink-0 items-center gap-2">
-                <div className="flex flex-1 rounded-full bg-muted p-1">
+                <div className="flex flex-1 gap-1 rounded-full bg-muted/70 p-1">
                   <TabButton
                     active={tab === 'notes'}
                     onClick={() => setTab('notes')}
@@ -609,22 +614,11 @@ export default function TaskDetailSheet({
 
               <div className="mt-3 flex min-h-0 flex-1 flex-col">
                 {tab === 'notes' ? (
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    <textarea
-                      ref={notesRef}
-                      value={notes}
-                      onChange={(e) => setNotes(e.target.value.slice(0, NOTES_MAX))}
-                      onBlur={commitNotes}
-                      placeholder="Add notes, links, or details…"
-                      maxLength={NOTES_MAX}
-                      className="block min-h-[120px] max-h-full w-full resize-none overflow-y-auto rounded-2xl border border-border/60 bg-muted/30 px-4 py-3.5 text-[16px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus:border-primary/50 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:text-[15px]"
-                    />
-                    {notes.length > NOTES_MAX - 100 && (
-                      <p className="mt-1 text-right text-[11px] font-bold tabular-nums text-muted-foreground">
-                        {notes.length}/{NOTES_MAX}
-                      </p>
-                    )}
-                  </div>
+                  <RichNotesEditor
+                    value={notes}
+                    onChange={setNotes}
+                    onBlur={commitNotes}
+                  />
                 ) : (
                   <div className="flex min-h-0 flex-1 flex-col">
                     {checklist.length > 0 && (
@@ -649,7 +643,11 @@ export default function TaskDetailSheet({
                         return (
                           <div
                             key={it.id}
-                            className="group flex items-center gap-3 rounded-2xl border border-border/50 bg-muted/30 px-3 py-2.5 transition-colors focus-within:border-primary/40 focus-within:bg-card hover:bg-muted/50"
+                            className={`group flex items-center gap-2.5 rounded-2xl border px-3 py-2.5 transition-all focus-within:border-primary/50 focus-within:bg-card ${
+                              it.done
+                                ? 'border-primary/30 bg-primary/[0.06]'
+                                : 'border-border/50 bg-muted/30 hover:bg-muted/50'
+                            }`}
                           >
                             <button
                               onClick={() => toggleItem(it.id)}
@@ -683,7 +681,7 @@ export default function TaskDetailSheet({
                               />
                             ) : (
                               <button
-                                onClick={() => toggleItem(it.id)}
+                                onClick={() => setEditingId(it.id)}
                                 className={`min-w-0 flex-1 break-words text-left text-[16px] transition-colors sm:text-[15px] ${
                                   it.done
                                     ? 'text-muted-foreground line-through'
@@ -698,22 +696,36 @@ export default function TaskDetailSheet({
                               </button>
                             )}
 
-                            {!isEditing && (
+                            {isEditing ? (
                               <button
-                                onClick={() => setEditingId(it.id)}
-                                aria-label="Edit item"
-                                className="shrink-0 rounded-lg p-1.5 text-muted-foreground/50 transition-opacity hover:text-foreground sm:opacity-0 sm:group-hover:opacity-100"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => {
+                                  persist({ checklist });
+                                  setEditingId(null);
+                                }}
+                                aria-label="Done editing"
+                                className="shrink-0 rounded-lg p-1.5 text-primary transition-colors hover:bg-primary/10"
                               >
-                                <Pencil className="h-[15px] w-[15px]" />
+                                <Check className="h-[18px] w-[18px]" strokeWidth={3} />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => removeItem(it.id)}
+                                aria-label="Remove item"
+                                className="shrink-0 rounded-lg p-1.5 text-muted-foreground/40 transition-opacity hover:text-rose-500 sm:opacity-0 sm:group-hover:opacity-100"
+                              >
+                                <X className="h-4 w-4" />
                               </button>
                             )}
-                            <button
-                              onClick={() => removeItem(it.id)}
-                              aria-label="Remove item"
-                              className="shrink-0 rounded-lg p-1.5 text-muted-foreground/50 transition-opacity hover:text-rose-500 sm:opacity-0 sm:group-hover:opacity-100"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
+                            <Fly
+                              size={26}
+                              y={-2}
+                              interactive={false}
+                              paused={!it.done}
+                              className={`shrink-0 transition-all duration-300 ${
+                                it.done ? 'opacity-100' : 'opacity-30 grayscale'
+                              }`}
+                            />
                           </div>
                         );
                       })}
@@ -821,7 +833,7 @@ function MiniAction({
   return (
     <button
       onClick={onClick}
-      className={`flex w-1/3 min-w-0 flex-col items-center gap-1.5 rounded-2xl py-2.5 transition-colors active:scale-95 ${
+      className={`flex min-w-0 flex-1 flex-col items-center gap-1.5 rounded-2xl py-2.5 transition-colors active:scale-95 ${
         active
           ? 'text-primary'
           : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
@@ -847,9 +859,9 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex-1 rounded-full py-1.5 text-[13px] font-bold transition-colors ${
+      className={`flex flex-1 items-center justify-center gap-1 rounded-full py-1.5 text-[13px] font-black transition-colors ${
         active
-          ? 'bg-card text-foreground shadow-sm'
+          ? 'bg-primary text-primary-foreground shadow-sm'
           : 'text-muted-foreground hover:text-foreground'
       }`}
     >

@@ -1,13 +1,15 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { mutate } from 'swr';
-import { Icon } from '@/components/ui/Icon';
 import { AnimatePresence, motion, useDragControls } from 'framer-motion';
 import {
   Bell,
+  CalendarDays,
   Plus,
+  Repeat,
+  Tag,
   X,
 } from 'lucide-react';
 import {
@@ -36,6 +38,58 @@ import {
   ymdLocal,
   type RepeatRule,
 } from './quick-add/utils';
+
+// Click-and-drag horizontal scrolling — mirrors the shop/wardrobe FilterBar.
+// Touch scrolls natively via `touch-pan-x`; this adds desktop drag, and `guard`
+// swallows the click that ends a drag so a pill doesn't open on release.
+function useDragScroll() {
+  const ref = useRef<HTMLDivElement>(null);
+  const isDown = useRef(false);
+  const startX = useRef(0);
+  const startScroll = useRef(0);
+  const dragging = useRef(false);
+
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!el) return;
+    isDown.current = true;
+    dragging.current = false;
+    startX.current = e.pageX - el.offsetLeft;
+    startScroll.current = el.scrollLeft;
+  }, []);
+  const onMouseLeave = useCallback(() => {
+    isDown.current = false;
+  }, []);
+  const onMouseUp = useCallback(() => {
+    isDown.current = false;
+    setTimeout(() => {
+      dragging.current = false;
+    }, 0);
+  }, []);
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    const el = ref.current;
+    if (!isDown.current || !el) return;
+    e.preventDefault();
+    const walk = e.pageX - el.offsetLeft - startX.current;
+    if (Math.abs(walk) > 5) {
+      dragging.current = true;
+      el.scrollLeft = startScroll.current - walk;
+    }
+  }, []);
+  const guard = useCallback(
+    (fn: () => void) => () => {
+      if (dragging.current) return;
+      fn();
+    },
+    [],
+  );
+
+  return {
+    ref,
+    handlers: { onMouseDown, onMouseLeave, onMouseUp, onMouseMove },
+    guard,
+  };
+}
 import type {
   ActivePicker,
   ChecklistItem,
@@ -80,6 +134,7 @@ export default function QuickAddSheet({
   const inputRef = useRef<HTMLInputElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
   const chipRowRef = useRef<HTMLDivElement>(null);
+  const toolbarScroll = useDragScroll();
   const [chipLift, setChipLift] = useState(0);
   const [chipView, setChipView] = useState<{
     tags: string[];
@@ -123,6 +178,17 @@ export default function QuickAddSheet({
     window.addEventListener('resize', check);
     return () => window.removeEventListener('resize', check);
   }, []);
+
+  // Desktop only: focus the task input when the sheet opens. On mobile this is
+  // skipped so the on-screen keyboard doesn't pop up unprompted.
+  useEffect(() => {
+    if (!open || !isDesktop) return;
+    const id = window.setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 60);
+    return () => window.clearTimeout(id);
+  }, [open, isDesktop]);
 
   useEffect(() => {
     if (!activePicker) {
@@ -205,8 +271,8 @@ export default function QuickAddSheet({
     sheetBaseHeight ?? viewportHeight ?? 900,
   );
   const showSuggestions = suggestionsReady && !hasTaskText && hasSuggestionContent;
-  // Time now lives in its own "Remind me" row, so only tag chips drive this.
-  const hasChips = tags.length > 0;
+  // Tag chips and the reminder time chip both drive the chip row.
+  const hasChips = tags.length > 0 || notifyEnabled;
   const isShortScreen = availableSheetHeight < 700;
   // The sheet hugs its content and sits at the bottom; this is just the cap so a
   // long saved list can't grow past the screen (it scrolls internally instead).
@@ -412,13 +478,13 @@ export default function QuickAddSheet({
               />
 
               <motion.div
-                initial={{ y: '100%' }}
-                animate={{ y: 0 }}
-                exit={{ y: '100%' }}
+                initial={isDesktop ? { opacity: 0, scale: 0.96 } : { y: '100%' }}
+                animate={isDesktop ? { opacity: 1, scale: 1 } : { y: 0 }}
+                exit={isDesktop ? { opacity: 0, scale: 0.96 } : { y: '100%' }}
                 transition={{
                   type: 'tween',
                   ease: [0.32, 0.72, 0, 1],
-                  duration: 0.4,
+                  duration: isDesktop ? 0.2 : 0.4,
                 }}
                 drag={!isDesktop ? 'y' : false}
                 dragControls={dragControls}
@@ -433,15 +499,18 @@ export default function QuickAddSheet({
                 }}
                 style={{
                   contain: 'layout paint style',
-                  // Offset the sheet upward by the chip row height so adding a
-                  // tag while the keyboard is open doesn't push the Add Task
-                  // button behind the keyboard. Transition matches the chip
-                  // row's expand animation so the button doesn't wiggle.
-                  bottom: chipLift || undefined,
+                  // Mobile only: offset the sheet upward by the chip row height so
+                  // adding a tag while the keyboard is open doesn't push the Add
+                  // Task button behind the keyboard.
+                  bottom: isDesktop ? undefined : chipLift || undefined,
                   transition: 'bottom 280ms cubic-bezier(0.32,0.72,0,1)',
                 }}
-                className={`fixed inset-x-0 bottom-0 z-[1400] flex max-h-[100dvh] transform-gpu items-end px-4 pt-2 pointer-events-none will-change-transform sm:px-6 ${
-                  keyboardActive ? 'pb-[7vh] sm:pb-[8vh]' : 'pb-4 sm:pb-6'
+                className={`fixed z-[1400] flex max-h-[100dvh] transform-gpu pointer-events-none will-change-transform ${
+                  isDesktop
+                    ? 'inset-0 items-center justify-center p-6'
+                    : `inset-x-0 bottom-0 items-end px-4 pt-2 sm:px-6 ${
+                        keyboardActive ? 'pb-[7vh] sm:pb-[8vh]' : 'pb-4 sm:pb-6'
+                      }`
                 }`}
               >
                 <div
@@ -459,53 +528,24 @@ export default function QuickAddSheet({
                       </div>
                     )}
                     <div dir="ltr" className="w-full pt-1">
-                      <div className="mb-1 flex shrink-0 items-center gap-2 sm:gap-3">
-                        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full border border-muted-foreground/10 bg-muted sm:h-16 sm:w-16">
-                          <Fly size={36} y={-3} />
-                        </div>
-                        <div className="relative flex-1">
-                          <input
-                            ref={inputRef}
-                            value={text}
-                            onChange={(e) => setText(e.target.value)}
-                            onFocus={() => setInputFocused(true)}
-                            onBlur={() => setInputFocused(false)}
-                            placeholder="Enter a new task..."
-                            disabled={isSubmitting}
-                            spellCheck={false}
-                            autoComplete="off"
-                            maxLength={100}
-                            className="h-14 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-xl font-medium text-foreground ring-2 ring-border shadow-[0_3px_0_0_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-primary/60 disabled:opacity-50 text-left sm:h-16 sm:text-xl"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSubmit();
-                              }
-                              if (e.key === 'Escape') onOpenChange(false);
-                            }}
-                          />
-                          {text.length >= 95 && (
-                            <span
-                              aria-hidden="true"
-                              className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums ${
-                                text.length >= 100 ? 'text-rose-500' : 'text-rose-400'
-                              }`}
-                            >
-                              {text.length}/100
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
+                      {/* Tags render above the input */}
                       <div
                         className={`grid px-1 transition-[grid-template-rows,opacity] duration-[280ms] ease-[cubic-bezier(0.32,0.72,0,1)] ${
                           hasChips
-                            ? 'grid-rows-[1fr] opacity-100'
+                            ? 'mb-2 grid-rows-[1fr] opacity-100'
                             : 'grid-rows-[0fr] opacity-0'
                         }`}
                       >
                         <div className="min-h-0 overflow-hidden">
                           <div ref={chipRowRef} className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 px-1 -mx-1 mask-fade-right">
+                            {chipView.notify && (
+                              <span className="shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-[11px] font-black uppercase tracking-wider text-primary shadow-sm">
+                                <Bell className="h-3 w-3 shrink-0 text-amber-500" />
+                                <span className="tabular-nums">
+                                  {chipView.startTime || '09:00'}
+                                </span>
+                              </span>
+                            )}
                             {chipView.tags.map((tagId) => {
                               const tag = tagManager.getTagDetails(tagId);
                               const color = tag?.color;
@@ -547,110 +587,116 @@ export default function QuickAddSheet({
                         </div>
                       </div>
 
-                      <div className="mb-0 mt-1 shrink-0 space-y-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setActivePicker('tags');
-                          }}
-                          className="group flex h-12 w-full items-center gap-3 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-14 sm:gap-3"
-                        >
-                          <span className="grid h-full w-12 shrink-0 place-items-center sm:w-14">
-                            <span className="grid h-11 w-11 place-items-center rounded-full bg-primary/10 text-primary sm:h-12 sm:w-12">
-                              <Icon name="filter" label="Tags" className="h-7 w-7 sm:h-8 sm:w-8" />
-                            </span>
-                          </span>
-                          <span className="min-w-0 flex-1 text-[15px] font-extrabold text-muted-foreground sm:text-[16px]">
-                            {tags.length > 0
-                              ? `${tags.length} tag${tags.length === 1 ? '' : 's'} selected`
-                              : 'Add tags'}
-                          </span>
-                        </button>
-
-                        {!hideDayPicker && (
-                          <button
-                            type="button"
-                            onClick={() => setActivePicker('date')}
-                            className="group flex h-12 w-full items-center gap-3 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-14 sm:gap-3"
-                          >
-                            <span className="grid h-full w-12 shrink-0 place-items-center sm:w-14">
-                              <span className="grid h-11 w-11 place-items-center rounded-full bg-primary/10 text-primary sm:h-12 sm:w-12">
-                                <Icon name="planner" label="Date" className="h-7 w-7 sm:h-8 sm:w-8" />
-                              </span>
-                            </span>
-                            <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[15px] font-extrabold text-muted-foreground sm:text-[16px]">
-                              <span className="truncate">{selectedDateLabel}</span>
-                            </span>
-                          </button>
-                        )}
-
-                        {/* Remind me — dedicated time row */}
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          onClick={() => setShowReminderPicker(true)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              setShowReminderPicker(true);
-                            }
-                          }}
-                          className="group flex h-12 w-full cursor-pointer items-center gap-3 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-14 sm:gap-3"
-                        >
-                          <span className="grid h-full w-12 shrink-0 place-items-center sm:w-14">
-                            <span className={`grid h-11 w-11 place-items-center rounded-full transition-colors sm:h-12 sm:w-12 ${notifyEnabled ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'}`}>
-                              <Bell className="h-[18px] w-[18px] stroke-[2.5] sm:h-5 sm:w-5" />
-                            </span>
-                          </span>
-                          <span className="flex min-w-0 flex-1 items-center gap-1.5 text-[15px] font-extrabold text-muted-foreground sm:text-[16px]">
-                            <span>Notify</span>
-                            {notifyEnabled && (
-                              <span className="text-primary">· {formatTimeDisplay(startTime || '09:00')}</span>
-                            )}
-                          </span>
-                          {notifyEnabled && (
+                      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+                        <div className="relative flex-1">
+                          <input
+                            ref={inputRef}
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            onFocus={() => setInputFocused(true)}
+                            onBlur={() => setInputFocused(false)}
+                            placeholder="Enter a new task..."
+                            disabled={isSubmitting}
+                            spellCheck={false}
+                            autoComplete="off"
+                            maxLength={100}
+                            className="h-14 w-full rounded-[16px] bg-muted/50 pl-4 pr-14 text-xl font-medium text-foreground ring-2 ring-border shadow-[0_3px_0_0_rgba(15,23,42,0.08)] focus:outline-none focus:ring-2 focus:ring-primary/60 disabled:opacity-50 text-left sm:h-16 sm:text-xl"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSubmit();
+                              }
+                              if (e.key === 'Escape') onOpenChange(false);
+                            }}
+                          />
+                          {text.length >= 95 && (
                             <span
-                              role="button"
-                              tabIndex={0}
-                              aria-label="Turn reminder off"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setNotifyEnabled(false);
-                              }}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  setNotifyEnabled(false);
-                                }
-                              }}
-                              className="mr-1 grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted-foreground transition-colors [@media(hover:hover)]:hover:bg-muted [@media(hover:hover)]:hover:text-foreground"
+                              aria-hidden="true"
+                              className={`pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold tabular-nums ${
+                                text.length >= 100 ? 'text-rose-500' : 'text-rose-400'
+                              }`}
                             >
-                              <X className="h-4 w-4" />
+                              {text.length}/100
                             </span>
                           )}
                         </div>
+                        <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-muted/60 ring-1 ring-inset ring-border/60 sm:h-16 sm:w-16">
+                          <Fly size={48} y={-3} />
+                        </div>
+                      </div>
 
+                      <div className="mt-3 mb-2.5 h-px bg-border/70" />
+
+                      {/* Metadata toolbar */}
+                      <div
+                        ref={toolbarScroll.ref}
+                        onMouseDown={toolbarScroll.handlers.onMouseDown}
+                        onMouseLeave={toolbarScroll.handlers.onMouseLeave}
+                        onMouseUp={toolbarScroll.handlers.onMouseUp}
+                        onMouseMove={toolbarScroll.handlers.onMouseMove}
+                        className="-mx-1 flex cursor-grab select-none items-center gap-2 overflow-x-auto no-scrollbar px-1 pb-0.5 touch-pan-x active:cursor-grabbing"
+                      >
+                        {!hideDayPicker && (
+                          <button
+                            type="button"
+                            onClick={toolbarScroll.guard(() => setActivePicker('date'))}
+                            className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary/10 px-3 py-2 text-[13px] font-bold text-primary transition-colors active:scale-95"
+                          >
+                            <CalendarDays className="h-4 w-4" />
+                            <span className="whitespace-nowrap">{selectedDateLabel}</span>
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={toolbarScroll.guard(() => setActivePicker('tags'))}
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors active:scale-95 ${
+                            tags.length > 0
+                              ? 'bg-primary/10 text-primary'
+                              : 'bg-muted/60 text-muted-foreground [@media(hover:hover)]:hover:bg-muted'
+                          }`}
+                        >
+                          <Tag className="h-4 w-4" />
+                          <span className="whitespace-nowrap">
+                            {tags.length > 0
+                              ? `${tags.length} tag${tags.length === 1 ? '' : 's'}`
+                              : 'Tags'}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={toolbarScroll.guard(() => setShowReminderPicker(true))}
+                          className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors active:scale-95 ${
+                            notifyEnabled
+                              ? 'bg-primary/10 text-primary'
+                              : 'bg-muted/60 text-muted-foreground [@media(hover:hover)]:hover:bg-muted'
+                          }`}
+                        >
+                          <Bell className="h-4 w-4" />
+                          <span className="whitespace-nowrap">
+                            {notifyEnabled
+                              ? formatTimeDisplay(startTime || '09:00')
+                              : 'Notify'}
+                          </span>
+                        </button>
                         {!hideRepeatPicker && (
                           <button
                             type="button"
-                            onClick={() => setActivePicker('repeat')}
-                            className="group flex h-12 w-full items-center gap-3 rounded-xl text-left transition-colors [@media(hover:hover)]:hover:bg-muted/45 sm:h-14 sm:gap-3"
+                            onClick={toolbarScroll.guard(() => setActivePicker('repeat'))}
+                            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-2 text-[13px] font-bold transition-colors active:scale-95 ${
+                              repeatsOn
+                                ? 'bg-primary/10 text-primary'
+                                : 'bg-muted/60 text-muted-foreground [@media(hover:hover)]:hover:bg-muted'
+                            }`}
                           >
-                            <span className="grid h-full w-12 shrink-0 place-items-center sm:w-14">
-                              <span className={`grid h-11 w-11 place-items-center rounded-full sm:h-12 sm:w-12 ${repeatsOn ? 'bg-primary/10' : 'bg-muted'}`}>
-                                <Icon name="repeat" label="Repeat" className={`h-7 w-7 sm:h-8 sm:w-8 ${repeatsOn ? '' : 'opacity-50 grayscale'}`} />
-                              </span>
-                            </span>
-                            <span className="min-w-0 flex-1 text-[15px] font-extrabold text-muted-foreground sm:text-[16px]">
-                              {repeatLabel}
+                            <Repeat className="h-4 w-4" />
+                            <span className="whitespace-nowrap">
+                              {repeatsOn ? repeatLabel : 'Repeat'}
                             </span>
                           </button>
                         )}
-
                       </div>
-                    </div>
 
+                    </div>
                   </div>
 
                   <div
@@ -668,7 +714,7 @@ export default function QuickAddSheet({
                             duration: 0.4,
                             ease: [0.32, 0.72, 0, 1],
                           }}
-                          className="pointer-events-auto absolute inset-x-0 top-0 px-1 pt-1"
+                          className="pointer-events-auto absolute inset-x-0 top-0 pt-1"
                         >
                           <button
                             type="button"

@@ -762,7 +762,7 @@ export default function Home() {
                         ref={(el) => {
                           flyRefs.current[task.id] = el;
                         }}
-                        className="flex items-center justify-center w-11 h-11 border rounded-full bg-muted border-muted-foreground/10 shrink-0 md:h-12 md:w-12"
+                        className="relative flex items-center justify-center w-11 h-11 border rounded-full bg-muted border-muted-foreground/10 shrink-0 md:h-12 md:w-12"
                       >
                         <Fly
                           onClick={() => null}
@@ -771,6 +771,11 @@ export default function Home() {
                           x={0}
                           paused={isPaused}
                         />
+                        {1 + (task.checklist?.filter((c) => c.done).length ?? 0) > 1 && (
+                          <span className="absolute -right-1 -top-1.5 sm:-top-1 flex min-w-[17px] items-center justify-center rounded-full border border-card bg-primary px-1 py-0.5 text-[10px] font-black leading-none text-primary-foreground shadow-sm">
+                            ×{1 + (task.checklist?.filter((c) => c.done).length ?? 0)}
+                          </span>
+                        )}
                       </div>
                     )
                   }

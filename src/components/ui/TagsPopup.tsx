@@ -163,7 +163,7 @@ export default function TagsPopup({
           >
             {/* Header */}
             <div className="relative mb-5 flex h-9 items-center justify-center">
-              <h2 className="text-[18px] font-extrabold text-muted-foreground">
+              <h2 className="text-[17px] font-black text-foreground">
                 {displayTitle}
               </h2>
             </div>

@@ -31,14 +31,19 @@ export function useSheetOverscrollDrag() {
     const onTouchMove = (e: TouchEvent) => {
       if (handedOff || !enabledRef.current || e.touches.length !== 1) return;
       const deltaY = e.touches[0].clientY - startY;
-      if (el.scrollTop <= 0 && deltaY > 6) {
-        handedOff = true;
-        e.preventDefault();
-        // Framer Motion's drag handlers read clientX/clientY on any event-like
-        // input; touch events work at runtime even though the types only list
-        // PointerEvent.
-        dragControlsRef.current?.start(e as unknown as PointerEvent);
+      if (deltaY <= 6) return;
+      let node = e.target as HTMLElement | null;
+      while (node) {
+        if (node.scrollTop > 0) return;
+        if (node === el) break;
+        node = node.parentElement;
       }
+      handedOff = true;
+      e.preventDefault();
+      // Framer Motion's drag handlers read clientX/clientY on any event-like
+      // input; touch events work at runtime even though the types only list
+      // PointerEvent.
+      dragControlsRef.current?.start(e as unknown as PointerEvent);
     };
 
     el.addEventListener('touchstart', onTouchStart, { passive: true });

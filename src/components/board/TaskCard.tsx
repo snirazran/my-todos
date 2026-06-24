@@ -235,6 +235,7 @@ export default function TaskCard({
 
   const hasMeta =
     (task.tags && task.tags.length > 0) || task.startTime || task.reminder;
+  const flyValue = 1 + (task.checklist?.filter((c) => c.done).length ?? 0);
   const chipClass = compact
     ? 'inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-bold tracking-normal uppercase transition-colors border shadow-sm'
     : 'inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[9px] font-bold tracking-wider uppercase transition-colors border shadow-sm';
@@ -465,6 +466,11 @@ export default function TaskCard({
               }`}
             >
               <Fly size={36} paused={task.completed} y={-3} />
+              {flyValue > 1 && (
+                <span className="absolute -right-1 -top-1.5 sm:-top-1 flex min-w-[17px] items-center justify-center rounded-full border border-card bg-primary px-1 py-0.5 text-[10px] font-black leading-none text-primary-foreground shadow-sm">
+                  ×{flyValue}
+                </span>
+              )}
             </span>
             <span
               className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${

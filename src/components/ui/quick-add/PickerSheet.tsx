@@ -231,7 +231,7 @@ export function PickerSheet(props: Props) {
           className="mx-auto min-h-0 w-full flex-1 overflow-y-auto overscroll-none px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-8"
         >
           <div className="relative mb-7 flex h-9 items-center justify-center">
-            <h2 className="text-[18px] font-extrabold text-muted-foreground">
+            <h2 className="text-[17px] font-black text-foreground">
               {displayPicker === 'tags'
                 ? 'Tags'
                 : displayPicker === 'date'
@@ -266,20 +266,29 @@ export function PickerSheet(props: Props) {
           )}
 
           {displayPicker === 'repeat' && (
-            <RepeatView
-              currentMode={currentRepeatMode}
-              setRepeatMode={setRepeatMode}
-              repeatDayLabel={labelForDisplayDay(
-                repeatDay as Exclude<DisplayDay, 7>,
-                daysOrder,
-              )}
-              monthlyLabel={monthlyRepeatLabel(selectedDateKey || todayKey)}
-              endDate={repeatEndDate}
-              onPickEndDate={() => setShowRepeatEndCalendar(true)}
-              onClearEndDate={() => setRepeatEndDate(null)}
-              customRule={repeatRule}
-              onOpenCustom={() => setShowCustomSheet(true)}
-            />
+            <>
+              <RepeatView
+                currentMode={currentRepeatMode}
+                setRepeatMode={setRepeatMode}
+                repeatDayLabel={labelForDisplayDay(
+                  repeatDay as Exclude<DisplayDay, 7>,
+                  daysOrder,
+                )}
+                monthlyLabel={monthlyRepeatLabel(selectedDateKey || todayKey)}
+                endDate={repeatEndDate}
+                onPickEndDate={() => setShowRepeatEndCalendar(true)}
+                onClearEndDate={() => setRepeatEndDate(null)}
+                customRule={repeatRule}
+                onOpenCustom={() => setShowCustomSheet(true)}
+              />
+              <button
+                type="button"
+                onClick={() => setActivePicker(null)}
+                className="mt-5 h-11 w-full rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
+              >
+                Save
+              </button>
+            </>
           )}
         </div>
         )}
@@ -303,6 +312,11 @@ export function PickerSheet(props: Props) {
         setReminderTimeParts={setReminderTimeParts}
         saveReminderTime={saveReminderTime}
         onClose={cancelReminderPicker}
+        canRemove={notifyEnabled}
+        onRemove={() => {
+          setNotifyEnabled(false);
+          setShowReminderPicker(false);
+        }}
       />
 
       <EndDateCalendarSheet
@@ -506,6 +520,8 @@ function ReminderOverlay({
   setReminderTimeParts,
   saveReminderTime,
   onClose,
+  onRemove,
+  canRemove = false,
 }: {
   open: boolean;
   reminderHour24: number;
@@ -513,6 +529,8 @@ function ReminderOverlay({
   setReminderTimeParts: (h: number, m: number) => void;
   saveReminderTime: () => void;
   onClose: () => void;
+  onRemove?: () => void;
+  canRemove?: boolean;
 }) {
   return (
     <BaseSheet
@@ -524,7 +542,7 @@ function ReminderOverlay({
       {() => (
         <div dir="ltr" className="mx-auto w-full px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6">
           <div className="relative mb-5 flex h-8 items-center justify-center">
-            <h3 className="text-[16px] font-extrabold text-foreground">Notify</h3>
+            <h3 className="text-[17px] font-black text-foreground">Notify</h3>
           </div>
 
           {/* Reminder summary */}
@@ -574,6 +592,16 @@ function ReminderOverlay({
           >
             Save reminder
           </button>
+
+          {canRemove && onRemove && (
+            <button
+              type="button"
+              onClick={onRemove}
+              className="mt-2 h-10 w-full rounded-xl text-[13px] font-bold text-rose-500 transition-colors hover:bg-rose-500/10"
+            >
+              Remove reminder
+            </button>
+          )}
         </div>
       )}
     </BaseSheet>

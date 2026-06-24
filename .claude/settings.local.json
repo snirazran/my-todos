@@ -147,7 +147,8 @@
       "Bash(echo \"tsc=$?\")",
       "WebFetch(domain:christianselig.com)",
       "WebFetch(domain:wwdcnotes.com)",
-      "WebFetch(domain:mfaani.com)"
+      "WebFetch(domain:mfaani.com)",
+      "Bash(rm -f src/components/ui/BacklogPanel.tsx)"
     ]
   }
 }

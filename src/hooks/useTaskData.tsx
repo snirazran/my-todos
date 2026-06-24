@@ -347,6 +347,7 @@ export function useTaskData({
                   </div>,
                 );
               } else if (newEarned > prevEarned) {
+                const gained = newEarned - prevEarned;
                 showNotification(
                   <div className="flex w-full items-center gap-3">
                     <div className="grid h-12 w-12 shrink-0 place-items-center">
@@ -354,7 +355,7 @@ export function useTaskData({
                     </div>
                     <div className="flex min-w-0 flex-1 flex-col leading-tight">
                       <span className="text-[14px] font-black text-foreground">
-                        +1 Fly Collected!
+                        +{gained} {gained === 1 ? 'Fly' : 'Flies'} Collected!
                       </span>
                       <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                         Keep it up!

@@ -82,7 +82,7 @@ export function TimePopup({
               <div className="mx-auto w-full">
                 {/* Header */}
                 <div className="relative mb-5 flex h-8 items-center justify-center">
-                  <h3 className="text-[16px] font-extrabold text-foreground">
+                  <h3 className="text-[17px] font-black text-foreground">
                     Notify
                   </h3>
                 </div>

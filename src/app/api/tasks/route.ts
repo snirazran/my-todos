@@ -344,6 +344,7 @@ const initDailyFly = (date: string): DailyFlyProgress => ({
   date,
   earned: 0,
   taskIds: [],
+  taskFlies: {},
   limitNotified: false,
 });
 
@@ -355,10 +356,17 @@ function normalizeDailyFly(
     return {
       ...flyDaily,
       taskIds: flyDaily.taskIds ?? [],
+      taskFlies: flyDaily.taskFlies ?? {},
       limitNotified: flyDaily.limitNotified ?? false,
     };
   }
   return initDailyFly(today);
+}
+
+/** Flies a task is worth: a base fly plus one per completed checklist item. */
+function taskFlyValue(task: Pick<TaskDoc, 'checklist'>): number {
+  const done = (task.checklist ?? []).filter((c) => c.done).length;
+  return 1 + done;
 }
 
 async function currentFlyStatus(
@@ -452,6 +460,7 @@ async function awardFlyForTask(
   taskId: string,
   tz: string,
   countTowardDaily: boolean = true,
+  value: number = 1,
 ): Promise<{
   awarded: boolean;
   flyStatus: FlyStatus;
@@ -578,13 +587,19 @@ async function awardFlyForTask(
     setFields['statistics.daily'] = statsUpdates['statistics.daily'];
   }
 
+  const desired = Math.max(1, Math.floor(value));
+  let grant = desired;
+  if (countTowardDaily) {
+    grant = Math.min(desired, Math.max(0, DAILY_FLY_LIMIT - daily.earned));
+  }
+
   let nextEarned = daily.earned;
   let nextBalance = currentBalance;
   let awardedFly = false;
 
-  if (countTowardDaily ? !atLimit : true) {
-    if (countTowardDaily) nextEarned += 1;
-    nextBalance += 1;
+  if (grant > 0) {
+    if (countTowardDaily) nextEarned += grant;
+    nextBalance += grant;
     awardedFly = true;
     setFields['wardrobe.flies'] = nextBalance;
   }
@@ -594,6 +609,7 @@ async function awardFlyForTask(
     date: today,
     earned: nextEarned,
     taskIds: Array.from(new Set([...(daily.taskIds ?? []), taskId])),
+    taskFlies: { ...(daily.taskFlies ?? {}), [taskId]: grant },
     limitNotified: limitNotified || hitLimit,
   };
 
@@ -680,12 +696,16 @@ async function unawardFlyForTask(
   let nextBalance = balance;
 
   if (wasRewarded) {
-    if (countTowardDaily) nextEarned = Math.max(0, daily.earned - 1);
-    nextBalance = Math.max(0, balance - 1);
+    const granted = daily.taskFlies?.[taskId] ?? 1;
+    if (countTowardDaily) nextEarned = Math.max(0, daily.earned - granted);
+    nextBalance = Math.max(0, balance - granted);
+    const nextTaskFlies = { ...(daily.taskFlies ?? {}) };
+    delete nextTaskFlies[taskId];
     const nextDaily: DailyFlyProgress = {
       date: today,
       earned: nextEarned,
       taskIds: (daily.taskIds ?? []).filter((id) => id !== taskId),
+      taskFlies: nextTaskFlies,
       limitNotified: nextEarned >= DAILY_FLY_LIMIT ? daily.limitNotified : false,
     };
     setFields['wardrobe.flies'] = nextBalance;
@@ -1638,7 +1658,13 @@ export async function PUT(req: NextRequest) {
   let awarded = false;
   const isTodayCompletion = date === getZonedToday(tz);
   if (completed && !alreadyCompletedForDate) {
-    const res = await awardFlyForTask(uid, taskId, tz, isTodayCompletion);
+    const res = await awardFlyForTask(
+      uid,
+      taskId,
+      tz,
+      isTodayCompletion,
+      taskFlyValue(doc),
+    );
     flyStatus = res.flyStatus;
     hungerStatus = res.hungerStatus;
     dailyTasksCount = res.dailyTasksCount;
