@@ -58,7 +58,12 @@ export async function POST(req: NextRequest) {
   try {
     await connectMongo();
 
-    let body: { action?: unknown; token?: unknown; controlSeq?: unknown } = {};
+    let body: {
+      action?: unknown;
+      token?: unknown;
+      controlSeq?: unknown;
+      activityId?: unknown;
+    } = {};
     try {
       body = await req.json();
     } catch {
@@ -69,6 +74,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
     const token = typeof body?.token === 'string' ? body.token : '';
+    const activityId = typeof body?.activityId === 'string' ? body.activityId : '';
     const rawControlSeq =
       typeof body?.controlSeq === 'number' && Number.isFinite(body.controlSeq)
         ? Math.floor(body.controlSeq)
@@ -206,7 +212,16 @@ export async function POST(req: NextRequest) {
       cancelFrogodoroTimerProcessing(userId);
     }
 
-    await fanOutTimerState(userId, next, live, startToken, startTokenClockSkewMs, prefs);
+    await fanOutTimerState(
+      userId,
+      next,
+      live,
+      startToken,
+      startTokenClockSkewMs,
+      prefs,
+      false,
+      !!activityId && activityId === live?.id,
+    );
 
     return NextResponse.json({ ok: true });
   } catch {

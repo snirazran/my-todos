@@ -1,6 +1,7 @@
 import AppIntents
 import ActivityKit
 import Foundation
+import UserNotifications
 
 // Powers the Live Activity buttons (Pause / Resume / Stop / Done). Interactive
 // Live Activity buttons require iOS 17+. perform() runs in the app's process
@@ -26,14 +27,28 @@ struct FrogTimerControlIntent: LiveActivityIntent {
         // under performExpiringActivity, which keeps the process alive past
         // perform()'s return so the request still lands when the app is
         // backgrounded/suspended (a plain detached Task is killed on re-suspend).
+        let perfStart = Date()
+        NSLog("FrogControl: perform start action=%@", action)
         await applyLocally()
+        NSLog("FrogControl: applyLocally done action=%@ dt=%.0fms", action, Date().timeIntervalSince(perfStart) * 1000)
+        let activityId = Activity<FrogTimerAttributes>.activities.first?.id
         let controlSeq = Self.nextControlSeq()
-        Self.postToServer(action: action, controlSeq: controlSeq)
+        Self.postToServer(action: action, controlSeq: controlSeq, activityId: activityId)
         return .result()
     }
 
     private func applyLocally() async {
-        guard let activity = Activity<FrogTimerAttributes>.activities.first else { return }
+        if action == "pause" || action == "stop" || action == "done" {
+            UNUserNotificationCenter.current().removePendingNotificationRequests(
+                withIdentifiers: ["880001", "880002"]
+            )
+        }
+        guard let activity = Activity<FrogTimerAttributes>.activities.first else {
+            NSLog("FrogControl: applyLocally no activity (count=%d) action=%@",
+                  Activity<FrogTimerAttributes>.activities.count, action)
+            return
+        }
+        NSLog("FrogControl: applyLocally found activity=%@ action=%@", activity.id, action)
         let s = activity.content.state
         let nowMs = Date().timeIntervalSince1970 * 1000
 
@@ -75,7 +90,7 @@ struct FrogTimerControlIntent: LiveActivityIntent {
         return value
     }
 
-    private static func postToServer(action: String, controlSeq: Int) {
+    private static func postToServer(action: String, controlSeq: Int, activityId: String?) {
         let suite = UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")
         // Prefer the stable control (FCM) token; fall back to the volatile push
         // tokens only if it isn't set yet.
@@ -110,9 +125,9 @@ struct FrogTimerControlIntent: LiveActivityIntent {
             request.httpMethod = "POST"
             request.timeoutInterval = 8
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.httpBody = try? JSONSerialization.data(
-                withJSONObject: ["action": action, "token": token, "controlSeq": controlSeq]
-            )
+            var payload: [String: Any] = ["action": action, "token": token, "controlSeq": controlSeq]
+            if let activityId { payload["activityId"] = activityId }
+            request.httpBody = try? JSONSerialization.data(withJSONObject: payload)
 
             let semaphore = DispatchSemaphore(value: 0)
             URLSession.shared.dataTask(with: request) { _, response, error in

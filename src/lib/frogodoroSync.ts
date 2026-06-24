@@ -81,6 +81,7 @@ export async function fanOutTimerState(
   // Activity itself — don't push-to-start it (that push must carry an alert and
   // would flash a banner on the device that just started the timer).
   suppressPushToStart = false,
+  suppressLiveActivityPush = false,
 ): Promise<void> {
   const tasks: Promise<unknown>[] = [];
   const clearRef = () =>
@@ -93,7 +94,7 @@ export async function fanOutTimerState(
     `Frogodoro fan-out: status=${timer.status} phase=${timer.phase} finished=${timer.finished === true} live=${live?.id ? 'yes' : 'no'} liveToken=${tokenLabel(live?.pushToken)} startToken=${tokenLabel(startToken)} apns=${livePushConfigured ? 'yes' : 'no'}`,
   );
 
-  if (livePushConfigured) {
+  if (livePushConfigured && !suppressLiveActivityPush) {
     const finished = timer.finished === true;
     const running = !finished && timer.status === 'running' && !!timer.endsAt;
     const endTime = running ? new Date(timer.endsAt as string).getTime() : 0;

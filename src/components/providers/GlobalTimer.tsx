@@ -580,7 +580,7 @@ export function GlobalTimer() {
 
       tickTimer(remaining);
 
-      if (remaining === 0) {
+      if (now >= endTime) {
         clearInterval(interval);
 
         // A large gap between ticks means the webview was suspended (backgrounded
