@@ -28,6 +28,25 @@ private func ringFraction(_ state: FrogTimerAttributes.ContentState) -> Double {
 }
 
 @available(iOS 16.1, *)
+private func resolvedState(
+    _ context: ActivityViewContext<FrogTimerAttributes>
+) -> FrogTimerAttributes.ContentState {
+    var s = context.state
+    if context.isStale && s.finished != true {
+        let phaseLabel = s.label
+        s.finished = true
+        s.paused = true
+        s.endTime = 0
+        s.timeText = "0:00"
+        s.label = "Time's up"
+        if s.subtitle.isEmpty || s.subtitle == "Paused" {
+            s.subtitle = phaseLabel.isEmpty ? "Session done" : "\(phaseLabel) done"
+        }
+    }
+    return s
+}
+
+@available(iOS 16.1, *)
 private struct TimeView: View {
     let state: FrogTimerAttributes.ContentState
     var font: Font
@@ -213,12 +232,13 @@ private func islandControls(_ state: FrogTimerAttributes.ContentState) -> some V
 struct FrogTimerLiveActivity: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: FrogTimerAttributes.self) { context in
-            lockScreen(context.state)
+            let state = resolvedState(context)
+            lockScreen(state)
                 .padding(16)
                 .activityBackgroundTint(Color.black.opacity(0.35))
-                .activitySystemActionForegroundColor(Color(hex: context.state.color))
+                .activitySystemActionForegroundColor(Color(hex: state.color))
         } dynamicIsland: { context in
-            let state = context.state
+            let state = resolvedState(context)
             return DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
                     if state.finished == true {

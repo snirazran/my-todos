@@ -144,7 +144,10 @@
       "Bash(awk 'NR>=340 && NR<=400' App.xcodeproj/project.pbxproj)",
       "Bash(awk NR>=194 && NR<=230 *)",
       "Bash(echo \"exit-grep=$?\")",
-      "Bash(echo \"tsc=$?\")"
+      "Bash(echo \"tsc=$?\")",
+      "WebFetch(domain:christianselig.com)",
+      "WebFetch(domain:wwdcnotes.com)",
+      "WebFetch(domain:mfaani.com)"
     ]
   }
 }

@@ -16,14 +16,39 @@ function tokenLabel(token: string): string {
   return `${token.slice(0, 8)}...${token.slice(-6)}`;
 }
 
+async function resolveUserId(creds: {
+  authToken?: string;
+  pushToStartToken?: string;
+  pushToken?: string;
+}): Promise<string | null> {
+  try {
+    return await requireUserId();
+  } catch {
+    void 0;
+  }
+  const cred = creds.authToken || creds.pushToStartToken || creds.pushToken;
+  if (!cred) return null;
+  const user = await UserModel.findOne(
+    {
+      $or: [
+        { 'notificationPrefs.fcmTokens': cred },
+        { liveActivityStartToken: cred },
+        { 'liveActivity.pushToken': cred },
+      ],
+    },
+    { _id: 1 },
+  ).lean();
+  return user ? String((user as { _id: unknown })._id) : null;
+}
+
 export async function PUT(req: NextRequest) {
   try {
-    const userId = await requireUserId();
     const body = await req.json();
     const id = typeof body?.activityId === 'string' ? body.activityId : '';
     const pushToken = typeof body?.pushToken === 'string' ? body.pushToken : '';
     const pushToStartToken =
       typeof body?.pushToStartToken === 'string' ? body.pushToStartToken : '';
+    const authToken = typeof body?.authToken === 'string' ? body.authToken : '';
     const clientNow = typeof body?.clientNow === 'number' ? body.clientNow : null;
     const clockSkewMs = normalizeClockSkewMs(
       clientNow && Number.isFinite(clientNow) ? Date.now() - clientNow : 0,
@@ -34,6 +59,9 @@ export async function PUT(req: NextRequest) {
     }
 
     await connectMongo();
+
+    const userId = await resolveUserId({ authToken, pushToStartToken, pushToken });
+    if (!userId) return unauth();
 
     // The push-to-start token arrives on its own event and persists across
     // activities, so it's stored independently of the current activity ref.

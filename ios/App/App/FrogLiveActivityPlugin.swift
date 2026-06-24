@@ -211,6 +211,75 @@ public class FrogLiveActivityPlugin: CAPPlugin, CAPBridgedPlugin {
         UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")?.set(token, forKey: key)
     }
 
+    private static var activityObservationStarted = false
+    private static var activityObservationTask: Task<Void, Never>?
+    private static var observedUploadIds = Set<String>()
+
+    static func startActivityObservation() {
+        if activityObservationStarted { return }
+        activityObservationStarted = true
+        activityObservationTask = Task {
+            if #available(iOS 16.2, *) {
+                await observeActivities()
+            }
+        }
+    }
+
+    @available(iOS 16.2, *)
+    private static func observeActivities() async {
+        for activity in Activity<FrogTimerAttributes>.activities {
+            observeTokenForUpload(activity)
+        }
+        for await activity in Activity<FrogTimerAttributes>.activityUpdates {
+            observeTokenForUpload(activity)
+        }
+    }
+
+    @available(iOS 16.2, *)
+    private static func observeTokenForUpload(_ activity: Activity<FrogTimerAttributes>) {
+        if observedUploadIds.contains(activity.id) { return }
+        observedUploadIds.insert(activity.id)
+        Task {
+            for await tokenData in activity.pushTokenUpdates {
+                let token = tokenData.map { String(format: "%02x", $0) }.joined()
+                storeToken(token, key: "frogActivityPushToken")
+                uploadActivityToken(activityId: activity.id, token: token)
+            }
+        }
+    }
+
+    private static func uploadActivityToken(activityId: String, token: String) {
+        let suite = UserDefaults(suiteName: "group.io.frog.tasks.liveactivities")
+        let auth =
+            suite?.string(forKey: "frogControlToken")
+            ?? suite?.string(forKey: "frogPushToStartToken")
+        let origin = suite?.string(forKey: "frogApiOrigin") ?? "https://frogress.com"
+        guard let auth, let url = URL(string: "\(origin)/api/frogodoro/live-activity") else { return }
+        ProcessInfo.processInfo.performExpiringActivity(withReason: "FrogActivityTokenUpload") { expired in
+            guard !expired else { return }
+            var request = URLRequest(url: url)
+            request.httpMethod = "PUT"
+            request.timeoutInterval = 8
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try? JSONSerialization.data(withJSONObject: [
+                "activityId": activityId,
+                "pushToken": token,
+                "authToken": auth,
+                "clientNow": Int(Date().timeIntervalSince1970 * 1000),
+            ])
+            let semaphore = DispatchSemaphore(value: 0)
+            URLSession.shared.dataTask(with: request) { _, response, error in
+                if let http = response as? HTTPURLResponse {
+                    NSLog("FrogActivityToken: PUT -> %d", http.statusCode)
+                } else if let error {
+                    NSLog("FrogActivityToken: PUT failed: %@", error.localizedDescription)
+                }
+                semaphore.signal()
+            }.resume()
+            semaphore.wait()
+        }
+    }
+
     @available(iOS 16.2, *)
     private static func activeActivity(
         preferred: Activity<FrogTimerAttributes>?

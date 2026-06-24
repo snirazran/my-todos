@@ -6,7 +6,9 @@ const KEY_ID = process.env.APNS_KEY_ID;
 const TEAM_ID = process.env.APNS_TEAM_ID;
 const BUNDLE_ID = process.env.APNS_BUNDLE_ID || 'io.frog.tasks';
 const PRODUCTION = process.env.APNS_PRODUCTION !== 'false';
-const ALLOW_START_ENV_FALLBACK = process.env.APNS_START_ENV_FALLBACK !== 'false';
+const ALLOW_ENV_FALLBACK =
+  process.env.APNS_ENV_FALLBACK !== 'false' &&
+  process.env.APNS_START_ENV_FALLBACK !== 'false';
 const ATTRIBUTES_TYPE =
   process.env.APNS_LIVE_ACTIVITY_ATTRIBUTES_TYPE ||
   'FrogTimerAttributes';
@@ -168,6 +170,31 @@ async function send(
   }
 }
 
+const tokenEnv = new Map<string, boolean>();
+
+async function sendWithEnvFallback(
+  event: 'start' | 'update' | 'end',
+  payload: unknown,
+  pushToken: string,
+  priority = 10,
+): Promise<LiveActivityPushResult> {
+  const firstProduction = tokenEnv.get(pushToken) ?? PRODUCTION;
+  const first = await send(event, payload, pushToken, firstProduction, priority);
+  if (first.ok) {
+    tokenEnv.set(pushToken, firstProduction);
+    return first;
+  }
+  if (ALLOW_ENV_FALLBACK && first.status === 400 && first.reason === 'BadDeviceToken') {
+    console.warn(
+      `APNs Live Activity ${event} retrying ${firstProduction ? 'sandbox' : 'production'} after BadDeviceToken`,
+    );
+    const second = await send(event, payload, pushToken, !firstProduction, priority);
+    if (second.ok) tokenEnv.set(pushToken, !firstProduction);
+    return second;
+  }
+  return first;
+}
+
 // content-state is the flat LiveActivityData, matching the native
 // FrogTimerAttributes.ContentState (ios/App/FrogTimerShared/FrogTimerAttributes.swift).
 export async function sendLiveActivityUpdate(opts: {
@@ -189,7 +216,7 @@ export async function sendLiveActivityUpdate(opts: {
     aps.alert = { title: opts.alert.title, body: opts.alert.body };
     aps.sound = opts.alert.sound ?? 'default';
   }
-  return send('update', { aps }, opts.pushToken);
+  return sendWithEnvFallback('update', { aps }, opts.pushToken);
 }
 
 export async function sendLiveActivityEnd(opts: {
@@ -203,7 +230,7 @@ export async function sendLiveActivityEnd(opts: {
     'content-state': opts.data,
     'dismissal-date': Math.floor(Date.now() / 1000),
   };
-  return send('end', { aps }, opts.pushToken);
+  return sendWithEnvFallback('end', { aps }, opts.pushToken);
 }
 
 // Creates the Live Activity remotely via the user's push-to-start token, so the
@@ -222,7 +249,6 @@ export async function sendLiveActivityStart(opts: {
     'attributes-type': ATTRIBUTES_TYPE,
     attributes: {},
     'content-state': opts.data,
-    'input-push-token': 1,
   };
   if (opts.staleDate) aps['stale-date'] = Math.floor(opts.staleDate / 1000);
   if (opts.alert) {
@@ -239,19 +265,5 @@ export async function sendLiveActivityStart(opts: {
     };
   }
   console.log(`APNs Live Activity start attributes-type=${ATTRIBUTES_TYPE}`);
-  const payload = { aps };
-  const first = await send('start', payload, opts.pushToStartToken);
-
-  if (
-    ALLOW_START_ENV_FALLBACK &&
-    first.reason === 'BadDeviceToken' &&
-    first.status === 400
-  ) {
-    console.warn(
-      `APNs Live Activity start retrying ${PRODUCTION ? 'sandbox' : 'production'} after BadDeviceToken`,
-    );
-    return send('start', payload, opts.pushToStartToken, !PRODUCTION);
-  }
-
-  return first;
+  return sendWithEnvFallback('start', { aps }, opts.pushToStartToken);
 }

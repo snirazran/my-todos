@@ -11,6 +11,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Initialize Firebase so @capacitor-firebase/messaging can mint FCM tokens.
         FirebaseApp.configure()
+        FrogLiveActivityPlugin.startActivityObservation()
         // Override point for customization after application launch.
         return true
     }
