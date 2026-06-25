@@ -1,5 +1,12 @@
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import UserModel from '@/lib/models/User';
+import {
+  createTaskEvent,
+  type TaskSyncChange,
+  type TaskEventMessage,
+} from '@/lib/taskEvents';
+
+export type { TaskSyncChange } from '@/lib/taskEvents';
 
 function isInvalidTokenError(err: unknown) {
   const code = (err as { code?: string } | null)?.code;
@@ -9,7 +16,10 @@ function isInvalidTokenError(err: unknown) {
   );
 }
 
-export async function sendTaskSyncMessage(userId: string) {
+export async function sendTaskSyncMessage(
+  userId: string,
+  event?: TaskEventMessage,
+) {
   try {
     const user = await UserModel.findById(userId, {
       'notificationPrefs.fcmTokens': 1,
@@ -21,17 +31,30 @@ export async function sendTaskSyncMessage(userId: string) {
 
     const messaging = getAdminMessaging();
     const invalidTokens: string[] = [];
-    const changedAt = new Date().toISOString();
+    const data: Record<string, string> = {
+      type: 'task_sync',
+      changedAt: event?.changedAt ?? new Date().toISOString(),
+    };
+    if (event) {
+      data.eventId = event.eventId;
+      data.eventKind = event.eventKind;
+      if (event.taskId) data.taskId = event.taskId;
+      if (typeof event.completed === 'boolean') {
+        data.completed = String(event.completed);
+      }
+      if (event.date) data.date = event.date;
+      if (event.backgroundId) data.backgroundId = event.backgroundId;
+      if (event.slot) data.slot = event.slot;
+      if (typeof event.itemId === 'string') data.itemId = event.itemId;
+      if (event.itemId === null) data.itemId = '';
+    }
 
     await Promise.all(
       tokens.map(async (token) => {
         try {
           await messaging.send({
             token,
-            data: {
-              type: 'task_sync',
-              changedAt,
-            },
+            data,
             android: { priority: 'high' as const },
             apns: {
               headers: {
@@ -70,6 +93,21 @@ export async function sendTaskSyncMessage(userId: string) {
   }
 }
 
-export function notifyTaskChanged(userId: string) {
-  return sendTaskSyncMessage(userId);
+export async function notifyUserChanged(userId: string, change?: TaskSyncChange) {
+  try {
+    const event = await createTaskEvent(userId, change);
+    void sendTaskSyncMessage(userId, event);
+    return event;
+  } catch (err) {
+    console.error(
+      'Task event publish failed:',
+      (err as { message?: string } | null)?.message,
+    );
+    void sendTaskSyncMessage(userId);
+    return null;
+  }
+}
+
+export function notifyTaskChanged(userId: string, change?: TaskSyncChange) {
+  return notifyUserChanged(userId, change);
 }

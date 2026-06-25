@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { CATALOG, type WardrobeSlot } from '@/lib/skins/catalog';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
+import { notifyUserChanged } from '@/lib/taskSync';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 
 const json = (body: unknown, init = 200) =>
@@ -163,6 +164,11 @@ export async function PUT(req: NextRequest) {
         { _id: user._id },
         { $set: { [`wardrobe.equipped.${slot}`]: null } },
       );
+      await notifyUserChanged(userId, {
+        eventKind: 'wardrobe-equipped',
+        slot,
+        itemId: null,
+      });
       return json({ ok: true });
     }
 
@@ -181,6 +187,11 @@ export async function PUT(req: NextRequest) {
       { _id: user._id },
       { $set: { [`wardrobe.equipped.${slot}`]: itemId } },
     );
+    await notifyUserChanged(userId, {
+      eventKind: 'wardrobe-equipped',
+      slot,
+      itemId,
+    });
     return json({ ok: true });
   } catch {
     return json({ error: 'Unauthorized' }, 401);

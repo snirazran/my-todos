@@ -5,7 +5,52 @@ import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { setLiveActivityControlToken, setTimerControlConfig } from '@/lib/liveTimer';
-import { notifyTaskSync } from '@/lib/taskSyncClient';
+import {
+  notifyTaskSync,
+  type TaskSyncDetail,
+  type TaskSyncEventKind,
+} from '@/lib/taskSyncClient';
+
+function stringDataValue(data: Record<string, unknown>, key: string) {
+  const value = data[key];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function isTaskSyncEventKind(
+  value: string | undefined,
+): value is TaskSyncEventKind {
+  return (
+    value === 'tasks-changed' ||
+    value === 'task-completed' ||
+    value === 'task-uncompleted' ||
+    value === 'background-equipped' ||
+    value === 'wardrobe-equipped'
+  );
+}
+
+function taskSyncDetailFromData(
+  data: Record<string, unknown>,
+): Partial<TaskSyncDetail> {
+  const completedValue = stringDataValue(data, 'completed');
+  const eventKind = stringDataValue(data, 'eventKind');
+  const itemId = stringDataValue(data, 'itemId');
+  return {
+    eventId: stringDataValue(data, 'eventId'),
+    changedAt: stringDataValue(data, 'changedAt'),
+    eventKind: isTaskSyncEventKind(eventKind) ? eventKind : undefined,
+    taskId: stringDataValue(data, 'taskId'),
+    completed:
+      completedValue === 'true'
+        ? true
+        : completedValue === 'false'
+          ? false
+          : undefined,
+    date: stringDataValue(data, 'date'),
+    backgroundId: stringDataValue(data, 'backgroundId'),
+    slot: stringDataValue(data, 'slot'),
+    itemId: itemId === '' ? null : itemId,
+  };
+}
 
 /**
  * Hook that handles push notification setup for native platforms (Android/iOS).
@@ -101,8 +146,7 @@ export function usePushNotifications(userId: string | null | undefined) {
           if (data?.type !== 'task_sync') return;
           notifyTaskSync({
             reason: 'remote-message',
-            changedAt:
-              typeof data.changedAt === 'string' ? data.changedAt : undefined,
+            ...taskSyncDetailFromData(data),
           });
         });
       } catch (err) {

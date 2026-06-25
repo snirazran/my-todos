@@ -8,7 +8,11 @@ import {
   onMessage,
   isSupported,
 } from 'firebase/messaging';
-import { notifyTaskSync } from '@/lib/taskSyncClient';
+import {
+  notifyTaskSync,
+  type TaskSyncDetail,
+  type TaskSyncEventKind,
+} from '@/lib/taskSyncClient';
 
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 const PREF_KEY = 'frogress.webPushPref';
@@ -61,6 +65,36 @@ export function webPushPermission(): NotificationPermission | 'unsupported' {
 
 let foregroundBound = false;
 
+function isTaskSyncEventKind(value: string | undefined): value is TaskSyncEventKind {
+  return (
+    value === 'tasks-changed' ||
+    value === 'task-completed' ||
+    value === 'task-uncompleted' ||
+    value === 'background-equipped' ||
+    value === 'wardrobe-equipped'
+  );
+}
+
+function taskSyncDetailFromData(data: Record<string, string>): Partial<TaskSyncDetail> {
+  const completed =
+    data.completed === 'true'
+      ? true
+      : data.completed === 'false'
+        ? false
+        : undefined;
+  return {
+    eventId: data.eventId,
+    changedAt: data.changedAt,
+    eventKind: isTaskSyncEventKind(data.eventKind) ? data.eventKind : undefined,
+    taskId: data.taskId,
+    completed,
+    date: data.date,
+    backgroundId: data.backgroundId,
+    slot: data.slot,
+    itemId: data.itemId === '' ? null : data.itemId,
+  };
+}
+
 function bindForeground() {
   if (foregroundBound) return;
   foregroundBound = true;
@@ -70,7 +104,10 @@ function bindForeground() {
       const n = payload.notification ?? {};
       const data = (payload.data ?? {}) as Record<string, string>;
       if (data.type === 'task_sync') {
-        notifyTaskSync({ reason: 'remote-message', changedAt: data.changedAt });
+        notifyTaskSync({
+          reason: 'remote-message',
+          ...taskSyncDetailFromData(data),
+        });
         return;
       }
       const title = n.title || data.title || 'Frogress';

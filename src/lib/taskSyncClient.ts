@@ -11,13 +11,30 @@ const fallbackSourceId =
 export type TaskSyncReason =
   | 'local-mutation'
   | 'remote-message'
+  | 'stream'
   | 'resume'
   | 'service-worker'
   | 'native-poll';
 
+export type TaskSyncEventKind =
+  | 'tasks-changed'
+  | 'task-completed'
+  | 'task-uncompleted'
+  | 'background-equipped'
+  | 'wardrobe-equipped';
+
 export type TaskSyncDetail = {
   reason: TaskSyncReason;
   changedAt?: string;
+  eventId?: string;
+  eventKind?: TaskSyncEventKind;
+  taskId?: string;
+  completed?: boolean;
+  date?: string;
+  backgroundId?: string;
+  slot?: string;
+  itemId?: string | null;
+  replayed?: boolean;
 };
 
 function sourceId() {
@@ -38,7 +55,14 @@ function sourceId() {
 
 function dispatch(detail: TaskSyncDetail) {
   window.dispatchEvent(new CustomEvent<TaskSyncDetail>(TASK_SYNC_EVENT, { detail }));
-  window.dispatchEvent(new Event('board-refresh'));
+  if (
+    !detail.eventKind ||
+    detail.eventKind === 'tasks-changed' ||
+    detail.eventKind === 'task-completed' ||
+    detail.eventKind === 'task-uncompleted'
+  ) {
+    window.dispatchEvent(new Event('board-refresh'));
+  }
 }
 
 export function notifyTaskSync(
@@ -76,6 +100,15 @@ export function bindTaskSyncMessages(onSync?: (detail: TaskSyncDetail) => void) 
     const detail: TaskSyncDetail = {
       reason: data.reason ?? 'local-mutation',
       changedAt: data.changedAt,
+      eventKind: data.eventKind,
+      eventId: data.eventId,
+      taskId: data.taskId,
+      completed: data.completed,
+      date: data.date,
+      backgroundId: data.backgroundId,
+      slot: data.slot,
+      itemId: data.itemId,
+      replayed: data.replayed,
     };
     dispatch(detail);
     onSync?.(detail);
@@ -97,11 +130,22 @@ export function bindTaskSyncMessages(onSync?: (detail: TaskSyncDetail) => void) 
   window.addEventListener('storage', onStorage);
 
   const onServiceWorkerMessage = (event: MessageEvent) => {
-    const data = event.data as { type?: string; changedAt?: string } | undefined;
+    const data = event.data as
+      | ({ type?: string; changedAt?: string } & Partial<TaskSyncDetail>)
+      | undefined;
     if (data?.type !== 'task_sync') return;
     const detail: TaskSyncDetail = {
       reason: 'service-worker',
       changedAt: data.changedAt,
+      eventKind: data.eventKind,
+      eventId: data.eventId,
+      taskId: data.taskId,
+      completed: data.completed,
+      date: data.date,
+      backgroundId: data.backgroundId,
+      slot: data.slot,
+      itemId: data.itemId,
+      replayed: data.replayed,
     };
     dispatch(detail);
     onSync?.(detail);

@@ -1698,7 +1698,12 @@ export async function PUT(req: NextRequest) {
     ));
   }
   void syncGamification(uid, tz);
-  await notifyTaskChanged(uid);
+  await notifyTaskChanged(uid, {
+    eventKind: completed ? 'task-completed' : 'task-uncompleted',
+    taskId,
+    completed,
+    date,
+  });
   return NextResponse.json({
     ok: true,
     awarded,

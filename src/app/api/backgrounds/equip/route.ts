@@ -7,6 +7,7 @@ import {
   DEFAULT_BACKGROUND_ID,
   ensureDefaultBackground,
 } from '@/lib/backgrounds/defaults';
+import { notifyUserChanged } from '@/lib/taskSync';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -51,6 +52,10 @@ export async function PUT(req: NextRequest) {
     }
 
     await UserModel.updateOne({ _id: user._id }, { $set: update });
+    await notifyUserChanged(userId, {
+      eventKind: 'background-equipped',
+      backgroundId: targetId,
+    });
     return json({ ok: true, equipped: targetId });
   } catch {
     return json({ error: 'Unauthorized' }, 401);

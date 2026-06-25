@@ -28,7 +28,20 @@ if (firebaseConfig.apiKey) {
           list.forEach((client) => {
             client.postMessage({
               type: 'task_sync',
+              eventId: data.eventId,
               changedAt: data.changedAt,
+              eventKind: data.eventKind,
+              taskId: data.taskId,
+              completed:
+                data.completed === 'true'
+                  ? true
+                  : data.completed === 'false'
+                    ? false
+                    : undefined,
+              date: data.date,
+              backgroundId: data.backgroundId,
+              slot: data.slot,
+              itemId: data.itemId === '' ? null : data.itemId,
             });
           });
         });
