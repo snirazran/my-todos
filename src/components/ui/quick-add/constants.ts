@@ -1,6 +1,3 @@
-export const TIME_SLIDER_ITEM_H = 44;
-export const TIME_SLIDER_PAD = 66;
-
 export const HOURS_12 = Array.from({ length: 12 }, (_, i) => i + 1);
 export const HOURS_24 = Array.from({ length: 24 }, (_, i) => i);
 export const MINUTES_60 = Array.from({ length: 60 }, (_, i) => i);

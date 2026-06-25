@@ -1,5 +1,10 @@
 export const pad = (n: number) => String(n).padStart(2, '0');
 
+export const nowHm = () => {
+  const d = new Date();
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 export function ymdLocal(date: Date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }

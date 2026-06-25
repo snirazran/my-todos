@@ -3,7 +3,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import {
-  Bell,
   CalendarCheck,
   Check,
   ChevronDown,
@@ -19,18 +18,15 @@ import {
   type ApiDay,
   type DisplayDay,
 } from '@/components/board/helpers';
-import { TimeSliderColumn } from './TimeSliderColumn';
 import { TagsView } from './TagsView';
 import { RepeatView } from './RepeatView';
+import { NotifyView } from './NotifyView';
 import { EndDateCalendarSheet } from './EndDateCalendarSheet';
 import { CustomRepeatSheet } from './CustomRepeatSheet';
 import {
-  HOURS_24,
-  MINUTES_60,
-} from './constants';
-import {
   allDisplayDays,
   monthlyRepeatLabel,
+  nowHm,
   pad,
   repeatModeFor,
   weekdayDisplayDays,
@@ -170,7 +166,7 @@ export function PickerSheet(props: Props) {
     }
   };
 
-  const reminderTime = startTime || '09:00';
+  const reminderTime = startTime || nowHm();
   const [reminderHour24, reminderMinute] = reminderTime.split(':').map(Number);
 
   const setReminderTimeParts = (hour24: number, minute: number) => {
@@ -179,7 +175,7 @@ export function PickerSheet(props: Props) {
   };
   const saveReminderTime = () => {
     setNotifyEnabled(true);
-    if (!startTime) setStartTime('09:00');
+    if (!startTime) setStartTime(nowHm());
     setReminder('at_time');
     reminderSnapshotRef.current = null;
     setShowReminderPicker(false);
@@ -541,67 +537,14 @@ function ReminderOverlay({
     >
       {() => (
         <div dir="ltr" className="mx-auto w-full px-5 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] pt-1 sm:pb-6">
-          <div className="relative mb-5 flex h-8 items-center justify-center">
-            <h3 className="text-[17px] font-black text-foreground">Notify</h3>
-          </div>
-
-          {/* Reminder summary */}
-          <div className="mb-4 flex items-center justify-center gap-2 text-[13px] font-bold text-muted-foreground">
-            <Bell className="h-4 w-4 text-primary" />
-            <span>
-              Notifies you at{' '}
-              <span className="text-primary">
-                {pad(reminderHour24)}:{pad(reminderMinute)}
-              </span>
-            </span>
-          </div>
-
-          <div className="mb-5">
-            <div className="mx-auto mb-2 grid max-w-[220px] grid-cols-2 text-center text-[10px] font-bold uppercase tracking-[0.18em] text-muted-foreground/70">
-              <span>Hour</span>
-              <span>Minute</span>
-            </div>
-            <div className="relative mx-auto grid max-w-[220px] grid-cols-2 items-center text-center">
-              <div className="pointer-events-none absolute -inset-x-1 top-1/2 z-0 h-12 -translate-y-1/2 rounded-2xl bg-primary/10 ring-1 ring-primary/25" />
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-background to-transparent" />
-              <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-background to-transparent" />
-              {/* Colon separator so it reads as a real time */}
-              <span className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-[60%] text-[26px] font-black leading-none text-primary">
-                :
-              </span>
-
-              <TimeSliderColumn
-                items={HOURS_24}
-                value={reminderHour24}
-                onChange={(hour) => setReminderTimeParts(hour, reminderMinute)}
-                formatLabel={pad}
-              />
-              <TimeSliderColumn
-                items={MINUTES_60}
-                value={reminderMinute}
-                onChange={(minute) => setReminderTimeParts(reminderHour24, minute)}
-                formatLabel={pad}
-              />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={saveReminderTime}
-            className="h-11 w-full rounded-xl bg-primary text-[15px] font-extrabold text-primary-foreground transition-all hover:brightness-105 active:scale-[0.985]"
-          >
-            Save reminder
-          </button>
-
-          {canRemove && onRemove && (
-            <button
-              type="button"
-              onClick={onRemove}
-              className="mt-2 h-10 w-full rounded-xl text-[13px] font-bold text-rose-500 transition-colors hover:bg-rose-500/10"
-            >
-              Remove reminder
-            </button>
-          )}
+          <NotifyView
+            reminderHour24={reminderHour24}
+            reminderMinute={reminderMinute}
+            setReminderTimeParts={setReminderTimeParts}
+            onSave={saveReminderTime}
+            canRemove={canRemove}
+            onRemove={onRemove}
+          />
         </div>
       )}
     </BaseSheet>

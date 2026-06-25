@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { Check, ChevronRight, ChevronUp } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
-import { TimeSliderColumn } from './TimeSliderColumn';
+import { Wheel } from './Wheel';
 import { EndDateCalendarSheet } from './EndDateCalendarSheet';
 import {
   dayOfMonthFromYmd,
@@ -209,17 +209,17 @@ export function CustomRepeatSheet({
               {everyExpanded && (
                 <>
                   <div className="mx-4 border-t border-border" />
-                  <div className="relative px-4 py-2">
-                    <div className="pointer-events-none absolute inset-x-4 top-1/2 z-0 h-11 -translate-y-1/2 rounded-2xl bg-primary/10 ring-1 ring-primary/25" />
-                    <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-background to-transparent" />
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-background to-transparent" />
-                    <div className="mx-auto max-w-[160px]">
-                      <TimeSliderColumn
-                        items={items}
-                        value={interval}
-                        onChange={(v) => setInterval(v)}
-                      />
-                    </div>
+                  <div className="px-4 py-2">
+                    <Wheel
+                      className="mx-auto max-w-[160px]"
+                      columns={[
+                        {
+                          items,
+                          value: interval,
+                          onChange: (v) => setInterval(v),
+                        },
+                      ]}
+                    />
                   </div>
                 </>
               )}

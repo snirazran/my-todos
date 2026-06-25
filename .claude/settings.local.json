@@ -153,7 +153,11 @@
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.dndkit.com)",
       "WebFetch(domain:dndkit.com)",
-      "Bash(NODE_OPTIONS= npx tsc --noEmit -p tsconfig.json)"
+      "Bash(NODE_OPTIONS= npx tsc --noEmit -p tsconfig.json)",
+      "WebFetch(domain:registry.npmjs.org)",
+      "PowerShell(pnpm add *)",
+      "WebFetch(domain:react-wheel-picker.chanhdai.com)",
+      "PowerShell(pnpm *)"
     ]
   }
 }
