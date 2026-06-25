@@ -59,8 +59,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const unsubscribe = auth.onIdTokenChanged(async (user) => {
       setUser(user);
-      setLoading(false);
       await syncToken(user);
+      setLoading(false);
     });
 
     // Proactive refresh: check token every 10 minutes and on visibility change

@@ -1,33 +1,127 @@
 'use client';
 
-import { useMemo } from 'react';
-import { useBackgrounds } from '@/hooks/useBackgrounds';
+import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { useAuth } from '@/components/auth/AuthContext';
+import {
+  DEFAULT_BACKGROUND_IMAGES,
+  readCachedBackground,
+  useBackgrounds,
+  writeCachedBackground,
+  type BackgroundImages,
+} from '@/hooks/useBackgrounds';
 import { useUIStore } from '@/lib/uiStore';
 
 export function GlobalPageBackground() {
-  const isLoadingScreenVisible = useUIStore((state) => state.isLoadingScreenVisible);
-  const { data } = useBackgrounds();
+  const isLoadingScreenVisible = useUIStore(
+    (state) => state.isLoadingScreenVisible,
+  );
+  const { user, loading } = useAuth();
+  const { data } = useBackgrounds(!!user && !loading);
+  const reduceMotion = useReducedMotion();
+  const [cachedBackground, setCachedBackground] = useState(() =>
+    readCachedBackground(),
+  );
 
   const equippedBackground = useMemo(() => {
     if (!data?.equipped) return null;
     return data.catalog.find((item) => item.id === data.equipped) ?? null;
   }, [data?.equipped, data?.catalog]);
 
-  const images = {
-    mobile: equippedBackground?.images?.mobile || '/bg-mobile.webp',
-    tablet: equippedBackground?.images?.tablet || '/bg-tablet.webp',
-    web: equippedBackground?.images?.web || '/bg-web.webp',
-    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.webp',
-  };
+  const activeBackground =
+    user || loading
+      ? equippedBackground
+        ? { id: equippedBackground.id, images: equippedBackground.images }
+        : cachedBackground
+      : null;
+  const shouldWaitForUserBackground = (loading || !!user) && !activeBackground && !data;
+  const backgroundKey = activeBackground?.id ?? 'default-bg';
+  const images = activeBackground?.images ?? DEFAULT_BACKGROUND_IMAGES;
 
-  if (isLoadingScreenVisible) return null;
+  useEffect(() => {
+    if (!equippedBackground) return;
+    const next = {
+      id: equippedBackground.id,
+      images: equippedBackground.images,
+    };
+    setCachedBackground(next);
+    writeCachedBackground(next);
+  }, [equippedBackground]);
+
+  if (isLoadingScreenVisible || shouldWaitForUserBackground) return null;
 
   return (
-    <picture
-      key={equippedBackground?.id ?? 'default-bg'}
+    <div
       aria-hidden
-      className="pointer-events-none absolute left-0 right-0 top-0 -z-10 block h-[400px] w-full overflow-hidden md:h-[440px]"
+      className="pointer-events-none absolute left-0 right-0 top-0 -z-10 h-[400px] w-full overflow-hidden md:h-[440px]"
     >
+      <AnimatePresence initial={false}>
+        <motion.div
+          key={backgroundKey}
+          className="absolute inset-0"
+          initial={
+            reduceMotion
+              ? { opacity: 0 }
+              : {
+                  opacity: 0,
+                  scale: 1.06,
+                  clipPath: 'polygon(0 0, 0 0, 0 100%, 0 100%)',
+                }
+          }
+          animate={
+            reduceMotion
+              ? { opacity: 1 }
+              : {
+                  opacity: 1,
+                  scale: 1,
+                  clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0 100%)',
+                }
+          }
+          exit={
+            reduceMotion
+              ? { opacity: 0 }
+              : {
+                  opacity: 0,
+                  scale: 1.02,
+                  filter: 'saturate(0.85) brightness(0.95)',
+                }
+          }
+          transition={{
+            opacity: { duration: 0.45, ease: 'easeOut' },
+            scale: { duration: 0.8, ease: [0.22, 1, 0.36, 1] },
+            clipPath: { duration: 0.7, ease: [0.22, 1, 0.36, 1] },
+            filter: { duration: 0.35, ease: 'easeOut' },
+          }}
+        >
+          <BackgroundPicture images={images} />
+          <div className="absolute inset-0 animate-[background-glint_700ms_ease-out] bg-gradient-to-b from-white/10 via-transparent to-black/5 opacity-0" />
+        </motion.div>
+      </AnimatePresence>
+      <div className="absolute inset-0 shadow-[rgba(0,0,0,0.06)_0px_2px_4px_0px_inset,rgba(0,0,0,0.15)_0px_-2px_5px_0px_inset]" />
+      <style jsx global>{`
+        @keyframes background-glint {
+          0% {
+            opacity: 0.8;
+            transform: translateX(-18%);
+          }
+          100% {
+            opacity: 0;
+            transform: translateX(18%);
+          }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          [data-background-picture] {
+            animation: none !important;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function BackgroundPicture({ images }: { images: BackgroundImages }) {
+  return (
+    <picture data-background-picture className="block h-full w-full">
       {images.webLarge && (
         <source media="(min-width: 1920px)" srcSet={images.webLarge} />
       )}
@@ -40,11 +134,6 @@ export function GlobalPageBackground() {
         alt=""
         className="h-full w-full object-cover object-top"
       />
-      {/* Inset "recessed" feel on the whole image. Same tight-inset style top
-          and bottom; the bottom uses a higher opacity only to compensate for
-          the dark, busy water — so it reads the SAME amount of inset as the top
-          inset that lands on the flat light sky. */}
-      <div className="absolute inset-0 shadow-[rgba(0,0,0,0.06)_0px_2px_4px_0px_inset,rgba(0,0,0,0.15)_0px_-2px_5px_0px_inset]" />
     </picture>
   );
 }

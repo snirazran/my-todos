@@ -12,7 +12,8 @@ export type TaskSyncReason =
   | 'local-mutation'
   | 'remote-message'
   | 'resume'
-  | 'service-worker';
+  | 'service-worker'
+  | 'native-poll';
 
 export type TaskSyncDetail = {
   reason: TaskSyncReason;

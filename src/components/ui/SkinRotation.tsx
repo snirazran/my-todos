@@ -7,7 +7,7 @@ import { Check, ChevronRight, Shuffle, X } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Icon } from '@/components/ui/Icon';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
-import { mutateBackgrounds } from '@/hooks/useBackgrounds';
+import { mutateBackgrounds, type BackgroundsApiData } from '@/hooks/useBackgrounds';
 import type { WardrobeSlot } from '@/lib/skins/catalog';
 
 const STORAGE_KEY = 'skinRotationInterval';
@@ -177,11 +177,7 @@ type SkinsResponse = {
   };
   catalog?: CatalogItem[];
 };
-type BackgroundsResponse = {
-  catalog?: { id: string }[];
-  inventory?: Record<string, number>;
-  equipped?: string;
-};
+type BackgroundsResponse = BackgroundsApiData;
 
 async function rotateOnce() {
   try {
@@ -227,8 +223,10 @@ async function rotateOnce() {
     const ownedBackgrounds = Object.entries(bgData.inventory ?? {})
       .filter(([, count]) => (count ?? 0) > 0)
       .map(([id]) => id);
+    let nextBackgroundData: BackgroundsApiData | null = null;
     if (ownedBackgrounds.length > 0) {
       const bgId = ownedBackgrounds[Math.floor(Math.random() * ownedBackgrounds.length)];
+      nextBackgroundData = { ...bgData, equipped: bgId };
       equipCalls.push(
         fetch('/api/backgrounds/equip', {
           method: 'PUT',
@@ -242,6 +240,7 @@ async function rotateOnce() {
     // Revalidate the SWR caches the frog/wardrobe/background read from so the
     // new look shows up live, without needing a navigation or manual refresh.
     mutateInventoryCaches();
+    if (nextBackgroundData) mutateBackgrounds(nextBackgroundData);
     mutateBackgrounds();
     window.dispatchEvent(new Event('wardrobe-refresh'));
     window.dispatchEvent(new Event('background-refresh'));

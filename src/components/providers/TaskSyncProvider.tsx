@@ -1,10 +1,15 @@
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { usePathname } from 'next/navigation';
+import { useAuth } from '@/components/auth/AuthContext';
 import {
   bindTaskSyncMessages,
   notifyTaskSync,
 } from '@/lib/taskSyncClient';
+
+const NATIVE_SYNC_INTERVAL_MS = 10_000;
 
 function isTaskMutation(input: RequestInfo | URL, init?: RequestInit) {
   const method =
@@ -30,6 +35,9 @@ function isTaskMutation(input: RequestInfo | URL, init?: RequestInit) {
 }
 
 export function TaskSyncProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const pathname = usePathname();
+
   useEffect(() => {
     const originalFetch = window.fetch.bind(window);
 
@@ -65,6 +73,20 @@ export function TaskSyncProvider({ children }: { children: ReactNode }) {
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+    if (!Capacitor.isNativePlatform()) return;
+    if (pathname !== '/' && pathname !== '/planner') return;
+
+    const poll = () => {
+      if (document.visibilityState !== 'visible') return;
+      notifyTaskSync({ reason: 'native-poll' });
+    };
+    const intervalId = window.setInterval(poll, NATIVE_SYNC_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [pathname, user]);
 
   return children;
 }

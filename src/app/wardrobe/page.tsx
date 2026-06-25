@@ -3,10 +3,8 @@
 import { Suspense, useMemo, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Frog, { type FrogHandle } from '@/components/ui/frog';
-import { PageBackground } from '@/components/ui/PageBackground';
 import { WardrobePageContent } from '@/components/ui/skins/WardrobePanel';
 import { useInventory } from '@/hooks/useInventory';
-import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
 
 function WardrobePageInner() {
@@ -14,19 +12,6 @@ function WardrobePageInner() {
   const searchParams = useSearchParams();
   const frogRef = useRef<FrogHandle>(null);
   const { data } = useInventory(true);
-  const { data: backgroundsData } = useBackgrounds(true);
-  const equippedBackground = useMemo(() => {
-    if (!backgroundsData?.equipped) return null;
-    return (
-      backgroundsData.catalog.find((b) => b.id === backgroundsData.equipped) ?? null
-    );
-  }, [backgroundsData]);
-  const bgImages = {
-    mobile: equippedBackground?.images?.mobile || '/bg-mobile.webp',
-    tablet: equippedBackground?.images?.tablet || '/bg-tablet.webp',
-    web: equippedBackground?.images?.web || '/bg-web.webp',
-    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.webp',
-  };
   const defaultTab =
     (searchParams.get('tab') as 'inventory' | 'shop' | 'trade') || 'inventory';
 

@@ -32,9 +32,7 @@ import FrogodoroPill from '@/components/ui/FrogodoroPill';
 import { useFrogodoroUiStore } from '@/lib/frogodoroUiStore';
 import { FilterDropdown } from '@/components/ui/FilterDropdown';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
-import { useBackgrounds } from '@/hooks/useBackgrounds';
 import { FrogDisplay } from '@/components/ui/FrogDisplay';
-import { PageBackground } from '@/components/ui/PageBackground';
 import { getQuestsUrl } from '@/components/ui/QuestsPanel';
 import { LoadingScreen } from '@/components/ui/LoadingScreen';
 import { HungerWarningModal } from '@/components/ui/HungerWarningModal';
@@ -457,19 +455,6 @@ export default function Home() {
   };
 
   const { indices } = useWardrobeIndices(!!user);
-  const { data: backgroundsData } = useBackgrounds(!!user);
-  const equippedBackground = useMemo(() => {
-    if (!backgroundsData?.equipped) return null;
-    return (
-      backgroundsData.catalog.find((b) => b.id === backgroundsData.equipped) ?? null
-    );
-  }, [backgroundsData]);
-  const bgImages = {
-    mobile: equippedBackground?.images?.mobile || '/bg-mobile.webp',
-    tablet: equippedBackground?.images?.tablet || '/bg-tablet.webp',
-    web: equippedBackground?.images?.web || '/bg-web.webp',
-    webLarge: equippedBackground?.images?.webLarge || '/bg-web-large.webp',
-  };
 
   const renderGuestPrompt = () =>
     !user ? (

@@ -73,6 +73,11 @@ export function BackgroundsPanel({
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || 'Failed to equip');
       }
+      if (data) {
+        const nextData = { ...data, equipped: item.id };
+        void mutate(nextData, { revalidate: false });
+        mutateBackgrounds(nextData);
+      }
       onNotify?.({ msg: `Equipped ${item.name}`, type: 'success' });
       refresh();
     } catch (err) {
