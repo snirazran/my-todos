@@ -30,6 +30,7 @@ type CatalogItem = {
 type RewardTier = {
   tier: number;
   label: string;
+  description?: string;
   flies?: number;
   itemId?: string | null;
   item?: CatalogItem | null;
@@ -105,8 +106,8 @@ export function InviteFriendsModal({
   const shareInviteUrl = React.useCallback(
     async (url: string) => {
       const shareData = {
-        title: config?.shareTitle || 'Come join me on Frogress!',
-        text: config?.shareMessage || 'I have a gift for you on Frogress. Tap the link to claim it!',
+        title: 'Come join me on Frogress!',
+        text: 'I have a gift for you on Frogress. Tap the link to claim it!',
         url,
       };
       try {
@@ -122,7 +123,7 @@ export function InviteFriendsModal({
         await navigator.clipboard.writeText(url);
       } catch {}
     },
-    [config?.shareMessage, config?.shareTitle],
+    [],
   );
 
   const handleSendInvite = async () => {
@@ -216,7 +217,7 @@ function OverviewStep({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="relative flex min-h-[44dvh] flex-col justify-end overflow-hidden bg-[#4f9149] px-6 pb-8 pt-6 text-center text-white sm:min-h-[48dvh] md:pb-3">
+      <div className="relative flex min-h-[44dvh] flex-col justify-end overflow-hidden bg-[#4f9149] px-6 pb-7 pt-6 text-center text-white sm:min-h-[48dvh] md:pb-6">
         <AppImage
           src="/invitefrog.webp"
           priority
@@ -228,14 +229,24 @@ function OverviewStep({
           className="absolute inset-0 hidden h-full w-full object-cover object-[center_32%] md:block"
         />
         <div className="absolute inset-0 bg-[linear-gradient(to_bottom,transparent_0%,transparent_48%,rgba(0,0,0,0.22)_72%,rgba(0,0,0,0.62)_100%)]" />
-        <div className="absolute inset-x-0 bottom-0 h-[50%] bg-gradient-to-b from-transparent via-black/30 to-black/76" />
-        <CloseButton onClose={onClose} className="right-4 top-4 text-white" />
+        <svg
+          aria-hidden
+          preserveAspectRatio="none"
+          viewBox="0 0 100 16"
+          className="absolute inset-x-0 bottom-[-1px] z-20 h-4 w-full fill-background sm:h-5"
+        >
+          <path d="M0 0 Q50 16 100 0 L100 16 L0 16 Z" />
+        </svg>
+        <CloseButton
+          onClose={onClose}
+          className="right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] text-white"
+        />
         <div className="relative z-10 mx-auto flex w-full max-w-xl flex-col items-center">
           <h2 className="text-3xl font-black tracking-tight [text-shadow:0_2px_0_rgba(25,83,43,0.75),0_4px_14px_rgba(0,0,0,0.32)]">
-            {config.headline}
+            Share Frogress, get rewards!
           </h2>
-          <p className="mt-2 max-w-md text-sm font-bold text-white [text-shadow:0_1px_0_rgba(25,83,43,0.85),0_3px_10px_rgba(0,0,0,0.28)]">
-            {config.subheading}
+          <p className="mt-2 max-w-md text-[15px] font-medium text-white/95 [text-shadow:0_1px_0_rgba(25,83,43,0.7),0_3px_10px_rgba(0,0,0,0.28)]">
+            Invite a friend to gift them a skin and earn rewards for yourself!
           </p>
         </div>
       </div>
@@ -252,7 +263,7 @@ function OverviewStep({
 
       <div
         className="border-t border-border/40 bg-background p-4"
-        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)' }}
+        style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.85rem)' }}
       >
         <button
           onClick={onInviteFriends}
@@ -282,16 +293,19 @@ function RewardProgressTrack({
   const railStart = 8;
   const railEnd = 92;
   const railSpan = railEnd - railStart;
-  const initialProgressPct = 2.5;
+  const initialProgressPct = 6;
   const progressEnd =
     claimedCount <= 0
       ? initialProgressPct
       : ((firstPos - railStart) / railSpan) * 100 +
         progressPct * ((lastPos - firstPos) / railSpan);
 
+  const nextReward =
+    rewards.find((r) => r.tier > claimedCount) ?? rewards[rewards.length - 1] ?? null;
+
   return (
     <div className="mx-auto max-w-2xl px-1 pt-0">
-      <div className="relative mx-auto h-48">
+      <div className="relative mx-auto h-56">
         {rewards.map((reward, index) => {
           const pos = milestonePositionPct(index, rewards.length);
           const isLastReward = index === rewards.length - 1;
@@ -302,7 +316,7 @@ function RewardProgressTrack({
               style={{ left: `${pos}%` }}
             >
               <div
-                className={`flex h-20 w-20 items-center justify-center rounded-[22px] border-4 bg-card shadow-sm transition-colors sm:h-24 sm:w-24 ${
+                className={`flex h-24 w-24 items-center justify-center rounded-[26px] border-4 bg-card shadow-sm transition-colors sm:h-28 sm:w-28 ${
                   claimedCount >= reward.tier ? 'border-primary/40' : 'border-muted'
                 }`}
               >
@@ -317,11 +331,11 @@ function RewardProgressTrack({
         })}
 
         <div
-          className="absolute top-[112px] h-3 -translate-y-1/2 rounded-full bg-muted"
+          className="absolute top-[132px] h-3 -translate-y-1/2 rounded-full bg-muted"
           style={{ left: `${railStart}%`, width: `${railSpan}%` }}
         />
         <div
-          className="absolute top-[112px] h-3 -translate-y-1/2 overflow-hidden rounded-full"
+          className="absolute top-[132px] h-3 -translate-y-1/2 overflow-hidden rounded-full"
           style={{ left: `${railStart}%`, width: `${railSpan * (progressEnd / 100)}%` }}
         >
           <motion.div
@@ -344,7 +358,7 @@ function RewardProgressTrack({
             return (
               <div
                 key={reward.tier}
-                className="absolute top-[112px] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
+                className="absolute top-[132px] flex -translate-x-1/2 -translate-y-1/2 flex-col items-center"
                 style={{ left: `${pos}%` }}
               >
                 <div
@@ -365,21 +379,52 @@ function RewardProgressTrack({
             return (
               <div
                 key={`reward-label-${reward.tier}`}
-                className="absolute top-[142px] -translate-x-1/2"
+                className="absolute top-[164px] -translate-x-1/2"
                 style={{ left: `${pos}%` }}
               >
-                <p className="w-24 text-center text-[11px] font-black text-muted-foreground sm:text-xs">
+                <p className="w-24 text-center text-sm font-black text-muted-foreground sm:text-[15px]">
                   {reward.label}
                 </p>
               </div>
             );
         })}
       </div>
-      <p className="-mt-4 text-center text-sm font-black text-muted-foreground">
-        {claimedCount} of {totalTiers} friends joined
-      </p>
+
+      {nextReward && (
+        <div className="mt-2 text-center">
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-muted-foreground/70">
+            Your rewards
+          </p>
+          <p className="mx-auto mt-2 max-w-sm text-base font-medium leading-snug text-foreground">
+            {rewardSentence(nextReward)}
+          </p>
+        </div>
+      )}
     </div>
   );
+}
+
+function rewardSentence(reward: RewardTier): string {
+  if (reward.description && reward.description.trim()) return reward.description.trim();
+
+  const parts: string[] = [];
+  for (const r of reward.rewards ?? []) {
+    if (r.type === 'FLIES') {
+      const amount = r.amountMode === 'random' ? r.maxAmount : r.amount;
+      if (amount) parts.push(`${amount} flies`);
+    } else if (r.type === 'ITEM' && (r.itemId || reward.item)) {
+      parts.push(`a ${reward.item?.name ?? 'special skin'}`);
+    }
+  }
+  if (parts.length === 0 && reward.flies) parts.push(`${reward.flies} flies`);
+
+  const ordinal = reward.label.replace(/\s*friend.*$/i, '').trim().toLowerCase() || 'next';
+  const earned =
+    parts.length > 1
+      ? `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
+      : parts[0] ?? 'rewards';
+
+  return `Earn ${earned} when your ${ordinal} friend joins Frogress!`;
 }
 
 function PickStep({
@@ -405,16 +450,19 @@ function PickStep({
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[#8fc36d] px-5 pb-5 pt-4 text-center text-white">
       <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col">
-        <CloseButton onClose={onBack} className="left-[-0.5rem] top-1 text-white" />
+        <CloseButton
+          onClose={onBack}
+          className="left-[-0.5rem] top-[calc(env(safe-area-inset-top)+0.5rem)] text-white"
+        />
 
-        <div className="relative mx-auto mt-10 flex h-52 w-full max-w-md items-center justify-center overflow-visible rounded-[28px] bg-[radial-gradient(circle_at_center,rgba(225,255,194,0.95),rgba(133,190,92,0.15)_42%,transparent_72%)]">
-          <div className="absolute inset-[-24px] opacity-55 [mask-image:radial-gradient(circle_at_center,black_0%,black_36%,transparent_72%)] [webkit-mask-image:radial-gradient(circle_at_center,black_0%,black_36%,transparent_72%)]">
-            <RotatingRays colorClass="text-white/18" />
+        <div className="relative mx-auto mt-10 flex h-52 w-full max-w-md items-center justify-center overflow-visible rounded-[28px] bg-[radial-gradient(circle_at_center,rgba(225,255,194,0.55),rgba(133,190,92,0.08)_46%,transparent_74%)]">
+          <div className="absolute inset-[-40px] opacity-40 [mask-image:radial-gradient(circle_at_center,black_0%,black_18%,rgba(0,0,0,0.35)_46%,transparent_70%)] [webkit-mask-image:radial-gradient(circle_at_center,black_0%,black_18%,rgba(0,0,0,0.35)_46%,transparent_70%)]">
+            <RotatingRays colorClass="text-white/14" />
           </div>
           <div className="relative z-10 -translate-y-3">
             <Frog width={250} height={190} />
-            <div className="absolute right-4 top-12 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-2">
-              What do I get?
+            <div className="absolute right-0 top-12 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-[-1rem]">
+              Ooh, a gift for me?
               <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />
             </div>
           </div>
@@ -459,7 +507,7 @@ function PickStep({
           )}
         </div>
 
-        <div style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.75rem)' }}>
           <button
             onClick={onSend}
             disabled={!selectedGiftId || creating}
@@ -520,7 +568,7 @@ function GiftPreview({ item, active = false }: { item: CatalogItem | null; activ
   if (item.slot === 'container') {
     return (
       <div className="flex h-full w-full items-center justify-center overflow-visible">
-        <div className="h-[155%] w-[155%]">
+        <div className="h-[170%] w-[170%]">
           <GiftRive color={item.riveIndex} isMilestone={false} paused={!active} />
         </div>
       </div>
@@ -530,7 +578,7 @@ function GiftPreview({ item, active = false }: { item: CatalogItem | null; activ
   const indices = itemToIndices(item);
   return (
     <div className="flex h-full w-full items-center justify-center overflow-visible">
-      <Frog width={230} height={172} indices={indices} paused={!active} />
+      <Frog width={300} height={242} indices={indices} paused={!active} />
     </div>
   );
 }
@@ -548,9 +596,9 @@ function RewardPreview({
   if (reward.type === 'FLIES') {
     const amount = reward.amountMode === 'random' ? reward.maxAmount : reward.amount;
     return (
-      <div className="flex flex-col items-center gap-0.5">
-        <Fly size={28} y={-2} paused />
-        <span className="text-[10px] font-black text-foreground">+{amount ?? 0}</span>
+      <div className="flex flex-col items-center gap-1">
+        <Fly size={42} y={-2} paused />
+        <span className="text-xs font-black text-foreground">+{amount ?? 0}</span>
       </div>
     );
   }
