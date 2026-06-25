@@ -28,6 +28,12 @@ import { patchInventoryFlies } from '@/hooks/useInventory';
 import { notifyQuestClaims } from '@/lib/questClaims';
 import { useLeftTongue } from './LeftTongue';
 
+// Hoisted so the motion wrapper gets a stable transition reference (a new
+// object each render would make framer reconfigure the animation every time).
+const LAYOUT_TRANSITION = {
+  layout: { type: 'spring', stiffness: 500, damping: 40 },
+} as const;
+
 export default React.memo(function TaskList({
   day,
   items,
@@ -565,8 +571,9 @@ export default React.memo(function TaskList({
         <motion.div
           key={wrapKey}
           layout={isAnyDragging ? false : 'position'}
+          layoutDependency={visibleIndex}
           initial={false}
-          transition={{ layout: { type: 'spring', stiffness: 500, damping: 40 } }}
+          transition={LAYOUT_TRANSITION}
           className="relative"
         >
           <TaskCard

@@ -541,6 +541,31 @@ export default function TaskBoard({
     };
   }, [scrollerRef, updateTodayVisibility, windowDates.length]);
 
+  // The board is a drag/pan surface. A mouse-drag that starts on a card or
+  // column header (where panning is intentionally disabled) would otherwise
+  // begin a native text selection that sweeps across columns. CSS
+  // `user-select: none` does not reliably stop a drag-initiated selection
+  // (the browser can anchor it on a selectable ancestor), so we cancel the
+  // `selectstart` event — the documented way to prevent a selection from ever
+  // being created. Real form fields are exempt so the composer/edit inputs and
+  // any text entry inside the board still work.
+  useEffect(() => {
+    const s = scrollerRef.current;
+    if (!s) return;
+    const onSelectStart = (e: Event) => {
+      const t = e.target as HTMLElement | null;
+      if (
+        t?.closest(
+          'input, textarea, select, [contenteditable], [contenteditable="true"]',
+        )
+      )
+        return;
+      e.preventDefault();
+    };
+    s.addEventListener('selectstart', onSelectStart);
+    return () => s.removeEventListener('selectstart', onSelectStart);
+  }, [scrollerRef]);
+
   // Track which column is centered on scroll
   useEffect(() => {
     const s = scrollerRef.current;

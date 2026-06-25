@@ -164,11 +164,12 @@ export default function TaskCard({
       // Suppress text selection from the very start of the press — the
       // pointerdown is passive (can't preventDefault) and the drag only begins
       // after the long-press delay, so without this the browser selects text
-      // across cards while the press is pending. Restored in cleanupLP.
-      if (canDrag) {
-        document.body.style.userSelect = 'none';
-        (document.body.style as any).webkitUserSelect = 'none';
-      }
+      // across cards while the press is pending. Applies to every card (not
+      // just draggable ones): a press on a completed/past card can still drift
+      // into a selection. Restored in cleanupLP. The board's selectstart guard
+      // is the belt-and-suspenders catch-all.
+      document.body.style.userSelect = 'none';
+      (document.body.style as any).webkitUserSelect = 'none';
 
       pointerIdRef.current = e.pointerId;
       longPressFiredRef.current = false;
