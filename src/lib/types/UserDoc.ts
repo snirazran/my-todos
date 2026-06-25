@@ -71,6 +71,7 @@ export type UserDoc = {
   passwordHash?: string;
   phoneNumber?: string;
   isGuest?: boolean;
+  friendCode?: string;
   createdAt: Date;
   wardrobe?: UserWardrobe;
   skins?: UserSkins;

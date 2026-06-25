@@ -1,11 +1,14 @@
 'use client';
 
 import { useMemo } from 'react';
-import { useBackgrounds } from '@/hooks/useBackgrounds';
+import {
+  DEFAULT_BACKGROUND_IMAGES,
+  useBackgrounds,
+} from '@/hooks/useBackgrounds';
 import { useOnboardingBackgroundStore } from '@/lib/onboardingBackgroundStore';
 
 // Renders the randomized onboarding background (chosen in OnboardingFrogHeader and
-// shared via the store). Falls back to the default swamp until one is rolled.
+// shared via the store). Falls back to the default background until one is rolled.
 export function OnboardingBackground() {
   const { data } = useBackgrounds();
   const backgroundId = useOnboardingBackgroundStore((s) => s.backgroundId);
@@ -16,10 +19,10 @@ export function OnboardingBackground() {
   }, [data?.catalog, backgroundId]);
 
   const images = {
-    mobile: background?.images?.mobile || '/bg-mobile.webp',
-    tablet: background?.images?.tablet || '/bg-tablet.webp',
-    web: background?.images?.web || '/bg-web.webp',
-    webLarge: background?.images?.webLarge || '/bg-web-large.webp',
+    mobile: background?.images?.mobile || DEFAULT_BACKGROUND_IMAGES.mobile,
+    tablet: background?.images?.tablet || DEFAULT_BACKGROUND_IMAGES.tablet,
+    web: background?.images?.web || DEFAULT_BACKGROUND_IMAGES.web,
+    webLarge: background?.images?.webLarge || DEFAULT_BACKGROUND_IMAGES.webLarge,
   };
 
   return (

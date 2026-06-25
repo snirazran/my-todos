@@ -121,6 +121,15 @@ export default function SiteHeader() {
       },
       isActive: pathname === '/wardrobe',
     },
+    {
+      label: 'Friends',
+      iconName: 'community' as const,
+      onClick: () => {
+        if (!user) { router.push('/login'); return; }
+        router.push('/friends');
+      },
+      isActive: pathname === '/friends',
+    },
   ];
 
   // Desktop keeps a full header. Mobile only gets lightweight home-page controls.

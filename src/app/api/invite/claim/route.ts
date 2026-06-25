@@ -6,6 +6,7 @@ import UserModel from '@/lib/models/User';
 import InviteConfigModel from '@/lib/models/InviteConfig';
 import { ensureInviteConfig } from '@/lib/inviteConfig/defaults';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
+import { createFriendship } from '@/lib/friends/code';
 
 export async function POST(req: NextRequest) {
   try {
@@ -54,6 +55,9 @@ export async function POST(req: NextRequest) {
     referral.claimedByUserId = userId;
     referral.claimedAt = new Date();
     await referral.save();
+
+    // Claiming a gift invite makes the inviter and the new user mutual friends.
+    await createFriendship(referral.inviterId, userId, 'invite');
 
     // Grant the gift to the new user
     const giftHistorySet =

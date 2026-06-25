@@ -33,6 +33,13 @@ export default function MobileNav() {
   const questClaimableCount = questsData?.claimableCount ?? 0;
   const questActiveCount = questsData?.activeCount ?? 0;
 
+  const { data: friendRequestsData } = useSWR<{ incoming?: { id: string }[] }>(
+    user ? '/api/friends/request' : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
+  const friendRequestCount = friendRequestsData?.incoming?.length ?? 0;
+
   if (
     pathname === '/welcome' ||
     pathname === '/login' ||
@@ -77,6 +84,18 @@ export default function MobileNav() {
       },
       isActive: pathname === '/wardrobe',
     },
+    {
+      label: 'Friends',
+      iconName: 'community' as const,
+      onClick: () => {
+        if (!user) {
+          router.push('/login');
+          return;
+        }
+        router.push('/friends');
+      },
+      isActive: pathname === '/friends',
+    },
   ];
 
   return (
@@ -88,7 +107,7 @@ export default function MobileNav() {
         )}
         aria-disabled={isLoadingScreenVisible}
       >
-        <div className="grid grid-cols-4 h-[76px] py-2.5">
+        <div className="grid grid-cols-5 h-[76px] py-2.5">
           {navItems.map((item) => {
             const isActive = item.href ? pathname === item.href : item.isActive;
 
@@ -110,6 +129,11 @@ export default function MobileNav() {
                       {questActiveCount > 9 ? '9+' : questActiveCount}
                     </span>
                   ) : null}
+                  {item.label === 'Friends' && friendRequestCount > 0 && (
+                    <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
+                      {friendRequestCount > 9 ? '9+' : friendRequestCount}
+                    </span>
+                  )}
                 </div>
                 <span className={`text-[10px] font-bold ${isActive ? 'text-primary' : ''}`}>{item.label}</span>
               </div>

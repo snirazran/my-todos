@@ -21,6 +21,7 @@ const UserSchema = new Schema<UserDoc>(
     passwordHash: { type: String, required: false },
     phoneNumber: { type: String, required: false, index: true, sparse: true },
     isGuest: { type: Boolean, default: false },
+    friendCode: { type: String, required: false, unique: true, index: true, sparse: true },
     createdAt: { type: Date, default: Date.now },
     wardrobe: {
       type: Schema.Types.Mixed,

@@ -19,9 +19,11 @@ export function GlobalPageBackground() {
   const { user, loading } = useAuth();
   const { data } = useBackgrounds(!!user && !loading);
   const reduceMotion = useReducedMotion();
-  const [cachedBackground, setCachedBackground] = useState(() =>
-    readCachedBackground(),
-  );
+  const [cachedBackground, setCachedBackground] =
+    useState<ReturnType<typeof readCachedBackground>>(null);
+  useEffect(() => {
+    setCachedBackground(readCachedBackground());
+  }, []);
 
   const equippedBackground = useMemo(() => {
     if (!data?.equipped) return null;

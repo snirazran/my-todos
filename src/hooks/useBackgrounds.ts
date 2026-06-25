@@ -62,6 +62,9 @@ export function readCachedBackground(): CachedBackground | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedBackground;
     if (!parsed?.id || !parsed.images?.mobile) return null;
+    if (parsed.id === 'bg_default') {
+      return { id: parsed.id, images: DEFAULT_BACKGROUND_IMAGES };
+    }
     return parsed;
   } catch {
     return null;

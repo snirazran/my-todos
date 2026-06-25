@@ -11,6 +11,7 @@ import { LiveTimerController } from '@/components/providers/LiveTimerController'
 import { GlobalCalendarSync } from '@/components/ui/GoogleCalendarSync';
 import { GlobalSkinRotation } from '@/components/ui/SkinRotation';
 import { ReferralClaimer } from '@/components/providers/ReferralClaimer';
+import { FriendLinkClaimer } from '@/components/providers/FriendLinkClaimer';
 import { TaskSyncProvider } from '@/components/providers/TaskSyncProvider';
 
 export default function Providers({ children }: { children: ReactNode }) {
@@ -31,6 +32,7 @@ export default function Providers({ children }: { children: ReactNode }) {
             <GlobalSkinRotation />
             <PushNotificationInit />
             <ReferralClaimer />
+            <FriendLinkClaimer />
             {children}
           </NotificationProvider>
         </TaskSyncProvider>
