@@ -46,8 +46,12 @@ export default function DragOverlay({
 }) {
   return (
     <div
-      className="fixed z-[100] pointer-events-none"
-      style={{ left: `${x - dx}px`, top: `${y - dy}px`, width: `${width}px` }}
+      className="fixed left-0 top-0 z-[100] pointer-events-none"
+      style={{
+        transform: `translate3d(${x - dx}px, ${y - dy}px, 0)`,
+        width: `${width}px`,
+        willChange: 'transform',
+      }}
     >
       <div
         className={[

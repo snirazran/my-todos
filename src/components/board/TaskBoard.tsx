@@ -50,11 +50,14 @@ type RepeatChoice = 'this-week' | 'weekly';
 // relative order within the active and completed groups (stable). Returns the
 // original array reference when it's already in order so memoized consumers and
 // React.memo children don't re-render needlessly.
-function sortCompletedLast(tasks: Task[]): Task[] {
+function sortCompletedLast(
+  tasks: Task[],
+  isDone: (t: Task) => boolean = (t) => !!t.completed,
+): Task[] {
   let seenCompleted = false;
   let needsSort = false;
   for (const t of tasks) {
-    if (t.completed) seenCompleted = true;
+    if (isDone(t)) seenCompleted = true;
     else if (seenCompleted) {
       needsSort = true;
       break;
@@ -63,7 +66,7 @@ function sortCompletedLast(tasks: Task[]): Task[] {
   if (!needsSort) return tasks;
   const active: Task[] = [];
   const completed: Task[] = [];
-  for (const t of tasks) (t.completed ? completed : active).push(t);
+  for (const t of tasks) (isDone(t) ? completed : active).push(t);
   return [...active, ...completed];
 }
 
@@ -170,6 +173,61 @@ export default function TaskBoard({
   const N = windowDates.length;
   const BACKLOG_IDX = N;
 
+  // Grace period: a just-completed task is held in its active position for a
+  // beat before it sinks to the finished pile (mirrors the home TaskList feel).
+  const COMPLETE_GRACE_MS = 3000;
+  const [recentlyCompleted, setRecentlyCompleted] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const graceTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(
+    new Map(),
+  );
+
+  const clearGrace = useCallback((taskId: string) => {
+    const t = graceTimersRef.current.get(taskId);
+    if (t) {
+      clearTimeout(t);
+      graceTimersRef.current.delete(taskId);
+    }
+    setRecentlyCompleted((prev) => {
+      if (!prev.has(taskId)) return prev;
+      const next = new Set(prev);
+      next.delete(taskId);
+      return next;
+    });
+  }, []);
+
+  const markRecentlyCompleted = useCallback((taskId: string) => {
+    const existing = graceTimersRef.current.get(taskId);
+    if (existing) clearTimeout(existing);
+    setRecentlyCompleted((prev) => {
+      if (prev.has(taskId)) return prev;
+      const next = new Set(prev);
+      next.add(taskId);
+      return next;
+    });
+    graceTimersRef.current.set(
+      taskId,
+      setTimeout(() => {
+        graceTimersRef.current.delete(taskId);
+        setRecentlyCompleted((prev) => {
+          if (!prev.has(taskId)) return prev;
+          const next = new Set(prev);
+          next.delete(taskId);
+          return next;
+        });
+      }, COMPLETE_GRACE_MS),
+    );
+  }, []);
+
+  useEffect(() => {
+    const timers = graceTimersRef.current;
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+      timers.clear();
+    };
+  }, []);
+
   // Derive a daysOrder array (Sun..Sat ordering) compatible with TaskList helpers,
   // mapping each column index -> dow for that date.
   const daysOrder = useMemo(
@@ -194,9 +252,10 @@ export default function TaskBoard({
   // rendering and drag math so the visual order matches array indices.
   const sortedTasksByDate = useMemo(() => {
     const out: Record<string, Task[]> = {};
-    for (const k in tasksByDate) out[k] = sortCompletedLast(tasksByDate[k]);
+    const isDone = (t: Task) => !!t.completed && !recentlyCompleted.has(t.id);
+    for (const k in tasksByDate) out[k] = sortCompletedLast(tasksByDate[k], isDone);
     return out;
-  }, [tasksByDate]);
+  }, [tasksByDate, recentlyCompleted]);
 
   // helpers to get/set a column by index
   const colAt = useCallback(
@@ -634,6 +693,10 @@ export default function TaskBoard({
       // id-only match would patch every future instance too.
       dateKey?: string,
     ) => {
+      if ('completed' in patch) {
+        if (patch.completed) markRecentlyCompleted(taskId);
+        else clearGrace(taskId);
+      }
       const match = (t: Task, columnKey?: string) =>
         scope === 'all' && groupId
           ? t.repeatGroupId === groupId
@@ -659,7 +722,7 @@ export default function TaskBoard({
         );
       }
     },
-    [setTasksByDate, setBacklog],
+    [setTasksByDate, setBacklog, markRecentlyCompleted, clearGrace],
   );
   const [initialDateKey, setInitialDateKey] = useState<string | undefined>(
     undefined,
@@ -680,7 +743,9 @@ export default function TaskBoard({
   let clampedTargetIndex = targetIndex;
   if (effectiveTargetDay !== null && effectiveTargetDay < BACKLOG_IDX) {
     const list = colAt(effectiveTargetDay);
-    const firstCompleted = list.findIndex((t) => t.completed);
+    const firstCompleted = list.findIndex(
+      (t) => t.completed && !recentlyCompleted.has(t.id),
+    );
     if (firstCompleted !== -1 && targetIndex !== null) {
       const isSelfDrag = drag?.fromDay === effectiveTargetDay;
       const limit = isSelfDrag
@@ -1187,7 +1252,7 @@ export default function TaskBoard({
         onPointerMove={scrollLocked ? undefined : onPanMove}
         onPointerUp={scrollLocked ? undefined : endPan}
         className={[
-          'no-scrollbar absolute inset-0 w-full h-full',
+          'no-scrollbar absolute inset-0 w-full h-full select-none',
           'flex flex-col items-start overflow-y-hidden overscroll-x-contain',
           scrollLocked ? 'overflow-x-hidden touch-none' : 'overflow-x-auto touch-pan-x',
           snapSuppressed
@@ -1237,6 +1302,7 @@ export default function TaskBoard({
                 <TaskList
                   day={i as any}
                   items={sortedTasksByDate[dk] ?? []}
+                  gracePeriodIds={recentlyCompleted}
                   isDragging={!!drag?.active}
                   dragFromDay={drag?.fromDay}
                   dragFromIndex={drag?.fromIndex}

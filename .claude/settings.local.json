@@ -152,7 +152,8 @@
       "WebFetch(domain:motion.dev)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:docs.dndkit.com)",
-      "WebFetch(domain:dndkit.com)"
+      "WebFetch(domain:dndkit.com)",
+      "Bash(NODE_OPTIONS= npx tsc --noEmit -p tsconfig.json)"
     ]
   }
 }

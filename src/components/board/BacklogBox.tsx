@@ -73,9 +73,8 @@ export default function BacklogBox({
         }}
         // Base styles
         className={`
-           // Added backdrop-blur-2xl and matched shadow to AddTaskButton
            relative flex items-center justify-center overflow-hidden w-full
-           bg-card border-border/80 border backdrop-blur-2xl will-change-transform
+           bg-card border-border/80 border
            ${isDragging 
              ? isDragOver 
                ? 'bg-primary border-primary text-primary-foreground shadow-xl' 

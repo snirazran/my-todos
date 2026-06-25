@@ -28,7 +28,7 @@ import {
   animate,
   useAnimation,
 } from 'framer-motion';
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import {
@@ -974,24 +974,40 @@ export default function TaskList({
     }
   }, [isAnyDragging]);
 
-  // DnD Sensors — grab anywhere on the row. A short press-and-hold separates an
-  // intentional pickup from a scroll/swipe; mouse needs no hold. Instant press
-  // feedback on the card makes the brief hold feel responsive.
+  // Narrow viewports run the horizontal swipe gesture (start timer / edit); the
+  // reorder activation must coexist with it.
+  const [isNarrow, setIsNarrow] = useState(false);
+  useEffect(() => {
+    const check = () => setIsNarrow(window.innerWidth < 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
+
+  // DnD Sensors — grab anywhere on the row. dnd-kit's `delay`+`tolerance` and
+  // `distance` activation constraints are mutually exclusive: with delay+
+  // tolerance, a pointer move past `tolerance` during the delay ABORTS the sort,
+  // which is what lets a horizontal swipe escape and reach framer-motion's
+  // drag="x". `distance` has no abort, so it swallows the swipe. Desktop has no
+  // swipe, so it keeps the snappier no-hold distance activation; narrow/touch
+  // use delay+tolerance so swiping a row still works.
+  const swipeFriendly = useMemo(() => ({ delay: 150, tolerance: 8 }), []);
+  const mouseOptions = useMemo(
+    () => ({ activationConstraint: isNarrow ? swipeFriendly : { distance: 5 } }),
+    [isNarrow, swipeFriendly],
+  );
+  const touchOptions = useMemo(
+    () => ({ activationConstraint: swipeFriendly }),
+    [swipeFriendly],
+  );
+  const keyboardOptions = useMemo(
+    () => ({ coordinateGetter: sortableKeyboardCoordinates }),
+    [],
+  );
   const sensors = useSensors(
-    useSensor(MouseSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 130,
-        tolerance: 6,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    }),
+    useSensor(MouseSensor, mouseOptions),
+    useSensor(TouchSensor, touchOptions),
+    useSensor(KeyboardSensor, keyboardOptions),
   );
 
   // Listen for other menus opening to auto-close this one

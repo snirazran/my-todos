@@ -60,13 +60,20 @@ export default function ManageTasksPage() {
 
   const { showNotification } = useNotification();
 
+  // Guards against out-of-order full refetches: rapid completions fire several
+  // overlapping board-refresh GETs, and a slower earlier one must not clobber a
+  // newer one's state. Only the latest full (non-merge) refetch is applied;
+  // merges target disjoint date keys and always apply.
+  const fullFetchSeqRef = useRef(0);
   const fetchRange = useCallback(
     async (from: string, to: string, mergeOnly = false) => {
+      const seq = mergeOnly ? 0 : ++fullFetchSeqRef.current;
       const res = await fetch(
         `/api/tasks?view=dateRange&from=${from}&to=${to}&timezone=${encodeURIComponent(tz)}`,
       );
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as DateRangeResponse;
+      if (!mergeOnly && seq !== fullFetchSeqRef.current) return;
       setTasksByDate((prev) =>
         mergeOnly ? { ...prev, ...data.byDate } : data.byDate,
       );
@@ -99,14 +106,30 @@ export default function ManageTasksPage() {
     }
   }, [fetchRange, windowStart, windowEnd]);
 
-  useEffect(() => {
-    window.addEventListener('tags-updated', refetchAll);
-    window.addEventListener('board-refresh', refetchAll);
-    return () => {
-      window.removeEventListener('tags-updated', refetchAll);
-      window.removeEventListener('board-refresh', refetchAll);
-    };
+  // Coalesce reconciliation refetches. board-refresh is dispatched in each
+  // mutation's PUT .then (post-commit), so a trailing debounce guarantees the
+  // single full refetch runs only after the LAST committed mutation — never
+  // mid-commit. Without this, rapidly toggling tasks fires overlapping
+  // destructive refetches that read pre-commit state and flash the task back to
+  // its old completed value (and re-sort it) before settling.
+  const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRefetch = useCallback(() => {
+    if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+    refetchTimerRef.current = setTimeout(() => {
+      refetchTimerRef.current = null;
+      void refetchAll();
+    }, 300);
   }, [refetchAll]);
+
+  useEffect(() => {
+    window.addEventListener('tags-updated', scheduleRefetch);
+    window.addEventListener('board-refresh', scheduleRefetch);
+    return () => {
+      window.removeEventListener('tags-updated', scheduleRefetch);
+      window.removeEventListener('board-refresh', scheduleRefetch);
+      if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
+    };
+  }, [scheduleRefetch]);
 
   const windowDates = useMemo(() => {
     const out: string[] = [];

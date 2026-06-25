@@ -266,8 +266,8 @@ export default function TaskCard({
       }}
       className={[
         compact
-          ? 'group relative overflow-visible flex items-center gap-2 px-2 py-2 select-none rounded-[14px] transition-all duration-200'
-          : 'group relative overflow-visible flex items-start gap-3 p-3.5 select-none rounded-xl transition-all duration-200',
+          ? 'group relative overflow-visible flex items-center gap-2 px-2 py-2 select-none rounded-[14px] transition-colors duration-200'
+          : 'group relative overflow-visible flex items-start gap-3 p-3.5 select-none rounded-xl transition-colors duration-200',
         task.completed
           ? isPast
             ? 'cursor-pointer'

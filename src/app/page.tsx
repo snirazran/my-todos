@@ -330,6 +330,7 @@ export default function Home() {
     frogBoxRef,
     flyRefs,
     scrollContainerRef: mainScrollRef,
+    trackMovingTarget: true,
   });
 
   // Any sheet/popup open (BaseSheet popups + bespoke sheets register here).

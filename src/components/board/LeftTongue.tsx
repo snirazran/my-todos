@@ -47,12 +47,15 @@ interface LeftTongueCtx {
   triggerTongue: (req: TriggerRequest) => boolean;
   /** True while the given task's fly is mid-grab and should be hidden in its card. */
   isHidden: (key: string) => boolean;
+  /** True while a grab is animating (or in its post-grab cooldown). */
+  isBusy: () => boolean;
 }
 
 const noop: LeftTongueCtx = {
   registerFly: () => {},
   triggerTongue: () => false,
   isHidden: () => false,
+  isBusy: () => false,
 };
 
 const Ctx = createContext<LeftTongueCtx>(noop);
@@ -121,20 +124,36 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
 
   const isHidden = useCallback((key: string) => hidden.has(key), [hidden]);
 
+  const isBusy = useCallback(
+    () => busyRef.current || performance.now() < cooldownUntil.current,
+    [],
+  );
+
   /* ── RAF loop ──────────────────────────────────────────────────────── */
   useEffect(() => {
     if (!grab) return;
 
-    const { origin: p0, control: p1, target: p2 } = grab;
+    const p0 = grab.origin;
 
     // Temp path used purely for getPointAtLength sampling.
     const tmp = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    tmp.setAttribute('d', `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`);
-    const total = tmp.getTotalLength();
+
+    const applyTarget = (target: Pt) => {
+      const control: Pt = {
+        x: (p0.x + target.x) / 2,
+        y: target.y - ARC_LIFT,
+      };
+      const d = `M ${p0.x} ${p0.y} Q ${control.x} ${control.y} ${target.x} ${target.y}`;
+      tmp.setAttribute('d', d);
+      return { d, total: tmp.getTotalLength() };
+    };
+
+    let target = grab.target;
+    let { d, total } = applyTarget(target);
 
     const node = pathEl.current;
     if (node) {
-      node.setAttribute('d', `M ${p0.x} ${p0.y} Q ${p1.x} ${p1.y} ${p2.x} ${p2.y}`);
+      node.setAttribute('d', d);
       node.style.visibility = 'visible';
       node.style.strokeDasharray = `0 ${total}`;
       node.style.strokeDashoffset = '0';
@@ -145,6 +164,19 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
 
     const tick = () => {
       const t = Math.max(0, Math.min(1, (performance.now() - grab.startAt) / DURATION_MS));
+
+      if (!hitDone && t <= HIT_AT) {
+        const el = flyRefs.current[grab.key];
+        if (el) {
+          const r = el.getBoundingClientRect();
+          if (r.width > 0 && r.height > 0) {
+            target = { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+          }
+        }
+        ({ d, total } = applyTarget(target));
+        if (node) node.setAttribute('d', d);
+      }
+
       const forward = t <= HIT_AT ? t / HIT_AT : 1 - (t - HIT_AT) / (1 - HIT_AT);
       const len = total * forward;
 
@@ -201,7 +233,7 @@ export function LeftTongueProvider({ children }: { children: React.ReactNode }) 
   }, [grab]);
 
   return (
-    <Ctx.Provider value={{ registerFly, triggerTongue, isHidden }}>
+    <Ctx.Provider value={{ registerFly, triggerTongue, isHidden, isBusy }}>
       {children}
       {grab && (
         <svg

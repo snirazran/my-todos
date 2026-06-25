@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { motion } from 'framer-motion';
 import TaskCard from './TaskCard';
 import TaskMenu from './TaskMenu';
 import TaskDetailSheet from './TaskDetailSheet';
@@ -30,6 +31,7 @@ import { useLeftTongue } from './LeftTongue';
 export default React.memo(function TaskList({
   day,
   items,
+  gracePeriodIds,
   isDragging,
   dragFromDay,
   dragFromIndex,
@@ -60,6 +62,8 @@ export default React.memo(function TaskList({
 }: {
   day: DisplayDay;
   items: Task[];
+  /** Just-completed tasks held in their active slot during the grace period. */
+  gracePeriodIds?: ReadonlySet<string>;
   isDragging: boolean;
   dragFromDay?: number;
   dragFromIndex?: number;
@@ -178,7 +182,7 @@ export default React.memo(function TaskList({
   // Planner mutations go straight to the API and refresh via the board event.
   const refresh = () => window.dispatchEvent(new Event('board-refresh'));
   const { showNotification } = useNotification();
-  const { triggerTongue } = useLeftTongue();
+  const { triggerTongue, isBusy } = useLeftTongue();
 
   const groupIdOf = (taskId: string) =>
     items.find((t) => t.id === taskId)?.repeatGroupId;
@@ -232,6 +236,7 @@ export default React.memo(function TaskList({
 
   const toggleComplete = (t: Task) => {
     const completing = !t.completed;
+    if (completing && isBusy()) return;
     if (completing) stopTimerIfActive(t.id);
 
     const persist = () => {
@@ -486,8 +491,10 @@ export default React.memo(function TaskList({
     />
   );
 
+  const inGrace = (id: string) => !!gracePeriodIds?.has(id);
+
   const filteredItems = items.filter((t) => {
-    if (!showCompleted && t.completed) return false;
+    if (!showCompleted && t.completed && !inGrace(t.id)) return false;
     if (selectedTags && selectedTags.length > 0) {
       const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));
       if (!hasTag) return false;
@@ -541,7 +548,7 @@ export default React.memo(function TaskList({
     const t = items[i];
 
     // Filter Logic
-    if (!showCompleted && t.completed) continue;
+    if (!showCompleted && t.completed && !inGrace(t.id)) continue;
     if (selectedTags && selectedTags.length > 0) {
       const hasTag = t.tags?.some((tagId) => selectedTags.includes(tagId));
       if (!hasTag) continue;
@@ -555,7 +562,13 @@ export default React.memo(function TaskList({
       const afterKey = `ph-${day}-${visibleIndex + 1}`;
 
       rows.push(
-        <div key={wrapKey} className="relative">
+        <motion.div
+          key={wrapKey}
+          layout={isAnyDragging ? false : 'position'}
+          initial={false}
+          transition={{ layout: { type: 'spring', stiffness: 500, damping: 40 } }}
+          className="relative"
+        >
           <TaskCard
             key={cardKey}
             innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
@@ -633,7 +646,7 @@ export default React.memo(function TaskList({
             isPast={!!dateKey && !isToday && !isFuture}
             showStreak
           />
-        </div>,
+        </motion.div>,
       );
 
       if (placeholderAt === visibleIndex + 1) {

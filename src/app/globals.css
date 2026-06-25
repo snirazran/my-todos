@@ -237,6 +237,22 @@ body.dragging {
 [data-role='board-scroller'] * {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Disable text selection across the board on every pointer type (web included).
+   Panning/sliding or dragging from the grip handle must never select task text.
+   Form fields inside the board (composer/edit) stay selectable. */
+[data-role='board-scroller'],
+[data-role='board-scroller'] * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+[data-role='board-scroller'] input,
+[data-role='board-scroller'] textarea,
+[data-role='board-scroller'] [contenteditable],
+[data-role='board-scroller'] [contenteditable='true'] {
+  -webkit-user-select: text;
+  user-select: text;
+}
 @media (min-width: 768px) {
   :root {
     --header-h: 4rem;
