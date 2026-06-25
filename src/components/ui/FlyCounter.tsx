@@ -35,8 +35,16 @@ export function FlyCounter({
   // bump animation — only real increments after mount should fire it.
   const hasMountedRef = useRef(false);
   const [bumps, setBumps] = useState<{ id: number; delta: number }[]>([]);
+  const bumpTimers = useRef<number[]>([]);
   const pillControls = useAnimationControls();
   const flyControls = useAnimationControls();
+
+  useEffect(
+    () => () => {
+      bumpTimers.current.forEach((t) => window.clearTimeout(t));
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!hasMountedRef.current) {
@@ -67,9 +75,9 @@ export function FlyCounter({
       });
       const t = window.setTimeout(() => {
         setBumps((curr) => curr.filter((b) => b.id !== id));
+        bumpTimers.current = bumpTimers.current.filter((x) => x !== t);
       }, 900);
-      prevRef.current = balance;
-      return () => window.clearTimeout(t);
+      bumpTimers.current.push(t);
     }
     prevRef.current = balance;
   }, [balance, pillControls, flyControls]);

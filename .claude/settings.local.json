@@ -148,7 +148,11 @@
       "WebFetch(domain:christianselig.com)",
       "WebFetch(domain:wwdcnotes.com)",
       "WebFetch(domain:mfaani.com)",
-      "Bash(rm -f src/components/ui/BacklogPanel.tsx)"
+      "Bash(rm -f src/components/ui/BacklogPanel.tsx)",
+      "WebFetch(domain:motion.dev)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:docs.dndkit.com)",
+      "WebFetch(domain:dndkit.com)"
     ]
   }
 }

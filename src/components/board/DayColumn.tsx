@@ -62,14 +62,13 @@ export default function DayColumn({
       className={[
         'group relative flex flex-col overflow-visible',
         'rounded-[20px]',
-        isPast ? 'bg-muted/40' : 'bg-card/80',
-        'backdrop-blur-2xl',
+        isPast ? 'bg-muted' : 'bg-card',
         'border border-border/50 shadow-sm',
         appliedMax,
         'p-3',
         'min-h-[100px]',
         'transition-colors duration-300',
-        isPast ? 'hover:bg-muted/50' : 'hover:bg-card/90',
+        isPast ? 'hover:bg-muted' : 'hover:bg-card',
       ].join(' ')}
     >
       <div className="flex flex-col gap-2 px-2 mb-4 pt-1">

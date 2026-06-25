@@ -41,6 +41,7 @@ import {
   DragEndEvent,
   TouchSensor,
   Modifier,
+  MeasuringStrategy,
 } from '@dnd-kit/core';
 import {
   restrictToVerticalAxis,
@@ -52,6 +53,8 @@ import {
   sortableKeyboardCoordinates,
   useSortable,
   verticalListSortingStrategy,
+  defaultAnimateLayoutChanges,
+  type AnimateLayoutChanges,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { DeleteDialog } from '@/components/ui/DeleteDialog';
@@ -98,6 +101,9 @@ interface Task {
   /** Consecutive-completion streak for a repeating task, as of today. */
   streak?: number;
 }
+
+const animateLayoutChanges: AnimateLayoutChanges = (args) =>
+  args.isSorting || args.wasDragging ? defaultAnimateLayoutChanges(args) : true;
 
 interface SortableTaskItemProps {
   task: Task;
@@ -207,7 +213,11 @@ const SortableTaskItem = React.forwardRef<
       transform,
       transition,
       isDragging,
-    } = useSortable({ id: task.id, disabled: isDragDisabled || isOpen });
+    } = useSortable({
+      id: task.id,
+      disabled: isDragDisabled || isOpen,
+      animateLayoutChanges,
+    });
 
     // Clear hover state and reset swipe position when any sort drag starts
     useEffect(() => {
@@ -409,19 +419,12 @@ const SortableTaskItem = React.forwardRef<
         style={{ ...style, overflow: 'hidden' }}
         {...attributes}
         {...listeners}
-        className={`relative w-full rounded-xl ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
+        className={`relative mb-1.5 w-full rounded-xl ${isDragging ? 'z-30' : isMenuOpen ? 'z-50 shadow-sm border border-primary/30' : 'z-auto'}`}
         data-is-active={!isDone}
-        initial={{ height: 0, opacity: 0, marginBottom: 0 }}
-        animate={{ height: 'auto', opacity: 1, marginBottom: 6 }}
-        exit={isExitingLater
-          ? { opacity: 1 }
-          : { height: 0, marginBottom: 0, opacity: 0, transition: { height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }, marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] }, opacity: { duration: 0.2, ease: 'easeOut' } } }
-        }
-        transition={{
-          height: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
-          marginBottom: { duration: 0.3, ease: [0.25, 0.1, 0.25, 1] },
-          opacity: { duration: 0.2, ease: 'easeOut' },
-        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={isExitingLater ? { opacity: 1 } : { opacity: 0 }}
+        transition={{ opacity: { duration: 0.2, ease: 'easeOut' } }}
       >
         <motion.div
           layout={false}
@@ -510,8 +513,8 @@ const SortableTaskItem = React.forwardRef<
                   : ''
               }
 
-              select-none active:border-primary/40
-              ${isDragging ? 'z-[100] opacity-100' : ''}
+              select-none active:border-primary/40 active:bg-muted/40
+              ${isDragging ? 'z-[100] opacity-100 shadow-lg shadow-black/15 ring-2 ring-primary/40 dark:shadow-black/40' : ''}
               ${isDone && !isDragging && isHovered && isDesktop ? 'bg-accent/50' : ''}
               cursor-pointer
             `}
@@ -527,10 +530,11 @@ const SortableTaskItem = React.forwardRef<
               />
             )}
 
-            {/* Grab handle (left) — 3-dot drag affordance, hugging the edge */}
+            {/* Grab affordance (left) — visual hint only; the whole row is the
+                drag activator. Highlights to primary while dragging. */}
             <div
               aria-hidden
-              className={`relative z-10 -ml-1 flex-shrink-0 flex items-center justify-center self-stretch transition-colors cursor-grab active:cursor-grabbing ${isDone ? 'text-muted-foreground/20' : 'text-muted-foreground/30 md:group-hover:text-muted-foreground/50'}`}
+              className={`relative z-10 -ml-1 flex-shrink-0 flex items-center justify-center self-stretch transition-colors cursor-grab active:cursor-grabbing ${isDone ? 'text-muted-foreground/20' : isDragging ? 'text-primary' : 'text-muted-foreground/40 md:group-hover:text-primary/70'}`}
             >
               <EllipsisVertical className="h-4 w-4 md:h-[18px] md:w-[18px]" />
             </div>
@@ -970,18 +974,19 @@ export default function TaskList({
     }
   }, [isAnyDragging]);
 
-  // DnD Sensors
+  // DnD Sensors — grab anywhere on the row. A short press-and-hold separates an
+  // intentional pickup from a scroll/swipe; mouse needs no hold. Instant press
+  // feedback on the card makes the brief hold feel responsive.
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: {
-        delay: 150,
-        tolerance: 5,
+        distance: 5,
       },
     }),
     useSensor(TouchSensor, {
       activationConstraint: {
-        delay: 150,
-        tolerance: 5,
+        delay: 130,
+        tolerance: 6,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -1391,6 +1396,7 @@ export default function TaskList({
               onDragEnd={handleDragEnd}
               onDragCancel={handleDragCancel}
               modifiers={[restrictToActiveArea]}
+              measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
             >
               {/* Single list: finished tasks reorder to the bottom in place,
                   no separate section / fancy transition between groups. */}
@@ -1399,7 +1405,7 @@ export default function TaskList({
                   items={activeTaskIds}
                   strategy={verticalListSortingStrategy}
                 >
-                  <AnimatePresence initial={false}>
+                  <AnimatePresence initial={false} mode="popLayout">
                     {sortedVisibleTasks.map((task) => {
                       const isCompleted = task.completed || vSet.has(task.id);
                       const isMenuOpen = menu?.id === task.id;

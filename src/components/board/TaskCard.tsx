@@ -106,6 +106,8 @@ export default function TaskCard({
   const defaultTouchAction = touchAction || 'auto';
 
   const cleanupLP = useCallback(() => {
+    document.body.style.userSelect = '';
+    (document.body.style as any).webkitUserSelect = '';
     if (longPressTimer.current) {
       clearTimeout(longPressTimer.current);
       longPressTimer.current = null;
@@ -159,6 +161,15 @@ export default function TaskCard({
       // never dragged.
       const canDrag = !task.completed && !disableDrag;
 
+      // Suppress text selection from the very start of the press — the
+      // pointerdown is passive (can't preventDefault) and the drag only begins
+      // after the long-press delay, so without this the browser selects text
+      // across cards while the press is pending. Restored in cleanupLP.
+      if (canDrag) {
+        document.body.style.userSelect = 'none';
+        (document.body.style as any).webkitUserSelect = 'none';
+      }
+
       pointerIdRef.current = e.pointerId;
       longPressFiredRef.current = false;
       movedOutRef.current = false;
@@ -197,6 +208,9 @@ export default function TaskCard({
         }
 
         startPos.current = null;
+
+        // Clear any selection that began before the drag took over.
+        window.getSelection()?.removeAllRanges();
 
         onGrabRef.current({
           clientX: e.clientX,
