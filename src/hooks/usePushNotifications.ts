@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Capacitor } from '@capacitor/core';
 import { FirebaseMessaging } from '@capacitor-firebase/messaging';
 import { setLiveActivityControlToken, setTimerControlConfig } from '@/lib/liveTimer';
+import { notifyTaskSync } from '@/lib/taskSyncClient';
 
 /**
  * Hook that handles push notification setup for native platforms (Android/iOS).
@@ -92,6 +93,18 @@ export function usePushNotifications(userId: string | null | undefined) {
             }
           },
         );
+
+        await FirebaseMessaging.addListener('notificationReceived', (event) => {
+          const data = event.notification.data as
+            | Record<string, unknown>
+            | undefined;
+          if (data?.type !== 'task_sync') return;
+          notifyTaskSync({
+            reason: 'remote-message',
+            changedAt:
+              typeof data.changedAt === 'string' ? data.changedAt : undefined,
+          });
+        });
       } catch (err) {
         console.error('Push notification setup failed:', err);
       }

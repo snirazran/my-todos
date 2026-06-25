@@ -101,7 +101,6 @@ export type UserDoc = {
   liveActivityStartToken?: string | null;
   liveActivityStartClockSkewMs?: number | null;
   liveActivityRemoteStart?: { key: string; attemptedAt: string } | null;
-  lastRecapWeek?: string;
   onboardingCompleted?: boolean;
 };
 

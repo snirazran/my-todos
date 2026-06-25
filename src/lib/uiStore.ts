@@ -19,10 +19,6 @@ interface UIState {
   isDebugMode: boolean;
   setIsDebugMode: (debug: boolean) => void;
 
-  isWeeklyWrappedOpen: boolean;
-  openWeeklyWrapped: () => void;
-  closeWeeklyWrapped: () => void;
-
   isLoadingScreenVisible: boolean;
   setLoadingScreenVisible: (visible: boolean) => void;
 }
@@ -46,10 +42,6 @@ export const useUIStore = create<UIState>()(
 
       isDebugMode: false,
       setIsDebugMode: (debug: boolean) => set({ isDebugMode: debug }),
-
-      isWeeklyWrappedOpen: false,
-      openWeeklyWrapped: () => set({ isWeeklyWrappedOpen: true }),
-      closeWeeklyWrapped: () => set({ isWeeklyWrappedOpen: false }),
 
       isLoadingScreenVisible: false,
       setLoadingScreenVisible: (visible: boolean) => set({ isLoadingScreenVisible: visible }),

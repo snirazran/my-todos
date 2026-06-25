@@ -21,6 +21,19 @@ if (firebaseConfig.apiKey) {
   messaging.onBackgroundMessage((payload) => {
     const n = payload.notification || {};
     const data = payload.data || {};
+    if (data.type === 'task_sync') {
+      self.clients
+        .matchAll({ type: 'window', includeUncontrolled: true })
+        .then((list) => {
+          list.forEach((client) => {
+            client.postMessage({
+              type: 'task_sync',
+              changedAt: data.changedAt,
+            });
+          });
+        });
+      return;
+    }
     self.registration.showNotification(n.title || data.title || 'Frogress', {
       body: n.body || data.body || '',
       icon: '/192x192.png',

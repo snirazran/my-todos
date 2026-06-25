@@ -51,8 +51,6 @@ import {
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
-import WeeklyWrapped from '@/components/ui/WeeklyWrapped';
-import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
 import type {
   FocusCategoryTagMap,
   MacroCategoryDefinition,
@@ -88,7 +86,6 @@ export default function Home() {
     isWardrobeOpen,
     setWardrobeOpen,
     setIsCinematicActive,
-    isDebugMode,
   } = useUIStore();
 
   // -- NEW STATE HOOK --
@@ -121,165 +118,6 @@ export default function Home() {
   } = useTaskData();
 
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-
-  // Weekly Recap
-  const [dismissRecap, setDismissRecap] = useState(false);
-  const { data: recapData } = useSWR<WeeklyRecapData>(
-    user ? `/api/weekly-recap?timezone=${encodeURIComponent(timezone)}` : null,
-    (url: string) => fetch(url).then((res) => res.json()),
-    { revalidateOnFocus: false },
-  );
-  const debugRecapData: WeeklyRecapData | undefined = isDebugMode
-    ? (() => {
-        const d = (offset: number) => {
-          const dt = new Date();
-          dt.setDate(dt.getDate() + offset);
-          return dt.toISOString().split('T')[0];
-        };
-        return {
-          weekStart: d(-7),
-          weekEnd: d(-1),
-          isPremium: true,
-          tasksAdded: 18,
-          tasksCompleted: 14,
-          completionRate: 78,
-          activeDays: 6,
-          bestDay: {
-            date: d(-4),
-            dayName: 'Wed',
-            tasksTotal: 5,
-            tasksCompleted: 5,
-            focusMinutes: 45,
-          },
-          totalFocusMinutes: 185,
-          fliesEarned: 14,
-          currentStreak: 4,
-          days: [
-            {
-              date: d(-7),
-              dayName: 'Mon',
-              tasksTotal: 3,
-              tasksCompleted: 2,
-              focusMinutes: 25,
-            },
-            {
-              date: d(-6),
-              dayName: 'Tue',
-              tasksTotal: 4,
-              tasksCompleted: 3,
-              focusMinutes: 30,
-            },
-            {
-              date: d(-5),
-              dayName: 'Wed',
-              tasksTotal: 5,
-              tasksCompleted: 5,
-              focusMinutes: 45,
-            },
-            {
-              date: d(-4),
-              dayName: 'Thu',
-              tasksTotal: 2,
-              tasksCompleted: 1,
-              focusMinutes: 25,
-            },
-            {
-              date: d(-3),
-              dayName: 'Fri',
-              tasksTotal: 3,
-              tasksCompleted: 2,
-              focusMinutes: 35,
-            },
-            {
-              date: d(-2),
-              dayName: 'Sat',
-              tasksTotal: 1,
-              tasksCompleted: 1,
-              focusMinutes: 15,
-            },
-            {
-              date: d(-1),
-              dayName: 'Sun',
-              tasksTotal: 0,
-              tasksCompleted: 0,
-              focusMinutes: 10,
-            },
-          ],
-          topTags: [
-            {
-              tagId: 'debug-tag-work',
-              tagName: 'Work',
-              tagColor: '#3b82f6',
-              completedCount: 8,
-              totalCount: 10,
-            },
-            {
-              tagId: 'debug-tag-health',
-              tagName: 'Health',
-              tagColor: '#22c55e',
-              completedCount: 5,
-              totalCount: 7,
-            },
-            {
-              tagId: 'debug-tag-personal',
-              tagName: 'Personal',
-              tagColor: '#f59e0b',
-              completedCount: 3,
-              totalCount: 5,
-            },
-          ],
-          focusAreas: [
-            {
-              categoryId: 'sport',
-              categoryName: 'Sport',
-              accent: '#22c55e',
-              tagIds: ['debug-tag-health'],
-              tasksTotal: 7,
-              tasksCompleted: 5,
-              focusMinutes: 60,
-              topTags: [
-                {
-                  tagId: 'debug-tag-health',
-                  tagName: 'Health',
-                  tagColor: '#22c55e',
-                  completedCount: 5,
-                  totalCount: 7,
-                },
-              ],
-            },
-            {
-              categoryId: 'mindfulness',
-              categoryName: 'Mindfulness',
-              accent: '#8b5cf6',
-              tagIds: ['debug-tag-personal'],
-              tasksTotal: 5,
-              tasksCompleted: 3,
-              focusMinutes: 45,
-              topTags: [
-                {
-                  tagId: 'debug-tag-personal',
-                  tagName: 'Personal',
-                  tagColor: '#f59e0b',
-                  completedCount: 3,
-                  totalCount: 5,
-                },
-              ],
-            },
-          ],
-          selectedCategoryIds: ['sport', 'mindfulness'],
-          prevWeek: {
-            tasksCompleted: 10,
-            completionRate: 62,
-            totalFocusMinutes: 120,
-            activeDays: 4,
-          },
-          alreadySeen: false,
-          skinsNew: 2,
-          skinsRarest: 'Wizard Hat',
-          skinsRarestDetail: { slot: 'hat', riveIndex: 5, name: 'Wizard Hat' },
-        };
-      })()
-    : undefined;
 
   const frogRef = useRef<FrogHandle>(null);
   const flyRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -530,16 +368,6 @@ export default function Home() {
   );
   const isPremium = !!questsData?.isPremium;
   const questOnboarding = questsData?.onboarding;
-
-  const [showWeeklyWrapped, setShowWeeklyWrapped] = useState(false);
-  const isFirstDayOfWeek = [0, 1].includes(new Date().getDay()); // Sunday or Monday
-
-  // Allow manual force show via ?wrapped=1
-  const forceShowWrapped =
-    typeof window !== 'undefined' &&
-    window.location.search.includes('wrapped=1');
-
-  const showRecapIndicator = !!user && !!recapData && !showWeeklyWrapped;
 
   useEffect(() => {
     if (questOnboarding?.complete) {

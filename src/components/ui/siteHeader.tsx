@@ -27,10 +27,7 @@ import {
   type RotationInterval,
 } from '@/components/ui/SkinRotation';
 import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
-import useSWR, { mutate as swrMutate } from 'swr';
-import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
-import WeeklyWrapped from '@/components/ui/WeeklyWrapped';
-import type { WeeklyRecapData } from '@/app/api/weekly-recap/route';
+import useSWR from 'swr';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight } from 'lucide-react';
 import Fly from '@/components/ui/fly';
@@ -50,13 +47,8 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const {
-    isWeeklyWrappedOpen,
-    openWeeklyWrapped,
-    closeWeeklyWrapped,
-    isDebugMode,
     isLoadingScreenVisible,
   } = useUIStore();
-  const { indices } = useWardrobeIndices(!!user);
   const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory(!!user, true);
   const flyBalance = inventoryData?.wardrobe?.flies;
   const inventoryBadge = unseenCount + unseenContainerCount;
@@ -84,16 +76,6 @@ export default function SiteHeader() {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  // Weekly Recap Fetching
-  const { data: recapData } = useSWR<WeeklyRecapData>(
-    user ? `/api/weekly-recap?timezone=${encodeURIComponent(timezone)}` : null,
-    (url: string) => fetch(url).then((res) => res.json()),
-    { revalidateOnFocus: false },
-  );
-
-  const forceShowWrapped = typeof window !== 'undefined' && window.location.search.includes('wrapped=1');
-  const showRecapIndicator = !!user && !!recapData && !isWeeklyWrappedOpen;
 
   const { data: questsData } = useSWR<{
     claimableCount?: number;
@@ -221,19 +203,6 @@ export default function SiteHeader() {
           onOpenChange={setShopOpen}
           balance={flyBalance ?? 0}
         />
-
-        {/* Global Modal rendering */}
-        {isWeeklyWrappedOpen && (isDebugMode ? true : recapData) && createPortal(
-          <WeeklyWrapped
-            data={(isDebugMode ? true : recapData) === true ? (undefined as any) : recapData!}
-            indices={indices}
-            onClose={() => {
-              closeWeeklyWrapped();
-              void swrMutate((key) => typeof key === 'string' && key.startsWith('/api/weekly-recap'));
-            }}
-          />,
-          document.body
-        )}
 
         {/* ───────── Desktop Navigation (Centered) ───────── */}
         <div className="hidden md:flex flex-1 min-w-0 items-center justify-center gap-0.5 lg:gap-1">

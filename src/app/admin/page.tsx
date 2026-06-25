@@ -169,23 +169,6 @@ function AdminPageContent() {
       window.location.reload(),
     );
 
-  const handleResetWeeklyRecap = async () => {
-    setLoading('reset-weekly-wrapped');
-    try {
-      const res = await fetch('/api/admin/reset-weekly-recap', { method: 'POST' });
-      if (res.ok) {
-        mutate((key) => typeof key === 'string' && key.startsWith('/api/weekly-recap'));
-        flash('success', 'Weekly Wrapped reset');
-      } else {
-        flash('error', 'Failed to reset weekly wrapped');
-      }
-    } catch {
-      flash('error', 'Network error');
-    } finally {
-      setLoading(null);
-    }
-  };
-
   const handleResetFlies = async () => {
     setLoading('reset-flies');
     try {
@@ -363,14 +346,6 @@ function AdminPageContent() {
               description="Rebuild quests for the selected focus areas"
               loading={loading === 'refresh-focus-quests'}
               onClick={() => handleRefreshQuests('focus')}
-            />
-            <ActionButton
-              icon={<Sparkles className="w-5 h-5" />}
-              accent="bg-pink-500/10 text-pink-600 dark:text-pink-400"
-              title="Reset Weekly Wrapped"
-              description="Allow viewing the Spotify-style recap again"
-              loading={loading === 'reset-weekly-wrapped'}
-              onClick={handleResetWeeklyRecap}
             />
             <ActionButton
               icon={<Wind className="w-5 h-5" />}

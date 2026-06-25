@@ -4,6 +4,7 @@ import connectMongo from '@/lib/mongoose';
 import TaskModel from '@/lib/models/Task';
 import { addFrogodoroSession } from '@/lib/frogodoroSessions';
 import { syncQuestState } from '@/lib/quests/engine';
+import { notifyTaskChanged } from '@/lib/taskSync';
 
 export async function PUT(
   req: NextRequest,
@@ -47,6 +48,7 @@ export async function PUT(
     }
 
     if (isModified) {
+      await notifyTaskChanged(userId);
       void syncQuestState({ userId, timezone }).catch((syncError) => {
         console.error('Quest sync failed after frogodoro update:', syncError);
       });

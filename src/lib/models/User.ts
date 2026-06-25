@@ -95,7 +95,6 @@ const UserSchema = new Schema<UserDoc>(
       default: null,
     },
     liveActivityStartToken: { type: String, default: null },
-    lastRecapWeek: { type: String, default: '' },
     onboardingCompleted: { type: Boolean, default: false },
   },
   { collection: 'users' },

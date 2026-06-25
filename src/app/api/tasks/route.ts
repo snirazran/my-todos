@@ -20,6 +20,7 @@ import {
 } from '@/lib/hungerLogic';
 import { syncQuestState } from '@/lib/quests/engine';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
+import { notifyTaskChanged } from '@/lib/taskSync';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
@@ -776,6 +777,7 @@ export async function POST(req: NextRequest) {
       reminder: src.reminder,
     });
     void syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({
       ok: true,
       id: dupId,
@@ -884,6 +886,7 @@ export async function POST(req: NextRequest) {
       repeatDayOfMonth,
     });
     void syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({
       ok: true,
       ids: [id],
@@ -942,6 +945,7 @@ export async function POST(req: NextRequest) {
       repeatRule: rule,
     });
     void syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({
       ok: true,
       ids: [id],
@@ -1033,6 +1037,7 @@ export async function POST(req: NextRequest) {
       });
     }
     void syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({
       ok: true,
       ids: createdIds,
@@ -1150,6 +1155,7 @@ export async function POST(req: NextRequest) {
     }
   }
   void syncGamification(uid, tz);
+  await notifyTaskChanged(uid);
   return NextResponse.json({ ok: true, ids: createdIds, tasks: createdTasks });
 }
 
@@ -1237,6 +1243,7 @@ export async function PUT(req: NextRequest) {
       { upsert: true },
     );
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true, id: newId });
   }
 
@@ -1288,6 +1295,7 @@ export async function PUT(req: NextRequest) {
         },
       );
       await syncGamification(uid, tz);
+      await notifyTaskChanged(uid);
       return NextResponse.json({ ok: true });
     }
 
@@ -1318,6 +1326,7 @@ export async function PUT(req: NextRequest) {
         { $unset: ['weekStart', 'dayOfWeek', 'suppressedDates'] },
       ]);
       await syncGamification(uid, tz);
+      await notifyTaskChanged(uid);
       return NextResponse.json({ ok: true });
     }
   }
@@ -1362,6 +1371,7 @@ export async function PUT(req: NextRequest) {
     if (Object.keys(unset).length) update.$unset = unset;
     if (Object.keys(update).length) await scopeApply(update);
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
 
@@ -1380,6 +1390,7 @@ export async function PUT(req: NextRequest) {
         }));
     }
     await TaskModel.updateOne({ userId: uid, id: taskId }, { $set: update });
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
 
@@ -1566,6 +1577,7 @@ export async function PUT(req: NextRequest) {
       }
     }
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
 
@@ -1620,17 +1632,20 @@ export async function PUT(req: NextRequest) {
       );
     }
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
   if (Array.isArray(tags)) {
     await scopeApply({ $set: { tags } });
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
   // New: Handle text update
   if (typeof body.text === 'string' && body.text.trim()) {
     await scopeApply({ $set: { text: body.text } });
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
 
@@ -1683,6 +1698,7 @@ export async function PUT(req: NextRequest) {
     ));
   }
   void syncGamification(uid, tz);
+  await notifyTaskChanged(uid);
   return NextResponse.json({
     ok: true,
     awarded,
@@ -1725,6 +1741,7 @@ export async function DELETE(req: NextRequest) {
       });
     }
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
 
@@ -1752,6 +1769,7 @@ export async function DELETE(req: NextRequest) {
       );
     }
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
   const { date, taskId } = body ?? {};
@@ -1779,14 +1797,17 @@ export async function DELETE(req: NextRequest) {
       );
     }
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
   if (doc.type === 'regular') {
     await TaskModel.deleteOne({ userId: uid, id: taskId, date });
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
   await syncGamification(uid, tz);
+  await notifyTaskChanged(uid);
   return NextResponse.json({ ok: true });
 }
 
@@ -2398,6 +2419,7 @@ async function handleBoardPut(
     if (ids.length === 0) {
       await TaskModel.deleteMany({ userId: uid, type: 'backlog', weekStart });
       await syncGamification(uid, tz);
+      await notifyTaskChanged(uid);
       return NextResponse.json({ ok: true });
     }
     await TaskModel.deleteMany({
@@ -2487,6 +2509,7 @@ async function handleBoardPut(
       type: { $in: ['weekly', 'regular'] },
     });
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
   const weekday: Weekday = day as Weekday;
@@ -2610,6 +2633,7 @@ async function handleBoardPut(
     }),
   );
   await syncGamification(uid, tz);
+  await notifyTaskChanged(uid);
   return NextResponse.json({ ok: true });
 }
 
@@ -2810,6 +2834,7 @@ async function handleBoardPutByDate(
     }),
   );
   await syncGamification(uid, tz);
+  await notifyTaskChanged(uid);
   return NextResponse.json({ ok: true });
 }
 
@@ -2842,6 +2867,7 @@ async function handleBoardDelete(
       id: taskId,
     });
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
   const doc = await TaskModel.findOne({ userId: uid, id: taskId }, { type: 1 })
@@ -2850,6 +2876,7 @@ async function handleBoardDelete(
   if (doc?.type === 'regular') {
     await TaskModel.deleteOne({ userId: uid, type: 'regular', id: taskId });
     await syncGamification(uid, tz);
+    await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
   }
   if (doc?.type === 'weekly') {
@@ -2866,6 +2893,7 @@ async function handleBoardDelete(
     date: { $gte: today },
   });
   await syncGamification(uid, tz);
+  await notifyTaskChanged(uid);
   return NextResponse.json({ ok: true });
 }
 

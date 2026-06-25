@@ -8,6 +8,7 @@ import {
   onMessage,
   isSupported,
 } from 'firebase/messaging';
+import { notifyTaskSync } from '@/lib/taskSyncClient';
 
 const VAPID_KEY = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
 const PREF_KEY = 'frogress.webPushPref';
@@ -68,6 +69,10 @@ function bindForeground() {
     onMessage(messaging, (payload) => {
       const n = payload.notification ?? {};
       const data = (payload.data ?? {}) as Record<string, string>;
+      if (data.type === 'task_sync') {
+        notifyTaskSync({ reason: 'remote-message', changedAt: data.changedAt });
+        return;
+      }
       const title = n.title || data.title || 'Frogress';
       void navigator.serviceWorker.ready
         .then((reg) =>
