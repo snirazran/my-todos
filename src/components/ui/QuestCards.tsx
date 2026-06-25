@@ -35,8 +35,11 @@ import { BaseSheet } from '@/components/ui/BaseSheet';
 
 export type QuestRewardCatalogItem = Pick<
   ItemDef,
-  'id' | 'name' | 'slot' | 'rarity' | 'riveIndex'
->;
+  'id' | 'name' | 'rarity' | 'riveIndex'
+> & {
+  slot: ItemDef['slot'] | 'background';
+  imageUrl?: string;
+};
 
 export type QuestTagChip = {
   id: string;
@@ -1167,7 +1170,24 @@ function QuestRewardDetailCard({
   isPremium: boolean;
   paused?: boolean;
 }) {
-  const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
+  const lookupId = reward.itemId ?? reward.backgroundId;
+  const item = lookupId ? rewardCatalog[lookupId] : null;
+
+  if (item?.slot === 'background') {
+    return (
+      <div className="relative flex flex-col overflow-hidden rounded-2xl border-[3px] border-emerald-500 bg-emerald-50 p-2.5 text-center shadow-emerald-500/15 dark:bg-emerald-950/30">
+        <div className="relative mx-auto mt-4 mb-2 flex aspect-[1/0.75] w-full items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-emerald-100 to-emerald-50 shadow-inner dark:from-emerald-900/40 dark:to-emerald-950/40">
+          {item.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.imageUrl} alt={item.name} className="absolute inset-0 h-full w-full object-cover" />
+          ) : null}
+        </div>
+        <p className="pb-1 text-xs font-bold leading-tight text-foreground">
+          {item.name}
+        </p>
+      </div>
+    );
+  }
 
   if (!item) {
     const quantityLabel = getRewardQuantityLabel(reward, isPremium);
@@ -1189,6 +1209,7 @@ function QuestRewardDetailCard({
 
   const itemDef: ItemDef = {
     ...item,
+    slot: item.slot as ItemDef['slot'],
     icon: '',
     priceFlies: 0,
   };
@@ -1235,7 +1256,8 @@ export const RewardTile = memo(function RewardTile({
   const { ref, hasHydrated } = useDelayedHydration<HTMLDivElement>(
     hydrateDelayMs,
   );
-  const item = reward.itemId ? rewardCatalog[reward.itemId] : null;
+  const lookupId = reward.itemId ?? reward.backgroundId;
+  const item = lookupId ? rewardCatalog[lookupId] : null;
   const tone = item
     ? REWARD_TILE_TONE[item.rarity]
     : reward.type === 'FLIES'
@@ -1285,6 +1307,19 @@ export const RewardTile = memo(function RewardTile({
             paused={paused}
             interactive={false}
           />
+        </div>
+      ) : item?.slot === 'background' ? (
+        <div className="absolute inset-0 z-10 overflow-hidden rounded-[inherit]">
+          {item.imageUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={item.imageUrl}
+              alt={item.name}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <RewardTileGloss />
+          )}
         </div>
       ) : item?.slot === 'container' && hasHydrated ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center">
@@ -1363,8 +1398,9 @@ function rewardLabel(
 ) {
   if (reward.type === 'FLIES')
     return `${getRewardQuantityLabel(reward, isPremium)} flies`;
-  if (reward.itemId) {
-    return rewardCatalog[reward.itemId]?.name ?? reward.itemId;
+  const id = reward.itemId ?? reward.backgroundId;
+  if (id) {
+    return rewardCatalog[id]?.name ?? id;
   }
   return 'Reward';
 }

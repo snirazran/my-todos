@@ -70,13 +70,20 @@ const RARITY_CONFIG: Record<
   },
 };
 
+type SellableItem = Pick<ItemDef, 'id' | 'name' | 'rarity'> & {
+  slot?: ItemDef['slot'];
+  riveIndex?: number;
+  priceFlies?: number;
+};
+
 interface SellConfirmationDialogProps {
   open: boolean;
   onClose: () => void;
   onConfirm: (amount: number) => void;
-  item: ItemDef | null;
+  item: SellableItem | null;
   ownedCount: number;
   paused?: boolean;
+  imageUrl?: string;
 }
 
 export function SellConfirmationDialog({
@@ -86,6 +93,7 @@ export function SellConfirmationDialog({
   item,
   ownedCount,
   paused = false,
+  imageUrl,
 }: SellConfirmationDialogProps) {
   const [quantity, setQuantity] = useState(1);
 
@@ -106,7 +114,7 @@ export function SellConfirmationDialog({
     hat: 0,
     body: 0,
     hand_item: 0,
-    [item.slot]: item.riveIndex,
+    ...(item.slot ? { [item.slot]: item.riveIndex ?? 0 } : {}),
   };
 
   const handleAdjust = (delta: number) => {
@@ -146,9 +154,16 @@ export function SellConfirmationDialog({
              <div className="absolute top-0 w-1/2 h-full -skew-x-12 pointer-events-none -inset-full bg-gradient-to-r from-transparent to-white/20 dark:to-white/10 opacity-50" />
              
              <div className="absolute inset-0 z-10 flex items-end justify-center">
-              {item.slot === 'container' ? (
+              {imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imageUrl}
+                  alt={item.name}
+                  className="absolute inset-0 h-full w-full object-cover"
+                />
+              ) : item.slot === 'container' ? (
                 <div className="w-[80%] h-[80%] mb-4 drop-shadow-xl">
-                   <GiftRive color={item.riveIndex} paused={false} />
+                   <GiftRive color={item.riveIndex ?? 0} paused={false} />
                 </div>
               ) : (
                 <Frog

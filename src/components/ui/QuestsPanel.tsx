@@ -123,11 +123,12 @@ type QuestRewardSummary = {
   flyBalanceBefore?: number;
   flyBalanceAfter?: number;
   grantedItemIds?: string[];
+  grantedBackgroundIds?: string[];
 };
 
 type QuestRewardRevealEntry = {
   key: string;
-  item: ItemDef;
+  item: ItemDef & { kind?: 'item' | 'background'; imageUrl?: string };
   fliesGranted?: number;
   flyBalanceBefore?: number;
   flyBalanceAfter?: number;
@@ -466,6 +467,40 @@ export function QuestsPanel({
       nextEntries.push({
         key,
         item,
+        quantity: count > 1 ? count : undefined,
+        baseQuantity: isPremium && count > 1 ? baseCount : undefined,
+        isQuestReward: true,
+      });
+    }
+
+    // Background rewards — reveal each as a card showing the background image.
+    const grantedBackgroundIds = Array.isArray(summary?.grantedBackgroundIds)
+      ? summary.grantedBackgroundIds
+      : [];
+    const bgCounts: Record<string, number> = {};
+    for (const bgId of grantedBackgroundIds) {
+      bgCounts[bgId] = (bgCounts[bgId] ?? 0) + 1;
+    }
+    for (const bgId of Object.keys(bgCounts)) {
+      const meta = catalog[bgId] as (ItemDef & { imageUrl?: string }) | undefined;
+      if (!meta) continue;
+      const count = bgCounts[bgId];
+      const key = `${bgId}-${rewardRevealIdRef.current}`;
+      rewardRevealIdRef.current += 1;
+      const baseCount = isPremium ? Math.floor(count / 2) || 1 : count;
+      nextEntries.push({
+        key,
+        item: {
+          id: meta.id,
+          name: meta.name,
+          slot: 'skin',
+          rarity: meta.rarity,
+          riveIndex: 0,
+          icon: '',
+          priceFlies: 0,
+          kind: 'background',
+          imageUrl: meta.imageUrl,
+        },
         quantity: count > 1 ? count : undefined,
         baseQuantity: isPremium && count > 1 ? baseCount : undefined,
         isQuestReward: true,
@@ -1195,7 +1230,7 @@ function QuestSeasonEventOverlay({
   const [greenLineWidth, setGreenLineWidth] = useState<string>('0px');
   const [lockedPreview, setLockedPreview] = useState<{
     day: number;
-    rewardType: 'FLIES' | 'ITEM' | 'BOX';
+    rewardType: 'FLIES' | 'ITEM' | 'BOX' | 'BACKGROUND';
     amount?: number;
     itemId?: string;
   } | null>(null);
@@ -1757,7 +1792,7 @@ function LockedPlusPreview({
   onUpgrade,
 }: {
   day: number;
-  rewardType: 'FLIES' | 'ITEM' | 'BOX';
+  rewardType: 'FLIES' | 'ITEM' | 'BOX' | 'BACKGROUND';
   amount?: number;
   itemId?: string;
   rewardCatalog: Record<string, ItemDef>;

@@ -1,10 +1,19 @@
 import CatalogItemModel from '@/lib/models/CatalogItem';
 import GiftDropConfigModel from '@/lib/models/GiftDropConfig';
+import BackgroundModel from '@/lib/models/Background';
 import connectMongo from '@/lib/mongoose';
 import { CATALOG, type ItemDef } from './catalog';
-import { getFullCatalog, buildById } from './getCatalog';
+import { getFullCatalog } from './getCatalog';
 
 export type GiftDropMode = 'item' | 'rarity';
+
+export type PrizeKind = 'item' | 'background';
+
+/** A unified prize: a catalog item, or a background rendered from an image. */
+export type GiftPrize = ItemDef & {
+  kind: PrizeKind;
+  imageUrl?: string;
+};
 
 export const GIFT_RARITIES: ItemDef['rarity'][] = [
   'common',
@@ -17,6 +26,7 @@ export const GIFT_RARITIES: ItemDef['rarity'][] = [
 export type GiftDropEntry = {
   itemId: string;
   chance: number;
+  kind?: PrizeKind;
 };
 
 export type GiftRarityDrop = {
@@ -25,7 +35,8 @@ export type GiftRarityDrop = {
 };
 
 export type GiftDropView = GiftDropEntry & {
-  item?: ItemDef;
+  kind: PrizeKind;
+  item?: GiftPrize;
 };
 
 export type GiftConfigView = {
@@ -77,6 +88,41 @@ function itemToDef(item: {
     icon: item.icon || '',
     priceFlies: item.priceFlies ?? 0,
   };
+}
+
+export async function loadBackgroundPrizes(): Promise<GiftPrize[]> {
+  const bgs = await BackgroundModel.find({ hidden: { $ne: true } }).lean();
+  return bgs.map((bg) => ({
+    id: bg.id,
+    name: bg.name,
+    slot: 'skin',
+    rarity: bg.rarity as ItemDef['rarity'],
+    riveIndex: 0,
+    icon: '',
+    priceFlies: bg.priceFlies ?? 0,
+    kind: 'background' as const,
+    imageUrl:
+      bg.images?.mobile ||
+      bg.images?.tablet ||
+      bg.images?.web ||
+      bg.images?.webLarge ||
+      '',
+  }));
+}
+
+/**
+ * The full pool of things a gift can award: every non-container catalog item
+ * plus every (non-hidden) background, each tagged with its `kind`.
+ */
+export async function getPrizePool(): Promise<GiftPrize[]> {
+  const [catalog, backgrounds] = await Promise.all([
+    getFullCatalog(),
+    loadBackgroundPrizes(),
+  ]);
+  const items: GiftPrize[] = catalog
+    .filter((item) => item.slot !== 'container')
+    .map((item) => ({ ...item, kind: 'item' as const }));
+  return [...items, ...backgrounds];
 }
 
 async function seedCatalogIfEmpty() {
@@ -150,7 +196,11 @@ export async function getGiftConfigs(includeHidden = false): Promise<GiftConfigV
       priceFlies: item.priceFlies,
     }),
   );
-  const byId = buildById(catalog);
+  const backgrounds = await loadBackgroundPrizes();
+  const bgById = Object.fromEntries(backgrounds.map((bg) => [bg.id, bg]));
+  const itemPrizes: Record<string, GiftPrize> = Object.fromEntries(
+    catalog.map((item) => [item.id, { ...item, kind: 'item' as const }]),
+  );
   const configs = await GiftDropConfigModel.find({}).lean();
   const configMap = new Map(configs.map((config) => [config.giftId, config]));
 
@@ -162,11 +212,15 @@ export async function getGiftConfigs(includeHidden = false): Promise<GiftConfigV
       return {
         gift,
         dropMode: (config?.dropMode === 'rarity' ? 'rarity' : 'item') as GiftDropMode,
-        drops: (config?.drops ?? []).map((drop) => ({
-          itemId: drop.itemId,
-          chance: drop.chance,
-          item: byId[drop.itemId],
-        })),
+        drops: (config?.drops ?? []).map((drop) => {
+          const kind: PrizeKind = drop.kind === 'background' ? 'background' : 'item';
+          return {
+            itemId: drop.itemId,
+            chance: drop.chance,
+            kind,
+            item: kind === 'background' ? bgById[drop.itemId] : itemPrizes[drop.itemId],
+          };
+        }),
         rarityDrops: (config?.rarityDrops ?? [])
           .filter((entry): entry is GiftRarityDrop =>
             GIFT_RARITIES.includes(entry.rarity as ItemDef['rarity']),
@@ -205,11 +259,11 @@ function weightedPick<T>(entries: { value: T; weight: number }[]): T | null {
  */
 export function pickGiftDrop(
   config: GiftConfigView,
-  prizePool?: ItemDef[],
-): ItemDef | null {
+  prizePool?: GiftPrize[],
+): GiftPrize | null {
   if (config.dropMode === 'rarity') {
     const pool = (prizePool ?? []).filter((item) => item.slot !== 'container');
-    // Only consider rarities that actually have items available.
+    // Only consider rarities that actually have prizes available.
     const candidates = config.rarityDrops
       .filter((entry) => entry.chance > 0 && pool.some((i) => i.rarity === entry.rarity))
       .map((entry) => ({ value: entry.rarity, weight: entry.chance }));
@@ -221,7 +275,7 @@ export function pickGiftDrop(
   }
 
   const validDrops = config.drops.filter(
-    (drop): drop is GiftDropView & { item: ItemDef } =>
+    (drop): drop is GiftDropView & { item: GiftPrize } =>
       !!drop.item && drop.chance > 0 && drop.item.slot !== 'container',
   );
   return weightedPick(validDrops.map((drop) => ({ value: drop.item, weight: drop.chance })));
@@ -234,7 +288,7 @@ export function pickGiftDrop(
  */
 export function expandGiftDrops(
   config: GiftConfigView,
-  prizePool: ItemDef[],
+  prizePool: GiftPrize[],
 ): GiftDropView[] {
   if (config.dropMode !== 'rarity') return config.drops;
 
@@ -250,7 +304,9 @@ export function expandGiftDrops(
     const items = pool.filter((item) => item.rarity === entry.rarity);
     if (items.length === 0) return;
     const perItem = entry.chance / totalWeight / items.length;
-    items.forEach((item) => result.push({ itemId: item.id, chance: perItem, item }));
+    items.forEach((item) =>
+      result.push({ itemId: item.id, chance: perItem, kind: item.kind, item }),
+    );
   });
   return result;
 }

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 
 // Helper to create dummy item def for flies/boxes
 const getRewardItemDef = (
-  type: 'FLIES' | 'ITEM' | 'BOX',
+  type: 'FLIES' | 'ITEM' | 'BOX' | 'BACKGROUND',
   amount?: number,
   itemId?: string,
 ): ItemDef => {
@@ -71,7 +71,7 @@ export function SingleRewardCard({
   giftAnimation,
 }: {
   day: number;
-  rewardType: 'FLIES' | 'ITEM' | 'BOX';
+  rewardType: 'FLIES' | 'ITEM' | 'BOX' | 'BACKGROUND';
   amount?: number;
   itemId?: string;
   status: 'CLAIMED' | 'READY' | 'LOCKED' | 'MISSED' | 'LOCKED_PREMIUM';

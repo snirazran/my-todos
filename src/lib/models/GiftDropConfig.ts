@@ -5,6 +5,8 @@ export type GiftDropMode = 'item' | 'rarity';
 export type GiftDropEntryDoc = {
   itemId: string;
   chance: number;
+  /** 'item' (default) pulls from the skins catalog; 'background' from the background catalog. */
+  kind?: 'item' | 'background';
 };
 
 export type GiftRarityDropDoc = {
@@ -28,6 +30,7 @@ const GiftDropEntrySchema = new Schema<GiftDropEntryDoc>(
   {
     itemId: { type: String, required: true },
     chance: { type: Number, required: true, min: 0 },
+    kind: { type: String, enum: ['item', 'background'], default: 'item' },
   },
   { _id: false },
 );

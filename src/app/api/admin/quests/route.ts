@@ -37,6 +37,7 @@ const VALID_REWARD_TYPES = new Set<QuestRewardType>([
   'FLIES',
   'ITEM',
   'BOX',
+  'BACKGROUND',
 ]);
 const VALID_VISIBILITY_METRICS = new Set<QuestVisibilityMetric>([
   'daily_tasks_count',
@@ -86,6 +87,11 @@ function sanitizeReward(input: any): QuestReward | null {
   if (input.type === 'ITEM' || input.type === 'BOX') {
     if (typeof input.itemId !== 'string' || !input.itemId.trim()) return null;
     reward.itemId = input.itemId.trim();
+  }
+
+  if (input.type === 'BACKGROUND') {
+    if (typeof input.backgroundId !== 'string' || !input.backgroundId.trim()) return null;
+    reward.backgroundId = input.backgroundId.trim();
   }
 
   return reward;

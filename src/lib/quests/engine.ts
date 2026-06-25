@@ -9,6 +9,7 @@ import connectMongo from '@/lib/mongoose';
 import type { UserDoc } from '@/lib/types/UserDoc';
 import type { ItemDef } from '@/lib/skins/catalog';
 import { getFullCatalog } from '@/lib/skins/getCatalog';
+import { loadBackgroundPrizes } from '@/lib/skins/gifts';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import type {
   CategoryQuestProgressView,
@@ -283,6 +284,7 @@ function sanitizeReward(reward: QuestReward) {
   if (typeof reward.minAmount === 'number') next.minAmount = reward.minAmount;
   if (typeof reward.maxAmount === 'number') next.maxAmount = reward.maxAmount;
   if (reward.itemId) next.itemId = reward.itemId;
+  if (reward.backgroundId) next.backgroundId = reward.backgroundId;
   return next;
 }
 
@@ -290,7 +292,8 @@ function isSupportedReward(reward: { type?: string }): reward is QuestReward {
   return (
     reward.type === 'FLIES' ||
     reward.type === 'ITEM' ||
-    reward.type === 'BOX'
+    reward.type === 'BOX' ||
+    reward.type === 'BACKGROUND'
   );
 }
 
@@ -338,19 +341,48 @@ function matchesVisibilityConditions(
   });
 }
 
-function buildRewardCatalog(catalog: ItemDef[], rewardSets: QuestRewards[]) {
+type RewardCatalogBackground = {
+  id: string;
+  name: string;
+  rarity: ItemDef['rarity'];
+  imageUrl?: string;
+};
+
+function buildRewardCatalog(
+  catalog: ItemDef[],
+  rewardSets: QuestRewards[],
+  backgrounds: RewardCatalogBackground[] = [],
+) {
   const itemIds = new Set<string>();
+  const backgroundIds = new Set<string>();
   rewardSets.forEach((set) => {
     set.forEach((reward) => {
       if (reward.itemId) itemIds.add(reward.itemId);
+      if (reward.backgroundId) backgroundIds.add(reward.backgroundId);
     });
   });
 
-  return Object.fromEntries(
-    catalog
-      .filter((item) => itemIds.has(item.id))
-      .map((item) => [item.id, item]),
-  );
+  const entries: [string, Record<string, unknown>][] = catalog
+    .filter((item) => itemIds.has(item.id))
+    .map((item) => [item.id, item]);
+
+  backgrounds
+    .filter((bg) => backgroundIds.has(bg.id))
+    .forEach((bg) =>
+      entries.push([
+        bg.id,
+        {
+          id: bg.id,
+          name: bg.name,
+          slot: 'background',
+          rarity: bg.rarity,
+          riveIndex: 0,
+          imageUrl: bg.imageUrl,
+        },
+      ]),
+    );
+
+  return Object.fromEntries(entries);
 }
 
 function categoryDocToDefinition(doc: QuestCategoryDoc): MacroCategoryDefinition {
@@ -869,6 +901,7 @@ export async function syncQuestState(args: {
   );
 
   const premium = isPremiumUser(user);
+  const rewardBackgrounds = includeCatalog ? await loadBackgroundPrizes() : [];
   const activeFocusCategoryId = resolveActiveFocusCategoryId(profile, premium);
   const gatedCategoryQuests: CategoryQuestProgressView[] = categoryQuests.map(
     (quest) => ({
@@ -892,14 +925,18 @@ export async function syncQuestState(args: {
     dailyQuests,
     categoryQuests: gatedCategoryQuests,
     rewardCatalog: includeCatalog
-      ? buildRewardCatalog(catalog, [
-          ...dailyQuests.flatMap((quest) =>
-            quest.logic.map((block) => block.rewards ?? []),
-          ),
-          ...categoryQuests.flatMap((quest) =>
-            quest.logic.map((block) => block.rewards ?? []),
-          ),
-        ])
+      ? buildRewardCatalog(
+          catalog,
+          [
+            ...dailyQuests.flatMap((quest) =>
+              quest.logic.map((block) => block.rewards ?? []),
+            ),
+            ...categoryQuests.flatMap((quest) =>
+              quest.logic.map((block) => block.rewards ?? []),
+            ),
+          ],
+          rewardBackgrounds,
+        )
       : {},
   };
 }
@@ -1106,11 +1143,16 @@ export async function claimQuestReward(args: {
   user.wardrobe.inventory = user.wardrobe.inventory ?? {};
   user.wardrobe.unseenItems = user.wardrobe.unseenItems ?? [];
   user.wardrobe.flies = user.wardrobe.flies ?? 0;
+  if (!user.wardrobe.backgrounds) {
+    user.wardrobe.backgrounds = { equipped: null, inventory: {} };
+  }
+  user.wardrobe.backgrounds.inventory = user.wardrobe.backgrounds.inventory ?? {};
   const summary = {
     fliesGranted: 0,
     flyBalanceBefore: user.wardrobe.flies,
     flyBalanceAfter: user.wardrobe.flies,
     grantedItemIds: [] as string[],
+    grantedBackgroundIds: [] as string[],
   };
 
   const multiplier = isPremium ? 2 : 1;
@@ -1123,6 +1165,12 @@ export async function claimQuestReward(args: {
         user.wardrobe!.flies += amount;
         summary.fliesGranted += amount;
         summary.flyBalanceAfter = user.wardrobe!.flies;
+      } else if (reward.type === 'BACKGROUND' && reward.backgroundId) {
+        const inv = user.wardrobe!.backgrounds!.inventory;
+        for (let i = 0; i < multiplier; i += 1) {
+          inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
+          summary.grantedBackgroundIds.push(reward.backgroundId);
+        }
       } else if (reward.itemId) {
         for (let i = 0; i < multiplier; i += 1) {
           user.wardrobe!.inventory[reward.itemId] =
@@ -1208,11 +1256,16 @@ export async function claimObjectiveReward(args: {
   user.wardrobe.inventory = user.wardrobe.inventory ?? {};
   user.wardrobe.unseenItems = user.wardrobe.unseenItems ?? [];
   user.wardrobe.flies = user.wardrobe.flies ?? 0;
+  if (!user.wardrobe.backgrounds) {
+    user.wardrobe.backgrounds = { equipped: null, inventory: {} };
+  }
+  user.wardrobe.backgrounds.inventory = user.wardrobe.backgrounds.inventory ?? {};
   const summary = {
     fliesGranted: 0,
     flyBalanceBefore: user.wardrobe.flies,
     flyBalanceAfter: user.wardrobe.flies,
     grantedItemIds: [] as string[],
+    grantedBackgroundIds: [] as string[],
   };
 
   const multiplier = isPremium ? 2 : 1;
@@ -1223,6 +1276,12 @@ export async function claimObjectiveReward(args: {
       user.wardrobe.flies += amount;
       summary.fliesGranted += amount;
       summary.flyBalanceAfter = user.wardrobe.flies;
+    } else if (reward.type === 'BACKGROUND' && reward.backgroundId) {
+      const inv = user.wardrobe.backgrounds.inventory;
+      for (let i = 0; i < multiplier; i += 1) {
+        inv[reward.backgroundId] = (inv[reward.backgroundId] ?? 0) + 1;
+        summary.grantedBackgroundIds.push(reward.backgroundId);
+      }
     } else if (reward.itemId) {
       for (let i = 0; i < multiplier; i += 1) {
         user.wardrobe.inventory[reward.itemId] =
@@ -1232,6 +1291,7 @@ export async function claimObjectiveReward(args: {
       }
     }
   }
+  user.markModified('wardrobe');
 
   quest.claimedObjectiveIds = [...(quest.claimedObjectiveIds ?? []), objectiveId];
   quest.markModified('claimedObjectiveIds');

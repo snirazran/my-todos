@@ -88,12 +88,27 @@ const RARITY_CONFIG: Record<
 import { FilterCategory } from './FilterBar';
 import { SortOrder } from './SortMenu';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import { BackgroundCard } from './BackgroundCard';
+import { backgroundPreview } from '@/hooks/useBackgroundActions';
+import type { BackgroundItem } from '@/hooks/useBackgrounds';
 
 const TRADE_ITEM_COUNT = 5;
+
+type TradeEntry = {
+  uid: string;
+  id: string;
+  kind: 'item' | 'background';
+  rarity: Rarity;
+  owned: number;
+  item?: ItemDef;
+  bg?: BackgroundItem;
+};
 
 type TradePanelProps = {
   inventory: Record<string, number>;
   catalog: ItemDef[];
+  backgrounds?: BackgroundItem[];
+  backgroundInventory?: Record<string, number>;
   unseenItems: string[];
   onTradeSuccess?: () => void;
   activeFilter?: FilterCategory;
@@ -104,6 +119,8 @@ type TradePanelProps = {
 export function TradePanel({
   inventory,
   catalog,
+  backgrounds = [],
+  backgroundInventory = {},
   unseenItems,
   onTradeSuccess,
   activeFilter = 'all',
@@ -113,7 +130,9 @@ export function TradePanel({
   // --- State ---
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isTrading, setIsTrading] = useState(false);
-  const [tradeResult, setTradeResult] = useState<ItemDef | null>(null);
+  const [tradeResult, setTradeResult] = useState<
+    (ItemDef & { kind?: 'item' | 'background'; imageUrl?: string }) | null
+  >(null);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [inventoryHasScrolled, setInventoryHasScrolled] = useState(false);
@@ -133,11 +152,38 @@ export function TradePanel({
   }, []);
 
   // --- Derived ---
+  // Unified pool of tradeable entries (items + backgrounds), keyed by `kind:id`.
+  const entryMap = useMemo(() => {
+    const map = new Map<string, TradeEntry>();
+    catalog.forEach((item) => {
+      const owned = inventory[item.id] ?? 0;
+      if (owned <= 0) return;
+      if (item.slot === 'container') return;
+      if (item.rarity === 'legendary') return;
+      const uid = `item:${item.id}`;
+      map.set(uid, { uid, id: item.id, kind: 'item', rarity: item.rarity, owned, item });
+    });
+    backgrounds.forEach((bgItem) => {
+      const owned = backgroundInventory[bgItem.id] ?? 0;
+      if (owned <= 0) return;
+      if (bgItem.rarity === 'legendary') return;
+      const uid = `background:${bgItem.id}`;
+      map.set(uid, {
+        uid,
+        id: bgItem.id,
+        kind: 'background',
+        rarity: bgItem.rarity,
+        owned,
+        bg: bgItem,
+      });
+    });
+    return map;
+  }, [catalog, inventory, backgrounds, backgroundInventory]);
+
   const targetRarity = useMemo(() => {
     if (selectedIds.length === 0) return null;
-    const firstItem = catalog.find((i) => i.id === selectedIds[0]);
-    return firstItem?.rarity || null;
-  }, [selectedIds, catalog]);
+    return entryMap.get(selectedIds[0])?.rarity ?? null;
+  }, [selectedIds, entryMap]);
 
   useEffect(() => {
     setInventoryHasScrolled(false);
@@ -171,29 +217,26 @@ export function TradePanel({
   }, []);
 
   const availableItems = useMemo(() => {
-    const ownedIds = Object.keys(inventory).filter((id) => (inventory[id] ?? 0) > 0);
-    let result = catalog.filter((item) => {
-      if (!ownedIds.includes(item.id)) return false;
-      if (item.slot === 'container') return false; // NEW: Skip gifts
-      if (item.rarity === 'legendary') return false; // Legendary can't be traded up
-      if (targetRarity && item.rarity !== targetRarity) return false;
-      
-      // Apply activeFilter
-      if (activeFilter !== 'all') {
-        if (activeFilter === 'skin') {
-          if (item.slot !== 'skin') return false;
-        } else if (activeFilter === 'body') {
-          if (item.slot !== 'body') return false;
-        } else if (activeFilter === 'held') {
-          if (item.slot !== 'hand_item') return false;
-        } else {
-          if (item.slot !== activeFilter) return false;
-        }
-      }
-      return true;
+    const matchesFilter = (entry: TradeEntry) => {
+      if (activeFilter === 'all') return true;
+      if (activeFilter === 'background') return entry.kind === 'background';
+      if (entry.kind !== 'item' || !entry.item) return false;
+      if (activeFilter === 'skin') return entry.item.slot === 'skin';
+      if (activeFilter === 'body') return entry.item.slot === 'body';
+      if (activeFilter === 'held') return entry.item.slot === 'hand_item';
+      return entry.item.slot === activeFilter;
+    };
+
+    const price = (entry: TradeEntry) =>
+      entry.kind === 'item'
+        ? entry.item?.priceFlies ?? 0
+        : entry.bg?.priceFlies ?? 0;
+
+    const result = Array.from(entryMap.values()).filter((entry) => {
+      if (targetRarity && entry.rarity !== targetRarity) return false;
+      return matchesFilter(entry);
     });
 
-    // Apply sortBy
     return result.sort((a, b) => {
       switch (sortBy) {
         case 'rarity_asc':
@@ -201,14 +244,14 @@ export function TradePanel({
         case 'rarity_desc':
           return rarityRank[b.rarity] - rarityRank[a.rarity];
         case 'price_asc':
-          return (a.priceFlies ?? 0) - (b.priceFlies ?? 0);
+          return price(a) - price(b);
         case 'price_desc':
-          return (b.priceFlies ?? 0) - (a.priceFlies ?? 0);
+          return price(b) - price(a);
         default:
           return 0;
       }
     });
-  }, [inventory, catalog, targetRarity, activeFilter, sortBy]);
+  }, [entryMap, targetRarity, activeFilter, sortBy]);
 
   const availableGrid = useInfiniteScroll(availableItems, {
     initial: availableItems.length,
@@ -264,12 +307,11 @@ export function TradePanel({
   }, [selectedIds]);
 
   // --- Actions ---
-  const handleSelect = (item: ItemDef) => {
+  const handleSelect = (entry: TradeEntry) => {
     if (selectedIds.length >= TRADE_ITEM_COUNT) return;
-    const currentlySelected = selectedCounts[item.id] || 0;
-    const owned = inventory[item.id] || 0;
-    if (currentlySelected < owned) {
-      setSelectedIds((prev) => [...prev, item.id]);
+    const currentlySelected = selectedCounts[entry.uid] || 0;
+    if (currentlySelected < entry.owned) {
+      setSelectedIds((prev) => [...prev, entry.uid]);
     }
   };
 
@@ -287,10 +329,14 @@ export function TradePanel({
     setIsTrading(true);
     setError(null);
     try {
+      const picks = selectedIds.map((uid) => {
+        const [kind, ...rest] = uid.split(':');
+        return { id: rest.join(':'), kind: kind === 'background' ? 'background' : 'item' };
+      });
       const res = await fetch('/api/skins/trade', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ itemIds: selectedIds }),
+        body: JSON.stringify({ picks }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Trade failed');
@@ -400,29 +446,42 @@ export function TradePanel({
           ) : (
             <>
               <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
-                {availableGrid.visibleItems.map((item, index) => {
-                  const owned = inventory[item.id] || 0;
-                  const selected = selectedCounts[item.id] || 0;
-                  const remaining = owned - selected;
+                {availableGrid.visibleItems.map((entry, index) => {
+                  const selected = selectedCounts[entry.uid] || 0;
+                  const remaining = entry.owned - selected;
                   const isDimmed = remaining === 0;
 
                   return (
-                    <div key={item.id} className={isDimmed ? 'opacity-50 grayscale pointer-events-none' : ''}>
-                      <ItemCard
-                        item={item}
-                        mode="trade"
-                        ownedCount={owned}
-                        isEquipped={false}
-                        canAfford={true}
-                        actionLoading={false}
-                        selectedCount={selected}
-                        onAction={() => handleSelect(item)}
-                        actionLabel={null}
-                        isNew={unseenItems.includes(item.id)}
-                        deferPreview
-                        pausePreview={true}
-                        previewDelayMs={index * 20}
-                      />
+                    <div key={entry.uid} className={isDimmed ? 'opacity-50 grayscale pointer-events-none' : ''}>
+                      {entry.kind === 'item' && entry.item ? (
+                        <ItemCard
+                          item={entry.item}
+                          mode="trade"
+                          ownedCount={entry.owned}
+                          isEquipped={false}
+                          canAfford={true}
+                          actionLoading={false}
+                          selectedCount={selected}
+                          onAction={() => handleSelect(entry)}
+                          actionLabel={null}
+                          isNew={unseenItems.includes(entry.id)}
+                          deferPreview
+                          pausePreview={true}
+                          previewDelayMs={index * 20}
+                        />
+                      ) : entry.bg ? (
+                        <BackgroundCard
+                          item={entry.bg}
+                          owned
+                          ownedCount={entry.owned}
+                          isEquipped={false}
+                          canAfford
+                          mode="trade"
+                          actionLoading={false}
+                          selectedCount={selected}
+                          onAction={() => handleSelect(entry)}
+                        />
+                      ) : null}
                     </div>
                   );
                 })}
@@ -493,42 +552,49 @@ export function TradePanel({
            >
            <div className="grid grid-cols-5 gap-1.5 lg:gap-3 mb-2 lg:mb-4">
                 {Array.from({ length: TRADE_ITEM_COUNT }).map((_, i) => {
-                  const itemId = selectedIds[i];
-                  const item = itemId
-                    ? catalog.find((c) => c.id === itemId)
-                    : null;
-                  const config = item ? RARITY_CONFIG[item.rarity] : null;
+                  const uid = selectedIds[i];
+                  const entry = uid ? entryMap.get(uid) : null;
+                  const config = entry ? RARITY_CONFIG[entry.rarity] : null;
 
                   return (
                     <motion.button
                       key={i}
                       layout
-                      onClick={() => item && handleRemove(i)}
+                      onClick={() => entry && handleRemove(i)}
                       className={cn(
                         'h-10 lg:h-auto lg:aspect-square rounded-lg border-2 flex items-center justify-center relative overflow-hidden transition-all duration-200',
-                        !item &&
+                        !entry &&
                           'border-dashed border-border bg-muted/50',
-                        item &&
+                        entry &&
                           config &&
                           cn(config.border, config.bg, 'shadow-sm')
                       )}
                     >
-                      {item ? (
-                        <div className="relative flex items-center justify-center w-full h-full">
-                          <Frog
-                            className="object-contain w-full h-full"
-                            indices={{
-                              skin: 0,
-                              hat: 0,
-                              body: 0,
-                              hand_item: 0,
-                              [item.slot]: item.riveIndex,
-                            }}
-                            width={60}
-                            height={60}
-                            paused={false}
+                      {entry ? (
+                        entry.kind === 'background' && entry.bg ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={backgroundPreview(entry.bg)}
+                            alt={entry.bg.name}
+                            className="absolute inset-0 w-full h-full object-cover"
                           />
-                        </div>
+                        ) : entry.item ? (
+                          <div className="relative flex items-center justify-center w-full h-full">
+                            <Frog
+                              className="object-contain w-full h-full"
+                              indices={{
+                                skin: 0,
+                                hat: 0,
+                                body: 0,
+                                hand_item: 0,
+                                [entry.item.slot]: entry.item.riveIndex,
+                              }}
+                              width={60}
+                              height={60}
+                              paused={false}
+                            />
+                          </div>
+                        ) : null
                       ) : (
                         <span className="text-[10px] font-bold text-muted-foreground/40">
                           {i + 1}

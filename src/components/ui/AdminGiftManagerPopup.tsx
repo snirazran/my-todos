@@ -27,9 +27,21 @@ type DbItem = ItemDef & {
   hidden?: boolean;
 };
 
+type BackgroundPrize = {
+  id: string;
+  name: string;
+  rarity: ItemDef['rarity'];
+  riveIndex: number;
+  priceFlies?: number;
+  imageUrl?: string;
+};
+
+type PrizeKind = 'item' | 'background';
+
 type GiftDrop = {
   itemId: string;
   chance: number;
+  kind?: PrizeKind;
   item?: ItemDef;
 };
 
@@ -81,6 +93,7 @@ export function AdminGiftManagerPopup({
 }) {
   const [gifts, setGifts] = useState<GiftConfig[]>([]);
   const [catalog, setCatalog] = useState<DbItem[]>([]);
+  const [backgrounds, setBackgrounds] = useState<BackgroundPrize[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addingNew, setAddingNew] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -124,8 +137,25 @@ export function AdminGiftManagerPopup({
     [rarityChances],
   );
   const rewardCatalog = useMemo<Record<string, QuestRewardCatalogItem>>(
-    () => Object.fromEntries(catalog.map((item) => [item.id, item])),
-    [catalog],
+    () =>
+      Object.fromEntries([
+        ...catalog.map((item) => [item.id, item] as const),
+        ...backgrounds.map(
+          (bg) =>
+            [
+              bg.id,
+              {
+                id: bg.id,
+                name: bg.name,
+                slot: 'background' as const,
+                rarity: bg.rarity,
+                riveIndex: 0,
+                imageUrl: bg.imageUrl,
+              },
+            ] as const,
+        ),
+      ]),
+    [catalog, backgrounds],
   );
   const filteredCatalog = useMemo(
     () =>
@@ -146,6 +176,7 @@ export function AdminGiftManagerPopup({
       const nextGifts: GiftConfig[] = data.gifts ?? [];
       setGifts(nextGifts);
       setCatalog(data.catalog ?? []);
+      setBackgrounds(data.backgrounds ?? []);
       const nextSelected =
         preferredId && nextGifts.some((config) => config.gift.id === preferredId)
           ? preferredId
@@ -171,7 +202,14 @@ export function AdminGiftManagerPopup({
       priceFlies: String(config.gift.priceFlies ?? 100),
       hidden: !!config.gift.hidden,
     });
-    setDrops(config.drops.map((drop) => ({ itemId: drop.itemId, chance: drop.chance, item: drop.item })));
+    setDrops(
+      config.drops.map((drop) => ({
+        itemId: drop.itemId,
+        chance: drop.chance,
+        kind: drop.kind === 'background' ? 'background' : 'item',
+        item: drop.item,
+      })),
+    );
     setDropMode(config.dropMode === 'rarity' ? 'rarity' : 'item');
     const nextRarity: Record<string, string> = { ...DEFAULT_RARITY_CHANCES };
     if (config.rarityDrops && config.rarityDrops.length > 0) {
@@ -218,9 +256,28 @@ export function AdminGiftManagerPopup({
   const toggleDropItem = (item: DbItem) => {
     setConfirmSave(false);
     setDrops((prev) => {
-      const exists = prev.some((drop) => drop.itemId === item.id);
-      if (exists) return prev.filter((drop) => drop.itemId !== item.id);
-      return [...prev, { itemId: item.id, chance: 1, item }];
+      const exists = prev.some(
+        (drop) => drop.itemId === item.id && (drop.kind ?? 'item') === 'item',
+      );
+      if (exists)
+        return prev.filter(
+          (drop) => !(drop.itemId === item.id && (drop.kind ?? 'item') === 'item'),
+        );
+      return [...prev, { itemId: item.id, chance: 1, kind: 'item', item }];
+    });
+  };
+
+  const toggleDropBackground = (bg: BackgroundPrize) => {
+    setConfirmSave(false);
+    setDrops((prev) => {
+      const exists = prev.some(
+        (drop) => drop.itemId === bg.id && drop.kind === 'background',
+      );
+      if (exists)
+        return prev.filter(
+          (drop) => !(drop.itemId === bg.id && drop.kind === 'background'),
+        );
+      return [...prev, { itemId: bg.id, chance: 1, kind: 'background' }];
     });
   };
 
@@ -269,6 +326,7 @@ export function AdminGiftManagerPopup({
         drops: drops.map((drop) => ({
           itemId: drop.itemId,
           chance: Number(drop.chance) || 0,
+          kind: drop.kind === 'background' ? 'background' : 'item',
         })),
         rarityDrops: RARITIES.map((rarity) => ({
           rarity,
@@ -643,6 +701,48 @@ export function AdminGiftManagerPopup({
                         </div>
                       </div>
 
+                      {backgrounds.length > 0 && (
+                        <div className="mb-4 rounded-2xl border border-border/50 bg-background/70 p-3">
+                          <p className="mb-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                            Pick Backgrounds
+                          </p>
+                          <div className="grid max-h-64 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
+                            {backgrounds.map((bg) => {
+                              const selected = drops.some(
+                                (drop) => drop.itemId === bg.id && drop.kind === 'background',
+                              );
+                              return (
+                                <button
+                                  key={bg.id}
+                                  type="button"
+                                  onClick={() => toggleDropBackground(bg)}
+                                  className={cn(
+                                    'flex items-center gap-3 rounded-2xl border p-3 text-left transition',
+                                    selected
+                                      ? 'border-primary/30 bg-primary/10 ring-1 ring-primary/20'
+                                      : 'border-border/50 bg-card hover:bg-muted/40',
+                                  )}
+                                >
+                                  <RewardTile
+                                    reward={{ type: 'BACKGROUND', backgroundId: bg.id }}
+                                    rewardCatalog={rewardCatalog}
+                                    isPremium={false}
+                                  />
+                                  <div className="min-w-0">
+                                    <p className="truncate text-xs font-black text-foreground">
+                                      {bg.name}
+                                    </p>
+                                    <p className={cn('text-[10px] font-black uppercase', RARITY_TEXT[bg.rarity])}>
+                                      {bg.rarity} · background
+                                    </p>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
                       <div className="space-y-2">
                         {drops.length === 0 ? (
                           <div className="rounded-2xl border border-dashed border-border p-5 text-center text-xs font-bold text-muted-foreground">
@@ -651,24 +751,29 @@ export function AdminGiftManagerPopup({
                         ) : (
                           drops.map((drop, index) => {
                             const pct = totalChance > 0 ? (drop.chance / totalChance) * 100 : 0;
-                            const item = drop.item ?? catalog.find((option) => option.id === drop.itemId);
+                            const meta = rewardCatalog[drop.itemId];
+                            const isBackground = drop.kind === 'background';
                             return (
                               <div
-                                key={`${drop.itemId}-${index}`}
+                                key={`${drop.kind ?? 'item'}-${drop.itemId}-${index}`}
                                 className="grid grid-cols-[minmax(0,1fr)_88px_44px] items-center gap-2 rounded-2xl border border-border/50 bg-background p-2"
                               >
                                 <div className="flex min-w-0 items-center gap-3">
                                   <RewardTile
-                                    reward={{ type: 'ITEM', itemId: drop.itemId }}
+                                    reward={
+                                      isBackground
+                                        ? { type: 'BACKGROUND', backgroundId: drop.itemId }
+                                        : { type: 'ITEM', itemId: drop.itemId }
+                                    }
                                     rewardCatalog={rewardCatalog}
                                     isPremium={false}
                                   />
                                   <div className="min-w-0">
                                     <p className="truncate text-sm font-black text-foreground">
-                                      {item?.name ?? drop.itemId}
+                                      {meta?.name ?? drop.itemId}
                                     </p>
-                                    <p className={cn('text-[10px] font-black uppercase', RARITY_TEXT[item?.rarity ?? 'common'])}>
-                                      {item?.rarity ?? 'unknown'}
+                                    <p className={cn('text-[10px] font-black uppercase', RARITY_TEXT[meta?.rarity ?? 'common'])}>
+                                      {meta?.rarity ?? 'unknown'}{isBackground ? ' · background' : ''}
                                     </p>
                                   </div>
                                 </div>
@@ -727,8 +832,8 @@ export function AdminGiftManagerPopup({
                           })}
                           <p className="px-1 pt-1 text-[11px] text-muted-foreground">
                             On open, a rarity is rolled by these weights, then a random
-                            non-gift item of that rarity is awarded. Rarities with no items
-                            are skipped.
+                            non-gift prize (item or background) of that rarity is awarded.
+                            Rarities with no prizes are skipped.
                           </p>
                         </div>
                       )}

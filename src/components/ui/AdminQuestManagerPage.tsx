@@ -163,7 +163,7 @@ type SeasonRewardPickerTarget = {
   tier: 'free' | 'premium';
 };
 
-type RewardPickerTab = 'flies' | 'item' | 'box';
+type RewardPickerTab = 'flies' | 'item' | 'box' | 'background';
 type ConfirmAction =
   | 'save-quest'
   | 'save-season'
@@ -382,8 +382,9 @@ function rewardSummary(
       : `${positiveNumber(reward.amount, 1)} flies`;
   }
 
-  if (reward.itemId) {
-    const name = rewardCatalog[reward.itemId]?.name ?? reward.itemId;
+  const lookupId = reward.itemId ?? reward.backgroundId;
+  if (lookupId) {
+    const name = rewardCatalog[lookupId]?.name ?? lookupId;
     if (reward.type === 'BOX' && reward.amount && reward.amount > 1) {
       return `${name} ×${reward.amount}`;
     }
@@ -395,7 +396,7 @@ function rewardSummary(
 
 function rewardKey(reward: QuestReward) {
   if (reward.type === 'FLIES') return 'FLIES';
-  return `${reward.type}:${reward.itemId ?? ''}`;
+  return `${reward.type}:${reward.itemId ?? reward.backgroundId ?? ''}`;
 }
 
 function normalizeRewardList(rewards: QuestReward[]) {
@@ -404,7 +405,10 @@ function normalizeRewardList(rewards: QuestReward[]) {
     .slice(0, 1);
   const items = rewards.filter((reward) => reward.type === 'ITEM' && reward.itemId);
   const boxes = rewards.filter((reward) => reward.type === 'BOX' && reward.itemId);
-  return [...flies, ...items, ...boxes];
+  const backgrounds = rewards.filter(
+    (reward) => reward.type === 'BACKGROUND' && reward.backgroundId,
+  );
+  return [...flies, ...items, ...boxes, ...backgrounds];
 }
 
 function normalizeSingleReward(rewards: QuestReward[]) {
@@ -414,6 +418,7 @@ function normalizeSingleReward(rewards: QuestReward[]) {
 function rewardTypeLabel(type: QuestRewardType) {
   if (type === 'FLIES') return 'Flies';
   if (type === 'BOX') return 'Box';
+  if (type === 'BACKGROUND') return 'Background';
   return 'Item';
 }
 
@@ -2268,8 +2273,11 @@ function RewardPickerDialog({
   }, [open, rewards, singleSelect]);
 
   const fliesReward = draft.find((reward) => reward.type === 'FLIES');
-  const itemOptions = rewardItems.filter((item) => item.slot !== 'container');
+  const itemOptions = rewardItems.filter(
+    (item) => item.slot !== 'container' && item.slot !== 'background',
+  );
   const boxOptions = rewardItems.filter((item) => item.slot === 'container');
+  const backgroundOptions = rewardItems.filter((item) => item.slot === 'background');
 
   const toggleFliesReward = () => {
     setDraft((current) => {
@@ -2327,6 +2335,23 @@ function RewardPickerDialog({
     });
   };
 
+  const toggleBackgroundReward = (backgroundId: string) => {
+    setDraft((current) => {
+      const exists = current.some(
+        (reward) => reward.type === 'BACKGROUND' && reward.backgroundId === backgroundId,
+      );
+      if (exists) {
+        return current.filter(
+          (reward) => !(reward.type === 'BACKGROUND' && reward.backgroundId === backgroundId),
+        );
+      }
+      if (singleSelect) {
+        return [{ type: 'BACKGROUND', backgroundId }];
+      }
+      return [...current, { type: 'BACKGROUND', backgroundId }];
+    });
+  };
+
   const handleSave = () => {
     if (confirmSave && onRequestConfirmSave) {
       onRequestConfirmSave();
@@ -2352,7 +2377,7 @@ function RewardPickerDialog({
 
         <div className="max-h-[75vh] overflow-y-auto px-6 py-5">
           <div className="mb-5 flex flex-wrap gap-2">
-            {(['flies', 'item', 'box'] as const).map((tab) => (
+            {(['flies', 'item', 'box', 'background'] as const).map((tab) => (
               <button
                 key={tab}
                 type="button"
@@ -2364,7 +2389,13 @@ function RewardPickerDialog({
                     : 'border-border/50 bg-background text-muted-foreground hover:bg-muted/40 hover:text-foreground',
                 )}
               >
-                {tab === 'flies' ? 'Flies' : tab === 'item' ? 'Items' : 'Boxes'}
+                {tab === 'flies'
+                  ? 'Flies'
+                  : tab === 'item'
+                    ? 'Items'
+                    : tab === 'box'
+                      ? 'Boxes'
+                      : 'Backgrounds'}
               </button>
             ))}
           </div>
@@ -2522,6 +2553,50 @@ function RewardPickerDialog({
                   )}
                 </div>
               ) : null}
+            </div>
+          ) : activeTab === 'background' ? (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {backgroundOptions.map((item) => {
+                const selected = draft.some(
+                  (reward) =>
+                    reward.type === 'BACKGROUND' && reward.backgroundId === item.id,
+                );
+                return (
+                  <button
+                    key={`BACKGROUND-${item.id}`}
+                    type="button"
+                    onClick={() => toggleBackgroundReward(item.id)}
+                    className={cn(
+                      'flex items-center gap-4 rounded-[24px] border p-4 text-left transition',
+                      selected
+                        ? 'border-primary/30 bg-primary/10'
+                        : 'border-border/50 bg-background/70 hover:bg-muted/40',
+                    )}
+                  >
+                    <RewardTile
+                      reward={{ type: 'BACKGROUND', backgroundId: item.id }}
+                      rewardCatalog={rewardCatalog}
+                      isPremium={false}
+                    />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black text-foreground">
+                        {item.name}
+                      </p>
+                      <p className="mt-1 text-xs font-black uppercase tracking-[0.16em] text-muted-foreground">
+                        {item.rarity}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {selected ? 'One background reward' : 'Click to add'}
+                      </p>
+                    </div>
+                  </button>
+                );
+              })}
+              {backgroundOptions.length === 0 && (
+                <div className="col-span-full rounded-2xl border border-dashed border-border p-5 text-center text-xs font-bold text-muted-foreground">
+                  No backgrounds available.
+                </div>
+              )}
             </div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

@@ -3,7 +3,7 @@ import { requireUserId } from '@/lib/auth';
 import connectMongo from '@/lib/mongoose';
 import UserModel, { type UserDoc } from '@/lib/models/User';
 import { getFullCatalog, buildById } from '@/lib/skins/getCatalog';
-import { getGiftConfig, pickGiftDrop } from '@/lib/skins/gifts';
+import { getGiftConfig, pickGiftDrop, getPrizePool } from '@/lib/skins/gifts';
 import type { UserWardrobe } from '@/lib/types/UserDoc';
 
 const json = (body: unknown, init = 200) =>
@@ -39,7 +39,8 @@ export async function POST(req: NextRequest) {
     const giftConfig = await getGiftConfig(giftBoxId);
     if (!giftConfig) return json({ error: 'Gift is not configured' }, 400);
 
-    const prize = pickGiftDrop(giftConfig, fullCatalog);
+    const prizePool = await getPrizePool();
+    const prize = pickGiftDrop(giftConfig, prizePool);
     if (!prize) return json({ error: 'Gift has no available drops' }, 400);
 
     await connectMongo();
@@ -51,6 +52,24 @@ export async function POST(req: NextRequest) {
 
     if (owned < 1) {
       return json({ error: 'You do not have any gift boxes to open' }, 403);
+    }
+
+    if (prize.kind === 'background') {
+      // Backgrounds live in their own inventory; the box is consumed and the
+      // background quantity is incremented (no unseen/history — those are item-only).
+      const currentUnseen = user.wardrobe?.unseenItems || [];
+      const nextUnseen = currentUnseen.filter((id) => id !== giftBoxId);
+      await UserModel.updateOne(
+        { _id: user._id },
+        {
+          $inc: {
+            [`wardrobe.inventory.${giftBoxId}`]: -1,
+            [`wardrobe.backgrounds.inventory.${prize.id}`]: 1,
+          },
+          $set: { 'wardrobe.unseenItems': nextUnseen },
+        },
+      );
+      return json({ ok: true, prize });
     }
 
     // 2. Atomic swap: decrement box, increment prize & update unseen items

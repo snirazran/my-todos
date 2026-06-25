@@ -28,7 +28,7 @@ export default function GiftBoxOpening({
   const { user } = useAuth();
   const router = useRouter();
   const [phase, setPhase] = useState<'idle' | 'shaking' | 'revealed'>('idle');
-  const [prize, setPrize] = useState<ItemDef | null>(null);
+  const [prize, setPrize] = useState<(ItemDef & { kind?: 'item' | 'background'; imageUrl?: string }) | null>(null);
   const [claiming, setClaiming] = useState(false);
   const [loadingText, setLoadingText] = useState(
     () => FUNNY_SENTENCES[Math.floor(Math.random() * FUNNY_SENTENCES.length)],

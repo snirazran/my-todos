@@ -3,7 +3,7 @@ import { requireAdminUserId as requireUserId } from '@/lib/adminAuth';
 import connectMongo from '@/lib/mongoose';
 import CatalogItemModel from '@/lib/models/CatalogItem';
 import GiftDropConfigModel from '@/lib/models/GiftDropConfig';
-import { getGiftConfigs, ensureGiftDropConfigs } from '@/lib/skins/gifts';
+import { getGiftConfigs, ensureGiftDropConfigs, loadBackgroundPrizes } from '@/lib/skins/gifts';
 
 const json = (body: unknown, init = 200) =>
   NextResponse.json(body, { status: init });
@@ -11,6 +11,7 @@ const json = (body: unknown, init = 200) =>
 type DropInput = {
   itemId?: string;
   chance?: number;
+  kind?: 'item' | 'background';
 };
 
 type RarityDropInput = {
@@ -26,12 +27,19 @@ function slugify(value: string) {
 
 function sanitizeDrops(drops: DropInput[] | undefined) {
   if (!Array.isArray(drops)) return [];
-  const merged = new Map<string, number>();
+  const merged = new Map<string, { itemId: string; chance: number; kind: 'item' | 'background' }>();
   drops.forEach((drop) => {
     if (!drop.itemId || typeof drop.chance !== 'number' || drop.chance <= 0) return;
-    merged.set(drop.itemId, (merged.get(drop.itemId) ?? 0) + drop.chance);
+    const kind = drop.kind === 'background' ? 'background' : 'item';
+    const key = `${kind}:${drop.itemId}`;
+    const existing = merged.get(key);
+    merged.set(key, {
+      itemId: drop.itemId,
+      kind,
+      chance: (existing?.chance ?? 0) + drop.chance,
+    });
   });
-  return Array.from(merged.entries()).map(([itemId, chance]) => ({ itemId, chance }));
+  return Array.from(merged.values());
 }
 
 function sanitizeRarityDrops(drops: RarityDropInput[] | undefined) {
@@ -55,14 +63,15 @@ export async function GET() {
     await connectMongo();
     await ensureGiftDropConfigs();
 
-    const [gifts, catalog] = await Promise.all([
+    const [gifts, catalog, backgrounds] = await Promise.all([
       getGiftConfigs(true),
       CatalogItemModel.find({ slot: { $ne: 'container' }, hidden: { $ne: true } })
         .sort({ slot: 1, rarity: 1, riveIndex: 1 })
         .lean(),
+      loadBackgroundPrizes(),
     ]);
 
-    return json({ gifts, catalog });
+    return json({ gifts, catalog, backgrounds });
   } catch {
     return json({ error: 'Unauthorized' }, 401);
   }

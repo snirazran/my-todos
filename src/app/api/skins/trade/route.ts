@@ -2,16 +2,27 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserId } from '@/lib/auth';
 import dbConnect from '@/lib/mongoose';
 import User from '@/lib/models/User';
-import { RARITY_ORDER, ItemDef } from '@/lib/skins/catalog';
-import { getFullCatalog } from '@/lib/skins/getCatalog';
+import { RARITY_ORDER } from '@/lib/skins/catalog';
+import { getPrizePool, type GiftPrize } from '@/lib/skins/gifts';
+
+type Pick = { id: string; kind: 'item' | 'background' };
 
 export async function POST(req: NextRequest) {
   try {
     const userId = await requireUserId();
 
-    const { itemIds } = await req.json(); // Expecting string[] of length 5
+    const body = await req.json();
+    // Back-compat: legacy clients send `itemIds: string[]` (all items).
+    const picks: Pick[] = Array.isArray(body?.picks)
+      ? body.picks.map((p: any) => ({
+          id: String(p?.id ?? ''),
+          kind: p?.kind === 'background' ? 'background' : 'item',
+        }))
+      : Array.isArray(body?.itemIds)
+        ? body.itemIds.map((id: any) => ({ id: String(id), kind: 'item' as const }))
+        : [];
 
-    if (!Array.isArray(itemIds) || itemIds.length !== 5) {
+    if (picks.length !== 5 || picks.some((p) => !p.id)) {
       return NextResponse.json(
         { error: 'Must provide exactly 5 items to trade.' },
         { status: 400 },
@@ -19,137 +30,120 @@ export async function POST(req: NextRequest) {
     }
 
     await dbConnect();
-    const CATALOG = await getFullCatalog();
+    const pool = await getPrizePool();
+    const byKey = new Map<string, GiftPrize>(
+      pool.map((p) => [`${p.kind}:${p.id}`, p]),
+    );
+
     const user = await User.findById(userId);
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // FIX 1: Use optional chaining (?.) here
-    // If wardrobe is undefined, inventory becomes {}
-    const inventory = user.wardrobe?.inventory || {};
+    const itemInv = user.wardrobe?.inventory || {};
+    const bgInv = user.wardrobe?.backgrounds?.inventory || {};
 
-    // 1. Validate ownership and get definitions
-    const inputItems: ItemDef[] = [];
-    const countsToDeduct: Record<string, number> = {};
-
-    for (const id of itemIds) {
-      const def = CATALOG.find((i) => i.id === id);
+    // 1. Validate ownership and resolve definitions
+    const inputs: GiftPrize[] = [];
+    const deduct: Record<string, number> = {};
+    for (const pick of picks) {
+      const key = `${pick.kind}:${pick.id}`;
+      const def = byKey.get(key);
       if (!def) {
-        return NextResponse.json(
-          { error: `Invalid item ID: ${id}` },
-          { status: 400 },
-        );
+        return NextResponse.json({ error: `Invalid item: ${pick.id}` }, { status: 400 });
       }
-      inputItems.push(def);
-      countsToDeduct[id] = (countsToDeduct[id] || 0) + 1;
+      inputs.push(def);
+      deduct[key] = (deduct[key] || 0) + 1;
     }
 
-    // Check ownership
-    // If user.wardrobe was undefined above, inventory is empty,
-    // so this check will fail correctly (0 < count)
-    for (const [id, count] of Object.entries(countsToDeduct)) {
-      if ((inventory[id] || 0) < count) {
-        return NextResponse.json(
-          { error: `Not enough items of type ${id}` },
-          { status: 400 },
-        );
+    for (const [key, count] of Object.entries(deduct)) {
+      const [kind, ...rest] = key.split(':');
+      const id = rest.join(':');
+      const owned = (kind === 'background' ? bgInv[id] : itemInv[id]) || 0;
+      if (owned < count) {
+        return NextResponse.json({ error: `Not enough of ${id}` }, { status: 400 });
       }
     }
 
-    // 2. Validate Rarity Consistency
-    const firstRarity = inputItems[0].rarity;
-    const allSameRarity = inputItems.every((i) => i.rarity === firstRarity);
-
-    if (!allSameRarity) {
+    // 2. Same rarity, not legendary
+    const firstRarity = inputs[0].rarity;
+    if (!inputs.every((i) => i.rarity === firstRarity)) {
       return NextResponse.json(
         { error: 'All items must be of the same rarity.' },
         { status: 400 },
       );
     }
-
     if (firstRarity === 'legendary') {
-      return NextResponse.json(
-        { error: 'Cannot trade up from Legendary.' },
-        { status: 400 },
-      );
+      return NextResponse.json({ error: 'Cannot trade up from Legendary.' }, { status: 400 });
     }
 
-    // 3. Determine Next Tier
+    // 3. Next tier
     const currentRankIndex = RARITY_ORDER.indexOf(firstRarity);
-    if (
-      currentRankIndex === -1 ||
-      currentRankIndex >= RARITY_ORDER.length - 1
-    ) {
-      return NextResponse.json(
-        { error: 'Invalid rarity tier for trade up.' },
-        { status: 400 },
-      );
+    if (currentRankIndex === -1 || currentRankIndex >= RARITY_ORDER.length - 1) {
+      return NextResponse.json({ error: 'Invalid rarity tier for trade up.' }, { status: 400 });
     }
     const nextRarity = RARITY_ORDER[currentRankIndex + 1];
 
-    // 4. Select Reward
-    const possibleRewards = CATALOG.filter((i) => i.rarity === nextRarity);
-
+    // 4. Reward — any prize (item or background) of the next rarity
+    const possibleRewards = pool.filter(
+      (i) => i.rarity === nextRarity && i.slot !== 'container',
+    );
     if (possibleRewards.length === 0) {
-      return NextResponse.json(
-        { error: `No items found for rarity ${nextRarity}` },
-        { status: 500 },
-      );
+      return NextResponse.json({ error: `No prizes for rarity ${nextRarity}` }, { status: 500 });
     }
+    const reward = possibleRewards[Math.floor(Math.random() * possibleRewards.length)];
 
-    const reward =
-      possibleRewards[Math.floor(Math.random() * possibleRewards.length)];
+    // 5. Execute
+    if (!user.wardrobe) {
+      user.wardrobe = { equipped: {}, inventory: {}, unseenItems: [], flies: 0 };
+    }
+    user.wardrobe.inventory = user.wardrobe.inventory ?? {};
+    if (!user.wardrobe.backgrounds) {
+      user.wardrobe.backgrounds = { equipped: null, inventory: {} };
+    }
+    user.wardrobe.backgrounds.inventory = user.wardrobe.backgrounds.inventory ?? {};
 
-    // 5. Execute Trade (Atomic-ish via Document save)
-    // Deduct items
-    for (const [id, count] of Object.entries(countsToDeduct)) {
-      // FIX 2: Use non-null assertion (!)
-      // We know wardrobe exists because the ownership check passed
-      user.wardrobe!.inventory[id] -= count;
-
-      if (user.wardrobe!.inventory[id] <= 0) {
-        delete user.wardrobe!.inventory[id];
+    for (const [key, count] of Object.entries(deduct)) {
+      const [kind, ...rest] = key.split(':');
+      const id = rest.join(':');
+      if (kind === 'background') {
+        user.wardrobe.backgrounds.inventory[id] =
+          (user.wardrobe.backgrounds.inventory[id] || 0) - count;
+        if (user.wardrobe.backgrounds.inventory[id] <= 0) {
+          delete user.wardrobe.backgrounds.inventory[id];
+        }
+      } else {
+        user.wardrobe.inventory[id] = (user.wardrobe.inventory[id] || 0) - count;
+        if (user.wardrobe.inventory[id] <= 0) {
+          delete user.wardrobe.inventory[id];
+        }
       }
     }
 
-    // Add reward
-    // FIX 3: Use non-null assertion (!) here as well
-    user.wardrobe!.inventory[reward.id] =
-      (user.wardrobe!.inventory[reward.id] || 0) + 1;
-
-    // Record history if not already present
-    if (!user.wardrobe!.inventoryHistory) {
-      user.wardrobe!.inventoryHistory = {};
-    }
-    if (!user.wardrobe!.inventoryHistory[reward.id]) {
-      user.wardrobe!.inventoryHistory[reward.id] = new Date().toISOString();
-    }
-
-    // Add to unseen items
-    if (!user.wardrobe!.unseenItems) {
-      user.wardrobe!.unseenItems = [];
-    }
-    if (!user.wardrobe!.unseenItems.includes(reward.id)) {
-      user.wardrobe!.unseenItems.push(reward.id);
+    if (reward.kind === 'background') {
+      user.wardrobe.backgrounds.inventory[reward.id] =
+        (user.wardrobe.backgrounds.inventory[reward.id] || 0) + 1;
+      user.markModified('wardrobe.backgrounds');
+    } else {
+      user.wardrobe.inventory[reward.id] = (user.wardrobe.inventory[reward.id] || 0) + 1;
+      if (!user.wardrobe.inventoryHistory) user.wardrobe.inventoryHistory = {};
+      if (!user.wardrobe.inventoryHistory[reward.id]) {
+        user.wardrobe.inventoryHistory[reward.id] = new Date().toISOString();
+      }
+      if (!user.wardrobe.unseenItems) user.wardrobe.unseenItems = [];
+      if (!user.wardrobe.unseenItems.includes(reward.id)) {
+        user.wardrobe.unseenItems.push(reward.id);
+      }
+      user.markModified('wardrobe.inventoryHistory');
+      user.markModified('wardrobe.unseenItems');
     }
 
-    // Mark modified because we are mutating the mixed type map directly
     user.markModified('wardrobe.inventory');
-    user.markModified('wardrobe.inventoryHistory');
-    user.markModified('wardrobe.unseenItems'); // Make sure Mongoose knows unseenItems changed
     await user.save();
 
-    return NextResponse.json({
-      success: true,
-      reward,
-      consumed: itemIds,
-    });
+    return NextResponse.json({ success: true, reward });
   } catch (error) {
     console.error('Trade error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
+import { Button } from '@/components/ui/button';
 import type { BackgroundItem, BackgroundRarity } from '@/hooks/useBackgrounds';
 
 const RARITY_CONFIG: Record<
@@ -60,25 +61,32 @@ const RARITY_CONFIG: Record<
 export function BackgroundCard({
   item,
   owned,
+  ownedCount = 0,
   isEquipped,
   canAfford,
   mode,
   actionLoading,
   confirming,
+  selectedCount = 0,
   onAction,
+  onSell,
 }: {
   item: BackgroundItem;
   owned: boolean;
+  ownedCount?: number;
   isEquipped: boolean;
   canAfford: boolean;
-  mode: 'inventory' | 'shop';
+  mode: 'inventory' | 'shop' | 'trade';
   actionLoading: boolean;
   confirming?: boolean;
+  selectedCount?: number;
   onAction: (e: React.MouseEvent) => void;
+  onSell?: () => void;
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const [shake, setShake] = useState(false);
   const preview = item.images.mobile || item.images.tablet || item.images.web || item.images.webLarge;
+  const isSelected = selectedCount > 0;
 
   const handleClick = (e: React.MouseEvent) => {
     if (mode === 'shop' && !canAfford) {
@@ -97,12 +105,18 @@ export function BackgroundCard({
         config.border,
         config.bg,
         isEquipped ? config.shadow : cn(config.shadow, config.hoverGlow),
+        isSelected && 'border-primary ring-2 ring-primary/30',
         shake && 'animate-pulse',
       )}
     >
       {isEquipped && (
         <div className="absolute z-30 p-1 text-white bg-green-500 rounded-full shadow-md top-1.5 right-1.5">
           <Check className="w-3 h-3 md:w-3.5 md:h-3.5 stroke-[4]" />
+        </div>
+      )}
+      {mode === 'trade' && isSelected && (
+        <div className="absolute z-30 flex h-6 min-w-6 items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-black text-primary-foreground shadow-md top-1.5 right-1.5">
+          {selectedCount}
         </div>
       )}
 
@@ -133,31 +147,64 @@ export function BackgroundCard({
         ) : (
           <span className="relative text-xs font-bold opacity-60">No image</span>
         )}
+
+        {ownedCount > 0 && (
+          <div className="absolute top-1 right-1 md:top-1.5 md:right-1.5 bg-black/50 backdrop-blur-sm text-white text-[9px] md:text-[10px] font-bold px-1.5 py-0.5 rounded-md md:rounded-lg shadow-sm border border-white/10 z-20">
+            x{ownedCount}
+          </div>
+        )}
       </div>
 
-      <div className="px-1 pt-1 pb-1">
-        <p className="text-xs md:text-sm font-black tracking-tight text-center text-foreground truncate">
-          {item.name}
-        </p>
-      </div>
-
-      <div className="w-full mx-auto mt-0 md:w-3/4">
+      <div className="w-full mx-auto mt-2 md:w-3/4">
         {mode === 'inventory' ? (
+          <>
+            <div
+              className={cn(
+                'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
+                isEquipped
+                  ? 'bg-primary text-primary-foreground shadow-md'
+                  : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
+              )}
+            >
+              {actionLoading ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : isEquipped ? (
+                'EQUIPPED'
+              ) : (
+                'EQUIP'
+              )}
+            </div>
+            {onSell && (item.priceFlies ?? 0) > 0 && (
+              <div className="mt-1 text-center w-full">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSell();
+                  }}
+                  className="w-full h-5 rounded-md text-[9px] font-bold uppercase tracking-wide text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 border border-transparent hover:border-red-200 dark:hover:border-red-900 transition-all shadow-none active:scale-95 gap-1 px-1"
+                >
+                  <span className="flex items-center gap-0.5">
+                    Sell
+                    <span className="mx-0.5 opacity-40">|</span>
+                    <Fly size={14} className="opacity-80" y={-2} paused={true} />+
+                    {Math.floor((item.priceFlies || 0) / 2)}
+                  </span>
+                </Button>
+              </div>
+            )}
+          </>
+        ) : mode === 'trade' ? (
           <div
             className={cn(
               'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
-              isEquipped
+              isSelected
                 ? 'bg-primary text-primary-foreground shadow-md'
                 : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
             )}
           >
-            {actionLoading ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : isEquipped ? (
-              'EQUIPPED'
-            ) : (
-              'EQUIP'
-            )}
+            {isSelected ? 'SELECTED' : 'SELECT'}
           </div>
         ) : (
           <button
@@ -169,18 +216,14 @@ export function BackgroundCard({
             disabled={actionLoading}
             className={cn(
               'group/buy w-full flex items-center justify-center gap-1 h-8 text-sm md:text-base font-black tracking-tight transition-colors active:scale-95 bg-transparent border-0 shadow-none',
-              owned
-                ? 'text-emerald-600 dark:text-emerald-400'
-                : canAfford
-                  ? cn(config.text, 'hover:brightness-110')
-                  : 'text-red-500 dark:text-red-400',
+              canAfford
+                ? cn(config.text, 'hover:brightness-110')
+                : 'text-red-500 dark:text-red-400',
               actionLoading && 'opacity-60 cursor-wait',
             )}
           >
             {actionLoading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
-            ) : owned ? (
-              <span>OWNED</span>
             ) : confirming ? (
               <span>CONFIRM</span>
             ) : (

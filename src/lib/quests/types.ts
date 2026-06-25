@@ -1,6 +1,6 @@
 export type MacroCategoryId = string;
 
-export type QuestRewardType = 'FLIES' | 'ITEM' | 'BOX';
+export type QuestRewardType = 'FLIES' | 'ITEM' | 'BOX' | 'BACKGROUND';
 
 export type QuestReward = {
   type: QuestRewardType;
@@ -9,6 +9,7 @@ export type QuestReward = {
   minAmount?: number;
   maxAmount?: number;
   itemId?: string;
+  backgroundId?: string;
 };
 
 export type QuestRewards = QuestReward[];

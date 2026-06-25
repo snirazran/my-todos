@@ -20,7 +20,54 @@ import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 import { TradePanel } from './TradePanel';
 import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import { SellConfirmationDialog } from './SellConfirmationDialog';
-import { BackgroundsPanel } from './BackgroundsPanel';
+import { BackgroundCard } from './BackgroundCard';
+import { mutateBackgrounds, type BackgroundItem } from '@/hooks/useBackgrounds';
+import { useBackgroundActions, backgroundPreview } from '@/hooks/useBackgroundActions';
+
+type WardrobeCard =
+  | { kind: 'item'; id: string; rarity: ItemDef['rarity']; price: number; item: ItemDef }
+  | { kind: 'bg'; id: string; rarity: ItemDef['rarity']; price: number; bg: BackgroundItem };
+
+function mergeWardrobeCards(
+  items: ItemDef[],
+  backgrounds: BackgroundItem[],
+  sortBy: SortOrder,
+): WardrobeCard[] {
+  const itemCards: WardrobeCard[] = items.map((item) => ({
+    kind: 'item',
+    id: item.id,
+    rarity: item.rarity,
+    price: item.priceFlies ?? 0,
+    item,
+  }));
+  const bgCards: WardrobeCard[] = backgrounds.map((bg) => ({
+    kind: 'bg',
+    id: bg.id,
+    rarity: bg.rarity,
+    price: bg.priceFlies ?? 0,
+    bg,
+  }));
+  // 'latest' has no meaningful timestamp for backgrounds — keep items (already
+  // latest-sorted) first, then backgrounds. Other modes merge and re-sort; the
+  // stable sort keeps items ahead of backgrounds within an equal bucket.
+  if (sortBy === 'latest') return [...itemCards, ...bgCards];
+  const all = [...itemCards, ...bgCards];
+  all.sort((a, b) => {
+    switch (sortBy) {
+      case 'rarity_asc':
+        return rarityRank[a.rarity] - rarityRank[b.rarity];
+      case 'rarity_desc':
+        return rarityRank[b.rarity] - rarityRank[a.rarity];
+      case 'price_asc':
+        return a.price - b.price;
+      case 'price_desc':
+        return b.price - a.price;
+      default:
+        return 0;
+    }
+  });
+  return all;
+}
 
 /* ---------------- Types & Data ---------------- */
 type ApiData = {
@@ -144,6 +191,19 @@ function WardrobeManagerContent({
   // --- Sell Dialog Logic ---
   const [itemToSell, setItemToSell] = useState<ItemDef | null>(null);
 
+  const bg = useBackgroundActions({
+    isGuest: !user,
+    onNotify: (n) => setNotif(n),
+    shopBalance: data?.wardrobe?.flies ?? 0,
+    onSpend: () => refreshInventory(),
+  });
+  const showBackgrounds =
+    activeFilter === 'all' || activeFilter === 'background';
+  const inventoryBackgrounds = showBackgrounds
+    ? bg.sortItems('inventory', sortBy)
+    : [];
+  const shopBackgrounds = showBackgrounds ? bg.sortItems('shop', sortBy) : [];
+
   const inventoryScrollRef = React.useRef<HTMLDivElement | null>(null);
   const shopScrollRef = React.useRef<HTMLDivElement | null>(null);
 
@@ -256,6 +316,7 @@ function WardrobeManagerContent({
   const refreshInventory = () => {
     mutate();
     mutateInventoryCaches();
+    mutateBackgrounds();
   };
 
   // Filter change handler to mark category as visited
@@ -540,7 +601,10 @@ function WardrobeManagerContent({
           ? 'min-h-0 overflow-hidden bg-transparent'
           : 'overflow-hidden rounded-[32px] border border-border/50 bg-background shadow-sm',
       )}
-      onClick={() => confirmingBuyId && setConfirmingBuyId(null)}
+      onClick={() => {
+        if (confirmingBuyId) setConfirmingBuyId(null);
+        if (bg.confirmingBuyId) bg.setConfirmingBuyId(null);
+      }}
     >
       {/* --- HEADER --- */}
       {!embedded && (
@@ -707,15 +771,11 @@ function WardrobeManagerContent({
               }}
               className="absolute inset-0 overflow-y-auto rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
             >
-              {activeTab === 'inventory' && activeFilter === 'background' ? (
-                <BackgroundsPanel
-                  mode="inventory"
-                  isGuest={isGuest}
-                  onNotify={(n) => setNotif(n)}
-                />
-              ) : !canRenderItems ? (
+              {!canRenderItems ? (
                 <WardrobeGridSkeleton />
-              ) : activeTab === 'inventory' && inventoryItems.length === 0 ? (
+              ) : activeTab === 'inventory' &&
+                inventoryItems.length === 0 &&
+                inventoryBackgrounds.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full opacity-50">
                   <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
                     <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
@@ -726,37 +786,56 @@ function WardrobeManagerContent({
                 </div>
               ) : activeTab === 'inventory' ? (
                 <>
-                  <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-20 md:pb-4">
-                    {inventoryGrid.visibleItems.map((item, index) => (
-                      <ItemCard
-                        key={item.id}
-                        item={item}
-                        mode="inventory"
-                        ownedCount={
-                          data?.wardrobe?.inventory?.[item.id] ?? 0
-                        }
-                        isEquipped={
-                          data?.wardrobe?.equipped?.[item.slot] ===
-                          item.id
-                        }
-                        canAfford={true}
-                        actionLoading={equippingId === item.id}
-                        onAction={() => handleItemAction(item)}
-                        onSell={() => {
-                          setItemToSell(item);
-                        }}
-                        actionLabel={null}
-                        isNew={unseenInventorySet.has(item.id)}
-                        deferPreview
-                        giftAnimation="box_shake"
-                        pausePreview={
-                          (item.slot !== 'container' && isDragging) ||
-                          (item.slot !== 'container' &&
-                           data?.wardrobe?.equipped?.[item.slot] !== item.id)
-                        }
-                        previewDelayMs={index * 20}
-                      />
-                    ))}
+                  <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
+                    {mergeWardrobeCards(
+                      inventoryGrid.visibleItems,
+                      inventoryBackgrounds,
+                      sortBy,
+                    ).map((card, index) =>
+                      card.kind === 'item' ? (
+                        <ItemCard
+                          key={card.item.id}
+                          item={card.item}
+                          mode="inventory"
+                          ownedCount={
+                            data?.wardrobe?.inventory?.[card.item.id] ?? 0
+                          }
+                          isEquipped={
+                            data?.wardrobe?.equipped?.[card.item.slot] ===
+                            card.item.id
+                          }
+                          canAfford={true}
+                          actionLoading={equippingId === card.item.id}
+                          onAction={() => handleItemAction(card.item)}
+                          onSell={() => {
+                            setItemToSell(card.item);
+                          }}
+                          actionLabel={null}
+                          isNew={unseenInventorySet.has(card.item.id)}
+                          deferPreview
+                          giftAnimation="box_shake"
+                          pausePreview={
+                            (card.item.slot !== 'container' && isDragging) ||
+                            (card.item.slot !== 'container' &&
+                             data?.wardrobe?.equipped?.[card.item.slot] !== card.item.id)
+                          }
+                          previewDelayMs={index * 20}
+                        />
+                      ) : (
+                        <BackgroundCard
+                          key={`bg-${card.bg.id}`}
+                          item={card.bg}
+                          owned={(bg.inventory[card.bg.id] ?? 0) > 0}
+                          ownedCount={bg.inventory[card.bg.id] ?? 0}
+                          isEquipped={bg.equipped === card.bg.id}
+                          canAfford={bg.balance >= card.bg.priceFlies}
+                          mode="inventory"
+                          actionLoading={bg.busyId === card.bg.id}
+                          onAction={() => bg.handleEquip(card.bg)}
+                          onSell={() => bg.setSellTarget(card.bg)}
+                        />
+                      ),
+                    )}
                   </div>
                   {inventoryGrid.hasMore && (
                     <div
@@ -798,46 +877,53 @@ function WardrobeManagerContent({
               }}
               className="absolute inset-0 overflow-y-auto rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
             >
-              {activeTab === 'shop' && activeFilter === 'background' ? (
-                <BackgroundsPanel
-                  mode="shop"
-                  isGuest={isGuest}
-                  shopBalance={balance}
-                  onNotify={(n) => setNotif(n)}
-                  onSpend={() => refreshInventory()}
-                />
-              ) : !canRenderItems ? (
+              {!canRenderItems ? (
                 <WardrobeGridSkeleton />
               ) : activeTab === 'shop' ? (
                 <>
-                  <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-20 md:pb-4">
-                    {shopGrid.visibleItems.map((item, index) => {
-                      const count =
-                        data?.wardrobe?.inventory?.[item.id] ?? 0;
-                      return (
+                  <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
+                    {mergeWardrobeCards(
+                      shopGrid.visibleItems,
+                      shopBackgrounds,
+                      sortBy,
+                    ).map((card, index) =>
+                      card.kind === 'item' ? (
                         <ItemCard
-                          key={item.id}
-                          item={item}
+                          key={card.item.id}
+                          item={card.item}
                           mode="shop"
-                          ownedCount={count}
+                          ownedCount={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
                           isEquipped={false}
                           canAfford={
-                            balance >= (item.priceFlies ?? 0) &&
+                            balance >= (card.item.priceFlies ?? 0) &&
                             !isGuest
                           }
-                          actionLoading={buyingId === item.id}
+                          actionLoading={buyingId === card.item.id}
                           actionLabel={
-                            confirmingBuyId === item.id
+                            confirmingBuyId === card.item.id
                               ? 'CONFIRM'
                               : undefined
                           }
-                          onAction={(e) => handleBuyItem(item, e)}
+                          onAction={(e) => handleBuyItem(card.item, e)}
                           deferPreview
-                          pausePreview={(item.slot !== 'container' && isDragging) || (item.slot !== 'container' && confirmingBuyId !== item.id)}
+                          pausePreview={(card.item.slot !== 'container' && isDragging) || (card.item.slot !== 'container' && confirmingBuyId !== card.item.id)}
                           previewDelayMs={index * 20}
                         />
-                      );
-                    })}
+                      ) : (
+                        <BackgroundCard
+                          key={`bg-${card.bg.id}`}
+                          item={card.bg}
+                          owned={(bg.inventory[card.bg.id] ?? 0) > 0}
+                          ownedCount={bg.inventory[card.bg.id] ?? 0}
+                          isEquipped={bg.equipped === card.bg.id}
+                          canAfford={bg.balance >= card.bg.priceFlies && !isGuest}
+                          mode="shop"
+                          actionLoading={bg.busyId === card.bg.id}
+                          confirming={bg.confirmingBuyId === card.bg.id}
+                          onAction={(e) => bg.handleBuy(card.bg, e)}
+                        />
+                      ),
+                    )}
                   </div>
                   {shopGrid.hasMore && (
                     <div
@@ -860,6 +946,8 @@ function WardrobeManagerContent({
                 <TradePanel
                   inventory={data.wardrobe.inventory}
                   catalog={data.catalog}
+                  backgrounds={bg.catalog}
+                  backgroundInventory={bg.inventory}
                   unseenItems={unseenItems}
                   onTradeSuccess={refreshInventory}
                   activeFilter={
@@ -889,6 +977,25 @@ function WardrobeManagerContent({
         ownedCount={
           itemToSell ? (data?.wardrobe?.inventory?.[itemToSell.id] ?? 0) : 0
         }
+        paused={isDragging}
+      />
+
+      <SellConfirmationDialog
+        open={!!bg.sellTarget}
+        onClose={() => bg.setSellTarget(null)}
+        onConfirm={bg.confirmSell}
+        item={
+          bg.sellTarget
+            ? {
+                id: bg.sellTarget.id,
+                name: bg.sellTarget.name,
+                rarity: bg.sellTarget.rarity,
+                priceFlies: bg.sellTarget.priceFlies,
+              }
+            : null
+        }
+        imageUrl={bg.sellTarget ? backgroundPreview(bg.sellTarget) : undefined}
+        ownedCount={bg.sellTarget ? (bg.inventory[bg.sellTarget.id] ?? 0) : 0}
         paused={isDragging}
       />
 

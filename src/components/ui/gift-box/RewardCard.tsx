@@ -8,8 +8,10 @@ import { cn } from '@/lib/utils';
 import { RARITY_CONFIG } from './constants';
 import { GiftRive } from './GiftBox';
 
+type Prize = ItemDef & { kind?: 'item' | 'background'; imageUrl?: string };
+
 type RewardCardProps = {
-  prize: ItemDef;
+  prize: Prize;
   claiming: boolean;
   onClaim: () => void;
   customPreview?: React.ReactNode;
@@ -222,6 +224,13 @@ export const RewardCard = ({
                   >
                     {customPreview ? (
                       customPreview
+                    ) : prize.kind === 'background' ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={prize.imageUrl}
+                        alt={prize.name}
+                        className="h-full w-full rounded-[16px] object-cover"
+                      />
                     ) : prize.slot === 'container' ? (
                       <div className="h-[120%] w-auto aspect-[282/381] mb-2">
                         <GiftRive className="w-full h-full" color={prize.riveIndex} paused={false} />
@@ -262,7 +271,10 @@ export const RewardCard = ({
               {prize.name}
             </h3>
             <p className="text-sm font-bold tracking-wider uppercase text-slate-500 dark:text-slate-400">
-              {slotLabel ?? prize.slot.replace('_', ' ')}
+              {slotLabel ??
+                (prize.kind === 'background'
+                  ? 'Background'
+                  : prize.slot.replace('_', ' '))}
             </p>
           </motion.div>
         </div>
