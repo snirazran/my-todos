@@ -49,6 +49,8 @@ export async function POST(req: NextRequest) {
       $pull: {
         'notificationPrefs.fcmTokens': fcmToken,
         'notificationPrefs.androidFcmTokens': fcmToken,
+        'notificationPrefs.iosFcmTokens': fcmToken,
+        'notificationPrefs.webFcmTokens': fcmToken,
       },
     },
   );
@@ -74,6 +76,26 @@ export async function POST(req: NextRequest) {
           'notificationPrefs.fcmTokens': fcmToken,
           'notificationPrefs.androidFcmTokens': fcmToken,
         },
+        $pull: {
+          'notificationPrefs.iosFcmTokens': fcmToken,
+          'notificationPrefs.webFcmTokens': fcmToken,
+        },
+        $set: baseSet,
+        $setOnInsert: baseSetOnInsert,
+      },
+    );
+  } else if (platform === 'ios') {
+    await UserModel.updateOne(
+      { _id: uid },
+      {
+        $addToSet: {
+          'notificationPrefs.fcmTokens': fcmToken,
+          'notificationPrefs.iosFcmTokens': fcmToken,
+        },
+        $pull: {
+          'notificationPrefs.androidFcmTokens': fcmToken,
+          'notificationPrefs.webFcmTokens': fcmToken,
+        },
         $set: baseSet,
         $setOnInsert: baseSetOnInsert,
       },
@@ -82,8 +104,14 @@ export async function POST(req: NextRequest) {
     await UserModel.updateOne(
       { _id: uid },
       {
-        $addToSet: { 'notificationPrefs.fcmTokens': fcmToken },
-        $pull: { 'notificationPrefs.androidFcmTokens': fcmToken },
+        $addToSet: {
+          'notificationPrefs.fcmTokens': fcmToken,
+          'notificationPrefs.webFcmTokens': fcmToken,
+        },
+        $pull: {
+          'notificationPrefs.androidFcmTokens': fcmToken,
+          'notificationPrefs.iosFcmTokens': fcmToken,
+        },
         $set: baseSet,
         $setOnInsert: baseSetOnInsert,
       },
@@ -124,6 +152,8 @@ export async function DELETE(req: NextRequest) {
       $pull: {
         'notificationPrefs.fcmTokens': fcmToken,
         'notificationPrefs.androidFcmTokens': fcmToken,
+        'notificationPrefs.iosFcmTokens': fcmToken,
+        'notificationPrefs.webFcmTokens': fcmToken,
       },
     },
   );

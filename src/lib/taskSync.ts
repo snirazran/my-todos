@@ -22,10 +22,21 @@ export async function sendTaskSyncMessage(
 ) {
   try {
     const user = await UserModel.findById(userId, {
-      'notificationPrefs.fcmTokens': 1,
-    }).lean<{ notificationPrefs?: { fcmTokens?: string[] } }>();
+      'notificationPrefs.androidFcmTokens': 1,
+      'notificationPrefs.iosFcmTokens': 1,
+    }).lean<{
+      notificationPrefs?: {
+        androidFcmTokens?: string[];
+        iosFcmTokens?: string[];
+      };
+    }>();
     const tokens = Array.from(
-      new Set((user?.notificationPrefs?.fcmTokens ?? []).filter(Boolean)),
+      new Set(
+        [
+          ...(user?.notificationPrefs?.androidFcmTokens ?? []),
+          ...(user?.notificationPrefs?.iosFcmTokens ?? []),
+        ].filter(Boolean),
+      ),
     );
     if (tokens.length === 0) return;
 

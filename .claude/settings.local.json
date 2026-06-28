@@ -158,7 +158,8 @@
       "PowerShell(pnpm add *)",
       "WebFetch(domain:react-wheel-picker.chanhdai.com)",
       "PowerShell(pnpm *)",
-      "WebFetch(domain:tkdodo.eu)"
+      "WebFetch(domain:tkdodo.eu)",
+      "Bash(NODE_OPTIONS= node *)"
     ]
   }
 }
