@@ -2061,7 +2061,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
         week[di].push({
           id: doc.id,
           text: doc.text,
-          order: doc.order,
+          order: doc.orderOverrides?.[date] ?? doc.order,
           type: doc.type,
           completed: (doc.completedDates ?? []).includes(date),
           tags: doc.tags ?? [],
@@ -2102,7 +2102,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
     week[day].push({
       id: doc.id,
       text: doc.text,
-      order: doc.order,
+      order: doc.orderOverrides?.[date] ?? doc.order,
       type: doc.type,
       completed:
         (doc.completedDates ?? []).includes(date) ||
@@ -2252,7 +2252,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         byDate[d].push({
           id: doc.id,
           text: doc.text,
-          order: doc.order,
+          order: doc.orderOverrides?.[d] ?? doc.order,
           type: doc.type,
           completed: (doc.completedDates ?? []).includes(d),
           tags: doc.tags ?? [],
@@ -2282,7 +2282,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         byDate[d].push({
           id: doc.id,
           text: doc.text,
-          order: doc.order,
+          order: doc.orderOverrides?.[d] ?? doc.order,
           type: doc.type,
           completed: (doc.completedDates ?? []).includes(d),
           tags: doc.tags ?? [],
@@ -2312,7 +2312,7 @@ async function handleDateRangeGet(req: NextRequest, uid: string, tz: string) {
         byDate[d].push({
           id: doc.id,
           text: doc.text,
-          order: doc.order,
+          order: doc.orderOverrides?.[d] ?? doc.order,
           type: doc.type,
           completed: (doc.completedDates ?? []).includes(d),
           tags: doc.tags ?? [],
@@ -2755,7 +2755,13 @@ async function handleBoardPutByDate(
         if (occursHere) {
           return TaskModel.updateOne(
             { userId: uid, id: t.id },
-            { $set: { order: i + 1, updatedAt: now, tags } },
+            {
+              $set: {
+                [`orderOverrides.${dateKey}`]: i + 1,
+                updatedAt: now,
+                tags,
+              },
+            },
           );
         }
         // Lands on a non-occurrence day: detach into a one-off regular task.

@@ -13,6 +13,7 @@ export interface TaskDoc {
   completed?: boolean;
   completedDates?: string[]; // YYYY-MM-DD entries where the task was completed
   suppressedDates?: string[]; // YYYY-MM-DD entries hidden for that date
+  orderOverrides?: Record<string, number>; // YYYY-MM-DD -> per-date order for repeating instances
   notes?: string; // free-text notes shown in the task detail card
   checklist?: { id: string; text: string; done: boolean }[]; // Trello-like sub-items
   repeatMode?:
@@ -71,6 +72,7 @@ const TaskSchema = new Schema<TaskDoc>(
     completed: { type: Boolean, default: false },
     completedDates: { type: [String], default: [] },
     suppressedDates: { type: [String], default: [] },
+    orderOverrides: { type: Schema.Types.Mixed, default: undefined },
     notes: { type: String },
     repeatMode: {
       type: String,
