@@ -1061,7 +1061,8 @@ export default function TaskBoard({
 
     if (backlogOpen && finalToDay !== BACKLOG_IDX) setBacklogOpen(false);
 
-    if (finalToDay !== BACKLOG_IDX) centerColumnSmooth(finalToDay);
+    if (finalToDay !== BACKLOG_IDX && window.innerWidth < 768)
+      centerColumnSmooth(finalToDay);
     commitDragReorder(finalToDay, finalToIndex);
 
     endDrag();
