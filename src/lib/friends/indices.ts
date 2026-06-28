@@ -28,4 +28,5 @@ export type FriendSummary = {
   name: string;
   frogName: string;
   indices: FrogIndices;
+  fliesToday: number;
 };

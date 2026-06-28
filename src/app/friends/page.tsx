@@ -2,9 +2,8 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Plus, Bell } from 'lucide-react';
+import { ChevronRight, Plus, Bell } from 'lucide-react';
 import useSWR from 'swr';
-import useEmblaCarousel from 'embla-carousel-react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { useWardrobeIndices } from '@/hooks/useWardrobeIndices';
 import Frog from '@/components/ui/frog';
@@ -20,34 +19,29 @@ const fetcher = (url: string) => fetch(url).then((r) => r.json());
 type UserInfo = { name?: string | null; frogName?: string | null };
 
 const MOCK_FRIENDS: FriendSummary[] = [
-  { userId: 'mock-1', name: 'Lily', frogName: 'Pip', indices: { skin: 2, hat: 0, body: 0, hand_item: 0 } },
-  { userId: 'mock-2', name: 'Sam', frogName: 'Bubbles', indices: { skin: 5, hat: 3, body: 0, hand_item: 0 } },
-  { userId: 'mock-3', name: 'Coco', frogName: 'Tadpole', indices: { skin: 3, hat: 1, body: 0, hand_item: 0 } },
-  { userId: 'mock-4', name: 'Maple', frogName: 'Sprout', indices: { skin: 1, hat: 5, body: 0, hand_item: 0 } },
+  { userId: 'mock-1', name: 'Lily', frogName: 'Pip', indices: { skin: 2, hat: 0, body: 0, hand_item: 0 }, fliesToday: 18 },
+  { userId: 'mock-2', name: 'Sam', frogName: 'Bubbles', indices: { skin: 5, hat: 3, body: 0, hand_item: 0 }, fliesToday: 11 },
+  { userId: 'mock-3', name: 'Coco', frogName: 'Tadpole', indices: { skin: 3, hat: 1, body: 0, hand_item: 0 }, fliesToday: 7 },
+  { userId: 'mock-4', name: 'Maple', frogName: 'Sprout', indices: { skin: 1, hat: 5, body: 0, hand_item: 0 }, fliesToday: 3 },
 ];
 
-function useIsDesktop() {
-  const [isDesktop, setIsDesktop] = useState(false);
-  React.useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)');
-    const update = () => setIsDesktop(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
-  return isDesktop;
-}
+type LeaderboardEntry = FriendSummary & { isSelf: boolean };
 
 export default function FriendsPage() {
   const router = useRouter();
   const { user, loading } = useAuth();
 
+  const tz = React.useMemo(
+    () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+    [],
+  );
+
   const { indices } = useWardrobeIndices(!!user);
   const { data: userInfo } = useSWR<UserInfo>(user ? '/api/user' : null, fetcher, {
     revalidateOnFocus: false,
   });
-  const { data: friendsData } = useSWR<{ friends: FriendSummary[] }>(
-    user ? '/api/friends' : null,
+  const { data: friendsData } = useSWR<{ friends: FriendSummary[]; me: FriendSummary | null }>(
+    user ? `/api/friends?tz=${encodeURIComponent(tz)}` : null,
     fetcher,
     { revalidateOnFocus: false },
   );
@@ -60,13 +54,6 @@ export default function FriendsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
-  const isDesktop = useIsDesktop();
-
-  const [emblaRef, emblaApi] = useEmblaCarousel({
-    loop: true,
-    align: 'center',
-    dragFree: true,
-  });
 
   React.useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -74,20 +61,29 @@ export default function FriendsPage() {
 
   if (loading || !user) return <LoadingScreen />;
 
-  const friends = friendsData?.friends?.length ? friendsData.friends : MOCK_FRIENDS;
+  const hasRealFriends = !!friendsData?.friends?.length;
+  const friends = hasRealFriends ? friendsData!.friends : MOCK_FRIENDS;
   const pendingCount = requestsData?.incoming?.length ?? 0;
 
-  // Embla disables looping when there are too few slides for a centered 3-up
-  // view, so repeat the list until there are enough for a seamless endless loop.
-  const carouselFriends = friends.length
-    ? Array.from({ length: Math.ceil(7 / friends.length) }).flatMap(() => friends)
-    : [];
+  const meFrogName = userInfo?.frogName || friendsData?.me?.frogName || 'Frog';
 
-  const meFrogName = userInfo?.frogName || 'Frog';
+  const selfEntry: LeaderboardEntry = {
+    userId: friendsData?.me?.userId ?? 'me',
+    name: userInfo?.name ?? friendsData?.me?.name ?? 'You',
+    frogName: meFrogName,
+    indices,
+    fliesToday: friendsData?.me?.fliesToday ?? 0,
+    isSelf: true,
+  };
 
-  // Own frog matches the home page frog (240×180); friends a touch smaller.
-  const selfSize = { w: 240, h: 180 };
-  const friendSize = isDesktop ? { w: 150, h: 126 } : { w: 134, h: 112 };
+  const leaderboard: LeaderboardEntry[] = [
+    selfEntry,
+    ...friends.map((f) => ({ ...f, isSelf: false })),
+  ].sort(
+    (a, b) =>
+      b.fliesToday - a.fliesToday ||
+      (a.frogName || a.name).localeCompare(b.frogName || b.name),
+  );
 
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
@@ -106,14 +102,9 @@ export default function FriendsPage() {
         )}
       </button>
 
-      <div className="relative z-10 mx-auto flex max-w-3xl flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:pt-4">
+      <div className="relative z-10 mx-auto flex max-w-2xl flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:pt-4">
         {/* Self frog */}
-        <SelfFrog
-          frogName={meFrogName}
-          indices={indices}
-          width={selfSize.w}
-          height={selfSize.h}
-        />
+        <SelfFrog frogName={meFrogName} indices={indices} />
 
         {/* Add friend — frog sits right on top of it */}
         <button
@@ -127,41 +118,32 @@ export default function FriendsPage() {
           Add friend
         </button>
 
-        {/* Friends carousel (swipeable, looping) */}
-        {friends.length > 0 && (
-          <div className="relative -mt-1 w-full max-w-xl md:mt-1 md:max-w-3xl">
-            <div className="overflow-hidden" ref={emblaRef}>
-              <div className="flex touch-pan-y items-end">
-                {carouselFriends.map((friend, i) => (
-                  <div
-                    key={`${friend.userId}-${i}`}
-                    className="flex min-w-0 shrink-0 grow-0 basis-1/3 justify-center"
-                  >
-                    <FriendFrog friend={friend} width={friendSize.w} height={friendSize.h} />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {friends.length > 1 && (
-              <>
-                <CarouselArrow
-                  dir="left"
-                  onClick={() => emblaApi?.scrollPrev()}
-                  className="absolute left-0 top-1/2 -translate-y-1/2"
-                />
-                <CarouselArrow
-                  dir="right"
-                  onClick={() => emblaApi?.scrollNext()}
-                  className="absolute right-0 top-1/2 -translate-y-1/2"
-                />
-              </>
-            )}
+        {/* Leaderboard */}
+        <div className="mt-6 w-full">
+          <div className="mb-3 flex items-baseline justify-between px-1">
+            <h2 className="text-lg font-black tracking-tight text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)]">
+              Today&apos;s leaderboard
+            </h2>
+            <span className="text-xs font-bold uppercase tracking-[0.14em] text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]">
+              Flies caught
+            </span>
           </div>
-        )}
+
+          <ul className="flex flex-col gap-2">
+            {leaderboard.map((entry, i) => (
+              <LeaderboardRow key={`${entry.userId}-${i}`} entry={entry} rank={i + 1} />
+            ))}
+          </ul>
+
+          {!hasRealFriends && (
+            <p className="mt-3 px-1 text-center text-sm font-semibold text-white/70 drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]">
+              Add friends to start a real leaderboard.
+            </p>
+          )}
+        </div>
 
         {/* Invite banner */}
-        <div className="mt-4 w-full max-w-lg md:mt-8">
+        <div className="mt-5 w-full max-w-lg">
           <InviteRewardBanner onClick={() => setInviteOpen(true)} />
         </div>
       </div>
@@ -170,6 +152,60 @@ export default function FriendsPage() {
       <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
       <FriendRequestsInbox open={inboxOpen} onClose={() => setInboxOpen(false)} />
     </main>
+  );
+}
+
+const RANK_RING: Record<number, string> = {
+  1: 'bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950',
+  2: 'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800',
+  3: 'bg-gradient-to-br from-orange-300 to-orange-500 text-orange-950',
+};
+
+function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
+  const medal = RANK_RING[rank];
+  return (
+    <li
+      className={`flex items-center gap-3 rounded-2xl px-3 py-2 shadow-md ring-1 transition-colors ${
+        entry.isSelf
+          ? 'bg-emerald-50 ring-emerald-400'
+          : 'bg-white/90 ring-black/5'
+      }`}
+    >
+      <span
+        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black ${
+          medal ?? 'bg-emerald-100 text-emerald-700'
+        }`}
+      >
+        {rank}
+      </span>
+
+      <div className="flex h-12 w-14 shrink-0 items-end justify-center overflow-hidden">
+        <Frog width={64} height={54} indices={entry.indices} paused />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-base font-black leading-tight tracking-tight text-emerald-950">
+          {entry.frogName || entry.name}
+          {entry.isSelf && (
+            <span className="ml-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 align-middle text-[10px] font-black uppercase tracking-wide text-white">
+              You
+            </span>
+          )}
+        </p>
+        {entry.name && entry.frogName && entry.name !== entry.frogName && (
+          <p className="truncate text-xs font-semibold text-emerald-700/70">
+            {entry.name}
+          </p>
+        )}
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1">
+        <Fly size={22} y={-1} paused />
+        <span className="text-base font-black tabular-nums text-emerald-800">
+          {entry.fliesToday}
+        </span>
+      </div>
+    </li>
   );
 }
 
@@ -242,61 +278,16 @@ function InviteRewardBanner({ onClick }: { onClick: () => void }) {
 function SelfFrog({
   frogName,
   indices,
-  width,
-  height,
 }: {
   frogName: string;
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
-  width: number;
-  height: number;
 }) {
   return (
     <div className="flex shrink-0 flex-col items-center">
       <p className="translate-y-5 text-xl font-black tracking-tight text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)] md:translate-y-7">
         {frogName}
       </p>
-      <Frog width={width} height={height} indices={indices} />
+      <Frog width={240} height={180} indices={indices} />
     </div>
-  );
-}
-
-function FriendFrog({
-  friend,
-  width,
-  height,
-}: {
-  friend: FriendSummary;
-  width: number;
-  height: number;
-}) {
-  return (
-    <div className="flex flex-col items-center">
-      <Frog width={width} height={height} indices={friend.indices} />
-      <p className="mt-1 max-w-[6rem] truncate text-base font-black tracking-tight text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)] sm:max-w-none">
-        {friend.frogName || friend.name}
-      </p>
-    </div>
-  );
-}
-
-function CarouselArrow({
-  dir,
-  onClick,
-  className = '',
-}: {
-  dir: 'left' | 'right';
-  onClick: () => void;
-  className?: string;
-}) {
-  const Icon = dir === 'left' ? ChevronLeft : ChevronRight;
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={dir === 'left' ? 'Previous friends' : 'Next friends'}
-      className={`z-20 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black/55 text-white shadow-md transition-transform active:scale-90 ${className}`}
-    >
-      <Icon className="h-5 w-5" strokeWidth={3} />
-    </button>
   );
 }
