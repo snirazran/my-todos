@@ -65,15 +65,22 @@ export default function ManageTasksPage() {
   // newer one's state. Only the latest full (non-merge) refetch is applied;
   // merges target disjoint date keys and always apply.
   const fullFetchSeqRef = useRef(0);
+  const pendingWritesRef = useRef(0);
+  const writeActivityRef = useRef(0);
   const fetchRange = useCallback(
     async (from: string, to: string, mergeOnly = false) => {
       const seq = mergeOnly ? 0 : ++fullFetchSeqRef.current;
+      const activityAtStart = writeActivityRef.current;
       const res = await fetch(
         `/api/tasks?view=dateRange&from=${from}&to=${to}&timezone=${encodeURIComponent(tz)}`,
       );
       if (!res.ok) throw new Error(`status ${res.status}`);
       const data = (await res.json()) as DateRangeResponse;
-      if (!mergeOnly && seq !== fullFetchSeqRef.current) return;
+      if (!mergeOnly) {
+        if (seq !== fullFetchSeqRef.current) return;
+        if (pendingWritesRef.current > 0) return;
+        if (writeActivityRef.current !== activityAtStart) return;
+      }
       setTasksByDate((prev) =>
         mergeOnly ? { ...prev, ...data.byDate } : data.byDate,
       );
@@ -114,12 +121,28 @@ export default function ManageTasksPage() {
   // its old completed value (and re-sort it) before settling.
   const refetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scheduleRefetch = useCallback(() => {
+    if (pendingWritesRef.current > 0) return;
     if (refetchTimerRef.current) clearTimeout(refetchTimerRef.current);
     refetchTimerRef.current = setTimeout(() => {
       refetchTimerRef.current = null;
       void refetchAll();
     }, 300);
   }, [refetchAll]);
+
+  const trackWrite = useCallback(
+    async <T,>(run: () => Promise<T>): Promise<T> => {
+      pendingWritesRef.current += 1;
+      writeActivityRef.current += 1;
+      try {
+        return await run();
+      } finally {
+        pendingWritesRef.current = Math.max(0, pendingWritesRef.current - 1);
+        writeActivityRef.current += 1;
+        if (pendingWritesRef.current === 0) scheduleRefetch();
+      }
+    },
+    [scheduleRefetch],
+  );
 
   useEffect(() => {
     window.addEventListener('tags-updated', scheduleRefetch);
@@ -253,61 +276,67 @@ export default function ManageTasksPage() {
       toDate: string,
       order?: number,
     ) => {
-      try {
-        await fetch('/api/tasks', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            moveInstance: { taskId, newId, fromDate, toDate, order },
-            timezone: tz,
-          }),
-        });
-      } catch (e) {
-        console.error('moveRepeatInstance failed', e);
-      }
+      await trackWrite(async () => {
+        try {
+          await fetch('/api/tasks', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              moveInstance: { taskId, newId, fromDate, toDate, order },
+              timezone: tz,
+            }),
+          });
+        } catch (e) {
+          console.error('moveRepeatInstance failed', e);
+        }
+      });
     },
-    [tz],
+    [tz, trackWrite],
   );
 
   // Save tasks for a specific date (full reorder for that column)
   const saveDate = useCallback(
     async (dateKey: string, tasks: Task[]) => {
       const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
-      try {
-        await fetch('/api/tasks?view=board', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            dateKey,
-            tasks: ordered,
-            timezone: tz,
-          }),
-        });
-      } catch (e) {
-        console.warn('saveDate failed', e);
-      }
+      await trackWrite(async () => {
+        try {
+          await fetch('/api/tasks?view=board', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              dateKey,
+              tasks: ordered,
+              timezone: tz,
+            }),
+          });
+        } catch (e) {
+          console.warn('saveDate failed', e);
+        }
+      });
     },
-    [tz],
+    [tz, trackWrite],
   );
 
   const saveBacklog = useCallback(
     async (tasks: Task[]) => {
       const ordered = tasks.map((t, i) => ({ ...t, order: i + 1 }));
-      try {
-        await fetch('/api/tasks?view=board', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            day: -1,
-            tasks: ordered,
-            timezone: tz,
-          }),
-        });
-      } catch (e) {
-        console.warn('saveBacklog failed', e);
-      }
+      await trackWrite(async () => {
+        try {
+          await fetch('/api/tasks?view=board', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              day: -1,
+              tasks: ordered,
+              timezone: tz,
+            }),
+          });
+        } catch (e) {
+          console.warn('saveBacklog failed', e);
+        }
+      });
     },
-    [tz],
+    [tz, trackWrite],
   );
 
   const removeOnDate = useCallback(
@@ -316,35 +345,39 @@ export default function ManageTasksPage() {
         const list = (prev[dateKey] ?? []).filter((t) => t.id !== id);
         return { ...prev, [dateKey]: list };
       });
-      try {
-        await fetch('/api/tasks?view=board', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dateKey, taskId: id, timezone: tz }),
-        });
-      } catch (e) {
-        console.error('Delete failed', e);
-        refetchAll();
-      }
+      await trackWrite(async () => {
+        try {
+          await fetch('/api/tasks?view=board', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ dateKey, taskId: id, timezone: tz }),
+          });
+        } catch (e) {
+          console.error('Delete failed', e);
+          refetchAll();
+        }
+      });
     },
-    [tz, refetchAll],
+    [tz, refetchAll, trackWrite],
   );
 
   const removeFromBacklog = useCallback(
     async (id: string) => {
       setBacklog((prev) => prev.filter((t) => t.id !== id));
-      try {
-        await fetch('/api/tasks?view=board', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ day: -1, taskId: id, timezone: tz }),
-        });
-      } catch (e) {
-        console.error('Delete failed', e);
-        refetchAll();
-      }
+      await trackWrite(async () => {
+        try {
+          await fetch('/api/tasks?view=board', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ day: -1, taskId: id, timezone: tz }),
+          });
+        } catch (e) {
+          console.error('Delete failed', e);
+          refetchAll();
+        }
+      });
     },
-    [tz, refetchAll],
+    [tz, refetchAll, trackWrite],
   );
 
   const onAddTask = useCallback(

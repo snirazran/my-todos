@@ -921,10 +921,7 @@ export default function TaskBoard({
         destList.splice(destIndex, 0, moved);
         setColAt(drag.fromDay, sourceList);
         setColAt(toDay, destList);
-        Promise.all([
-          saveCol(drag.fromDay, sourceList),
-          saveCol(toDay, destList),
-        ]).catch(() => {});
+        saveCol(toDay, destList).catch(() => {});
       }
     },
     [

@@ -157,7 +157,8 @@
       "WebFetch(domain:registry.npmjs.org)",
       "PowerShell(pnpm add *)",
       "WebFetch(domain:react-wheel-picker.chanhdai.com)",
-      "PowerShell(pnpm *)"
+      "PowerShell(pnpm *)",
+      "WebFetch(domain:tkdodo.eu)"
     ]
   }
 }
