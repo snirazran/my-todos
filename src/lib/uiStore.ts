@@ -21,6 +21,9 @@ interface UIState {
 
   isLoadingScreenVisible: boolean;
   setLoadingScreenVisible: (visible: boolean) => void;
+
+  isPremiumModalOpen: boolean;
+  setPremiumModalOpen: (open: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -45,6 +48,9 @@ export const useUIStore = create<UIState>()(
 
       isLoadingScreenVisible: false,
       setLoadingScreenVisible: (visible: boolean) => set({ isLoadingScreenVisible: visible }),
+
+      isPremiumModalOpen: false,
+      setPremiumModalOpen: (open: boolean) => set({ isPremiumModalOpen: open }),
     }),
     {
       name: 'frogress-ui-storage',

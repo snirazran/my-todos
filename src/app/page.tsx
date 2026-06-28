@@ -49,6 +49,7 @@ import {
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { randomUUID } from '@/lib/uuid';
 import { QuestOnboardingPopup } from '@/components/ui/QuestOnboardingPopup';
+import { PlusUpgradeModal } from '@/components/ui/PlusUpgradeModal';
 import type {
   FocusCategoryTagMap,
   MacroCategoryDefinition,
@@ -84,6 +85,8 @@ export default function Home() {
     isWardrobeOpen,
     setWardrobeOpen,
     setIsCinematicActive,
+    isPremiumModalOpen,
+    setPremiumModalOpen,
   } = useUIStore();
 
   // -- NEW STATE HOOK --
@@ -915,6 +918,11 @@ export default function Home() {
           mutateQuests();
           mutateToday();
         }}
+      />
+
+      <PlusUpgradeModal
+        open={isPremiumModalOpen}
+        onClose={() => setPremiumModalOpen(false)}
       />
 
       {/* Floating Add Task FAB */}

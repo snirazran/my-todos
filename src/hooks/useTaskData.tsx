@@ -7,6 +7,7 @@ import { useReminderScheduler } from '@/hooks/useReminderScheduler';
 import { INVENTORY_KEY, INVENTORY_SUMMARY_KEY } from '@/hooks/useInventory';
 import { notifyQuestClaims, seedQuestClaims } from '@/lib/questClaims';
 import Fly from '@/components/ui/fly';
+import { useUIStore } from '@/lib/uiStore';
 
 // --- Types ---
 export interface ChecklistItem {
@@ -60,6 +61,7 @@ export type FlyStatus = {
   limit: number;
   limitHit: boolean;
   justHitLimit?: boolean;
+  isPremium?: boolean;
 };
 
 export type HungerStatus = {
@@ -245,7 +247,7 @@ export function useTaskData({
   const flyStatus = todayData?.flyStatus || {
     balance: 0,
     earnedToday: 0,
-    limit: 15,
+    limit: 50,
     limitHit: false,
   };
   const hungerStatus = todayData?.hungerStatus || {
@@ -338,14 +340,50 @@ export function useTaskData({
               const newEarned = newFlyStatus.earnedToday;
 
               if (newFlyStatus.justHitLimit) {
-                showNotification(
-                  <div className="flex items-center gap-3 pr-1">
-                    <Fly size={28} y={-4} />
-                    <span className="font-bold text-red-500">
-                      Daily Target Reached!
-                    </span>
-                  </div>,
-                );
+                if (newFlyStatus.isPremium) {
+                  showNotification(
+                    <div className="flex w-full items-center gap-3">
+                      <div className="grid h-12 w-12 shrink-0 place-items-center">
+                        <Fly size={44} y={-2} />
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col leading-tight">
+                        <span className="text-[14px] font-black text-foreground">
+                          Daily max reached — {newFlyStatus.limit} flies!
+                        </span>
+                        <span className="mt-0.5 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                          Incredible focus today
+                        </span>
+                      </div>
+                    </div>,
+                    undefined,
+                    { durationMs: 5000 },
+                  );
+                } else {
+                  showNotification(
+                    <button
+                      type="button"
+                      onClick={() => {
+                        useUIStore.getState().setPremiumModalOpen(true);
+                        hideNotification();
+                      }}
+                      className="flex w-full items-center gap-3 text-left"
+                    >
+                      <div className="grid h-12 w-12 shrink-0 place-items-center">
+                        <Fly size={44} y={-2} />
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col leading-tight">
+                        <span className="text-[14px] font-black text-foreground">
+                          Daily limit reached — {newFlyStatus.limit} flies
+                        </span>
+                        <span className="mt-0.5 text-[12px] font-bold text-primary">
+                          Go Premium for up to 100 flies a day →
+                        </span>
+                      </div>
+                    </button>,
+                    undefined,
+                    { durationMs: 8000 },
+                  );
+                }
               } else if (newEarned > prevEarned) {
                 const gained = newEarned - prevEarned;
                 showNotification(

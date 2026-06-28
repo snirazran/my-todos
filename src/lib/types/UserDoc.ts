@@ -10,6 +10,11 @@ export type DailyFlyProgress = {
   limitNotified?: boolean;
 };
 
+export type FriendFlyDaily = {
+  date: string;
+  credited: Record<string, number>;
+};
+
 // --- UPDATED STATISTICS TYPES ---
 export type DailyStats = {
   date: string;
@@ -43,6 +48,7 @@ export type UserWardrobe = {
   unseenItems?: string[];
   flies: number;
   flyDaily?: DailyFlyProgress;
+  friendFlyDaily?: FriendFlyDaily;
 
   // Hunger System
   hunger?: number; // Time remaining in ms (Max 24h = 86400000)

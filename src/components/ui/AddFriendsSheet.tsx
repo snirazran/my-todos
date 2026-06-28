@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, QrCode } from 'lucide-react';
+import { Search, QrCode, ChevronRight } from 'lucide-react';
 import { BaseSheet } from '@/components/ui/BaseSheet';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { EnterFriendCodeModal } from '@/components/ui/EnterFriendCodeModal';
@@ -25,52 +25,73 @@ export function AddFriendsSheet({
       <BaseSheet
         open={open}
         onOpenChange={(v) => !v && onClose()}
-        className="!bg-[#4f9149] bg-gradient-to-b from-[#57a84e] to-[#3f8038] text-white sm:max-w-md"
+        className="border-0 sm:max-w-2xl"
         closeAriaLabel="Close add friends"
+        hideHandle
       >
         {() => (
-          <div
-            className="flex flex-col gap-4 px-5 pb-[calc(env(safe-area-inset-bottom)+1.75rem)] pt-2"
-          >
-            <h2 className="text-center text-xl font-black tracking-tight text-white">
-              Add Friends
-            </h2>
+          <div className="flex flex-col">
+            <div className="relative">
+              <img
+                src="/friend-share.png"
+                alt="Friends sending the flies they catch into your basket"
+                className="w-full object-cover"
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent px-5 pb-4 pt-20 text-center sm:pb-5 sm:pt-10">
+                <h2 className="text-2xl font-black tracking-tight text-white drop-shadow-[0_2px_5px_rgba(0,0,0,0.55)] sm:text-4xl">
+                  Earn together!
+                </h2>
+                <p className="mx-auto mt-1 max-w-[24rem] text-[13px] font-semibold leading-snug text-white/90 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)] sm:text-base">
+                  Every 2 flies a friend catches earns you 1 — and yours feed
+                  them back.
+                </p>
+              </div>
+            </div>
 
-            <button
-              type="button"
-              onClick={() => setInviteOpen(true)}
-              className="rounded-[22px] bg-white px-5 py-6 text-center shadow-sm transition-transform active:scale-[0.98]"
-            >
-              <div className="text-3xl">🎁</div>
-              <p className="mt-1 text-xl font-black tracking-tight text-zinc-900">
-                Invite your friends
-              </p>
-              <p className="mt-0.5 text-sm font-medium text-zinc-400">
-                Get rewarded when they join!
-              </p>
-            </button>
-
-            <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-3 px-5 pb-[calc(env(safe-area-inset-bottom)+1.75rem)] pt-4 sm:gap-4 sm:px-6 sm:pt-5">
               <button
                 type="button"
-                onClick={() => setCodeOpen(true)}
-                className="flex flex-col items-center gap-3 rounded-[22px] bg-white px-4 py-6 shadow-sm transition-transform active:scale-[0.98]"
+                onClick={() => setInviteOpen(true)}
+                className="flex items-center gap-3 rounded-2xl bg-emerald-500 px-4 py-3.5 text-left text-white shadow-[0_5px_0_rgba(16,122,72,0.4)] transition-all active:translate-y-0.5 active:shadow-[0_2px_0_rgba(16,122,72,0.4)] sm:py-4"
               >
-                <Search className="h-8 w-8 text-sky-500" strokeWidth={2.5} />
-                <span className="text-base font-black tracking-tight text-zinc-900">
-                  Enter code
+                <span className="text-2xl leading-none sm:text-3xl">🎁</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-base font-black tracking-tight sm:text-lg">
+                    Invite friends
+                  </span>
+                  <span className="block text-xs font-semibold text-white/80 sm:text-[13px]">
+                    Earn a reward when they join
+                  </span>
                 </span>
+                <ChevronRight className="h-5 w-5 shrink-0 text-white/80" />
               </button>
-              <button
-                type="button"
-                onClick={() => setQrOpen(true)}
-                className="flex flex-col items-center gap-3 rounded-[22px] bg-white px-4 py-6 shadow-sm transition-transform active:scale-[0.98]"
-              >
-                <QrCode className="h-8 w-8 text-zinc-800" strokeWidth={2.5} />
-                <span className="text-base font-black tracking-tight text-zinc-900">
-                  QR code
-                </span>
-              </button>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setCodeOpen(true)}
+                  className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/60 bg-muted/40 px-4 py-5 transition-transform active:scale-[0.98] sm:py-6"
+                >
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-sky-500/10 sm:h-12 sm:w-12">
+                    <Search className="h-6 w-6 text-sky-500" strokeWidth={2.5} />
+                  </span>
+                  <span className="text-sm font-black tracking-tight text-foreground sm:text-base">
+                    Enter code
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQrOpen(true)}
+                  className="flex flex-col items-center gap-2.5 rounded-2xl border border-border/60 bg-muted/40 px-4 py-5 transition-transform active:scale-[0.98] sm:py-6"
+                >
+                  <span className="flex h-11 w-11 items-center justify-center rounded-full bg-emerald-500/10 sm:h-12 sm:w-12">
+                    <QrCode className="h-6 w-6 text-emerald-600" strokeWidth={2.5} />
+                  </span>
+                  <span className="text-sm font-black tracking-tight text-foreground sm:text-base">
+                    QR code
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         )}

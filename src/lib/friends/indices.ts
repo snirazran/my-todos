@@ -29,4 +29,11 @@ export type FriendSummary = {
   frogName: string;
   indices: FrogIndices;
   fliesToday: number;
+  /** Flies this friend contributes to you today (floor of their flies / 2). */
+  givesYou?: number;
 };
+
+/** Flies a friend's daily catch contributes to you: every 2 → 1. */
+export function contributionFrom(fliesToday: number): number {
+  return Math.floor(Math.max(0, fliesToday) / 2);
+}

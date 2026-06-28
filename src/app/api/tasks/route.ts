@@ -18,7 +18,7 @@ import {
   MAX_HUNGER_MS,
   TASK_HUNGER_REWARD_MS,
 } from '@/lib/hungerLogic';
-import { syncQuestState } from '@/lib/quests/engine';
+import { syncQuestState, isPremiumUser } from '@/lib/quests/engine';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { notifyTaskChanged } from '@/lib/taskSync';
 
@@ -31,6 +31,7 @@ type FlyStatus = {
   limit: number;
   limitHit: boolean;
   justHitLimit?: boolean;
+  isPremium?: boolean;
 };
 
 type HungerStatus = {
@@ -39,7 +40,8 @@ type HungerStatus = {
   maxHunger: number;
 };
 
-const DAILY_FLY_LIMIT = 15;
+const DAILY_FLY_LIMIT_FREE = 50;
+const DAILY_FLY_LIMIT_PREMIUM = 100;
 
 const isWeekday = (n: number): n is Weekday =>
   Number.isInteger(n) && n >= 0 && n <= 6;
@@ -382,6 +384,7 @@ async function currentFlyStatus(
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
     statistics: 1,
+    premiumUntil: 1,
   }).lean()) as LeanUser;
 
   if (!user) {
@@ -389,8 +392,9 @@ async function currentFlyStatus(
       flyStatus: {
         balance: 0,
         earnedToday: 0,
-        limit: DAILY_FLY_LIMIT,
+        limit: DAILY_FLY_LIMIT_FREE,
         limitHit: false,
+        isPremium: false,
       },
       hungerStatus: {
         hunger: MAX_HUNGER_MS,
@@ -401,6 +405,8 @@ async function currentFlyStatus(
     };
   }
 
+  const premium = isPremiumUser(user);
+  const limit = premium ? DAILY_FLY_LIMIT_PREMIUM : DAILY_FLY_LIMIT_FREE;
   const { updates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
   const daily = normalizeDailyFly(
@@ -442,8 +448,9 @@ async function currentFlyStatus(
     flyStatus: {
       balance: currentBalance,
       earnedToday: daily.earned,
-      limit: DAILY_FLY_LIMIT,
-      limitHit: false,
+      limit,
+      limitHit: daily.earned >= limit,
+      isPremium: premium,
     },
     hungerStatus,
     dailyTasksCount,
@@ -472,6 +479,7 @@ async function awardFlyForTask(
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
     statistics: 1, // Include statistics
+    premiumUntil: 1,
   }).lean()) as LeanUser;
 
   if (!user) {
@@ -480,8 +488,9 @@ async function awardFlyForTask(
       flyStatus: {
         balance: 0,
         earnedToday: 0,
-        limit: DAILY_FLY_LIMIT,
+        limit: DAILY_FLY_LIMIT_FREE,
         limitHit: false,
+        isPremium: false,
       },
       hungerStatus: {
         hunger: MAX_HUNGER_MS,
@@ -492,6 +501,8 @@ async function awardFlyForTask(
     };
   }
 
+  const premium = isPremiumUser(user);
+  const limit = premium ? DAILY_FLY_LIMIT_PREMIUM : DAILY_FLY_LIMIT_FREE;
   const { updates: hungerUpdates, status: currentHungerState } =
     calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
@@ -500,7 +511,7 @@ async function awardFlyForTask(
     wardrobe.flyDaily as DailyFlyProgress | undefined,
   );
   const alreadyRewarded = (daily.taskIds ?? []).includes(taskId);
-  const atLimit = daily.earned >= DAILY_FLY_LIMIT;
+  const atLimit = daily.earned >= limit;
   const limitNotified = daily.limitNotified ?? false;
   let currentBalance = hungerUpdates['wardrobe.flies'] ?? wardrobe.flies ?? 0;
 
@@ -563,8 +574,9 @@ async function awardFlyForTask(
       flyStatus: {
         balance: currentBalance,
         earnedToday: daily.earned,
-        limit: DAILY_FLY_LIMIT,
+        limit,
         limitHit: atLimit,
+        isPremium: premium,
       },
       hungerStatus: currentHungerState,
       dailyTasksCount: nextDailyTasksCount,
@@ -591,7 +603,7 @@ async function awardFlyForTask(
   const desired = Math.max(1, Math.floor(value));
   let grant = desired;
   if (countTowardDaily) {
-    grant = Math.min(desired, Math.max(0, DAILY_FLY_LIMIT - daily.earned));
+    grant = Math.min(desired, Math.max(0, limit - daily.earned));
   }
 
   let nextEarned = daily.earned;
@@ -605,7 +617,7 @@ async function awardFlyForTask(
     setFields['wardrobe.flies'] = nextBalance;
   }
 
-  const hitLimit = nextEarned >= DAILY_FLY_LIMIT;
+  const hitLimit = nextEarned >= limit;
   const nextDaily: DailyFlyProgress = {
     date: today,
     earned: nextEarned,
@@ -635,10 +647,11 @@ async function awardFlyForTask(
     flyStatus: {
       balance: nextBalance,
       earnedToday: nextEarned,
-      limit: DAILY_FLY_LIMIT,
+      limit,
       limitHit: hitLimit,
       justHitLimit:
         countTowardDaily && hitLimit && !limitNotified ? true : undefined,
+      isPremium: premium,
     },
     hungerStatus: finalHungerStatus,
     dailyTasksCount: nextDailyTasksCount,
@@ -659,6 +672,7 @@ async function unawardFlyForTask(
   const user = (await UserModel.findById(userId, {
     wardrobe: 1,
     statistics: 1,
+    premiumUntil: 1,
   }).lean()) as LeanUser;
 
   if (!user) {
@@ -666,8 +680,9 @@ async function unawardFlyForTask(
       flyStatus: {
         balance: 0,
         earnedToday: 0,
-        limit: DAILY_FLY_LIMIT,
+        limit: DAILY_FLY_LIMIT_FREE,
         limitHit: false,
+        isPremium: false,
       },
       hungerStatus: {
         hunger: MAX_HUNGER_MS,
@@ -678,6 +693,8 @@ async function unawardFlyForTask(
     };
   }
 
+  const premium = isPremiumUser(user);
+  const limit = premium ? DAILY_FLY_LIMIT_PREMIUM : DAILY_FLY_LIMIT_FREE;
   const { updates: hungerUpdates, status: hungerStatus } = calculateHunger(user);
   const wardrobe = user.wardrobe ?? { equipped: {}, inventory: {}, flies: 0 };
   const daily = normalizeDailyFly(
@@ -707,7 +724,7 @@ async function unawardFlyForTask(
       earned: nextEarned,
       taskIds: (daily.taskIds ?? []).filter((id) => id !== taskId),
       taskFlies: nextTaskFlies,
-      limitNotified: nextEarned >= DAILY_FLY_LIMIT ? daily.limitNotified : false,
+      limitNotified: nextEarned >= limit ? daily.limitNotified : false,
     };
     setFields['wardrobe.flies'] = nextBalance;
     setFields['wardrobe.flyDaily'] = nextDaily;
@@ -721,8 +738,9 @@ async function unawardFlyForTask(
     flyStatus: {
       balance: nextBalance,
       earnedToday: nextEarned,
-      limit: DAILY_FLY_LIMIT,
-      limitHit: nextEarned >= DAILY_FLY_LIMIT,
+      limit,
+      limitHit: nextEarned >= limit,
+      isPremium: premium,
     },
     hungerStatus,
     dailyTasksCount,
