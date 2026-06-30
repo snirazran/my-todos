@@ -159,7 +159,10 @@
       "WebFetch(domain:react-wheel-picker.chanhdai.com)",
       "PowerShell(pnpm *)",
       "WebFetch(domain:tkdodo.eu)",
-      "Bash(NODE_OPTIONS= node *)"
+      "Bash(NODE_OPTIONS= node *)",
+      "Bash(sed -i '' 's/  if\\(!rule||!start\\) return false;/  if\\(!rule||!start\\) return false;\\\\n  if\\(date<start\\) return false;/' rep.mjs)",
+      "Bash(node rep.mjs)",
+      "Bash(git log *)"
     ]
   }
 }

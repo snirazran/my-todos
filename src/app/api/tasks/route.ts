@@ -270,6 +270,7 @@ function customOccursOn(
   const rule = task.repeatRule;
   const start = task.repeatStartDate;
   if (!rule || !start) return false;
+  if (date < start) return false;
   const interval = Math.max(1, rule.interval || 1);
 
   if (rule.freq === 'daily') {
@@ -1738,31 +1739,70 @@ export async function DELETE(req: NextRequest) {
   const body = await req.json();
   const tz = body.timezone || 'UTC';
 
-  // Delete a whole repeat series: the linked group (daily/weekdays), or a lone
-  // weekly task across all weeks.
+  // Delete a whole repeat series (the linked group, or a lone weekly task):
+  // stop it going forward, but preserve every PAST occurrence as a standalone
+  // one-off task — completed and missed alike — so history isn't lost and the
+  // past tasks no longer read as repeating.
   if (body.deleteSeries && body.taskId) {
     const doc = await TaskModel.findOne(
       { userId: uid, id: body.taskId },
       { repeatGroupId: 1, type: 1 },
     ).lean<TaskDoc>();
-    if (doc?.repeatGroupId) {
-      await TaskModel.deleteMany({
-        userId: uid,
-        repeatGroupId: doc.repeatGroupId,
-      });
-    } else {
-      await TaskModel.updateOne(
-        { userId: uid, id: body.taskId },
-        { $set: { deletedAt: new Date() } },
-      );
-      const today = getZonedToday(tz);
-      await TaskModel.deleteMany({
-        userId: uid,
-        type: 'regular',
-        id: body.taskId,
-        date: { $gte: today },
-      });
+    const today = getZonedToday(tz);
+    const cutoff = addDaysYMD(today, -1);
+    const seriesFilter = doc?.repeatGroupId
+      ? { userId: uid, repeatGroupId: doc.repeatGroupId }
+      : { userId: uid, id: body.taskId };
+    const seriesDocs = await TaskModel.find(seriesFilter).lean<TaskDoc[]>();
+    const now = new Date();
+    const toInsert: Record<string, unknown>[] = [];
+    for (const s of seriesDocs) {
+      if (s.type !== 'weekly') continue;
+      const start = repeatStartForDoc(s, tz);
+      if (!start) continue;
+      const suppressed = new Set(s.suppressedDates ?? []);
+      const completed = new Set(s.completedDates ?? []);
+      let d = start;
+      for (let guard = 0; guard < 1000 && d <= cutoff; guard++, d = addDaysYMD(d, 1)) {
+        if (suppressed.has(d)) continue;
+        if (!siblingOccursOn(s, d)) continue;
+        const session = s.frogodoroSessions?.find((x) => x.date === d);
+        const isOriginal = d === start;
+        toInsert.push({
+          userId: uid,
+          id: uuid(),
+          type: 'regular',
+          text: s.text,
+          date: d,
+          order: s.orderOverrides?.[d] ?? s.order ?? 0,
+          completed: completed.has(d),
+          completedDates: completed.has(d) ? [d] : [],
+          tags: s.tags ?? [],
+          notes: isOriginal ? s.notes ?? '' : '',
+          checklist: isOriginal ? s.checklist ?? [] : [],
+          startTime: s.startTime,
+          endTime: s.endTime,
+          reminder: s.reminder,
+          frogodoroSettings: isOriginal ? s.frogodoroSettings : undefined,
+          frogodoroSessions: session ? [session] : [],
+          createdAt: now,
+          updatedAt: now,
+        });
+      }
     }
+    if (toInsert.length) await TaskModel.insertMany(toInsert);
+    const seriesIds = seriesDocs.map((s) => s.id);
+    await TaskModel.deleteMany({
+      userId: uid,
+      type: 'weekly',
+      id: { $in: seriesIds },
+    });
+    await TaskModel.deleteMany({
+      userId: uid,
+      type: 'regular',
+      id: { $in: seriesIds },
+      date: { $gte: today },
+    });
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
@@ -1808,17 +1848,10 @@ export async function DELETE(req: NextRequest) {
   if (!doc)
     return NextResponse.json({ error: 'Task not found' }, { status: 404 });
   if (doc.type === 'weekly') {
-    if (body.permanent) {
-      await TaskModel.updateOne(
-        { userId: uid, id: taskId },
-        { $set: { deletedAt: new Date() } },
-      );
-    } else {
-      await TaskModel.updateOne(
-        { userId: uid, id: taskId },
-        { $addToSet: { suppressedDates: date } },
-      );
-    }
+    await TaskModel.updateOne(
+      { userId: uid, id: taskId },
+      { $addToSet: { suppressedDates: date } },
+    );
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });
@@ -1880,7 +1913,7 @@ async function handleDailyGet(req: NextRequest, userId: string, tz: string) {
     .map((t: TaskDoc) => ({
       id: t.id,
       text: t.text,
-      order: t.order ?? 0,
+      order: t.orderOverrides?.[date] ?? t.order ?? 0,
       completed:
         (t.completedDates ?? []).includes(date) ||
         (!!t.completed && t.type === 'regular'),
@@ -1989,7 +2022,7 @@ async function handleBoardGet(req: NextRequest, uid: string, tz: string) {
       .map((t: TaskDoc) => ({
         id: t.id,
         text: t.text,
-        order: t.order,
+        order: t.orderOverrides?.[weekDates[dayNum]] ?? t.order,
         type: t.type,
         completed:
           (t.completedDates ?? []).includes(weekDates[dayNum]) ||
