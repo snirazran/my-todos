@@ -2,13 +2,14 @@
 
 import React, { useEffect } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
-import { ArrowDownToLine } from 'lucide-react';
+import { ArrowDownToLine, EyeOff } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 
 interface Props {
   count: number;
   isDragOver: boolean;
   isDragging: boolean;
+  isRepeating?: boolean;
   isDesktop: boolean;
   proximity: number; // 0 to 1
   onClick: () => void;
@@ -19,6 +20,7 @@ export default function BacklogBox({
   count,
   isDragOver,
   isDragging,
+  isRepeating = false,
   isDesktop,
   proximity,
   onClick,
@@ -94,14 +96,27 @@ export default function BacklogBox({
           className="absolute inset-0 flex flex-col items-center justify-center gap-1"
           style={{ pointerEvents: 'none' }}
         >
-          <ArrowDownToLine
-            size={isDesktop ? 28 : 22}
-            className={isDragOver ? 'animate-bounce' : ''}
-          />
+          {isRepeating ? (
+            <EyeOff
+              size={isDesktop ? 28 : 22}
+              className={isDragOver ? 'animate-bounce' : ''}
+            />
+          ) : (
+            <ArrowDownToLine
+              size={isDesktop ? 28 : 22}
+              className={isDragOver ? 'animate-bounce' : ''}
+            />
+          )}
           <span
             className={`${isDesktop ? 'text-sm' : 'text-xs'} font-black whitespace-nowrap`}
           >
-            {isDragOver ? 'Drop to save' : 'Save for later'}
+            {isRepeating
+              ? isDragOver
+                ? 'Drop to skip'
+                : 'Skip for this day'
+              : isDragOver
+                ? 'Drop to save'
+                : 'Save for later'}
           </span>
         </motion.div>
 

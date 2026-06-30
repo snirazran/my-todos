@@ -280,6 +280,20 @@ export default function TaskBoard({
     [BACKLOG_IDX, setBacklog, setTasksByDate, windowDates],
   );
 
+  const draggingTask = useMemo(
+    () =>
+      drag?.active
+        ? (colAt(drag.fromDay).find((t) => t.id === drag.taskId) ?? null)
+        : null,
+    [drag?.active, drag?.fromDay, drag?.taskId, colAt],
+  );
+  const draggingRepeating =
+    !!draggingTask &&
+    draggingTask.type !== 'backlog' &&
+    drag?.fromDay !== BACKLOG_IDX &&
+    (draggingTask.type === 'weekly' ||
+      (!!draggingTask.repeatMode && draggingTask.repeatMode !== 'none'));
+
   const saveCol = useCallback(
     (i: number, tasks: Task[]) => {
       const ordered = tasks.map((t, idx) => ({ ...t, order: idx + 1 }));
@@ -1025,6 +1039,15 @@ export default function TaskBoard({
       return;
     }
 
+    if (isDragOverBacklog && draggingRepeating) {
+      const fromKey = windowDates[drag.fromDay];
+      if (fromKey) removeOnDate(fromKey, drag.taskId).catch(console.error);
+      endDrag();
+      setIsDragOverBacklog(false);
+      setTrayCloseProgress(0);
+      return;
+    }
+
     let finalToDay = (targetDay ?? drag.fromDay) as number;
     let finalToIndex = targetIndex ?? drag.fromIndex;
 
@@ -1084,6 +1107,8 @@ export default function TaskBoard({
     centerColumnSmooth,
     commitDragReorder,
     endDrag,
+    draggingRepeating,
+    removeOnDate,
   ]);
 
   useEffect(() => {
@@ -1511,6 +1536,7 @@ export default function TaskBoard({
             count={backlog.length}
             isDragOver={isDragOverBacklog}
             isDragging={!!drag?.active}
+            isRepeating={draggingRepeating}
             isDesktop={!isMobile}
             proximity={backlogProximity}
             onClick={() => setBacklogOpen(true)}

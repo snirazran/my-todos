@@ -1701,6 +1701,13 @@ export default function TaskList({
                   }
                 : undefined
             }
+            onSkipToday={
+              (isWeekly ||
+                (sheetTask.repeatMode && sheetTask.repeatMode !== 'none')) &&
+              !isCompletedTask
+                ? () => onDeleteToday(sheetTask.id)
+                : undefined
+            }
             onDelete={() =>
               setDialog({
                 task: sheetTask as any,
