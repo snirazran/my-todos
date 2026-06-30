@@ -39,10 +39,12 @@ function WardrobePageInner() {
   return (
     <main className="relative min-h-[100dvh] md:min-h-[calc(100vh-4rem)] flex flex-col">
       <div className="relative z-10 flex flex-1 flex-col w-full min-h-[100dvh] md:min-h-[calc(100vh-4rem)] max-w-3xl mx-auto px-4 md:px-6">
-        <div className="relative z-40 flex shrink-0 items-end justify-center pointer-events-none h-[176px] pt-[env(safe-area-inset-top)] md:h-[210px]">
+        <div className="relative z-40 flex shrink-0 items-end justify-center pointer-events-none h-[calc(176px+env(safe-area-inset-top))] md:h-[calc(210px+env(safe-area-inset-top))]">
           <div className="relative z-50 translate-y-5 pointer-events-none md:translate-y-5">
             <Frog
               ref={frogRef}
+              width={240}
+              height={240}
               mouthOpen={false}
               indices={previewIndices}
               paused={false}

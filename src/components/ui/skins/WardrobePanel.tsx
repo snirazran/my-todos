@@ -246,7 +246,7 @@ function WardrobeManagerContent({
 
   const tabTriggerClass = cn(
     'flex-1 h-full rounded-2xl relative flex items-center justify-center gap-2',
-    'text-xs md:text-sm font-bold tracking-wide uppercase transition-all',
+    'text-xs md:text-sm font-bold tracking-wide uppercase transition-colors',
     embedded
       ? 'data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm'
       : 'data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none',
@@ -719,10 +719,10 @@ function WardrobeManagerContent({
                   'p-1 rounded-[18px] border border-border/50 flex items-center gap-1',
                   embedded
                     ? cn(
-                        'mx-auto w-full transition-[max-width,background-color,box-shadow,height] duration-300',
+                        'mx-auto w-full transition-[background-color,box-shadow,border-color] duration-200 md:transition-[max-width,background-color,box-shadow,border-color] md:duration-300',
                         isStuck
-                          ? 'h-11 max-w-full bg-muted/50 backdrop-blur-xl shadow-none border-border/60'
-                          : 'h-[50px] md:h-[54px] max-w-[340px] md:max-w-[380px] bg-muted/50 shadow-lg',
+                          ? 'h-11 max-w-full bg-muted shadow-none border-border/60'
+                          : 'h-[50px] md:h-[54px] max-w-[340px] md:max-w-[380px] bg-muted shadow-lg',
                       )
                     : cn(
                         'h-10 md:h-11 flex-1 shadow-sm',

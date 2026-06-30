@@ -154,6 +154,8 @@ export function FrogDisplay({
         >
           <Frog
             ref={frogRef}
+            width={240}
+            height={240}
             mouthOpen={!!mouthOpen}
             mouthOffset={mouthOffset}
             indices={indices}

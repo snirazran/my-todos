@@ -460,7 +460,7 @@ function PickStep({
             <RotatingRays colorClass="text-white/14" />
           </div>
           <div className="relative z-10 -translate-y-3">
-            <Frog width={250} height={190} />
+            <Frog width={250} height={250} />
             <div className="absolute right-0 top-12 z-20 rotate-[6deg] rounded-2xl bg-white px-3 py-1.5 text-[13px] font-black tracking-tight text-[#4f8f28] shadow-[0_3px_0_rgba(52,100,31,0.25)] sm:right-[-1rem]">
               Ooh, a gift for me?
               <span className="absolute -bottom-1.5 left-4 h-3 w-3 rotate-45 bg-white" />
@@ -578,7 +578,7 @@ function GiftPreview({ item, active = false }: { item: CatalogItem | null; activ
   const indices = itemToIndices(item);
   return (
     <div className="flex h-full w-full items-center justify-center overflow-visible">
-      <Frog width={300} height={242} indices={indices} paused={!active} />
+      <Frog width={300} height={300} indices={indices} paused={!active} />
     </div>
   );
 }

@@ -353,7 +353,7 @@ function SelfFrog({
 }) {
   return (
     <div className="relative z-30 flex shrink-0 flex-col items-center">
-      <Frog width={240} height={180} indices={indices} />
+      <Frog width={240} height={240} indices={indices} />
     </div>
   );
 }
