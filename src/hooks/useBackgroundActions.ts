@@ -158,6 +158,36 @@ export function useBackgroundActions({
     }
   };
 
+  const buyNow = async (item: BackgroundItem): Promise<boolean> => {
+    if (isGuest) {
+      onNotify?.({ msg: 'Sign in to buy backgrounds!', type: 'error' });
+      return false;
+    }
+    if (balance < item.priceFlies) {
+      onNotify?.({ msg: 'Not enough flies!', type: 'error' });
+      return false;
+    }
+    setBusyId(item.id);
+    try {
+      const res = await fetch('/api/backgrounds/buy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body.error || 'Purchase failed');
+      onSpend?.(item.priceFlies);
+      onNotify?.({ msg: `Purchased ${item.name}!`, type: 'success' });
+      refresh();
+      return true;
+    } catch (err) {
+      onNotify?.({ msg: err instanceof Error ? err.message : 'Purchase failed', type: 'error' });
+      return false;
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const sellBackground = async (item: BackgroundItem, qty: number) => {
     if (isGuest) return;
     const currentCount = inventory[item.id] ?? 0;
@@ -203,6 +233,7 @@ export function useBackgroundActions({
     sortItems,
     handleEquip,
     handleBuy,
+    buyNow,
     confirmSell,
   };
 }

@@ -1340,7 +1340,7 @@ export const RewardTile = memo(function RewardTile({
             className={cn(
               'object-contain',
               compact
-                ? 'h-[118%] w-[118%]'
+                ? 'h-[118%] w-[118%] -translate-y-[18%]'
                 : 'h-[120%] w-[120%] translate-y-[8%]',
             )}
             indices={previewIndices}

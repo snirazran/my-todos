@@ -494,7 +494,7 @@ export default function Home() {
               frogRef={frogRef}
               frogBoxRef={frogBoxRef}
               mouthOpen={!!grab}
-              mouthOffset={{ y: -4 }}
+              mouthOffset={{ x: -18, y: 12 }}
               indices={indices}
               openWardrobe={isWardrobeOpen}
               onOpenChange={setWardrobeOpen}

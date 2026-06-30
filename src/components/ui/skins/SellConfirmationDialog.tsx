@@ -1,14 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog';
+import { BaseSheet } from '@/components/ui/BaseSheet';
 import { Button } from '@/components/ui/button';
 import { ItemDef } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
@@ -122,16 +115,23 @@ export function SellConfirmationDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(val) => !val && onClose()}>
-      <DialogContent className="z-[2000] sm:max-w-[400px] border-border/50 bg-background/95 backdrop-blur-xl shadow-2xl rounded-3xl">
-        <DialogHeader className="flex flex-col items-center gap-1 text-center">
-          <DialogTitle className="text-2xl font-black tracking-tight">
+    <BaseSheet
+      open={open && !!item}
+      onOpenChange={(val) => !val && onClose()}
+      className="select-none sm:max-w-[400px]"
+      zIndex={1300}
+      closeAriaLabel="Close"
+    >
+      {() => (
+        <div className="flex flex-col px-5 pb-[calc(env(safe-area-inset-bottom)+1.25rem)] pt-3 sm:px-6 sm:pb-6 sm:pt-7">
+        <div className="flex flex-col items-center gap-1 text-center px-8">
+          <h2 className="text-2xl font-black tracking-tight text-foreground">
             Sell Item?
-          </DialogTitle>
-          <DialogDescription className="text-sm text-muted-foreground">
+          </h2>
+          <p className="text-sm text-muted-foreground">
             You are about to sell this item. This cannot be undone.
-          </DialogDescription>
-        </DialogHeader>
+          </p>
+        </div>
 
         {/* Item Preview Card (Smaller box as requested) */}
         <div className="flex flex-col items-center justify-center my-4">
@@ -230,26 +230,27 @@ export function SellConfirmationDialog({
           </div>
         </div>
 
-        <DialogFooter className="flex-col gap-2 sm:justify-center sm:gap-3">
-           <Button 
-            size="lg" 
-            variant="destructive" 
+        <div className="flex flex-col gap-2">
+           <Button
+            size="lg"
+            variant="destructive"
             onClick={() => onConfirm(quantity)}
             className="w-full text-base font-bold shadow-lg shadow-red-500/20 hover:shadow-red-500/30 transition-all rounded-xl"
             disabled={!item}
           >
             Confirm Sale
           </Button>
-          <Button 
-            size="lg" 
-            variant="outline" 
+          <Button
+            size="lg"
+            variant="outline"
             onClick={onClose}
             className="w-full text-base font-bold rounded-xl"
           >
             Cancel
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+        </div>
+      )}
+    </BaseSheet>
   );
 }

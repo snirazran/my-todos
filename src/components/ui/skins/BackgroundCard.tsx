@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Fly from '@/components/ui/fly';
@@ -84,16 +84,10 @@ export function BackgroundCard({
   onSell?: () => void;
 }) {
   const config = RARITY_CONFIG[item.rarity];
-  const [shake, setShake] = useState(false);
   const preview = item.images.mobile || item.images.tablet || item.images.web || item.images.webLarge;
   const isSelected = selectedCount > 0;
 
   const handleClick = (e: React.MouseEvent) => {
-    if (mode === 'shop' && !canAfford) {
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-      return;
-    }
     if (!actionLoading) onAction(e);
   };
 
@@ -106,7 +100,6 @@ export function BackgroundCard({
         config.bg,
         isEquipped ? config.shadow : cn(config.shadow, config.hoverGlow),
         isSelected && 'border-primary ring-2 ring-primary/30',
-        shake && 'animate-pulse',
       )}
     >
       {isEquipped && (

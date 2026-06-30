@@ -139,7 +139,6 @@ function ItemCardComponent({
 }) {
   const config = RARITY_CONFIG[item.rarity];
   const isOwned = ownedCount > 0;
-  const [shake, setShake] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   const [nearViewport, setNearViewport] = useState(false);
   const [previewReady, setPreviewReady] = useState(!deferPreview);
@@ -197,11 +196,6 @@ function ItemCardComponent({
   );
 
   const handleAction = (e?: React.MouseEvent) => {
-    if (mode === 'shop' && !canAfford) {
-      setShake(true);
-      setTimeout(() => setShake(false), 500);
-      return;
-    }
     if (!actionLoading && onAction && e) {
       onAction(e);
     }
@@ -212,8 +206,6 @@ function ItemCardComponent({
   return (
     <motion.div
       ref={cardRef}
-      animate={shake ? { x: [-5, 5, -5, 5, 0] } : {}}
-      transition={{ duration: 0.4 }}
       onClick={(e) => {
         if (mode === 'inventory' || mode === 'trade' || mode === 'shop')
           handleAction(e);
@@ -305,7 +297,7 @@ function ItemCardComponent({
           ) : (
             <Frog
               className={cn(
-                'w-[125%] h-[125%] object-contain translate-y-[10%] md:translate-y-[10%]',
+                'w-[125%] h-[125%] object-contain translate-y-[10%] min-[375px]:translate-y-[2%] min-[425px]:-translate-y-[4%] md:-translate-y-[5%]',
                 previewClassName,
               )}
               indices={previewIndices}

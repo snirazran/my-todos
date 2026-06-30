@@ -17,13 +17,14 @@ import {
   Gift,
 } from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
-import { rarityRank } from '@/lib/skins/catalog';
+import { rarityRank, byId as staticById } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
+import Frog from '@/components/ui/frog';
 import { ItemCard } from './ItemCard';
+import { PurchaseSheet, type PurchaseTarget } from './PurchaseSheet';
 import { FilterBar, FilterCategory } from './FilterBar';
 import { SortMenu, SortOrder } from './SortMenu';
 import { cn } from '@/lib/utils';
-import confetti from 'canvas-confetti';
 import { motion, type DragControls } from 'framer-motion';
 import { AnimatedNumber } from '@/components/ui/AnimatedNumber';
 import { BaseSheet } from '@/components/ui/BaseSheet';
@@ -111,6 +112,14 @@ function pinEquippedFirst(
   for (const c of cards) (isEquipped(c) ? equippedCards : rest).push(c);
   return [...equippedCards, ...rest];
 }
+
+const SLOT_LABEL: Record<WardrobeSlot, string> = {
+  skin: 'Skin',
+  hat: 'Hat',
+  body: 'Body',
+  hand_item: 'Held',
+  container: 'Gift',
+};
 
 /* ---------------- Types & Data ---------------- */
 type ApiData = {
@@ -213,7 +222,7 @@ function WardrobeManagerContent({
     Set<FilterCategory>
   >(new Set<FilterCategory>(['all']));
   const [buyingId, setBuyingId] = useState<string | null>(null);
-  const [confirmingBuyId, setConfirmingBuyId] = useState<string | null>(null);
+  const [purchaseCard, setPurchaseCard] = useState<WardrobeCard | null>(null);
   const [equippingId, setEquippingId] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOrder>('latest');
   const [notif, setNotif] = useState<{
@@ -497,6 +506,33 @@ function WardrobeManagerContent({
     refreshInventory();
   };
 
+  const equipItemDirect = async (item: ItemDef) => {
+    if (!data?.wardrobe?.equipped) return;
+    if (data.wardrobe.equipped[item.slot] === item.id) return;
+    setEquippingId(item.id);
+    await fetch('/api/skins/inventory', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slot: item.slot, itemId: item.id }),
+    });
+    setEquippingId(null);
+    refreshInventory();
+  };
+
+  const equippedIndices = useMemo(() => {
+    const eq = data?.wardrobe?.equipped ?? {};
+    const map: Record<string, number> = {};
+    for (const it of data?.catalog ?? []) map[it.id] = it.riveIndex;
+    const idx = (id?: string | null) =>
+      id ? (map[id] ?? staticById[id]?.riveIndex ?? 0) : 0;
+    return {
+      skin: idx(eq.skin),
+      hat: idx(eq.hat),
+      body: idx(eq.body),
+      hand_item: idx(eq.hand_item),
+    };
+  }, [data?.wardrobe?.equipped, data?.catalog]);
+
   const handleItemAction = (item: ItemDef) => {
     if (!user) {
       setNotif({ msg: 'Sign in to equip items!', type: 'error' });
@@ -514,30 +550,22 @@ function WardrobeManagerContent({
     }
   };
 
-  const handleBuyItem = async (item: ItemDef, e?: React.MouseEvent) => {
-    if (!user || buyingId) {
+  const performItemPurchase = async (item: ItemDef): Promise<boolean> => {
+    if (!user) {
       setNotif({ msg: 'Sign in to buy items!', type: 'error' });
-      return;
+      return false;
     }
-
-    if (!data?.wardrobe) return;
+    if (!data?.wardrobe || buyingId) return false;
     const balance = data.wardrobe.flies ?? 0;
     const price = item.priceFlies ?? 0;
     if (balance < price) {
       setNotif({ msg: 'Not enough flies!', type: 'error' });
       setShakeBalance(true);
       setTimeout(() => setShakeBalance(false), 500);
-      return;
-    }
-
-    // Confirmation Step
-    if (confirmingBuyId !== item.id) {
-      setConfirmingBuyId(item.id);
-      return;
+      return false;
     }
 
     setBuyingId(item.id);
-    setConfirmingBuyId(null); // Clear confirmation for this item
     try {
       const currentCount = data.wardrobe.inventory[item.id] ?? 0;
       const newData: ApiData = {
@@ -553,36 +581,20 @@ function WardrobeManagerContent({
       };
       mutate(newData, false);
 
-      const origin = e
-        ? {
-            x: e.clientX / window.innerWidth,
-            y: e.clientY / window.innerHeight,
-          }
-        : { y: 0.6 };
-
-      confetti({
-        particleCount: 40,
-        spread: 70,
-        origin,
-        zIndex: 9999,
-        colors: ['#a78bfa', '#4ade80', '#facc15'],
-      });
-
       const res = await fetch('/api/skins/shop', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ itemId: item.id }),
       });
 
-      if (res.ok) {
-        setNotif({ msg: `Purchased ${item.name}!`, type: 'success' });
-        refreshInventory();
-      } else {
-        throw new Error('Failed');
-      }
+      if (!res.ok) throw new Error('Failed');
+      setNotif({ msg: `Purchased ${item.name}!`, type: 'success' });
+      refreshInventory();
+      return true;
     } catch (e) {
       setNotif({ msg: 'Purchase failed.', type: 'error' });
       refreshInventory();
+      return false;
     } finally {
       setBuyingId(null);
     }
@@ -669,6 +681,46 @@ function WardrobeManagerContent({
   const isGuest = !user;
   const canRenderItems = !!data;
 
+  const purchaseItem = purchaseCard?.kind === 'item' ? purchaseCard.item : null;
+  const purchaseBg = purchaseCard?.kind === 'bg' ? purchaseCard.bg : null;
+  const purchaseTarget: PurchaseTarget | null = purchaseItem
+    ? {
+        id: purchaseItem.id,
+        name: purchaseItem.name,
+        rarity: purchaseItem.rarity,
+        price: purchaseItem.priceFlies ?? 0,
+        slotLabel: SLOT_LABEL[purchaseItem.slot],
+      }
+    : purchaseBg
+      ? {
+          id: purchaseBg.id,
+          name: purchaseBg.name,
+          rarity: purchaseBg.rarity,
+          price: purchaseBg.priceFlies ?? 0,
+          slotLabel: 'Background',
+        }
+      : null;
+  const purchasePreview = purchaseItem ? (
+    <Frog
+      className="h-[118%] w-[118%] -translate-y-[14%] object-contain"
+      indices={{ ...equippedIndices, [purchaseItem.slot]: purchaseItem.riveIndex }}
+      width={240}
+      height={240}
+    />
+  ) : purchaseBg ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={backgroundPreview(purchaseBg)}
+      alt={purchaseBg.name}
+      className="h-full w-full object-cover"
+    />
+  ) : null;
+  const purchaseOwnedCount = purchaseItem
+    ? (data?.wardrobe?.inventory?.[purchaseItem.id] ?? 0)
+    : purchaseBg
+      ? (bg.inventory[purchaseBg.id] ?? 0)
+      : 0;
+
   return (
     <div
       className={cn(
@@ -677,10 +729,6 @@ function WardrobeManagerContent({
           ? 'flex-1 bg-transparent'
           : 'h-full overflow-hidden rounded-[32px] border border-border/50 bg-background shadow-sm',
       )}
-      onClick={() => {
-        if (confirmingBuyId) setConfirmingBuyId(null);
-        if (bg.confirmingBuyId) bg.setConfirmingBuyId(null);
-      }}
     >
       {/* --- HEADER --- */}
       {!embedded && (
@@ -1107,18 +1155,17 @@ function WardrobeManagerContent({
                             balance >= (card.item.priceFlies ?? 0) && !isGuest
                           }
                           actionLoading={buyingId === card.item.id}
-                          actionLabel={
-                            confirmingBuyId === card.item.id
-                              ? 'CONFIRM'
-                              : undefined
+                          onAction={() =>
+                            setPurchaseCard({
+                              kind: 'item',
+                              id: card.item.id,
+                              rarity: card.item.rarity,
+                              price: card.item.priceFlies ?? 0,
+                              item: card.item,
+                            })
                           }
-                          onAction={(e) => handleBuyItem(card.item, e)}
                           deferPreview
-                          pausePreview={
-                            (card.item.slot !== 'container' && isDragging) ||
-                            (card.item.slot !== 'container' &&
-                              confirmingBuyId !== card.item.id)
-                          }
+                          pausePreview={card.item.slot !== 'container'}
                           previewDelayMs={index * 20}
                         />
                       ) : (
@@ -1133,8 +1180,15 @@ function WardrobeManagerContent({
                           }
                           mode="shop"
                           actionLoading={bg.busyId === card.bg.id}
-                          confirming={bg.confirmingBuyId === card.bg.id}
-                          onAction={(e) => bg.handleBuy(card.bg, e)}
+                          onAction={() =>
+                            setPurchaseCard({
+                              kind: 'bg',
+                              id: card.bg.id,
+                              rarity: card.bg.rarity,
+                              price: card.bg.priceFlies ?? 0,
+                              bg: card.bg,
+                            })
+                          }
                         />
                       ),
                     )}
@@ -1225,6 +1279,26 @@ function WardrobeManagerContent({
           paused={isDragging}
         />
       )}
+
+      <PurchaseSheet
+        open={!!purchaseCard}
+        onClose={() => setPurchaseCard(null)}
+        target={purchaseTarget}
+        preview={purchasePreview}
+        balance={balance}
+        ownedCount={purchaseOwnedCount}
+        isGuest={isGuest}
+        equipLabel={purchaseBg ? 'Use background' : 'Equip now'}
+        onBuy={async () => {
+          if (purchaseItem) return performItemPurchase(purchaseItem);
+          if (purchaseBg) return bg.buyNow(purchaseBg);
+          return false;
+        }}
+        onEquip={async () => {
+          if (purchaseItem) await equipItemDirect(purchaseItem);
+          else if (purchaseBg) await bg.handleEquip(purchaseBg);
+        }}
+      />
     </div>
   );
 }
