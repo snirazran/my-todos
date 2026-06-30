@@ -174,6 +174,7 @@ export function FrogDisplay({
               readyQuests={questClaimableCount}
               isCatching={isCatching}
               clickedAt={clickedAt}
+              className="!top-20"
             />
           )}
       </div>

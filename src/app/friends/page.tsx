@@ -352,7 +352,7 @@ function SelfFrog({
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
 }) {
   return (
-    <div className="relative z-30 flex shrink-0 flex-col items-center">
+    <div className="pointer-events-none relative z-30 flex shrink-0 flex-col items-center">
       <Frog width={240} height={270} indices={indices} />
     </div>
   );
