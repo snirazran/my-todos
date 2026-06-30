@@ -22,6 +22,9 @@ type RewardCardProps = {
   baseQuantity?: number;
   isPremium?: boolean;
   showDoubleUpsell?: boolean;
+  /** When provided, the "Watch a short ad" option calls this (stub for a real
+   *  rewarded-ad SDK) instead of just closing. */
+  onWatchAd?: () => void;
   paused?: boolean;
 };
 
@@ -45,6 +48,7 @@ export const RewardCard = ({
   baseQuantity,
   isPremium,
   showDoubleUpsell,
+  onWatchAd,
   paused = false,
 }: RewardCardProps) => {
   const [showContent, setShowContent] = useState(false);
@@ -347,7 +351,12 @@ export const RewardCard = ({
           </button>
         )}
       </div>
-      {showUpsellPopup && <DoubleRewardUpsell onClose={() => setShowUpsellPopup(false)} />}
+      {showUpsellPopup && (
+        <DoubleRewardUpsell
+          onClose={() => setShowUpsellPopup(false)}
+          onWatchAd={onWatchAd}
+        />
+      )}
     </motion.div>
   );
 };
@@ -391,7 +400,13 @@ const PREMIUM_PERKS = [
   { icon: BarChart3, label: 'History access' },
 ];
 
-function DoubleRewardUpsell({ onClose }: { onClose: () => void }) {
+function DoubleRewardUpsell({
+  onClose,
+  onWatchAd,
+}: {
+  onClose: () => void;
+  onWatchAd?: () => void;
+}) {
   return createPortal(
     <div
       className="fixed inset-0 z-[10002] flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-4 pb-6 sm:pb-0"
@@ -432,7 +447,10 @@ function DoubleRewardUpsell({ onClose }: { onClose: () => void }) {
           <button
             type="button"
             className="w-full flex items-center gap-3 p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all text-left border border-emerald-200/60 dark:border-emerald-800/40 active:scale-[0.98]"
-            onClick={onClose}
+            onClick={() => {
+              if (onWatchAd) onWatchAd();
+              onClose();
+            }}
           >
             <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
               <Play className="w-4 h-4" />

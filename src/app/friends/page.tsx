@@ -1,6 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, Plus, UserPlus, Bell } from 'lucide-react';
 import useSWR from 'swr';
@@ -13,12 +15,15 @@ import { AddFriendsSheet } from '@/components/ui/AddFriendsSheet';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { FriendRequestsInbox } from '@/components/ui/FriendRequestsInbox';
 import { contributionFrom, type FriendSummary } from '@/lib/friends/indices';
+import { RewardCard } from '@/components/ui/gift-box/RewardCard';
+import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
+import { RARITY_CONFIG } from '@/components/ui/gift-box/constants';
+import { mutateInventoryCaches } from '@/hooks/useInventory';
+import type { ItemDef } from '@/lib/skins/catalog';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
-type UserInfo = { name?: string | null; frogName?: string | null };
-
-type LeaderboardEntry = FriendSummary & { isSelf: boolean };
+type LeaderboardEntry = FriendSummary;
 
 export default function FriendsPage() {
   const router = useRouter();
@@ -30,13 +35,11 @@ export default function FriendsPage() {
   );
 
   const { indices } = useWardrobeIndices(!!user);
-  const { data: userInfo } = useSWR<UserInfo>(user ? '/api/user' : null, fetcher, {
-    revalidateOnFocus: false,
-  });
-  const { data: friendsData } = useSWR<{
+  const { data: friendsData, mutate: mutateFriends } = useSWR<{
     friends: FriendSummary[];
     me: FriendSummary | null;
-    contribution?: { receivedToday: number; justCredited: number };
+    claimable?: number;
+    contribution?: { receivedToday: number };
   }>(
     user ? `/api/friends?tz=${encodeURIComponent(tz)}` : null,
     fetcher,
@@ -51,6 +54,31 @@ export default function FriendsPage() {
   const [addOpen, setAddOpen] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inboxOpen, setInboxOpen] = useState(false);
+  const [claiming, setClaiming] = useState(false);
+  const [claimReward, setClaimReward] = useState<number | null>(null);
+
+  const claimable = friendsData?.claimable ?? 0;
+
+  const handleClaim = React.useCallback(async () => {
+    if (claiming || claimable <= 0) return;
+    setClaiming(true);
+    try {
+      const res = await fetch('/api/friends/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tz }),
+      });
+      const data = await res.json();
+      const granted = Math.max(0, Math.floor(data?.granted ?? 0));
+      if (granted > 0) {
+        mutateInventoryCaches();
+        await mutateFriends();
+        setClaimReward(granted);
+      }
+    } finally {
+      setClaiming(false);
+    }
+  }, [claiming, claimable, tz, mutateFriends]);
 
   React.useEffect(() => {
     if (!loading && !user) router.replace('/login');
@@ -62,30 +90,13 @@ export default function FriendsPage() {
   const hasRealFriends = friends.length > 0;
   const pendingCount = requestsData?.incoming?.length ?? 0;
 
-  const meFrogName = userInfo?.frogName || friendsData?.me?.frogName || 'Frog';
-
-  const selfEntry: LeaderboardEntry = {
-    userId: friendsData?.me?.userId ?? 'me',
-    name: userInfo?.name ?? friendsData?.me?.name ?? 'You',
-    frogName: meFrogName,
-    indices,
-    fliesToday: friendsData?.me?.fliesToday ?? 0,
-    isSelf: true,
-  };
-
-  const myFliesToday = friendsData?.me?.fliesToday ?? 0;
-  const youGiveEach = contributionFrom(myFliesToday);
-
-  const give = (f: FriendSummary) => f.givesYou ?? contributionFrom(f.fliesToday);
-  const friendEntries: LeaderboardEntry[] = friends
-    .map((f) => ({ ...f, isSelf: false }))
-    .sort(
-      (a, b) =>
-        give(b) - give(a) ||
-        b.fliesToday - a.fliesToday ||
-        (a.frogName || a.name).localeCompare(b.frogName || b.name),
-    );
-  const leaderboard: LeaderboardEntry[] = [...friendEntries, selfEntry];
+  const sharedFrom = (f: FriendSummary) =>
+    f.givesYou ?? contributionFrom(f.fliesToday);
+  const leaderboard: LeaderboardEntry[] = [...friends].sort(
+    (a, b) =>
+      sharedFrom(b) - sharedFrom(a) ||
+      (a.frogName || a.name).localeCompare(b.frogName || b.name),
+  );
 
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden pb-24 md:pb-12">
@@ -112,9 +123,9 @@ export default function FriendsPage() {
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="relative z-20 -mt-3 flex w-[min(20rem,80vw)] items-center justify-center gap-2 rounded-2xl bg-white px-10 py-3.5 text-lg font-black tracking-tight text-emerald-700 shadow-lg transition-transform active:scale-[0.97]"
+          className="relative z-20 -mt-3 flex w-[min(20rem,80vw)] items-center justify-center gap-2 rounded-2xl bg-white px-10 py-3.5 text-lg font-black tracking-tight text-primary ring-1 ring-primary/20 transition-transform active:scale-[0.98]"
         >
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500 text-white">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
             <Plus className="h-5 w-5" strokeWidth={3} />
           </span>
           Add friend
@@ -122,6 +133,15 @@ export default function FriendsPage() {
 
         {/* Rising sheet */}
         <div className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-24 md:px-8">
+          {/* Claim flies — the page's main action */}
+          {hasRealFriends && (
+            <ClaimHeroCard
+              claimable={claimable}
+              claiming={claiming}
+              onClaim={handleClaim}
+            />
+          )}
+
           {/* Friend requests — surfaced inline only when there's something to act on */}
           {pendingCount > 0 && (
             <button
@@ -154,27 +174,20 @@ export default function FriendsPage() {
 
           {/* Leaderboard — focus is how much each friend shares with you */}
           <div className="w-full">
-            <div className="mb-2.5 flex items-baseline justify-between px-1.5">
+            <div className="mb-2.5 px-1.5">
               <h2 className="text-lg font-black tracking-tight text-emerald-950">
-                Today&apos;s leaderboard
+                Top contributors today
               </h2>
-              {hasRealFriends && (
-                <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700/50">
-                  Shared with you
-                </span>
-              )}
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700/50">
+                Flies shared with you
+              </p>
             </div>
 
             <div className="w-full overflow-hidden rounded-[18px] border border-border/50 bg-card/40 p-1.5 shadow-sm">
               {hasRealFriends ? (
                 <ul className="flex flex-col gap-1.5">
                   {leaderboard.map((entry, i) => (
-                    <LeaderboardRow
-                      key={`${entry.userId}-${i}`}
-                      entry={entry}
-                      rank={i + 1}
-                      youGiveEach={youGiveEach}
-                    />
+                    <LeaderboardRow key={`${entry.userId}-${i}`} entry={entry} />
                   ))}
                 </ul>
               ) : (
@@ -192,55 +205,183 @@ export default function FriendsPage() {
       <AddFriendsSheet open={addOpen} onClose={() => setAddOpen(false)} indices={indices} />
       <InviteFriendsModal open={inviteOpen} onClose={() => setInviteOpen(false)} />
       <FriendRequestsInbox open={inboxOpen} onClose={() => setInboxOpen(false)} />
+      {claimReward !== null && (
+        <FlyClaimRewardOverlay
+          amount={claimReward}
+          tz={tz}
+          onClose={() => setClaimReward(null)}
+        />
+      )}
     </main>
   );
 }
 
-const RANK_RING: Record<number, string> = {
-  1: 'bg-gradient-to-br from-amber-300 to-amber-500 text-amber-950',
-  2: 'bg-gradient-to-br from-slate-200 to-slate-400 text-slate-800',
-  3: 'bg-gradient-to-br from-orange-300 to-orange-500 text-orange-950',
-};
-
-function LeaderboardRow({
-  entry,
-  rank,
-  youGiveEach,
+function ClaimHeroCard({
+  claimable,
+  claiming,
+  onClaim,
 }: {
-  entry: LeaderboardEntry;
-  rank: number;
-  youGiveEach: number;
+  claimable: number;
+  claiming: boolean;
+  onClaim: () => void;
 }) {
-  const medal = RANK_RING[rank];
-  const gives = entry.givesYou ?? contributionFrom(entry.fliesToday);
+  if (claimable <= 0) {
+    return (
+      <div className="mb-5 flex w-full items-center gap-3 rounded-[20px] border border-border/50 bg-card/40 px-4 py-3.5">
+        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted">
+          <Fly size={30} interactive={false} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-black tracking-tight text-emerald-950">
+            No flies to claim yet
+          </p>
+          <p className="text-xs font-semibold text-muted-foreground">
+            Come back as your friends finish tasks
+          </p>
+        </div>
+      </div>
+    );
+  }
   return (
-    <li
-      className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors ${
-        entry.isSelf
-          ? 'border-emerald-300 bg-emerald-50'
-          : 'border-border/50 bg-card'
-      }`}
+    <button
+      type="button"
+      onClick={onClaim}
+      disabled={claiming}
+      className="group mb-5 flex w-full items-center gap-3 overflow-hidden rounded-[20px] border border-emerald-300 bg-gradient-to-br from-emerald-50 to-emerald-100/70 px-4 py-3.5 text-left shadow-sm disabled:opacity-70"
     >
-      <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-black ${
-          medal ?? 'bg-emerald-100 text-emerald-700'
-        }`}
-      >
-        {rank}
+      <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-500/15">
+        <Fly size={36} interactive={false} />
       </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-base font-black tracking-tight text-emerald-950">
+          {claimable} {claimable === 1 ? 'fly' : 'flies'} ready
+        </p>
+        <p className="text-xs font-semibold text-emerald-700/70">
+          From your friends today
+        </p>
+      </div>
+      <span className="inline-flex h-10 shrink-0 items-center justify-center rounded-xl bg-amber-500 px-5 text-[11px] font-black uppercase tracking-[0.15em] text-white shadow-[0_3px_0_0_#b45309] transition-all group-hover:-translate-y-[1px] group-hover:shadow-[0_4px_0_0_#b45309] group-active:translate-y-[2px] group-active:shadow-none">
+        {claiming ? 'Claiming…' : 'Claim'}
+      </span>
+    </button>
+  );
+}
 
-      <div className="-mb-2.5 flex h-[104px] w-32 shrink-0 items-end justify-center self-end overflow-hidden">
-        <Frog width={172} height={144} indices={entry.indices} />
+function makeFlyPrize(amount: number): ItemDef {
+  return {
+    id: `friend-flies-${amount}`,
+    name: `${amount} ${amount === 1 ? 'Fly' : 'Flies'}`,
+    rarity: 'uncommon',
+    priceFlies: 0,
+    slot: 'hand_item',
+    riveIndex: 0,
+    icon: '',
+  };
+}
+
+function FlyClaimRewardOverlay({
+  amount,
+  tz,
+  onClose,
+}: {
+  amount: number;
+  tz: string;
+  onClose: () => void;
+}) {
+  const [displayAmount, setDisplayAmount] = useState(amount);
+  const [doubling, setDoubling] = useState(false);
+  const doubledRef = useRef(false);
+  const prize = useMemo(() => makeFlyPrize(displayAmount), [displayAmount]);
+
+  const handleWatchAd = async () => {
+    if (doubledRef.current || doubling) return;
+    setDoubling(true);
+    try {
+      const res = await fetch('/api/friends/claim', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tz, double: true }),
+      });
+      const data = await res.json();
+      const bonus = Math.max(0, Math.floor(data?.granted ?? 0));
+      if (bonus > 0) {
+        doubledRef.current = true;
+        mutateInventoryCaches();
+        setDisplayAmount((a) => a + bonus);
+      }
+    } finally {
+      setDoubling(false);
+    }
+  };
+
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
+    <AnimatePresence>
+      <motion.div
+        key="fly-claim"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-[10001] flex items-center justify-center px-4"
+      >
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="absolute inset-0 bg-slate-950/90 backdrop-blur-sm"
+          onClick={onClose}
+        />
+        <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center">
+          <RotatingRays colorClass={RARITY_CONFIG.uncommon.rays} />
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                'radial-gradient(circle, transparent 40%, rgba(2,6,23,0.8) 100%)',
+            }}
+          />
+        </div>
+        <div className="relative z-10 flex w-full max-w-md flex-col items-center justify-center p-6">
+          <RewardCard
+            prize={prize}
+            claiming={false}
+            onClaim={onClose}
+            slotLabel="currency"
+            showDoubleUpsell={!doubledRef.current}
+            onWatchAd={handleWatchAd}
+            customPreview={
+              <div className="relative flex h-full w-full items-center justify-center">
+                <Fly size={132} interactive={false} />
+                <span className="absolute right-3 top-3 z-40 rounded-xl border border-white/20 bg-black/45 px-3 py-1 text-sm font-black text-white shadow-sm backdrop-blur-sm">
+                  x{displayAmount}
+                </span>
+              </div>
+            }
+          />
+        </div>
+      </motion.div>
+    </AnimatePresence>,
+    document.body,
+  );
+}
+
+function LeaderboardRow({ entry }: { entry: LeaderboardEntry }) {
+  const shared = entry.givesYou ?? contributionFrom(entry.fliesToday);
+  return (
+    <li className="flex items-center gap-2 rounded-xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 sm:gap-2.5 sm:py-2">
+      <div className="flex h-[78px] w-[96px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:h-[102px] min-[360px]:w-[132px] min-[400px]:h-[124px] min-[400px]:w-[164px] sm:h-[124px] sm:w-48 md:h-[144px] md:w-56">
+        <Frog
+          className="min-[360px]:-translate-y-2 min-[400px]:-translate-y-3.5 md:-translate-y-3"
+          width={224}
+          height={185}
+          indices={entry.indices}
+        />
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-base font-black leading-tight tracking-tight text-emerald-950">
+        <p className="truncate text-sm font-black leading-tight tracking-tight text-emerald-950 sm:text-base">
           {entry.frogName || entry.name}
-          {entry.isSelf && (
-            <span className="ml-1.5 rounded-full bg-emerald-500 px-1.5 py-0.5 align-middle text-[10px] font-black uppercase tracking-wide text-white">
-              You
-            </span>
-          )}
         </p>
         {entry.name && entry.frogName && entry.name !== entry.frogName && (
           <p className="truncate text-xs font-semibold text-emerald-700/70">
@@ -249,31 +390,12 @@ function LeaderboardRow({
         )}
       </div>
 
-      {entry.isSelf ? (
-        <div className="flex shrink-0 flex-col items-end text-right">
-          <div className="flex items-center gap-1.5">
-            <Fly size={30} y={-1} />
-            <span className="text-2xl font-black tabular-nums leading-none text-foreground">
-              {entry.fliesToday}
-            </span>
-          </div>
-          <span className="mt-1.5 text-[11px] font-bold tabular-nums text-emerald-600/70">
-            {youGiveEach > 0 ? `+${youGiveEach} to friends` : 'caught today'}
-          </span>
-        </div>
-      ) : (
-        <div className="flex shrink-0 flex-col items-end text-right">
-          <div className="flex items-center gap-1.5">
-            <Fly size={30} y={-1} />
-            <span className="text-2xl font-black tabular-nums leading-none text-emerald-600">
-              +{gives}
-            </span>
-          </div>
-          <span className="mt-1.5 text-[11px] font-bold tabular-nums text-muted-foreground/55">
-            {entry.fliesToday} caught
-          </span>
-        </div>
-      )}
+      <div className="flex shrink-0 items-center gap-1.5">
+        <Fly size={28} y={-4} interactive={false} />
+        <span className="text-xl font-black tabular-nums leading-none text-emerald-600 sm:text-2xl">
+          +{shared}
+        </span>
+      </div>
     </li>
   );
 }
@@ -320,9 +442,14 @@ function InviteRewardBanner({ onClick }: { onClick: () => void }) {
       onClick={onClick}
       className="flex w-full items-center gap-3 rounded-[18px] border border-emerald-200/70 bg-emerald-50/50 px-3.5 py-3 text-left transition-transform active:scale-[0.99]"
     >
-      <span className="flex h-16 w-16 shrink-0 items-center justify-center self-center overflow-hidden rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/15">
+      <span className="relative flex h-16 w-16 shrink-0 items-center justify-center self-center overflow-hidden rounded-2xl bg-emerald-500/10 ring-1 ring-emerald-500/15">
         {isOutfit && item ? (
-          <Frog width={86} height={72} indices={rewardItemToIndices(item)} />
+          <Frog
+            className="-translate-y-[5px]"
+            width={94}
+            height={80}
+            indices={rewardItemToIndices(item)}
+          />
         ) : item?.icon ? (
           <img src={item.icon} alt="" className="h-12 w-12 object-contain" />
         ) : (
@@ -352,7 +479,7 @@ function SelfFrog({
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
 }) {
   return (
-    <div className="pointer-events-none relative z-30 flex shrink-0 flex-col items-center">
+    <div className="pointer-events-none relative z-30 flex shrink-0 origin-bottom flex-col items-center md:scale-110 lg:scale-100">
       <Frog width={240} height={270} indices={indices} />
     </div>
   );

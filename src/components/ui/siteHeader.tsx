@@ -87,6 +87,13 @@ export default function SiteHeader() {
     { revalidateOnFocus: false },
   );
   const questClaimableCount = questsData?.claimableCount ?? 0;
+
+  const { data: friendsData } = useSWR<{ claimable?: number }>(
+    user ? `/api/friends?tz=${encodeURIComponent(timezone)}` : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
+  const friendClaimable = friendsData?.claimable ?? 0;
   const questActiveCount = questsData?.activeCount ?? 0;
 
   const navItems = [
@@ -292,7 +299,11 @@ export default function SiteHeader() {
                   onClick={item.onClick}
                   className={buttonClass}
                 >
-                  <Icon name={item.iconName} label={item.label} className="w-8 h-8" />
+                  <Icon
+                    name={item.iconName}
+                    label={item.label}
+                    className={`w-8 h-8 ${item.label === 'Friends' ? 'scale-125' : ''}`}
+                  />
                   <span className="hidden lg:inline">{item.label}</span>
                   {item.label === 'Quests' && questClaimableCount > 0 ? (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
@@ -301,6 +312,10 @@ export default function SiteHeader() {
                   ) : item.label === 'Quests' && questActiveCount > 0 ? (
                     <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-muted-foreground px-1 text-[10px] font-bold text-white shadow-sm ml-1">
                       {questActiveCount > 9 ? '9+' : questActiveCount}
+                    </span>
+                  ) : item.label === 'Friends' && friendClaimable > 0 ? (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white shadow-sm ml-1">
+                      {friendClaimable > 9 ? '9+' : friendClaimable}
                     </span>
                   ) : null}
                 </button>

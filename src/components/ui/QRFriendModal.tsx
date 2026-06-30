@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Copy, Check, Send, Loader2 } from 'lucide-react';
+import { X, Copy, Check, Send, Loader2 } from 'lucide-react';
 import useSWR, { mutate as swrMutate } from 'swr';
 import jsQR from 'jsqr';
 import Frog from '@/components/ui/frog';
@@ -29,6 +29,15 @@ export function QRFriendModal({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const [isDesktop, setIsDesktop] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 640px)');
+    const update = () => setIsDesktop(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
   const [tab, setTab] = useState<Tab>(initialTab);
   useEffect(() => {
     if (open) setTab(initialTab);
@@ -43,41 +52,48 @@ export function QRFriendModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[1500] flex flex-col bg-[#23a6f0] text-white"
+          className="fixed inset-0 z-[1500] flex justify-center sm:items-center sm:bg-black/70 sm:p-6"
           data-qr-modal
+          onClick={(e) => {
+            if (e.target === e.currentTarget) onClose();
+          }}
         >
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Back"
-            className="absolute left-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex h-11 w-11 items-center justify-center rounded-full text-white"
-          >
-            <ChevronLeft className="h-8 w-8" strokeWidth={3} />
-          </button>
+          <div className="relative flex h-full w-full flex-col bg-[#23a6f0] text-white sm:h-auto sm:max-h-[calc(100dvh-3rem)] sm:w-[24rem] sm:max-w-[calc(100vw-3rem)] sm:overflow-hidden sm:rounded-[32px] sm:shadow-2xl">
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.5rem)] z-40 flex h-10 w-10 items-center justify-center rounded-full bg-black/25 text-white ring-1 ring-white/30 backdrop-blur-sm transition-transform active:scale-95 sm:top-3"
+            >
+              <X className="h-6 w-6" strokeWidth={3} />
+            </button>
 
-          <div className="relative flex-1 overflow-hidden">
-            {tab === 'mycode' ? (
-              <MyCodeView indices={indices} />
-            ) : (
-              <ScanView active={open && tab === 'scan'} onClose={onClose} />
-            )}
-          </div>
-
-          <div
-            className="relative z-30 bg-[#5bc0f8] px-6 pt-5 text-center"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
-          >
-            <p className="mx-auto max-w-sm text-lg font-bold leading-snug text-white">
-              Scan a Frogress QR code with your phone&apos;s camera to add a new friend!
-            </p>
-            <div className="mt-4 flex items-center justify-center gap-3">
-              <TabButton active={tab === 'scan'} onClick={() => setTab('scan')}>
-                SCAN
-              </TabButton>
-              <TabButton active={tab === 'mycode'} onClick={() => setTab('mycode')}>
-                MY CODE
-              </TabButton>
+            <div className="relative flex-1 overflow-hidden sm:flex-none">
+              {!isDesktop && tab === 'scan' ? (
+                <ScanView active={open && tab === 'scan'} onClose={onClose} />
+              ) : (
+                <MyCodeView indices={indices} isDesktop={isDesktop} />
+              )}
             </div>
+
+            {!isDesktop && (
+              <div
+                className="relative z-30 bg-[#5bc0f8] px-6 pt-5 text-center"
+                style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)' }}
+              >
+                <p className="mx-auto max-w-sm text-sm font-bold leading-snug text-white min-[400px]:text-base">
+                  Scan a Frogress QR code with your phone&apos;s camera to add a new friend!
+                </p>
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  <TabButton active={tab === 'scan'} onClick={() => setTab('scan')}>
+                    SCAN
+                  </TabButton>
+                  <TabButton active={tab === 'mycode'} onClick={() => setTab('mycode')}>
+                    MY CODE
+                  </TabButton>
+                </div>
+              </div>
+            )}
           </div>
         </motion.div>
       )}
@@ -110,8 +126,10 @@ function TabButton({
 
 function MyCodeView({
   indices,
+  isDesktop,
 }: {
   indices?: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
+  isDesktop?: boolean;
 }) {
   const { data } = useSWR<CodeData>('/api/friends/code', fetcher, {
     revalidateOnFocus: false,
@@ -175,20 +193,24 @@ function MyCodeView({
   }, [data?.code]);
 
   return (
-    <div className="flex h-full flex-col items-center justify-center px-6">
-      <div className="relative w-full max-w-sm">
-        <div className="pointer-events-none absolute -top-16 left-1/2 z-10 -translate-x-1/2">
-          <Frog width={150} height={169} indices={indices} paused />
+    <div className="flex h-full flex-col items-center justify-center px-6 py-3 sm:h-auto sm:justify-start sm:py-5">
+      <div className="flex w-full max-w-sm flex-col items-center">
+        <div className="pointer-events-none relative z-10 origin-bottom -mb-1.5 sm:-mb-2 sm:-mt-14 sm:translate-y-1.5 min-[360px]:max-sm:scale-125 min-[360px]:max-sm:translate-y-1 min-[400px]:max-sm:scale-[1.45] min-[400px]:max-sm:translate-y-2">
+          <Frog
+            width={isDesktop ? 230 : 150}
+            height={isDesktop ? 259 : 169}
+            indices={indices}
+          />
         </div>
 
-        <div className="relative rounded-[28px] bg-white px-6 pb-7 pt-12 text-center shadow-2xl">
-          <p className="text-xl font-black tracking-tight text-zinc-900">
+        <div className="relative w-full rounded-[28px] bg-white px-5 pb-5 pt-6 text-center shadow-2xl sm:px-6 sm:pb-7">
+          <p className="text-lg font-black leading-tight tracking-tight text-zinc-900 sm:text-xl">
             {data?.name ? `${data.name} & ${data.frogName}` : data?.frogName ?? 'Your code'}
           </p>
           <button
             type="button"
             onClick={handleCopy}
-            className="mx-auto mt-1 flex items-center gap-1.5 text-base font-bold tracking-[0.12em] text-zinc-500"
+            className="mx-auto mt-1.5 flex items-center gap-1.5 text-base font-bold tracking-[0.12em] text-zinc-500"
           >
             {data?.code ?? '··········'}
             {copied ? (
@@ -198,7 +220,7 @@ function MyCodeView({
             )}
           </button>
 
-          <div className="mx-auto mt-5 flex aspect-square w-full max-w-[260px] items-center justify-center">
+          <div className="mx-auto mt-3 flex aspect-square w-full max-w-[155px] items-center justify-center min-[360px]:max-w-[190px] min-[400px]:max-w-[220px] sm:mt-4 sm:max-w-[210px]">
             {qr ? (
               <img src={qr} alt="Your friend QR code" className="h-full w-full" />
             ) : (
@@ -211,7 +233,7 @@ function MyCodeView({
       <button
         type="button"
         onClick={handleShare}
-        className="mt-7 flex items-center gap-2.5 rounded-2xl bg-white px-8 py-3.5 text-lg font-black tracking-tight text-[#23a6f0] shadow-[0_5px_0_rgba(0,0,0,0.12)] transition-all active:translate-y-0.5"
+        className="mt-4 flex items-center gap-2.5 rounded-2xl bg-white px-8 py-3.5 text-lg font-black tracking-tight text-[#23a6f0] shadow-[0_5px_0_rgba(0,0,0,0.12)] transition-all active:translate-y-0.5 sm:mt-5"
       >
         <Send className="h-5 w-5 -rotate-12" />
         Share Link

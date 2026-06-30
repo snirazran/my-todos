@@ -13,6 +13,7 @@ export type DailyFlyProgress = {
 export type FriendFlyDaily = {
   date: string;
   credited: Record<string, number>;
+  lastClaim?: { amount: number; doubled: boolean };
 };
 
 // --- UPDATED STATISTICS TYPES ---

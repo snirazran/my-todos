@@ -76,25 +76,11 @@ export async function GET(req: NextRequest) {
     const credited: Record<string, number> =
       prior && prior.date === today ? { ...prior.credited } : {};
 
-    let grantTotal = 0;
+    let claimable = 0;
     for (const f of friends) {
       const owed = f.givesYou ?? 0;
       const already = credited[f.userId] ?? 0;
-      if (owed > already) {
-        grantTotal += owed - already;
-        credited[f.userId] = owed;
-      }
-    }
-
-    const dateChanged = !prior || prior.date !== today;
-    if (grantTotal > 0 || dateChanged) {
-      await UserModel.updateOne(
-        { _id: userId },
-        {
-          ...(grantTotal > 0 ? { $inc: { 'wardrobe.flies': grantTotal } } : {}),
-          $set: { 'wardrobe.friendFlyDaily': { date: today, credited } },
-        },
-      );
+      if (owed > already) claimable += owed - already;
     }
 
     const receivedToday = friends.reduce((sum, f) => sum + (f.givesYou ?? 0), 0);
@@ -102,7 +88,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       friends,
       me: me ? toSummary(me) : null,
-      contribution: { receivedToday, justCredited: grantTotal },
+      claimable,
+      contribution: { receivedToday },
     });
   } catch (err) {
     return NextResponse.json(

@@ -40,6 +40,13 @@ export default function MobileNav() {
   );
   const friendRequestCount = friendRequestsData?.incoming?.length ?? 0;
 
+  const { data: friendsData } = useSWR<{ claimable?: number }>(
+    user ? `/api/friends?tz=${encodeURIComponent(timezone)}` : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
+  const friendClaimable = friendsData?.claimable ?? 0;
+
   if (
     pathname === '/welcome' ||
     pathname === '/login' ||
@@ -114,7 +121,11 @@ export default function MobileNav() {
             const content = (
               <div className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-2xl transition-colors ${isActive ? 'bg-primary/10' : ''}`}>
                 <div className="relative">
-                  <Icon name={item.iconName} label={item.label} className="w-9 h-9" />
+                  <Icon
+                    name={item.iconName}
+                    label={item.label}
+                    className={cn('w-9 h-9', item.label === 'Friends' && 'scale-125')}
+                  />
                   {item.label === 'Wardrobe' && inventoryBadge > 0 && (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
                       {inventoryBadge > 9 ? '9+' : inventoryBadge}
@@ -129,11 +140,15 @@ export default function MobileNav() {
                       {questActiveCount > 9 ? '9+' : questActiveCount}
                     </span>
                   ) : null}
-                  {item.label === 'Friends' && friendRequestCount > 0 && (
+                  {item.label === 'Friends' && friendClaimable > 0 ? (
+                    <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-amber-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
+                      {friendClaimable > 9 ? '9+' : friendClaimable}
+                    </span>
+                  ) : item.label === 'Friends' && friendRequestCount > 0 ? (
                     <span className="absolute -top-2 -right-3 flex items-center justify-center min-w-[1.25rem] h-5 px-1 text-[10px] font-bold text-white bg-rose-500 rounded-full border-2 border-background animate-in zoom-in duration-300 shadow-sm">
                       {friendRequestCount > 9 ? '9+' : friendRequestCount}
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 <span className={`text-[10px] font-bold ${isActive ? 'text-primary' : ''}`}>{item.label}</span>
               </div>
