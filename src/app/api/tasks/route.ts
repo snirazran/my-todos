@@ -2617,7 +2617,15 @@ async function handleBoardPut(
       if (ttype === 'weekly')
         return TaskModel.updateOne(
           { userId: uid, type: 'weekly', id: t.id },
-          { $set: { dayOfWeek: weekday, order: i + 1, updatedAt: now, tags } },
+          {
+            $set: {
+              dayOfWeek: weekday,
+              order: i + 1,
+              [`orderOverrides.${weekDates[weekday]}`]: i + 1,
+              updatedAt: now,
+              tags,
+            },
+          },
         );
       if (ttype === 'regular')
         return TaskModel.updateOne(
