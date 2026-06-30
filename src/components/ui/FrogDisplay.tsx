@@ -136,7 +136,7 @@ export function FrogDisplay({
     // Added mb-12 to create the requested space from the tabs below
 
     <div
-      className={`${className} flex flex-col items-center mb-2 md:mb-2 relative md:-translate-y-6 lg:-translate-y-9 xl:translate-y-0`}
+      className={`${className} flex flex-col items-center mb-2 md:mb-2 relative md:-translate-y-6`}
     >
       <CurrencyShop
         open={shopOpen}
@@ -154,8 +154,6 @@ export function FrogDisplay({
         >
           <Frog
             ref={frogRef}
-            width={240}
-            height={240}
             mouthOpen={!!mouthOpen}
             mouthOffset={mouthOffset}
             indices={indices}

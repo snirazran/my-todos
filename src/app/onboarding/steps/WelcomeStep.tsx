@@ -17,7 +17,7 @@ export default function WelcomeStep({ onNext, saving }: OnboardingStepProps) {
       </h1>
       <Frog
         width={280}
-        height={280}
+        height={315}
         indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
       />
       <motion.button

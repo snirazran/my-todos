@@ -41,7 +41,7 @@ export default function FrogOnDeck({
         className="relative z-50 pointer-events-none"
         style={{ marginBottom: -Math.round(width * 0.18) }}
       >
-        <Frog width={width} height={height ?? width} indices={indices} paused={paused} />
+        <Frog width={width} height={height} indices={indices} paused={paused} />
       </div>
       <div
         className={cn(

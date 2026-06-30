@@ -178,7 +178,7 @@ function MyCodeView({
     <div className="flex h-full flex-col items-center justify-center px-6">
       <div className="relative w-full max-w-sm">
         <div className="pointer-events-none absolute -top-16 left-1/2 z-10 -translate-x-1/2">
-          <Frog width={150} height={150} indices={indices} paused />
+          <Frog width={150} height={169} indices={indices} paused />
         </div>
 
         <div className="relative rounded-[28px] bg-white px-6 pb-7 pt-12 text-center shadow-2xl">

@@ -162,7 +162,9 @@
       "Bash(NODE_OPTIONS= node *)",
       "Bash(sed -i '' 's/  if\\(!rule||!start\\) return false;/  if\\(!rule||!start\\) return false;\\\\n  if\\(date<start\\) return false;/' rep.mjs)",
       "Bash(node rep.mjs)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "WebFetch(domain:help.rive.app)",
+      "WebFetch(domain:rive.app)"
     ]
   }
 }

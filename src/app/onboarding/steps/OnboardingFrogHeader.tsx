@@ -47,7 +47,7 @@ export function OnboardingFrogHeader({
               messageClassName="!whitespace-pre-line !text-sm !leading-tight md:!text-base"
             />
           ) : null}
-          <Frog width={280} height={280} indices={indices} />
+          <Frog width={280} height={315} indices={indices} />
         </div>
         <div className="relative block md:hidden">
           {speechBubbleMessage ? (
@@ -60,7 +60,7 @@ export function OnboardingFrogHeader({
               messageClassName="!whitespace-pre-line !text-sm !leading-tight md:!text-base"
             />
           ) : null}
-          <Frog width={230} height={230} indices={indices} />
+          <Frog width={230} height={259} indices={indices} />
         </div>
       </div>
 

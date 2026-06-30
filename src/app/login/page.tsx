@@ -321,8 +321,6 @@ function LoginPageInner() {
           <div ref={frogBoxRef}>
             <Frog
               ref={frogRef}
-              width={240}
-              height={240}
               mouthOpen={!!grab}
               indices={{ skin: 0, hat: 0, body: 0, hand_item: 0 }}
             />

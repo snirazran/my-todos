@@ -488,7 +488,7 @@ export default function Home() {
       <div className="px-3 pt-[calc(3rem+env(safe-area-inset-top))] pb-4 mx-auto max-w-4xl md:px-6 md:pt-12">
         <Header router={router} />
 
-        <div className="relative flex flex-col items-stretch gap-2 lg:gap-5">
+        <div className="relative flex flex-col items-stretch gap-2">
           <div className="relative z-10 flex flex-col gap-2 lg:gap-4">
             <FrogDisplay
               frogRef={frogRef}
@@ -514,7 +514,7 @@ export default function Home() {
           </div>
 
           <div
-            className="relative z-20 -mx-3 mt-6 flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-5 md:mx-auto md:mt-10 md:w-full md:max-w-2xl md:px-8 lg:gap-4"
+            className="relative z-20 -mx-3 mt-[14px] flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-5 md:mx-auto md:mt-14 md:w-full md:max-w-2xl md:px-8 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
             <div className="flex flex-col gap-2 w-full">

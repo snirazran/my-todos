@@ -39,12 +39,10 @@ function WardrobePageInner() {
   return (
     <main className="relative min-h-[100dvh] md:min-h-[calc(100vh-4rem)] flex flex-col">
       <div className="relative z-10 flex flex-1 flex-col w-full min-h-[100dvh] md:min-h-[calc(100vh-4rem)] max-w-3xl mx-auto px-4 md:px-6">
-        <div className="relative z-40 flex shrink-0 items-end justify-center pointer-events-none h-[calc(176px+env(safe-area-inset-top))] md:h-[calc(210px+env(safe-area-inset-top))]">
-          <div className="relative z-50 translate-y-5 pointer-events-none md:translate-y-5">
+        <div className="relative z-40 flex shrink-0 items-end justify-center pointer-events-none h-[calc(204px+env(safe-area-inset-top))] md:h-[calc(222px+env(safe-area-inset-top))]">
+          <div className="relative z-50 translate-y-[72px] pointer-events-none md:translate-y-[5.15rem]">
             <Frog
               ref={frogRef}
-              width={240}
-              height={240}
               mouthOpen={false}
               indices={previewIndices}
               paused={false}
@@ -52,7 +50,7 @@ function WardrobePageInner() {
           </div>
         </div>
 
-        <section className="relative z-10 -mx-4 flex flex-1 flex-col px-4 md:-mx-6 md:px-6">
+        <section className="relative z-10 flex flex-col flex-1 px-4 -mx-4 md:-mx-6 md:px-6">
           <WardrobePageContent
             defaultTab={defaultTab}
             onClose={() => router.push('/')}

@@ -3,7 +3,19 @@ import { useMemo, useState, useEffect } from 'react';
 import React from 'react';
 import { useAuth } from '@/components/auth/AuthContext';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Lock, Shirt, ShoppingBag, Repeat, ChevronDown, Sparkles, Paintbrush, Crown, Hand, Image as ImageIcon, Gift } from 'lucide-react';
+import {
+  Lock,
+  Shirt,
+  ShoppingBag,
+  Repeat,
+  ChevronDown,
+  Sparkles,
+  Paintbrush,
+  Crown,
+  Hand,
+  Image as ImageIcon,
+  Gift,
+} from 'lucide-react';
 import type { ItemDef, WardrobeSlot } from '@/lib/skins/catalog';
 import { rarityRank } from '@/lib/skins/catalog';
 import Fly from '@/components/ui/fly';
@@ -22,12 +34,27 @@ import GiftBoxOpening from '@/components/ui/gift-box/GiftBoxOpening';
 import { SellConfirmationDialog } from './SellConfirmationDialog';
 import { BackgroundCard } from './BackgroundCard';
 import { mutateBackgrounds, type BackgroundItem } from '@/hooks/useBackgrounds';
-import { useBackgroundActions, backgroundPreview } from '@/hooks/useBackgroundActions';
+import {
+  useBackgroundActions,
+  backgroundPreview,
+} from '@/hooks/useBackgroundActions';
 import { useUIStore } from '@/lib/uiStore';
 
 type WardrobeCard =
-  | { kind: 'item'; id: string; rarity: ItemDef['rarity']; price: number; item: ItemDef }
-  | { kind: 'bg'; id: string; rarity: ItemDef['rarity']; price: number; bg: BackgroundItem };
+  | {
+      kind: 'item';
+      id: string;
+      rarity: ItemDef['rarity'];
+      price: number;
+      item: ItemDef;
+    }
+  | {
+      kind: 'bg';
+      id: string;
+      rarity: ItemDef['rarity'];
+      price: number;
+      bg: BackgroundItem;
+    };
 
 function mergeWardrobeCards(
   items: ItemDef[],
@@ -138,7 +165,7 @@ export function WardrobePageContent({
   onClose: () => void;
 }) {
   return (
-    <div className="flex flex-1 flex-col">
+    <div className="flex flex-col flex-1">
       <WardrobeManagerContent
         open={true}
         defaultTab={defaultTab}
@@ -171,17 +198,13 @@ function WardrobeManagerContent({
   bindScroll?: (el: HTMLElement | null) => void;
 }) {
   const { user } = useAuth();
-  const {
-    data,
-    mutate,
-    unseenItems,
-    unseenContainers,
-    markItemSeen,
-  } =
+  const { data, mutate, unseenItems, unseenContainers, markItemSeen } =
     useInventory(open);
 
   const [activeTab, setActiveTab] = useState<string>(defaultTab);
-  useEffect(() => { setActiveTab(defaultTab); }, [defaultTab]);
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
   useEffect(() => {
     setSortBy(activeTab === 'inventory' ? 'latest' : 'rarity_asc');
   }, [activeTab]);
@@ -656,7 +679,7 @@ function WardrobeManagerContent({
       {!embedded && (
         <div
           onPointerDown={(e) => !isDesktop && dragControls?.start(e)}
-          className="px-4 py-4 md:px-6 shrink-0 border-b border-border/50"
+          className="px-4 py-4 border-b md:px-6 shrink-0 border-border/50"
         >
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -664,7 +687,7 @@ function WardrobeManagerContent({
                 Style Studio
               </p>
               <div className="min-w-0">
-                <h2 className="text-3xl font-black tracking-tight text-foreground leading-none">
+                <h2 className="text-3xl font-black leading-none tracking-tight text-foreground">
                   Wardrobe
                 </h2>
                 <p className="mt-1 text-sm font-medium text-muted-foreground">
@@ -702,7 +725,7 @@ function WardrobeManagerContent({
                     'sticky top-0 z-40 transition-colors duration-300',
                     isStuck
                       ? '-mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-[calc(env(safe-area-inset-top)+4.25rem)] md:pt-3 pb-3 shadow-[0_10px_10px_-12px_rgba(0,0,0,0.2)]'
-                      : 'pt-2 pb-0',
+                      : 'mt-[68px] pt-2 pb-0 md:mt-0',
                   )
                 : 'relative z-40 space-y-2 px-4 pt-0 md:space-y-2 md:px-6 md:pt-2',
             )}
@@ -722,11 +745,13 @@ function WardrobeManagerContent({
                         'mx-auto w-full transition-[background-color,box-shadow,border-color] duration-200 md:transition-[max-width,background-color,box-shadow,border-color] md:duration-300',
                         isStuck
                           ? 'h-11 max-w-full bg-muted shadow-none border-border/60'
-                          : 'h-[50px] md:h-[54px] max-w-[340px] md:max-w-[380px] bg-muted shadow-lg',
+                          : 'h-[50px] md:h-[54px] max-w-[340px] md:max-w-[380px] -translate-y-3.5 bg-muted shadow-lg md:translate-y-16',
                       )
                     : cn(
                         'h-10 md:h-11 flex-1 shadow-sm',
-                        isDesktop ? 'bg-card/80 backdrop-blur-2xl' : 'bg-muted/30',
+                        isDesktop
+                          ? 'bg-card/80 backdrop-blur-2xl'
+                          : 'bg-muted/30',
                       ),
                 )}
               >
@@ -762,40 +787,101 @@ function WardrobeManagerContent({
                       '-mx-4 px-4 md:-mx-6 md:px-6 bg-background',
                       isStuck
                         ? 'mt-2 rounded-t-none pt-0'
-                        : 'mt-10 md:mt-20 rounded-t-[24px] pt-3',
+                        : 'mt-6 rounded-t-[24px] pt-3 md:mt-20',
                     )
                   : 'mt-2 w-full min-w-0',
               )}
             >
-              <div className="min-w-0 flex-1">
-              <FilterBar
-                active={activeFilter === 'container' && activeTab !== 'inventory' ? 'all' : activeFilter}
-                onChange={handleFilterChange}
-                badges={filterBadges}
-                options={
-                  activeTab !== 'inventory'
-                    ? [
-                        { id: 'all', label: 'All Items', icon: <Sparkles className="w-5 h-5" /> },
-                        { id: 'skin', label: 'Skins', icon: <Paintbrush className="w-5 h-5" /> },
-                        { id: 'hat', label: 'Hats', icon: <Crown className="w-5 h-5" /> },
-                        { id: 'body', label: 'Body', icon: <Shirt className="w-5 h-5" /> },
-                        { id: 'held', label: 'Held', icon: <Hand className="w-5 h-5" /> },
-                        { id: 'background', label: 'Backgrounds', icon: <ImageIcon className="w-5 h-5" /> },
-                      ]
-                    : [
-                        { id: 'all', label: 'All Items', icon: <Sparkles className="w-5 h-5" /> },
-                        { id: 'container', label: 'Gifts', icon: <Gift className="w-5 h-5" /> },
-                        { id: 'skin', label: 'Skins', icon: <Paintbrush className="w-5 h-5" /> },
-                        { id: 'hat', label: 'Hats', icon: <Crown className="w-5 h-5" /> },
-                        { id: 'body', label: 'Body', icon: <Shirt className="w-5 h-5" /> },
-                        { id: 'held', label: 'Held', icon: <Hand className="w-5 h-5" /> },
-                        { id: 'background', label: 'Backgrounds', icon: <ImageIcon className="w-5 h-5" /> },
-                      ]
-                }
-              />
+              <div className="flex-1 min-w-0">
+                <FilterBar
+                  active={
+                    activeFilter === 'container' && activeTab !== 'inventory'
+                      ? 'all'
+                      : activeFilter
+                  }
+                  onChange={handleFilterChange}
+                  badges={filterBadges}
+                  options={
+                    activeTab !== 'inventory'
+                      ? [
+                          {
+                            id: 'all',
+                            label: 'All Items',
+                            icon: <Sparkles className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'skin',
+                            label: 'Skins',
+                            icon: <Paintbrush className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'hat',
+                            label: 'Hats',
+                            icon: <Crown className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'body',
+                            label: 'Body',
+                            icon: <Shirt className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'held',
+                            label: 'Held',
+                            icon: <Hand className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'background',
+                            label: 'Backgrounds',
+                            icon: <ImageIcon className="w-5 h-5" />,
+                          },
+                        ]
+                      : [
+                          {
+                            id: 'all',
+                            label: 'All Items',
+                            icon: <Sparkles className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'container',
+                            label: 'Gifts',
+                            icon: <Gift className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'skin',
+                            label: 'Skins',
+                            icon: <Paintbrush className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'hat',
+                            label: 'Hats',
+                            icon: <Crown className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'body',
+                            label: 'Body',
+                            icon: <Shirt className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'held',
+                            label: 'Held',
+                            icon: <Hand className="w-5 h-5" />,
+                          },
+                          {
+                            id: 'background',
+                            label: 'Backgrounds',
+                            icon: <ImageIcon className="w-5 h-5" />,
+                          },
+                        ]
+                  }
+                />
               </div>
               {embedded && (
-                <div className="relative z-10 flex shrink-0 items-center self-stretch bg-background pl-3 border-l border-border/40">
+                <div
+                  className={cn(
+                    'relative z-10 flex shrink-0 items-center self-stretch border-l border-border/40 pl-3',
+                    'bg-background',
+                  )}
+                >
                   <SortMenu
                     value={sortBy}
                     onChange={setSortBy}
@@ -809,7 +895,7 @@ function WardrobeManagerContent({
           <div
             className={cn(
               embedded
-                ? 'relative flex-1 -mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-3 pb-2'
+                ? 'relative flex-1 -mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-5 pb-2 rounded-t-[24px] md:pt-3 md:rounded-t-none'
                 : 'relative mt-4 flex-1 overflow-hidden rounded-t-[24px] border-t border-border/40',
               embedded
                 ? ''
@@ -845,10 +931,7 @@ function WardrobeManagerContent({
                 setInventoryHasScrolled(true);
                 if (
                   inventoryGrid.hasMore &&
-                  shouldLoadMoreFromWheel(
-                    event.currentTarget,
-                    event.deltaY,
-                  )
+                  shouldLoadMoreFromWheel(event.currentTarget, event.deltaY)
                 ) {
                   inventoryGrid.loadMore();
                 }
@@ -910,7 +993,8 @@ function WardrobeManagerContent({
                           pausePreview={
                             (card.item.slot !== 'container' && isDragging) ||
                             (card.item.slot !== 'container' &&
-                             data?.wardrobe?.equipped?.[card.item.slot] !== card.item.id)
+                              data?.wardrobe?.equipped?.[card.item.slot] !==
+                                card.item.id)
                           }
                           previewDelayMs={index * 20}
                         />
@@ -949,10 +1033,7 @@ function WardrobeManagerContent({
               }}
               onScroll={(event) => {
                 setShopHasScrolled(true);
-                if (
-                  shopGrid.hasMore &&
-                  isNearScrollEnd(event.currentTarget)
-                ) {
+                if (shopGrid.hasMore && isNearScrollEnd(event.currentTarget)) {
                   shopGrid.loadMore();
                 }
               }}
@@ -960,10 +1041,7 @@ function WardrobeManagerContent({
                 setShopHasScrolled(true);
                 if (
                   shopGrid.hasMore &&
-                  shouldLoadMoreFromWheel(
-                    event.currentTarget,
-                    event.deltaY,
-                  )
+                  shouldLoadMoreFromWheel(event.currentTarget, event.deltaY)
                 ) {
                   shopGrid.loadMore();
                 }
@@ -990,11 +1068,12 @@ function WardrobeManagerContent({
                           key={card.item.id}
                           item={card.item}
                           mode="shop"
-                          ownedCount={data?.wardrobe?.inventory?.[card.item.id] ?? 0}
+                          ownedCount={
+                            data?.wardrobe?.inventory?.[card.item.id] ?? 0
+                          }
                           isEquipped={false}
                           canAfford={
-                            balance >= (card.item.priceFlies ?? 0) &&
-                            !isGuest
+                            balance >= (card.item.priceFlies ?? 0) && !isGuest
                           }
                           actionLoading={buyingId === card.item.id}
                           actionLabel={
@@ -1004,7 +1083,11 @@ function WardrobeManagerContent({
                           }
                           onAction={(e) => handleBuyItem(card.item, e)}
                           deferPreview
-                          pausePreview={(card.item.slot !== 'container' && isDragging) || (card.item.slot !== 'container' && confirmingBuyId !== card.item.id)}
+                          pausePreview={
+                            (card.item.slot !== 'container' && isDragging) ||
+                            (card.item.slot !== 'container' &&
+                              confirmingBuyId !== card.item.id)
+                          }
                           previewDelayMs={index * 20}
                         />
                       ) : (
@@ -1014,7 +1097,9 @@ function WardrobeManagerContent({
                           owned={(bg.inventory[card.bg.id] ?? 0) > 0}
                           ownedCount={bg.inventory[card.bg.id] ?? 0}
                           isEquipped={bg.equipped === card.bg.id}
-                          canAfford={bg.balance >= card.bg.priceFlies && !isGuest}
+                          canAfford={
+                            bg.balance >= card.bg.priceFlies && !isGuest
+                          }
                           mode="shop"
                           actionLoading={bg.busyId === card.bg.id}
                           confirming={bg.confirmingBuyId === card.bg.id}
@@ -1043,7 +1128,9 @@ function WardrobeManagerContent({
             >
               {!canRenderItems ? (
                 <WardrobeGridSkeleton />
-              ) : activeTab === 'trade' && data?.wardrobe?.inventory && data.catalog ? (
+              ) : activeTab === 'trade' &&
+                data?.wardrobe?.inventory &&
+                data.catalog ? (
                 <TradePanel
                   inventory={data.wardrobe.inventory}
                   catalog={data.catalog}
@@ -1064,9 +1151,7 @@ function WardrobeManagerContent({
             {activeTab === 'inventory' && inventoryGrid.hasMore && (
               <ScrollMoreCue />
             )}
-            {activeTab === 'shop' && shopGrid.hasMore && (
-              <ScrollMoreCue />
-            )}
+            {activeTab === 'shop' && shopGrid.hasMore && <ScrollMoreCue />}
           </div>
         </Tabs>
       </div>
@@ -1122,8 +1207,8 @@ function WardrobeGridSkeleton() {
           className="mx-auto flex w-full max-w-[240px] flex-col rounded-2xl border-[3px] border-border bg-card p-2.5 md:p-3.5"
         >
           <div className="mt-4 mb-2 md:mt-5 md:mb-3 aspect-[1/0.75] md:aspect-[1.2/1] rounded-xl bg-muted/50" />
-          <div className="mx-auto h-3 w-2/3 rounded-full bg-muted/60" />
-          <div className="mx-auto mt-3 h-7 w-3/4 rounded-lg bg-muted/50 md:h-8" />
+          <div className="w-2/3 h-3 mx-auto rounded-full bg-muted/60" />
+          <div className="w-3/4 mx-auto mt-3 rounded-lg h-7 bg-muted/50 md:h-8" />
         </div>
       ))}
     </div>
@@ -1132,7 +1217,7 @@ function WardrobeGridSkeleton() {
 
 function ScrollMoreCue() {
   return (
-    <div className="pointer-events-none absolute inset-x-0 bottom-0 z-30 flex justify-center bg-gradient-to-t from-background/95 via-background/60 to-transparent pb-4 pt-10">
+    <div className="absolute inset-x-0 bottom-0 z-30 flex justify-center pt-10 pb-4 pointer-events-none bg-gradient-to-t from-background/95 via-background/60 to-transparent">
       <div className="flex items-center gap-1.5 rounded-full border border-border/50 bg-background/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-muted-foreground shadow-sm backdrop-blur">
         <ChevronDown className="h-3.5 w-3.5 animate-bounce text-primary" />
         <span>Scroll for more</span>

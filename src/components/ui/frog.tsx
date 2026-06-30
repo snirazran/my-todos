@@ -24,7 +24,10 @@ import { useRiveVisibility } from '@/hooks/useRiveVisibility';
 
 // Stable layout constant — defined once at module level to prevent useRive from seeing
 // a new object reference on every render, which can cause unnecessary reinitialization.
-const FROG_LAYOUT = new Layout({ fit: Fit.Contain, alignment: Alignment.Center });
+const FROG_LAYOUT = new Layout({
+  fit: Fit.Contain,
+  alignment: Alignment.Center,
+});
 
 /* === Artboard & geometry (adjust to your .riv) =========================== */
 const ARTBOARD_NAME = 'main';
@@ -52,8 +55,12 @@ const DATA_BINDINGS: Record<WardrobeSlot, string> = {
 };
 
 /** Artboard pixel dimensions + anchor (artboard coords) */
-const ARTBOARD_WIDTH = 149;
-const ARTBOARD_HEIGHT = 120;
+const ARTBOARD_WIDTH = 128;
+const ARTBOARD_HEIGHT = 144;
+const DEFAULT_FROG_WIDTH = 240;
+const DEFAULT_FROG_HEIGHT = Math.round(
+  (DEFAULT_FROG_WIDTH * ARTBOARD_HEIGHT) / ARTBOARD_WIDTH,
+);
 const MOUTH_TARGET_X = 75;
 const MOUTH_TARGET_Y = 75;
 /* ========================================================================= */
@@ -77,6 +84,7 @@ interface FrogProps {
   mouthOffset?: { x?: number; y?: number };
   width?: number;
   height?: number;
+  visualOffsetY?: number;
   paused?: boolean;
 
   /** Controlled numeric indices per slot (optional) */
@@ -89,8 +97,9 @@ const Frog = memo(
       className = '',
       mouthOpen,
       mouthOffset,
-      width = 240,
-      height = 180,
+      width = DEFAULT_FROG_WIDTH,
+      height = DEFAULT_FROG_HEIGHT,
+      visualOffsetY,
       paused = false,
       indices,
     },
@@ -110,6 +119,9 @@ const Frog = memo(
     });
 
     useRiveVisibility(rive, wrapperRef, !paused, 'frog');
+
+    const resolvedVisualOffsetY =
+      visualOffsetY ?? Math.round(height * 0.17);
 
     useEffect(() => {
       if (!rive) return;
@@ -266,7 +278,7 @@ const Frog = memo(
         const drawTop = rect.top + (rect.height - drawH) / 2;
 
         const cx = drawLft + MOUTH_TARGET_X * scale;
-        const cy = drawTop + MOUTH_TARGET_Y * scale;
+        const cy = drawTop + MOUTH_TARGET_Y * scale + resolvedVisualOffsetY;
         const ox = mouthOffset?.x ?? 0;
         const oy = mouthOffset?.y ?? 0;
         return { x: Math.round(cx + ox), y: Math.round(cy + oy) };
@@ -329,11 +341,16 @@ const Frog = memo(
       <div
         ref={wrapperRef}
         className={className}
-        style={{ width, height, position: 'relative' }}
+        style={{ width, height, position: 'relative', overflow: 'visible' }}
       >
         {riveUrl && (
           <RiveComponent
-            style={{ width: '100%', height: '100%', display: 'block' }}
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'block',
+              transform: `translateY(${resolvedVisualOffsetY}px)`,
+            }}
           />
         )}
       </div>

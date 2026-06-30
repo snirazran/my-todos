@@ -104,7 +104,7 @@ export default function FriendsPage() {
         )}
       </button>
 
-      <div className="relative z-10 mx-auto flex max-w-2xl flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:pt-11">
+      <div className="relative z-10 mx-auto flex w-full flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:max-w-2xl md:pt-11">
         {/* Self frog */}
         <SelfFrog indices={indices} />
 
@@ -121,7 +121,7 @@ export default function FriendsPage() {
         </button>
 
         {/* Rising sheet */}
-        <div className="relative z-10 -mx-4 mt-11 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-16 md:px-8">
+        <div className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-24 md:px-8">
           {/* Friend requests — surfaced inline only when there's something to act on */}
           {pendingCount > 0 && (
             <button
@@ -353,7 +353,7 @@ function SelfFrog({
 }) {
   return (
     <div className="relative z-30 flex shrink-0 flex-col items-center">
-      <Frog width={240} height={240} indices={indices} />
+      <Frog width={240} height={270} indices={indices} />
     </div>
   );
 }
