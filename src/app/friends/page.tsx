@@ -104,9 +104,9 @@ export default function FriendsPage() {
         )}
       </button>
 
-      <div className="relative z-10 mx-auto flex max-w-2xl flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:pt-4">
+      <div className="relative z-10 mx-auto flex max-w-2xl flex-col items-center px-4 pt-[calc(env(safe-area-inset-top)+0.5rem)] md:pt-11">
         {/* Self frog */}
-        <SelfFrog frogName={meFrogName} indices={indices} />
+        <SelfFrog indices={indices} />
 
         {/* Add friend — frog sits right on top of it */}
         <button
@@ -121,7 +121,7 @@ export default function FriendsPage() {
         </button>
 
         {/* Rising sheet */}
-        <div className="relative z-10 -mx-4 mt-8 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:px-8">
+        <div className="relative z-10 -mx-4 mt-11 flex w-[calc(100%+2rem)] flex-col self-stretch rounded-t-[24px] bg-background px-4 pb-12 pt-5 md:mt-16 md:px-8">
           {/* Friend requests — surfaced inline only when there's something to act on */}
           {pendingCount > 0 && (
             <button
@@ -347,17 +347,12 @@ function InviteRewardBanner({ onClick }: { onClick: () => void }) {
 }
 
 function SelfFrog({
-  frogName,
   indices,
 }: {
-  frogName: string;
   indices: Partial<Record<'skin' | 'hat' | 'body' | 'hand_item', number>>;
 }) {
   return (
     <div className="relative z-30 flex shrink-0 flex-col items-center">
-      <p className="translate-y-5 text-xl font-black tracking-tight text-white drop-shadow-[0_2px_3px_rgba(0,0,0,0.35)] md:translate-y-7">
-        {frogName}
-      </p>
       <Frog width={240} height={180} indices={indices} />
     </div>
   );

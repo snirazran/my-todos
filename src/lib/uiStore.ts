@@ -24,6 +24,9 @@ interface UIState {
 
   isPremiumModalOpen: boolean;
   setPremiumModalOpen: (open: boolean) => void;
+
+  isWardrobeStuck: boolean;
+  setWardrobeStuck: (stuck: boolean) => void;
 }
 
 export const useUIStore = create<UIState>()(
@@ -51,6 +54,9 @@ export const useUIStore = create<UIState>()(
 
       isPremiumModalOpen: false,
       setPremiumModalOpen: (open: boolean) => set({ isPremiumModalOpen: open }),
+
+      isWardrobeStuck: false,
+      setWardrobeStuck: (stuck: boolean) => set({ isWardrobeStuck: stuck }),
     }),
     {
       name: 'frogress-ui-storage',

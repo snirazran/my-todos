@@ -114,6 +114,7 @@ type TradePanelProps = {
   activeFilter?: FilterCategory;
   sortBy?: SortOrder;
   paused?: boolean;
+  pageScroll?: boolean;
 };
 
 export function TradePanel({
@@ -126,6 +127,7 @@ export function TradePanel({
   activeFilter = 'all',
   sortBy = 'rarity_asc',
   paused = false,
+  pageScroll = false,
 }: TradePanelProps) {
   // --- State ---
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -364,7 +366,12 @@ export function TradePanel({
 
   // --- Render ---
   return (
-    <div className="relative flex flex-col w-full h-full overflow-y-auto lg:overflow-hidden bg-background">
+    <div
+      className={cn(
+        'relative flex flex-col w-full bg-background',
+        pageScroll ? '' : 'h-full overflow-y-auto lg:overflow-hidden',
+      )}
+    >
       {/* --- RESULT OVERLAY --- */}
       {mounted && tradeResult && 
         createPortal(
@@ -428,7 +435,12 @@ export function TradePanel({
             availableGrid.loadMore();
           }
         }}
-        className="flex-1 flex flex-col lg:min-h-0 lg:overflow-y-auto lg:overscroll-none order-2 bg-background lg:bg-muted/40 lg:rounded-[20px] lg:border lg:border-border/40"
+        className={cn(
+          'flex-1 flex flex-col order-2 bg-background lg:bg-muted/40 lg:rounded-[20px] lg:border lg:border-border/40',
+          pageScroll
+            ? 'pb-[150px] lg:pb-4'
+            : 'lg:min-h-0 lg:overflow-y-auto lg:overscroll-none',
+        )}
       >
         {!availableItems.length && (
           <div className="flex items-center justify-end px-4 py-3 lg:px-6 lg:py-4 shrink-0">

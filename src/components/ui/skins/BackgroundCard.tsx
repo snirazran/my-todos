@@ -158,24 +158,22 @@ export function BackgroundCard({
       <div className="w-full mx-auto mt-2 md:w-3/4">
         {mode === 'inventory' ? (
           <>
-            <div
-              className={cn(
-                'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
-                isEquipped
-                  ? 'bg-primary text-primary-foreground shadow-md'
-                  : 'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
-              )}
-            >
-              {actionLoading ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : isEquipped ? (
-                'EQUIPPED'
-              ) : (
-                'EQUIP'
-              )}
-            </div>
+            {!isEquipped && (
+              <div
+                className={cn(
+                  'h-7 md:h-8 w-full flex items-center justify-center rounded-lg text-[10px] md:text-xs font-black uppercase tracking-wide transition-colors',
+                  'bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary',
+                )}
+              >
+                {actionLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  'EQUIP'
+                )}
+              </div>
+            )}
             {onSell && (item.priceFlies ?? 0) > 0 && (
-              <div className="mt-1 text-center w-full">
+              <div className={cn('text-center w-full', !isEquipped && 'mt-1')}>
                 <Button
                   variant="ghost"
                   size="sm"

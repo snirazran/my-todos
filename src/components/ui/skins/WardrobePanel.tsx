@@ -23,6 +23,7 @@ import { SellConfirmationDialog } from './SellConfirmationDialog';
 import { BackgroundCard } from './BackgroundCard';
 import { mutateBackgrounds, type BackgroundItem } from '@/hooks/useBackgrounds';
 import { useBackgroundActions, backgroundPreview } from '@/hooks/useBackgroundActions';
+import { useUIStore } from '@/lib/uiStore';
 
 type WardrobeCard =
   | { kind: 'item'; id: string; rarity: ItemDef['rarity']; price: number; item: ItemDef }
@@ -67,6 +68,21 @@ function mergeWardrobeCards(
     }
   });
   return all;
+}
+
+function pinEquippedFirst(
+  cards: WardrobeCard[],
+  equipped: Partial<Record<WardrobeSlot, string | null>> | undefined,
+  equippedBgId: string | null | undefined,
+): WardrobeCard[] {
+  const isEquipped = (c: WardrobeCard) =>
+    c.kind === 'item'
+      ? equipped?.[c.item.slot] === c.item.id
+      : c.bg.id === equippedBgId;
+  const equippedCards: WardrobeCard[] = [];
+  const rest: WardrobeCard[] = [];
+  for (const c of cards) (isEquipped(c) ? equippedCards : rest).push(c);
+  return [...equippedCards, ...rest];
 }
 
 /* ---------------- Types & Data ---------------- */
@@ -122,7 +138,7 @@ export function WardrobePageContent({
   onClose: () => void;
 }) {
   return (
-    <div className="min-h-0 flex-1">
+    <div className="flex flex-1 flex-col">
       <WardrobeManagerContent
         open={true}
         defaultTab={defaultTab}
@@ -206,6 +222,36 @@ function WardrobeManagerContent({
 
   const inventoryScrollRef = React.useRef<HTMLDivElement | null>(null);
   const shopScrollRef = React.useRef<HTMLDivElement | null>(null);
+
+  const stickySentinelRef = React.useRef<HTMLDivElement | null>(null);
+  const [isStuck, setIsStuck] = React.useState(false);
+  const setWardrobeStuck = useUIStore((s) => s.setWardrobeStuck);
+  React.useEffect(() => {
+    if (!embedded) return;
+    const sentinel = stickySentinelRef.current;
+    if (!sentinel) return;
+    const root = document.getElementById('main-scroll');
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsStuck(!entry.isIntersecting),
+      { root, threshold: 0 },
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [embedded]);
+  React.useEffect(() => {
+    if (!embedded) return;
+    setWardrobeStuck(isStuck);
+    return () => setWardrobeStuck(false);
+  }, [embedded, isStuck, setWardrobeStuck]);
+
+  const tabTriggerClass = cn(
+    'flex-1 h-full rounded-2xl relative flex items-center justify-center gap-2',
+    'text-xs md:text-sm font-bold tracking-wide uppercase transition-all',
+    embedded
+      ? 'data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm'
+      : 'data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none',
+    'data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground',
+  );
 
   const unseenInventorySet = useMemo(
     () => new Set(data?.wardrobe?.unseenItems ?? []),
@@ -596,10 +642,10 @@ function WardrobeManagerContent({
   return (
     <div
       className={cn(
-        'flex flex-col h-full',
+        'flex flex-col',
         embedded
-          ? 'min-h-0 overflow-hidden bg-transparent'
-          : 'overflow-hidden rounded-[32px] border border-border/50 bg-background shadow-sm',
+          ? 'flex-1 bg-transparent'
+          : 'h-full overflow-hidden rounded-[32px] border border-border/50 bg-background shadow-sm',
       )}
       onClick={() => {
         if (confirmingBuyId) setConfirmingBuyId(null);
@@ -632,72 +678,96 @@ function WardrobeManagerContent({
 
       <div
         className={cn(
-          'flex flex-col flex-1 min-h-0',
+          'flex flex-col',
           embedded
-            ? 'bg-transparent'
+            ? 'flex-1 bg-transparent'
             : isDesktop
-              ? 'bg-background/50 backdrop-blur-2xl'
-              : 'bg-transparent',
+              ? 'flex-1 min-h-0 bg-background/50 backdrop-blur-2xl'
+              : 'flex-1 min-h-0 bg-transparent',
         )}
       >
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="flex flex-col h-full"
+          className={cn('flex flex-col', embedded ? 'flex-1' : 'h-full')}
         >
-          <div className="relative px-4 pt-0 space-y-2 shrink-0 md:px-6 md:pt-2 md:space-y-2">
-            <div className="relative z-10 flex items-center justify-between gap-2 md:gap-4">
+          {embedded && (
+            <div ref={stickySentinelRef} aria-hidden className="h-px -mb-px" />
+          )}
+          <div
+            className={cn(
+              'shrink-0',
+              embedded
+                ? cn(
+                    'sticky top-0 z-40 transition-colors duration-300',
+                    isStuck
+                      ? '-mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-[calc(env(safe-area-inset-top)+4.25rem)] md:pt-3 pb-3 shadow-[0_10px_10px_-12px_rgba(0,0,0,0.2)]'
+                      : 'pt-2 pb-0',
+                  )
+                : 'relative z-40 space-y-2 px-4 pt-0 md:space-y-2 md:px-6 md:pt-2',
+            )}
+          >
+            <div
+              className={cn(
+                embedded
+                  ? 'flex'
+                  : 'relative z-10 flex items-center justify-between gap-2 md:gap-4',
+              )}
+            >
               <TabsList
                 className={cn(
-                  'flex-1 h-10 md:h-11 p-1 rounded-[18px] border border-border/50 shadow-sm flex items-center gap-1',
+                  'p-1 rounded-[18px] border border-border/50 flex items-center gap-1',
                   embedded
-                    ? 'bg-card/50 backdrop-blur-xl'
-                    : isDesktop
-                    ? 'bg-card/80 backdrop-blur-2xl'
-                    : 'bg-muted/30',
+                    ? cn(
+                        'mx-auto w-full transition-[max-width,background-color,box-shadow,height] duration-300',
+                        isStuck
+                          ? 'h-11 max-w-full bg-muted/50 backdrop-blur-xl shadow-none border-border/60'
+                          : 'h-[50px] md:h-[54px] max-w-[340px] md:max-w-[380px] bg-muted/50 shadow-lg',
+                      )
+                    : cn(
+                        'h-10 md:h-11 flex-1 shadow-sm',
+                        isDesktop ? 'bg-card/80 backdrop-blur-2xl' : 'bg-muted/30',
+                      ),
                 )}
               >
-                <TabsTrigger value="inventory" className="
-                            flex-1 h-full rounded-2xl relative
-                            flex items-center justify-center gap-2
-                            text-xs md:text-sm font-bold tracking-wide uppercase
-                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
-                            data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                          ">
+                <TabsTrigger value="inventory" className={tabTriggerClass}>
                   <Shirt className="w-4 h-4" />
                   <span className="hidden xs:inline">Wardrobe</span>
                   <span className="xs:hidden">INV</span>
                 </TabsTrigger>
-                <TabsTrigger value="shop" className="
-                            flex-1 h-full rounded-2xl relative
-                            flex items-center justify-center gap-2
-                            text-xs md:text-sm font-bold tracking-wide uppercase
-                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
-                            data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                          ">
+                <TabsTrigger value="shop" className={tabTriggerClass}>
                   <ShoppingBag className="w-4 h-4" />
                   <span>Shop</span>
                 </TabsTrigger>
-                <TabsTrigger value="trade" className="
-                            flex-1 h-full rounded-2xl relative
-                            flex items-center justify-center gap-2
-                            text-xs md:text-sm font-bold tracking-wide uppercase
-                            data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none
-                            data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:bg-muted/50 data-[state=inactive]:hover:text-foreground
-                          ">
+                <TabsTrigger value="trade" className={tabTriggerClass}>
                   <Repeat className="w-4 h-4" />
                   <span>Trade</span>
                 </TabsTrigger>
               </TabsList>
 
-              <SortMenu
-                value={sortBy}
-                onChange={setSortBy}
-                showLatest={activeTab === 'inventory'}
-              />
+              {!embedded && (
+                <SortMenu
+                  value={sortBy}
+                  onChange={setSortBy}
+                  showLatest={activeTab === 'inventory'}
+                />
+              )}
             </div>
 
-            <div className="relative z-10 w-full min-w-0">
+            <div
+              className={cn(
+                'relative z-10 flex items-center',
+                embedded
+                  ? cn(
+                      '-mx-4 px-4 md:-mx-6 md:px-6 bg-background',
+                      isStuck
+                        ? 'mt-2 rounded-t-none pt-0'
+                        : 'mt-10 md:mt-20 rounded-t-[24px] pt-3',
+                    )
+                  : 'mt-2 w-full min-w-0',
+              )}
+            >
+              <div className="min-w-0 flex-1">
               <FilterBar
                 active={activeFilter === 'container' && activeTab !== 'inventory' ? 'all' : activeFilter}
                 onChange={handleFilterChange}
@@ -723,15 +793,29 @@ function WardrobeManagerContent({
                       ]
                 }
               />
+              </div>
+              {embedded && (
+                <div className="relative z-10 flex shrink-0 items-center self-stretch bg-background pl-3 border-l border-border/40">
+                  <SortMenu
+                    value={sortBy}
+                    onChange={setSortBy}
+                    showLatest={activeTab === 'inventory'}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
           <div
             className={cn(
-              'flex-1 relative mt-4 overflow-hidden',
               embedded
-                ? 'rounded-[28px] bg-transparent'
-                : 'rounded-t-[24px] border-t border-border/40',
+                ? 'relative flex-1 -mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-3 pb-2'
+                : 'relative mt-4 flex-1 overflow-hidden rounded-t-[24px] border-t border-border/40',
+              embedded
+                ? ''
+                : isDesktop
+                  ? 'bg-card/40 backdrop-blur-md'
+                  : 'bg-card/20',
               embedded
                 ? ''
                 : isDesktop
@@ -769,14 +853,19 @@ function WardrobeManagerContent({
                   inventoryGrid.loadMore();
                 }
               }}
-              className="absolute inset-0 overflow-y-auto rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
+              className={cn(
+                embedded
+                  ? 'relative'
+                  : 'absolute inset-0 overflow-y-auto overscroll-none',
+                'rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden',
+              )}
             >
               {!canRenderItems ? (
                 <WardrobeGridSkeleton />
               ) : activeTab === 'inventory' &&
                 inventoryItems.length === 0 &&
                 inventoryBackgrounds.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full opacity-50">
+                <div className="flex flex-col items-center justify-center min-h-[40vh] opacity-50">
                   <div className="flex items-center justify-center w-16 h-16 mb-4 rounded-full md:w-24 md:h-24 bg-secondary">
                     <Shirt className="w-8 h-8 md:w-10 md:h-10 text-muted-foreground" />
                   </div>
@@ -787,10 +876,14 @@ function WardrobeManagerContent({
               ) : activeTab === 'inventory' ? (
                 <>
                   <div className="grid grid-cols-2 min-[450px]:grid-cols-3 md:grid-cols-4 gap-3 md:gap-4 pb-4">
-                    {mergeWardrobeCards(
-                      inventoryGrid.visibleItems,
-                      inventoryBackgrounds,
-                      sortBy,
+                    {pinEquippedFirst(
+                      mergeWardrobeCards(
+                        inventoryGrid.visibleItems,
+                        inventoryBackgrounds,
+                        sortBy,
+                      ),
+                      data?.wardrobe?.equipped,
+                      bg.equipped,
                     ).map((card, index) =>
                       card.kind === 'item' ? (
                         <ItemCard
@@ -875,7 +968,12 @@ function WardrobeManagerContent({
                   shopGrid.loadMore();
                 }
               }}
-              className="absolute inset-0 overflow-y-auto rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden overscroll-none"
+              className={cn(
+                embedded
+                  ? 'relative'
+                  : 'absolute inset-0 overflow-y-auto overscroll-none',
+                'rounded-[20px] border border-border/40 bg-muted/40 p-3 md:p-4 data-[state=inactive]:hidden',
+              )}
             >
               {!canRenderItems ? (
                 <WardrobeGridSkeleton />
@@ -938,7 +1036,10 @@ function WardrobeManagerContent({
 
             <TabsContent
               value="trade"
-              className="absolute inset-0 overflow-hidden data-[state=inactive]:hidden"
+              className={cn(
+                embedded ? 'relative' : 'absolute inset-0 overflow-hidden',
+                'data-[state=inactive]:hidden',
+              )}
             >
               {!canRenderItems ? (
                 <WardrobeGridSkeleton />
@@ -955,6 +1056,7 @@ function WardrobeManagerContent({
                   }
                   sortBy={sortBy}
                   paused={isDragging}
+                  pageScroll={embedded}
                 />
               ) : null}
             </TabsContent>

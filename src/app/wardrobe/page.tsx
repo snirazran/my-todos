@@ -37,22 +37,20 @@ function WardrobePageInner() {
   }, [data?.catalog, data?.wardrobe?.equipped]);
 
   return (
-    <main className="relative h-[100dvh] md:h-[calc(100vh-4rem)] overflow-hidden">
-      <div className="relative z-10 flex flex-col w-full h-full max-w-3xl gap-0 px-4 pt-[env(safe-area-inset-top)] pb-4 mx-auto md:px-6 md:pb-6 md:pt-4">
-        <section className="relative z-20 flex flex-col pointer-events-none shrink-0 min-h-[182px] md:min-h-[230px]">
-          <div className="flex items-start justify-center">
-            <div className="relative z-50 -mb-6 transition-transform duration-500 origin-top scale-100 pointer-events-none translate-y-6 md:mb-6 md:scale-100 md:-translate-y-2 lg:-translate-y-4">
-              <Frog
-                ref={frogRef}
-                mouthOpen={false}
-                indices={previewIndices}
-                paused={false}
-              />
-            </div>
+    <main className="relative min-h-[100dvh] md:min-h-[calc(100vh-4rem)] flex flex-col">
+      <div className="relative z-10 flex flex-1 flex-col w-full min-h-[100dvh] md:min-h-[calc(100vh-4rem)] max-w-3xl mx-auto px-4 md:px-6">
+        <div className="relative z-40 flex shrink-0 items-end justify-center pointer-events-none h-[176px] pt-[env(safe-area-inset-top)] md:h-[210px]">
+          <div className="relative z-50 translate-y-5 pointer-events-none md:translate-y-5">
+            <Frog
+              ref={frogRef}
+              mouthOpen={false}
+              indices={previewIndices}
+              paused={false}
+            />
           </div>
-        </section>
+        </div>
 
-        <section className="relative z-10 -mx-4 mt-2 flex min-h-0 flex-1 flex-col rounded-t-[32px] bg-background px-4 pt-5 md:-mt-[72px] md:mx-[calc((100%-100vw)/2)] md:px-8 md:pt-6 lg:-mx-6 lg:-mt-[78px] lg:px-6">
+        <section className="relative z-10 -mx-4 flex flex-1 flex-col px-4 md:-mx-6 md:px-6">
           <WardrobePageContent
             defaultTab={defaultTab}
             onClose={() => router.push('/')}

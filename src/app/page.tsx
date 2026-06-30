@@ -514,7 +514,7 @@ export default function Home() {
           </div>
 
           <div
-            className="relative z-20 -mx-3 -mt-2 flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-6 md:mx-auto md:-mt-4 md:w-full md:max-w-2xl md:px-8 lg:gap-4"
+            className="relative z-20 -mx-3 mt-6 flex flex-col gap-2 rounded-t-[24px] bg-background px-1.5 pt-5 md:mx-auto md:mt-10 md:w-full md:max-w-2xl md:px-8 lg:gap-4"
             style={{ pointerEvents: cinematic ? 'none' : 'auto' }}
           >
             <div className="flex flex-col gap-2 w-full">

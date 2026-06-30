@@ -48,6 +48,7 @@ export default function SiteHeader() {
   const router = useRouter();
   const {
     isLoadingScreenVisible,
+    isWardrobeStuck,
   } = useUIStore();
   const { unseenCount, unseenContainerCount, data: inventoryData } = useInventory(!!user, true);
   const flyBalance = inventoryData?.wardrobe?.flies;
@@ -187,7 +188,9 @@ export default function SiteHeader() {
       <header
         className={cn(
           'relative z-[90] hidden w-full h-16 bg-background/95 backdrop-blur-xl md:block',
-          pathname !== '/planner' && 'shadow-lg shadow-black/5 dark:shadow-black/20',
+          pathname !== '/planner' &&
+            !(pathname === '/wardrobe' && isWardrobeStuck) &&
+            'shadow-lg shadow-black/5 dark:shadow-black/20',
           isLoadingScreenVisible && 'pointer-events-none',
         )}
         aria-disabled={isLoadingScreenVisible}

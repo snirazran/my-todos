@@ -169,7 +169,7 @@ export function FilterBar({
           // Mobile Layout (Full Bleed)
           '-mx-4 px-4 w-[calc(100%+2rem)] md:mx-0 md:px-0 md:w-full',
           // Scroll & Interaction
-          'pb-2 touch-pan-x cursor-grab active:cursor-grabbing',
+          'pt-1 pb-2 touch-pan-x cursor-grab active:cursor-grabbing',
           // Hide Scrollbars
           'no-scrollbar',
         )}
@@ -207,7 +207,7 @@ export function FilterBar({
                 'relative flex-none flex items-center justify-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 border-[2px] shadow-sm select-none',
                 'text-sm font-bold whitespace-nowrap',
                 isActive
-                  ? 'bg-primary/10 text-primary border-primary/20 ring-1 ring-primary/20 shadow-none'
+                  ? 'bg-primary/12 text-primary border-primary/30 shadow-sm shadow-primary/10'
                   : 'bg-muted/40 text-muted-foreground border-transparent hover:bg-muted/60 hover:text-foreground',
               )}
             >
