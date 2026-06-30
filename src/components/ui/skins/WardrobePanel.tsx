@@ -388,6 +388,13 @@ function WardrobeManagerContent({
     mutateBackgrounds();
   };
 
+  const scrollPageToTop = () => {
+    if (!embedded) return;
+    document
+      .getElementById('main-scroll')
+      ?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Filter change handler to mark category as visited
   const handleFilterChange = (cat: FilterCategory) => {
     setActiveFilter(cat);
@@ -722,14 +729,25 @@ function WardrobeManagerContent({
               'shrink-0',
               embedded
                 ? cn(
-                    'sticky top-0 z-40 transition-colors duration-300',
+                    'sticky top-0 z-50',
                     isStuck
-                      ? '-mx-4 px-4 md:-mx-6 md:px-6 bg-background pt-[calc(env(safe-area-inset-top)+4.25rem)] md:pt-3 pb-3 shadow-[0_10px_10px_-12px_rgba(0,0,0,0.2)]'
+                      ? '-mx-4 px-4 md:-mx-6 md:px-6 pt-[calc(env(safe-area-inset-top)+4.25rem)] md:pt-3 pb-3'
                       : 'mt-[68px] pt-2 pb-0 md:mt-0',
                   )
                 : 'relative z-40 space-y-2 px-4 pt-0 md:space-y-2 md:px-6 md:pt-2',
             )}
           >
+            {embedded && (
+              <div
+                aria-hidden
+                className={cn(
+                  'pointer-events-none absolute left-1/2 top-0 bottom-0 -z-10 w-screen -translate-x-1/2',
+                  'border-b border-border/50 bg-background',
+                  'shadow-lg shadow-black/5 dark:shadow-black/20',
+                  isStuck ? 'opacity-100' : 'opacity-0',
+                )}
+              />
+            )}
             <div
               className={cn(
                 embedded
@@ -742,10 +760,11 @@ function WardrobeManagerContent({
                   'p-1 rounded-[18px] border border-border/50 flex items-center gap-1',
                   embedded
                     ? cn(
-                        'mx-auto w-full transition-[background-color,box-shadow,border-color] duration-200 md:transition-[max-width,background-color,box-shadow,border-color] md:duration-300',
+                        'mx-auto w-full h-12 bg-muted',
+                        'transition-[transform,box-shadow,border-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]',
                         isStuck
-                          ? 'h-11 max-w-full bg-muted shadow-none border-border/60'
-                          : 'h-[50px] md:h-[54px] max-w-[340px] md:max-w-[380px] -translate-y-3.5 bg-muted shadow-lg md:translate-y-16',
+                          ? 'translate-y-0 shadow-sm border-border/60'
+                          : '-translate-y-3.5 shadow-lg md:translate-y-16',
                       )
                     : cn(
                         'h-10 md:h-11 flex-1 shadow-sm',
@@ -755,16 +774,28 @@ function WardrobeManagerContent({
                       ),
                 )}
               >
-                <TabsTrigger value="inventory" className={tabTriggerClass}>
+                <TabsTrigger
+                  value="inventory"
+                  className={tabTriggerClass}
+                  onClick={scrollPageToTop}
+                >
                   <Shirt className="w-4 h-4" />
                   <span className="hidden xs:inline">Wardrobe</span>
                   <span className="xs:hidden">INV</span>
                 </TabsTrigger>
-                <TabsTrigger value="shop" className={tabTriggerClass}>
+                <TabsTrigger
+                  value="shop"
+                  className={tabTriggerClass}
+                  onClick={scrollPageToTop}
+                >
                   <ShoppingBag className="w-4 h-4" />
                   <span>Shop</span>
                 </TabsTrigger>
-                <TabsTrigger value="trade" className={tabTriggerClass}>
+                <TabsTrigger
+                  value="trade"
+                  className={tabTriggerClass}
+                  onClick={scrollPageToTop}
+                >
                   <Repeat className="w-4 h-4" />
                   <span>Trade</span>
                 </TabsTrigger>

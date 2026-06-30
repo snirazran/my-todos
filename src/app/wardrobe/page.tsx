@@ -6,12 +6,15 @@ import Frog, { type FrogHandle } from '@/components/ui/frog';
 import { WardrobePageContent } from '@/components/ui/skins/WardrobePanel';
 import { useInventory } from '@/hooks/useInventory';
 import { byId as staticById, type WardrobeSlot } from '@/lib/skins/catalog';
+import { useUIStore } from '@/lib/uiStore';
+import { cn } from '@/lib/utils';
 
 function WardrobePageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const frogRef = useRef<FrogHandle>(null);
   const { data } = useInventory(true);
+  const isStuck = useUIStore((s) => s.isWardrobeStuck);
   const defaultTab =
     (searchParams.get('tab') as 'inventory' | 'shop' | 'trade') || 'inventory';
 
@@ -37,10 +40,21 @@ function WardrobePageInner() {
   }, [data?.catalog, data?.wardrobe?.equipped]);
 
   return (
-    <main className="relative min-h-[100dvh] md:min-h-[calc(100vh-4rem)] flex flex-col">
+    <main className="relative min-h-[100dvh] md:min-h-[calc(100vh-4rem)] flex flex-col overflow-x-clip">
       <div className="relative z-10 flex flex-1 flex-col w-full min-h-[100dvh] md:min-h-[calc(100vh-4rem)] max-w-3xl mx-auto px-4 md:px-6">
-        <div className="relative z-40 flex shrink-0 items-end justify-center pointer-events-none h-[calc(204px+env(safe-area-inset-top))] md:h-[calc(222px+env(safe-area-inset-top))]">
-          <div className="relative z-50 translate-y-[72px] pointer-events-none md:translate-y-[5.15rem]">
+        <div
+          className={cn(
+            'relative flex shrink-0 items-end justify-center pointer-events-none h-[calc(204px+env(safe-area-inset-top))] md:h-[calc(222px+env(safe-area-inset-top))]',
+            isStuck ? 'z-[5]' : 'z-40',
+          )}
+        >
+          <div
+            className={cn(
+              'relative z-50 translate-y-[72px] pointer-events-none md:translate-y-[5.15rem]',
+              'origin-bottom transition-[opacity,transform] duration-300 ease-out',
+              isStuck && 'opacity-0 scale-95',
+            )}
+          >
             <Frog
               ref={frogRef}
               mouthOpen={false}
