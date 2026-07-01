@@ -112,6 +112,8 @@ export default function QuickAddSheet({
   hideRepeatPicker = false,
   focusCategoryIds,
   categoryTagMap,
+  submitLabel = 'Add Task',
+  defaultRepeatDaily = false,
 }: QuickAddSheetProps) {
   const [text, setText] = useState(initialText);
   const [repeat, setRepeat] = useState<RepeatChoice>(defaultRepeat);
@@ -216,9 +218,15 @@ export default function QuickAddSheet({
       if (defaultPickedDay !== undefined) return defaultPickedDay as DisplayDay;
       return todayDisplayIndex(daysOrder);
     })();
-    setPickedDays([
-      (initialDay >= 0 ? initialDay : todayDisplayIndex(daysOrder)) as DisplayDay,
-    ]);
+    setPickedDays(
+      defaultRepeatDaily
+        ? ([0, 1, 2, 3, 4, 5, 6] as DisplayDay[])
+        : [
+            (initialDay >= 0
+              ? initialDay
+              : todayDisplayIndex(daysOrder)) as DisplayDay,
+          ],
+    );
 
     setRepeat(defaultRepeat);
     setRepeatEndDate(null);
@@ -735,7 +743,7 @@ export default function QuickAddSheet({
                               ) : (
                                 <>
                                   <Plus className="w-4 h-4 stroke-[3]" />
-                                  <span>Add Task</span>
+                                  <span>{submitLabel}</span>
                                 </>
                               )}
                             </span>

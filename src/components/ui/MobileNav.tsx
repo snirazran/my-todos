@@ -38,7 +38,14 @@ export default function MobileNav() {
     (url: string) => fetch(url).then((res) => res.json()),
     { revalidateOnFocus: false },
   );
-  const friendRequestCount = friendRequestsData?.incoming?.length ?? 0;
+  const { data: buddyInvitesData } = useSWR<{ incoming?: unknown[] }>(
+    user ? '/api/buddy/invite' : null,
+    (url: string) => fetch(url).then((res) => res.json()),
+    { revalidateOnFocus: false },
+  );
+  const friendRequestCount =
+    (friendRequestsData?.incoming?.length ?? 0) +
+    (buddyInvitesData?.incoming?.length ?? 0);
 
   const { data: friendsData } = useSWR<{ claimable?: number }>(
     user ? `/api/friends?tz=${encodeURIComponent(timezone)}` : null,

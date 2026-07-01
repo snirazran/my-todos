@@ -12,6 +12,7 @@ import { GlobalCalendarSync } from '@/components/ui/GoogleCalendarSync';
 import { GlobalSkinRotation } from '@/components/ui/SkinRotation';
 import { ReferralClaimer } from '@/components/providers/ReferralClaimer';
 import { FriendLinkClaimer } from '@/components/providers/FriendLinkClaimer';
+import { BuddyApprovalBanner } from '@/components/ui/BuddyApprovalBanner';
 import { DeepLinkHandler } from '@/components/providers/DeepLinkHandler';
 import { TaskSyncProvider } from '@/components/providers/TaskSyncProvider';
 
@@ -34,6 +35,7 @@ export default function Providers({ children }: { children: ReactNode }) {
             <PushNotificationInit />
             <ReferralClaimer />
             <FriendLinkClaimer />
+            <BuddyApprovalBanner />
             <DeepLinkHandler />
             {children}
           </NotificationProvider>

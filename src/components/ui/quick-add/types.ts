@@ -46,6 +46,10 @@ export type QuickAddSheetProps = Readonly<{
   daysOrder?: ReadonlyArray<Exclude<ApiDay, -1>>;
   hideDayPicker?: boolean;
   hideRepeatPicker?: boolean;
+  /** Overrides the submit button label (default "Add Task"). */
+  submitLabel?: string;
+  /** Preselect all 7 weekdays so the repeat defaults to "Every day". */
+  defaultRepeatDaily?: boolean;
   focusCategoryIds?: MacroCategoryId[];
   categoryTagMap?: FocusCategoryTagMap[];
 }>;

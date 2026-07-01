@@ -21,6 +21,7 @@ import {
 import { syncQuestState, isPremiumUser } from '@/lib/quests/engine';
 import { getZonedToday, getZonedYMD } from '@/lib/utils';
 import { notifyTaskChanged } from '@/lib/taskSync';
+import { severBond, handleBuddyCompletion } from '@/lib/buddy/server';
 
 type Origin = 'weekly' | 'regular';
 type BoardItem = { id: string; text: string; order: number; type: TaskType };
@@ -819,6 +820,34 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  const result = await createTasksForUser(uid, body, tz);
+  if (!result.ok)
+    return NextResponse.json({ error: result.error }, { status: result.status });
+  void syncGamification(uid, tz);
+  await notifyTaskChanged(uid);
+  return NextResponse.json({ ok: true, ids: result.ids, tasks: result.tasks });
+}
+
+export type CreateTasksResult =
+  | { ok: true; ids: string[]; tasks: any[]; repeatGroupId?: string }
+  | { ok: false; error: string; status: number };
+
+/**
+ * Shared task-creation logic used by POST /api/tasks and the buddy-accept flow.
+ * When `opts.bondId` is provided, every created doc (and returned task) is
+ * stamped with the buddy bond so both sides stay linked. Does NOT run
+ * syncGamification / notify — callers do that after.
+ */
+export async function createTasksForUser(
+  uid: string,
+  body: any,
+  tz: string,
+  opts?: { bondId?: string; buddyUserId?: string },
+): Promise<CreateTasksResult> {
+  const buddyFields = opts?.bondId
+    ? { bondId: opts.bondId, buddyUserId: opts.buddyUserId }
+    : {};
+
   const text = String(body?.text ?? '').trim();
   const rawDays: number[] = Array.isArray(body?.days) ? body.days : [];
   const tags: string[] = Array.isArray(body?.tags) ? body.tags.map(String) : [];
@@ -848,8 +877,7 @@ export async function POST(req: NextRequest) {
         : body?.repeat === 'monthly'
           ? 'monthly'
           : 'weekly';
-  if (!text)
-    return NextResponse.json({ error: 'text is required' }, { status: 400 });
+  if (!text) return { ok: false, error: 'text is required', status: 400 };
   const explicitDates: string[] = Array.isArray(body?.dates)
     ? body.dates
         .map(String)
@@ -863,10 +891,7 @@ export async function POST(req: NextRequest) {
           .filter(Number.isInteger)
           .filter((d) => d === -1 || isWeekday(d));
   if (days.length === 0 && explicitDates.length === 0)
-    return NextResponse.json(
-      { error: 'days must include -1 or 0..6' },
-      { status: 400 },
-    );
+    return { ok: false, error: 'days must include -1 or 0..6', status: 400 };
   const { weekStart, weekDates } = getRollingWeekDatesZoned(tz);
   const createdIds: string[] = [];
   const now = new Date();
@@ -876,10 +901,7 @@ export async function POST(req: NextRequest) {
   if (repeat === 'monthly') {
     const anchor = explicitDates.slice().sort()[0];
     if (!anchor)
-      return NextResponse.json(
-        { error: 'monthly repeat requires a date' },
-        { status: 400 },
-      );
+      return { ok: false, error: 'monthly repeat requires a date', status: 400 };
     const repeatDayOfMonth = domFromYMD(anchor);
     const repeatEndDate = normalizeRepeatEnd(body?.repeatEndDate) ?? undefined;
     const dayOfWeek = dowFromYMD(anchor);
@@ -903,10 +925,9 @@ export async function POST(req: NextRequest) {
       repeatStartDate: anchor,
       repeatEndDate,
       repeatDayOfMonth,
+      ...buddyFields,
     });
-    void syncGamification(uid, tz);
-    await notifyTaskChanged(uid);
-    return NextResponse.json({
+    return {
       ok: true,
       ids: [id],
       tasks: [
@@ -924,22 +945,19 @@ export async function POST(req: NextRequest) {
           repeatStartDate: anchor,
           repeatEndDate,
           repeatDayOfMonth,
+          ...buddyFields,
         },
       ],
-    });
+    };
   }
 
   // Custom interval recurrence (the "Custom…" builder).
   if (body?.repeatRule) {
     const anchor = explicitDates.slice().sort()[0];
     if (!anchor)
-      return NextResponse.json(
-        { error: 'custom repeat requires a date' },
-        { status: 400 },
-      );
+      return { ok: false, error: 'custom repeat requires a date', status: 400 };
     const rule = normalizeRepeatRule(body.repeatRule, anchor);
-    if (!rule)
-      return NextResponse.json({ error: 'invalid repeatRule' }, { status: 400 });
+    if (!rule) return { ok: false, error: 'invalid repeatRule', status: 400 };
     const repeatEndDate = normalizeRepeatEnd(body?.repeatEndDate) ?? undefined;
     const dow = dowFromYMD(anchor);
     const id = uuid();
@@ -962,10 +980,9 @@ export async function POST(req: NextRequest) {
       repeatStartDate: anchor,
       repeatEndDate,
       repeatRule: rule,
+      ...buddyFields,
     });
-    void syncGamification(uid, tz);
-    await notifyTaskChanged(uid);
-    return NextResponse.json({
+    return {
       ok: true,
       ids: [id],
       tasks: [
@@ -983,16 +1000,18 @@ export async function POST(req: NextRequest) {
           repeatStartDate: anchor,
           repeatEndDate,
           repeatRule: rule,
+          ...buddyFields,
         },
       ],
-    });
+    };
   }
   if (repeat === 'weekly') {
     if (days.some((d) => d === -1))
-      return NextResponse.json(
-        { error: 'Repeating tasks target weekdays 0..6' },
-        { status: 400 },
-      );
+      return {
+        ok: false,
+        error: 'Repeating tasks target weekdays 0..6',
+        status: 400,
+      };
     // Multi-day repeats (daily / weekdays) become a linked group so later
     // edits/deletes can apply to the whole series.
     const isMulti = days.length > 1;
@@ -1036,6 +1055,7 @@ export async function POST(req: NextRequest) {
         repeatGroupId,
         repeatStartDate,
         repeatEndDate,
+        ...buddyFields,
       });
       createdIds.push(id);
       createdTasks.push({
@@ -1053,15 +1073,10 @@ export async function POST(req: NextRequest) {
         repeatGroupId,
         repeatStartDate,
         repeatEndDate,
+        ...buddyFields,
       });
     }
-    void syncGamification(uid, tz);
-    await notifyTaskChanged(uid);
-    return NextResponse.json({
-      ok: true,
-      ids: createdIds,
-      tasks: createdTasks,
-    });
+    return { ok: true, ids: createdIds, tasks: createdTasks, repeatGroupId };
   }
   // Explicit-date creation (for date-slider UI). Always creates 'regular' tasks on those dates.
   for (const date of explicitDates) {
@@ -1084,6 +1099,7 @@ export async function POST(req: NextRequest) {
       startTime,
       endTime,
       reminder,
+      ...buddyFields,
     });
     createdIds.push(id);
     createdTasks.push({
@@ -1099,6 +1115,7 @@ export async function POST(req: NextRequest) {
       startTime: task.startTime,
       endTime: task.endTime,
       reminder: task.reminder,
+      ...buddyFields,
     });
   }
   for (const d of days) {
@@ -1122,6 +1139,7 @@ export async function POST(req: NextRequest) {
         startTime,
         endTime,
         reminder,
+        ...buddyFields,
       });
       createdTasks.push({
         id: task.id,
@@ -1135,6 +1153,7 @@ export async function POST(req: NextRequest) {
         startTime: task.startTime,
         endTime: task.endTime,
         reminder: task.reminder,
+        ...buddyFields,
       });
     } else {
       const weekday = d as Weekday;
@@ -1156,6 +1175,7 @@ export async function POST(req: NextRequest) {
         startTime,
         endTime,
         reminder,
+        ...buddyFields,
       });
       createdTasks.push({
         id: task.id,
@@ -1170,12 +1190,202 @@ export async function POST(req: NextRequest) {
         startTime: task.startTime,
         endTime: task.endTime,
         reminder: task.reminder,
+        ...buddyFields,
       });
     }
   }
-  void syncGamification(uid, tz);
+  return { ok: true, ids: createdIds, tasks: createdTasks };
+}
+
+/**
+ * Change a task's repeat schedule in place (preserving the primary doc's
+ * personal fields). Shared by PUT /api/tasks (setRepeat) and the buddy
+ * repeat-change approval, which applies the same change to both copies.
+ */
+export async function applySetRepeat(
+  uid: string,
+  taskId: string,
+  setRepeat: any,
+  date: string | undefined,
+  tz: string,
+): Promise<{ ok: true } | { ok: false; error: string; status: number }> {
+  const mode:
+    | 'none'
+    | 'daily'
+    | 'weekdays'
+    | 'weekend'
+    | 'weekly'
+    | 'monthly'
+    | 'custom' =
+    setRepeat.mode ?? (setRepeat.weekly ? 'weekly' : 'none');
+  const doc = await TaskModel.findOne({
+    userId: uid,
+    id: taskId,
+  }).lean<TaskDoc>();
+  if (!doc) return { ok: false, error: 'Task not found', status: 404 };
+
+  // Drop any sibling tasks created by a previous daily/weekdays choice.
+  if (doc.repeatGroupId) {
+    await TaskModel.deleteMany({
+      userId: uid,
+      repeatGroupId: doc.repeatGroupId,
+      id: { $ne: taskId },
+    });
+  }
+
+  const repeatEndDate = normalizeRepeatEnd(setRepeat.endDate);
+
+  if (mode === 'none') {
+    const targetDate =
+      date ||
+      new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+    await TaskModel.updateOne(
+      { userId: uid, id: taskId },
+      {
+        $set: { type: 'regular', date: targetDate, completed: false, repeatMode: 'none' },
+        $unset: {
+          dayOfWeek: 1,
+          weekStart: 1,
+          completedDates: 1,
+          repeatGroupId: 1,
+          repeatStartDate: 1,
+          repeatEndDate: 1,
+          repeatDayOfMonth: 1,
+          repeatRule: 1,
+        },
+      },
+    );
+  } else if (mode === 'monthly') {
+    const repeatStartDate =
+      typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : doc.date || getZonedToday(tz);
+    const set: Record<string, unknown> = {
+      type: 'weekly',
+      repeatMode: 'monthly',
+      repeatStartDate,
+      repeatDayOfMonth: domFromYMD(repeatStartDate),
+    };
+    const unset: Record<string, unknown> = {
+      date: 1,
+      weekStart: 1,
+      completed: 1,
+      dayOfWeek: 1,
+      repeatGroupId: 1,
+      repeatRule: 1,
+    };
+    if (repeatEndDate) set.repeatEndDate = repeatEndDate;
+    else unset.repeatEndDate = 1;
+    await TaskModel.updateOne(
+      { userId: uid, id: taskId },
+      { $set: set, $unset: unset },
+    );
+  } else if (mode === 'custom') {
+    const repeatStartDate =
+      typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : doc.date || getZonedToday(tz);
+    const rule = normalizeRepeatRule(setRepeat.rule, repeatStartDate);
+    if (!rule) return { ok: false, error: 'invalid repeatRule', status: 400 };
+    const set: Record<string, unknown> = {
+      type: 'weekly',
+      repeatMode: 'custom',
+      repeatStartDate,
+      repeatRule: rule,
+    };
+    const unset: Record<string, unknown> = {
+      date: 1,
+      weekStart: 1,
+      completed: 1,
+      dayOfWeek: 1,
+      repeatGroupId: 1,
+      repeatDayOfMonth: 1,
+    };
+    if (repeatEndDate) set.repeatEndDate = repeatEndDate;
+    else unset.repeatEndDate = 1;
+    await TaskModel.updateOne(
+      { userId: uid, id: taskId },
+      { $set: set, $unset: unset },
+    );
+  } else {
+    const requested = Number(setRepeat.dayOfWeek);
+    const dow = isWeekday(requested) ? requested : new Date().getDay();
+    const isMulti =
+      mode === 'daily' || mode === 'weekdays' || mode === 'weekend';
+    // Weekdays must land on Mon–Fri; weekend on Sat/Sun.
+    const weeklyDay = (
+      mode === 'weekdays' && (dow === 0 || dow === 6)
+        ? 1
+        : mode === 'weekend' && dow !== 0 && dow !== 6
+          ? 6
+          : dow
+    ) as Weekday;
+    const groupId = isMulti ? doc.repeatGroupId || uuid() : undefined;
+    const repeatStartDate =
+      typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
+        ? date
+        : doc.date || getZonedToday(tz);
+
+    const set: Record<string, unknown> = {
+      type: 'weekly',
+      dayOfWeek: weeklyDay,
+      repeatMode: mode,
+      repeatStartDate,
+    };
+    const unset: Record<string, unknown> = {
+      date: 1,
+      weekStart: 1,
+      completed: 1,
+      repeatDayOfMonth: 1,
+      repeatRule: 1,
+    };
+    if (repeatEndDate) set.repeatEndDate = repeatEndDate;
+    else unset.repeatEndDate = 1;
+    if (isMulti) set.repeatGroupId = groupId;
+    else unset.repeatGroupId = 1;
+    await TaskModel.updateOne(
+      { userId: uid, id: taskId },
+      { $set: set, $unset: unset },
+    );
+
+    if (isMulti) {
+      const allDays =
+        mode === 'daily'
+          ? [0, 1, 2, 3, 4, 5, 6]
+          : mode === 'weekend'
+            ? [0, 6]
+            : [1, 2, 3, 4, 5];
+      const { weekDates } = getRollingWeekDatesZoned(tz);
+      const now = new Date();
+      for (const d of allDays.filter((day) => day !== weeklyDay)) {
+        const order = await nextOrderForDay(uid, d as Weekday, weekDates[d]);
+        await TaskModel.create({
+          userId: uid,
+          type: 'weekly',
+          id: uuid(),
+          text: doc.text,
+          order,
+          dayOfWeek: d as Weekday,
+          createdAt: now,
+          updatedAt: now,
+          tags: doc.tags ?? [],
+          // Notes & checklist are intentionally NOT copied to sibling repeats —
+          // they belong to the original task instance, not the whole series.
+          repeatMode: mode,
+          repeatGroupId: groupId,
+          repeatStartDate,
+          repeatEndDate: repeatEndDate ?? undefined,
+          startTime: doc.startTime,
+          endTime: doc.endTime,
+          reminder: doc.reminder,
+          ...(doc.bondId ? { bondId: doc.bondId, buddyUserId: doc.buddyUserId } : {}),
+        });
+      }
+    }
+  }
+  await syncGamification(uid, tz);
   await notifyTaskChanged(uid);
-  return NextResponse.json({ ok: true, ids: createdIds, tasks: createdTasks });
+  return { ok: true };
 }
 
 export async function PUT(req: NextRequest) {
@@ -1417,186 +1627,18 @@ export async function PUT(req: NextRequest) {
   // modes as QuickAdd. daily/weekdays expand into linked sibling weekly tasks
   // (a repeat group) so a task can appear on multiple days.
   if (body.setRepeat !== undefined && taskId) {
-    const mode:
-      | 'none'
-      | 'daily'
-      | 'weekdays'
-      | 'weekend'
-      | 'weekly'
-      | 'monthly'
-      | 'custom' =
-      body.setRepeat.mode ?? (body.setRepeat.weekly ? 'weekly' : 'none');
-    const doc = await TaskModel.findOne({
-      userId: uid,
-      id: taskId,
-    }).lean<TaskDoc>();
-    if (!doc)
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
-
-    // Drop any sibling tasks created by a previous daily/weekdays choice.
-    if (doc.repeatGroupId) {
-      await TaskModel.deleteMany({
-        userId: uid,
-        repeatGroupId: doc.repeatGroupId,
-        id: { $ne: taskId },
-      });
-    }
-
-    const repeatEndDate = normalizeRepeatEnd(body.setRepeat.endDate);
-
-    if (mode === 'none') {
-      const targetDate =
-        date ||
-        new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
-      await TaskModel.updateOne(
-        { userId: uid, id: taskId },
-        {
-          $set: { type: 'regular', date: targetDate, completed: false, repeatMode: 'none' },
-          $unset: {
-            dayOfWeek: 1,
-            weekStart: 1,
-            completedDates: 1,
-            repeatGroupId: 1,
-            repeatStartDate: 1,
-            repeatEndDate: 1,
-            repeatDayOfMonth: 1,
-            repeatRule: 1,
-          },
-        },
+    // A shared buddy task's schedule can only change via mutual approval.
+    const owner = await TaskModel.findOne({ userId: uid, id: taskId })
+      .select('bondId')
+      .lean<{ bondId?: string }>();
+    if (owner?.bondId)
+      return NextResponse.json(
+        { error: 'buddy_repeat_needs_approval', bondId: owner.bondId },
+        { status: 409 },
       );
-    } else if (mode === 'monthly') {
-      const repeatStartDate =
-        typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
-          ? date
-          : doc.date || getZonedToday(tz);
-      const set: Record<string, unknown> = {
-        type: 'weekly',
-        repeatMode: 'monthly',
-        repeatStartDate,
-        repeatDayOfMonth: domFromYMD(repeatStartDate),
-      };
-      const unset: Record<string, unknown> = {
-        date: 1,
-        weekStart: 1,
-        completed: 1,
-        dayOfWeek: 1,
-        repeatGroupId: 1,
-        repeatRule: 1,
-      };
-      if (repeatEndDate) set.repeatEndDate = repeatEndDate;
-      else unset.repeatEndDate = 1;
-      await TaskModel.updateOne(
-        { userId: uid, id: taskId },
-        { $set: set, $unset: unset },
-      );
-    } else if (mode === 'custom') {
-      const repeatStartDate =
-        typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
-          ? date
-          : doc.date || getZonedToday(tz);
-      const rule = normalizeRepeatRule(body.setRepeat.rule, repeatStartDate);
-      if (!rule)
-        return NextResponse.json(
-          { error: 'invalid repeatRule' },
-          { status: 400 },
-        );
-      const set: Record<string, unknown> = {
-        type: 'weekly',
-        repeatMode: 'custom',
-        repeatStartDate,
-        repeatRule: rule,
-      };
-      const unset: Record<string, unknown> = {
-        date: 1,
-        weekStart: 1,
-        completed: 1,
-        dayOfWeek: 1,
-        repeatGroupId: 1,
-        repeatDayOfMonth: 1,
-      };
-      if (repeatEndDate) set.repeatEndDate = repeatEndDate;
-      else unset.repeatEndDate = 1;
-      await TaskModel.updateOne(
-        { userId: uid, id: taskId },
-        { $set: set, $unset: unset },
-      );
-    } else {
-      const requested = Number(body.setRepeat.dayOfWeek);
-      const dow = isWeekday(requested) ? requested : new Date().getDay();
-      const isMulti =
-        mode === 'daily' || mode === 'weekdays' || mode === 'weekend';
-      // Weekdays must land on Mon–Fri; weekend on Sat/Sun.
-      const weeklyDay = (
-        mode === 'weekdays' && (dow === 0 || dow === 6)
-          ? 1
-          : mode === 'weekend' && dow !== 0 && dow !== 6
-            ? 6
-            : dow
-      ) as Weekday;
-      const groupId = isMulti ? doc.repeatGroupId || uuid() : undefined;
-      const repeatStartDate =
-        typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)
-          ? date
-          : doc.date || getZonedToday(tz);
-
-      const set: Record<string, unknown> = {
-        type: 'weekly',
-        dayOfWeek: weeklyDay,
-        repeatMode: mode,
-        repeatStartDate,
-      };
-      const unset: Record<string, unknown> = {
-        date: 1,
-        weekStart: 1,
-        completed: 1,
-        repeatDayOfMonth: 1,
-        repeatRule: 1,
-      };
-      if (repeatEndDate) set.repeatEndDate = repeatEndDate;
-      else unset.repeatEndDate = 1;
-      if (isMulti) set.repeatGroupId = groupId;
-      else unset.repeatGroupId = 1;
-      await TaskModel.updateOne(
-        { userId: uid, id: taskId },
-        { $set: set, $unset: unset },
-      );
-
-      if (isMulti) {
-        const allDays =
-          mode === 'daily'
-            ? [0, 1, 2, 3, 4, 5, 6]
-            : mode === 'weekend'
-              ? [0, 6]
-              : [1, 2, 3, 4, 5];
-        const { weekDates } = getRollingWeekDatesZoned(tz);
-        const now = new Date();
-        for (const d of allDays.filter((day) => day !== weeklyDay)) {
-          const order = await nextOrderForDay(uid, d as Weekday, weekDates[d]);
-          await TaskModel.create({
-            userId: uid,
-            type: 'weekly',
-            id: uuid(),
-            text: doc.text,
-            order,
-            dayOfWeek: d as Weekday,
-            createdAt: now,
-            updatedAt: now,
-            tags: doc.tags ?? [],
-            // Notes & checklist are intentionally NOT copied to sibling repeats —
-            // they belong to the original task instance, not the whole series.
-            repeatMode: mode,
-            repeatGroupId: groupId,
-            repeatStartDate,
-            repeatEndDate: repeatEndDate ?? undefined,
-            startTime: doc.startTime,
-            endTime: doc.endTime,
-            reminder: doc.reminder,
-          });
-        }
-      }
-    }
-    await syncGamification(uid, tz);
-    await notifyTaskChanged(uid);
+    const res = await applySetRepeat(uid, taskId, body.setRepeat, date, tz);
+    if (!res.ok)
+      return NextResponse.json({ error: res.error }, { status: res.status });
     return NextResponse.json({ ok: true });
   }
 
@@ -1716,6 +1758,16 @@ export async function PUT(req: NextRequest) {
       tz,
     ));
   }
+  if (doc.bondId) {
+    await handleBuddyCompletion({
+      bondId: doc.bondId,
+      userId: uid,
+      date,
+      completed,
+      ownFlyValue: taskFlyValue(doc),
+      tz,
+    });
+  }
   void syncGamification(uid, tz);
   await notifyTaskChanged(uid, {
     eventKind: completed ? 'task-completed' : 'task-uncompleted',
@@ -1746,7 +1798,7 @@ export async function DELETE(req: NextRequest) {
   if (body.deleteSeries && body.taskId) {
     const doc = await TaskModel.findOne(
       { userId: uid, id: body.taskId },
-      { repeatGroupId: 1, type: 1 },
+      { repeatGroupId: 1, type: 1, bondId: 1 },
     ).lean<TaskDoc>();
     const today = getZonedToday(tz);
     const cutoff = addDaysYMD(today, -1);
@@ -1803,6 +1855,7 @@ export async function DELETE(req: NextRequest) {
       id: { $in: seriesIds },
       date: { $gte: today },
     });
+    if (doc?.bondId) await severBond(doc.bondId, uid);
     await syncGamification(uid, tz);
     await notifyTaskChanged(uid);
     return NextResponse.json({ ok: true });

@@ -56,6 +56,8 @@ export interface TaskDoc {
   endTime?: string; // e.g. "11:30"
   reminder?: string; // e.g. "at_time", "5m", "10m", "15m", "30m", "1h"
   reminderSentKeys?: string[];
+  bondId?: string; // links this task to a shared "buddy" bond (TaskBond)
+  buddyUserId?: string; // the friend this task is shared with
 }
 
 const TaskSchema = new Schema<TaskDoc>(
@@ -140,6 +142,8 @@ const TaskSchema = new Schema<TaskDoc>(
     endTime: { type: String },
     reminder: { type: String },
     reminderSentKeys: { type: [String], default: [] },
+    bondId: { type: String, index: true },
+    buddyUserId: { type: String },
   },
   {
     collection: 'tasks',

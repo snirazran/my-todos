@@ -25,6 +25,8 @@ import { TimePopup } from '@/components/ui/TimePopup';
 import { useNotification } from '@/components/providers/NotificationProvider';
 import { useFrogodoroStore } from '@/lib/frogodoroStore';
 import { patchInventoryFlies } from '@/hooks/useInventory';
+import { useBuddyState } from '@/hooks/useBuddyState';
+import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 import { notifyQuestClaims } from '@/lib/questClaims';
 import { useLeftTongue } from './LeftTongue';
 
@@ -188,6 +190,7 @@ export default React.memo(function TaskList({
   // Planner mutations go straight to the API and refresh via the board event.
   const refresh = () => window.dispatchEvent(new Event('board-refresh'));
   const { showNotification } = useNotification();
+  const buddyState = useBuddyState();
   const { triggerTongue, isBusy } = useLeftTongue();
 
   const groupIdOf = (taskId: string) =>
@@ -316,6 +319,24 @@ export default React.memo(function TaskList({
     endDate?: string | null,
     rule?: RepeatRule | null,
   ) => {
+    // Shared buddy task: a schedule change needs the partner's approval, so
+    // route it through a request instead of applying it directly.
+    const buddy = buddyState[taskId];
+    if (buddy) {
+      fetch(`/api/buddy/${buddy.bondId}/repeat-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          setRepeat: { mode, dayOfWeek, endDate: endDate ?? null, rule: rule ?? null },
+          date: dateKey ?? todayYmdStr(),
+          timezone: tz,
+        }),
+      }).then(() => {
+        mutateFriendsCaches();
+        showNotification('Change requested — waiting for your buddy to approve');
+      });
+      return;
+    }
     onPatchTask?.(taskId, {
       repeatMode: mode,
       type: mode === 'none' ? 'regular' : 'weekly',
@@ -581,6 +602,7 @@ export default React.memo(function TaskList({
             innerRef={(el) => setCardRef(draggableIdFor(day, t.id), el)}
             dragId={draggableIdFor(day, t.id)}
             task={t}
+            occurrenceDate={dateKey ?? todayYmdStr()}
             menuOpen={menu?.id === t.id}
             onToggleMenu={(rect) => {
               setMenu((prev) => {

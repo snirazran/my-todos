@@ -65,6 +65,7 @@ import { EditScopeDialog } from '../board/EditScopeDialog';
 import TagsPopup from '@/components/ui/TagsPopup';
 import { EditTaskDialog } from '@/components/ui/EditTaskDialog';
 import { TimePopup } from '@/components/ui/TimePopup';
+import { BuddyBadge } from '@/components/ui/BuddyBadge';
 import { format } from 'date-fns';
 
 interface Task {
@@ -623,6 +624,10 @@ const SortableTaskItem = React.forwardRef<
                       </span>
                     </span>
                   )}
+                  <BuddyBadge
+                    taskId={task.id}
+                    date={new Intl.DateTimeFormat('en-CA').format(new Date())}
+                  />
                   {task.calendarEventId && (
                     <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
                   )}

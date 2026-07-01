@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Icon } from '@/components/ui/Icon';
 import { TimeTag } from '@/components/ui/TimeTag';
+import { BuddyBadge } from '@/components/ui/BuddyBadge';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Task } from './helpers';
 import Fly from '@/components/ui/fly';
@@ -44,9 +45,12 @@ export default function TaskCard({
   disableDrag = false,
   isPast = false,
   showStreak = false,
+  occurrenceDate,
 }: {
   dragId: string;
   task: Task;
+  /** The occurrence date (YYYY-MM-DD) for this column — used by the buddy badge. */
+  occurrenceDate?: string;
   menuOpen: boolean;
   onToggleMenu: (anchor: DOMRect) => void;
   innerRef?: (el: HTMLDivElement | null) => void;
@@ -387,6 +391,7 @@ export default function TaskCard({
                   </span>
                 </span>
               )}
+              <BuddyBadge taskId={task.id} date={occurrenceDate} />
               {task.calendarEventId && (
                 <CalendarDays className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 flex-shrink-0" />
               )}

@@ -23,6 +23,7 @@ import { AddFriendsSheet } from '@/components/ui/AddFriendsSheet';
 import { InviteFriendsModal } from '@/components/ui/InviteFriendsModal';
 import { FriendRequestsInbox } from '@/components/ui/FriendRequestsInbox';
 import { FriendDetailModal } from '@/components/ui/FriendDetailModal';
+import { BuddyUpFlow } from '@/components/ui/BuddyUpFlow';
 import { contributionFrom, type FriendSummary } from '@/lib/friends/indices';
 import { RewardCard } from '@/components/ui/gift-box/RewardCard';
 import { RotatingRays } from '@/components/ui/gift-box/RotatingRays';
@@ -54,6 +55,15 @@ export default function FriendsPage() {
     fetcher,
     { revalidateOnFocus: false },
   );
+  const { data: buddyInvitesData } = useSWR<{
+    incoming: { bondId: string; withUserId: string }[];
+  }>(user ? '/api/buddy/invite' : null, fetcher, { revalidateOnFocus: false });
+  const buddyInviteByFriend = React.useMemo(() => {
+    const m = new Map<string, number>();
+    for (const inv of buddyInvitesData?.incoming ?? [])
+      m.set(inv.withUserId, (m.get(inv.withUserId) ?? 0) + 1);
+    return m;
+  }, [buddyInvitesData]);
   const { data: requestsData } = useSWR<{ incoming: { id: string }[] }>(
     user ? '/api/friends/request' : null,
     fetcher,
@@ -67,6 +77,7 @@ export default function FriendsPage() {
   const [claimReward, setClaimReward] = useState<number | null>(null);
   const [removeTarget, setRemoveTarget] = useState<FriendSummary | null>(null);
   const [detailTarget, setDetailTarget] = useState<FriendSummary | null>(null);
+  const [buddyTarget, setBuddyTarget] = useState<FriendSummary | null>(null);
 
   const claimable = friendsData?.claimable ?? 0;
 
@@ -100,6 +111,8 @@ export default function FriendsPage() {
   const friends = friendsData?.friends ?? [];
   const hasRealFriends = friends.length > 0;
   const pendingCount = requestsData?.incoming?.length ?? 0;
+  const buddyInviteCount = buddyInvitesData?.incoming?.length ?? 0;
+  const alertsCount = pendingCount + buddyInviteCount;
 
   const sharedFrom = (f: FriendSummary) =>
     f.givesYou ?? contributionFrom(f.fliesToday);
@@ -119,9 +132,9 @@ export default function FriendsPage() {
         className="absolute right-4 top-[calc(env(safe-area-inset-top)+0.75rem)] z-30 flex h-11 w-11 items-center justify-center rounded-full bg-white/90 text-emerald-700 shadow-md ring-1 ring-black/5 backdrop-blur-sm transition-transform active:scale-95"
       >
         <Bell className="h-[22px] w-[22px]" />
-        {pendingCount > 0 && (
+        {alertsCount > 0 && (
           <span className="absolute -right-1 -top-1 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-white bg-rose-500 px-1 text-[10px] font-black text-white">
-            {pendingCount > 9 ? '9+' : pendingCount}
+            {alertsCount > 9 ? '9+' : alertsCount}
           </span>
         )}
       </button>
@@ -201,6 +214,7 @@ export default function FriendsPage() {
                     <LeaderboardRow
                       key={`${entry.userId}-${i}`}
                       entry={entry}
+                      buddyInvites={buddyInviteByFriend.get(entry.userId) ?? 0}
                       onOpen={() => setDetailTarget(entry)}
                     />
                   ))}
@@ -234,6 +248,15 @@ export default function FriendsPage() {
           setDetailTarget(null);
           setRemoveTarget(entry);
         }}
+        onBuddyUp={(entry) => {
+          setDetailTarget(null);
+          setBuddyTarget(entry);
+        }}
+      />
+      <BuddyUpFlow
+        open={!!buddyTarget}
+        friend={buddyTarget}
+        onClose={() => setBuddyTarget(null)}
       />
       <RemoveFriendDialog
         target={removeTarget}
@@ -481,9 +504,11 @@ function FlyClaimRewardOverlay({
 function LeaderboardRow({
   entry,
   onOpen,
+  buddyInvites = 0,
 }: {
   entry: LeaderboardEntry;
   onOpen: () => void;
+  buddyInvites?: number;
 }) {
   const shared = entry.givesYou ?? contributionFrom(entry.fliesToday);
 
@@ -492,8 +517,13 @@ function LeaderboardRow({
       <button
         type="button"
         onClick={onOpen}
-        className="flex w-full items-center gap-2 rounded-xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md active:scale-[0.99] sm:gap-2.5 sm:py-2"
+        className="relative flex w-full items-center gap-2 rounded-xl border border-border/50 bg-card py-1.5 pl-1.5 pr-3 text-left transition-all hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md active:scale-[0.99] sm:gap-2.5 sm:py-2"
       >
+        {buddyInvites > 0 && (
+          <span className="absolute -left-1 -top-1 z-10 flex h-5 min-w-[1.25rem] items-center justify-center rounded-full border-2 border-background bg-rose-500 px-1 text-[10px] font-black text-white">
+            {buddyInvites > 9 ? '9+' : buddyInvites}
+          </span>
+        )}
         <div className="flex h-[78px] w-[96px] shrink-0 items-end justify-center self-center overflow-hidden min-[360px]:h-[102px] min-[360px]:w-[132px] min-[400px]:h-[124px] min-[400px]:w-[164px] sm:h-[124px] sm:w-48 md:h-[144px] md:w-56">
           <Frog
             className="min-[360px]:-translate-y-2 min-[400px]:-translate-y-3.5 md:-translate-y-3"

@@ -3,7 +3,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MoreVertical, X, UserMinus, Gift, Users } from 'lucide-react';
+import { MoreVertical, X, UserMinus, Users, Check, Loader2, Clock } from 'lucide-react';
+import useSWR from 'swr';
 import Frog from '@/components/ui/frog';
 import Fly from '@/components/ui/fly';
 import {
@@ -12,6 +13,18 @@ import {
   type BackgroundImages,
 } from '@/hooks/useBackgrounds';
 import { contributionFrom, type FriendSummary } from '@/lib/friends/indices';
+import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
+
+type BuddyInvite = {
+  bondId: string;
+  direction: 'incoming' | 'outgoing';
+  withUserId: string;
+  withName: string;
+  text: string;
+  repeatLabel: string;
+};
+
+const inviteFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 function BackgroundPicture({ images }: { images: BackgroundImages }) {
   return (
@@ -37,13 +50,48 @@ export function FriendDetailModal({
   entry,
   onClose,
   onRemove,
+  onBuddyUp,
 }: {
   entry: FriendSummary | null;
   onClose: () => void;
   onRemove: (entry: FriendSummary) => void;
+  onBuddyUp: (entry: FriendSummary) => void;
 }) {
   const { data } = useBackgrounds(!!entry);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [busyBond, setBusyBond] = useState<string | null>(null);
+
+  const { data: invitesData, mutate: mutateInvites } = useSWR<{
+    incoming: BuddyInvite[];
+    outgoing: BuddyInvite[];
+  }>(entry ? '/api/buddy/invite' : null, inviteFetcher, {
+    revalidateOnFocus: false,
+  });
+
+  const incoming = (invitesData?.incoming ?? []).filter(
+    (i) => i.withUserId === entry?.userId,
+  );
+  const outgoing = (invitesData?.outgoing ?? []).filter(
+    (i) => i.withUserId === entry?.userId,
+  );
+
+  const respondInvite = async (bondId: string, action: 'accept' | 'decline') => {
+    setBusyBond(bondId);
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res = await fetch(`/api/buddy/${bondId}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ timezone: tz }),
+      });
+      if (res.ok) {
+        await mutateInvites();
+        mutateFriendsCaches();
+      }
+    } finally {
+      setBusyBond(null);
+    }
+  };
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -177,6 +225,69 @@ export function FriendDetailModal({
                   <FlyStat label="Shared total" value={total} />
                 </div>
 
+                {/* Pending buddy invitations with this friend */}
+                {(incoming.length > 0 || outgoing.length > 0) && (
+                  <div className="flex flex-col gap-2">
+                    <p className="px-1 text-[11px] font-black uppercase tracking-[0.14em] text-muted-foreground">
+                      Buddy invitations
+                    </p>
+                    {incoming.map((inv) => (
+                      <div
+                        key={inv.bondId}
+                        className="rounded-[18px] border border-[#4f9149]/30 bg-[#4f9149]/8 p-3"
+                      >
+                        <p className="text-sm font-black text-emerald-950">
+                          {inv.withName} invited you
+                        </p>
+                        <p className="truncate text-[13px] font-semibold text-emerald-800/70">
+                          {inv.text}
+                          {inv.repeatLabel ? ` · ${inv.repeatLabel}` : ''}
+                        </p>
+                        <div className="mt-2.5 flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => respondInvite(inv.bondId, 'accept')}
+                            disabled={busyBond === inv.bondId}
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-[#4f9149] py-2.5 text-sm font-black text-white transition-colors hover:bg-[#457f40] disabled:opacity-60"
+                          >
+                            {busyBond === inv.bondId ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Check className="h-4 w-4" strokeWidth={3} />
+                            )}
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => respondInvite(inv.bondId, 'decline')}
+                            disabled={busyBond === inv.bondId}
+                            className="rounded-xl bg-muted px-4 py-2.5 text-sm font-black text-muted-foreground transition-colors hover:bg-muted/70 disabled:opacity-60"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {outgoing.map((inv) => (
+                      <div
+                        key={inv.bondId}
+                        className="flex items-center gap-2.5 rounded-[18px] border border-border/60 bg-card/60 p-3"
+                      >
+                        <Clock className="h-5 w-5 shrink-0 text-amber-500" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-black text-foreground">
+                            Invitation pending
+                          </p>
+                          <p className="truncate text-[13px] font-semibold text-muted-foreground">
+                            {inv.text}
+                            {inv.repeatLabel ? ` · ${inv.repeatLabel}` : ''}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Buddy-up card */}
                 <div className="rounded-[20px] border border-[#4f9149]/25 bg-[#4f9149]/8 p-4 text-center">
                   <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-2xl bg-[#4f9149]/15 text-[#4f9149]">
@@ -190,20 +301,13 @@ export function FriendDetailModal({
                   </p>
                   <button
                     type="button"
+                    onClick={() => onBuddyUp(entry)}
                     className="mt-3.5 h-12 w-full rounded-2xl bg-[#4f9149] text-base font-black tracking-tight text-white shadow-[0_4px_0_#34631f] transition-all hover:bg-[#457f40] active:translate-y-0.5 active:shadow-none"
                   >
                     Buddy up
                   </button>
                 </div>
 
-                {/* Send gift */}
-                <button
-                  type="button"
-                  className="flex w-full items-center justify-center gap-2 rounded-2xl border border-border bg-card py-3.5 text-base font-black tracking-tight text-foreground transition-transform active:scale-[0.98]"
-                >
-                  <Gift className="h-5 w-5 text-[#4f9149]" />
-                  Send gift
-                </button>
               </div>
             </motion.div>
           </div>
