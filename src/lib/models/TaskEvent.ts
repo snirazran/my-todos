@@ -5,7 +5,8 @@ export type TaskEventKind =
   | 'task-completed'
   | 'task-uncompleted'
   | 'background-equipped'
-  | 'wardrobe-equipped';
+  | 'wardrobe-equipped'
+  | 'friend-updated';
 
 export interface TaskEventDoc {
   _id?: mongoose.Types.ObjectId;
@@ -31,6 +32,7 @@ const TaskEventSchema = new Schema<TaskEventDoc>(
         'task-uncompleted',
         'background-equipped',
         'wardrobe-equipped',
+        'friend-updated',
       ],
       required: true,
     },

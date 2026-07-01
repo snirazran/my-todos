@@ -1,10 +1,18 @@
 import { getAdminMessaging } from '@/lib/firebaseAdmin';
 import UserModel from '@/lib/models/User';
+import FriendshipModel from '@/lib/models/Friendship';
+import connectMongo from '@/lib/mongoose';
 import {
   createTaskEvent,
   type TaskSyncChange,
   type TaskEventMessage,
 } from '@/lib/taskEvents';
+
+const FRIEND_RELEVANT_KINDS = new Set<TaskSyncChange['eventKind']>([
+  'task-completed',
+  'task-uncompleted',
+  'wardrobe-equipped',
+]);
 
 export type { TaskSyncChange } from '@/lib/taskEvents';
 
@@ -104,10 +112,40 @@ export async function sendTaskSyncMessage(
   }
 }
 
+export async function notifyFriendsChanged(actorId: string) {
+  try {
+    await connectMongo();
+    const edges = await FriendshipModel.find({
+      $or: [{ userA: actorId }, { userB: actorId }],
+    })
+      .select('userA userB')
+      .lean();
+    const friendIds = edges.map((e) =>
+      e.userA === actorId ? e.userB : e.userA,
+    );
+    await Promise.all(
+      friendIds.map(async (friendId) => {
+        const event = await createTaskEvent(friendId, {
+          eventKind: 'friend-updated',
+        });
+        void sendTaskSyncMessage(friendId, event);
+      }),
+    );
+  } catch (err) {
+    console.error(
+      'Friend sync fan-out failed:',
+      (err as { message?: string } | null)?.message,
+    );
+  }
+}
+
 export async function notifyUserChanged(userId: string, change?: TaskSyncChange) {
   try {
     const event = await createTaskEvent(userId, change);
     void sendTaskSyncMessage(userId, event);
+    if (change?.eventKind && FRIEND_RELEVANT_KINDS.has(change.eventKind)) {
+      void notifyFriendsChanged(userId);
+    }
     return event;
   } catch (err) {
     console.error(

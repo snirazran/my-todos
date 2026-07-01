@@ -21,7 +21,8 @@ export type TaskSyncEventKind =
   | 'task-completed'
   | 'task-uncompleted'
   | 'background-equipped'
-  | 'wardrobe-equipped';
+  | 'wardrobe-equipped'
+  | 'friend-updated';
 
 export type TaskSyncDetail = {
   reason: TaskSyncReason;

@@ -13,6 +13,7 @@ import {
 } from '@/lib/taskSyncClient';
 import { mutateBackgrounds } from '@/hooks/useBackgrounds';
 import { mutateInventoryCaches } from '@/hooks/useInventory';
+import { mutateFriendsCaches } from '@/hooks/useFriendsSync';
 
 const NATIVE_SYNC_INTERVAL_MS = 10_000;
 const TASK_EVENT_LAST_ID_KEY = 'frogress.taskSyncLastEventId';
@@ -46,7 +47,8 @@ function isTaskSyncEventKind(value: unknown): value is TaskSyncEventKind {
     value === 'task-completed' ||
     value === 'task-uncompleted' ||
     value === 'background-equipped' ||
-    value === 'wardrobe-equipped'
+    value === 'wardrobe-equipped' ||
+    value === 'friend-updated'
   );
 }
 
@@ -93,6 +95,10 @@ function taskDetailFromStream(data: unknown): TaskSyncDetail | null {
 }
 
 function applySyncSideEffects(detail: TaskSyncDetail) {
+  if (detail.eventKind === 'friend-updated') {
+    mutateFriendsCaches();
+    return;
+  }
   if (detail.eventKind === 'background-equipped') {
     mutateBackgrounds();
     mutateInventoryCaches();
